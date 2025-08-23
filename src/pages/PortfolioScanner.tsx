@@ -639,18 +639,7 @@ const PortfolioScanner = () => {
           </CardContent>
         </Card>
 
-        {/* Comprehensive Recommended Next Steps Dashboard */}
-        <Card className="mt-8 shadow-medium">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Target className="h-5 w-5" />
-              Recommended Next Steps Dashboard
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RecommendedNextStepsDashboard />
-          </CardContent>
-        </Card>
+        <RecommendedNextStepsDashboard />
         </section>
       </div>
     </div>
@@ -1064,11 +1053,12 @@ Would you like me to suggest specific modifications to any of the action steps?`
           {/* Modal Content - Almost Full Screen */}
           <div className="relative z-10 w-[95vw] h-[95vh] bg-background border border-border rounded-lg shadow-2xl overflow-hidden flex">
             {/* Main Content Area */}
-            <div className={`${isChatOpen && selectedStep.isCustomizable ? 'w-2/3' : 'w-full'} flex flex-col`}>
+            <div className={`${selectedStep.isCustomizable ? 'w-2/3' : 'w-full'} flex flex-col`}>
               {/* Header */}
               <div className="flex items-center justify-between p-6 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
-                <div>
+                <div className="flex-1">
                   <h2 className="text-2xl font-bold text-foreground">{selectedStep.title}</h2>
+                  <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{selectedStep.description}</p>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge className={`${getPriorityColor(selectedStep.priority)}`}>
                       {selectedStep.priority.toUpperCase()}
@@ -1084,23 +1074,24 @@ Would you like me to suggest specific modifications to any of the action steps?`
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   {selectedStep.isCustomizable && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setIsChatOpen(!isChatOpen)}
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      {isChatOpen ? 'Hide Chat' : 'Customize Task'}
-                    </Button>
+                    <div className="text-right">
+                      <h4 className="font-medium text-sm mb-1">Related Goals:</h4>
+                      <div className="flex flex-wrap gap-1 justify-end">
+                        {selectedStep.relatedGoals.map((goal: string, index: number) => (
+                          <Badge key={index} variant="secondary" className="text-xs">
+                            {goal}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   <Button 
                     variant="ghost" 
                     size="sm"
                     onClick={() => {
                       setIsDetailModalOpen(false);
-                      setIsChatOpen(false);
                       setChatHistory([]);
                     }}
                     className="shrink-0"
@@ -1128,12 +1119,54 @@ Would you like me to suggest specific modifications to any of the action steps?`
                 </div>
               </div>
               
-              {/* Detailed Description */}
+              {/* Detailed Description with Examples */}
               <div>
-                <h3 className="text-lg font-semibold mb-3">Detailed Overview</h3>
+                <h3 className="text-lg font-semibold mb-3">Detailed Overview & Examples</h3>
                 <div className="bg-muted/30 p-4 rounded-lg">
-                  <p className="text-muted-foreground leading-relaxed">{selectedStep.description}</p>
-                  <div className="mt-4 p-3 bg-background border border-border rounded">
+                  <p className="text-muted-foreground leading-relaxed mb-4">{selectedStep.description}</p>
+                  
+                  {/* Example Projects/Implementations */}
+                  <div className="mt-4 space-y-3">
+                    <h4 className="font-medium text-foreground">Example Implementations:</h4>
+                    {selectedStep.category === 'community' && (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-background border border-border rounded-lg">
+                          <p className="text-sm font-medium text-foreground">Cultural Bridge Initiative</p>
+                          <p className="text-xs text-muted-foreground">Created a peer tutoring program connecting bilingual students with newcomer immigrants, resulting in 85% academic improvement and featured in local news.</p>
+                        </div>
+                        <div className="p-3 bg-background border border-border rounded-lg">
+                          <p className="text-sm font-medium text-foreground">Community Garden Translation Project</p>
+                          <p className="text-xs text-muted-foreground">Developed multilingual guides for local community garden, increasing participation by 40% among non-English speaking families.</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedStep.category === 'leadership' && (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-background border border-border rounded-lg">
+                          <p className="text-sm font-medium text-foreground">Student Government President</p>
+                          <p className="text-xs text-muted-foreground">Led initiative that reduced lunch wait times by 35% and implemented mental health resources, affecting 800+ students daily.</p>
+                        </div>
+                        <div className="p-3 bg-background border border-border rounded-lg">
+                          <p className="text-sm font-medium text-foreground">Peer Mentorship Coordinator</p>
+                          <p className="text-xs text-muted-foreground">Established program pairing upperclassmen with freshmen, achieving 92% retention rate and recognition from district administration.</p>
+                        </div>
+                      </div>
+                    )}
+                    {selectedStep.category === 'readiness' && (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-background border border-border rounded-lg">
+                          <p className="text-sm font-medium text-foreground">Pre-Med Research Plan</p>
+                          <p className="text-xs text-muted-foreground">Detailed 5-year pathway including volunteering at local clinic, shadowing physicians, and research opportunities at nearby university.</p>
+                        </div>
+                        <div className="p-3 bg-background border border-border rounded-lg">
+                          <p className="text-sm font-medium text-foreground">Business Leadership Track</p>
+                          <p className="text-xs text-muted-foreground">Entrepreneurship program combining internship at family business with formal business mentorship and eventual startup launch.</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="mt-4 p-3 bg-background border border-border rounded-lg">
                     <p className="text-sm font-medium text-foreground">
                       Why This Matters: This action directly addresses key portfolio gaps and leverages your existing strengths to create maximum impact. 
                       The strategic timing aligns with application deadlines and scholarship opportunities, making this a high-ROI investment of your time.
@@ -1147,7 +1180,7 @@ Would you like me to suggest specific modifications to any of the action steps?`
                 <h3 className="text-lg font-semibold mb-3">Complete Action Plan</h3>
                 <div className="space-y-3">
                   {selectedStep.steps.map((step: string, index: number) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-muted/20 rounded border">
+                    <div key={index} className="flex items-start gap-3 p-4 bg-muted/20 rounded-lg border">
                       <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center font-semibold shrink-0 mt-1">
                         {index + 1}
                       </div>
@@ -1163,61 +1196,81 @@ Would you like me to suggest specific modifications to any of the action steps?`
                 </div>
               </div>
               
-              {/* Success Metrics & Tracking */}
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Success Metrics</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between p-2 bg-muted/20 rounded">
-                      <span className="text-sm">Portfolio Score Increase</span>
-                      <span className="font-medium">{selectedStep.potentialImpact}</span>
+              {/* Comprehensive Tracking & Resources */}
+              <div className="space-y-6">
+                {/* Success Metrics Section */}
+                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                  <h3 className="text-lg font-semibold mb-3 text-green-800">Success Metrics & KPIs</h3>
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
+                      <span className="text-sm font-medium text-green-700">Portfolio Score Increase</span>
+                      <span className="font-bold text-green-800">{selectedStep.potentialImpact}</span>
                     </div>
-                    <div className="flex justify-between p-2 bg-muted/20 rounded">
-                      <span className="text-sm">New Opportunities Unlocked</span>
-                      <span className="font-medium">3-7 scholarships/programs</span>
+                    <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
+                      <span className="text-sm font-medium text-green-700">New Opportunities</span>
+                      <span className="font-bold text-green-800">3-7 programs</span>
                     </div>
-                    <div className="flex justify-between p-2 bg-muted/20 rounded">
-                      <span className="text-sm">Application Readiness</span>
-                      <span className="font-medium">+25% completion</span>
+                    <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
+                      <span className="text-sm font-medium text-green-700">Application Readiness</span>
+                      <span className="font-bold text-green-800">+25% completion</span>
                     </div>
                   </div>
                 </div>
                 
-                <div>
-                  <h3 className="text-lg font-semibold mb-3">Progress Tracking</h3>
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <p>✓ Daily check-ins via Smart Journal integration</p>
-                    <p>✓ Weekly progress reviews in Calendar Intelligence</p>
-                    <p>✓ Milestone celebrations and course corrections</p>
-                    <p>✓ Impact measurement after 2 weeks</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Resources & Support */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Resources & Support</h3>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <h4 className="font-medium mb-2">Required Resources:</h4>
-                    <div className="space-y-1">
-                      {selectedStep.requiredResources.map((resource: string, index: number) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                          <div className="w-2 h-2 bg-primary rounded-full" />
-                          {resource}
-                        </div>
-                      ))}
+                {/* Progress Tracking Section */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h3 className="text-lg font-semibold mb-3 text-blue-800">Progress Tracking System</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-blue-700">Daily Checkpoints</h4>
+                      <div className="space-y-1 text-sm text-blue-600">
+                        <p>✓ Smart Journal reflection entries</p>
+                        <p>✓ Progress photos and documentation</p>
+                        <p>✓ Quick win celebrations</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-blue-700">Weekly Reviews</h4>
+                      <div className="space-y-1 text-sm text-blue-600">
+                        <p>✓ Calendar Intelligence analysis</p>
+                        <p>✓ Milestone achievement assessment</p>
+                        <p>✓ Course corrections and adjustments</p>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div>
-                    <h4 className="font-medium mb-2">Related Goals:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedStep.relatedGoals.map((goal: string, index: number) => (
-                        <Badge key={index} variant="secondary" className="text-xs">
-                          {goal}
-                        </Badge>
-                      ))}
+                </div>
+                
+                {/* Resources & Support Section */}
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <h3 className="text-lg font-semibold mb-3 text-purple-800">Required Resources & Support</h3>
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="font-medium mb-2 text-purple-700">Essential Resources:</h4>
+                      <div className="space-y-2">
+                        {selectedStep.requiredResources.map((resource: string, index: number) => (
+                          <div key={index} className="flex items-center gap-2 text-sm text-purple-600">
+                            <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                            {resource}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2 text-purple-700">Support Network:</h4>
+                      <div className="space-y-2 text-sm text-purple-600">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                          Uplift AI mentor guidance
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                          Community peer support
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                          Expert advisor access
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1244,8 +1297,8 @@ Would you like me to suggest specific modifications to any of the action steps?`
               </div>
             </div>
 
-            {/* Chat Sidebar */}
-            {isChatOpen && selectedStep.isCustomizable && (
+            {/* Chat Sidebar - Always Open for Customizable Tasks */}
+            {selectedStep.isCustomizable && (
               <div className="w-1/3 border-l border-border bg-muted/20 flex flex-col">
                 <div className="p-4 border-b border-border bg-primary/5">
                   <h3 className="font-semibold text-foreground flex items-center gap-2">
