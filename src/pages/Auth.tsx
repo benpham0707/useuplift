@@ -21,7 +21,7 @@ const Auth = () => {
 
   useEffect(() => {
     if (user) {
-      navigate('/');
+      navigate('/portfolio-scanner');
     }
   }, [user, navigate]);
 
@@ -51,6 +51,8 @@ const Auth = () => {
     
     if (error) {
       setError(error.message);
+    } else {
+      navigate('/portfolio-scanner');
     }
     setLoading(false);
   };

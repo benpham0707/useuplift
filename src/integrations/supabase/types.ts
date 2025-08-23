@@ -536,6 +536,7 @@ export type Database = {
           goals: Json
           hidden_strengths: string[]
           id: string
+          has_completed_assessment?: boolean | null
           last_enrichment_date: string | null
           narrative_summary: string | null
           search_vector: unknown | null
@@ -557,6 +558,7 @@ export type Database = {
           goals?: Json
           hidden_strengths?: string[]
           id?: string
+          has_completed_assessment?: boolean | null
           last_enrichment_date?: string | null
           narrative_summary?: string | null
           search_vector?: unknown | null
@@ -578,6 +580,7 @@ export type Database = {
           goals?: Json
           hidden_strengths?: string[]
           id?: string
+          has_completed_assessment?: boolean | null
           last_enrichment_date?: string | null
           narrative_summary?: string | null
           search_vector?: unknown | null

@@ -15,8 +15,14 @@ import {
 } from 'lucide-react';
 import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import AssessmentDashboard from '@/components/portfolio/AssessmentDashboard';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 const PortfolioScanner = () => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const [initializing, setInitializing] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
   
@@ -39,15 +45,53 @@ const PortfolioScanner = () => {
      rubricScores.futureReadiness.score) / 6 * 10
   ) / 10;
 
-  // Check for existing progress on load
+  // Guard route and load profile state from Supabase
   useEffect(() => {
-    const savedProgress = localStorage.getItem('uplift_portfolio_progress');
-    if (savedProgress) {
-      const progress = JSON.parse(savedProgress);
-      setHasCompletedOnboarding(progress.onboarding_complete);
-      setOverallProgress(progress.overall_progress || 0);
+    if (loading) return;
+    if (!user) {
+      navigate('/auth');
+      return;
     }
-  }, []);
+
+    const loadProfile = async () => {
+      // Fetch profile by user_id
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, has_completed_assessment')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load profile', error);
+      }
+
+      if (!data) {
+        // Create profile if missing
+        const { data: created, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            user_id: user.id,
+            user_context: 'high_school_11th',
+            has_completed_assessment: false,
+          })
+          .select('id, has_completed_assessment')
+          .single();
+        if (insertError) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to create profile', insertError);
+          setInitializing(false);
+          return;
+        }
+        setHasCompletedOnboarding(Boolean(created?.has_completed_assessment));
+      } else {
+        setHasCompletedOnboarding(Boolean(data.has_completed_assessment));
+      }
+      setInitializing(false);
+    };
+
+    loadProfile();
+  }, [user, loading, navigate]);
 
   const completionLevels = [
     { level: 'Bronze', min: 20, color: 'bg-amber-600', description: 'Foundation Set' },
@@ -59,11 +103,26 @@ const PortfolioScanner = () => {
   const currentLevel = completionLevels.find(level => overallProgress >= level.min) || 
                       { level: 'Getting Started', color: 'bg-muted', description: 'Begin Your Journey' };
 
+  if (initializing) {
+    return (
+      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
+        <div className="text-muted-foreground">Loading your profile...</div>
+      </div>
+    );
+  }
+
   if (!hasCompletedOnboarding) {
     return (
       <div className="min-h-screen bg-gradient-subtle">
         <div className="max-w-4xl mx-auto px-4 py-8">
-          <OnboardingFlow onComplete={() => setHasCompletedOnboarding(true)} />
+          <OnboardingFlow onComplete={async () => {
+            if (!user) return;
+            await supabase
+              .from('profiles')
+              .update({ has_completed_assessment: true })
+              .eq('user_id', user.id);
+            setHasCompletedOnboarding(true);
+          }} />
         </div>
       </div>
     );
