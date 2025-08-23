@@ -45,6 +45,75 @@ const PortfolioScanner = () => {
      rubricScores.futureReadiness.score) / 6 * 10
   ) / 10;
 
+  // Function to get score styling based on value
+  const getScoreStyles = (score: number) => {
+    if (score >= 9.8) {
+      // Special effects for near-perfect scores
+      return {
+        backgroundColor: 'linear-gradient(135deg, hsl(220, 100%, 50%), hsl(240, 100%, 70%))',
+        color: 'white',
+        textShadow: '0 0 10px rgba(59, 130, 246, 0.8)',
+        boxShadow: '0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4)',
+        border: '2px solid hsl(220, 100%, 60%)',
+        animation: 'pulse 2s infinite'
+      };
+    } else if (score >= 9.0) {
+      // Glowing blue for 9-9.8
+      const intensity = (score - 9) / 0.8; // 0 to 1
+      const hue = 220 + (intensity * 20); // 220 to 240
+      const saturation = 90 + (intensity * 10); // 90% to 100%
+      const lightness = 50 + (intensity * 10); // 50% to 60%
+      return {
+        backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        color: 'white',
+        textShadow: `0 0 8px rgba(59, 130, 246, ${0.4 + intensity * 0.4})`,
+        boxShadow: `0 0 15px rgba(59, 130, 246, ${0.3 + intensity * 0.3})`,
+        border: `2px solid hsl(${hue}, ${saturation}%, ${lightness + 10}%)`
+      };
+    } else if (score >= 7.0) {
+      // Green transitioning to blue for 7-9
+      const progress = (score - 7) / 2; // 0 to 1
+      const hue = 120 - (progress * 100); // 120 (green) to 220 (blue)
+      const saturation = 60 + (progress * 30); // 60% to 90%
+      const lightness = 40 + (progress * 20); // Light green to deeper
+      return {
+        backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        color: 'white',
+        textShadow: progress > 0.5 ? `0 0 4px rgba(59, 130, 246, ${progress * 0.3})` : 'none',
+        boxShadow: progress > 0.5 ? `0 0 8px rgba(59, 130, 246, ${progress * 0.2})` : 'none'
+      };
+    } else if (score >= 5.0) {
+      // Yellow transitioning from orange for 5-7
+      const progress = (score - 5) / 2; // 0 to 1
+      const hue = 45 + (progress * 15); // 45 (orange-yellow) to 60 (yellow)
+      const saturation = 85 + (progress * 10); // 85% to 95%
+      const lightness = 50 + (progress * 5); // 50% to 55%
+      return {
+        backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        color: 'white'
+      };
+    } else if (score >= 3.0) {
+      // Orange transitioning from red for 3-5
+      const progress = (score - 3) / 2; // 0 to 1
+      const hue = 0 + (progress * 25); // 0 (red) to 25 (orange)
+      const saturation = 85 + (progress * 10); // 85% to 95%
+      const lightness = 45 + (progress * 10); // 45% to 55%
+      return {
+        backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
+        color: 'white'
+      };
+    } else {
+      // Red for 0-3
+      const progress = score / 3; // 0 to 1
+      const saturation = 80 + (progress * 15); // 80% to 95%
+      const lightness = 35 + (progress * 15); // 35% to 50%
+      return {
+        backgroundColor: `hsl(0, ${saturation}%, ${lightness}%)`,
+        color: 'white'
+      };
+    }
+  };
+
   // Guard route and load profile state from Supabase
   useEffect(() => {
     if (loading) return;
@@ -140,29 +209,47 @@ const PortfolioScanner = () => {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 max-w-4xl mx-auto">
-            <div className="bg-white/10 rounded-lg p-3">
+            <div 
+              className="rounded-lg p-3 transition-all duration-300"
+              style={getScoreStyles(rubricScores.academicExcellence.score)}
+            >
               <div className="text-lg font-semibold">{rubricScores.academicExcellence.score}</div>
-              <div className="text-xs opacity-75">Academic</div>
+              <div className="text-xs opacity-90">Academic</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div 
+              className="rounded-lg p-3 transition-all duration-300"
+              style={getScoreStyles(rubricScores.leadershipPotential.score)}
+            >
               <div className="text-lg font-semibold">{rubricScores.leadershipPotential.score}</div>
-              <div className="text-xs opacity-75">Leadership</div>
+              <div className="text-xs opacity-90">Leadership</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div 
+              className="rounded-lg p-3 transition-all duration-300"
+              style={getScoreStyles(rubricScores.personalGrowth.score)}
+            >
               <div className="text-lg font-semibold">{rubricScores.personalGrowth.score}</div>
-              <div className="text-xs opacity-75">Growth</div>
+              <div className="text-xs opacity-90">Growth</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div 
+              className="rounded-lg p-3 transition-all duration-300"
+              style={getScoreStyles(rubricScores.communityImpact.score)}
+            >
               <div className="text-lg font-semibold">{rubricScores.communityImpact.score}</div>
-              <div className="text-xs opacity-75">Community</div>
+              <div className="text-xs opacity-90">Community</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div 
+              className="rounded-lg p-3 transition-all duration-300"
+              style={getScoreStyles(rubricScores.uniqueValue.score)}
+            >
               <div className="text-lg font-semibold">{rubricScores.uniqueValue.score}</div>
-              <div className="text-xs opacity-75">Uniqueness</div>
+              <div className="text-xs opacity-90">Uniqueness</div>
             </div>
-            <div className="bg-white/10 rounded-lg p-3">
+            <div 
+              className="rounded-lg p-3 transition-all duration-300"
+              style={getScoreStyles(rubricScores.futureReadiness.score)}
+            >
               <div className="text-lg font-semibold">{rubricScores.futureReadiness.score}</div>
-              <div className="text-xs opacity-75">Readiness</div>
+              <div className="text-xs opacity-90">Readiness</div>
             </div>
           </div>
         </div>
@@ -256,23 +343,9 @@ const PortfolioScanner = () => {
         {/* Recent Insights */}
         <Card className="mt-8 shadow-medium">
           <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Lightbulb className="h-5 w-5" />
-                Recent Insights & Cross-Feature Analysis
-              </div>
-              <div className="flex items-center gap-4">
-              <div className="text-right">
-                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                  🔒 Pending Impact (Locked Until Actions Complete)
-                  <div className="flex gap-3 text-xs opacity-50">
-                    <span className="text-muted-foreground font-medium">+0.67 Overall</span>
-                    <span className="text-muted-foreground font-medium">+0.23 Leadership</span>
-                    <span className="text-muted-foreground font-medium">+0.44 Community</span>
-                  </div>
-                </div>
-              </div>
-              </div>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" />
+              Recent Insights & Cross-Feature Analysis
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -538,7 +611,7 @@ const InsightItem = ({ title, description, time, type, impact, pendingGains, rel
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{description}</p>
             </div>
             <div className="text-right ml-4 min-w-[140px]">
-              <div className="text-xs text-muted-foreground mb-2 flex items-center justify-center gap-1 font-medium">
+              <div className="text-xs text-muted-foreground mb-2 flex items-center justify-end gap-1 font-medium">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
                   <path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/>
