@@ -608,7 +608,7 @@ export class ValidationService {
       field: 'userId',
       rules: [
         { type: 'required', message: 'User ID is required' },
-        { type: 'pattern', params: { pattern: '^[a-zA-Z0-9_-]+ }, message: 'Invalid user ID format' }
+        { type: 'pattern', params: { pattern: '^[a-zA-Z0-9_-]+$' }, message: 'Invalid user ID format' }
       ]
     }]);
 
