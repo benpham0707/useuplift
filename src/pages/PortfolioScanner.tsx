@@ -21,7 +21,11 @@ import {
   Send,
   Sparkles,
   X,
-  Maximize2
+  Maximize2,
+  Home,
+  BarChart3,
+  ListTodo,
+  Award
 } from 'lucide-react';
 import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import AssessmentDashboard from '@/components/portfolio/AssessmentDashboard';
@@ -35,7 +39,25 @@ const PortfolioScanner = () => {
   const [initializing, setInitializing] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
+  const [activeSection, setActiveSection] = useState('overview');
   
+  // Navigation items for the portfolio scanner
+  const navigationItems = [
+    { id: 'overview', label: 'Overview', icon: BarChart3 },
+    { id: 'rubric', label: 'Rubric Scores', icon: Award },
+    { id: 'assessment', label: 'Assessment', icon: Target },
+    { id: 'next-steps', label: 'Next Steps', icon: ListTodo },
+    { id: 'actions', label: 'Actions', icon: Zap }
+  ];
+
+  const scrollToSection = (sectionId: string) => {
+    setActiveSection(sectionId);
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   // Mock rubric scores - in real app these would come from API
   const [rubricScores] = useState({
     academicExcellence: { score: 7.2, evidence: ['3.5 GPA while working'], feedback: 'Strong performance given constraints' },
@@ -204,6 +226,75 @@ const PortfolioScanner = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Portfolio Scanner Navigation */}
+      <nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            {/* Logo and Back to Home */}
+            <div className="flex items-center space-x-4">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => navigate('/')}
+                className="flex items-center space-x-2"
+              >
+                <Home className="h-4 w-4" />
+                <span className="hidden sm:inline">Back to Home</span>
+              </Button>
+              <div className="text-xl font-semibold text-primary">
+                Portfolio Scanner
+              </div>
+            </div>
+
+            {/* Navigation Items */}
+            <div className="hidden md:flex items-center space-x-1">
+              {navigationItems.map((item) => (
+                <Button
+                  key={item.id}
+                  variant={activeSection === item.id ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => scrollToSection(item.id)}
+                  className="flex items-center space-x-2"
+                >
+                  <item.icon className="h-4 w-4" />
+                  <span>{item.label}</span>
+                </Button>
+              ))}
+            </div>
+
+            {/* User Info */}
+            <div className="flex items-center space-x-2">
+              {user && (
+                <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span className="hidden sm:inline">{user.email}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Mobile Navigation */}
+          <div className="md:hidden pb-4">
+            <div className="flex flex-wrap gap-2">
+              {navigationItems.map((item) => (
+                <Button
+                  key={item.id}
+                  variant={activeSection === item.id ? "secondary" : "ghost"}
+                  size="sm"
+                  onClick={() => scrollToSection(item.id)}
+                  className="flex items-center space-x-1"
+                >
+                  <item.icon className="h-3 w-3" />
+                  <span className="text-xs">{item.label}</span>
+                </Button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Overview Section */}
+      <section id="overview">
       {/* Dramatic Overall Score Header */}
       <div className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
         <div className="max-w-7xl mx-auto px-4 py-12 text-center">
@@ -315,10 +406,14 @@ const PortfolioScanner = () => {
           </div>
         </div>
       </div>
+      </section>
 
       {/* Main Dashboard */}
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <AssessmentDashboard 
+      <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+        
+        {/* Assessment Section */}
+        <section id="assessment">
+        <AssessmentDashboard
           onProgressUpdate={setOverallProgress}
           currentProgress={overallProgress}
         />
@@ -491,6 +586,7 @@ const PortfolioScanner = () => {
             <RecommendedNextStepsDashboard />
           </CardContent>
         </Card>
+        </section>
       </div>
     </div>
   );
