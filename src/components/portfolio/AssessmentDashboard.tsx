@@ -15,6 +15,9 @@ import {
   Lock,
   CheckCircle2
 } from 'lucide-react';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import ExperiencesWizard from '@/components/portfolio/ExperiencesWizard';
+import PersonalInfoWizard from '@/components/portfolio/PersonalInfoWizard';
 
 interface AssessmentDashboardProps {
   onProgressUpdate: (progress: number) => void;
@@ -22,7 +25,7 @@ interface AssessmentDashboardProps {
 }
 
 const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDashboardProps) => {
-  const [assessmentSections] = useState([
+  const [assessmentSections, setAssessmentSections] = useState([
     {
       id: 'personal',
       title: 'Personal Information',
@@ -85,6 +88,8 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
     }
   ]);
 
+  const [openSection, setOpenSection] = useState<string | null>(null);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
@@ -143,8 +148,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
             key={section.id}
             section={section}
             onOpen={() => {
-              // Handle section opening
-              console.log(`Opening section: ${section.id}`);
+              if (section.unlocked) setOpenSection(section.id);
             }}
           />
         ))}
@@ -178,6 +182,27 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
           </div>
         </CardContent>
       </Card>
+      {/* Wizards */}
+      <Dialog open={openSection === 'experiences'} onOpenChange={(v) => setOpenSection(v ? 'experiences' : null)}>
+        <DialogContent className="max-w-3xl w-full">
+          <ExperiencesWizard
+            onAdded={() => {
+              // Optional: update section status to in-progress if previously not-started
+              setAssessmentSections((prev) => prev.map((s) => s.id === 'experiences' ? { ...s, status: 'in-progress' } : s));
+              if (typeof onProgressUpdate === 'function') {
+                // leave as-is; full dynamic progress can be wired later
+                onProgressUpdate(currentProgress);
+              }
+            }}
+            onClose={() => setOpenSection(null)}
+          />
+        </DialogContent>
+      </Dialog>
+      <Dialog open={openSection === 'personal'} onOpenChange={(v) => setOpenSection(v ? 'personal' : null)}>
+        <DialogContent className="max-w-3xl w-full">
+          <PersonalInfoWizard onComplete={() => setOpenSection(null)} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
