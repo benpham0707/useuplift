@@ -537,25 +537,28 @@ const InsightItem = ({ title, description, time, type, impact, pendingGains, rel
               </div>
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{description}</p>
             </div>
-            <div className="text-right ml-4">
-              <div className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                🔒 Estimated Impact
-              </div>
-              <div className="space-y-1 opacity-50">
-                {Object.entries(pendingGains).map(([key, value]) => (
-                  <div key={key} className={`text-xs font-medium ${
-                    key === 'missedOpportunity' ? 'text-orange-600' : 
-                    value >= 0 ? 'text-muted-foreground' : 'text-red-600'
-                  }`}>
-                    {key === 'missedOpportunity' ? '⚠️ Missed: ' : value >= 0 ? '+' : ''}
-                    {value.toFixed(2)} {key === 'missedOpportunity' ? 'potential' : key}
-                  </div>
-                ))}
+            <div className="text-right ml-4 min-w-[140px]">
+              <div className="bg-muted/50 rounded-md p-2 border border-muted">
+                <div className="text-xs text-muted-foreground mb-2 flex items-center justify-center gap-1 font-medium">
+                  🔒 Estimated Impact
+                </div>
+                <div className="space-y-1">
+                  {Object.entries(pendingGains).map(([key, value]) => (
+                    <div key={key} className={`text-xs font-semibold text-center px-2 py-1 rounded ${
+                      key === 'missedOpportunity' ? 'bg-orange-100 text-orange-700' : 
+                      value >= 0.2 ? 'bg-blue-100 text-blue-700' :
+                      value >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {key === 'missedOpportunity' ? '⚠️ Missed: ' : value >= 0 ? '+' : ''}
+                      {value.toFixed(2)} {key === 'missedOpportunity' ? 'potential' : key}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
           
-          <div className="bg-white/60 rounded-md p-3 border border-white/40">
+          <div className="bg-muted/30 rounded-md p-3 border border-border">
             <h5 className="font-medium text-foreground text-sm mb-2">🔗 Feature Connections:</h5>
             <div className="flex flex-wrap gap-2 mb-3">
               {relatedFeatures.map((feature, index) => (
@@ -567,7 +570,7 @@ const InsightItem = ({ title, description, time, type, impact, pendingGains, rel
             <p className="text-xs text-muted-foreground italic">{connections}</p>
           </div>
 
-          <div className="bg-white/60 rounded-md p-3 border border-white/40">
+          <div className="bg-accent/20 rounded-md p-3 border border-accent/40">
             <h5 className="font-medium text-foreground text-sm mb-2">⚡ Recommended Actions:</h5>
             <div className="space-y-2">
               {actionItems.map((item, index) => (
