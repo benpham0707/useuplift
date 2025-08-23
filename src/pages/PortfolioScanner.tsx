@@ -52,17 +52,16 @@ const PortfolioScanner = () => {
   // Function to get score styling based on value
   const getScoreStyles = (score: number) => {
     if (score >= 9.8) {
-      // Special effects for near-perfect scores - background AND text effects
+      // Special effects for near-perfect scores - background AND text effects, fully opaque
       return {
         boxStyle: {
           background: 'linear-gradient(135deg, hsl(220, 100%, 50%), hsl(240, 100%, 70%))',
-          boxShadow: '0 0 20px rgba(59, 130, 246, 0.6), 0 0 40px rgba(59, 130, 246, 0.4)',
-          border: '2px solid hsl(220, 100%, 60%)',
-          animation: 'pulse 2s infinite'
+          boxShadow: '0 0 25px rgba(59, 130, 246, 1), 0 0 50px rgba(59, 130, 246, 0.8), 0 0 75px rgba(59, 130, 246, 0.6)',
+          border: '2px solid hsl(220, 100%, 60%)'
         },
         textStyle: {
           color: 'white',
-          textShadow: '0 0 10px rgba(255, 255, 255, 0.8)'
+          textShadow: '0 0 15px rgba(255, 255, 255, 1), 0 0 25px rgba(255, 255, 255, 0.8)'
         }
       };
     } else {
@@ -495,6 +494,8 @@ const PortfolioScanner = () => {
 const RecommendedNextStepsDashboard = () => {
   const [selectedFilter, setSelectedFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
+  const [selectedStep, setSelectedStep] = useState<any>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   const categories = [
     { id: 'all', name: 'All Categories', count: 24 },
@@ -771,8 +772,15 @@ const RecommendedNextStepsDashboard = () => {
                     <Clock className="h-4 w-4 mr-2" />
                     Schedule Later
                   </Button>
-                  <Button variant="ghost" size="sm">
-                    View Details
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedStep(step);
+                      setIsDetailModalOpen(true);
+                    }}
+                  >
+                     View Details
                   </Button>
                 </div>
               </div>
@@ -800,6 +808,172 @@ const RecommendedNextStepsDashboard = () => {
           <div className="text-xs text-muted-foreground">Weeks Timeline</div>
         </div>
       </div>
+      
+      {/* Full-Screen Detail Modal */}
+      {isDetailModalOpen && selectedStep && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-background/95 backdrop-blur-sm animate-fade-in"
+            onClick={() => setIsDetailModalOpen(false)}
+          />
+          
+          {/* Modal Content */}
+          <div className="relative z-10 w-full max-w-4xl max-h-[90vh] mx-4 bg-background border border-border rounded-lg shadow-2xl animate-scale-in overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
+              <div>
+                <h2 className="text-2xl font-bold text-foreground">{selectedStep.title}</h2>
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge className={`${getPriorityColor(selectedStep.priority)}`}>
+                    {selectedStep.priority.toUpperCase()}
+                  </Badge>
+                  <Badge variant="outline" className="text-xs">
+                    {selectedStep.category.replace('_', ' ').toUpperCase()}
+                  </Badge>
+                </div>
+              </div>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setIsDetailModalOpen(false)}
+                className="shrink-0"
+              >
+                ✕ Close
+              </Button>
+            </div>
+            
+            {/* Scrollable Content */}
+            <div className="overflow-y-auto max-h-[calc(90vh-120px)] p-6 space-y-6">
+              {/* Impact Metrics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-primary">{selectedStep.potentialImpact}</div>
+                  <div className="text-sm text-muted-foreground">Potential Impact</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">{selectedStep.estimatedTime}</div>
+                  <div className="text-sm text-muted-foreground">Time Investment</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-red-600">{selectedStep.deadline}</div>
+                  <div className="text-sm text-muted-foreground">Deadline</div>
+                </div>
+              </div>
+              
+              {/* Detailed Description */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Detailed Overview</h3>
+                <div className="bg-muted/30 p-4 rounded-lg">
+                  <p className="text-muted-foreground leading-relaxed">{selectedStep.description}</p>
+                  <div className="mt-4 p-3 bg-background border border-border rounded">
+                    <p className="text-sm font-medium text-foreground">
+                      Why This Matters: This action directly addresses key portfolio gaps and leverages your existing strengths to create maximum impact. 
+                      The strategic timing aligns with application deadlines and scholarship opportunities, making this a high-ROI investment of your time.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Comprehensive Action Plan */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Complete Action Plan</h3>
+                <div className="space-y-3">
+                  {selectedStep.steps.map((step: string, index: number) => (
+                    <div key={index} className="flex items-start gap-3 p-3 bg-muted/20 rounded border">
+                      <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center font-semibold shrink-0 mt-1">
+                        {index + 1}
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-foreground font-medium">{step}</p>
+                        <div className="text-sm text-muted-foreground">
+                          <strong>Estimated Time:</strong> {Math.ceil((index + 1) * 30)} minutes • 
+                          <strong className="ml-2">Resources:</strong> {selectedStep.requiredResources.slice(0, 2).join(', ')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Success Metrics & Tracking */}
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Success Metrics</h3>
+                  <div className="space-y-2">
+                    <div className="flex justify-between p-2 bg-muted/20 rounded">
+                      <span className="text-sm">Portfolio Score Increase</span>
+                      <span className="font-medium">{selectedStep.potentialImpact}</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-muted/20 rounded">
+                      <span className="text-sm">New Opportunities Unlocked</span>
+                      <span className="font-medium">3-7 scholarships/programs</span>
+                    </div>
+                    <div className="flex justify-between p-2 bg-muted/20 rounded">
+                      <span className="text-sm">Application Readiness</span>
+                      <span className="font-medium">+25% completion</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="text-lg font-semibold mb-3">Progress Tracking</h3>
+                  <div className="space-y-2 text-sm text-muted-foreground">
+                    <p>✓ Daily check-ins via Smart Journal integration</p>
+                    <p>✓ Weekly progress reviews in Calendar Intelligence</p>
+                    <p>✓ Milestone celebrations and course corrections</p>
+                    <p>✓ Impact measurement after 2 weeks</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Resources & Support */}
+              <div>
+                <h3 className="text-lg font-semibold mb-3">Resources & Support</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2">Required Resources:</h4>
+                    <div className="space-y-1">
+                      {selectedStep.requiredResources.map((resource: string, index: number) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <div className="w-2 h-2 bg-primary rounded-full" />
+                          {resource}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium mb-2">Related Goals:</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedStep.relatedGoals.map((goal: string, index: number) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {goal}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer Actions */}
+            <div className="flex items-center justify-between p-6 border-t border-border bg-muted/20">
+              <div className="text-sm text-muted-foreground">
+                Ready to transform your portfolio? Start this action today.
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>
+                  Save for Later
+                </Button>
+                <Button className="bg-primary hover:bg-primary/90">
+                  Start This Action Now
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
