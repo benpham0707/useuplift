@@ -1058,10 +1058,9 @@ Would you like me to suggest specific modifications to any of the action steps?`
             {/* Main Content Area */}
             <div className={`${selectedStep.isCustomizable ? 'w-2/3' : 'w-full'} flex flex-col`}>
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
+              <div className="flex items-center justify-between p-4 border-b border-border bg-primary/5">
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold text-foreground">{selectedStep.title}</h2>
-                  <p className="text-sm text-muted-foreground mt-2 max-w-2xl">{selectedStep.description}</p>
+                  <h2 className="text-xl font-bold text-foreground">{selectedStep.title}</h2>
                   <div className="flex items-center gap-2 mt-2">
                     <Badge className={`${getPriorityColor(selectedStep.priority)}`}>
                       {selectedStep.priority.toUpperCase()}
@@ -1102,6 +1101,11 @@ Would you like me to suggest specific modifications to any of the action steps?`
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
+              </div>
+              
+              {/* Description Section - Moved outside header */}
+              <div className="p-4 bg-muted/10 border-b border-border">
+                <p className="text-sm text-muted-foreground max-w-4xl">{selectedStep.description}</p>
               </div>
               
               {/* Scrollable Content */}
@@ -1281,7 +1285,7 @@ Would you like me to suggest specific modifications to any of the action steps?`
               </div>
               
               {/* Footer Actions */}
-              <div className="flex items-center justify-between p-6 border-t border-border bg-muted/20">
+              <div className="flex items-center justify-between p-4 border-t border-border bg-muted/20">
                 <div className="text-sm text-muted-foreground">
                   Ready to transform your portfolio? Start this action today.
                 </div>
@@ -1308,7 +1312,11 @@ Would you like me to suggest specific modifications to any of the action steps?`
                     <MessageSquare className="h-5 w-5" />
                     Personalize Your Task
                   </h3>
-                  <p className="text-sm text-muted-foreground mt-1">
+                </div>
+                
+                {/* Description Section - Aligned with left side */}
+                <div className="p-4 bg-muted/10 border-b border-border">
+                  <p className="text-sm text-muted-foreground">
                     Chat with AI to customize this action plan to your specific interests and goals.
                   </p>
                 </div>

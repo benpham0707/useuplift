@@ -15,10 +15,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
       .from("profiles").select("id").eq("user_id", userId).single();
     if (profileError || !profile) throw profileError || new Error("Profile not found");
 
-    const expId = randomUUID();
-
-    const { error: insertError } = await supabaseAdmin.from("experiences").insert({
-      id: expId,
+    const { data, error: insertError } = await supabaseAdmin.from("experiences").insert([{
       profile_id: profile.id,
       title: input.title,
       organization: input.organization,
@@ -37,8 +34,10 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
       verification_url: input.verificationUrl || null,
       supervisor_name: input.supervisorName || null,
       can_contact: input.canContact ?? false,
-    });
+    } as any]).select('id').single();
     if (insertError) throw insertError;
+    
+    const expId = data?.id;
 
     if (input.skills?.length) {
       const rows = input.skills.map((skill) => ({
