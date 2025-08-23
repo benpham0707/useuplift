@@ -4,6 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { 
   User, 
   Brain, 
@@ -1103,18 +1104,29 @@ Would you like me to suggest specific modifications to any of the action steps?`
                 </div>
               </div>
               
-              {/* Description Section - Moved outside header */}
-              <div className="p-4 bg-muted/10 border-b border-border">
-                <p className="text-sm text-muted-foreground max-w-4xl">{selectedStep.description}</p>
-              </div>
+              {/* No redundant description - it's already in the detailed overview below */}
               
               {/* Scrollable Content */}
               <div className="overflow-y-auto flex-1 p-6 space-y-6">
-              {/* Impact Metrics */}
+              {/* Impact Metrics with Expandable Success Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-primary">{selectedStep.potentialImpact}</div>
                   <div className="text-sm text-muted-foreground">Potential Impact</div>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-xs mt-1">
+                        <ChevronDown className="h-3 w-3 mr-1" />
+                        Detailed Metrics
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-2 space-y-2 p-3 bg-green-50 rounded-lg border border-green-200">
+                      <div className="text-xs font-medium text-green-700">Portfolio Score Increase: +{selectedStep.potentialImpact}</div>
+                      <div className="text-xs font-medium text-green-700">New Opportunities: 3-7 programs</div>
+                      <div className="text-xs font-medium text-green-700">Application Readiness: +25%</div>
+                      <div className="text-xs font-medium text-green-700">Competitive Advantage: +40%</div>
+                    </CollapsibleContent>
+                  </Collapsible>
                 </div>
                 <div className="text-center">
                   <div className="text-2xl font-bold text-orange-600">{selectedStep.estimatedTime}</div>
@@ -1126,65 +1138,158 @@ Would you like me to suggest specific modifications to any of the action steps?`
                 </div>
               </div>
               
-              {/* Detailed Description with Examples */}
+              {/* Detailed Description with Real Examples */}
               <div>
                 <h3 className="text-lg font-semibold mb-3">Detailed Overview & Examples</h3>
                 <div className="bg-muted/30 p-4 rounded-lg">
                   <p className="text-muted-foreground leading-relaxed mb-4">{selectedStep.description}</p>
                   
-                  {/* Example Projects/Implementations */}
+                  {/* Real Implementation Examples */}
                   <div className="mt-4 space-y-3">
                     <h4 className="font-medium text-foreground">Example Implementations:</h4>
                     {selectedStep.category === 'community' && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-background border border-border rounded-lg">
-                          <p className="text-sm font-medium text-foreground">Cultural Bridge Initiative</p>
-                          <p className="text-xs text-muted-foreground">Created a peer tutoring program connecting bilingual students with newcomer immigrants, resulting in 85% academic improvement and featured in local news.</p>
+                      <div className="space-y-3">
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Cultural Bridge Initiative</p>
+                            <Badge variant="secondary" className="text-xs">Featured in Local News</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Created a peer tutoring program connecting bilingual students with newcomer immigrants, resulting in 85% academic improvement and featured in local news.</p>
+                          <div className="text-xs text-primary">Impact: +4.2 portfolio points • Time: 6 weeks • Participants: 24 students</div>
                         </div>
-                        <div className="p-3 bg-background border border-border rounded-lg">
-                          <p className="text-sm font-medium text-foreground">Community Garden Translation Project</p>
-                          <p className="text-xs text-muted-foreground">Developed multilingual guides for local community garden, increasing participation by 40% among non-English speaking families.</p>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Community Garden Translation Project</p>
+                            <Badge variant="secondary" className="text-xs">40% Participation Increase</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Developed multilingual guides for local community garden, increasing participation by 40% among non-English speaking families.</p>
+                          <div className="text-xs text-primary">Impact: +3.1 portfolio points • Time: 4 weeks • Languages: 5</div>
+                        </div>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Digital Literacy for Seniors</p>
+                            <Badge variant="secondary" className="text-xs">City Partnership</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Launched tech workshops for elderly residents, teaching basic smartphone and internet skills to 150+ seniors across 3 community centers.</p>
+                          <div className="text-xs text-primary">Impact: +5.8 portfolio points • Time: 8 weeks • Graduates: 150+</div>
+                        </div>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Youth Mental Health Advocacy</p>
+                            <Badge variant="secondary" className="text-xs">Policy Change</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Organized student-led mental health awareness campaign that led to school district implementing mandatory mental health days.</p>
+                          <div className="text-xs text-primary">Impact: +6.5 portfolio points • Time: 12 weeks • Students Affected: 3,200</div>
                         </div>
                       </div>
                     )}
                     {selectedStep.category === 'leadership' && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-background border border-border rounded-lg">
-                          <p className="text-sm font-medium text-foreground">Student Government President</p>
-                          <p className="text-xs text-muted-foreground">Led initiative that reduced lunch wait times by 35% and implemented mental health resources, affecting 800+ students daily.</p>
+                      <div className="space-y-3">
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Student Government President</p>
+                            <Badge variant="secondary" className="text-xs">35% Efficiency Gain</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Led initiative that reduced lunch wait times by 35% and implemented mental health resources, affecting 800+ students daily.</p>
+                          <div className="text-xs text-primary">Impact: +7.2 portfolio points • Time: Full year • Budget Managed: $15,000</div>
                         </div>
-                        <div className="p-3 bg-background border border-border rounded-lg">
-                          <p className="text-sm font-medium text-foreground">Peer Mentorship Coordinator</p>
-                          <p className="text-xs text-muted-foreground">Established program pairing upperclassmen with freshmen, achieving 92% retention rate and recognition from district administration.</p>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Peer Mentorship Coordinator</p>
+                            <Badge variant="secondary" className="text-xs">92% Retention Rate</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Established program pairing upperclassmen with freshmen, achieving 92% retention rate and recognition from district administration.</p>
+                          <div className="text-xs text-primary">Impact: +5.9 portfolio points • Time: 6 months • Mentees: 48</div>
+                        </div>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Environmental Action Team Leader</p>
+                            <Badge variant="secondary" className="text-xs">50% Waste Reduction</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Spearheaded campus sustainability initiative reducing school waste by 50% and saving $8,000 annually in disposal costs.</p>
+                          <div className="text-xs text-primary">Impact: +6.1 portfolio points • Time: 8 months • Cost Savings: $8,000</div>
                         </div>
                       </div>
                     )}
                     {selectedStep.category === 'readiness' && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-background border border-border rounded-lg">
-                          <p className="text-sm font-medium text-foreground">Pre-Med Research Plan</p>
-                          <p className="text-xs text-muted-foreground">Detailed 5-year pathway including volunteering at local clinic, shadowing physicians, and research opportunities at nearby university.</p>
+                      <div className="space-y-3">
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Pre-Med Research Pathway</p>
+                            <Badge variant="secondary" className="text-xs">Research Publication</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Detailed 5-year pathway including volunteering at local clinic, shadowing physicians, and research opportunities at nearby university resulting in co-authored paper.</p>
+                          <div className="text-xs text-primary">Impact: +8.4 portfolio points • Time: 18 months • Publications: 1</div>
                         </div>
-                        <div className="p-3 bg-background border border-border rounded-lg">
-                          <p className="text-sm font-medium text-foreground">Business Leadership Track</p>
-                          <p className="text-xs text-muted-foreground">Entrepreneurship program combining internship at family business with formal business mentorship and eventual startup launch.</p>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Business Leadership Track</p>
+                            <Badge variant="secondary" className="text-xs">$25K Revenue Generated</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Entrepreneurship program combining internship at family business with formal business mentorship and eventual startup launch generating $25,000 in first year.</p>
+                          <div className="text-xs text-primary">Impact: +7.8 portfolio points • Time: 2 years • Revenue: $25,000</div>
+                        </div>
+                        <div className="p-4 bg-background border border-border rounded-lg shadow-sm">
+                          <div className="flex items-start justify-between mb-2">
+                            <p className="text-sm font-semibold text-foreground">Engineering Design Challenge</p>
+                            <Badge variant="secondary" className="text-xs">National Competition</Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mb-2">Developed water purification system for developing communities, winning regional engineering fair and advancing to nationals with patent pending.</p>
+                          <div className="text-xs text-primary">Impact: +9.1 portfolio points • Time: 14 months • Patents: 1 pending</div>
                         </div>
                       </div>
                     )}
                   </div>
-                  
-                  <div className="mt-4 p-3 bg-background border border-border rounded-lg">
-                    <p className="text-sm font-medium text-foreground">
-                      Why This Matters: This action directly addresses key portfolio gaps and leverages your existing strengths to create maximum impact. 
-                      The strategic timing aligns with application deadlines and scholarship opportunities, making this a high-ROI investment of your time.
-                    </p>
-                  </div>
                 </div>
               </div>
               
-              {/* Comprehensive Action Plan */}
+              {/* Comprehensive Action Plan with Expandable Details */}
               <div>
-                <h3 className="text-lg font-semibold mb-3">Complete Action Plan</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-lg font-semibold">Complete Action Plan</h3>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Settings className="h-4 w-4 mr-2" />
+                        Detailed Walkthrough
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <h4 className="font-semibold text-blue-800 mb-3">Step-by-Step Implementation Guide</h4>
+                      <div className="space-y-4">
+                        {selectedStep.steps.map((step: string, index: number) => (
+                          <div key={index} className="bg-white p-4 rounded-lg border border-blue-100">
+                            <div className="flex items-start gap-3">
+                              <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-semibold shrink-0">
+                                {index + 1}
+                              </div>
+                              <div className="space-y-2 flex-1">
+                                <p className="text-foreground font-medium">{step}</p>
+                                <div className="text-sm text-blue-600 bg-blue-50 p-2 rounded">
+                                  <strong>How to do it:</strong> Break this into 3-4 smaller tasks. Start with research phase (2-3 days), then planning (1 week), implementation (2-3 weeks), and evaluation (2-3 days).
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  <strong>Time:</strong> {Math.ceil((index + 1) * 30)} minutes • 
+                                  <strong className="ml-2">Resources:</strong> {selectedStep.requiredResources.slice(0, 2).join(', ')}
+                                </div>
+                                <div className="flex gap-2 mt-2">
+                                  <Button variant="outline" size="sm" className="text-xs">
+                                    <BookOpen className="h-3 w-3 mr-1" />
+                                    Resource Guide
+                                  </Button>
+                                  <Button variant="outline" size="sm" className="text-xs">
+                                    <Users className="h-3 w-3 mr-1" />
+                                    Find Mentors
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
                 <div className="space-y-3">
                   {selectedStep.steps.map((step: string, index: number) => (
                     <div key={index} className="flex items-start gap-3 p-4 bg-muted/20 rounded-lg border">
@@ -1203,80 +1308,35 @@ Would you like me to suggest specific modifications to any of the action steps?`
                 </div>
               </div>
               
-              {/* Comprehensive Tracking & Resources */}
-              <div className="space-y-6">
-                {/* Success Metrics Section */}
-                <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                  <h3 className="text-lg font-semibold mb-3 text-green-800">Success Metrics & KPIs</h3>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
-                      <span className="text-sm font-medium text-green-700">Portfolio Score Increase</span>
-                      <span className="font-bold text-green-800">{selectedStep.potentialImpact}</span>
-                    </div>
-                    <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
-                      <span className="text-sm font-medium text-green-700">New Opportunities</span>
-                      <span className="font-bold text-green-800">3-7 programs</span>
-                    </div>
-                    <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
-                      <span className="text-sm font-medium text-green-700">Application Readiness</span>
-                      <span className="font-bold text-green-800">+25% completion</span>
+              {/* Resources & Support Section - Non-repetitive content only */}
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <h3 className="text-lg font-semibold mb-3 text-purple-800">Required Resources & Support</h3>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <h4 className="font-medium mb-2 text-purple-700">Essential Resources:</h4>
+                    <div className="space-y-2">
+                      {selectedStep.requiredResources.map((resource: string, index: number) => (
+                        <div key={index} className="flex items-center gap-2 text-sm text-purple-600">
+                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                          {resource}
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
-                
-                {/* Progress Tracking Section */}
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <h3 className="text-lg font-semibold mb-3 text-blue-800">Progress Tracking System</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-blue-700">Daily Checkpoints</h4>
-                      <div className="space-y-1 text-sm text-blue-600">
-                        <p>✓ Smart Journal reflection entries</p>
-                        <p>✓ Progress photos and documentation</p>
-                        <p>✓ Quick win celebrations</p>
+                  <div>
+                    <h4 className="font-medium mb-2 text-purple-700">Support Network:</h4>
+                    <div className="space-y-2 text-sm text-purple-600">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                        Uplift AI mentor guidance
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-blue-700">Weekly Reviews</h4>
-                      <div className="space-y-1 text-sm text-blue-600">
-                        <p>✓ Calendar Intelligence analysis</p>
-                        <p>✓ Milestone achievement assessment</p>
-                        <p>✓ Course corrections and adjustments</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                        Community peer support
                       </div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Resources & Support Section */}
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <h3 className="text-lg font-semibold mb-3 text-purple-800">Required Resources & Support</h3>
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-medium mb-2 text-purple-700">Essential Resources:</h4>
-                      <div className="space-y-2">
-                        {selectedStep.requiredResources.map((resource: string, index: number) => (
-                          <div key={index} className="flex items-center gap-2 text-sm text-purple-600">
-                            <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                            {resource}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-medium mb-2 text-purple-700">Support Network:</h4>
-                      <div className="space-y-2 text-sm text-purple-600">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                          Uplift AI mentor guidance
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                          Community peer support
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 bg-purple-500 rounded-full" />
-                          Expert advisor access
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                        Expert advisor access
                       </div>
                     </div>
                   </div>
