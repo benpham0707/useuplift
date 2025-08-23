@@ -25,7 +25,12 @@ import {
   Home,
   BarChart3,
   ListTodo,
-  Award
+  Award,
+  ChevronDown,
+  Calendar,
+  BookOpen,
+  Users,
+  Settings
 } from 'lucide-react';
 import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import AssessmentDashboard from '@/components/portfolio/AssessmentDashboard';
@@ -40,14 +45,14 @@ const PortfolioScanner = () => {
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [overallProgress, setOverallProgress] = useState(0);
   const [activeSection, setActiveSection] = useState('overview');
-  
-  // Navigation items for the portfolio scanner
-  const navigationItems = [
+  const [isPortfolioDropdownOpen, setIsPortfolioDropdownOpen] = useState(false);
+
+  // Navigation items for portfolio scanner dropdown
+  const portfolioNavigationItems = [
     { id: 'overview', label: 'Overview', icon: BarChart3 },
-    { id: 'rubric', label: 'Rubric Scores', icon: Award },
     { id: 'assessment', label: 'Assessment', icon: Target },
-    { id: 'next-steps', label: 'Next Steps', icon: ListTodo },
-    { id: 'actions', label: 'Actions', icon: Zap }
+    { id: 'rubric', label: 'Recent Insights', icon: Award },
+    { id: 'next-steps', label: 'Next Steps', icon: ListTodo }
   ];
 
   const scrollToSection = (sectionId: string) => {
@@ -226,48 +231,102 @@ const PortfolioScanner = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Portfolio Scanner Navigation */}
+      {/* Uplift Platform Navigation */}
       <nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo and Back to Home */}
+            {/* Uplift Logo */}
             <div className="flex items-center space-x-4">
               <Button 
                 variant="ghost" 
-                size="sm"
                 onClick={() => navigate('/')}
-                className="flex items-center space-x-2"
+                className="flex items-center space-x-2 text-xl font-bold text-primary hover:text-primary/80"
               >
-                <Home className="h-4 w-4" />
-                <span className="hidden sm:inline">Back to Home</span>
+                <Home className="h-5 w-5" />
+                <span>Uplift</span>
               </Button>
-              <div className="text-xl font-semibold text-primary">
-                Portfolio Scanner
-              </div>
             </div>
 
-            {/* Navigation Items */}
-            <div className="hidden md:flex items-center space-x-1">
-              {navigationItems.map((item) => (
-                <Button
-                  key={item.id}
-                  variant={activeSection === item.id ? "secondary" : "ghost"}
+            {/* Main Platform Navigation */}
+            <div className="hidden md:flex items-center space-x-6">
+              {/* Platform Overview */}
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                Platform
+              </Button>
+              
+              {/* Features */}
+              <Button variant="ghost" size="sm">
+                Features
+              </Button>
+              
+              {/* Portfolio Scanner Dropdown */}
+              <div className="relative">
+                <Button 
+                  variant={activeSection ? "secondary" : "ghost"}
                   size="sm"
-                  onClick={() => scrollToSection(item.id)}
-                  className="flex items-center space-x-2"
+                  onMouseEnter={() => setIsPortfolioDropdownOpen(true)}
+                  onMouseLeave={() => setIsPortfolioDropdownOpen(false)}
+                  className="flex items-center space-x-1"
                 >
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.label}</span>
+                  <span>Portfolio Scanner</span>
+                  <ChevronDown className="h-3 w-3" />
                 </Button>
-              ))}
+                
+                {/* Dropdown Menu */}
+                {isPortfolioDropdownOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 w-48 bg-background border border-border rounded-lg shadow-lg z-[60]"
+                    onMouseEnter={() => setIsPortfolioDropdownOpen(true)}
+                    onMouseLeave={() => setIsPortfolioDropdownOpen(false)}
+                  >
+                    <div className="py-2">
+                      {portfolioNavigationItems.map((item) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            scrollToSection(item.id);
+                            setIsPortfolioDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center space-x-2 ${
+                            activeSection === item.id ? 'bg-muted text-primary font-medium' : 'text-foreground'
+                          }`}
+                        >
+                          <item.icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* AI Tools */}
+              <Button variant="ghost" size="sm">
+                AI Tools
+              </Button>
+              
+              {/* Calendar */}
+              <Button variant="ghost" size="sm">
+                <Calendar className="h-4 w-4 mr-1" />
+                Calendar
+              </Button>
             </div>
 
-            {/* User Info */}
-            <div className="flex items-center space-x-2">
-              {user && (
+            {/* User Info & Auth */}
+            <div className="flex items-center space-x-3">
+              {user ? (
                 <div className="flex items-center space-x-2 text-sm text-muted-foreground">
                   <User className="h-4 w-4" />
                   <span className="hidden sm:inline">{user.email}</span>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
+                    Sign In
+                  </Button>
+                  <Button size="sm" onClick={() => navigate('/auth')}>
+                    Sign Up
+                  </Button>
                 </div>
               )}
             </div>
@@ -276,7 +335,13 @@ const PortfolioScanner = () => {
           {/* Mobile Navigation */}
           <div className="md:hidden pb-4">
             <div className="flex flex-wrap gap-2">
-              {navigationItems.map((item) => (
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                Platform
+              </Button>
+              <Button variant="ghost" size="sm">
+                Features
+              </Button>
+              {portfolioNavigationItems.map((item) => (
                 <Button
                   key={item.id}
                   variant={activeSection === item.id ? "secondary" : "ghost"}
