@@ -1077,19 +1077,25 @@ Would you like me to suggest specific modifications to any of the action steps?`
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  {selectedStep.isCustomizable && (
-                    <div className="text-right">
-                      <h4 className="font-medium text-sm mb-1">Related Goals:</h4>
-                      <div className="flex flex-wrap gap-1 justify-end">
-                        {selectedStep.relatedGoals.map((goal: string, index: number) => (
-                          <Badge key={index} variant="secondary" className="text-xs">
-                            {goal}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+              {/* Enhanced Header with Better Alignment */}
+              <div className="flex items-start justify-between p-6 border-b border-border">
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-foreground mb-2">{selectedStep.title}</h2>
+                  <p className="text-base text-muted-foreground leading-relaxed">
+                    {selectedStep.description}
+                  </p>
+                </div>
+                
+                {/* Related Goals and Close Button */}
+                <div className="ml-6 flex-shrink-0">
+                  <div className="text-sm text-muted-foreground mb-2">Related Goals:</div>
+                  <div className="flex gap-2 flex-wrap max-w-xs mb-3">
+                    {selectedStep.relatedGoals.map((goal: string, index: number) => (
+                      <Badge key={index} variant="secondary" className="text-xs">
+                        {goal}
+                      </Badge>
+                    ))}
+                  </div>
                   <Button 
                     variant="ghost" 
                     size="sm"
@@ -1097,36 +1103,220 @@ Would you like me to suggest specific modifications to any of the action steps?`
                       setIsDetailModalOpen(false);
                       setChatHistory([]);
                     }}
-                    className="shrink-0"
+                    className="text-muted-foreground hover:text-foreground"
                   >
                     <X className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               
-              {/* Scrollable Content */}
-              <div className="overflow-y-auto flex-1 p-6 space-y-6">
-              {/* Impact Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{selectedStep.potentialImpact}</div>
-                  <div className="text-sm text-muted-foreground">Potential Impact</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-600">{selectedStep.estimatedTime}</div>
-                  <div className="text-sm text-muted-foreground">Time Investment</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">{selectedStep.deadline}</div>
-                  <div className="text-sm text-muted-foreground">Deadline</div>
-                </div>
-              </div>
-              
-              {/* Detailed Description with Examples */}
-              <div>
-                <h3 className="text-lg font-semibold mb-3">Detailed Overview & Examples</h3>
-                <div className="bg-muted/30 p-4 rounded-lg">
-                  <p className="text-muted-foreground leading-relaxed mb-4">{selectedStep.description}</p>
+              <div className="flex-1 flex overflow-hidden">
+                {/* Main Content Area */}
+                <div className={`${selectedStep.isCustomizable ? 'w-2/3' : 'w-full'} overflow-y-auto`}>
+                  <div className="p-6 space-y-8">
+                    
+                  {/* Impact Metrics */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/20">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-primary">{selectedStep.potentialImpact}</div>
+                      <div className="text-sm text-muted-foreground">Potential Impact</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">{selectedStep.estimatedTime}</div>
+                      <div className="text-sm text-muted-foreground">Time Investment</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-red-600">{selectedStep.deadline}</div>
+                      <div className="text-sm text-muted-foreground">Deadline</div>
+                    </div>
+                  </div>
+                  
+                  {/* Comprehensive Success Stories & Implementation Guide */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 text-foreground">Real-World Examples & Step-by-Step Implementation</h3>
+                    <div className="space-y-6">
+                      
+                      {/* Success Stories */}
+                      <div className="bg-green-50 p-6 rounded-lg border border-green-200">
+                        <h4 className="font-semibold text-green-800 mb-4 flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5" />
+                          Student Success Stories
+                        </h4>
+                        <div className="space-y-4">
+                          <div className="bg-white p-4 rounded-lg border border-green-100">
+                            <div className="flex items-start gap-3">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
+                              <div>
+                                <p className="font-medium text-green-800 mb-2">Sarah - From Family Coordinator to Student Body President</p>
+                                <p className="text-sm text-green-700 mb-3">
+                                  Started as family meal coordinator for household of 7. Identified inefficiencies, created weekly meal planning system, 
+                                  reduced grocery costs by 30%. Leveraged organizational skills to run for class representative, then student council treasurer, 
+                                  finally student body president. Her platform focused on cafeteria improvements using data-driven approach from family experience.
+                                </p>
+                                <div className="bg-green-100 p-3 rounded text-xs text-green-700">
+                                  <strong>Key Insight:</strong> Translated "helping with family logistics" into "multi-stakeholder project management and resource optimization"
+                                </div>
+                                <div className="mt-2 text-xs text-green-600">
+                                  <strong>Timeline:</strong> 8 months • <strong>Portfolio Impact:</strong> +1.4 points • <strong>College Outcome:</strong> Accepted to 6/8 target schools
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-4 rounded-lg border border-green-100">
+                            <div className="flex items-start gap-3">
+                              <div className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0" />
+                              <div>
+                                <p className="font-medium text-green-800 mb-2">Marcus - Community Outreach Through Cultural Bridge Building</p>
+                                <p className="text-sm text-green-700 mb-3">
+                                  Used bilingual skills from translating for grandparents to create "Cultural Bridge" program at local library. 
+                                  Started with informal homework help, expanded to structured tutoring program serving 40+ immigrant families. 
+                                  Secured $2,000 city funding, recruited 15 volunteer tutors, tracked 85% academic improvement in participants.
+                                </p>
+                                <div className="bg-green-100 p-3 rounded text-xs text-green-700">
+                                  <strong>Key Insight:</strong> Transformed "helping family with translations" into "cross-cultural communication and community program development"
+                                </div>
+                                <div className="mt-2 text-xs text-green-600">
+                                  <strong>Timeline:</strong> 12 months • <strong>Portfolio Impact:</strong> +1.8 points • <strong>Media Coverage:</strong> Featured in 3 local publications
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Step-by-Step Implementation Roadmap */}
+                      <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
+                        <h4 className="font-semibold text-blue-800 mb-4 flex items-center gap-2">
+                          <MapPin className="h-5 w-5" />
+                          Your Personalized Implementation Roadmap
+                        </h4>
+                        <div className="space-y-4">
+                          <div className="bg-white p-5 rounded-lg border border-blue-100">
+                            <div className="flex items-start gap-4">
+                              <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-bold flex-shrink-0">1</div>
+                              <div className="flex-1">
+                                <p className="font-medium text-blue-800 mb-2">Foundation Documentation & Skills Inventory (Week 1-2)</p>
+                                <p className="text-sm text-blue-700 mb-3">
+                                  Create comprehensive documentation of your current family leadership role. Don't just list tasks—quantify your impact, 
+                                  document challenges you've solved, and gather evidence of your leadership effectiveness.
+                                </p>
+                                <div className="bg-blue-100 p-3 rounded mb-3">
+                                  <p className="text-xs text-blue-700 font-medium mb-2">Specific Action Steps:</p>
+                                  <ul className="text-xs text-blue-700 space-y-1">
+                                    <li>• Conduct structured interviews with 3 family members about your leadership impact</li>
+                                    <li>• Create before/after photo documentation of systems you've implemented</li>
+                                    <li>• Calculate quantifiable metrics: time saved, money managed, conflicts resolved, schedules coordinated</li>
+                                    <li>• Write detailed challenge-solution-outcome stories for your top 5 family leadership moments</li>
+                                    <li>• Create a "Family Leadership Portfolio" document with visuals and testimonials</li>
+                                  </ul>
+                                </div>
+                                <div className="text-xs text-blue-600">
+                                  <strong>Success Metric:</strong> Complete portfolio with 3+ quantified achievements • <strong>Time Investment:</strong> 4-6 hours
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-5 rounded-lg border border-blue-100">
+                            <div className="flex items-start gap-4">
+                              <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-bold flex-shrink-0">2</div>
+                              <div className="flex-1">
+                                <p className="font-medium text-blue-800 mb-2">Strategic Opportunity Research & Application (Week 3-4)</p>
+                                <p className="text-sm text-blue-700 mb-3">
+                                  Research formal leadership opportunities that directly connect to your family leadership skills. 
+                                  Focus on positions where you can leverage existing strengths while addressing current portfolio gaps.
+                                </p>
+                                <div className="bg-blue-100 p-3 rounded mb-3">
+                                  <p className="text-xs text-blue-700 font-medium mb-2">Research & Application Process:</p>
+                                  <ul className="text-xs text-blue-700 space-y-1">
+                                    <li>• Identify 5 student government positions that match your organizational skills</li>
+                                    <li>• Research 3 community organizations needing youth coordinators or program assistants</li>
+                                    <li>• Schedule informational interviews with 2 current student leaders in target positions</li>
+                                    <li>• Create "Skills Transfer Matrix" connecting family experience to formal role requirements</li>
+                                    <li>• Draft compelling application essays that reframe family leadership using professional language</li>
+                                    <li>• Prepare 3-minute elevator pitch highlighting your unique leadership background</li>
+                                  </ul>
+                                </div>
+                                <div className="text-xs text-blue-600">
+                                  <strong>Success Metric:</strong> 2+ applications submitted with family leadership emphasis • <strong>Time Investment:</strong> 6-8 hours
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-5 rounded-lg border border-blue-100">
+                            <div className="flex items-start gap-4">
+                              <div className="w-8 h-8 rounded-full bg-blue-600 text-white text-sm flex items-center justify-center font-bold flex-shrink-0">3</div>
+                              <div className="flex-1">
+                                <p className="font-medium text-blue-800 mb-2">Campaign Strategy & Interview Preparation (Week 5-6)</p>
+                                <p className="text-sm text-blue-700 mb-3">
+                                  Develop comprehensive campaign/interview strategy that positions your family leadership as a competitive advantage. 
+                                  Create materials and talking points that translate domestic skills into formal leadership potential.
+                                </p>
+                                <div className="bg-blue-100 p-3 rounded mb-3">
+                                  <p className="text-xs text-blue-700 font-medium mb-2">Campaign & Interview Excellence:</p>
+                                  <ul className="text-xs text-blue-700 space-y-1">
+                                    <li>• Create campaign slogan and materials highlighting "proven leadership through family coordination"</li>
+                                    <li>• Develop 5 specific examples of how family skills transfer to student government challenges</li>
+                                    <li>• Practice interview responses with 3 different mock interviewers (family, teacher, peer)</li>
+                                    <li>• Create visual campaign materials showcasing leadership statistics and family testimonials</li>
+                                    <li>• Prepare detailed policy proposals based on organizational systems you've successfully implemented</li>
+                                    <li>• Record and review practice speeches to refine delivery and messaging</li>
+                                  </ul>
+                                </div>
+                                <div className="text-xs text-blue-600">
+                                  <strong>Success Metric:</strong> Confident campaign launch or interview performance • <strong>Time Investment:</strong> 5-7 hours
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Common Pitfalls & Pro Tips */}
+                      <div className="bg-orange-50 p-6 rounded-lg border border-orange-200">
+                        <h4 className="font-semibold text-orange-800 mb-4 flex items-center gap-2">
+                          <AlertTriangle className="h-5 w-5" />
+                          Common Pitfalls & Expert Solutions
+                        </h4>
+                        <div className="space-y-4">
+                          <div className="bg-white p-4 rounded-lg border border-orange-100">
+                            <p className="font-medium text-orange-800 mb-2">❌ Pitfall #1: Minimizing family leadership as "not real leadership"</p>
+                            <p className="text-sm text-orange-700 mb-3">
+                              <strong>✅ Solution:</strong> Reframe using professional terminology. "Helped siblings with homework" becomes 
+                              "Implemented differentiated learning strategies for multiple individuals with varying academic needs, resulting in 20% grade improvement."
+                            </p>
+                            <div className="bg-orange-100 p-3 rounded text-xs text-orange-700">
+                              <strong>Pro Tip:</strong> Create a "Family-to-Formal" translation guide. For every family responsibility, write the professional equivalent.
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-4 rounded-lg border border-orange-100">
+                            <p className="font-medium text-orange-800 mb-2">❌ Pitfall #2: Applying for positions without connecting existing strengths</p>
+                            <p className="text-sm text-orange-700 mb-3">
+                              <strong>✅ Solution:</strong> Every application should explicitly connect family leadership experience to the new role's requirements. 
+                              Use the STAR method (Situation, Task, Action, Result) with family examples to demonstrate capability.
+                            </p>
+                            <div className="bg-orange-100 p-3 rounded text-xs text-orange-700">
+                              <strong>Pro Tip:</strong> Practice the "bridge phrase": "In my role coordinating my family's [specific area], I developed skills in [relevant skill] which I would apply to [position responsibility]."
+                            </div>
+                          </div>
+                          
+                          <div className="bg-white p-4 rounded-lg border border-orange-100">
+                            <p className="font-medium text-orange-800 mb-2">❌ Pitfall #3: Lack of concrete evidence or measurable outcomes</p>
+                            <p className="text-sm text-orange-700 mb-3">
+                              <strong>✅ Solution:</strong> Always include specific metrics and outcomes. "Improved family organization" is weak. 
+                              "Implemented weekly planning system that reduced morning rush time by 40% and eliminated forgotten assignments" is powerful.
+                            </p>
+                            <div className="bg-orange-100 p-3 rounded text-xs text-orange-700">
+                              <strong>Pro Tip:</strong> If you don't have numbers, create them. Start measuring your current impact for 2 weeks before applications.
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   
                   {/* Example Projects/Implementations */}
                   <div className="mt-4 space-y-3">
@@ -1174,6 +1364,107 @@ Would you like me to suggest specific modifications to any of the action steps?`
                       Why This Matters: This action directly addresses key portfolio gaps and leverages your existing strengths to create maximum impact. 
                       The strategic timing aligns with application deadlines and scholarship opportunities, making this a high-ROI investment of your time.
                     </p>
+                  
+                  {/* Complete Action Plan */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-3">Complete Action Plan</h3>
+                    <div className="space-y-3">
+                      {selectedStep.steps.map((step: string, index: number) => (
+                        <div key={index} className="flex items-start gap-3 p-4 bg-muted/20 rounded-lg border">
+                          <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm flex items-center justify-center font-semibold shrink-0 mt-1">
+                            {index + 1}
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-foreground font-medium">{step}</p>
+                            <div className="text-sm text-muted-foreground">
+                              <strong>Estimated Time:</strong> {Math.ceil((index + 1) * 30)} minutes • 
+                              <strong className="ml-2">Resources:</strong> {selectedStep.requiredResources.slice(0, 2).join(', ')}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Comprehensive Tracking & Resources */}
+                  <div className="space-y-6">
+                    {/* Success Metrics Section */}
+                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                      <h3 className="text-lg font-semibold mb-3 text-green-800">Success Metrics & KPIs</h3>
+                      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
+                          <span className="text-sm font-medium text-green-700">Portfolio Score Increase</span>
+                          <span className="font-bold text-green-800">{selectedStep.potentialImpact}</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
+                          <span className="text-sm font-medium text-green-700">New Opportunities</span>
+                          <span className="font-bold text-green-800">3-7 programs</span>
+                        </div>
+                        <div className="flex justify-between p-3 bg-white rounded-lg border border-green-100">
+                          <span className="text-sm font-medium text-green-700">Application Readiness</span>
+                          <span className="font-bold text-green-800">+25% completion</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Progress Tracking Section */}
+                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <h3 className="text-lg font-semibold mb-3 text-blue-800">Progress Tracking System</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-blue-700">Daily Checkpoints</h4>
+                          <div className="space-y-1 text-sm text-blue-600">
+                            <p>✓ Smart Journal reflection entries</p>
+                            <p>✓ Progress photos and documentation</p>
+                            <p>✓ Quick win celebrations</p>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-blue-700">Weekly Reviews</h4>
+                          <div className="space-y-1 text-sm text-blue-600">
+                            <p>✓ Calendar Intelligence analysis</p>
+                            <p>✓ Milestone achievement assessment</p>
+                            <p>✓ Course corrections and adjustments</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Resources & Support Section */}
+                    <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                      <h3 className="text-lg font-semibold mb-3 text-purple-800">Required Resources & Support</h3>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="font-medium mb-2 text-purple-700">Essential Resources:</h4>
+                          <div className="space-y-2">
+                            {selectedStep.requiredResources.map((resource: string, index: number) => (
+                              <div key={index} className="flex items-center gap-2 text-sm text-purple-600">
+                                <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                                {resource}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="font-medium mb-2 text-purple-700">Support Network:</h4>
+                          <div className="space-y-2 text-sm text-purple-600">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                              Uplift AI mentor guidance
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                              Community peer support
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-purple-500 rounded-full" />
+                              Expert advisor access
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                   </div>
                 </div>
               </div>

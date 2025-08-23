@@ -17,8 +17,7 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
 
     const expId = randomUUID();
 
-    const { error: insertError } = await supabaseAdmin.from("experiences").insert({
-      id: expId,
+    const { data: insertResult, error: insertError } = await supabaseAdmin.from("experiences").insert({
       profile_id: profile.id,
       title: input.title,
       organization: input.organization,
@@ -37,8 +36,9 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
       verification_url: input.verificationUrl || null,
       supervisor_name: input.supervisorName || null,
       can_contact: input.canContact ?? false,
-    });
+    } as any).select('id');
     if (insertError) throw insertError;
+    const actualExpId = insertResult?.[0]?.id || expId;
 
     if (input.skills?.length) {
       const rows = input.skills.map((skill) => ({
