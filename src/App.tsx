@@ -9,6 +9,7 @@ import PortfolioScanner from "./pages/PortfolioScanner";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import PersonalInfo from "./pages/PersonalInfo";
+import CollegeApplication from "./pages/CollegeApplication";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
             <Route path="/personal-info" element={<PersonalInfo />} />
+            <Route path="/college-application" element={<CollegeApplication />} />
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
