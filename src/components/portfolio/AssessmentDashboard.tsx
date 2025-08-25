@@ -270,14 +270,16 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       </Dialog>
 
       <Dialog open={openSection === 'academic'} onOpenChange={(v) => setOpenSection(v ? 'academic' : null)}>
-        <DialogContent className="max-w-7xl w-[95vw] max-h-[90vh] overflow-y-auto">
-          <AcademicJourneyWizard
-            onComplete={() => {
-              setAssessmentSections((prev) => prev.map((s) => s.id === 'academic' ? { ...s, status: 'completed', progress: 100 } : s));
-              setOpenSection(null);
-            }}
-            onCancel={() => setOpenSection(null)}
-          />
+        <DialogContent className="max-w-[98vw] w-full max-h-[95vh] overflow-hidden">
+          <div className="max-h-[85vh] overflow-y-auto pr-2">
+            <AcademicJourneyWizard
+              onComplete={() => {
+                setAssessmentSections((prev) => prev.map((s) => s.id === 'academic' ? { ...s, status: 'completed', progress: 100 } : s));
+                setOpenSection(null);
+              }}
+              onCancel={() => setOpenSection(null)}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 
