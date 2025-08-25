@@ -14,165 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
-      academic_records: {
+      academic_journey: {
         Row: {
-          academic_honors: string[]
-          academic_interests: string[]
-          class_rank: number | null
+          ap_exams: Json | null
+          class_rank: string | null
           class_size: number | null
-          coursework: Json
-          created_at: string
-          current_grade: string
+          college_courses: Json | null
+          course_history: Json | null
+          current_grade: string | null
+          current_school: Json | null
+          english_proficiency: Json | null
+          expected_grad_date: string | null
           gpa: number | null
-          gpa_scale: Database["public"]["Enums"]["gpa_scale"]
+          gpa_scale: string | null
+          gpa_type: string | null
+          ib_exams: Json | null
           id: string
-          planned_courses: Json
+          other_schools: Json | null
           profile_id: string
-          school: Json
-          standardized_tests: Json
-          strong_subjects: string[]
-          struggling_subjects: string[]
-          summer_programs: string[]
-          updated_at: string
-          weighted_gpa: number | null
+          standardized_tests: Json | null
         }
         Insert: {
-          academic_honors?: string[]
-          academic_interests?: string[]
-          class_rank?: number | null
+          ap_exams?: Json | null
+          class_rank?: string | null
           class_size?: number | null
-          coursework?: Json
-          created_at?: string
-          current_grade: string
+          college_courses?: Json | null
+          course_history?: Json | null
+          current_grade?: string | null
+          current_school?: Json | null
+          english_proficiency?: Json | null
+          expected_grad_date?: string | null
           gpa?: number | null
-          gpa_scale?: Database["public"]["Enums"]["gpa_scale"]
+          gpa_scale?: string | null
+          gpa_type?: string | null
+          ib_exams?: Json | null
           id?: string
-          planned_courses?: Json
+          other_schools?: Json | null
           profile_id: string
-          school?: Json
-          standardized_tests?: Json
-          strong_subjects?: string[]
-          struggling_subjects?: string[]
-          summer_programs?: string[]
-          updated_at?: string
-          weighted_gpa?: number | null
+          standardized_tests?: Json | null
         }
         Update: {
-          academic_honors?: string[]
-          academic_interests?: string[]
-          class_rank?: number | null
+          ap_exams?: Json | null
+          class_rank?: string | null
           class_size?: number | null
-          coursework?: Json
-          created_at?: string
-          current_grade?: string
+          college_courses?: Json | null
+          course_history?: Json | null
+          current_grade?: string | null
+          current_school?: Json | null
+          english_proficiency?: Json | null
+          expected_grad_date?: string | null
           gpa?: number | null
-          gpa_scale?: Database["public"]["Enums"]["gpa_scale"]
+          gpa_scale?: string | null
+          gpa_type?: string | null
+          ib_exams?: Json | null
           id?: string
-          planned_courses?: Json
+          other_schools?: Json | null
           profile_id?: string
-          school?: Json
-          standardized_tests?: Json
-          strong_subjects?: string[]
-          struggling_subjects?: string[]
-          summer_programs?: string[]
-          updated_at?: string
-          weighted_gpa?: number | null
+          standardized_tests?: Json | null
         }
         Relationships: [
           {
-            foreignKeyName: "academic_records_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: true
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      achievements: {
-        Row: {
-          character_traits: string[]
-          context: Json
-          created_at: string
-          criteria: string | null
-          date_received: string
-          deleted_at: string | null
-          description: string
-          document_url: string | null
-          enhanced_description: string | null
-          id: string
-          impact: Database["public"]["Enums"]["achievement_impact"]
-          is_underrecognized: boolean
-          metrics: Json
-          organization: string
-          profile_id: string
-          relevance_scores: Json
-          requires_context: boolean
-          scope: Database["public"]["Enums"]["achievement_scope"]
-          search_vector: unknown | null
-          skills_demonstrated: string[]
-          suggested_narratives: string[]
-          title: string
-          type: Database["public"]["Enums"]["achievement_type"]
-          updated_at: string
-          verification_url: string | null
-        }
-        Insert: {
-          character_traits?: string[]
-          context?: Json
-          created_at?: string
-          criteria?: string | null
-          date_received: string
-          deleted_at?: string | null
-          description: string
-          document_url?: string | null
-          enhanced_description?: string | null
-          id?: string
-          impact?: Database["public"]["Enums"]["achievement_impact"]
-          is_underrecognized?: boolean
-          metrics?: Json
-          organization: string
-          profile_id: string
-          relevance_scores?: Json
-          requires_context?: boolean
-          scope: Database["public"]["Enums"]["achievement_scope"]
-          search_vector?: unknown | null
-          skills_demonstrated?: string[]
-          suggested_narratives?: string[]
-          title: string
-          type: Database["public"]["Enums"]["achievement_type"]
-          updated_at?: string
-          verification_url?: string | null
-        }
-        Update: {
-          character_traits?: string[]
-          context?: Json
-          created_at?: string
-          criteria?: string | null
-          date_received?: string
-          deleted_at?: string | null
-          description?: string
-          document_url?: string | null
-          enhanced_description?: string | null
-          id?: string
-          impact?: Database["public"]["Enums"]["achievement_impact"]
-          is_underrecognized?: boolean
-          metrics?: Json
-          organization?: string
-          profile_id?: string
-          relevance_scores?: Json
-          requires_context?: boolean
-          scope?: Database["public"]["Enums"]["achievement_scope"]
-          search_vector?: unknown | null
-          skills_demonstrated?: string[]
-          suggested_narratives?: string[]
-          title?: string
-          type?: Database["public"]["Enums"]["achievement_type"]
-          updated_at?: string
-          verification_url?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "achievements_profile_id_fkey"
+            foreignKeyName: "academic_journey_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -180,40 +82,40 @@ export type Database = {
           },
         ]
       }
-      ai_analysis_cache: {
+      experiences_activities: {
         Row: {
-          analysis_result: Json
-          analysis_type: string
-          confidence_score: number | null
-          created_at: string
-          expires_at: string
+          academic_honors: Json | null
+          extracurriculars: Json | null
+          formal_recognition: Json | null
           id: string
-          model_version: string
+          personal_projects: Json | null
           profile_id: string
+          volunteer_service: Json | null
+          work_experiences: Json | null
         }
         Insert: {
-          analysis_result: Json
-          analysis_type: string
-          confidence_score?: number | null
-          created_at?: string
-          expires_at?: string
+          academic_honors?: Json | null
+          extracurriculars?: Json | null
+          formal_recognition?: Json | null
           id?: string
-          model_version: string
+          personal_projects?: Json | null
           profile_id: string
+          volunteer_service?: Json | null
+          work_experiences?: Json | null
         }
         Update: {
-          analysis_result?: Json
-          analysis_type?: string
-          confidence_score?: number | null
-          created_at?: string
-          expires_at?: string
+          academic_honors?: Json | null
+          extracurriculars?: Json | null
+          formal_recognition?: Json | null
           id?: string
-          model_version?: string
+          personal_projects?: Json | null
           profile_id?: string
+          volunteer_service?: Json | null
+          work_experiences?: Json | null
         }
         Relationships: [
           {
-            foreignKeyName: "ai_analysis_cache_profile_id_fkey"
+            foreignKeyName: "experiences_activities_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -221,55 +123,28 @@ export type Database = {
           },
         ]
       }
-      assessment_sessions: {
+      family_responsibilities: {
         Row: {
-          completed_at: string | null
-          completion_rate: number
-          created_at: string
-          expires_at: string
           id: string
-          insights: Json
-          profile_id: string | null
-          questions_answered: number
-          responses: Json
-          session_type: string
-          started_at: string
-          total_questions: number | null
-          updated_at: string
+          life_circumstances: Json | null
+          profile_id: string
+          responsibilities: Json | null
         }
         Insert: {
-          completed_at?: string | null
-          completion_rate?: number
-          created_at?: string
-          expires_at?: string
           id?: string
-          insights?: Json
-          profile_id?: string | null
-          questions_answered?: number
-          responses?: Json
-          session_type?: string
-          started_at?: string
-          total_questions?: number | null
-          updated_at?: string
+          life_circumstances?: Json | null
+          profile_id: string
+          responsibilities?: Json | null
         }
         Update: {
-          completed_at?: string | null
-          completion_rate?: number
-          created_at?: string
-          expires_at?: string
           id?: string
-          insights?: Json
-          profile_id?: string | null
-          questions_answered?: number
-          responses?: Json
-          session_type?: string
-          started_at?: string
-          total_questions?: number | null
-          updated_at?: string
+          life_circumstances?: Json | null
+          profile_id?: string
+          responsibilities?: Json | null
         }
         Relationships: [
           {
-            foreignKeyName: "assessment_sessions_profile_id_fkey"
+            foreignKeyName: "family_responsibilities_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -277,46 +152,37 @@ export type Database = {
           },
         ]
       }
-      enrichment_sessions: {
+      goals_aspirations: {
         Row: {
-          achievements_unlocked: string[]
-          completion_rate: number
-          created_at: string
-          ended_at: string | null
+          career_interests: string[] | null
+          college_plans: Json | null
+          highest_degree: string | null
           id: string
-          items_completed: string[]
-          points_earned: number
+          intended_major: string | null
+          preferred_environment: string[] | null
           profile_id: string
-          session_type: string
-          started_at: string
         }
         Insert: {
-          achievements_unlocked?: string[]
-          completion_rate?: number
-          created_at?: string
-          ended_at?: string | null
+          career_interests?: string[] | null
+          college_plans?: Json | null
+          highest_degree?: string | null
           id?: string
-          items_completed?: string[]
-          points_earned?: number
+          intended_major?: string | null
+          preferred_environment?: string[] | null
           profile_id: string
-          session_type: string
-          started_at?: string
         }
         Update: {
-          achievements_unlocked?: string[]
-          completion_rate?: number
-          created_at?: string
-          ended_at?: string | null
+          career_interests?: string[] | null
+          college_plans?: Json | null
+          highest_degree?: string | null
           id?: string
-          items_completed?: string[]
-          points_earned?: number
+          intended_major?: string | null
+          preferred_environment?: string[] | null
           profile_id?: string
-          session_type?: string
-          started_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "enrichment_sessions_profile_id_fkey"
+            foreignKeyName: "goals_aspirations_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -324,109 +190,28 @@ export type Database = {
           },
         ]
       }
-      experiences: {
+      personal_growth: {
         Row: {
-          achievements: string[]
-          ai_extracted_themes: string[]
-          can_contact: boolean
-          challenges: string[]
-          college_relevance_score: number | null
-          created_at: string
-          deleted_at: string | null
-          description: string
-          end_date: string | null
+          additional_context: Json | null
           id: string
-          is_ongoing: boolean
-          leadership_examples: string[]
-          lessons_learned: string[]
-          metrics: Json
-          narrative_summary: string | null
-          organization: string
-          problem_solving_examples: string[]
+          meaningful_experiences: Json | null
           profile_id: string
-          responsibilities: string[]
-          search_vector: unknown | null
-          skills_demonstrated: Json
-          start_date: string
-          supervisor_name: string | null
-          time_commitment: Database["public"]["Enums"]["time_commitment"]
-          title: string
-          tools_used: string[]
-          total_hours: number | null
-          transferable_skills: string[]
-          type: Database["public"]["Enums"]["experience_type"]
-          updated_at: string
-          verification_url: string | null
         }
         Insert: {
-          achievements?: string[]
-          ai_extracted_themes?: string[]
-          can_contact?: boolean
-          challenges?: string[]
-          college_relevance_score?: number | null
-          created_at?: string
-          deleted_at?: string | null
-          description: string
-          end_date?: string | null
+          additional_context?: Json | null
           id?: string
-          is_ongoing?: boolean
-          leadership_examples?: string[]
-          lessons_learned?: string[]
-          metrics?: Json
-          narrative_summary?: string | null
-          organization: string
-          problem_solving_examples?: string[]
+          meaningful_experiences?: Json | null
           profile_id: string
-          responsibilities?: string[]
-          search_vector?: unknown | null
-          skills_demonstrated?: Json
-          start_date: string
-          supervisor_name?: string | null
-          time_commitment: Database["public"]["Enums"]["time_commitment"]
-          title: string
-          tools_used?: string[]
-          total_hours?: number | null
-          transferable_skills?: string[]
-          type: Database["public"]["Enums"]["experience_type"]
-          updated_at?: string
-          verification_url?: string | null
         }
         Update: {
-          achievements?: string[]
-          ai_extracted_themes?: string[]
-          can_contact?: boolean
-          challenges?: string[]
-          college_relevance_score?: number | null
-          created_at?: string
-          deleted_at?: string | null
-          description?: string
-          end_date?: string | null
+          additional_context?: Json | null
           id?: string
-          is_ongoing?: boolean
-          leadership_examples?: string[]
-          lessons_learned?: string[]
-          metrics?: Json
-          narrative_summary?: string | null
-          organization?: string
-          problem_solving_examples?: string[]
+          meaningful_experiences?: Json | null
           profile_id?: string
-          responsibilities?: string[]
-          search_vector?: unknown | null
-          skills_demonstrated?: Json
-          start_date?: string
-          supervisor_name?: string | null
-          time_commitment?: Database["public"]["Enums"]["time_commitment"]
-          title?: string
-          tools_used?: string[]
-          total_hours?: number | null
-          transferable_skills?: string[]
-          type?: Database["public"]["Enums"]["experience_type"]
-          updated_at?: string
-          verification_url?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "experiences_profile_id_fkey"
+            foreignKeyName: "personal_growth_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -434,87 +219,100 @@ export type Database = {
           },
         ]
       }
-      profile_events: {
+      personal_information: {
         Row: {
-          created_at: string
-          event_data: Json
-          event_type: string
+          alternate_address: Json | null
+          citizenship_status: string | null
+          date_of_birth: string | null
+          first_gen: boolean | null
+          first_name: string | null
+          former_names: string[] | null
+          gender_identity: string | null
+          hispanic_background: string | null
+          hispanic_latino: string | null
+          household_income: string | null
+          household_size: string | null
           id: string
-          ip_address: unknown | null
+          last_name: string | null
+          living_situation: string | null
+          other_languages: Json | null
+          parent_guardians: Json | null
+          permanent_address: Json | null
+          place_of_birth: Json | null
+          preferred_name: string | null
+          primary_email: string | null
+          primary_language: string | null
+          primary_phone: string | null
           profile_id: string
-          user_agent: string | null
-          user_id: string | null
+          pronouns: string | null
+          race_ethnicity: string[] | null
+          secondary_phone: string | null
+          siblings: Json | null
+          years_in_us: number | null
         }
         Insert: {
-          created_at?: string
-          event_data?: Json
-          event_type: string
+          alternate_address?: Json | null
+          citizenship_status?: string | null
+          date_of_birth?: string | null
+          first_gen?: boolean | null
+          first_name?: string | null
+          former_names?: string[] | null
+          gender_identity?: string | null
+          hispanic_background?: string | null
+          hispanic_latino?: string | null
+          household_income?: string | null
+          household_size?: string | null
           id?: string
-          ip_address?: unknown | null
+          last_name?: string | null
+          living_situation?: string | null
+          other_languages?: Json | null
+          parent_guardians?: Json | null
+          permanent_address?: Json | null
+          place_of_birth?: Json | null
+          preferred_name?: string | null
+          primary_email?: string | null
+          primary_language?: string | null
+          primary_phone?: string | null
           profile_id: string
-          user_agent?: string | null
-          user_id?: string | null
+          pronouns?: string | null
+          race_ethnicity?: string[] | null
+          secondary_phone?: string | null
+          siblings?: Json | null
+          years_in_us?: number | null
         }
         Update: {
-          created_at?: string
-          event_data?: Json
-          event_type?: string
+          alternate_address?: Json | null
+          citizenship_status?: string | null
+          date_of_birth?: string | null
+          first_gen?: boolean | null
+          first_name?: string | null
+          former_names?: string[] | null
+          gender_identity?: string | null
+          hispanic_background?: string | null
+          hispanic_latino?: string | null
+          household_income?: string | null
+          household_size?: string | null
           id?: string
-          ip_address?: unknown | null
+          last_name?: string | null
+          living_situation?: string | null
+          other_languages?: Json | null
+          parent_guardians?: Json | null
+          permanent_address?: Json | null
+          place_of_birth?: Json | null
+          preferred_name?: string | null
+          primary_email?: string | null
+          primary_language?: string | null
+          primary_phone?: string | null
           profile_id?: string
-          user_agent?: string | null
-          user_id?: string | null
+          pronouns?: string | null
+          race_ethnicity?: string[] | null
+          secondary_phone?: string | null
+          siblings?: Json | null
+          years_in_us?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "profile_events_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profile_skills: {
-        Row: {
-          category: string
-          confidence: number
-          created_at: string
-          evidence: string[]
-          id: string
-          profile_id: string
-          skill: string
-          source_id: string | null
-          source_type: string
-          updated_at: string
-        }
-        Insert: {
-          category: string
-          confidence: number
-          created_at?: string
-          evidence?: string[]
-          id?: string
-          profile_id: string
-          skill: string
-          source_id?: string | null
-          source_type: string
-          updated_at?: string
-        }
-        Update: {
-          category?: string
-          confidence?: number
-          created_at?: string
-          evidence?: string[]
-          id?: string
-          profile_id?: string
-          skill?: string
-          source_id?: string | null
-          source_type?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_skills_profile_id_fkey"
+            foreignKeyName: "personal_information_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
@@ -534,9 +332,9 @@ export type Database = {
           enrichment_priorities: Json
           extracted_skills: Json
           goals: Json
+          has_completed_assessment: boolean
           hidden_strengths: string[]
           id: string
-          has_completed_assessment?: boolean | null
           last_enrichment_date: string | null
           narrative_summary: string | null
           search_vector: unknown | null
@@ -556,9 +354,9 @@ export type Database = {
           enrichment_priorities?: Json
           extracted_skills?: Json
           goals?: Json
+          has_completed_assessment?: boolean
           hidden_strengths?: string[]
           id?: string
-          has_completed_assessment?: boolean | null
           last_enrichment_date?: string | null
           narrative_summary?: string | null
           search_vector?: unknown | null
@@ -578,9 +376,9 @@ export type Database = {
           enrichment_priorities?: Json
           extracted_skills?: Json
           goals?: Json
+          has_completed_assessment?: boolean
           hidden_strengths?: string[]
           id?: string
-          has_completed_assessment?: boolean | null
           last_enrichment_date?: string | null
           narrative_summary?: string | null
           search_vector?: unknown | null
@@ -590,6 +388,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      support_network: {
+        Row: {
+          community_support: Json | null
+          counselor: Json | null
+          documents: Json | null
+          id: string
+          portfolio_items: Json | null
+          profile_id: string
+          teachers: string[] | null
+        }
+        Insert: {
+          community_support?: Json | null
+          counselor?: Json | null
+          documents?: Json | null
+          id?: string
+          portfolio_items?: Json | null
+          profile_id: string
+          teachers?: string[] | null
+        }
+        Update: {
+          community_support?: Json | null
+          counselor?: Json | null
+          documents?: Json | null
+          id?: string
+          portfolio_items?: Json | null
+          profile_id?: string
+          teachers?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_network_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
