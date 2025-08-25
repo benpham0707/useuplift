@@ -124,15 +124,9 @@ interface Props {
 }
 
 const STEPS = [
-  { id: 1, title: 'Current School', description: 'Basic school information' },
-  { id: 2, title: 'Academic Performance', description: 'GPA and class ranking' },
-  { id: 3, title: 'Other Schools', description: 'Previous educational history' },
-  { id: 4, title: 'Course History', description: 'Current and completed courses' },
-  { id: 5, title: 'College Coursework', description: 'Dual enrollment and college courses' },
-  { id: 6, title: 'Standardized Testing', description: 'SAT, ACT, and other tests' },
-  { id: 7, title: 'Advanced Placement', description: 'AP exam history and plans' },
-  { id: 8, title: 'International Baccalaureate', description: 'IB programme participation' },
-  { id: 9, title: 'English Proficiency', description: 'International student requirements' }
+  { id: 1, title: 'School & Performance', description: 'Current school and academic performance' },
+  { id: 2, title: 'History & Coursework', description: 'Previous schools, course history, and college coursework' },
+  { id: 3, title: 'Testing & Exams', description: 'Standardized tests, AP, IB, and proficiency exams' }
 ];
 
 const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
@@ -256,23 +250,62 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   const renderCurrentStep = () => {
     switch (currentStep) {
       case 1:
-        return <CurrentSchoolStep data={data} setData={setData} />;
+        return (
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Current School Information</h3>
+              <CurrentSchoolStep data={data} setData={setData} />
+            </div>
+            <Separator />
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Academic Performance</h3>
+              <AcademicPerformanceStep data={data} setData={setData} />
+            </div>
+          </div>
+        );
       case 2:
-        return <AcademicPerformanceStep data={data} setData={setData} />;
+        return (
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Previous Schools & Study History</h3>
+              <OtherSchoolsStep data={data} setData={setData} />
+            </div>
+            <Separator />
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Course History</h3>
+              <CourseHistoryStep data={data} setData={setData} />
+            </div>
+            <Separator />
+            <div>
+              <h3 className="text-lg font-semibold mb-4">College Coursework</h3>
+              <CollegeCourseworkStep data={data} setData={setData} />
+            </div>
+          </div>
+        );
       case 3:
-        return <OtherSchoolsStep data={data} setData={setData} />;
-      case 4:
-        return <CourseHistoryStep data={data} setData={setData} />;
-      case 5:
-        return <CollegeCourseworkStep data={data} setData={setData} />;
-      case 6:
-        return <StandardizedTestingStep data={data} setData={setData} />;
-      case 7:
-        return <APExamsStep data={data} setData={setData} />;
-      case 8:
-        return <IBProgrammeStep data={data} setData={setData} />;
-      case 9:
-        return <EnglishProficiencyStep data={data} setData={setData} />;
+        return (
+          <div className="space-y-8">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Standardized Testing</h3>
+              <StandardizedTestingStep data={data} setData={setData} />
+            </div>
+            <Separator />
+            <div>
+              <h3 className="text-lg font-semibold mb-4">AP Exams</h3>
+              <APExamsStep data={data} setData={setData} />
+            </div>
+            <Separator />
+            <div>
+              <h3 className="text-lg font-semibold mb-4">IB Programme</h3>
+              <IBProgrammeStep data={data} setData={setData} />
+            </div>
+            <Separator />
+            <div>
+              <h3 className="text-lg font-semibold mb-4">English Proficiency</h3>
+              <EnglishProficiencyStep data={data} setData={setData} />
+            </div>
+          </div>
+        );
       default:
         return null;
     }
