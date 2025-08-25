@@ -71,6 +71,7 @@ interface PersonalInformationData {
   numberOfSiblings: number;
   siblingsEducation: string;
   firstGenCollege?: boolean;
+  firstGenStatus?: 'yes' | 'no' | 'partial';
 }
 
 interface Props {
@@ -136,7 +137,8 @@ export default function BasicInformationWizard({ onComplete, onCancel }: Props) 
     ],
     numberOfSiblings: 0,
     siblingsEducation: '',
-    firstGenCollege: undefined
+    firstGenCollege: undefined,
+    firstGenStatus: 'partial'
   });
 
   const updateData = (updates: Partial<PersonalInformationData>) => {
@@ -157,6 +159,70 @@ export default function BasicInformationWizard({ onComplete, onCancel }: Props) 
       return updated;
     });
   };
+
+  // Prefill from latest saved personal_information
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!profile?.id) return;
+
+        const { data: pi } = await supabase
+          .from('personal_information')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .maybeSingle();
+        if (!pi) return;
+
+        const allowedPronouns = ['she-her','he-him','they-them','other','prefer-not-to-say'];
+        const allowedGender = ['female','male','non-binary','self-describe','prefer-not-to-say'];
+
+        setData((prev: PersonalInformationData) => ({
+          ...prev,
+          firstName: pi.first_name || '',
+          lastName: pi.last_name || '',
+          preferredName: pi.preferred_name || '',
+          dateOfBirth: pi.date_of_birth || '',
+          primaryEmail: pi.primary_email || prev.primaryEmail,
+          primaryPhone: pi.primary_phone || '',
+          secondaryPhone: pi.secondary_phone || '',
+          pronouns: allowedPronouns.includes(pi.pronouns) ? pi.pronouns : 'other',
+          genderIdentity: allowedGender.includes(pi.gender_identity) ? pi.gender_identity : 'prefer-not-to-say',
+          permanentAddress: (pi.permanent_address as any) || prev.permanentAddress,
+          alternateAddress: (pi.alternate_address as any) || prev.alternateAddress,
+          placeOfBirth: (pi.place_of_birth as any) || prev.placeOfBirth,
+          hispanicLatino: pi.hispanic_latino || '',
+          hispanicBackground: pi.hispanic_background || '',
+          raceEthnicity: ((pi.race_ethnicity || []) as any[]).map(String),
+          citizenshipStatus: pi.citizenship_status || '',
+          primaryLanguage: pi.primary_language || prev.primaryLanguage,
+          otherLanguages: (pi.other_languages || []) as any,
+          yearsInUS: pi.years_in_us ?? undefined,
+          formerNames: (pi.former_names || []) as any,
+          livingSituation: (typeof pi.living_situation === 'string' && (pi.living_situation as string).startsWith('other:')) ? 'other' : (pi.living_situation || ''),
+          householdSize: pi.household_size || '',
+          householdIncome: pi.household_income || '',
+          parentGuardians: Array.isArray(pi.parent_guardians) ? (pi.parent_guardians as any[]).slice(0,2).map(pg => ({
+            relationship: pg.relationship || '',
+            educationLevel: pg.education_level || '',
+            occupation: pg.occupation_category || '',
+            contactInfo: pg.contact_email || pg.contact_phone || ''
+          })) : prev.parentGuardians,
+          numberOfSiblings: (pi.siblings as any)?.count ?? prev.numberOfSiblings,
+          siblingsEducation: (pi.siblings as any)?.education_status || (pi.siblings as any)?.education_summary || prev.siblingsEducation,
+          firstGenStatus: pi.first_gen === true ? 'yes' : pi.first_gen === false ? 'no' : 'partial'
+        }));
+      } catch (e) {
+        // ignore
+      }
+    })();
+  }, []);
 
   const handleNext = () => {
     if (currentStep < STEPS.length) {
@@ -216,22 +282,35 @@ export default function BasicInformationWizard({ onComplete, onCancel }: Props) 
           count: data.numberOfSiblings,
           education_status: data.siblingsEducation
         },
-        first_gen: data.firstGenCollege
+        first_gen: data.firstGenStatus === 'yes' ? true : data.firstGenStatus === 'no' ? false : null
       };
 
-      const { error } = await supabase
+      // Upsert without ON CONFLICT (profile_id is not unique) → select then update/insert
+      const { data: existingPI, error: piFetchErr } = await supabase
         .from('personal_information')
-        .upsert(personalInfoData, { 
-          onConflict: 'profile_id'
-        });
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+      if (piFetchErr) throw piFetchErr;
 
-      if (error) throw error;
+      if (existingPI?.id) {
+        const { error: piUpdateErr } = await supabase
+          .from('personal_information')
+          .update(personalInfoData)
+          .eq('id', existingPI.id as string);
+        if (piUpdateErr) throw piUpdateErr;
+      } else {
+        const { error: piInsertErr } = await supabase
+          .from('personal_information')
+          .insert(personalInfoData);
+        if (piInsertErr) throw piInsertErr;
+      }
 
       // Update profile completion score
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
-          completion_score: 85
+          completion_score: 0.6
         })
         .eq('id', profile.id);
 
@@ -324,16 +403,85 @@ export default function BasicInformationWizard({ onComplete, onCancel }: Props) 
           {currentStep === 1 ? 'Cancel' : 'Previous'}
         </Button>
 
-        {currentStep < STEPS.length ? (
-          <Button onClick={handleNext}>
-            Continue
-            <ArrowRight className="h-4 w-4 ml-2" />
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="secondary"
+            onClick={async () => {
+              // save draft: reuse handleSubmit's mapping but without completion toast
+              setIsLoading(true);
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('id, completion_details, completion_score')
+                  .eq('user_id', user.id)
+                  .single();
+                if (!profile) throw new Error('Profile not found');
+                const personalInfoDataDraft = {
+                  profile_id: profile.id,
+                  first_name: data.firstName || null,
+                  last_name: data.lastName || null,
+                  preferred_name: data.preferredName || null,
+                  date_of_birth: data.dateOfBirth || null,
+                  primary_email: data.primaryEmail || null,
+                  primary_phone: data.primaryPhone || null,
+                  secondary_phone: data.secondaryPhone || null,
+                  pronouns: data.pronouns || null,
+                  gender_identity: data.genderIdentity || null,
+                  permanent_address: data.permanentAddress || null,
+                  alternate_address: data.alternateAddress || null,
+                  place_of_birth: data.placeOfBirth || null,
+                  hispanic_latino: data.hispanicLatino || null,
+                  hispanic_background: data.hispanicBackground || null,
+                  race_ethnicity: data.raceEthnicity || [],
+                  citizenship_status: data.citizenshipStatus || null,
+                  primary_language: data.primaryLanguage || null,
+                  other_languages: data.otherLanguages || [],
+                  years_in_us: data.yearsInUS ?? null,
+                  former_names: data.formerNames || [],
+                  living_situation: data.livingSituation || null,
+                  household_size: data.householdSize || null,
+                  household_income: data.householdIncome || null,
+                  parent_guardians: data.parentGuardians || [],
+                  siblings: { count: data.numberOfSiblings ?? null, education_status: data.siblingsEducation || null },
+                  first_gen: data.firstGenStatus === 'yes' ? true : data.firstGenStatus === 'no' ? false : null
+                } as any;
+                const { data: existingPI } = await supabase
+                  .from('personal_information')
+                  .select('id')
+                  .eq('profile_id', profile.id)
+                  .maybeSingle();
+                if (existingPI?.id) {
+                  await supabase.from('personal_information').update(personalInfoDataDraft).eq('id', existingPI.id);
+                } else {
+                  await supabase.from('personal_information').insert(personalInfoDataDraft);
+                }
+                // progress bump light
+                await supabase.from('profiles').update({ completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) }).eq('id', profile.id);
+                toast({ title: 'Progress saved', description: 'You can come back anytime.' });
+              } catch (e) {
+                toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            disabled={isLoading}
+          >
+            Save & Quit
           </Button>
-        ) : (
-          <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Complete Personal Information'}
-          </Button>
-        )}
+
+          {currentStep < STEPS.length ? (
+            <Button onClick={handleNext}>
+              Continue
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Complete Personal Information'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -782,6 +930,29 @@ const FamilyContextStep: React.FC<{
           placeholder="High school, college, working, etc."
         />
       </div>
+    </div>
+
+    {/* First-Generation */}
+    <div>
+      <Label>Are you a first-generation college student?</Label>
+      <RadioGroup 
+        value={data.firstGenStatus || 'partial'}
+        onValueChange={(value) => updateData({ firstGenStatus: value as any })}
+        className="mt-2"
+      >
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="yes" id="firstgen-yes" />
+          <Label htmlFor="firstgen-yes">Yes</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="no" id="firstgen-no" />
+          <Label htmlFor="firstgen-no">No</Label>
+        </div>
+        <div className="flex items-center space-x-2">
+          <RadioGroupItem value="partial" id="firstgen-partial" />
+          <Label htmlFor="firstgen-partial">Unsure/One parent attended college</Label>
+        </div>
+      </RadioGroup>
     </div>
   </div>
 );

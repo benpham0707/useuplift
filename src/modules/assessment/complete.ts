@@ -30,12 +30,34 @@ export async function completeAssessment(req: Request, res: Response, next: Next
 
     // Academic records functionality removed for current schema - using academic_journey table instead
     const gpaNum = parseGPA(input.gpa);
-    const { error: aErr } = await supabaseAdmin.from("academic_journey").upsert({
-      profile_id: profileId,
-      current_grade: input.academicLevel,
-      gpa: gpaNum ?? null
-    }, { onConflict: "profile_id" });
-    if (aErr) throw aErr;
+    // Upsert without relying on a unique constraint on profile_id
+    const { data: existingAJ, error: ajFetchErr } = await supabaseAdmin
+      .from("academic_journey")
+      .select("id")
+      .eq("profile_id", profileId)
+      .maybeSingle();
+    if (ajFetchErr) throw ajFetchErr;
+
+    if (existingAJ?.id) {
+      const { error: ajUpdateErr } = await supabaseAdmin
+        .from("academic_journey")
+        .update({
+          profile_id: profileId,
+          current_grade: input.academicLevel,
+          gpa: gpaNum ?? null
+        })
+        .eq("id", existingAJ.id as string);
+      if (ajUpdateErr) throw ajUpdateErr;
+    } else {
+      const { error: ajInsertErr } = await supabaseAdmin
+        .from("academic_journey")
+        .insert({
+          profile_id: profileId,
+          current_grade: input.academicLevel,
+          gpa: gpaNum ?? null
+        });
+      if (ajInsertErr) throw ajInsertErr;
+    }
 
     // 3) update profile goals/constraints + completion bump
     const goals = {
