@@ -28,9 +28,9 @@ export async function completeAssessment(req: Request, res: Response, next: Next
       profileId = created.id;
     }
 
-    // 2) upsert academic record
+    // Academic records functionality removed for current schema - using academic_journey table instead
     const gpaNum = parseGPA(input.gpa);
-    const { error: aErr } = await supabaseAdmin.from("academic_records").upsert({
+    const { error: aErr } = await supabaseAdmin.from("academic_journey").upsert({
       profile_id: profileId,
       current_grade: input.academicLevel,
       gpa: gpaNum ?? null
@@ -63,34 +63,34 @@ export async function completeAssessment(req: Request, res: Response, next: Next
     }).eq("id", profileId);
     if (uErr) throw uErr;
 
-    // 4) record one assessment_session row with raw responses
-    const sessionId = randomUUID();
-    const { error: sErr } = await supabaseAdmin.from("assessment_sessions").insert({
-      id: sessionId,
-      profile_id: profileId,
-      session_type: "initial",
-      total_questions: 5,
-      questions_answered: 5,
-      completion_rate: 1,
-      responses: {
-        academicLevel: input.academicLevel,
-        gpa: input.gpa ?? null,
-        goals: input.goals,
-        challenges: input.challenges,
-        financialBand: input.financialBand
-      },
-      insights: {}
-    });
-    if (sErr) throw sErr;
+    // Assessment sessions functionality removed for current schema
+    // const sessionId = randomUUID();
+    // const { error: sErr } = await supabaseAdmin.from("assessment_sessions").insert({
+    //   id: sessionId,
+    //   profile_id: profileId,
+    //   session_type: "initial",
+    //   total_questions: 5,
+    //   questions_answered: 5,
+    //   completion_rate: 1,
+    //   responses: {
+    //     academicLevel: input.academicLevel,
+    //     gpa: input.gpa ?? null,
+    //     goals: input.goals,
+    //     challenges: input.challenges,
+    //     financialBand: input.financialBand
+    //   },
+    //   insights: {}
+    // });
+    // if (sErr) throw sErr;
 
-    // Optional event
-    await supabaseAdmin.from("profile_events").insert({
-      profile_id: profileId,
-      event_type: "assessment_completed",
-      event_data: { sessionId, financialBand: input.financialBand }
-    });
+    // Event logging removed for current schema
+    // await supabaseAdmin.from("profile_events").insert({
+    //   profile_id: profileId,
+    //   event_type: "assessment_completed",
+    //   event_data: { sessionId, financialBand: input.financialBand }
+    // });
 
-    res.json({ ok: true, profileId, sessionId });
+    res.json({ ok: true, profileId });
   } catch (e) {
     next(e);
   }

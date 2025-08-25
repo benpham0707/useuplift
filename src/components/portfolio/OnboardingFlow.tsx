@@ -110,7 +110,7 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
 
     const gpaNum = parseGPA(payload.gpa);
     const { error: aErr } = await supabase
-      .from('academic_records')
+      .from('academic_journey')
       .upsert({
         profile_id: profileId,
         current_grade: payload.academicLevel,
@@ -147,25 +147,26 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
       .eq('id', profileId);
     if (uErr) throw uErr;
 
-    const { error: sErr } = await supabase
-      .from('assessment_sessions')
-      .insert({
-        profile_id: profileId,
-        session_type: 'initial',
-        total_questions: 5,
-        questions_answered: 5,
-        completion_rate: 1,
-        completed_at: new Date().toISOString(),
-        responses: {
-          academicLevel: payload.academicLevel,
-          gpa: payload.gpa ?? null,
-          goals: payload.goals,
-          challenges: payload.challenges,
-          financialBand: payload.financialBand
-        },
-        insights: {}
-      });
-    if (sErr) throw sErr;
+    // Assessment sessions removed for current schema
+    // const { error: sErr } = await supabase
+    //   .from('assessment_sessions')
+    //   .insert({
+    //     profile_id: profileId,
+    //     session_type: 'initial',
+    //     total_questions: 5,
+    //     questions_answered: 5,
+    //     completion_rate: 1,
+    //     completed_at: new Date().toISOString(),
+    //     responses: {
+    //       academicLevel: payload.academicLevel,
+    //       gpa: payload.gpa ?? null,
+    //       goals: payload.goals,
+    //       challenges: payload.challenges,
+    //       financialBand: payload.financialBand
+    //     },
+    //     insights: {}
+    //   });
+    // if (sErr) throw sErr;
   }
 
   function parseGPA(s?: string) {

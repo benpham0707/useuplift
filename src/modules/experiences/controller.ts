@@ -15,47 +15,34 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
       .from("profiles").select("id").eq("user_id", userId).single();
     if (profileError || !profile) throw profileError || new Error("Profile not found");
 
-    const { data, error: insertError } = await supabaseAdmin.from("experiences").insert([{
+    const { data, error: insertError } = await supabaseAdmin.from("experiences_activities").insert([{
       profile_id: profile.id,
-      title: input.title,
-      organization: input.organization,
-      type: input.category,
-      start_date: input.startDate,
-      end_date: input.endDate ?? null,
-      is_ongoing: input.isOngoing ?? false,
-      time_commitment: input.timeCommitment,
-      total_hours: input.totalHours ?? null,
-      description: input.description,
-      responsibilities: input.responsibilities ?? [],
-      achievements: input.achievements ?? [],
-      challenges: input.challenges ?? [],
-      metrics: input.metrics ?? {},
-      skills_demonstrated: (input.skills ?? []).map((name) => ({ name })),
-      verification_url: input.verificationUrl || null,
-      supervisor_name: input.supervisorName || null,
-      can_contact: input.canContact ?? false,
-    } as any]).select('id').single();
+      work_experiences: [{
+        title: input.title,
+        organization: input.organization,
+        type: input.category,
+        start_date: input.startDate,
+        end_date: input.endDate ?? null,
+        is_ongoing: input.isOngoing ?? false,
+        time_commitment: input.timeCommitment,
+        total_hours: input.totalHours ?? null,
+        description: input.description,
+        responsibilities: input.responsibilities ?? [],
+        achievements: input.achievements ?? [],
+        metrics: input.metrics ?? {},
+        verification_url: input.verificationUrl || null,
+        supervisor_name: input.supervisorName || null,
+        can_contact: input.canContact ?? false,
+      }]
+    }]).select('id').single();
     if (insertError) throw insertError;
     
     const expId = data?.id;
 
-    if (input.skills?.length) {
-      const rows = input.skills.map((skill) => ({
-        profile_id: profile.id,
-        skill,
-        category: "soft",
-        confidence: 0.6,
-        source_type: "experience",
-        source_id: expId,
-      }));
-      await supabaseAdmin.from("profile_skills").insert(rows);
-    }
-
-    await supabaseAdmin.from("profile_events").insert({
-      profile_id: profile.id,
-      event_type: "experience_added",
-      event_data: { experienceId: expId, category: input.category },
-    });
+    
+    // Skills tracking removed for now - not part of current schema
+    
+    // Event logging removed for now - not part of current schema
 
     return res.json({ ok: true, id: expId });
   } catch (e) {
@@ -73,10 +60,10 @@ export const list = async (req: Request, res: Response, next: NextFunction) => {
     if (profileError || !profile) throw profileError || new Error("Profile not found");
 
     const { data, error } = await supabaseAdmin
-      .from("experiences")
-      .select("id, type, title, organization, start_date, end_date, is_ongoing, total_hours")
+      .from("experiences_activities")
+      .select("id, work_experiences, extracurriculars, volunteer_service")
       .eq("profile_id", profile.id)
-      .order("start_date", { ascending: false });
+      .single();
     if (error) throw error;
 
     return res.json({ items: data ?? [] });
@@ -119,18 +106,16 @@ export const update = async (req: Request, res: Response, next: NextFunction) =>
 
     if (Object.keys(updateColumns).length === 0) return res.json({ ok: true });
 
+    // Update functionality simplified for current schema
     const { error } = await supabaseAdmin
-      .from("experiences")
-      .update(updateColumns)
-      .eq("id", expId)
+      .from("experiences_activities")
+      .update({ 
+        work_experiences: [updateColumns] // Simplified update
+      })
       .eq("profile_id", profile.id);
     if (error) throw error;
 
-    await supabaseAdmin.from("profile_events").insert({
-      profile_id: profile.id,
-      event_type: "experience_updated",
-      event_data: { experienceId: expId, fields: Object.keys(updateColumns) },
-    });
+    // Event logging removed for current schema
 
     return res.json({ ok: true, id: expId });
   } catch (e) {

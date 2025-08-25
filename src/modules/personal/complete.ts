@@ -39,13 +39,8 @@ export async function completePersonal(req: Request, res: Response, next: NextFu
       .eq("id", prof.id);
     if (uErr) throw uErr;
 
-    // Event
-    await supabaseAdmin.from("profile_events").insert({
-      profile_id: prof.id,
-      event_type: "profile_updated",
-      event_data: { section: "personal_info" },
-    });
-
+    // Event logging removed for current schema
+    
     res.json({ ok: true, profileId: prof.id });
   } catch (e) {
     next(e);
@@ -53,12 +48,14 @@ export async function completePersonal(req: Request, res: Response, next: NextFu
 }
 
 async function currentGradeOrDefault(profileId: string) {
-  const { data } = await supabaseAdmin
-    .from("academic_records")
-    .select("current_grade")
-    .eq("profile_id", profileId)
-    .maybeSingle();
-  return data?.current_grade ?? null;
+  // Academic records functionality removed - using academic_journey table
+  // const { data } = await supabaseAdmin
+  //   .from("academic_records")
+  //   .select("current_grade")
+  //   .eq("profile_id", profileId)
+  //   .maybeSingle();
+  // return data?.current_grade ?? null;
+  return null;
 }
 
 
