@@ -384,7 +384,7 @@ function BasicInfoStep({ data, onChange }: { data: BasicInfo; onChange: (data: B
 
   return (
     <div className="space-y-8">
-      {/* Core Required Fields */}
+        {/* Core Required Fields */}
       <div>
         <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
           Core Information
@@ -392,7 +392,7 @@ function BasicInfoStep({ data, onChange }: { data: BasicInfo; onChange: (data: B
         </h3>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
-            <Label htmlFor="legal-first">Legal First Name *</Label>
+            <Label htmlFor="legal-first">First Name *</Label>
             <Input
               id="legal-first"
               value={data.legalFirstName}
@@ -401,7 +401,7 @@ function BasicInfoStep({ data, onChange }: { data: BasicInfo; onChange: (data: B
             />
           </div>
           <div>
-            <Label htmlFor="legal-last">Legal Last Name *</Label>
+            <Label htmlFor="legal-last">Last Name *</Label>
             <Input
               id="legal-last"
               value={data.legalLastName}
