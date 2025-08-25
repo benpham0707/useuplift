@@ -93,11 +93,17 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
       const { error } = await supabase
         .from('profiles')
         .update({
-          // Save family data to profiles table for now
-          profile_id: user.id,
-          responsibilities: data.responsibilities,
-          life_circumstances: data.circumstances
-        });
+          // Store family responsibilities in demographics field
+          demographics: {
+            family_responsibilities: {
+              significant_responsibilities: data.significantResponsibilities,
+              responsibilities: data.responsibilities,
+              challenging_circumstances: data.challengingCircumstances,
+              circumstances: data.circumstances
+            }
+          }
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 

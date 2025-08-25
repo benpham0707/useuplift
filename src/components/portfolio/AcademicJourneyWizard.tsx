@@ -224,41 +224,22 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          // Save academic journey data to profiles table for now
-          profile_id: user.id,
-          current_school: {
-            name: data.schoolName,
-            type: data.schoolType,
-            city: data.schoolCity,
-            state: data.schoolState,
-            country: data.schoolCountry,
-            current_grade: data.currentGrade,
-            expected_graduation: data.expectedGraduation,
-            will_graduate: data.willGraduateFromSchool,
-            is_boarding: data.isBoardingSchool
-          },
-          gpa: parseFloat(data.cumulativeGPA) || null,
-          gpa_scale: data.gpaScale,
-          gpa_type: data.gpaType,
-          class_rank: data.classRank,
-          class_size: parseInt(data.totalClassSize) || null,
-          other_schools: data.previousSchools,
-          course_history: {
-            current_courses: data.currentCourses,
-            completed_courses: data.completedCourses,
-            took_math_early: data.tookMathEarly,
-            took_language_early: data.tookLanguageEarly
-          },
-          college_courses: data.collegeCoursework,
-          standardized_tests: {
-            report_scores: data.reportTestScores,
-            sat: data.sat,
-            act: data.act
-          },
-          ap_exams: data.apExams,
-          ib_exams: data.ibExams,
-          english_proficiency: data.englishProficiency
-        });
+          // Store academic journey data in demographics field for now
+          demographics: {
+            academic_journey: {
+              school_name: data.schoolName,
+              school_type: data.schoolType,
+              current_grade: data.currentGrade,
+              expected_graduation: data.expectedGraduation,
+              cumulative_gpa: data.cumulativeGPA,
+              gpa_scale: data.gpaScale,
+              standardized_tests: data.reportTestScores ? { sat: data.sat, act: data.act } : null,
+              ap_exams: data.takingAPExams ? data.apExams : null,
+              ib_programme: data.inIBProgramme ? data.ibExams : null
+            }
+          }
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 

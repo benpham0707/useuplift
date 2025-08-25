@@ -73,21 +73,28 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          // Save goals data to profiles table for now
-          profile_id: user.id,
-          intended_major: data.intendedMajor,
-          career_interests: data.careerInterests,
-          highest_degree: data.highestDegree,
-          preferred_environment: data.collegeEnvironment,
-          college_plans: {
-            applying_to_uc: data.applyingToUC,
-            using_common_app: data.usingCommonApp,
-            start_date: data.startDate,
-            geographic_preferences: data.geographicPreferences,
-            need_based_aid: data.needBasedAid,
-            merit_scholarships: data.meritScholarships
+          // Store goals in the goals field and demographics
+          goals: {
+            primaryGoal: data.intendedMajor || 'exploring_options',
+            desiredOutcomes: data.careerInterests,
+            timelineUrgency: data.startDate || 'flexible'
+          },
+          demographics: {
+            college_plans: {
+              intended_major: data.intendedMajor,
+              career_interests: data.careerInterests,
+              highest_degree: data.highestDegree,
+              college_environment: data.collegeEnvironment,
+              applying_to_uc: data.applyingToUC,
+              using_common_app: data.usingCommonApp,
+              start_date: data.startDate,
+              geographic_preferences: data.geographicPreferences,
+              need_based_aid: data.needBasedAid,
+              merit_scholarships: data.meritScholarships
+            }
           }
-        });
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 

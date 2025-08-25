@@ -90,14 +90,19 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          // Save support network data to profiles table for now
-          profile_id: user.id,
-          counselor: data.counselor,
-          teachers: data.teachers,
-          community_support: data.communityOrganizations,
-          portfolio_items: data.portfolioItems,
-          documents: data.documents
-        });
+          // Store support network data in demographics field
+          demographics: {
+            support_network: {
+              counselor: data.counselor,
+              teachers: data.teachers,
+              community_support: data.communitySupport,
+              community_organizations: data.communityOrganizations,
+              portfolio_items: data.hasPortfolioItems ? data.portfolioItems : null,
+              documents: data.wantsToUploadDocuments ? data.documents : null
+            }
+          }
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 

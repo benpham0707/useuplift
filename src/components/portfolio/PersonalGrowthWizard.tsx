@@ -159,11 +159,19 @@ const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          // Save personal growth data to profiles table for now
-          profile_id: user.id,
-          meaningful_experiences: data.meaningfulExperiences,
-          additional_context: data.additionalContext
-        });
+          // Store personal growth stories in narrative_summary field
+          narrative_summary: JSON.stringify({
+            meaningful_experiences: data.meaningfulExperiences,
+            additional_context: data.additionalContext
+          }),
+          demographics: {
+            personal_growth: {
+              meaningful_experiences: data.meaningfulExperiences,
+              additional_context: data.additionalContext
+            }
+          }
+        })
+        .eq('user_id', user.id);
 
       if (error) throw error;
 
