@@ -643,7 +643,6 @@ const PortfolioScanner = () => {
           </CardContent>
         </Card>
 
-        <RecommendedNextStepsDashboard />
         </section>
       </div>
     </div>
