@@ -31,7 +31,8 @@ import {
   Calendar,
   BookOpen,
   Users,
-  Settings
+  Settings,
+  Plus
 } from 'lucide-react';
 import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import AssessmentDashboard from '@/components/portfolio/AssessmentDashboard';
@@ -644,6 +645,9 @@ const PortfolioScanner = () => {
         </Card>
 
         </section>
+
+        {/* Recommended Next Steps Section */}
+        <RecommendedNextStepsSection />
       </div>
     </div>
   );
@@ -1685,6 +1689,91 @@ const InsightItem = ({ title, description, time, type, impact, pendingGains, rel
           </div>
         </div>
       </div>
+    </div>
+  );
+};
+
+// Recommended Next Steps Section Component  
+const RecommendedNextStepsSection = () => {
+  /* Hard coded data values - these are placeholder recommendation items for the portfolio scanner next steps section */
+  const nextStepsItems = [
+    {
+      title: "Add Your Work Experience",
+      description: "Transform your part-time jobs into valuable experience stories",
+      priority: "high" as const,
+      timeEstimate: "10 minutes"
+    },
+    {
+      title: "Document Family Responsibilities", 
+      description: "Caring for family members shows leadership and maturity",
+      priority: "medium" as const,
+      timeEstimate: "5 minutes"
+    },
+    {
+      title: "List Academic Achievements",
+      description: "Include honors classes, good grades, and improvement trends", 
+      priority: "medium" as const,
+      timeEstimate: "15 minutes"
+    }
+  ];
+
+  return (
+    <section id="next-steps" className="py-16 bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>Recommended Next Steps</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {nextStepsItems.map((item, index) => (
+                <RecommendationItem
+                  key={index}
+                  title={item.title}
+                  description={item.description}
+                  priority={item.priority}
+                  timeEstimate={item.timeEstimate}
+                />
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  );
+};
+
+interface RecommendationItemProps {
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  timeEstimate: string;
+}
+
+const RecommendationItem = ({ title, description, priority, timeEstimate }: RecommendationItemProps) => {
+  const priorityColors = {
+    high: 'bg-red-100 text-red-800',
+    medium: 'bg-yellow-100 text-yellow-800', 
+    low: 'bg-green-100 text-green-800'
+  };
+
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <h4 className="font-medium text-foreground">{title}</h4>
+          <Badge variant="secondary" className={priorityColors[priority]}>
+            {priority}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-xs text-muted-foreground">Est. {timeEstimate}</span>
+        </div>
+      </div>
+      <Button size="sm" variant="outline">
+        <Plus className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

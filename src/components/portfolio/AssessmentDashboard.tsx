@@ -316,34 +316,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
         </CardContent>
       </Card>
 
-      {/* Recommended Next Steps */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recommended Next Steps</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <RecommendationItem
-              title="Add Your Work Experience"
-              description="Transform your part-time jobs into valuable experience stories"
-              priority="high"
-              timeEstimate="10 minutes"
-            />
-            <RecommendationItem
-              title="Document Family Responsibilities"
-              description="Caring for family members shows leadership and maturity"
-              priority="medium"
-              timeEstimate="5 minutes"
-            />
-            <RecommendationItem
-              title="List Academic Achievements"
-              description="Include honors classes, good grades, and improvement trends"
-              priority="medium"
-              timeEstimate="15 minutes"
-            />
-          </div>
-        </CardContent>
-      </Card>
       {/* Wizards */}
       <Dialog open={openSection === 'personal'} onOpenChange={(v) => {
         setOpenSection(v ? 'personal' : null);
