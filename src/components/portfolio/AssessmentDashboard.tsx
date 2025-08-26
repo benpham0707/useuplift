@@ -335,7 +335,186 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       <ActionRecommendationsSection />
 
       {/* Recent Insights & Cross-Feature Analysis */}
-      <RecentInsightsSection />
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-foreground">Recent Insights & Cross-Feature Analysis</h2>
+            <p className="text-sm text-muted-foreground">Showing 2 of 4 insights</p>
+          </div>
+          <Button variant="outline" size="sm">
+            <TrendingUp className="h-4 w-4 mr-2" />
+            View All Insights
+          </Button>
+        </div>
+
+        <Carousel className="w-full">
+          <CarouselContent className="-ml-2 md:-ml-4">
+            {/* Hard coded data values - placeholder insights for academic performance analysis */}
+            <CarouselItem className="pl-2 md:pl-4 md:basis-1/2">
+              <Card className="h-full hover:shadow-md transition-all duration-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-foreground leading-tight">Academic Performance Trend Analysis</h3>
+                      <p className="text-xs text-muted-foreground">Academic Insight</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      Academic
+                    </Badge>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Your GPA has shown consistent improvement over the past two semesters, particularly in STEM subjects. This upward trend demonstrates academic resilience.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Impact:</span>
+                    </div>
+                    <p className="text-sm text-primary">Strong academic narrative</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+                    <span>2 hours ago</span>
+                    <Badge variant="outline" className="text-xs">
+                      Actionable
+                    </Badge>
+                  </div>
+
+                  <Button size="sm" variant="outline" className="w-full">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Take Action
+                  </Button>
+                </CardContent>
+              </Card>
+            </CarouselItem>
+
+            <CarouselItem className="pl-2 md:pl-4 md:basis-1/2">
+              <Card className="h-full hover:shadow-md transition-all duration-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-foreground leading-tight">Leadership Experience Gap Analysis</h3>
+                      <p className="text-xs text-muted-foreground">Cross-Feature Analysis</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800">
+                      Leadership
+                    </Badge>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Analysis shows opportunities to better highlight informal leadership roles within family responsibilities and part-time work experiences.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Impact:</span>
+                    </div>
+                    <p className="text-sm text-primary">Enhanced leadership profile</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+                    <span>1 day ago</span>
+                    <Badge variant="outline" className="text-xs">
+                      Actionable
+                    </Badge>
+                  </div>
+
+                  <Button size="sm" variant="outline" className="w-full">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Take Action
+                  </Button>
+                </CardContent>
+              </Card>
+            </CarouselItem>
+
+            {/* Additional hidden insights for carousel */}
+            <CarouselItem className="pl-2 md:pl-4 md:basis-1/2">
+              <Card className="h-full hover:shadow-md transition-all duration-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-foreground leading-tight">Work-Life Balance Achievement</h3>
+                      <p className="text-xs text-muted-foreground">Personal Insight</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-green-100 text-green-800">
+                      Character
+                    </Badge>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Successfully managing 20+ hours of work while maintaining academic performance demonstrates exceptional time management and maturity.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Impact:</span>
+                    </div>
+                    <p className="text-sm text-primary">Compelling personal narrative</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+                    <span>3 days ago</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </CarouselItem>
+
+            <CarouselItem className="pl-2 md:pl-4 md:basis-1/2">
+              <Card className="h-full hover:shadow-md transition-all duration-200">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-foreground leading-tight">Extracurricular Engagement Opportunities</h3>
+                      <p className="text-xs text-muted-foreground">Recommendation Engine</p>
+                    </div>
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+                      Activities
+                    </Badge>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Based on your interests and schedule, consider virtual volunteer opportunities that align with your career goals in healthcare.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Impact:</span>
+                    </div>
+                    <p className="text-sm text-primary">Strengthen extracurricular profile</p>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+                    <span>1 week ago</span>
+                    <Badge variant="outline" className="text-xs">
+                      Actionable
+                    </Badge>
+                  </div>
+
+                  <Button size="sm" variant="outline" className="w-full">
+                    <ArrowRight className="h-4 w-4 mr-2" />
+                    Take Action
+                  </Button>
+                </CardContent>
+              </Card>
+            </CarouselItem>
+          </CarouselContent>
+          <CarouselPrevious className="hidden md:flex" />
+          <CarouselNext className="hidden md:flex" />
+        </Carousel>
+      </section>
 
       {/* Wizards */}
       <Dialog open={openSection === 'personal'} onOpenChange={(v) => {
@@ -666,7 +845,7 @@ const ActionRecommendationsSection = () => {
       <Carousel className="w-full">
         <CarouselContent className="-ml-2 md:-ml-4">
           {actionRecommendations.map((action) => (
-            <CarouselItem key={action.id} className="pl-2 md:pl-4 md:basis-1/2">
+            <CarouselItem key={action.id} className="pl-2 md:pl-4 basis-full">
               <DetailedActionCard action={action} />
             </CarouselItem>
           ))}
@@ -678,79 +857,6 @@ const ActionRecommendationsSection = () => {
   );
 };
 
-// Recent Insights Section Component
-const RecentInsightsSection = () => {
-  /* Hard coded data values - these are placeholder insight items for the assessment dashboard */
-  const recentInsights = [
-    {
-      id: 1,
-      title: "Academic Performance Trend Analysis",
-      type: "Academic Insight",
-      description: "Your GPA has shown consistent improvement over the past two semesters, particularly in STEM subjects. This upward trend demonstrates academic resilience.",
-      impact: "Strong academic narrative",
-      actionable: true,
-      timestamp: "2 hours ago",
-      category: "Academic"
-    },
-    {
-      id: 2,
-      title: "Leadership Experience Gap Analysis",
-      type: "Cross-Feature Analysis",
-      description: "Analysis shows opportunities to better highlight informal leadership roles within family responsibilities and part-time work experiences.",
-      impact: "Enhanced leadership profile",
-      actionable: true,
-      timestamp: "1 day ago",
-      category: "Leadership"
-    },
-    {
-      id: 3,
-      title: "Work-Life Balance Achievement",
-      type: "Personal Insight",
-      description: "Successfully managing 20+ hours of work while maintaining academic performance demonstrates exceptional time management and maturity.",
-      impact: "Compelling personal narrative",
-      actionable: false,
-      timestamp: "3 days ago",
-      category: "Character"
-    },
-    {
-      id: 4,
-      title: "Extracurricular Engagement Opportunities",
-      type: "Recommendation Engine",
-      description: "Based on your interests and schedule, consider virtual volunteer opportunities that align with your career goals in healthcare.",
-      impact: "Strengthen extracurricular profile",
-      actionable: true,
-      timestamp: "1 week ago",
-      category: "Activities"
-    }
-  ];
-
-  return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">Recent Insights & Cross-Feature Analysis</h2>
-          <p className="text-sm text-muted-foreground">Showing 2 of {recentInsights.length} insights</p>
-        </div>
-        <Button variant="outline" size="sm">
-          <TrendingUp className="h-4 w-4 mr-2" />
-          View All Insights
-        </Button>
-      </div>
-
-      <Carousel className="w-full">
-        <CarouselContent className="-ml-2 md:-ml-4">
-          {recentInsights.map((insight) => (
-            <CarouselItem key={insight.id} className="pl-2 md:pl-4 md:basis-1/2">
-              <InsightCard insight={insight} />
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        <CarouselPrevious className="hidden md:flex" />
-        <CarouselNext className="hidden md:flex" />
-      </Carousel>
-    </section>
-  );
-};
 
 // Detailed Action Card Component
 interface DetailedActionCardProps {
