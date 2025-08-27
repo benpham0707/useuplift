@@ -241,11 +241,11 @@ const AcademicInterestsStep: React.FC<{
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6">
       <h3 className="text-lg font-medium mb-6">Academic & Career Interests</h3>
       
-      {/* Top Row - Dropdowns Side by Side with wider layout */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+      {/* Top Row - Dropdowns Side by Side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div>
           <Label htmlFor="intended-major" className="text-sm font-medium">Intended Major or Field of Study</Label>
           <Select value={data.intendedMajor} onValueChange={(value) => setData({ ...data, intendedMajor: value })}>
@@ -281,11 +281,11 @@ const AcademicInterestsStep: React.FC<{
         </div>
       </div>
 
-      {/* Career Interests - Full Width */}
+      {/* Career Interests - Single Column List */}
       <div className="mb-8">
         <Label className="text-sm font-medium mb-3 block">Career Interests (select all that apply)</Label>
-        <div className="border rounded-lg p-4 h-48 overflow-y-auto bg-background">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="border rounded-lg p-4 h-60 overflow-y-auto bg-background">
+          <div className="space-y-2">
             {careerFields.map(field => (
               <div key={field} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
                 <Checkbox
@@ -303,11 +303,11 @@ const AcademicInterestsStep: React.FC<{
         </div>
       </div>
 
-      {/* College Environment Preferences - Full Width */}
+      {/* College Environment Preferences - Single Column List */}
       <div>
         <Label className="text-sm font-medium mb-3 block">College Environment Preferences (select all that appeal to you)</Label>
-        <div className="border rounded-lg p-4 h-48 overflow-y-auto bg-background">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="border rounded-lg p-4 h-60 overflow-y-auto bg-background">
+          <div className="space-y-2">
             {collegeEnvironments.map(env => (
               <div key={env} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
                 <Checkbox
