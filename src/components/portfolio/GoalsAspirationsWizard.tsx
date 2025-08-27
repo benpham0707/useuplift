@@ -241,89 +241,86 @@ const AcademicInterestsStep: React.FC<{
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium mb-4">Academic & Career Interests</h3>
-        
-        {/* Top Row - Dropdowns Side by Side */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div>
-            <Label htmlFor="intended-major" className="text-sm font-medium">Intended Major or Field of Study</Label>
-            <Select value={data.intendedMajor} onValueChange={(value) => setData({ ...data, intendedMajor: value })}>
-              <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Select your intended major" />
-              </SelectTrigger>
-              <SelectContent className="max-h-64">
-                {commonMajors.map(major => (
-                  <SelectItem key={major} value={major.toLowerCase().replace(/\s+/g, '_')}>
-                    {major}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="highest-degree" className="text-sm font-medium">Highest Degree You Intend to Earn</Label>
-            <Select value={data.highestDegree} onValueChange={(value) => setData({ ...data, highestDegree: value })}>
-              <SelectTrigger className="mt-2">
-                <SelectValue placeholder="Select highest degree goal" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
-                <SelectItem value="masters">Master's Degree</SelectItem>
-                <SelectItem value="phd">PhD/Doctorate</SelectItem>
-                <SelectItem value="md">Medical Degree (MD)</SelectItem>
-                <SelectItem value="jd">Law Degree (JD)</SelectItem>
-                <SelectItem value="other_professional">Other Professional Degree</SelectItem>
-                <SelectItem value="undecided">Undecided</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <h3 className="text-lg font-medium mb-6">Academic & Career Interests</h3>
+      
+      {/* Top Row - Dropdowns Side by Side with wider layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <div>
+          <Label htmlFor="intended-major" className="text-sm font-medium">Intended Major or Field of Study</Label>
+          <Select value={data.intendedMajor} onValueChange={(value) => setData({ ...data, intendedMajor: value })}>
+            <SelectTrigger className="mt-2">
+              <SelectValue placeholder="Select your intended major" />
+            </SelectTrigger>
+            <SelectContent className="max-h-64">
+              {commonMajors.map(major => (
+                <SelectItem key={major} value={major.toLowerCase().replace(/\s+/g, '_')}>
+                  {major}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
-        {/* Bottom Row - Checkbox Lists Side by Side with Better Spacing */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div>
-            <Label className="text-sm font-medium mb-3 block">Career Interests (select all that apply)</Label>
-            <div className="border rounded-lg p-4 h-80 overflow-y-auto bg-background">
-              <div className="space-y-3">
-                {careerFields.map(field => (
-                  <div key={field} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
-                    <Checkbox
-                      id={`career-${field}`}
-                      checked={data.careerInterests.includes(field)}
-                      onCheckedChange={() => setData({
-                        ...data,
-                        careerInterests: toggleArrayItem(data.careerInterests, field)
-                      })}
-                    />
-                    <Label htmlFor={`career-${field}`} className="text-sm cursor-pointer flex-1">{field}</Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+        <div>
+          <Label htmlFor="highest-degree" className="text-sm font-medium">Highest Degree You Intend to Earn</Label>
+          <Select value={data.highestDegree} onValueChange={(value) => setData({ ...data, highestDegree: value })}>
+            <SelectTrigger className="mt-2">
+              <SelectValue placeholder="Select highest degree goal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
+              <SelectItem value="masters">Master's Degree</SelectItem>
+              <SelectItem value="phd">PhD/Doctorate</SelectItem>
+              <SelectItem value="md">Medical Degree (MD)</SelectItem>
+              <SelectItem value="jd">Law Degree (JD)</SelectItem>
+              <SelectItem value="other_professional">Other Professional Degree</SelectItem>
+              <SelectItem value="undecided">Undecided</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
-          <div>
-            <Label className="text-sm font-medium mb-3 block">College Environment Preferences (select all that appeal to you)</Label>
-            <div className="border rounded-lg p-4 h-80 overflow-y-auto bg-background">
-              <div className="space-y-3">
-                {collegeEnvironments.map(env => (
-                  <div key={env} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
-                    <Checkbox
-                      id={`env-${env}`}
-                      checked={data.collegeEnvironment.includes(env)}
-                      onCheckedChange={() => setData({
-                        ...data,
-                        collegeEnvironment: toggleArrayItem(data.collegeEnvironment, env)
-                      })}
-                    />
-                    <Label htmlFor={`env-${env}`} className="text-sm cursor-pointer flex-1">{env}</Label>
-                  </div>
-                ))}
+      {/* Career Interests - Full Width */}
+      <div className="mb-8">
+        <Label className="text-sm font-medium mb-3 block">Career Interests (select all that apply)</Label>
+        <div className="border rounded-lg p-4 h-48 overflow-y-auto bg-background">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {careerFields.map(field => (
+              <div key={field} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
+                <Checkbox
+                  id={`career-${field}`}
+                  checked={data.careerInterests.includes(field)}
+                  onCheckedChange={() => setData({
+                    ...data,
+                    careerInterests: toggleArrayItem(data.careerInterests, field)
+                  })}
+                />
+                <Label htmlFor={`career-${field}`} className="text-sm cursor-pointer flex-1">{field}</Label>
               </div>
-            </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* College Environment Preferences - Full Width */}
+      <div>
+        <Label className="text-sm font-medium mb-3 block">College Environment Preferences (select all that appeal to you)</Label>
+        <div className="border rounded-lg p-4 h-48 overflow-y-auto bg-background">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {collegeEnvironments.map(env => (
+              <div key={env} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
+                <Checkbox
+                  id={`env-${env}`}
+                  checked={data.collegeEnvironment.includes(env)}
+                  onCheckedChange={() => setData({
+                    ...data,
+                    collegeEnvironment: toggleArrayItem(data.collegeEnvironment, env)
+                  })}
+                />
+                <Label htmlFor={`env-${env}`} className="text-sm cursor-pointer flex-1">{env}</Label>
+              </div>
+            ))}
           </div>
         </div>
       </div>
