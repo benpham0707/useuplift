@@ -286,232 +286,249 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
               </div>
             </CardHeader>
             
-            <CardContent className="space-y-6">
-              <ScrollArea className="max-h-[600px] pr-4">
-                <div className="space-y-6">
-                  {/* Category Selection */}
-                  <div>
-                    <Label className="text-sm font-medium">Category *</Label>
-                    <Select 
-                      value={experience.category} 
-                      onValueChange={(v) => updateExperience(index, 'category', v)}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {EXPERIENCE_TYPE.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+            <CardContent className="h-[calc(100vh-200px)] overflow-hidden">
+              <ScrollArea className="h-full pr-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Left Column */}
+                  <div className="space-y-6">
+                    {/* Category Selection */}
+                    <div>
+                      <Label className="text-sm font-medium">Category *</Label>
+                      <Select 
+                        value={experience.category} 
+                        onValueChange={(v) => updateExperience(index, 'category', v)}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EXPERIENCE_TYPE.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Title/Role */}
+                    <div>
+                      <Label className="text-sm font-medium">Title/Role *</Label>
+                      <Input 
+                        value={experience.title}
+                        onChange={(e) => updateExperience(index, 'title', e.target.value)}
+                        placeholder="e.g., Team Captain, Volunteer Coordinator"
+                        className="mt-2"
+                      />
+                    </div>
+
+                    {/* Organization */}
+                    <div>
+                      <Label className="text-sm font-medium">Organization</Label>
+                      <Input 
+                        value={experience.organization}
+                        onChange={(e) => updateExperience(index, 'organization', e.target.value)}
+                        placeholder="e.g., National Honor Society, Local Food Bank"
+                        className="mt-2"
+                      />
+                    </div>
+
+                    {/* Dates */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-sm font-medium">Start Date</Label>
+                        <Input 
+                          type="date"
+                          value={experience.startDate}
+                          onChange={(e) => updateExperience(index, 'startDate', e.target.value)}
+                          className="mt-2"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-medium">End Date</Label>
+                        <Input 
+                          type="date"
+                          value={experience.endDate}
+                          disabled={experience.isOngoing}
+                          onChange={(e) => updateExperience(index, 'endDate', e.target.value)}
+                          className="mt-2"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`ongoing-${index}`}
+                        checked={experience.isOngoing}
+                        onCheckedChange={(checked) => updateExperience(index, 'isOngoing', checked)}
+                      />
+                      <Label htmlFor={`ongoing-${index}`} className="text-sm">Currently ongoing</Label>
+                    </div>
+
+                    {/* Time Commitment */}
+                    <div>
+                      <Label className="text-sm font-medium">Time Commitment</Label>
+                      <Select 
+                        value={experience.timeCommitment} 
+                        onValueChange={(v) => updateExperience(index, 'timeCommitment', v)}
+                      >
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder="Select commitment level" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TIME_COMMITMENT.map((t) => (
+                            <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Total Hours */}
+                    <div>
+                      <Label className="text-sm font-medium">Total Hours (approximate)</Label>
+                      <Input 
+                        type="number"
+                        value={experience.totalHours}
+                        onChange={(e) => updateExperience(index, 'totalHours', e.target.value)}
+                        placeholder="e.g., 100"
+                        className="mt-2"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column */}
+                  <div className="space-y-6">
+                    {/* Description */}
+                    <div>
+                      <Label className="text-sm font-medium">Description *</Label>
+                      <Textarea 
+                        value={experience.description}
+                        onChange={(e) => updateExperience(index, 'description', e.target.value)}
+                        placeholder="Describe what you did, your responsibilities, and impact..."
+                        className="mt-2 min-h-[150px] resize-none"
+                      />
+                    </div>
+
+                    {/* Key Responsibilities */}
+                    <div>
+                      <Label className="text-sm font-medium">Key Responsibilities</Label>
+                      <Input 
+                        placeholder="Add responsibility and press Enter"
+                        className="mt-2"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addChip(index, 'responsibilities', e.currentTarget.value);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <div className="flex flex-wrap gap-2 mt-3 max-h-24 overflow-y-auto">
+                        {experience.responsibilities.map((resp, respIndex) => (
+                          <Badge 
+                            key={respIndex} 
+                            variant="outline" 
+                            className="cursor-pointer text-xs hover:bg-destructive/10"
+                            onClick={() => removeChip(index, 'responsibilities', resp)}
+                          >
+                            {resp} ×
+                          </Badge>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Title/Role */}
-                  <div>
-                    <Label className="text-sm font-medium">Title/Role *</Label>
-                    <Input 
-                      value={experience.title}
-                      onChange={(e) => updateExperience(index, 'title', e.target.value)}
-                      placeholder="e.g., Team Captain, Volunteer Coordinator"
-                      className="mt-2"
-                    />
-                  </div>
-
-                  {/* Organization */}
-                  <div>
-                    <Label className="text-sm font-medium">Organization</Label>
-                    <Input 
-                      value={experience.organization}
-                      onChange={(e) => updateExperience(index, 'organization', e.target.value)}
-                      placeholder="e.g., National Honor Society, Local Food Bank"
-                      className="mt-2"
-                    />
-                  </div>
-
-                  {/* Dates */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium">Start Date</Label>
-                      <Input 
-                        type="date"
-                        value={experience.startDate}
-                        onChange={(e) => updateExperience(index, 'startDate', e.target.value)}
-                        className="mt-2"
-                      />
+                      </div>
                     </div>
+
+                    {/* Achievements */}
                     <div>
-                      <Label className="text-sm font-medium">End Date</Label>
+                      <Label className="text-sm font-medium">Achievements</Label>
                       <Input 
-                        type="date"
-                        value={experience.endDate}
-                        disabled={experience.isOngoing}
-                        onChange={(e) => updateExperience(index, 'endDate', e.target.value)}
+                        placeholder="Add achievement and press Enter"
                         className="mt-2"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addChip(index, 'achievements', e.currentTarget.value);
+                            e.currentTarget.value = '';
+                          }
+                        }}
                       />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`ongoing-${index}`}
-                      checked={experience.isOngoing}
-                      onCheckedChange={(checked) => updateExperience(index, 'isOngoing', checked)}
-                    />
-                    <Label htmlFor={`ongoing-${index}`} className="text-sm">Currently ongoing</Label>
-                  </div>
-
-                  {/* Time Commitment */}
-                  <div>
-                    <Label className="text-sm font-medium">Time Commitment</Label>
-                    <Select 
-                      value={experience.timeCommitment} 
-                      onValueChange={(v) => updateExperience(index, 'timeCommitment', v)}
-                    >
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder="Select commitment level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {TIME_COMMITMENT.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                      <div className="flex flex-wrap gap-2 mt-3 max-h-24 overflow-y-auto">
+                        {experience.achievements.map((achievement, achIndex) => (
+                          <Badge 
+                            key={achIndex} 
+                            variant="outline" 
+                            className="cursor-pointer text-xs hover:bg-destructive/10"
+                            onClick={() => removeChip(index, 'achievements', achievement)}
+                          >
+                            {achievement} ×
+                          </Badge>
                         ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      </div>
+                    </div>
 
-                  {/* Description */}
-                  <div>
-                    <Label className="text-sm font-medium">Description *</Label>
-                    <Textarea 
-                      value={experience.description}
-                      onChange={(e) => updateExperience(index, 'description', e.target.value)}
-                      placeholder="Describe what you did, your responsibilities, and impact..."
-                      className="mt-2 min-h-[120px]"
-                    />
-                  </div>
+                     {/* Skills Developed */}
+                     <div>
+                       <Label className="text-sm font-medium">Skills Developed</Label>
+                       <Input 
+                         placeholder="Add skill and press Enter"
+                         className="mt-2"
+                         onKeyDown={(e) => {
+                           if (e.key === 'Enter') {
+                             e.preventDefault();
+                             addChip(index, 'skills', e.currentTarget.value);
+                             e.currentTarget.value = '';
+                           }
+                         }}
+                       />
+                       <div className="flex flex-wrap gap-2 mt-3 max-h-24 overflow-y-auto">
+                         {experience.skills.map((skill, skillIndex) => (
+                           <Badge 
+                             key={skillIndex} 
+                             variant="secondary" 
+                             className="cursor-pointer text-xs hover:bg-destructive/10"
+                             onClick={() => removeChip(index, 'skills', skill)}
+                           >
+                             {skill} ×
+                           </Badge>
+                         ))}
+                       </div>
+                     </div>
 
-                  {/* Key Responsibilities */}
-                  <div>
-                    <Label className="text-sm font-medium">Key Responsibilities</Label>
-                    <Input 
-                      placeholder="Add responsibility and press Enter"
-                      className="mt-2"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addChip(index, 'responsibilities', e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {experience.responsibilities.map((resp, respIndex) => (
-                        <Badge 
-                          key={respIndex} 
-                          variant="outline" 
-                          className="cursor-pointer text-xs"
-                          onClick={() => removeChip(index, 'responsibilities', resp)}
-                        >
-                          {resp} ×
-                        </Badge>
-                      ))}
+                     {/* Contact Information */}
+                     <div>
+                       <Label className="text-sm font-medium">Supervisor/Contact</Label>
+                       <Input 
+                         value={experience.supervisorName}
+                         onChange={(e) => updateExperience(index, 'supervisorName', e.target.value)}
+                         placeholder="Name (optional)"
+                         className="mt-2"
+                       />
+                     </div>
+
+                     <div>
+                       <Label className="text-sm font-medium">Verification Link</Label>
+                       <Input 
+                         value={experience.verificationUrl}
+                         onChange={(e) => updateExperience(index, 'verificationUrl', e.target.value)}
+                         placeholder="https://... (optional)"
+                         className="mt-2"
+                       />
+                     </div>
+
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id={`contact-${index}`}
+                          checked={experience.canContact}
+                          onCheckedChange={(checked) => updateExperience(index, 'canContact', checked)}
+                        />
+                        <Label htmlFor={`contact-${index}`} className="text-sm">OK to contact for verification</Label>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Achievements */}
-                  <div>
-                    <Label className="text-sm font-medium">Achievements</Label>
-                    <Input 
-                      placeholder="Add achievement and press Enter"
-                      className="mt-2"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addChip(index, 'achievements', e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {experience.achievements.map((achievement, achIndex) => (
-                        <Badge 
-                          key={achIndex} 
-                          variant="outline" 
-                          className="cursor-pointer text-xs"
-                          onClick={() => removeChip(index, 'achievements', achievement)}
-                        >
-                          {achievement} ×
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Skills Developed */}
-                  <div>
-                    <Label className="text-sm font-medium">Skills Developed</Label>
-                    <Input 
-                      placeholder="Add skill and press Enter"
-                      className="mt-2"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addChip(index, 'skills', e.currentTarget.value);
-                          e.currentTarget.value = '';
-                        }
-                      }}
-                    />
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {experience.skills.map((skill, skillIndex) => (
-                        <Badge 
-                          key={skillIndex} 
-                          variant="secondary" 
-                          className="cursor-pointer text-xs"
-                          onClick={() => removeChip(index, 'skills', skill)}
-                        >
-                          {skill} ×
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Contact Information */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium">Supervisor/Contact</Label>
-                      <Input 
-                        value={experience.supervisorName}
-                        onChange={(e) => updateExperience(index, 'supervisorName', e.target.value)}
-                        placeholder="Name (optional)"
-                        className="mt-2"
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium">Verification Link</Label>
-                      <Input 
-                        value={experience.verificationUrl}
-                        onChange={(e) => updateExperience(index, 'verificationUrl', e.target.value)}
-                        placeholder="https://... (optional)"
-                        className="mt-2"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox 
-                      id={`contact-${index}`}
-                      checked={experience.canContact}
-                      onCheckedChange={(checked) => updateExperience(index, 'canContact', checked)}
-                    />
-                    <Label htmlFor={`contact-${index}`} className="text-sm">OK to contact for verification</Label>
-                  </div>
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </>
-        )}
-      </Card>
-    );
-  };
+                </ScrollArea>
+              </CardContent>
+            </>
+          )}
+        </Card>
+      );
+    };
 
   return (
     <div className="min-h-screen bg-background">
