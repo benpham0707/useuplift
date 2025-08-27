@@ -142,10 +142,8 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       </div>
 
       {/* Main Content Area - Full height scrollable */}
-      <div className="flex-1 overflow-y-auto p-4 max-h-0">
-        <div className="h-full overflow-y-auto">
-          {renderCurrentStep()}
-        </div>
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
+        {renderCurrentStep()}
       </div>
 
       {/* Navigation Footer */}
