@@ -115,7 +115,7 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-screen max-h-screen flex flex-col">
       {/* Minimal Header */}
       <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
         <div className="flex items-center gap-2">
