@@ -530,72 +530,63 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
   };
 
   return (
-    <div className="flex flex-col h-full max-h-[90vh]">
-      {/* Header Section - Fixed */}
-      <div className="flex-shrink-0 text-center space-y-4 p-6 border-b bg-background">
-        <h1 className="text-3xl font-bold text-foreground">Experiences & Activities</h1>
-        <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-          Build a comprehensive portfolio of your work, volunteer service, extracurricular activities, and personal projects. 
-          <strong className="text-primary"> Minimum 3 experiences required.</strong>
-        </p>
-        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 max-w-4xl mx-auto">
-          <h3 className="font-semibold text-primary mb-2">🎯 What colleges want to see:</h3>
-          <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
-            <div>
-              <p className="font-medium mb-1">Leadership & Initiative:</p>
-              <ul className="space-y-1">
-                <li>• Student government, club officer roles</li>
-                <li>• Starting new organizations or projects</li>
-                <li>• Mentoring or tutoring others</li>
-              </ul>
+    <div className="flex flex-col h-full max-h-[95vh]">
+      {/* Compact Header Section */}
+      <div className="flex-shrink-0 border-b bg-background px-6 py-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold text-foreground">Experiences & Activities</h1>
+            <p className="text-sm text-muted-foreground">
+              Build your portfolio. <strong className="text-primary">Minimum 3 experiences required.</strong>
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-sm text-muted-foreground">
+              <span className="font-medium">
+                {experiences.filter(exp => isExperienceComplete(exp)).length} of {Math.max(3, experiences.length)} completed
+              </span>
             </div>
-            <div>
-              <p className="font-medium mb-1">Community Impact:</p>
-              <ul className="space-y-1">
-                <li>• Volunteer work with measurable hours</li>
-                <li>• Community service projects</li>
-                <li>• Work experience and responsibility</li>
-              </ul>
+            <div className="text-xs text-muted-foreground">
+              Completion: <span className="font-medium text-primary">{getCompletionRate()}%</span>
             </div>
           </div>
         </div>
-
-        {/* Progress Indicator */}
-        <div className="flex items-center justify-between bg-muted/50 rounded-lg p-4 max-w-4xl mx-auto">
-          <div className="text-sm text-muted-foreground">
-            <span className="font-medium">
-              {experiences.filter(exp => isExperienceComplete(exp)).length} of {Math.max(3, experiences.length)} experiences completed
-            </span>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            Completion: <span className="font-medium text-primary">{getCompletionRate()}%</span>
+        
+        {/* Compact info box */}
+        <div className="bg-primary/5 border border-primary/20 rounded p-3 mt-3">
+          <div className="grid md:grid-cols-2 gap-3 text-xs text-muted-foreground">
+            <div>
+              <span className="font-medium">Leadership:</span> Student government, mentoring, new projects
+            </div>
+            <div>
+              <span className="font-medium">Community:</span> Volunteer work, service projects, work experience
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Scrollable Experiences List */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-5xl mx-auto space-y-6">
+      {/* Main Content Area - Maximum Space */}
+      <div className="flex-1 overflow-y-auto p-4">
+        <div className="max-w-6xl mx-auto space-y-4">
           {experiences.map((experience, index) => (
             <ExperienceCard key={index} experience={experience} index={index} />
           ))}
         </div>
       </div>
 
-      {/* Action Buttons - Fixed */}
-      <div className="flex-shrink-0 flex items-center justify-between border-t p-6 bg-background">
-        <Button onClick={addExperience} variant="outline" size="lg" className="flex items-center gap-2">
+      {/* Compact Action Bar */}
+      <div className="flex-shrink-0 flex items-center justify-between border-t px-6 py-3 bg-background">
+        <Button onClick={addExperience} variant="outline" className="flex items-center gap-2">
           <Plus className="h-4 w-4" />
-          Add Another Experience
+          Add Experience
         </Button>
         
         <Button 
           onClick={saveAllExperiences} 
           disabled={saving || getCompletionRate() < 100} 
-          size="lg"
-          className="min-w-[180px]"
+          className="min-w-[140px]"
         >
-          {saving ? 'Saving...' : 'Save All Experiences'}
+          {saving ? 'Saving...' : 'Save All'}
         </Button>
       </div>
     </div>
