@@ -634,7 +634,7 @@ const DocumentationPortfolioStep: React.FC<{
             }}
           />
           <Label htmlFor="upload-documents" className="font-medium">
-            I would like to upload supporting documents
+            I would like to upload teacher letters of recommendation
           </Label>
         </div>
 
@@ -649,14 +649,14 @@ const DocumentationPortfolioStep: React.FC<{
                   </svg>
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Upload Your Supporting Documents</p>
+                  <p className="text-sm font-medium">Upload Teacher Letters of Recommendation</p>
                   <p className="text-xs text-muted-foreground">Drag and drop files here or click to browse</p>
                 </div>
                 <Button variant="outline" size="sm">
-                  Choose Supporting Documents
+                  Choose Recommendation Letters
                 </Button>
                 <p className="text-xs text-muted-foreground">
-                  Include transcripts, test scores, awards, recommendation letters, essays, etc. (PDF, DOC, DOCX, JPG, PNG - Max 10MB each)
+                  Upload letters of recommendation from teachers, counselors, or mentors (PDF, DOC, DOCX - Max 10MB each)
                 </p>
               </div>
             </Card>
