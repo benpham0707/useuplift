@@ -129,10 +129,6 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
     <div className="h-[95vh] flex flex-col">
       {/* Header */}
       <div className="text-center space-y-2 flex-shrink-0 p-6">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Users2 className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">Support Network & Resources</h2>
-        </div>
         
         {/* Progress Steps */}
         <div className="flex items-center justify-center space-x-2 mb-6">
