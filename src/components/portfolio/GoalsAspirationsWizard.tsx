@@ -241,7 +241,7 @@ const AcademicInterestsStep: React.FC<{
   };
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
+    <div className="max-w-2xl mx-auto space-y-6 pb-6">
       <h3 className="text-lg font-medium mb-6">Academic & Career Interests</h3>
       
       {/* Top Row - Dropdowns Side by Side */}
