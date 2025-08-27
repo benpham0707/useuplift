@@ -101,11 +101,11 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
   };
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="h-full flex flex-col space-y-3">
       {/* Compact Header */}
-      <div className="text-center space-y-2">
+      <div className="text-center space-y-2 flex-shrink-0">
         <div className="flex items-center justify-center gap-2">
-          <Heart className="h-5 w-5 text-primary" />
+          <Users className="h-5 w-5 text-primary" />
           <h2 className="text-xl font-semibold">Family Responsibilities & Circumstances</h2>
         </div>
         
@@ -136,14 +136,7 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
         <Card className="h-full flex flex-col">
-          <CardHeader className="pb-3 flex-shrink-0">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Users className="h-4 w-4" />
-              {STEPS[currentStep - 1]?.title}
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">{STEPS[currentStep - 1]?.description}</p>
-          </CardHeader>
-          <CardContent className="flex-1 overflow-y-auto">
+          <CardContent className="flex-1 overflow-y-auto p-4">
             <div className="max-h-full">
               {renderCurrentStep()}
             </div>
@@ -233,9 +226,9 @@ const ResponsibilitiesStep: React.FC<{
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full">
       <div>
-        <Label htmlFor="hours-per-week">How many hours per week do you spend on family responsibilities?</Label>
+        <Label htmlFor="hours-per-week" className="text-base font-medium">How many hours per week do you spend on family responsibilities?</Label>
         <Input
           id="hours-per-week"
           type="number"
@@ -248,25 +241,27 @@ const ResponsibilitiesStep: React.FC<{
         />
       </div>
 
-      <div>
+      <div className="flex-1">
         <Label className="text-base font-medium">Select all responsibilities that apply to you:</Label>
-        <div className="mt-3 space-y-2 h-64 overflow-y-auto pr-2 border rounded-lg p-2">
-          {responsibilityOptions.map((option) => (
-            <div key={option.id} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
-              <Checkbox
-                id={option.id}
-                checked={data.responsibilities.includes(option.id)}
-                onCheckedChange={() => toggleResponsibility(option.id)}
-                className="mt-0.5"
-              />
-              <div className="flex-1 min-w-0">
-                <Label htmlFor={option.id} className="text-sm font-medium cursor-pointer">
-                  {option.label}
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+        <div className="mt-2 h-80 overflow-y-auto border rounded-lg p-3">
+          <div className="space-y-2">
+            {responsibilityOptions.map((option) => (
+              <div key={option.id} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
+                <Checkbox
+                  id={option.id}
+                  checked={data.responsibilities.includes(option.id)}
+                  onCheckedChange={() => toggleResponsibility(option.id)}
+                  className="mt-0.5"
+                />
+                <div className="flex-1 min-w-0">
+                  <Label htmlFor={option.id} className="text-sm font-medium cursor-pointer">
+                    {option.label}
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
 
@@ -337,7 +332,7 @@ const CircumstancesStep: React.FC<{
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full">
       <div className="flex items-center space-x-2">
         <Checkbox 
           id="challenging-circumstances"
@@ -353,25 +348,27 @@ const CircumstancesStep: React.FC<{
       </div>
 
       {data.challengingCircumstances && (
-        <div>
+        <div className="flex-1">
           <Label className="text-base font-medium">Select all circumstances that have affected your high school experience:</Label>
-          <div className="mt-3 space-y-2 h-64 overflow-y-auto pr-2 border rounded-lg p-2">
-            {circumstanceOptions.map((option) => (
-              <div key={option.id} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
-                <Checkbox
-                  id={option.id}
-                  checked={data.circumstances.includes(option.id)}
-                  onCheckedChange={() => toggleCircumstance(option.id)}
-                  className="mt-0.5"
-                />
-                <div className="flex-1 min-w-0">
-                  <Label htmlFor={option.id} className="text-sm font-medium cursor-pointer">
-                    {option.label}
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+          <div className="mt-2 h-80 overflow-y-auto border rounded-lg p-3">
+            <div className="space-y-2">
+              {circumstanceOptions.map((option) => (
+                <div key={option.id} className="flex items-start space-x-3 p-2 rounded hover:bg-muted/50">
+                  <Checkbox
+                    id={option.id}
+                    checked={data.circumstances.includes(option.id)}
+                    onCheckedChange={() => toggleCircumstance(option.id)}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor={option.id} className="text-sm font-medium cursor-pointer">
+                      {option.label}
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
