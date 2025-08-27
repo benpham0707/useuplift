@@ -10,8 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { createExperience } from '@/app/experiences/api';
-import { Trash2, Plus, Edit, ChevronDown, ChevronRight } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Trash2, Plus, Edit, ChevronDown } from 'lucide-react';
 
 const EXPERIENCE_TYPE = [
   { id: 'work', label: 'Work' },
@@ -286,8 +285,8 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
               </div>
             </CardHeader>
             
-            <CardContent className="h-[calc(100vh-200px)] overflow-hidden">
-              <ScrollArea className="h-full pr-4">
+            <CardContent className="p-6">
+              <div className="max-h-[70vh] overflow-y-auto pr-2">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Left Column */}
                   <div className="space-y-6">
@@ -463,108 +462,106 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                       </div>
                     </div>
 
-                     {/* Skills Developed */}
-                     <div>
-                       <Label className="text-sm font-medium">Skills Developed</Label>
-                       <Input 
-                         placeholder="Add skill and press Enter"
-                         className="mt-2"
-                         onKeyDown={(e) => {
-                           if (e.key === 'Enter') {
-                             e.preventDefault();
-                             addChip(index, 'skills', e.currentTarget.value);
-                             e.currentTarget.value = '';
-                           }
-                         }}
-                       />
-                       <div className="flex flex-wrap gap-2 mt-3 max-h-24 overflow-y-auto">
-                         {experience.skills.map((skill, skillIndex) => (
-                           <Badge 
-                             key={skillIndex} 
-                             variant="secondary" 
-                             className="cursor-pointer text-xs hover:bg-destructive/10"
-                             onClick={() => removeChip(index, 'skills', skill)}
-                           >
-                             {skill} ×
-                           </Badge>
-                         ))}
-                       </div>
-                     </div>
-
-                     {/* Contact Information */}
-                     <div>
-                       <Label className="text-sm font-medium">Supervisor/Contact</Label>
-                       <Input 
-                         value={experience.supervisorName}
-                         onChange={(e) => updateExperience(index, 'supervisorName', e.target.value)}
-                         placeholder="Name (optional)"
-                         className="mt-2"
-                       />
-                     </div>
-
-                     <div>
-                       <Label className="text-sm font-medium">Verification Link</Label>
-                       <Input 
-                         value={experience.verificationUrl}
-                         onChange={(e) => updateExperience(index, 'verificationUrl', e.target.value)}
-                         placeholder="https://... (optional)"
-                         className="mt-2"
-                       />
-                     </div>
-
-                      <div className="flex items-center space-x-2">
-                        <Checkbox 
-                          id={`contact-${index}`}
-                          checked={experience.canContact}
-                          onCheckedChange={(checked) => updateExperience(index, 'canContact', checked)}
-                        />
-                        <Label htmlFor={`contact-${index}`} className="text-sm">OK to contact for verification</Label>
+                    {/* Skills Developed */}
+                    <div>
+                      <Label className="text-sm font-medium">Skills Developed</Label>
+                      <Input 
+                        placeholder="Add skill and press Enter"
+                        className="mt-2"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addChip(index, 'skills', e.currentTarget.value);
+                            e.currentTarget.value = '';
+                          }
+                        }}
+                      />
+                      <div className="flex flex-wrap gap-2 mt-3 max-h-24 overflow-y-auto">
+                        {experience.skills.map((skill, skillIndex) => (
+                          <Badge 
+                            key={skillIndex} 
+                            variant="secondary" 
+                            className="cursor-pointer text-xs hover:bg-destructive/10"
+                            onClick={() => removeChip(index, 'skills', skill)}
+                          >
+                            {skill} ×
+                          </Badge>
+                        ))}
                       </div>
                     </div>
+
+                    {/* Contact Information */}
+                    <div>
+                      <Label className="text-sm font-medium">Supervisor/Contact</Label>
+                      <Input 
+                        value={experience.supervisorName}
+                        onChange={(e) => updateExperience(index, 'supervisorName', e.target.value)}
+                        placeholder="Name (optional)"
+                        className="mt-2"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">Verification Link</Label>
+                      <Input 
+                        value={experience.verificationUrl}
+                        onChange={(e) => updateExperience(index, 'verificationUrl', e.target.value)}
+                        placeholder="https://... (optional)"
+                        className="mt-2"
+                      />
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`contact-${index}`}
+                        checked={experience.canContact}
+                        onCheckedChange={(checked) => updateExperience(index, 'canContact', checked)}
+                      />
+                      <Label htmlFor={`contact-${index}`} className="text-sm">OK to contact for verification</Label>
+                    </div>
                   </div>
-                </ScrollArea>
-              </CardContent>
-            </>
-          )}
-        </Card>
-      );
-    };
+                </div>
+              </div>
+            </CardContent>
+          </>
+        )}
+      </Card>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-5xl mx-auto p-6 space-y-8">
-        {/* Header Section */}
-        <div className="text-center space-y-4">
-          <h1 className="text-3xl font-bold text-foreground">Experiences & Activities</h1>
-          <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-            Build a comprehensive portfolio of your work, volunteer service, extracurricular activities, and personal projects. 
-            <strong className="text-primary"> Minimum 3 experiences required.</strong>
-          </p>
-          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 max-w-4xl mx-auto">
-            <h3 className="font-semibold text-primary mb-2">🎯 What colleges want to see:</h3>
-            <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
-              <div>
-                <p className="font-medium mb-1">Leadership & Initiative:</p>
-                <ul className="space-y-1">
-                  <li>• Student government, club officer roles</li>
-                  <li>• Starting new organizations or projects</li>
-                  <li>• Mentoring or tutoring others</li>
-                </ul>
-              </div>
-              <div>
-                <p className="font-medium mb-1">Community Impact:</p>
-                <ul className="space-y-1">
-                  <li>• Volunteer work with measurable hours</li>
-                  <li>• Community service projects</li>
-                  <li>• Work experience and responsibility</li>
-                </ul>
-              </div>
+    <div className="flex flex-col h-full max-h-[90vh]">
+      {/* Header Section - Fixed */}
+      <div className="flex-shrink-0 text-center space-y-4 p-6 border-b bg-background">
+        <h1 className="text-3xl font-bold text-foreground">Experiences & Activities</h1>
+        <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
+          Build a comprehensive portfolio of your work, volunteer service, extracurricular activities, and personal projects. 
+          <strong className="text-primary"> Minimum 3 experiences required.</strong>
+        </p>
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 max-w-4xl mx-auto">
+          <h3 className="font-semibold text-primary mb-2">🎯 What colleges want to see:</h3>
+          <div className="grid md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+            <div>
+              <p className="font-medium mb-1">Leadership & Initiative:</p>
+              <ul className="space-y-1">
+                <li>• Student government, club officer roles</li>
+                <li>• Starting new organizations or projects</li>
+                <li>• Mentoring or tutoring others</li>
+              </ul>
+            </div>
+            <div>
+              <p className="font-medium mb-1">Community Impact:</p>
+              <ul className="space-y-1">
+                <li>• Volunteer work with measurable hours</li>
+                <li>• Community service projects</li>
+                <li>• Work experience and responsibility</li>
+              </ul>
             </div>
           </div>
         </div>
 
         {/* Progress Indicator */}
-        <div className="flex items-center justify-between bg-muted/50 rounded-lg p-4">
+        <div className="flex items-center justify-between bg-muted/50 rounded-lg p-4 max-w-4xl mx-auto">
           <div className="text-sm text-muted-foreground">
             <span className="font-medium">
               {experiences.filter(exp => isExperienceComplete(exp)).length} of {Math.max(3, experiences.length)} experiences completed
@@ -574,60 +571,33 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
             Completion: <span className="font-medium text-primary">{getCompletionRate()}%</span>
           </div>
         </div>
+      </div>
 
-        {/* Experiences List - Scrollable */}
-        <div className="space-y-6">
-          <ScrollArea 
-            className="h-[600px] w-full pr-4"
-            style={{
-              scrollbarWidth: 'thin',
-              scrollbarColor: 'hsl(var(--border)) transparent'
-            }}
-          >
-            <style dangerouslySetInnerHTML={{
-              __html: `
-                .experiences-scroll::-webkit-scrollbar {
-                  width: 6px;
-                }
-                .experiences-scroll::-webkit-scrollbar-track {
-                  background: transparent;
-                }
-                .experiences-scroll::-webkit-scrollbar-thumb {
-                  background: hsl(var(--border));
-                  border-radius: 3px;
-                }
-                .experiences-scroll::-webkit-scrollbar-thumb:hover {
-                  background: hsl(var(--foreground) / 0.3);
-                }
-              `
-            }} />
-            <div className="space-y-6 experiences-scroll">
-              {experiences.map((experience, index) => (
-                <ExperienceCard key={index} experience={experience} index={index} />
-              ))}
-            </div>
-          </ScrollArea>
+      {/* Scrollable Experiences List */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {experiences.map((experience, index) => (
+            <ExperienceCard key={index} experience={experience} index={index} />
+          ))}
         </div>
+      </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between border-t pt-6">
-          <Button onClick={addExperience} variant="outline" size="lg" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            Add Another Experience
-          </Button>
-          
-          <Button 
-            onClick={saveAllExperiences} 
-            disabled={saving || getCompletionRate() < 100} 
-            size="lg"
-            className="min-w-[180px]"
-          >
-            {saving ? 'Saving...' : 'Save All Experiences'}
-          </Button>
-        </div>
+      {/* Action Buttons - Fixed */}
+      <div className="flex-shrink-0 flex items-center justify-between border-t p-6 bg-background">
+        <Button onClick={addExperience} variant="outline" size="lg" className="flex items-center gap-2">
+          <Plus className="h-4 w-4" />
+          Add Another Experience
+        </Button>
+        
+        <Button 
+          onClick={saveAllExperiences} 
+          disabled={saving || getCompletionRate() < 100} 
+          size="lg"
+          className="min-w-[180px]"
+        >
+          {saving ? 'Saving...' : 'Save All Experiences'}
+        </Button>
       </div>
     </div>
   );
 }
-
-
