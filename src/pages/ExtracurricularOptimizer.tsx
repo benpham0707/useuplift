@@ -200,29 +200,21 @@ const AcademicPlanningIntelligence = () => {
 
       {/* Compact Dashboard Header */}
       <div className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
-        <div className="max-w-7xl mx-auto px-4 py-6">
+        <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center space-x-3 mb-2">
-                <div className="p-2 bg-primary rounded-lg">
-                  <Brain className="h-5 w-5 text-primary-foreground" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground">Academic Planning Intelligence</h1>
-                  <p className="text-sm text-muted-foreground">Strategic planning dashboard for academic success</p>
-                </div>
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-primary rounded-lg">
+                <Brain className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-lg font-semibold text-foreground">Strategic Planning Dashboard</h1>
+                <p className="text-xs text-muted-foreground">AI-powered academic and career optimization</p>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Button size="sm" variant="outline">
-                <Calendar className="h-4 w-4 mr-2" />
-                Schedule Planning
-              </Button>
-              <Button size="sm">
-                <Target className="h-4 w-4 mr-2" />
-                Start Strategy
-              </Button>
-            </div>
+            <Button size="sm">
+              <Target className="h-3 w-3 mr-2" />
+              Start Planning
+            </Button>
           </div>
         </div>
       </div>
@@ -284,135 +276,288 @@ const AcademicPlanningIntelligence = () => {
           </Card>
         </div>
 
-        {/* Main Dashboard Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Planning Areas */}
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Target className="h-5 w-5" />
-                  <span>Strategic Planning Areas</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="grid grid-cols-4 w-full mb-6">
-                    {planningAreas.map((area) => (
-                      <TabsTrigger key={area.id} value={area.id} className="flex flex-col gap-1 p-3">
-                        <area.icon className="h-4 w-4" />
-                        <span className="text-xs">{area.title}</span>
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-
-                  {planningAreas.map((area) => (
-                    <TabsContent key={area.id} value={area.id} className="space-y-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div>
-                          <h3 className="text-lg font-semibold">{area.title}</h3>
-                          <p className="text-sm text-muted-foreground">{area.description}</p>
-                        </div>
-                        <Badge variant={area.status === 'Active' ? 'default' : 'secondary'}>
-                          {area.status}
-                        </Badge>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <div className="flex justify-between text-sm">
-                          <span>Progress</span>
-                          <span>{area.progress}%</span>
-                        </div>
-                        <div className="w-full bg-secondary rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full transition-all duration-300" 
-                            style={{ width: `${area.progress}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex space-x-2 mt-4">
-                        <Button size="sm">
-                          <Play className="h-4 w-4 mr-2" />
-                          Continue Planning
-                        </Button>
-                        <Button size="sm" variant="outline">
-                          <Settings className="h-4 w-4 mr-2" />
-                          Configure
-                        </Button>
-                      </div>
-                    </TabsContent>
-                  ))}
-                </Tabs>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Recent Recommendations */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Zap className="h-5 w-5" />
-                  <span>AI Recommendations</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {recentRecommendations.map((rec, index) => (
-                  <div key={index} className="border rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <Badge variant="outline" className="text-xs">
-                        {rec.type}
-                      </Badge>
-                      <Badge 
-                        variant={rec.priority === 'High' ? 'destructive' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {rec.priority}
-                      </Badge>
-                    </div>
-                    <h4 className="text-sm font-medium mb-1">{rec.title}</h4>
-                    <p className="text-xs text-muted-foreground mb-2">{rec.reason}</p>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">{rec.timeframe}</span>
-                      <Button size="sm" variant="ghost" className="h-6 px-2">
-                        <ArrowRight className="h-3 w-3" />
-                      </Button>
-                    </div>
+        {/* Four Dashboard Sections */}
+        <div className="space-y-12">
+          
+          {/* 1. Academic Planning Intelligence Section */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <BookOpen className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Academic Planning Intelligence</h2>
+                  <p className="text-sm text-muted-foreground">Strategic course selection and grade optimization</p>
+                </div>
+              </div>
+              <Badge variant="secondary">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                45% Complete
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Target className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Course Recommendation Engine</h3>
                   </div>
-                ))}
-              </CardContent>
-            </Card>
+                  <p className="text-sm text-muted-foreground mb-3">Multi-horizon planning and strategic sequencing</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-600">3 recommendations ready</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
 
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Clock className="h-5 w-5" />
-                  <span>Quick Actions</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {quickActions.map((action, index) => (
-                  <Button 
-                    key={index} 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full justify-start"
-                  >
-                    <action.icon className="h-4 w-4 mr-2" />
-                    <span className="text-sm">{action.title}</span>
-                    {action.urgent && (
-                      <Badge variant="destructive" className="ml-auto text-xs">
-                        !
-                      </Badge>
-                    )}
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Star className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Grade Optimization Strategy</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Strategic targeting and effort allocation</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-blue-600">Current GPA: 3.7</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Globe className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Special Scenarios</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Transfer, double major, study abroad planning</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-600">5 scenarios available</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* 2. Project Incubation System Section */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Lightbulb className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Project Incubation System</h2>
+                  <p className="text-sm text-muted-foreground">AI-collaborative project development and uniqueness preservation</p>
+                </div>
+              </div>
+              <Badge variant="secondary">
+                <Brain className="h-3 w-3 mr-1" />
+                2 Active Projects
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Search className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Project Discovery</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Interest mining and problem identification</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-600">Ready to explore</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">AI Collaboration</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Socratic mode and development partner</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-blue-600">Chat available</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Code className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Technical Projects</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Open source, hackathons, apps</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-orange-600">3 ideas ready</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Briefcase className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Entrepreneurial</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">MVP development and validation</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-600">Market research</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* 3. Extracurricular Strategy Engine Section */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Users className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Extracurricular Strategy Engine</h2>
+                  <p className="text-sm text-muted-foreground">Strategic involvement optimization for maximum impact</p>
+                </div>
+              </div>
+              <Badge variant="secondary">
+                <Award className="h-3 w-3 mr-1" />
+                Score: 78/100
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Portfolio Analysis</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Leadership mapping and ROI calculation</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-600">5 activities tracked</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Target className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Strategic Recommendations</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Depth vs breadth optimization</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-blue-600">3 recommendations</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <PlusCircle className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Creation Opportunities</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Club founding and event organization</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-purple-600">2 opportunities</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
+
+          {/* 4. Skill Development Accelerator Section */}
+          <section>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Brain className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold">Skill Development Accelerator</h2>
+                  <p className="text-sm text-muted-foreground">Strategic skill building aligned with goals and market demands</p>
+                </div>
+              </div>
+              <Badge variant="secondary">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                8 Skills Mastered
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <BarChart3 className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Skill Gap Analysis</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Current vs target state assessment</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-red-600">4 priority gaps</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Code className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Technical Skills</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Stack development and certifications</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-green-600">2 certs planned</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Soft Skills</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Communication and leadership development</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-blue-600">In progress</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-shadow cursor-pointer group">
+                <CardContent className="p-4">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <Building className="h-5 w-5 text-primary" />
+                    <h3 className="font-medium">Domain Knowledge</h3>
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">Industry learning and business acumen</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-orange-600">3 domains</span>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </section>
         </div>
       </div>
     </div>
