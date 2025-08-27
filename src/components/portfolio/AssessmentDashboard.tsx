@@ -374,7 +374,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       </Dialog>
 
       <Dialog open={openSection === 'support'} onOpenChange={(v) => setOpenSection(v ? 'support' : null)}>
-        <DialogContent className="max-w-3xl w-full">
+        <DialogContent className="max-w-3xl w-full max-h-[95vh] overflow-hidden p-0">
           <SupportNetworkWizard
             onComplete={() => {
               setAssessmentSections((prev) => prev.map((s) => s.id === 'support' ? { ...s, status: 'completed', progress: 100 } : s));
