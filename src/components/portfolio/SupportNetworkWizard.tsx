@@ -128,10 +128,9 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   return (
     <div className="h-[95vh] flex flex-col">
       {/* Header */}
-      <div className="text-center space-y-2 flex-shrink-0 p-6">
-        
+      <div className="text-center flex-shrink-0 px-6 pt-4 pb-2">
         {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-2 mb-6">
+        <div className="flex items-center justify-center space-x-2">
           {STEPS.map((step, index) => (
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-2 ${
@@ -575,6 +574,27 @@ const DocumentationPortfolioStep: React.FC<{
                 Add Document
               </Button>
             </div>
+
+            {/* File Upload Section */}
+            <Card className="p-4 border-dashed border-2 border-primary/20">
+              <div className="text-center space-y-3">
+                <div className="flex justify-center">
+                  <svg className="h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Upload Your Documents</p>
+                  <p className="text-xs text-muted-foreground">Drag and drop files here or click to browse</p>
+                </div>
+                <Button variant="outline" size="sm">
+                  Choose Files
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Supported formats: PDF, DOC, DOCX, JPG, PNG (Max 10MB each)
+                </p>
+              </div>
+            </Card>
 
             {data.documents.map((doc, index) => (
               <Card key={index} className="p-4">
