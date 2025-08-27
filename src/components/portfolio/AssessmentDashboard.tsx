@@ -70,7 +70,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       progress: 0,
       status: 'not-started',
       items: ['Family responsibilities', 'Life circumstances'],
-      unlocked: currentProgress >= 20
+      unlocked: true // TODO: Restore to: currentProgress >= 20
     },
     {
       id: 'goals',
@@ -80,7 +80,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       progress: 0,
       status: 'not-started',
       items: ['Academic interests', 'Career goals', 'College application plans'],
-      unlocked: currentProgress >= 40
+      unlocked: true // TODO: Restore to: currentProgress >= 40
     },
     {
       id: 'support',
@@ -90,7 +90,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       progress: 0,
       status: 'not-started',
       items: ['Educational support', 'Community organizations', 'Portfolio items'],
-      unlocked: currentProgress >= 60
+      unlocked: true // TODO: Restore to: currentProgress >= 60
     }
   ]);
 
@@ -261,57 +261,39 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
               </div>
             </div>
             <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-              {currentProgress >= 80 ? 'Ready to Start' : 'Locked'}
+              Ready to Start {/* TODO: Restore to: {currentProgress >= 80 ? 'Ready to Start' : 'Locked'} */}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
-          {currentProgress >= 80 ? (
-            <div className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4 text-sm">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span>Meaningful experiences</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span>Personal challenges</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  <span>Additional context</span>
-                </div>
+          {/* TODO: Restore conditional wrapper when re-implementing progress gates */}
+          <div className="space-y-4">
+            <div className="grid md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Meaningful experiences</span>
               </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                This is the most important section of your portfolio. Share the stories that make you unique and help colleges understand who you are beyond grades and test scores.
-              </p>
-              <Button 
-                size="lg" 
-                className="w-full md:w-auto"
-                onClick={() => setOpenSection('growth')}
-              >
-                Start Personal Growth Section
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <h4 className="font-medium text-lg mb-2">Complete More Sections to Unlock</h4>
-              <p className="text-muted-foreground mb-4">
-                Complete at least 80% of other sections to unlock Personal Growth & Stories
-              </p>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div 
-                  className="bg-primary h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(currentProgress, 100)}%` }}
-                />
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Personal challenges</span>
               </div>
-              <p className="text-sm text-muted-foreground mt-2">
-                {currentProgress}% complete • {80 - currentProgress}% remaining
-              </p>
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                <span>Additional context</span>
+              </div>
             </div>
-          )}
+            <p className="text-sm text-muted-foreground mb-4">
+              This is the most important section of your portfolio. Share the stories that make you unique and help colleges understand who you are beyond grades and test scores.
+            </p>
+            <Button 
+              size="lg" 
+              className="w-full md:w-auto"
+              onClick={() => setOpenSection('growth')}
+            >
+              Start Personal Growth Section
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
