@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, 
   Target, 
@@ -27,461 +28,393 @@ import {
   Briefcase,
   Globe,
   Building,
-  Play
+  Play,
+  Home,
+  User,
+  Clock,
+  ChevronDown
 } from 'lucide-react';
-import Navigation from '@/components/Navigation';
-import Footer from '@/components/Footer';
 
 const AcademicPlanningIntelligence = () => {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("academic");
+  const [isPlanningDropdownOpen, setIsPlanningDropdownOpen] = useState(false);
 
-  // Hard coded data representing AI-powered academic planning features
-  const academicPlanningFeatures = [
-    {
-      icon: GraduationCap,
-      title: "Course Recommendation Engine",
-      description: "Multi-horizon planning for next semester, next year, and graduation requirements",
-      features: ["Strategic sequencing", "Prerequisite optimization", "Workload balancing", "Professor intelligence"]
-    },
-    {
-      icon: BarChart3,
-      title: "Grade Optimization Strategy", 
-      description: "Strategic grade targeting and effort allocation for maximum impact",
-      features: ["When A's matter vs B's", "Recovery planning", "Risk management", "Context-aware advice"]
-    },
-    {
-      icon: MapPin,
-      title: "Special Scenarios",
-      description: "Tailored strategies for unique academic paths and situations",
-      features: ["Transfer students", "Double majors", "Pre-professional tracks", "Study abroad timing"]
-    }
-  ];
+  // Hard coded dashboard data representing strategic planning metrics
+  const dashboardStats = {
+    academicPlan: { progress: 45, status: "In Progress", nextAction: "Schedule course selection" },
+    projectPipeline: { active: 2, planned: 3, completed: 1 },
+    extracurricularOptimization: { score: 78, target: 85, improved: "+12 pts" },
+    skillGapAnalysis: { priority: 4, addressing: 2, completed: 8 }
+  };
 
-  const projectIncubationFeatures = [
+  // Planning sections for quick access
+  const planningAreas = [
     {
-      icon: Search,
-      title: "Project Discovery Process",
-      description: "Start with passions and curiosities to find real problems worth solving",
-      features: ["Interest mining", "Problem identification", "Skill inventory matching", "Resource reality check"]
+      id: 'academic',
+      title: 'Academic Planning',
+      icon: BookOpen,
+      description: 'Course selection & grade optimization',
+      status: 'Active',
+      progress: 45
     },
     {
-      icon: MessageSquare,
-      title: "AI Collaboration Modes",
-      description: "Socratic questioning and development partnership for unique project ideas",
-      features: ["Probing questions", "Technical architecture", "Feature prioritization", "Launch planning"]
+      id: 'projects',
+      title: 'Project Incubation',
+      icon: Lightbulb,
+      description: 'AI-collaborative project development',
+      status: 'Planning',
+      progress: 30
     },
     {
-      icon: Star,
-      title: "Uniqueness Preservation",
-      description: "Ensure your projects stand out in a crowded landscape",
-      features: ["Saturation tracking", "Variation suggestions", "Niche identification", "Personal story integration"]
-    }
-  ];
-
-  const extracurricularFeatures = [
-    {
-      icon: TrendingUp,
-      title: "Involvement Portfolio Analysis",
-      description: "Strategic assessment of your activities for maximum impact",
-      features: ["Leadership ladder mapping", "Time ROI calculation", "Skill development mapping", "Network value assessment"]
+      id: 'extracurricular',
+      title: 'Activity Strategy',
+      icon: Users,
+      description: 'Strategic involvement optimization',
+      status: 'Review',
+      progress: 78
     },
     {
-      icon: Target,
-      title: "Strategic Recommendations",
-      description: "Depth vs breadth optimization for your specific goals",
-      features: ["When to go deep", "Leadership development pathway", "Impact amplification", "Position targeting"]
-    },
-    {
-      icon: Award,
-      title: "Competition & Creation Strategy",
-      description: "Win competitions and create new opportunities",
-      features: ["Competition selection", "Team formation strategy", "Club founding guidance", "Event organization"]
-    }
-  ];
-
-  const skillDevelopmentFeatures = [
-    {
+      id: 'skills',
+      title: 'Skill Development',
       icon: Brain,
-      title: "Skill Gap Analysis",
-      description: "Identify and prioritize the skills that matter most for your goals",
-      features: ["Current state assessment", "Target state definition", "Gap prioritization", "Learning path optimization"]
-    },
-    {
-      icon: Settings,
-      title: "Learning Strategy Personalization",
-      description: "Optimize your learning approach based on your style and pace",
-      features: ["Learning style matching", "Pace optimization", "Resource curation", "Practice integration"]
-    },
-    {
-      icon: Code,
-      title: "Skill Categories & Strategies",
-      description: "Comprehensive approach to technical, soft, and domain skills",
-      features: ["Technical stack development", "Communication skills", "Industry knowledge", "Certification strategy"]
+      description: 'Targeted skill building roadmap',
+      status: 'Active',
+      progress: 62
     }
   ];
 
-  // Hard coded project examples - represents real AI-generated project ideas
-  const projectExamples = [
+  const recentRecommendations = [
     {
-      category: "Technical",
-      title: "AI-Powered Study Group Matcher",
-      description: "App that matches students based on learning styles, schedules, and course difficulty",
-      skills: ["React Native", "Machine Learning", "Database Design"],
-      uniqueness: "Addresses real problem of ineffective study groups with data-driven matching"
+      type: "Academic",
+      title: "Add Data Structures (CS 301) to spring schedule",
+      priority: "High",
+      reason: "Prerequisite for advanced courses",
+      timeframe: "Spring 2024"
     },
     {
-      category: "Social Impact", 
-      title: "Local Food Waste Reduction Platform",
-      description: "Connect restaurants with food banks and community organizations",
-      skills: ["Project Management", "Stakeholder Engagement", "Impact Measurement"],
-      uniqueness: "Focuses on hyperlocal solutions rather than broad national approaches"
+      type: "Project",
+      title: "Local business digitization initiative",
+      priority: "Medium",
+      reason: "Combines tech skills with community impact",
+      timeframe: "6-8 months"
     },
     {
-      category: "Creative",
-      title: "Interactive College Prep Podcast Series",
-      description: "Student-hosted podcast with interactive elements and community features",
-      skills: ["Content Creation", "Audio Production", "Community Building"],
-      uniqueness: "Combines traditional podcasting with interactive digital experiences"
+      type: "Extracurricular",
+      title: "Run for treasurer position in CS club",
+      priority: "High",
+      reason: "Leadership experience + skill development",
+      timeframe: "Next election cycle"
     }
+  ];
+
+  // Quick action items for dashboard
+  const quickActions = [
+    { icon: Calendar, title: "Schedule Course Planning Session", urgent: true },
+    { icon: Search, title: "Discover New Project Ideas", urgent: false },
+    { icon: Target, title: "Review Activity Portfolio", urgent: false },
+    { icon: BarChart3, title: "Analyze Skill Gaps", urgent: true }
   ];
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-      
-      {/* Hero Section */}
-      <section className="pt-24 pb-16 bg-gradient-to-br from-primary/10 via-background to-secondary/10">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <Badge className="mb-6 px-4 py-2 text-sm">
-              🎯 Academic Planning Intelligence
-            </Badge>
-            <h1 className="text-4xl md:text-6xl font-bold mb-6 gradient-text">
-              Strategic Academic Planning
-            </h1>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8 leading-relaxed">
-              AI-powered planner and project generator that helps you navigate the right choices across academics, projects, extracurriculars, and skill development.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-              <Button size="lg" className="px-8 py-6 text-lg">
-                Start Your Strategic Plan
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-              <Button variant="outline" size="lg" className="px-8 py-6 text-lg">
-                <Play className="mr-2 h-5 w-5" />
-                See How It Works
+      {/* Compact Navigation */}
+      <nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-4">
+              <Button 
+                variant="ghost" 
+                onClick={() => navigate('/')}
+                className="flex items-center space-x-2 text-xl font-bold text-primary hover:text-primary/80"
+              >
+                <Home className="h-5 w-5" />
+                <span>Uplift</span>
               </Button>
             </div>
-            
-            {/* Key Stats */}
-            <div className="grid md:grid-cols-3 gap-8 max-w-2xl mx-auto">
-              <div className="text-center">
-                <div className="text-3xl font-bold text-primary">94%</div>
-                <div className="text-sm text-muted-foreground">Better Decision Making</div>
+
+            {/* Navigation Items */}
+            <div className="hidden md:flex items-center space-x-6">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                Platform
+              </Button>
+              
+              <Button variant="ghost" size="sm">
+                Features
+              </Button>
+              
+              {/* Academic Planning Dropdown */}
+              <div className="relative">
+                <Button 
+                  variant="secondary"
+                  size="sm"
+                  onMouseEnter={() => setIsPlanningDropdownOpen(true)}
+                  onMouseLeave={() => setIsPlanningDropdownOpen(false)}
+                  className="flex items-center space-x-1"
+                >
+                  <span>Academic Planning</span>
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+                
+                {isPlanningDropdownOpen && (
+                  <div 
+                    className="absolute top-full left-0 mt-1 w-48 bg-background border border-border rounded-lg shadow-lg z-[60]"
+                    onMouseEnter={() => setIsPlanningDropdownOpen(true)}
+                    onMouseLeave={() => setIsPlanningDropdownOpen(false)}
+                  >
+                    <div className="py-2">
+                      {planningAreas.map((area) => (
+                        <button
+                          key={area.id}
+                          onClick={() => {
+                            setActiveTab(area.id);
+                            setIsPlanningDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-2 text-sm hover:bg-muted transition-colors flex items-center space-x-2 ${
+                            activeTab === area.id ? 'bg-muted text-primary font-medium' : 'text-foreground'
+                          }`}
+                        >
+                          <area.icon className="h-4 w-4" />
+                          <span>{area.title}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-primary">5.2x</div>
-                <div className="text-sm text-muted-foreground">Faster Goal Achievement</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl font-bold text-primary">200+</div>
-                <div className="text-sm text-muted-foreground">Hours Saved Planning</div>
-              </div>
+              
+              <Button variant="ghost" size="sm">
+                Portfolio Scanner
+              </Button>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <Badge variant="secondary" className="hidden sm:flex">
+                <Brain className="h-3 w-3 mr-1" />
+                Strategic Planning
+              </Badge>
             </div>
           </div>
         </div>
-      </section>
+      </nav>
 
-      {/* Main Planning Sections */}
-      <section className="py-20">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Four Strategic Pillars for Academic Success
-            </h2>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-              Comprehensive AI-powered guidance across every aspect of your academic journey
-            </p>
-          </div>
-
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="max-w-6xl mx-auto">
-            <TabsList className="grid grid-cols-4 w-full mb-12">
-              <TabsTrigger value="academic" className="flex flex-col gap-2 p-4">
-                <BookOpen className="h-5 w-5" />
-                <span className="text-sm">Academic Planning</span>
-              </TabsTrigger>
-              <TabsTrigger value="projects" className="flex flex-col gap-2 p-4">
-                <Lightbulb className="h-5 w-5" />
-                <span className="text-sm">Project Incubation</span>
-              </TabsTrigger>
-              <TabsTrigger value="extracurricular" className="flex flex-col gap-2 p-4">
-                <Users className="h-5 w-5" />
-                <span className="text-sm">Extracurricular Strategy</span>
-              </TabsTrigger>
-              <TabsTrigger value="skills" className="flex flex-col gap-2 p-4">
-                <Brain className="h-5 w-5" />
-                <span className="text-sm">Skill Development</span>
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="academic" className="space-y-8">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-4">Academic Planning Intelligence</h3>
-                <p className="text-muted-foreground text-lg">Strategic course selection and grade optimization based on your goals, capacity, and market demands</p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6">
-                {academicPlanningFeatures.map((feature, index) => (
-                  <Card key={index} className="border-2 hover:border-primary/20 transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <feature.icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <CardTitle className="text-lg">{feature.title}</CardTitle>
-                      </div>
-                      <p className="text-muted-foreground text-sm">{feature.description}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2">
-                        {feature.features.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Button className="w-full mt-4" variant="outline">
-                        Start Academic Planning
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="projects" className="space-y-8">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-4">Project Incubation System</h3>
-                <p className="text-muted-foreground text-lg">AI-collaborative project development that ensures uniqueness and maximum impact</p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6 mb-12">
-                {projectIncubationFeatures.map((feature, index) => (
-                  <Card key={index} className="border-2 hover:border-primary/20 transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <feature.icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <CardTitle className="text-lg">{feature.title}</CardTitle>
-                      </div>
-                      <p className="text-muted-foreground text-sm">{feature.description}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2">
-                        {feature.features.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Button className="w-full mt-4" variant="outline">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Start Project Discovery
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Project Examples */}
-              <div className="bg-muted/30 rounded-lg p-6">
-                <h4 className="text-xl font-semibold mb-4">AI-Generated Project Examples</h4>
-                <div className="grid md:grid-cols-3 gap-4">
-                  {projectExamples.map((project, index) => (
-                    <Card key={index} className="border">
-                      <CardHeader>
-                        <Badge variant="secondary" className="w-fit">{project.category}</Badge>
-                        <CardTitle className="text-lg">{project.title}</CardTitle>
-                        <p className="text-sm text-muted-foreground">{project.description}</p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3">
-                          <div>
-                            <p className="text-sm font-medium mb-1">Skills Developed:</p>
-                            <div className="flex flex-wrap gap-1">
-                              {project.skills.map((skill, idx) => (
-                                <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
-                              ))}
-                            </div>
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium mb-1">Uniqueness Factor:</p>
-                            <p className="text-xs text-muted-foreground">{project.uniqueness}</p>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+      {/* Compact Dashboard Header */}
+      <div className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="p-2 bg-primary rounded-lg">
+                  <Brain className="h-5 w-5 text-primary-foreground" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground">Academic Planning Intelligence</h1>
+                  <p className="text-sm text-muted-foreground">Strategic planning dashboard for academic success</p>
                 </div>
               </div>
-            </TabsContent>
-
-            <TabsContent value="extracurricular" className="space-y-8">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-4">Extracurricular Strategy Engine</h3>
-                <p className="text-muted-foreground text-lg">Strategic involvement optimization for maximum impact and personal growth</p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6">
-                {extracurricularFeatures.map((feature, index) => (
-                  <Card key={index} className="border-2 hover:border-primary/20 transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <feature.icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <CardTitle className="text-lg">{feature.title}</CardTitle>
-                      </div>
-                      <p className="text-muted-foreground text-sm">{feature.description}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2">
-                        {feature.features.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Button className="w-full mt-4" variant="outline">
-                        Optimize Activities
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="skills" className="space-y-8">
-              <div className="text-center mb-8">
-                <h3 className="text-2xl font-bold mb-4">Skill Development Accelerator</h3>
-                <p className="text-muted-foreground text-lg">Strategic skill building aligned with your goals and market demands</p>
-              </div>
-              
-              <div className="grid md:grid-cols-3 gap-6">
-                {skillDevelopmentFeatures.map((feature, index) => (
-                  <Card key={index} className="border-2 hover:border-primary/20 transition-colors">
-                    <CardHeader>
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="p-2 rounded-lg bg-primary/10">
-                          <feature.icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <CardTitle className="text-lg">{feature.title}</CardTitle>
-                      </div>
-                      <p className="text-muted-foreground text-sm">{feature.description}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="space-y-2">
-                        {feature.features.map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
-                            <span className="text-sm">{item}</span>
-                          </li>
-                        ))}
-                      </ul>
-                      <Button className="w-full mt-4" variant="outline">
-                        Analyze Skills Gap
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-
-              {/* Skill Categories */}
-              <div className="grid md:grid-cols-3 gap-6 mt-8">
-                <Card className="border">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Code className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">Technical Skills</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-1 text-sm">
-                      <li>• Stack development</li>
-                      <li>• Tool mastery sequencing</li>
-                      <li>• Certification strategy</li>
-                      <li>• Portfolio building</li>
-                    </ul>
-                  </CardContent>
-                </Card>
-
-                <Card className="border">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <MessageSquare className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">Soft Skills</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-1 text-sm">
-                      <li>• Communication development</li>
-                      <li>• Leadership building</li>
-                      <li>• Collaboration skills</li>
-                      <li>• Cultural intelligence</li>
-                    </ul>
-                  </CardContent>
-                </Card>
-
-                <Card className="border">
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <Globe className="h-5 w-5 text-primary" />
-                      <CardTitle className="text-lg">Domain Knowledge</CardTitle>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-1 text-sm">
-                      <li>• Industry learning</li>
-                      <li>• Business acumen</li>
-                      <li>• Research skills</li>
-                      <li>• Market dynamics</li>
-                    </ul>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gradient-to-r from-primary to-primary/80">
-        <div className="container mx-auto px-4 text-center">
-          <div className="max-w-3xl mx-auto text-white">
-            <h2 className="text-3xl md:text-4xl font-bold mb-6">
-              Ready to Transform Your Academic Strategy?
-            </h2>
-            <p className="text-xl mb-8 opacity-90">
-              Get AI-powered guidance across academics, projects, extracurriculars, and skill development
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" variant="secondary" className="px-8 py-6 text-lg">
-                Start Strategic Planning
-                <ArrowRight className="ml-2 h-5 w-5" />
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button size="sm" variant="outline">
+                <Calendar className="h-4 w-4 mr-2" />
+                Schedule Planning
               </Button>
-              <Button size="lg" variant="outline" className="px-8 py-6 text-lg bg-white/10 border-white text-white hover:bg-white/20">
-                Book Strategy Session
+              <Button size="sm">
+                <Target className="h-4 w-4 mr-2" />
+                Start Strategy
               </Button>
             </div>
           </div>
         </div>
-      </section>
+      </div>
 
-      <Footer />
+      {/* Dashboard Overview */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Key Metrics Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Academic Plan</p>
+                  <p className="text-2xl font-bold">{dashboardStats.academicPlan.progress}%</p>
+                  <p className="text-xs text-muted-foreground">{dashboardStats.academicPlan.status}</p>
+                </div>
+                <BookOpen className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Active Projects</p>
+                  <p className="text-2xl font-bold">{dashboardStats.projectPipeline.active}</p>
+                  <p className="text-xs text-muted-foreground">{dashboardStats.projectPipeline.planned} in pipeline</p>
+                </div>
+                <Lightbulb className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Activity Score</p>
+                  <p className="text-2xl font-bold">{dashboardStats.extracurricularOptimization.score}</p>
+                  <p className="text-xs text-green-600">{dashboardStats.extracurricularOptimization.improved} this month</p>
+                </div>
+                <Users className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Priority Skills</p>
+                  <p className="text-2xl font-bold">{dashboardStats.skillGapAnalysis.priority}</p>
+                  <p className="text-xs text-muted-foreground">{dashboardStats.skillGapAnalysis.addressing} in progress</p>
+                </div>
+                <Brain className="h-8 w-8 text-muted-foreground" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Dashboard Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Planning Areas */}
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Target className="h-5 w-5" />
+                  <span>Strategic Planning Areas</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
+                  <TabsList className="grid grid-cols-4 w-full mb-6">
+                    {planningAreas.map((area) => (
+                      <TabsTrigger key={area.id} value={area.id} className="flex flex-col gap-1 p-3">
+                        <area.icon className="h-4 w-4" />
+                        <span className="text-xs">{area.title}</span>
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+
+                  {planningAreas.map((area) => (
+                    <TabsContent key={area.id} value={area.id} className="space-y-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold">{area.title}</h3>
+                          <p className="text-sm text-muted-foreground">{area.description}</p>
+                        </div>
+                        <Badge variant={area.status === 'Active' ? 'default' : 'secondary'}>
+                          {area.status}
+                        </Badge>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{area.progress}%</span>
+                        </div>
+                        <div className="w-full bg-secondary rounded-full h-2">
+                          <div 
+                            className="bg-primary h-2 rounded-full transition-all duration-300" 
+                            style={{ width: `${area.progress}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex space-x-2 mt-4">
+                        <Button size="sm">
+                          <Play className="h-4 w-4 mr-2" />
+                          Continue Planning
+                        </Button>
+                        <Button size="sm" variant="outline">
+                          <Settings className="h-4 w-4 mr-2" />
+                          Configure
+                        </Button>
+                      </div>
+                    </TabsContent>
+                  ))}
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Recent Recommendations */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Zap className="h-5 w-5" />
+                  <span>AI Recommendations</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {recentRecommendations.map((rec, index) => (
+                  <div key={index} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <Badge variant="outline" className="text-xs">
+                        {rec.type}
+                      </Badge>
+                      <Badge 
+                        variant={rec.priority === 'High' ? 'destructive' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {rec.priority}
+                      </Badge>
+                    </div>
+                    <h4 className="text-sm font-medium mb-1">{rec.title}</h4>
+                    <p className="text-xs text-muted-foreground mb-2">{rec.reason}</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">{rec.timeframe}</span>
+                      <Button size="sm" variant="ghost" className="h-6 px-2">
+                        <ArrowRight className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Clock className="h-5 w-5" />
+                  <span>Quick Actions</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {quickActions.map((action, index) => (
+                  <Button 
+                    key={index} 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full justify-start"
+                  >
+                    <action.icon className="h-4 w-4 mr-2" />
+                    <span className="text-sm">{action.title}</span>
+                    {action.urgent && (
+                      <Badge variant="destructive" className="ml-auto text-xs">
+                        !
+                      </Badge>
+                    )}
+                  </Button>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
