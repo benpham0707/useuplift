@@ -326,75 +326,159 @@ const AcademicPlanningIntelligence = () => {
         </div>
       </div>
 
-      {/* Progressive Journey Timeline */}
+      {/* Continuous Progress Loop */}
       <div className="bg-muted/30 py-16">
-        <div className="max-w-7xl mx-auto px-4">
+        <div className="max-w-6xl mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-foreground mb-4">
-              Your Strategic Journey
+              Continuous Strategic Evolution
             </h2>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              A progressive approach to maximizing your potential across all domains
+              Your development follows a continuous cycle of assessment, planning, and optimization
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-            {/* Timeline Steps */}
-            {[
-              { step: '01', title: 'Assess', desc: 'Current state analysis', icon: Search },
-              { step: '02', title: 'Plan', desc: 'Strategic roadmap creation', icon: Target },
-              { step: '03', title: 'Execute', desc: 'Guided implementation', icon: Play },
-              { step: '04', title: 'Optimize', desc: 'Continuous improvement', icon: TrendingUp }
-            ].map((phase, index) => (
-              <div key={index} className="text-center">
-                <div className="relative mb-6">
-                  <div className="w-16 h-16 bg-primary rounded-full flex items-center justify-center mx-auto mb-4">
-                    <phase.icon className="h-8 w-8 text-primary-foreground" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-foreground text-background rounded-full flex items-center justify-center text-sm font-bold">
-                    {phase.step}
-                  </div>
+          {/* Arrow Loop Infographic */}
+          <div className="relative">
+            <svg viewBox="0 0 800 400" className="w-full h-80 mx-auto">
+              {/* Background circle path */}
+              <defs>
+                <path id="circle-path" d="M 400,200 m -150,0 a 150,150 0 1,1 300,0 a 150,150 0 1,1 -300,0" />
+                <linearGradient id="arrow-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="hsl(var(--primary))" />
+                  <stop offset="100%" stopColor="hsl(var(--primary)/0.6)" />
+                </linearGradient>
+              </defs>
+              
+              {/* Curved arrow path */}
+              <path 
+                d="M 400,200 m -150,0 a 150,150 0 1,1 300,0 a 150,150 0 1,1 -300,0" 
+                fill="none" 
+                stroke="url(#arrow-gradient)" 
+                strokeWidth="3"
+                strokeDasharray="8,4"
+                className="animate-pulse"
+              />
+              
+              {/* Arrow heads at key points */}
+              <polygon points="550,200 540,195 540,205" fill="hsl(var(--primary))" />
+              <polygon points="400,50 395,60 405,60" fill="hsl(var(--primary))" />
+              <polygon points="250,200 260,195 260,205" fill="hsl(var(--primary))" />
+              <polygon points="400,350 405,340 395,340" fill="hsl(var(--primary))" />
+            </svg>
+
+            {/* Loop stages positioned around the circle */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="relative w-80 h-80">
+                {/* Center - You */}
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-primary rounded-full flex items-center justify-center">
+                  <User className="h-8 w-8 text-primary-foreground" />
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">{phase.title}</h3>
-                <p className="text-sm text-muted-foreground">{phase.desc}</p>
+                
+                {/* Stage 1 - Top */}
+                <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                  <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mb-2 mx-auto">
+                    <Search className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">Analyze</h4>
+                  <p className="text-xs text-muted-foreground">Current state</p>
+                </div>
+                
+                {/* Stage 2 - Right */}
+                <div className="absolute top-1/2 right-0 transform translate-x-1/2 -translate-y-1/2 text-center">
+                  <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mb-2 mx-auto">
+                    <Target className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">Strategize</h4>
+                  <p className="text-xs text-muted-foreground">Plan moves</p>
+                </div>
+                
+                {/* Stage 3 - Bottom */}
+                <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 text-center">
+                  <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mb-2 mx-auto">
+                    <Play className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">Execute</h4>
+                  <p className="text-xs text-muted-foreground">Take action</p>
+                </div>
+                
+                {/* Stage 4 - Left */}
+                <div className="absolute top-1/2 left-0 transform -translate-x-1/2 -translate-y-1/2 text-center">
+                  <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center mb-2 mx-auto">
+                    <TrendingUp className="h-6 w-6 text-white" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">Optimize</h4>
+                  <p className="text-xs text-muted-foreground">Improve & adapt</p>
+                </div>
               </div>
-            ))}
+            </div>
+          </div>
+
+          <div className="text-center mt-8">
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Each cycle builds on previous insights, creating compound growth in your strategic development
+            </p>
           </div>
         </div>
       </div>
 
-      {/* Success Promise CTA */}
-      <div className="bg-gradient-to-r from-primary to-primary/80 py-16">
-        <div className="max-w-4xl mx-auto px-4 text-center">
-          <div className="mb-8">
-            <Star className="h-12 w-12 text-primary-foreground mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-primary-foreground mb-4">
-              Your Success, Strategically Planned
-            </h2>
-            <p className="text-lg text-primary-foreground/90 leading-relaxed">
-              Join students who've transformed their academic and professional trajectory with data-driven, 
-              personalized strategic planning. No more guesswork—just clear, actionable steps to your goals.
-            </p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button 
-              size="lg" 
-              variant="secondary"
-              className="bg-white text-primary hover:bg-white/90 font-semibold"
-            >
-              <Target className="h-5 w-5 mr-2" />
-              Start Your Strategic Plan
-            </Button>
-            <Button 
-              size="lg" 
-              variant="outline"
-              className="border-white text-white hover:bg-white hover:text-primary"
-            >
-              <Calendar className="h-5 w-5 mr-2" />
-              Book a Strategy Session
-            </Button>
-          </div>
+      {/* FAQ Section */}
+      <div className="max-w-4xl mx-auto px-4 py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-foreground mb-4">
+            Frequently Asked Questions
+          </h2>
+          <p className="text-lg text-muted-foreground">
+            Everything you need to know about strategic planning with Next Moves Engine
+          </p>
+        </div>
+
+        <div className="space-y-6">
+          {/* Hard coded FAQ data representing common strategic planning questions */}
+          {[
+            {
+              question: "How is this different from general college advice?",
+              answer: "Instead of one-size-fits-all advice, we analyze your specific situation, goals, and timeline to provide personalized recommendations. Our AI considers your current GPA, interests, career goals, and even factors like course difficulty and professor ratings."
+            },
+            {
+              question: "What makes the project recommendations unique?",
+              answer: "Our AI doesn't just suggest popular projects. It analyzes trending problems in your field, your skill level, and available time to propose projects that solve real problems while building your portfolio strategically."
+            },
+            {
+              question: "How does the extracurricular strategy actually work?",
+              answer: "We map your current involvement, calculate leadership ROI, and identify strategic gaps. Rather than joining everything, we help you choose 2-3 activities where you can achieve meaningful leadership and impact."
+            },
+            {
+              question: "Can this help with specific scenarios like transferring or study abroad?",
+              answer: "Yes, our academic planning intelligence includes specialized modules for transfers, double majors, study abroad planning, and graduate school preparation with timeline-specific recommendations."
+            },
+            {
+              question: "How often should I use the strategic planning tools?",
+              answer: "We recommend quarterly strategic reviews with monthly check-ins. The system adapts as your goals evolve and new opportunities arise, ensuring your strategy stays current and effective."
+            },
+            {
+              question: "What if I'm already a senior - is it too late?",
+              answer: "Not at all. We have specific strategies for seniors focused on maximizing final semester opportunities, graduate school applications, job search optimization, and strategic networking."
+            }
+          ].map((faq, index) => (
+            <Card key={index} className="border border-border">
+              <CardContent className="p-6">
+                <h3 className="text-lg font-semibold text-foreground mb-3">
+                  {faq.question}
+                </h3>
+                <p className="text-muted-foreground leading-relaxed">
+                  {faq.answer}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        <div className="text-center mt-12">
+          <Button size="lg" className="bg-primary hover:bg-primary/90">
+            <Target className="h-5 w-5 mr-2" />
+            Start Your Strategic Assessment
+          </Button>
         </div>
       </div>
     </div>
