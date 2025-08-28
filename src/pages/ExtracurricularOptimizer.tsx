@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,36 @@ const AcademicPlanningIntelligence = () => {
   const { user, signOut, loading } = useAuth();
   const [isPlanningDropdownOpen, setIsPlanningDropdownOpen] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState(null);
+  const [visibleSections, setVisibleSections] = useState(new Set());
+
+  // Scroll-based fade effect
+  useEffect(() => {
+    const observerOptions = {
+      threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+      rootMargin: '-10% 0px -10% 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const sectionId = entry.target.id;
+        if (entry.isIntersecting && entry.intersectionRatio > 0.3) {
+          setVisibleSections(prev => new Set([...prev, sectionId]));
+        } else {
+          setVisibleSections(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(sectionId);
+            return newSet;
+          });
+        }
+      });
+    }, observerOptions);
+
+    // Observe all sections
+    const sections = document.querySelectorAll('[data-scroll-section]');
+    sections.forEach(section => observer.observe(section));
+
+    return () => observer.disconnect();
+  }, []);
 
   // Hard coded strategic domain data representing the Next Moves Engine's five core areas
   const strategicDomains = [
@@ -358,10 +388,15 @@ const AcademicPlanningIntelligence = () => {
       </div>
 
       {/* Academic Planning Intelligence Section */}
-      <div id="academic" className="section-transition animate-fade-in"
-           style={{
-             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
-           }}>
+      <div 
+        id="academic" 
+        data-scroll-section
+        className={`transition-all duration-1000 ease-out ${
+          visibleSections.has('academic') 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-30 translate-y-8'
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -445,10 +480,15 @@ const AcademicPlanningIntelligence = () => {
       </div>
 
       {/* Project Incubation System Section */}
-      <div id="projects" className="section-transition animate-fade-in"
-           style={{
-             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
-           }}>
+      <div 
+        id="projects" 
+        data-scroll-section
+        className={`transition-all duration-1000 ease-out ${
+          visibleSections.has('projects') 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-30 translate-y-8'
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -532,10 +572,15 @@ const AcademicPlanningIntelligence = () => {
       </div>
 
       {/* Extracurricular Strategy Engine Section */}
-      <div id="extracurricular" className="section-transition animate-fade-in"
-           style={{
-             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
-           }}>
+      <div 
+        id="extracurricular" 
+        data-scroll-section
+        className={`transition-all duration-1000 ease-out ${
+          visibleSections.has('extracurricular') 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-30 translate-y-8'
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -619,10 +664,15 @@ const AcademicPlanningIntelligence = () => {
       </div>
 
       {/* Skill Development Accelerator Section */}
-      <div id="skills" className="section-transition animate-fade-in"
-           style={{
-             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
-           }}>
+      <div 
+        id="skills" 
+        data-scroll-section
+        className={`transition-all duration-1000 ease-out ${
+          visibleSections.has('skills') 
+            ? 'opacity-100 translate-y-0' 
+            : 'opacity-30 translate-y-8'
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
