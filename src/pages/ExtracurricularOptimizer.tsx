@@ -58,7 +58,7 @@ const AcademicPlanningIntelligence = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Scroll-based fade effect - new section appears slowly, old section fades quickly
+  // Scroll-based fade effect - smooth transitions
   useEffect(() => {
     const observerOptions = {
       threshold: Array.from({length: 101}, (_, i) => i * 0.01), // 0 to 1 in 0.01 increments
@@ -70,16 +70,13 @@ const AcademicPlanningIntelligence = () => {
         const sectionId = entry.target.id;
         const ratio = entry.intersectionRatio;
         
-        // Calculate opacity - new sections appear slowly, old sections fade quickly
+        // Simple opacity calculation based on visibility ratio
+        // Sections fade in slowly as they become visible
+        // Sections fade out quickly as they become less visible
         let opacity = 0;
         if (ratio > 0.1) {
-          // New section appears slowly over 80% visibility range (10% to 90%)
-          opacity = Math.min(1, (ratio - 0.1) / 0.8); 
-        }
-        
-        // For sections going out of view, fade them quickly
-        if (ratio < 0.5 && ratio > 0) {
-          opacity = ratio * 2; // Quick fade out
+          // Smooth fade in from 10% to 90% visibility
+          opacity = Math.min(1, (ratio - 0.1) / 0.8);
         }
         
         setSectionOpacity(prev => ({
@@ -107,36 +104,36 @@ const AcademicPlanningIntelligence = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Dynamic background gradient with theme colors - horizontal transitions
+  // Dynamic background gradient with theme colors - vertical transitions
   const getBackgroundGradient = () => {
     const progress = scrollProgress;
     
-    // Smooth horizontal transitions between sections
+    // Smooth vertical transitions between sections
     if (progress < 0.2) {
       // Start light (background color)
       return `hsl(var(--background))`;
     } else if (progress < 0.4) {
-      // Gradual horizontal transition to dark (primary navy)
+      // Gradual vertical transition to dark (primary navy)
       const localProgress = (progress - 0.2) / 0.2;
       const smoothProgress = localProgress * localProgress * (3 - 2 * localProgress); // Smooth ease
-      return `linear-gradient(to right, 
+      return `linear-gradient(to bottom, 
         hsl(var(--background)) ${Math.max(0, 100 - smoothProgress * 100)}%, 
         hsl(var(--primary)) ${Math.min(100, smoothProgress * 100)}%)`;
     } else if (progress < 0.6) {
       // Stay dark for the full dark section
       return `hsl(var(--primary))`;
     } else if (progress < 0.8) {
-      // Gradual horizontal transition back to light
+      // Gradual vertical transition back to light
       const localProgress = (progress - 0.6) / 0.2;
       const smoothProgress = localProgress * localProgress * (3 - 2 * localProgress); // Smooth ease
-      return `linear-gradient(to right, 
+      return `linear-gradient(to bottom, 
         hsl(var(--primary)) ${Math.max(0, 100 - smoothProgress * 100)}%, 
         hsl(var(--background)) ${Math.min(100, smoothProgress * 100)}%)`;
     } else {
-      // Gradual horizontal transition to dark again
+      // Gradual vertical transition to dark again
       const localProgress = (progress - 0.8) / 0.2;
       const smoothProgress = localProgress * localProgress * (3 - 2 * localProgress); // Smooth ease
-      return `linear-gradient(to right, 
+      return `linear-gradient(to bottom, 
         hsl(var(--background)) ${Math.max(0, 100 - smoothProgress * 100)}%, 
         hsl(var(--primary)) ${Math.min(100, smoothProgress * 100)}%)`;
     }
