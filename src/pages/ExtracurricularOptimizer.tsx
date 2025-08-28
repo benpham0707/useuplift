@@ -137,69 +137,18 @@ const AcademicPlanningIntelligence = () => {
               </Button>
             </div>
 
-            {/* Strategic Domain Navigation */}
-            <div className="hidden md:flex items-center space-x-1">
-              {strategicDomains.map((domain) => {
-                const Icon = domain.icon;
-                const needsImprovement = domain.progress < 50;
-                
-                return (
-                  <div key={domain.id} className="relative group">
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className={`flex flex-col items-center px-3 py-2 h-auto transition-all duration-200 ${
-                        needsImprovement ? 'bg-amber-50 hover:bg-amber-100 border border-amber-200' : 'hover:bg-muted'
-                      }`}
-                      onClick={() => {
-                        const element = document.getElementById(domain.id);
-                        element?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                    >
-                      <div className={`flex items-center justify-center w-8 h-8 rounded-lg mb-1 ${domain.iconBg}`}>
-                        <Icon className={`h-4 w-4 ${domain.iconColor}`} />
-                      </div>
-                      <span className="text-xs font-medium text-center leading-tight">
-                        {domain.title.split(' ')[0]}
-                      </span>
-                      <div className="flex items-center mt-1">
-                        <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full transition-all duration-300 ${
-                              needsImprovement ? 'bg-amber-500' : 'bg-primary'
-                            }`}
-                            style={{ width: `${domain.progress}%` }}
-                          />
-                        </div>
-                        {needsImprovement && (
-                          <Badge variant="outline" className="ml-2 text-xs bg-amber-100 text-amber-800 border-amber-300">
-                            Focus
-                          </Badge>
-                        )}
-                      </div>
-                    </Button>
-                    
-                    {/* Tooltip */}
-                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
-                      <div className="bg-card border border-border rounded-lg shadow-lg p-3 w-64">
-                        <div className="text-sm font-medium text-foreground">{domain.title}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{domain.subtitle}</div>
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-muted-foreground">Progress</span>
-                          <span className={`text-xs font-medium ${needsImprovement ? 'text-amber-600' : 'text-primary'}`}>
-                            {domain.progress}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            {/* Navigation Items */}
+            <div className="hidden md:flex items-center space-x-6">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                Platform
+              </Button>
+              
+              <Button variant="ghost" size="sm">
+                Features
+              </Button>
             </div>
 
-            {/* Right Side Navigation */}
             <div className="hidden md:flex items-center space-x-4">
-              
               {/* Academic Planning Dropdown */}
               <div className="relative">
                 <Button 
@@ -240,13 +189,13 @@ const AcademicPlanningIntelligence = () => {
               <Button variant="ghost" size="sm">
                 Portfolio Scanner
               </Button>
-            </div>
 
-            <div className="flex items-center space-x-3">
-              <Badge variant="secondary" className="hidden sm:flex">
-                <Brain className="h-3 w-3 mr-1" />
-                Strategic Planning
-              </Badge>
+              <div className="flex items-center space-x-3">
+                <Badge variant="secondary" className="hidden sm:flex">
+                  <Brain className="h-3 w-3 mr-1" />
+                  Strategic Planning
+                </Badge>
+              </div>
             </div>
           </div>
         </div>
@@ -269,8 +218,54 @@ const AcademicPlanningIntelligence = () => {
               Get strategic guidance that actually fits your goals, timeline, and current situation. 
               Your AI-powered strategic advisor for academic, professional, and personal development.
             </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12">
+              {strategicDomains.map((domain) => {
+                const Icon = domain.icon;
+                const needsImprovement = domain.progress < 50;
+                
+                return (
+                  <Card 
+                    key={domain.id} 
+                    className={`cursor-pointer transition-all duration-200 hover:shadow-lg ${
+                      needsImprovement ? 'bg-amber-50 border-amber-200 hover:bg-amber-100' : 'hover:shadow-medium'
+                    }`}
+                    onClick={() => {
+                      const element = document.getElementById(domain.id);
+                      element?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                  >
+                    <CardContent className="p-6 text-center">
+                      <div className={`inline-flex items-center justify-center w-12 h-12 rounded-xl mb-4 ${domain.iconBg}`}>
+                        <Icon className={`h-6 w-6 ${domain.iconColor}`} />
+                      </div>
+                      <h3 className="font-semibold text-sm text-foreground mb-2">
+                        {domain.title.split(' ')[0]}
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${
+                              needsImprovement ? 'bg-amber-500' : 'bg-primary'
+                            }`}
+                            style={{ width: `${domain.progress}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-muted-foreground">{domain.progress}%</span>
+                          {needsImprovement && (
+                            <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800 border-amber-300">
+                              Focus
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
             
-            <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground mb-12">
+            <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground">
               <div className="flex items-center space-x-2">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
                 <span>Personalized recommendations</span>
@@ -289,7 +284,7 @@ const AcademicPlanningIntelligence = () => {
       </div>
 
       {/* Academic Planning Intelligence Section */}
-      <div className="section-divider gradient-section">
+      <div id="academic" className="section-divider gradient-section">
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -376,7 +371,7 @@ const AcademicPlanningIntelligence = () => {
       <div className="h-20 bg-gradient-to-b from-transparent via-primary/5 to-transparent"></div>
 
       {/* Project Incubation System Section */}
-      <div className="gradient-accent">
+      <div id="projects" className="gradient-accent">
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -463,7 +458,7 @@ const AcademicPlanningIntelligence = () => {
       <div className="h-20 bg-gradient-to-b from-transparent via-primary/5 to-transparent"></div>
 
       {/* Extracurricular Strategy Engine Section */}
-      <div className="section-divider gradient-section">
+      <div id="extracurricular" className="section-divider gradient-section">
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -550,7 +545,7 @@ const AcademicPlanningIntelligence = () => {
       <div className="h-20 bg-gradient-to-b from-transparent via-primary/5 to-transparent"></div>
 
       {/* Skill Development Accelerator Section */}
-      <div className="gradient-accent">
+      <div id="skills" className="gradient-accent">
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
