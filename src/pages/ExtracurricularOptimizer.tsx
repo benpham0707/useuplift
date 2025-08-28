@@ -296,6 +296,22 @@ const AcademicPlanningIntelligence = () => {
                         ? 'bg-gradient-to-br from-primary/90 to-blue-600/90 border-blue-400 text-primary-foreground' 
                         : 'bg-gradient-to-br from-primary/70 to-blue-500/70 border-blue-600/30 text-primary-foreground'
                     }`}>
+                      {/* Top Right Corner Indicators */}
+                      {domain.id === 'projects' && (
+                        <div className="absolute -top-2 -right-2 z-10">
+                          <Badge className="bg-blue-500/90 text-white border-blue-400 text-xs px-3 py-1 shadow-lg shadow-blue-500/50">
+                            Recommended
+                          </Badge>
+                        </div>
+                      )}
+                      {domain.id === 'skills' && (
+                        <div className="absolute -top-2 -right-2 z-10">
+                          <Badge className="bg-purple-500/90 text-white border-purple-400 text-xs px-3 py-1 shadow-lg animate-pulse">
+                            New Insights
+                          </Badge>
+                        </div>
+                      )}
+                      
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <div className={`p-3 rounded-xl transition-all duration-300 group-hover:scale-110 ${
@@ -303,24 +319,11 @@ const AcademicPlanningIntelligence = () => {
                           }`}>
                             <Icon className="h-6 w-6" />
                           </div>
-                            <div>
-                             <h3 className="text-lg font-bold mb-2">
-                               {domain.title.split(' ')[0]}
-                             </h3>
-                             <div className="flex items-center space-x-3">
-                               {/* New opportunity indicator */}
-                               {domain.id === 'projects' && (
-                                 <Badge className="bg-green-500/20 text-green-400 border-green-500/30 text-xs px-2 py-1">
-                                   Recommended
-                                 </Badge>
-                               )}
-                               {domain.id === 'skills' && (
-                                 <Badge className="bg-blue-500/20 text-blue-400 border-blue-500/30 text-xs px-2 py-1">
-                                   New Insights
-                                 </Badge>
-                               )}
-                             </div>
-                           </div>
+                          <div>
+                            <h3 className="text-lg font-bold">
+                              {domain.title.split(' ')[0]}
+                            </h3>
+                          </div>
                         </div>
                         
                         {/* Arrow Indicator */}
