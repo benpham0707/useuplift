@@ -244,52 +244,90 @@ const AcademicPlanningIntelligence = () => {
             </p>
             
             {/* Strategic Domain Navigation */}
-            <div className="flex justify-center items-center space-x-3 max-w-5xl mx-auto mb-12">
+            <div className="grid grid-cols-2 gap-6 max-w-4xl mx-auto mb-12">
               {strategicDomains.map((domain) => {
                 const Icon = domain.icon;
-                const hasHighImpact = domain.impact === 'Very High';
+                const fireIntensity = domain.impact === 'Very High' ? 'intense' : domain.impact === 'High' ? 'medium' : 'low';
                 
                 return (
                   <div 
                     key={domain.id} 
-                    className={`group cursor-pointer transition-all duration-200 hover:scale-105 ${
-                      hasHighImpact ? 'animate-pulse' : ''
-                    }`}
+                    className={`relative group cursor-pointer transition-all duration-500 hover:scale-105 animate-fade-in`}
                     onClick={() => {
                       const element = document.getElementById(domain.id);
                       element?.scrollIntoView({ behavior: 'smooth' });
                     }}
                   >
-                    <div className={`relative px-4 py-3 rounded-xl border transition-all duration-200 group-hover:shadow-lg ${
-                      hasHighImpact 
-                        ? 'bg-primary/95 border-primary text-primary-foreground' 
-                        : 'bg-primary/80 border-primary/50 text-primary-foreground'
+                    {/* Fire Border Effect */}
+                    <div className={`absolute inset-0 rounded-2xl transition-all duration-500 group-hover:scale-110 ${
+                      fireIntensity === 'intense' 
+                        ? 'shadow-[0_0_30px_#3b82f6,0_0_60px_#3b82f6,0_0_90px_#60a5fa,inset_0_0_30px_#3b82f6] animate-pulse' 
+                        : fireIntensity === 'medium'
+                        ? 'shadow-[0_0_20px_#3b82f6,0_0_40px_#3b82f6,inset_0_0_20px_#3b82f6]'
+                        : 'shadow-[0_0_10px_#3b82f6,inset_0_0_10px_#3b82f6]'
+                    } bg-gradient-to-r from-primary/20 via-blue-500/30 to-primary/20`}></div>
+                    
+                    {/* Animated Fire Particles */}
+                    {fireIntensity === 'intense' && (
+                      <>
+                        <div className="absolute -top-2 -left-2 w-4 h-4 bg-blue-400 rounded-full animate-bounce opacity-60"></div>
+                        <div className="absolute -top-1 -right-3 w-3 h-3 bg-blue-300 rounded-full animate-bounce delay-75 opacity-40"></div>
+                        <div className="absolute -bottom-2 -left-3 w-3 h-3 bg-blue-500 rounded-full animate-bounce delay-150 opacity-50"></div>
+                        <div className="absolute -bottom-1 -right-2 w-2 h-2 bg-blue-400 rounded-full animate-bounce delay-300 opacity-60"></div>
+                      </>
+                    )}
+                    
+                    {/* Main Card */}
+                    <div className={`relative px-6 py-5 rounded-2xl border-2 transition-all duration-300 group-hover:border-blue-400 ${
+                      fireIntensity === 'intense' 
+                        ? 'bg-gradient-to-br from-primary/95 to-blue-600/95 border-blue-400 text-primary-foreground' 
+                        : fireIntensity === 'medium'
+                        ? 'bg-gradient-to-br from-primary/85 to-blue-500/85 border-blue-500/50 text-primary-foreground'
+                        : 'bg-gradient-to-br from-primary/75 to-blue-400/75 border-blue-600/30 text-primary-foreground'
                     }`}>
-                      <div className="flex items-center space-x-3">
-                        <div className="flex-shrink-0">
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="text-center">
-                          <div className="text-sm font-medium">
-                            {domain.title.split(' ')[0]}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-3 rounded-xl transition-all duration-300 group-hover:scale-110 ${
+                            fireIntensity === 'intense' ? 'bg-white/20 shadow-lg' : 'bg-white/15'
+                          }`}>
+                            <Icon className="h-6 w-6" />
                           </div>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <div className="flex space-x-1">
-                              {[1, 2, 3].map((i) => (
-                                <div 
-                                  key={i}
-                                  className={`w-1.5 h-1.5 rounded-full ${
-                                    i <= (domain.impact === 'Very High' ? 3 : domain.impact === 'High' ? 2 : 1)
-                                      ? 'bg-current'
-                                      : 'bg-current/30'
-                                  }`}
-                                />
-                              ))}
+                          <div>
+                            <h3 className="text-lg font-bold mb-1">
+                              {domain.title.split(' ')[0]}
+                            </h3>
+                            <div className="flex items-center space-x-3">
+                              {/* Fire Intensity Indicator */}
+                              <div className="flex items-center space-x-1">
+                                {[1, 2, 3].map((i) => (
+                                  <div 
+                                    key={i}
+                                    className={`transition-all duration-300 ${
+                                      i <= (fireIntensity === 'intense' ? 3 : fireIntensity === 'medium' ? 2 : 1)
+                                        ? 'w-2 h-4 bg-orange-300 shadow-[0_0_8px_#fbbf24]'
+                                        : 'w-2 h-2 bg-white/30'
+                                    } rounded-full ${
+                                      i <= (fireIntensity === 'intense' ? 3 : fireIntensity === 'medium' ? 2 : 1) && fireIntensity === 'intense'
+                                        ? 'animate-pulse'
+                                        : ''
+                                    }`}
+                                  />
+                                ))}
+                              </div>
+                              {fireIntensity === 'intense' && (
+                                <span className="text-sm font-bold text-orange-200 animate-pulse">
+                                  🔥 Priority
+                                </span>
+                              )}
                             </div>
-                            {hasHighImpact && (
-                              <span className="text-xs font-medium">Priority</span>
-                            )}
                           </div>
+                        </div>
+                        
+                        {/* Arrow Indicator */}
+                        <div className={`transition-all duration-300 group-hover:translate-x-2 ${
+                          fireIntensity === 'intense' ? 'text-orange-200' : 'text-white/70'
+                        }`}>
+                          <ArrowRight className="h-5 w-5" />
                         </div>
                       </div>
                     </div>
@@ -298,7 +336,7 @@ const AcademicPlanningIntelligence = () => {
               })}
             </div>
             
-            <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground">
+            <div className="flex items-center justify-center space-x-8 text-sm text-muted-foreground animate-fade-in">
               <div className="flex items-center space-x-2">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
                 <span>Personalized recommendations</span>
