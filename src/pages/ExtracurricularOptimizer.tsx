@@ -58,11 +58,11 @@ const AcademicPlanningIntelligence = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Scroll-based fade effect with full fade in/out
+  // Scroll-based fade effect with faster fade transitions
   useEffect(() => {
     const observerOptions = {
       threshold: Array.from({length: 101}, (_, i) => i * 0.01), // 0 to 1 in 0.01 increments
-      rootMargin: '-5% 0px -5% 0px'
+      rootMargin: '-10% 0px -10% 0px'
     };
 
     const observer = new IntersectionObserver((entries) => {
@@ -70,11 +70,11 @@ const AcademicPlanningIntelligence = () => {
         const sectionId = entry.target.id;
         const ratio = entry.intersectionRatio;
         
-        // Calculate opacity based on intersection ratio
-        // Section becomes visible when 20% is in view, fully visible at 80%
+        // Calculate opacity with faster fade transitions
+        // Previous section disappears when next section is 50% visible
         let opacity = 0;
-        if (ratio > 0.2) {
-          opacity = Math.min(1, (ratio - 0.2) / 0.6); // Smooth transition from 20% to 80%
+        if (ratio > 0.3) {
+          opacity = Math.min(1, (ratio - 0.3) / 0.2); // Faster transition from 30% to 50%
         }
         
         setSectionOpacity(prev => ({
@@ -102,39 +102,41 @@ const AcademicPlanningIntelligence = () => {
     return () => observer.disconnect();
   }, []);
 
-  // Dynamic background gradient based on scroll progress
+  // Dynamic background gradient with theme colors - alternating light/dark
   const getBackgroundGradient = () => {
     const progress = scrollProgress;
     
     if (progress < 0.25) {
-      // Hero to Academic (blue to light blue)
-      const localProgress = progress / 0.25;
-      return `linear-gradient(135deg, 
-        hsl(${209 + localProgress * 10}, ${52 + localProgress * 10}%, ${25 + localProgress * 15}%) 0%, 
-        hsl(${205 + localProgress * 15}, ${17 + localProgress * 20}%, ${42 + localProgress * 20}%) 50%,
-        hsl(${210 + localProgress * 20}, ${11 + localProgress * 30}%, ${91 - localProgress * 10}%) 100%)`;
+      // Start light (background color)
+      return `hsl(var(--background))`;
     } else if (progress < 0.5) {
-      // Academic to Projects (blue to yellow)
+      // Transition to dark (primary navy)
       const localProgress = (progress - 0.25) / 0.25;
       return `linear-gradient(135deg, 
-        hsl(${219 - localProgress * 174}, ${62 - localProgress * 17}%, ${40 + localProgress * 20}%) 0%, 
-        hsl(${220 - localProgress * 175}, ${37 + localProgress * 53}%, ${62 - localProgress * 7}%) 50%,
-        hsl(${230 - localProgress * 185}, ${41 + localProgress * 49}%, ${81 - localProgress * 21}%) 100%)`;
+        hsl(var(--background)) ${Math.max(0, 100 - localProgress * 100)}%, 
+        hsl(var(--primary)) ${Math.min(100, localProgress * 100)}%)`;
     } else if (progress < 0.75) {
-      // Projects to Extracurricular (yellow to green)
+      // Transition back to light
       const localProgress = (progress - 0.5) / 0.25;
       return `linear-gradient(135deg, 
-        hsl(${45 + localProgress * 75}, ${90 - localProgress * 5}%, ${60 + localProgress * 5}%) 0%, 
-        hsl(${90 + localProgress * 30}, ${90 - localProgress * 5}%, ${55 + localProgress * 5}%) 50%,
-        hsl(${135 + localProgress * 15}, ${90 - localProgress * 10}%, ${60 + localProgress * 20}%) 100%)`;
+        hsl(var(--primary)) ${Math.max(0, 100 - localProgress * 100)}%, 
+        hsl(var(--background)) ${Math.min(100, localProgress * 100)}%)`;
     } else {
-      // Extracurricular to Skills (green to purple)
+      // Transition to dark again
       const localProgress = (progress - 0.75) / 0.25;
       return `linear-gradient(135deg, 
-        hsl(${120 + localProgress * 150}, ${85 - localProgress * 20}%, ${65 - localProgress * 10}%) 0%, 
-        hsl(${150 + localProgress * 120}, ${85 - localProgress * 20}%, ${60 - localProgress * 10}%) 50%,
-        hsl(${180 + localProgress * 90}, ${80 - localProgress * 15}%, ${70 - localProgress * 15}%) 100%)`;
+        hsl(var(--background)) ${Math.max(0, 100 - localProgress * 100)}%, 
+        hsl(var(--primary)) ${Math.min(100, localProgress * 100)}%)`;
     }
+  };
+
+  // Get text color based on current background
+  const getTextColor = () => {
+    const progress = scrollProgress;
+    if ((progress >= 0.25 && progress < 0.5) || progress >= 0.75) {
+      return 'text-primary-foreground'; // White text on dark background
+    }
+    return 'text-foreground'; // Dark text on light background
   };
 
   // Hard coded strategic domain data representing the Next Moves Engine's five core areas
@@ -466,11 +468,11 @@ const AcademicPlanningIntelligence = () => {
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
               <div className="p-4 bg-primary/10 rounded-2xl">
-                <BookOpen className="h-8 w-8 text-primary" />
+                <BookOpen className={`h-8 w-8 ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground' : 'text-primary'}`} />
               </div>
               <div>
-                <h2 className="text-4xl font-bold text-foreground">Academic Planning Intelligence</h2>
-                <p className="text-xl text-muted-foreground mt-2">Strategic course selection and grade optimization</p>
+                <h2 className={`text-4xl font-bold ${getTextColor()}`}>Academic Planning Intelligence</h2>
+                <p className={`text-xl ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground/70' : 'text-muted-foreground'} mt-2`}>Strategic course selection and grade optimization</p>
               </div>
             </div>
             
@@ -558,11 +560,11 @@ const AcademicPlanningIntelligence = () => {
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
               <div className="p-4 bg-primary/10 rounded-2xl">
-                <Lightbulb className="h-8 w-8 text-primary" />
+                <Lightbulb className={`h-8 w-8 ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground' : 'text-primary'}`} />
               </div>
               <div>
-                <h2 className="text-4xl font-bold text-foreground">Project Incubation System</h2>
-                <p className="text-xl text-muted-foreground mt-2">AI-collaborative project development that ensures uniqueness</p>
+                <h2 className={`text-4xl font-bold ${getTextColor()}`}>Project Incubation System</h2>
+                <p className={`text-xl ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground/70' : 'text-muted-foreground'} mt-2`}>AI-collaborative project development that ensures uniqueness</p>
               </div>
             </div>
             
@@ -650,11 +652,11 @@ const AcademicPlanningIntelligence = () => {
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
               <div className="p-4 bg-primary/10 rounded-2xl">
-                <Users className="h-8 w-8 text-primary" />
+                <Users className={`h-8 w-8 ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground' : 'text-primary'}`} />
               </div>
               <div>
-                <h2 className="text-4xl font-bold text-foreground">Extracurricular Strategy Engine</h2>
-                <p className="text-xl text-muted-foreground mt-2">Strategic involvement optimization for maximum impact</p>
+                <h2 className={`text-4xl font-bold ${getTextColor()}`}>Extracurricular Strategy Engine</h2>
+                <p className={`text-xl ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground/70' : 'text-muted-foreground'} mt-2`}>Strategic involvement optimization for maximum impact</p>
               </div>
             </div>
             
@@ -742,11 +744,11 @@ const AcademicPlanningIntelligence = () => {
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
               <div className="p-4 bg-primary/10 rounded-2xl">
-                <Brain className="h-8 w-8 text-primary" />
+                <Brain className={`h-8 w-8 ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground' : 'text-primary'}`} />
               </div>
               <div>
-                <h2 className="text-4xl font-bold text-foreground">Skill Development Accelerator</h2>
-                <p className="text-xl text-muted-foreground mt-2">Strategic skill building aligned with your goals and market demands</p>
+                <h2 className={`text-4xl font-bold ${getTextColor()}`}>Skill Development Accelerator</h2>
+                <p className={`text-xl ${getTextColor() === 'text-primary-foreground' ? 'text-primary-foreground/70' : 'text-muted-foreground'} mt-2`}>Strategic skill building aligned with your goals and market demands</p>
               </div>
             </div>
             
