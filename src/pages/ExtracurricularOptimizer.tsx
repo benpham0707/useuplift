@@ -358,7 +358,10 @@ const AcademicPlanningIntelligence = () => {
       </div>
 
       {/* Academic Planning Intelligence Section */}
-      <div id="academic" className="section-divider gradient-section">
+      <div id="academic" className="section-transition animate-fade-in"
+           style={{
+             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
+           }}>
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -441,11 +444,11 @@ const AcademicPlanningIntelligence = () => {
         </div>
       </div>
 
-      {/* Smooth transition divider */}
-      <div className="h-20 bg-gradient-to-b from-transparent via-primary/5 to-transparent"></div>
-
       {/* Project Incubation System Section */}
-      <div id="projects" className="gradient-accent">
+      <div id="projects" className="section-transition animate-fade-in"
+           style={{
+             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
+           }}>
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -528,11 +531,11 @@ const AcademicPlanningIntelligence = () => {
         </div>
       </div>
 
-      {/* Smooth transition divider */}
-      <div className="h-20 bg-gradient-to-b from-transparent via-primary/5 to-transparent"></div>
-
       {/* Extracurricular Strategy Engine Section */}
-      <div id="extracurricular" className="section-divider gradient-section">
+      <div id="extracurricular" className="section-transition animate-fade-in"
+           style={{
+             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
+           }}>
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
@@ -615,11 +618,11 @@ const AcademicPlanningIntelligence = () => {
         </div>
       </div>
 
-      {/* Smooth transition divider */}
-      <div className="h-20 bg-gradient-to-b from-transparent via-primary/5 to-transparent"></div>
-
       {/* Skill Development Accelerator Section */}
-      <div id="skills" className="gradient-accent">
+      <div id="skills" className="section-transition animate-fade-in"
+           style={{
+             background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 100%)'
+           }}>
         <div className="max-w-7xl mx-auto px-4 py-20">
           <div className="mb-16">
             <div className="flex items-center space-x-4 mb-6">
