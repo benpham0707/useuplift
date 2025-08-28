@@ -137,15 +137,68 @@ const AcademicPlanningIntelligence = () => {
               </Button>
             </div>
 
-            {/* Navigation Items */}
-            <div className="hidden md:flex items-center space-x-6">
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                Platform
-              </Button>
-              
-              <Button variant="ghost" size="sm">
-                Features
-              </Button>
+            {/* Strategic Domain Navigation */}
+            <div className="hidden md:flex items-center space-x-1">
+              {strategicDomains.map((domain) => {
+                const Icon = domain.icon;
+                const needsImprovement = domain.progress < 50;
+                
+                return (
+                  <div key={domain.id} className="relative group">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className={`flex flex-col items-center px-3 py-2 h-auto transition-all duration-200 ${
+                        needsImprovement ? 'bg-amber-50 hover:bg-amber-100 border border-amber-200' : 'hover:bg-muted'
+                      }`}
+                      onClick={() => {
+                        const element = document.getElementById(domain.id);
+                        element?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      <div className={`flex items-center justify-center w-8 h-8 rounded-lg mb-1 ${domain.iconBg}`}>
+                        <Icon className={`h-4 w-4 ${domain.iconColor}`} />
+                      </div>
+                      <span className="text-xs font-medium text-center leading-tight">
+                        {domain.title.split(' ')[0]}
+                      </span>
+                      <div className="flex items-center mt-1">
+                        <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full transition-all duration-300 ${
+                              needsImprovement ? 'bg-amber-500' : 'bg-primary'
+                            }`}
+                            style={{ width: `${domain.progress}%` }}
+                          />
+                        </div>
+                        {needsImprovement && (
+                          <Badge variant="outline" className="ml-2 text-xs bg-amber-100 text-amber-800 border-amber-300">
+                            Focus
+                          </Badge>
+                        )}
+                      </div>
+                    </Button>
+                    
+                    {/* Tooltip */}
+                    <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 translate-y-full opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                      <div className="bg-card border border-border rounded-lg shadow-lg p-3 w-64">
+                        <div className="text-sm font-medium text-foreground">{domain.title}</div>
+                        <div className="text-xs text-muted-foreground mt-1">{domain.subtitle}</div>
+                        <div className="flex items-center justify-between mt-2">
+                          <span className="text-xs text-muted-foreground">Progress</span>
+                          <span className={`text-xs font-medium ${needsImprovement ? 'text-amber-600' : 'text-primary'}`}>
+                            {domain.progress}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Right Side Navigation */}
+            <div className="hidden md:flex items-center space-x-4">
               
               {/* Academic Planning Dropdown */}
               <div className="relative">
