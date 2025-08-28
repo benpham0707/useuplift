@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -927,7 +928,7 @@ const AcademicPlanningIntelligence = () => {
           </p>
         </div>
 
-        <div className="space-y-6">
+        <Accordion type="single" collapsible className="space-y-2">
           {/* Hard coded FAQ data representing common strategic planning questions */}
           {[
             {
@@ -955,18 +956,20 @@ const AcademicPlanningIntelligence = () => {
               answer: "Not at all. We have specific strategies for seniors focused on maximizing final semester opportunities, graduate school applications, job search optimization, and strategic networking."
             }
           ].map((faq, index) => (
-            <Card key={index} className="border border-border">
-              <CardContent className="p-6">
-                <h3 className="text-lg font-semibold text-foreground mb-3">
+            <AccordionItem key={index} value={`item-${index}`} className="border border-border rounded-lg">
+              <AccordionTrigger className="px-6 py-4 text-left hover:no-underline">
+                <h3 className="text-lg font-semibold text-foreground">
                   {faq.question}
                 </h3>
+              </AccordionTrigger>
+              <AccordionContent className="px-6 pb-4">
                 <p className="text-muted-foreground leading-relaxed">
                   {faq.answer}
                 </p>
-              </CardContent>
-            </Card>
+              </AccordionContent>
+            </AccordionItem>
           ))}
-        </div>
+        </Accordion>
 
         <div className="text-center mt-12">
           <Button size="lg" className="bg-primary hover:bg-primary/90">
