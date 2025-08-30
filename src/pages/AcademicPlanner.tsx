@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { 
   GraduationCap, 
   TrendingUp, 
@@ -45,6 +46,15 @@ const AcademicPlanner = () => {
     majorRecommended: 3.6,
     target: 3.9
   };
+
+  // Hard coded data for GPA over time line chart
+  const gpaTimeData = [
+    { semester: 'Fall 2022', yourGPA: 3.5, majorAverage: 3.1 },
+    { semester: 'Spring 2023', yourGPA: 3.6, majorAverage: 3.2 },
+    { semester: 'Fall 2023', yourGPA: 3.7, majorAverage: 3.2 },
+    { semester: 'Spring 2024', yourGPA: 3.8, majorAverage: 3.3 },
+    { semester: 'Fall 2024', yourGPA: 3.8, majorAverage: 3.2 },
+  ];
 
   // Hard coded data for expandable insights
   const insights = [
@@ -131,133 +141,103 @@ const AcademicPlanner = () => {
     "Study abroad planning"
   ];
 
-  // Enhanced GPA Visualization Component
-  const GPAVisualization = () => {
-    const maxGPA = 4.0;
-    const minGPA = 2.0;
-    const range = maxGPA - minGPA;
-    
-    const getPosition = (gpa: number) => ((gpa - minGPA) / range) * 100;
-    
-    const positions = {
-      current: getPosition(gpaData.current),
-      schoolAvg: getPosition(gpaData.schoolAverage),
-      target: getPosition(gpaData.target)
-    };
-
-    // Sort positions to handle overlapping labels
-    const sortedItems = [
-      { key: 'schoolAvg', position: positions.schoolAvg, label: 'School Avg', color: 'gray', gpa: gpaData.schoolAverage },
-      { key: 'current', position: positions.current, label: 'Your GPA', color: 'blue', gpa: gpaData.current },
-      { key: 'target', position: positions.target, label: 'Target', color: 'green', gpa: gpaData.target }
-    ].sort((a, b) => a.position - b.position);
-
-    // Assign alternating top/bottom positions to avoid overlap
-    const labelPositions = sortedItems.map((item, index) => {
-      const isAbove = index % 2 === 0;
-      return { ...item, isAbove };
-    });
-
+  // GPA Line Chart Component
+  const GPALineChart = () => {
     return (
-      <div className="space-y-6">
-        {/* Enhanced Chart with better spacing */}
-        <div className="relative" style={{ height: '120px', marginTop: '30px', marginBottom: '30px' }}>
-          <div className="h-8 bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 to-blue-500 rounded-lg relative overflow-visible" style={{ top: '40px' }}>
-            {/* Grid lines */}
-            <div className="absolute inset-0 flex">
-              {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pos, i) => (
-                <div key={i} className="absolute top-0 bottom-0 w-px border-r border-white/40" style={{ left: `${pos}%` }} />
-              ))}
-            </div>
-            
-            {/* Scale labels */}
-            <div className="absolute -bottom-8 inset-x-0 flex justify-between text-xs text-muted-foreground">
-              <span>2.0</span>
-              <span>2.2</span>
-              <span>2.4</span>
-              <span>2.6</span>
-              <span>2.8</span>
-              <span>3.0</span>
-              <span>3.2</span>
-              <span>3.4</span>
-              <span>3.6</span>
-              <span>3.8</span>
-              <span>4.0</span>
-            </div>
-            
-            {/* Dark vertical reference lines and diagonal-horizontal connectors */}
-            {labelPositions.map((item, index) => (
-              <React.Fragment key={item.key}>
-                {/* Vertical line on bar */}
-                <div 
-                  className="absolute top-0 bottom-0 w-0.5 bg-black"
-                  style={{ left: `${item.position}%`, transform: 'translateX(-50%)' }}
-                />
-                
-                {/* Diagonal line */}
-                <div 
-                  className="absolute w-8 h-0.5 bg-black"
-                  style={{ 
-                    left: `${item.position}%`, 
-                    top: item.isAbove ? '32px' : '48px',
-                    transform: item.isAbove ? 'translateX(-2px) rotate(-35deg)' : 'translateX(-2px) rotate(35deg)',
-                    transformOrigin: 'left center'
-                  }}
-                />
-                
-                {/* Horizontal line */}
-                <div 
-                  className="absolute h-0.5 bg-black"
-                  style={{ 
-                    left: `${item.position}%`, 
-                    top: item.isAbove ? '26px' : '54px',
-                    width: '32px',
-                    transform: 'translateX(4px)'
-                  }}
-                />
-                
-                 {/* Label */}
-                <div 
-                  className={`absolute text-sm font-medium whitespace-nowrap ${
-                    item.key === 'current' ? 'text-black' :
-                    item.key === 'target' ? 'text-red-500 drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]' :
-                    'text-gray-500'
-                  }`}
-                  style={{ 
-                    left: `${item.position}%`, 
-                    top: item.isAbove ? '20px' : '60px',
-                    transform: 'translateX(38px)'
-                  }}
-                >
-                  {item.label}
-                </div>
-              </React.Fragment>
-            ))}
-          </div>
+      <div className="space-y-4">
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart
+              data={gpaTimeData}
+              margin={{
+                top: 20,
+                right: 30,
+                left: 20,
+                bottom: 20,
+              }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+              <XAxis 
+                dataKey="semester" 
+                tick={{ fontSize: 12 }}
+                axisLine={{ stroke: '#6b7280' }}
+                tickLine={{ stroke: '#6b7280' }}
+              />
+              <YAxis 
+                domain={[2.5, 4.0]}
+                tick={{ fontSize: 12 }}
+                axisLine={{ stroke: '#6b7280' }}
+                tickLine={{ stroke: '#6b7280' }}
+                label={{ value: 'GPA', angle: -90, position: 'insideLeft' }}
+              />
+              <Tooltip 
+                contentStyle={{
+                  backgroundColor: 'white',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Legend 
+                wrapperStyle={{ paddingTop: '20px' }}
+              />
+              
+              {/* Reference lines for target and school average */}
+              <ReferenceLine 
+                y={gpaData.target} 
+                stroke="#dc2626" 
+                strokeDasharray="8 4" 
+                strokeWidth={2}
+                label={{ value: "Target GPA", position: "top", fill: "#dc2626", fontWeight: "bold" }}
+              />
+              <ReferenceLine 
+                y={gpaData.schoolAverage} 
+                stroke="#6b7280" 
+                strokeDasharray="8 4" 
+                strokeWidth={2}
+                label={{ value: "School Average", position: "top", fill: "#6b7280", fontWeight: "bold" }}
+              />
+              
+              {/* GPA lines */}
+              <Line 
+                type="monotone" 
+                dataKey="yourGPA" 
+                stroke="#2563eb" 
+                strokeWidth={3}
+                dot={{ fill: '#2563eb', strokeWidth: 2, r: 5 }}
+                activeDot={{ r: 7, stroke: '#2563eb', strokeWidth: 2 }}
+                name="Your GPA"
+              />
+              <Line 
+                type="monotone" 
+                dataKey="majorAverage" 
+                stroke="#f59e0b" 
+                strokeWidth={3}
+                dot={{ fill: '#f59e0b', strokeWidth: 2, r: 5 }}
+                activeDot={{ r: 7, stroke: '#f59e0b', strokeWidth: 2 }}
+                name="Major Average"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
         
-        {/* Legend with enhanced styling */}
-        <div className="grid grid-cols-3 gap-3 mt-8">
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-blue-50 border border-blue-200">
-            <div className="w-2 h-2 bg-blue-600 rounded-sm"></div>
-            <div>
-              <span className="font-medium text-blue-900">Your GPA</span>
-              <div className="text-sm text-blue-700">{gpaData.current}</div>
-            </div>
+        {/* Summary stats */}
+        <div className="grid grid-cols-4 gap-4 mt-6">
+          <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="text-xl font-bold text-blue-600">{gpaData.current}</div>
+            <div className="text-xs text-blue-700">Current GPA</div>
           </div>
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-200">
-            <div className="w-2 h-2 bg-gray-500 rounded-sm"></div>
-            <div>
-              <span className="font-medium text-gray-900">School Avg</span>
-              <div className="text-sm text-gray-700">{gpaData.schoolAverage}</div>
-            </div>
+          <div className="text-center p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <div className="text-xl font-bold text-amber-600">{gpaData.majorRecommended}</div>
+            <div className="text-xs text-amber-700">Major Average</div>
           </div>
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-green-50 border border-green-200">
-            <div className="w-2 h-2 bg-green-600 rounded-sm"></div>
-            <div>
-              <span className="font-medium text-green-900">Target</span>
-              <div className="text-sm text-green-700">{gpaData.target}</div>
-            </div>
+          <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+            <div className="text-xl font-bold text-red-600">{gpaData.target}</div>
+            <div className="text-xs text-red-700">Target GPA</div>
+          </div>
+          <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <div className="text-xl font-bold text-gray-600">{gpaData.schoolAverage}</div>
+            <div className="text-xs text-gray-700">School Average</div>
           </div>
         </div>
       </div>
@@ -320,7 +300,7 @@ const AcademicPlanner = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <GPAVisualization />
+                <GPALineChart />
               </CardContent>
             </Card>
           </div>

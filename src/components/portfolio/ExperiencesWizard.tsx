@@ -129,10 +129,10 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
         });
 
         const merged: Experience[] = [
-          ...flatten(ea.work_experiences).map((i: any) => toExp(i, 'work')),
-          ...flatten(ea.volunteer_service).map((i: any) => toExp(i, 'volunteer')),
-          ...flatten(ea.extracurriculars).map((i: any) => toExp(i, 'school_activity')),
-          ...flatten(ea.personal_projects).map((i: any) => toExp(i, 'project')),
+          ...flatten(ea.work_experiences as any[]).map((i: any) => toExp(i, 'work')),
+          ...flatten(ea.volunteer_service as any[]).map((i: any) => toExp(i, 'volunteer')),
+          ...flatten(ea.extracurriculars as any[]).map((i: any) => toExp(i, 'school_activity')),
+          ...flatten(ea.personal_projects as any[]).map((i: any) => toExp(i, 'project')),
         ];
 
         const padded = [...merged];
