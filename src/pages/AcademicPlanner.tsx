@@ -160,9 +160,9 @@ const AcademicPlanner = () => {
 
     return (
       <div className="space-y-6">
-        {/* Enhanced Chart */}
-        <div className="relative" style={{ height: '100px', marginTop: '20px', marginBottom: '20px' }}>
-          <div className="h-8 bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 to-blue-500 rounded-lg relative overflow-visible" style={{ top: '32px' }}>
+        {/* Enhanced Chart with better spacing */}
+        <div className="relative" style={{ height: '120px', marginTop: '30px', marginBottom: '30px' }}>
+          <div className="h-8 bg-gradient-to-r from-red-500 via-orange-500 via-yellow-500 via-green-500 to-blue-500 rounded-lg relative overflow-visible" style={{ top: '40px' }}>
             {/* Grid lines */}
             <div className="absolute inset-0 flex">
               {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pos, i) => (
@@ -171,7 +171,7 @@ const AcademicPlanner = () => {
             </div>
             
             {/* Scale labels */}
-            <div className="absolute -bottom-6 inset-x-0 flex justify-between text-xs text-muted-foreground">
+            <div className="absolute -bottom-8 inset-x-0 flex justify-between text-xs text-muted-foreground">
               <span>2.0</span>
               <span>2.2</span>
               <span>2.4</span>
@@ -186,7 +186,7 @@ const AcademicPlanner = () => {
             </div>
             
             {/* Dark vertical reference lines and diagonal-horizontal connectors */}
-            {labelPositions.map((item) => (
+            {labelPositions.map((item, index) => (
               <React.Fragment key={item.key}>
                 {/* Vertical line on bar */}
                 <div 
@@ -196,11 +196,11 @@ const AcademicPlanner = () => {
                 
                 {/* Diagonal line */}
                 <div 
-                  className="absolute w-6 h-0.5 bg-black"
+                  className="absolute w-8 h-0.5 bg-black"
                   style={{ 
                     left: `${item.position}%`, 
-                    top: item.isAbove ? '32px' : '40px',
-                    transform: item.isAbove ? 'translateX(-2px) rotate(-45deg)' : 'translateX(-2px) rotate(45deg)',
+                    top: item.isAbove ? '32px' : '48px',
+                    transform: item.isAbove ? 'translateX(-2px) rotate(-35deg)' : 'translateX(-2px) rotate(35deg)',
                     transformOrigin: 'left center'
                   }}
                 />
@@ -210,23 +210,23 @@ const AcademicPlanner = () => {
                   className="absolute h-0.5 bg-black"
                   style={{ 
                     left: `${item.position}%`, 
-                    top: item.isAbove ? '28px' : '44px',
-                    width: '24px',
-                    transform: 'translateX(2.2px)'
+                    top: item.isAbove ? '26px' : '54px',
+                    width: '32px',
+                    transform: 'translateX(4px)'
                   }}
                 />
                 
                  {/* Label */}
                 <div 
-                  className={`absolute text-xs font-medium whitespace-nowrap ${
+                  className={`absolute text-sm font-medium whitespace-nowrap ${
                     item.key === 'current' ? 'text-black' :
                     item.key === 'target' ? 'text-red-500 drop-shadow-[0_0_4px_rgba(239,68,68,0.6)]' :
                     'text-gray-500'
                   }`}
                   style={{ 
                     left: `${item.position}%`, 
-                    top: item.isAbove ? '24px' : '48px',
-                    transform: 'translateX(28px)'
+                    top: item.isAbove ? '20px' : '60px',
+                    transform: 'translateX(38px)'
                   }}
                 >
                   {item.label}
@@ -275,8 +275,8 @@ const AcademicPlanner = () => {
             <p className="text-muted-foreground">Track your progress and plan your academic journey strategically</p>
           </div>
 
-          {/* Compact Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          {/* Expanded Stats Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             {/* Academic Standing */}
             <Card>
               <CardHeader className="pb-3">
@@ -311,8 +311,8 @@ const AcademicPlanner = () => {
               </CardContent>
             </Card>
 
-            {/* GPA Analysis */}
-            <Card>
+            {/* GPA Analysis - Wider card */}
+            <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <BarChart3 className="h-5 w-5" />
