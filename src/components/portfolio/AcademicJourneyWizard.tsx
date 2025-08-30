@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Plus, Trash2, ArrowRight, ArrowLeft, GraduationCap, X, ChevronDown, ChevronRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Progress } from '@/components/ui/progress';
 
 interface AcademicJourneyData {
   // Current School
@@ -131,7 +130,6 @@ interface AcademicJourneyData {
 interface Props {
   onComplete: () => void;
   onCancel: () => void;
-  onProgressRefresh?: () => void;
 }
 
 const STEPS = [
@@ -146,11 +144,11 @@ const STEPS = [
   { id: 9, title: 'English Proficiency', description: 'English proficiency test scores (if applicable)' }
 ];
 
-const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgressRefresh }) => {
+const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [profileId, setProfileId] = useState<string | null>(null);
   
+  // Mock data for demonstration - replace with actual form state management
   const [data, setData] = useState<AcademicJourneyData>({
     schoolName: '',
     schoolType: '',
@@ -206,210 +204,6 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
     }
   });
 
-  const progress = useMemo(() => {
-    const isFilled = (v: any) => {
-      if (v === null || v === undefined) return false;
-      if (typeof v === 'string') return v.toString().trim().length > 0;
-      if (typeof v === 'number') return !Number.isNaN(v);
-      if (typeof v === 'boolean') return v === true || v === false;
-      if (Array.isArray(v)) return v.length > 0;
-      if (typeof v === 'object') return Object.values(v).some((x) => isFilled(x));
-      return Boolean(v);
-    };
-
-    const basicRequired = [
-      data.schoolName,
-      data.currentGrade,
-      data.expectedGraduation,
-    ];
-
-    const performanceRequired = [
-      data.cumulativeGPA,
-      data.schoolRanksStudents !== 'none' ? data.totalClassSize : 'filled', // placeholder counts as filled when none
-    ];
-
-    const testsRequired = data.reportTestScores
-      ? [data.sat.total || data.act.composite]
-      : [];
-
-    const all = [...basicRequired, ...performanceRequired, ...testsRequired];
-    const completed = all.filter(isFilled).length;
-    const total = all.length || 1;
-    const percent = Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
-
-    const sectionComplete = {
-      step_1: basicRequired.every(isFilled),
-      step_2: isFilled(data.cumulativeGPA) || (data.schoolRanksStudents !== 'none' && isFilled(data.totalClassSize)),
-      step_3: data.otherSchoolsAttended === 0 || data.previousSchools.length > 0 || data.studiedAbroad || data.beenHomeschooled,
-      step_4: (data.academicYears || []).length > 0,
-      step_5: data.collegeCoursesTaken === 0 || (data.collegeCoursework || []).length > 0,
-      step_6: !data.reportTestScores || isFilled(data.sat.total) || isFilled(data.act.composite),
-      step_7: !data.takingAPExams || (data.apExams || []).length > 0,
-      step_8: !data.inIBProgramme || (data.ibExams || []).length > 0,
-      step_9: !data.needEnglishProficiency || isFilled(data.englishProficiency?.testType),
-    } as const;
-
-    return { percent, sectionComplete } as any;
-  }, [data]);
-
-  // Load existing academic_journey for this user
-  useEffect(() => {
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id, completion_score')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (!profile?.id) return;
-        setProfileId(profile.id);
-
-        const { data: aj } = await supabase
-          .from('academic_journey')
-          .select('*')
-          .eq('profile_id', profile.id)
-          .maybeSingle();
-        if (!aj) return;
-
-        // Map DB row -> local state
-        setData((prev) => ({
-          ...prev,
-          schoolName: (aj.current_school?.name as string) || '',
-          schoolType: (aj.current_school?.type as string) || '',
-          schoolCity: (aj.current_school?.city as string) || '',
-          schoolState: (aj.current_school?.state as string) || '',
-          schoolCountry: (aj.current_school?.country as string) || 'United States',
-          currentGrade: aj.current_grade || '',
-          expectedGraduation: (aj.expected_grad_date as string)?.slice(0, 7) || '',
-          willGraduateFromSchool: Boolean(aj.will_graduate_from_school),
-          isBoardingSchool: Boolean(aj.is_boarding_school),
-
-          cumulativeGPA: aj.gpa == null ? '' : String(aj.gpa),
-          gpaScale: aj.gpa_scale || '4.0',
-          gpaType: aj.gpa_type || 'weighted',
-          schoolRanksStudents: aj.rank_reporting_method || 'none',
-          classRank: aj.class_rank || '',
-          totalClassSize: aj.class_size == null ? '' : String(aj.class_size),
-
-          otherSchoolsAttended: (aj.other_schools?.count as number) || 0,
-          previousSchools: (aj.other_schools?.previous_schools as any[]) || [],
-          studiedAbroad: Boolean(aj.studied_abroad),
-          beenHomeschooled: Boolean(aj.homeschooled),
-
-          academicYears: (aj.course_history as any[]) || [],
-          tookMathEarly: Boolean(aj.took_math_early),
-          tookLanguageEarly: Boolean(aj.took_language_early),
-
-          collegeCoursesTaken: Array.isArray(aj.college_courses) ? ((aj.college_courses as any[])?.length || 0) : 0,
-          collegeCoursework: (aj.college_courses as any[]) || [],
-
-          reportTestScores: Boolean(aj.report_test_scores),
-          sat: (aj.standardized_tests?.sat as any) || { readingWriting: '', math: '', total: '', testDate: '', timesTaken: 0 },
-          act: (aj.standardized_tests?.act as any) || { english: '', math: '', reading: '', science: '', composite: '', testDate: '', timesTaken: 0 },
-
-          takingAPExams: Boolean(aj.taking_ap_exams),
-          apExams: (aj.ap_exams as any[]) || [],
-          inIBProgramme: Boolean(aj.in_ib_programme),
-          ibExams: (aj.ib_exams as any[]) || [],
-
-          needEnglishProficiency: Boolean(aj.need_english_proficiency),
-          englishProficiency: (aj.english_proficiency as any) || { testType: '', testDate: '', scores: '', planToRetake: false },
-        }));
-      } catch (e) {
-        // ignore prefill errors
-      }
-    })();
-  }, []);
-
-  const mapStateToDb = (pid: string) => {
-    const expected = data.expectedGraduation ? `${data.expectedGraduation}-01` : null;
-    const gpaNumeric = data.cumulativeGPA ? parseFloat(data.cumulativeGPA) : null;
-    const classSizeInt = data.totalClassSize ? parseInt(data.totalClassSize) : null;
-    const otherSchools = {
-      count: data.otherSchoolsAttended || 0,
-      previous_schools: data.previousSchools || []
-    } as any;
-    const standardized = data.reportTestScores ? { sat: data.sat, act: data.act } : {};
-
-    return {
-      profile_id: pid,
-      current_school: {
-        name: data.schoolName || null,
-        type: data.schoolType || null,
-        city: data.schoolCity || null,
-        state: data.schoolState || null,
-        country: data.schoolCountry || null,
-      },
-      current_grade: data.currentGrade || null,
-      expected_grad_date: expected,
-      gpa: gpaNumeric,
-      gpa_scale: data.gpaScale || null,
-      gpa_type: data.gpaType || null,
-      class_rank: data.classRank || null,
-      class_size: classSizeInt,
-      rank_reporting_method: data.schoolRanksStudents || null,
-
-      will_graduate_from_school: Boolean(data.willGraduateFromSchool),
-      is_boarding_school: Boolean(data.isBoardingSchool),
-
-      other_schools: otherSchools,
-      studied_abroad: Boolean(data.studiedAbroad),
-      homeschooled: Boolean(data.beenHomeschooled),
-
-      course_history: data.academicYears || [],
-      took_math_early: Boolean(data.tookMathEarly),
-      took_language_early: Boolean(data.tookLanguageEarly),
-
-      college_courses: data.collegeCoursework || [],
-
-      report_test_scores: Boolean(data.reportTestScores),
-      standardized_tests: standardized,
-
-      taking_ap_exams: Boolean(data.takingAPExams),
-      ap_exams: data.apExams || [],
-      in_ib_programme: Boolean(data.inIBProgramme),
-      ib_exams: data.ibExams || [],
-
-      need_english_proficiency: Boolean(data.needEnglishProficiency),
-      english_proficiency: data.needEnglishProficiency ? data.englishProficiency : {},
-    } as any;
-  };
-
-  const upsertJourney = async (isFinal: boolean) => {
-    if (!profileId) throw new Error('Profile not loaded');
-    const payload = mapStateToDb(profileId);
-
-    // Check if row exists
-    const { data: existing, error: fetchErr } = await supabase
-      .from('academic_journey')
-      .select('id')
-      .eq('profile_id', profileId)
-      .maybeSingle();
-    if (fetchErr) throw fetchErr;
-
-    if (existing?.id) {
-      const { error } = await supabase
-        .from('academic_journey')
-        .update(payload)
-        .eq('id', existing.id as string);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase
-        .from('academic_journey')
-        .insert(payload);
-      if (error) throw error;
-    }
-
-    // Update profile completion score gently
-    const bump = isFinal ? 0.7 : 0.4;
-    await supabase
-      .from('profiles')
-      .update({ completion_score: bump })
-      .eq('id', profileId);
-  };
-
   const handleNext = () => {
     if (currentStep < STEPS.length) {
       setCurrentStep(currentStep + 1);
@@ -425,19 +219,23 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      if (!profileId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        if (!profile?.id) throw new Error('Profile not found');
-        setProfileId(profile.id);
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
 
-      await upsertJourney(true);
+      // Create a lightweight academic summary
+      const academicSummary = `Grade: ${data.currentGrade}, School: ${data.schoolName}, GPA: ${data.cumulativeGPA || 'N/A'}`;
+      
+      // Update profiles with minimal data to avoid timeouts
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          // Store just essential info to avoid timeout
+          narrative_summary: academicSummary,
+          completion_score: 30 // Update completion score
+        })
+        .eq('user_id', user.id);
+
+      if (error) throw error;
 
       toast({
         title: "Academic journey saved!",
@@ -452,31 +250,6 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
         description: "Please try again. If the problem persists, contact support.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSaveQuit = async () => {
-    setIsLoading(true);
-    try {
-      if (!profileId) {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('Not authenticated');
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .single();
-        if (!profile?.id) throw new Error('Profile not found');
-        setProfileId(profile.id);
-      }
-
-      await upsertJourney(false);
-      toast({ title: 'Progress saved', description: 'You can come back anytime.' });
-      onProgressRefresh?.();
-    } catch (e) {
-      toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
@@ -516,27 +289,19 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
           <h2 className="text-2xl font-semibold">Academic Journey</h2>
         </div>
         
-        <Progress value={progress.percent} className="h-2 max-w-md mx-auto" />
-
         {/* Progress Steps */}
         <div className="flex items-center justify-center space-x-2 mb-6">
           {STEPS.map((step, index) => (
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-2 ${
-                progress.sectionComplete[`step_${step.id}` as keyof typeof progress.sectionComplete]
-                  ? 'text-green-600'
-                  : currentStep === step.id
-                  ? 'text-primary'
-                  : 'text-muted-foreground'
+                currentStep === step.id ? 'text-primary' : 
+                currentStep > step.id ? 'text-green-600' : 'text-muted-foreground'
               }`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  progress.sectionComplete[`step_${step.id}` as keyof typeof progress.sectionComplete]
-                    ? 'bg-green-600 text-white'
-                    : currentStep === step.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
+                  currentStep === step.id ? 'bg-primary text-primary-foreground' :
+                  currentStep > step.id ? 'bg-green-600 text-white' : 'bg-muted'
                 }`}>
-                  {progress.sectionComplete[`step_${step.id}` as keyof typeof progress.sectionComplete] ? '✓' : step.id}
+                  {step.id}
                 </div>
                 <span className="text-sm font-medium hidden sm:block">{step.title}</span>
               </div>
@@ -569,26 +334,16 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
           {currentStep === 1 ? 'Cancel' : 'Previous'}
         </Button>
 
-        <div className="flex items-center gap-2">
-          <Button 
-            variant="secondary"
-            onClick={handleSaveQuit}
-            disabled={isLoading}
-          >
-            Save & Quit
+        {currentStep < STEPS.length ? (
+          <Button onClick={handleNext}>
+            Continue
+            <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
-
-          {currentStep < STEPS.length ? (
-            <Button onClick={handleNext}>
-              Continue
-              <ArrowRight className="h-4 w-4 ml-2" />
-            </Button>
-          ) : (
-            <Button onClick={handleSubmit} disabled={isLoading}>
-              {isLoading ? 'Saving...' : 'Complete Academic Journey'}
-            </Button>
-          )}
-        </div>
+        ) : (
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Complete Academic Journey'}
+          </Button>
+        )}
       </div>
     </div>
   );
@@ -1583,6 +1338,239 @@ const PREDEFINED_COURSES = {
       { name: "Senior Capstone Business", honors: "NH" },
       { name: "Senior Project", honors: "NH" },
       { name: "Social Work and Health Advocacy in Action", honors: "UCCI" },
+    ]
+  },
+  '12th': {
+    'History/Social Science': [
+      { name: 'AP African American Studies (AP)', honorsType: 'AP' },
+      { name: 'AP Government and Politics Comparative (AP)', honorsType: 'AP' },
+      { name: 'AP Government and Politics United States (AP)', honorsType: 'AP' },
+      { name: 'AP Human Geography (AP)', honorsType: 'AP' },
+      { name: 'AP United States History (AP)', honorsType: 'AP' },
+      { name: 'AP World History (AP)', honorsType: 'AP' },
+      { name: 'Ethnic Studies: Our American Histories', honorsType: 'NH' },
+      { name: 'Modern World History', honorsType: 'NH' },
+      { name: 'Modern World History APEX', honorsType: 'NH' },
+      { name: 'Modern World History Accelerated', honorsType: 'NH' },
+      { name: 'US Government', honorsType: 'NH' },
+      { name: 'US Government APEX', honorsType: 'NH' },
+      { name: 'US Government Accelerated', honorsType: 'NH' },
+      { name: 'US History', honorsType: 'NH' },
+      { name: 'US History APEX', honorsType: 'NH' },
+    ],
+    'English': [
+      { name: 'AP English Language and Composition (AP)', honorsType: 'AP' },
+      { name: 'AP English Literature and Composition (AP)', honorsType: 'AP' },
+      { name: 'AP Seminar (AP)', honorsType: 'AP' },
+      { name: 'Advanced ELD', honorsType: 'NH' },
+      { name: 'CSU Expository Reading and Writing (CSU)', honorsType: 'CSU' },
+      { name: 'Diverse Voices and Media Literacy', honorsType: 'NH' },
+      { name: 'English 1-2', honorsType: 'NH' },
+      { name: 'English 1-2 APEX', honorsType: 'NH' },
+      { name: 'English 1-2 Accelerated', honorsType: 'NH' },
+      { name: 'English 3-4', honorsType: 'NH' },
+      { name: 'English 3-4 APEX', honorsType: 'NH' },
+      { name: 'English 3-4 Accelerated', honorsType: 'NH' },
+      { name: 'English 5-6', honorsType: 'NH' },
+      { name: 'English 5-6 APEX', honorsType: 'NH' },
+      { name: 'English 7-8 APEX', honorsType: 'NH' },
+      { name: 'Pathway Ambassadors 1-2', honorsType: 'NH' },
+    ],
+    'Mathematics': [
+      { name: 'AP Calculus AB (AP)', honorsType: 'AP' },
+      { name: 'AP Calculus BC (AP)', honorsType: 'AP' },
+      { name: 'AP Computer Science A (AP)', honorsType: 'AP' },
+      { name: 'AP Precalculus (AP)', honorsType: 'AP' },
+      { name: 'AP Statistics (AP)', honorsType: 'AP' },
+      { name: 'Algebra 1', honorsType: 'NH' },
+      { name: 'Algebra 1 APEX', honorsType: 'NH' },
+      { name: 'Algebra 2', honorsType: 'NH' },
+      { name: 'Algebra 2 APEX', honorsType: 'NH' },
+      { name: 'Algebra 2 Accelerated', honorsType: 'NH' },
+      { name: 'Algebra AB', honorsType: 'NH' },
+      { name: 'Algebra CD', honorsType: 'NH' },
+      { name: 'Functions/Statistics/Trigonometry', honorsType: 'NH' },
+      { name: 'Geometry', honorsType: 'NH' },
+      { name: 'Geometry APEX', honorsType: 'NH' },
+      { name: 'Geometry Accelerated', honorsType: 'NH' },
+      { name: 'Introduction to Data Science AB (Center X)', honorsType: 'NH' },
+      { name: 'Pre Calculus', honorsType: 'NH' },
+    ],
+    'Science': [
+      { name: 'AP Biology (AP)', honorsType: 'AP' },
+      { name: 'AP Chemistry (AP)', honorsType: 'AP' },
+      { name: 'AP Computer Science Principles (PLTW)', honorsType: 'PLTW' },
+      { name: 'AP Environmental Science (AP)', honorsType: 'AP' },
+      { name: 'AP Physics 1 (AP)', honorsType: 'AP' },
+      { name: 'AP Physics C: Mechanics (AP)', honorsType: 'AP' },
+      { name: 'Anatomy/Physiology', honorsType: 'NH' },
+      { name: 'Anatomy/Physiology Honors', honorsType: 'HL' },
+      { name: 'Biology 1-2 APEX', honorsType: 'NH' },
+      { name: 'Biology: The Living Earth', honorsType: 'NH' },
+      { name: 'Biology: The Living Earth APEX', honorsType: 'NH' },
+      { name: 'Biomedical Research', honorsType: 'NH' },
+      { name: 'Chemistry 1-2 APEX', honorsType: 'NH' },
+      { name: 'Chemistry 1-2 Honors', honorsType: 'HL' },
+      { name: 'Chemistry in the Earth System', honorsType: 'NH' },
+      { name: 'Chemistry in the Earth System APEX', honorsType: 'NH' },
+      { name: 'Earth Science 1-2 APEX', honorsType: 'NH' },
+      { name: 'Environmental Geoscience', honorsType: 'NH' },
+      { name: 'Food Science', honorsType: 'NH' },
+      { name: 'Honors PLTW Civil Engineering and Architecture (PLTW)', honorsType: 'PLTW' },
+      { name: 'Honors PLTW Cybersecurity (PLTW)', honorsType: 'PLTW' },
+      { name: 'Honors PLTW Engineering Design and Development (PLTW)', honorsType: 'PLTW' },
+      { name: 'Marine Biology 1-2', honorsType: 'NH' },
+      { name: 'Medical Biology 1-2', honorsType: 'NH' },
+      { name: 'Medical Chemistry 1-2', honorsType: 'NH' },
+      { name: 'PLTW Capstone Course (PLTW)', honorsType: 'PLTW' },
+      { name: 'PLTW Computer Science Essentials (PLTW)', honorsType: 'PLTW' },
+      { name: 'Physical Oceanography', honorsType: 'NH' },
+      { name: 'Physics 1-2 APEX', honorsType: 'NH' },
+      { name: 'Physics of the Universe', honorsType: 'NH' },
+      { name: 'Physics of the Universe APEX', honorsType: 'NH' },
+      { name: 'The Science of Green Energy', honorsType: 'NH' },
+    ],
+    'Language Other Than English': [
+      { name: 'AP Chinese Language and Culture (AP)', honorsType: 'AP' },
+      { name: 'AP French Language and Culture (AP)', honorsType: 'AP' },
+      { name: 'AP Japanese Language and Culture (AP)', honorsType: 'AP' },
+      { name: 'AP Spanish Language and Culture (AP)', honorsType: 'AP' },
+      { name: 'AP Spanish Literature and Culture (AP)', honorsType: 'AP' },
+      { name: 'Chinese 1-2', honorsType: 'NH' },
+      { name: 'Chinese 3-4', honorsType: 'NH' },
+      { name: 'Chinese 5-6', honorsType: 'NH' },
+      { name: 'Chinese 7-8', honorsType: 'NH' },
+      { name: 'French 1-2', honorsType: 'NH' },
+      { name: 'French 3-4', honorsType: 'NH' },
+      { name: 'French 5-6', honorsType: 'NH' },
+      { name: 'French I', honorsType: 'NH' },
+      { name: 'French II', honorsType: 'NH' },
+      { name: 'Japanese 1-2', honorsType: 'NH' },
+      { name: 'Japanese 3-4', honorsType: 'NH' },
+      { name: 'Japanese 5-6', honorsType: 'NH' },
+      { name: 'Japanese 5-6 Honors', honorsType: 'HL' },
+      { name: 'Japanese 7-8', honorsType: 'NH' },
+      { name: 'Khmer For Khmer Speakers 1-2', honorsType: 'NH' },
+      { name: 'Khmer For Khmer Speakers 3-4', honorsType: 'NH' },
+      { name: 'Spanish 1-2', honorsType: 'NH' },
+      { name: 'Spanish 1-2 APEX', honorsType: 'NH' },
+      { name: 'Spanish 3-4', honorsType: 'NH' },
+      { name: 'Spanish 3-4 APEX', honorsType: 'NH' },
+      { name: 'Spanish 5-6', honorsType: 'NH' },
+      { name: 'Spanish 5-6 APEX', honorsType: 'NH' },
+      { name: 'Spanish for Spanish 1-2', honorsType: 'NH' },
+      { name: 'Spanish for Spanish 3-4', honorsType: 'NH' },
+      { name: 'Spanish for Spanish 5-6', honorsType: 'NH' },
+    ],
+    'Visual and Performing Arts': [
+      { name: 'AP 2D Art and Design (AP)', honorsType: 'AP' },
+      { name: 'AP 3D Art and Design (AP)', honorsType: 'AP' },
+      { name: 'AP Art History (AP)', honorsType: 'AP' },
+      { name: 'AP Drawing (AP)', honorsType: 'AP' },
+      { name: 'AP Music Theory (AP)', honorsType: 'AP' },
+      { name: 'Advanced Chamber Orchestra 3-8', honorsType: 'NH' },
+      { name: 'Advanced Stage Technology', honorsType: 'NH' },
+      { name: 'Advanced Theatre Arts', honorsType: 'NH' },
+      { name: 'Art 1-2: Foundations', honorsType: 'NH' },
+      { name: 'Art 3-4: Ceramics', honorsType: 'NH' },
+      { name: 'Art 3-4: Drawing & Painting', honorsType: 'NH' },
+      { name: 'Art 3-4: Three-Dimensional Art', honorsType: 'NH' },
+      { name: 'Art 5-6: Ceramics', honorsType: 'NH' },
+      { name: 'Art 5-6: Drawing & Painting', honorsType: 'NH' },
+      { name: 'Art 5-6: Three-Dimensional Art', honorsType: 'NH' },
+      { name: 'Art 7-8: Drawing & Painting', honorsType: 'NH' },
+      { name: 'Ballet Folklorico', honorsType: 'NH' },
+      { name: 'Band 1-2', honorsType: 'NH' },
+      { name: 'Band 3-8', honorsType: 'NH' },
+      { name: 'Cecilian Singers 1-2', honorsType: 'NH' },
+      { name: 'Cecilian Singers 3-8', honorsType: 'NH' },
+      { name: 'Chorus/Voice 1-2', honorsType: 'NH' },
+      { name: 'Chorus/Voice 3-8', honorsType: 'NH' },
+      { name: 'Contemporary Video', honorsType: 'NH' },
+      { name: 'Dance 5-6', honorsType: 'NH' },
+      { name: 'Dance 7-8', honorsType: 'NH' },
+      { name: 'Digital Art & Imaging 1-2', honorsType: 'NH' },
+      { name: 'Digital Art & Imaging 3-4', honorsType: 'NH' },
+      { name: 'Digital Art & Imaging 5-6', honorsType: 'NH' },
+      { name: 'Exploring Art 1-2 APEX', honorsType: 'NH' },
+      { name: 'Global Art Studies ELD', honorsType: 'NH' },
+      { name: 'Instruments 1-2', honorsType: 'NH' },
+      { name: 'Intermediate Songwriting', honorsType: 'NH' },
+      { name: 'Intermediate String Orchestra', honorsType: 'NH' },
+      { name: 'Intermediate Theatre Arts', honorsType: 'NH' },
+      { name: 'Introduction to Design & Engineering', honorsType: 'NH' },
+      { name: 'Introduction to Songwriting', honorsType: 'NH' },
+      { name: 'Introduction to Theatre Arts', honorsType: 'NH' },
+      { name: 'Jazz Band 1-2', honorsType: 'NH' },
+      { name: 'Jazz Band 3-8', honorsType: 'NH' },
+      { name: 'Music Appreciation APEX', honorsType: 'NH' },
+      { name: 'Orchestra 1-2', honorsType: 'NH' },
+      { name: 'Orchestra 3-4', honorsType: 'NH' },
+      { name: 'Orchestra 5-6', honorsType: 'NH' },
+      { name: 'Orchestra 7-8', honorsType: 'NH' },
+      { name: 'Photo and Video 1-2', honorsType: 'NH' },
+      { name: 'Photo and Video 3-4', honorsType: 'NH' },
+      { name: 'Photo and Video 5-6', honorsType: 'NH' },
+      { name: 'Piano 1-2', honorsType: 'NH' },
+      { name: 'Play Production 1-2', honorsType: 'NH' },
+      { name: 'Studio Vocal Jazz Singers 1-2', honorsType: 'NH' },
+      { name: 'Studio Vocal Jazz Singers 3-4', honorsType: 'NH' },
+      { name: 'Studio Vocal Jazz Singers 5-6', honorsType: 'NH' },
+      { name: 'Studio Vocal Jazz Singers 7-8', honorsType: 'NH' },
+      { name: 'Symphonic Winds 1-2', honorsType: 'NH' },
+      { name: 'Symphonic Winds 3-8', honorsType: 'NH' },
+      { name: 'Varsity Chorale 3-8', honorsType: 'NH' },
+      { name: 'Vocal Ensemble/Chamber Singers 1-2', honorsType: 'NH' },
+      { name: 'Vocal Ensemble/Chamber Singers 3-8', honorsType: 'NH' },
+    ],
+    'College-Prep Electives': [
+      { name: 'AP Macroeconomics (AP)', honorsType: 'AP' },
+      { name: 'AP Microeconomics (AP)', honorsType: 'AP' },
+      { name: 'AP Psychology (AP)', honorsType: 'AP' },
+      { name: 'AP Research (AP)', honorsType: 'AP' },
+      { name: 'Advanced Journalism: Edit, Design, Manage', honorsType: 'NH' },
+      { name: 'Applied Medical Occupations and Terminology', honorsType: 'NH' },
+      { name: 'Automotive and Transportation Technology 1-2', honorsType: 'NH' },
+      { name: 'Automotive and Transportation Technology 3-4', honorsType: 'NH' },
+      { name: 'Computer Applications', honorsType: 'NH' },
+      { name: 'Creative Writing 1-2', honorsType: 'NH' },
+      { name: 'Creative Writing 1-2 APEX', honorsType: 'NH' },
+      { name: 'Criminal/Civil Law', honorsType: 'NH' },
+      { name: 'Developing Future Mental and Behavioral Health Professionals Through Mentorships and Internships (UCCI)', honorsType: 'UCCI' },
+      { name: 'Digital Design and Yearbook Publication 1-2', honorsType: 'NH' },
+      { name: 'Digital Design and Yearbook Publication 3-8', honorsType: 'NH' },
+      { name: 'Digital Literacy for Career and College Readiness', honorsType: 'NH' },
+      { name: 'Digital Media', honorsType: 'NH' },
+      { name: 'Economics', honorsType: 'NH' },
+      { name: 'Economics APEX', honorsType: 'NH' },
+      { name: 'Economics Accelerated', honorsType: 'NH' },
+      { name: 'Elements of Journalism', honorsType: 'NH' },
+      { name: 'Elements of Oral Communication', honorsType: 'NH' },
+      { name: 'Environmental Science APEX', honorsType: 'NH' },
+      { name: 'Ethnic Studies APEX', honorsType: 'NH' },
+      { name: 'Ethnic and Identity Studies', honorsType: 'NH' },
+      { name: 'Forensic Science', honorsType: 'NH' },
+      { name: 'Geography', honorsType: 'NH' },
+      { name: 'Health and Career Exploration', honorsType: 'NH' },
+      { name: 'Healthcare Administrative Technology', honorsType: 'NH' },
+      { name: 'History of Rock & Roll', honorsType: 'NH' },
+      { name: 'International Business', honorsType: 'NH' },
+      { name: 'International Marketing', honorsType: 'NH' },
+      { name: 'International Relations', honorsType: 'NH' },
+      { name: 'Introduction to Entrepreneurship', honorsType: 'NH' },
+      { name: 'Introduction to Psychology', honorsType: 'NH' },
+      { name: 'Introduction to Sociology', honorsType: 'NH' },
+      { name: 'Journalism: Production/Management', honorsType: 'NH' },
+      { name: 'Medical Administrative Assistant', honorsType: 'NH' },
+      { name: 'Medical/Clerical Occupations', honorsType: 'NH' },
+      { name: 'Model United Nations', honorsType: 'NH' },
+      { name: 'Model United Nations II / Leadership', honorsType: 'NH' },
+      { name: 'Pathway Ambassadors 3-4', honorsType: 'NH' },
+      { name: 'Psychology', honorsType: 'NH' },
+      { name: 'Senior Capstone Business', honorsType: 'NH' },
+      { name: 'Senior Project', honorsType: 'NH' },
+      { name: 'Social Work and Health Advocacy in Action (UCCI)', honorsType: 'UCCI' },
+      { name: 'The Green Future of Energy and Transportation', honorsType: 'NH' },
     ]
   }
 };

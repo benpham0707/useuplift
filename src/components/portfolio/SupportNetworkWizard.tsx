@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowRight, ArrowLeft, Users2, Plus, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowRight, ArrowLeft, Users2, Plus, Trash2, Paperclip, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -31,8 +32,12 @@ interface SupportNetworkData {
   // Documentation & Portfolio
   hasPortfolioItems: boolean;
   portfolioItems: Array<{
+    id: string;
     type: string;
+    title: string;
     description: string;
+    category: string;
+    attachedFile?: File;
   }>;
   wantsToUploadDocuments: boolean;
   documents: Array<{
@@ -126,16 +131,11 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="h-[95vh] flex flex-col">
       {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Users2 className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">Support Network & Resources</h2>
-        </div>
-        
+      <div className="text-center flex-shrink-0 px-6 pt-4 pb-2">
         {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-2 mb-6">
+        <div className="flex items-center justify-center space-x-2">
           {STEPS.map((step, index) => (
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-2 ${
@@ -159,21 +159,21 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       </div>
 
       {/* Step Content */}
-      <Card>
-        <CardHeader>
+      <Card className="flex-1 flex flex-col mx-6 min-h-0">
+        <CardHeader className="flex-shrink-0">
           <CardTitle className="flex items-center gap-2">
             <Users2 className="h-5 w-5" />
             {STEPS[currentStep - 1]?.title}
           </CardTitle>
           <p className="text-muted-foreground">{STEPS[currentStep - 1]?.description}</p>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1 overflow-y-auto min-h-0 pb-4">
           {renderCurrentStep()}
         </CardContent>
       </Card>
 
       {/* Navigation */}
-      <div className="flex justify-between">
+      <div className="flex justify-between p-6 flex-shrink-0">
         <Button 
           variant="outline" 
           onClick={currentStep === 1 ? onCancel : handlePrevious}
@@ -435,11 +435,17 @@ const DocumentationPortfolioStep: React.FC<{
   const addPortfolioItem = () => {
     setData({
       ...data,
-      portfolioItems: [...data.portfolioItems, { type: '', description: '' }]
+      portfolioItems: [...data.portfolioItems, { 
+        id: Date.now().toString(),
+        type: '', 
+        title: '',
+        description: '',
+        category: ''
+      }]
     });
   };
 
-  const updatePortfolioItem = (index: number, field: string, value: string) => {
+  const updatePortfolioItem = (index: number, field: string, value: string | File) => {
     const newItems = [...data.portfolioItems];
     newItems[index] = { ...newItems[index], [field]: value };
     setData({ ...data, portfolioItems: newItems });
@@ -493,36 +499,110 @@ const DocumentationPortfolioStep: React.FC<{
           <div className="ml-6 space-y-4 border-l-2 border-muted pl-4">
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                List creative work, projects, or other portfolio items that showcase your abilities.
+                Add your portfolio items like artwork, writing samples, coding projects, etc.
               </p>
               <Button type="button" variant="outline" size="sm" onClick={addPortfolioItem}>
                 <Plus className="h-4 w-4 mr-2" />
-                Add Item
+                Add Portfolio Item
               </Button>
             </div>
 
             {data.portfolioItems.map((item, index) => (
-              <Card key={index} className="p-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor={`portfolio-type-${index}`}>Item Type</Label>
-                    <Select value={item.type} onValueChange={(value) => updatePortfolioItem(index, 'type', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select item type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="artwork">Artwork/Visual Art</SelectItem>
-                        <SelectItem value="writing">Writing Samples</SelectItem>
-                        <SelectItem value="music">Music/Audio</SelectItem>
-                        <SelectItem value="video">Video/Film</SelectItem>
-                        <SelectItem value="research">Research Project</SelectItem>
-                        <SelectItem value="website">Website/App</SelectItem>
-                        <SelectItem value="photography">Photography</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
+              <Card key={item.id} className="p-4">
+                <div className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`portfolio-title-${index}`}>Title</Label>
+                      <Input
+                        id={`portfolio-title-${index}`}
+                        value={item.title}
+                        onChange={(e) => updatePortfolioItem(index, 'title', e.target.value)}
+                        placeholder="My Art Project"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`portfolio-category-${index}`}>Category</Label>
+                      <Select value={item.category} onValueChange={(value) => updatePortfolioItem(index, 'category', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="visual_art">Visual Art</SelectItem>
+                          <SelectItem value="writing">Writing</SelectItem>
+                          <SelectItem value="music">Music</SelectItem>
+                          <SelectItem value="coding">Coding Project</SelectItem>
+                          <SelectItem value="research">Research</SelectItem>
+                          <SelectItem value="design">Design</SelectItem>
+                          <SelectItem value="photography">Photography</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                  <div className="flex items-end gap-2">
+                  
+                  <div>
+                    <Label htmlFor={`portfolio-description-${index}`}>Description</Label>
+                    <Textarea
+                      id={`portfolio-description-${index}`}
+                      value={item.description}
+                      onChange={(e) => updatePortfolioItem(index, 'description', e.target.value)}
+                      placeholder="Describe your portfolio item, what it represents, techniques used, etc."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="outline" size="sm">
+                            <Paperclip className="h-4 w-4 mr-2" />
+                            Attach File
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-md">
+                          <DialogHeader>
+                            <DialogTitle>Attach File to "{item.title || 'Portfolio Item'}"</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="border-2 border-dashed border-primary/20 rounded-lg p-6 text-center">
+                              <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                              <p className="text-sm text-muted-foreground mb-2">
+                                Drop files here or click to browse
+                              </p>
+                              <input
+                                type="file"
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.mp3,.mp4,.mov,.zip"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    updatePortfolioItem(index, 'attachedFile', file);
+                                  }
+                                }}
+                                id={`portfolio-file-${index}`}
+                              />
+                              <label
+                                htmlFor={`portfolio-file-${index}`}
+                                className="cursor-pointer text-primary hover:text-primary/80 text-sm font-medium"
+                              >
+                                Choose file
+                              </label>
+                            </div>
+                            {item.attachedFile && (
+                              <p className="text-sm text-green-600">
+                                File attached: {item.attachedFile.name}
+                              </p>
+                            )}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                      {item.attachedFile && (
+                        <span className="text-xs text-muted-foreground">
+                          {item.attachedFile.name}
+                        </span>
+                      )}
+                    </div>
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -532,16 +612,6 @@ const DocumentationPortfolioStep: React.FC<{
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-                </div>
-                <div className="mt-4">
-                  <Label htmlFor={`portfolio-desc-${index}`}>Description</Label>
-                  <Textarea
-                    id={`portfolio-desc-${index}`}
-                    value={item.description}
-                    onChange={(e) => updatePortfolioItem(index, 'description', e.target.value)}
-                    placeholder="Brief description of this portfolio item..."
-                    className="min-h-[60px]"
-                  />
                 </div>
               </Card>
             ))}
@@ -564,65 +634,32 @@ const DocumentationPortfolioStep: React.FC<{
             }}
           />
           <Label htmlFor="upload-documents" className="font-medium">
-            I would like to upload supporting documents
+            I would like to upload teacher letters of recommendation
           </Label>
         </div>
 
         {data.wantsToUploadDocuments && (
           <div className="ml-6 space-y-4 border-l-2 border-muted pl-4">
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                List documents you'd like to include (transcripts, certificates, etc.).
-              </p>
-              <Button type="button" variant="outline" size="sm" onClick={addDocument}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Document
-              </Button>
-            </div>
-
-            {data.documents.map((doc, index) => (
-              <Card key={index} className="p-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor={`doc-type-${index}`}>Document Type</Label>
-                    <Select value={doc.type} onValueChange={(value) => updateDocument(index, 'type', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select document type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="transcript">Transcript</SelectItem>
-                        <SelectItem value="certificate">Certificate/Award</SelectItem>
-                        <SelectItem value="test_scores">Test Scores</SelectItem>
-                        <SelectItem value="resume">Resume</SelectItem>
-                        <SelectItem value="essay">Essay/Writing Sample</SelectItem>
-                        <SelectItem value="recommendation">Recommendation Letter</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => removeDocument(index)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
+            {/* File Upload Section */}
+            <Card className="p-4 border-dashed border-2 border-primary/20">
+              <div className="text-center space-y-3">
+                <div className="flex justify-center">
+                  <svg className="h-10 w-10 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
                 </div>
-                <div className="mt-4">
-                  <Label htmlFor={`doc-desc-${index}`}>Description</Label>
-                  <Textarea
-                    id={`doc-desc-${index}`}
-                    value={doc.description}
-                    onChange={(e) => updateDocument(index, 'description', e.target.value)}
-                    placeholder="Brief description of this document..."
-                    className="min-h-[60px]"
-                  />
+                <div>
+                  <p className="text-sm font-medium">Upload Teacher Letters of Recommendation</p>
+                  <p className="text-xs text-muted-foreground">Drag and drop files here or click to browse</p>
                 </div>
-              </Card>
-            ))}
+                <Button variant="outline" size="sm">
+                  Choose Recommendation Letters
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Upload letters of recommendation from teachers, counselors, or mentors (PDF, DOC, DOCX - Max 10MB each)
+                </p>
+              </div>
+            </Card>
           </div>
         )}
       </div>

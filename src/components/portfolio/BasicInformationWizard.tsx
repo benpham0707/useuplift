@@ -91,22 +91,6 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
-  // Normalize parent/guardian entries to DB shape
-  const mapParentGuardiansToDb = (entries: Array<{ relationship: string; educationLevel: string; occupation: string; contactInfo?: string; }>) => {
-    if (!Array.isArray(entries)) return [] as any[];
-    return entries.map((pg) => {
-      const contact = (pg?.contactInfo || '').trim();
-      const isEmail = contact.includes('@');
-      return {
-        relationship: pg?.relationship || null,
-        education_level: pg?.educationLevel || null,
-        occupation_category: pg?.occupation || null,
-        contact_email: isEmail ? contact : null,
-        contact_phone: !isEmail && contact ? contact : null,
-      } as any;
-    });
-  };
-  
   // Mock data for demonstration - comprehensive personal information structure
   const [data, setData] = useState<PersonalInformationData>({
     firstName: '',
@@ -294,7 +278,7 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
         living_situation: data.livingSituation,
         household_size: data.householdSize,
         household_income: data.householdIncome,
-        parent_guardians: mapParentGuardiansToDb(data.parentGuardians as any),
+        parent_guardians: data.parentGuardians,
         siblings: {
           count: data.numberOfSiblings,
           education_status: data.siblingsEducation
@@ -434,43 +418,35 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
         
         {/* Progress Steps */}
         <div className="flex items-center justify-center space-x-2 mb-6">
-          {STEPS.map((step, index) => {
-            const isActive = currentStep === step.id;
-            const isComplete =
-              (step.id === 1 && progress.sectionComplete.basic) ||
-              (step.id === 2 && progress.sectionComplete.background) ||
-              (step.id === 3 && progress.sectionComplete.family);
-
-            return (
-              <React.Fragment key={step.id}>
-                <div
-                  className={`flex items-center gap-2 ${
-                    isComplete
-                      ? 'text-green-600'
-                      : isActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground'
-                  }`}
-                >
-                  <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                      isComplete
-                        ? 'bg-green-600 text-white'
-                        : isActive
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    {isComplete ? <CheckCircle2 className="h-5 w-5" /> : step.id}
-                  </div>
-                  <span className="text-sm font-medium hidden sm:block">{step.title}</span>
+          {STEPS.map((step, index) => (
+            <React.Fragment key={step.id}>
+              <div className={`flex items-center gap-2 ${
+                currentStep === step.id
+                  ? 'text-primary'
+                  : (step.id === 1 && progress.sectionComplete.basic) ||
+                    (step.id === 2 && progress.sectionComplete.background) ||
+                    (step.id === 3 && progress.sectionComplete.family)
+                  ? 'text-green-600'
+                  : 'text-muted-foreground'
+              }`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                  currentStep === step.id
+                    ? 'bg-primary text-primary-foreground'
+                    : (step.id === 1 && progress.sectionComplete.basic) ||
+                      (step.id === 2 && progress.sectionComplete.background) ||
+                      (step.id === 3 && progress.sectionComplete.family)
+                    ? 'bg-green-600 text-white'
+                    : 'bg-muted'
+                }`}>
+                  {currentStep > step.id ? <CheckCircle2 className="h-5 w-5" /> : step.id}
                 </div>
-                {index < STEPS.length - 1 && (
-                  <div className={`w-8 h-0.5 ${isComplete ? 'bg-green-600' : 'bg-muted'}`} />
-                )}
-              </React.Fragment>
-            );
-          })}
+                <span className="text-sm font-medium hidden sm:block">{step.title}</span>
+              </div>
+              {index < STEPS.length - 1 && (
+                <div className={`w-8 h-0.5 ${currentStep > step.id ? 'bg-green-600' : 'bg-muted'}`} />
+              )}
+            </React.Fragment>
+          ))}
         </div>
         
         <Progress value={progress.percent} className="h-2 max-w-md mx-auto" />
@@ -537,7 +513,7 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
                   living_situation: data.livingSituation || null,
                   household_size: data.householdSize || null,
                   household_income: data.householdIncome || null,
-                  parent_guardians: mapParentGuardiansToDb((data.parentGuardians as any) || []),
+                  parent_guardians: data.parentGuardians || [],
                   siblings: { count: data.numberOfSiblings ?? null, education_status: data.siblingsEducation || null },
                   first_gen: data.firstGenStatus === 'yes' ? true : data.firstGenStatus === 'no' ? false : null
                 } as any;

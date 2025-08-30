@@ -115,69 +115,55 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="text-center space-y-2">
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <Target className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-semibold">Goals & Aspirations</h2>
+    <div className="h-screen max-h-screen flex flex-col">
+      {/* Minimal Header */}
+      <div className="flex items-center justify-between p-3 border-b flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Target className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-semibold">Goals & Aspirations</h2>
         </div>
         
         {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-2 mb-6">
+        <div className="flex items-center space-x-2">
           {STEPS.map((step, index) => (
             <React.Fragment key={step.id}>
-              <div className={`flex items-center gap-2 ${
-                currentStep === step.id ? 'text-primary' : 
-                currentStep > step.id ? 'text-green-600' : 'text-muted-foreground'
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                currentStep === step.id ? 'bg-primary text-primary-foreground' :
+                currentStep > step.id ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
               }`}>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                  currentStep === step.id ? 'bg-primary text-primary-foreground' :
-                  currentStep > step.id ? 'bg-green-600 text-white' : 'bg-muted'
-                }`}>
-                  {step.id}
-                </div>
-                <span className="text-sm font-medium hidden sm:block">{step.title}</span>
+                {step.id}
               </div>
               {index < STEPS.length - 1 && (
-                <div className={`w-8 h-0.5 ${currentStep > step.id ? 'bg-green-600' : 'bg-muted'}`} />
+                <div className={`w-4 h-0.5 ${currentStep > step.id ? 'bg-green-600' : 'bg-muted'}`} />
               )}
             </React.Fragment>
           ))}
         </div>
       </div>
 
-      {/* Step Content */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Lightbulb className="h-5 w-5" />
-            {STEPS[currentStep - 1]?.title}
-          </CardTitle>
-          <p className="text-muted-foreground">{STEPS[currentStep - 1]?.description}</p>
-        </CardHeader>
-        <CardContent>
-          {renderCurrentStep()}
-        </CardContent>
-      </Card>
+      {/* Main Content Area - Full height scrollable */}
+      <div className="flex-1 overflow-y-auto p-4 min-h-0">
+        {renderCurrentStep()}
+      </div>
 
-      {/* Navigation */}
-      <div className="flex justify-between">
+      {/* Navigation Footer */}
+      <div className="flex justify-between p-3 border-t flex-shrink-0">
         <Button 
           variant="outline" 
+          size="sm"
           onClick={currentStep === 1 ? onCancel : handlePrevious}
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
+          <ArrowLeft className="h-4 w-4 mr-1" />
           {currentStep === 1 ? 'Cancel' : 'Previous'}
         </Button>
 
         {currentStep < STEPS.length ? (
-          <Button onClick={handleNext}>
+          <Button size="sm" onClick={handleNext}>
             Continue
-            <ArrowRight className="h-4 w-4 ml-2" />
+            <ArrowRight className="h-4 w-4 ml-1" />
           </Button>
         ) : (
-          <Button onClick={handleSubmit} disabled={isLoading}>
+          <Button size="sm" onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? 'Saving...' : 'Complete'}
           </Button>
         )}
@@ -255,76 +241,87 @@ const AcademicInterestsStep: React.FC<{
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <Label htmlFor="intended-major">Intended Major or Field of Study</Label>
-        <Select value={data.intendedMajor} onValueChange={(value) => setData({ ...data, intendedMajor: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select your intended major" />
-          </SelectTrigger>
-          <SelectContent>
-            {commonMajors.map(major => (
-              <SelectItem key={major} value={major.toLowerCase().replace(/\s+/g, '_')}>
-                {major}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+    <div className="max-w-2xl mx-auto space-y-6 pb-6">
+      <h3 className="text-lg font-medium mb-6">Academic & Career Interests</h3>
+      
+      {/* Top Row - Dropdowns Side by Side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div>
+          <Label htmlFor="intended-major" className="text-sm font-medium">Intended Major or Field of Study</Label>
+          <Select value={data.intendedMajor} onValueChange={(value) => setData({ ...data, intendedMajor: value })}>
+            <SelectTrigger className="mt-2">
+              <SelectValue placeholder="Select your intended major" />
+            </SelectTrigger>
+            <SelectContent className="max-h-64">
+              {commonMajors.map(major => (
+                <SelectItem key={major} value={major.toLowerCase().replace(/\s+/g, '_')}>
+                  {major}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div>
-        <Label>Career Interests (select all that apply)</Label>
-        <div className="grid md:grid-cols-3 gap-3 mt-2">
-          {careerFields.map(field => (
-            <div key={field} className="flex items-center space-x-2">
-              <Checkbox
-                id={`career-${field}`}
-                checked={data.careerInterests.includes(field)}
-                onCheckedChange={() => setData({
-                  ...data,
-                  careerInterests: toggleArrayItem(data.careerInterests, field)
-                })}
-              />
-              <Label htmlFor={`career-${field}`} className="text-sm">{field}</Label>
-            </div>
-          ))}
+        <div>
+          <Label htmlFor="highest-degree" className="text-sm font-medium">Highest Degree You Intend to Earn</Label>
+          <Select value={data.highestDegree} onValueChange={(value) => setData({ ...data, highestDegree: value })}>
+            <SelectTrigger className="mt-2">
+              <SelectValue placeholder="Select highest degree goal" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
+              <SelectItem value="masters">Master's Degree</SelectItem>
+              <SelectItem value="phd">PhD/Doctorate</SelectItem>
+              <SelectItem value="md">Medical Degree (MD)</SelectItem>
+              <SelectItem value="jd">Law Degree (JD)</SelectItem>
+              <SelectItem value="other_professional">Other Professional Degree</SelectItem>
+              <SelectItem value="undecided">Undecided</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div>
-        <Label htmlFor="highest-degree">Highest Degree You Intend to Earn</Label>
-        <Select value={data.highestDegree} onValueChange={(value) => setData({ ...data, highestDegree: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select highest degree goal" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="bachelors">Bachelor's Degree</SelectItem>
-            <SelectItem value="masters">Master's Degree</SelectItem>
-            <SelectItem value="phd">PhD/Doctorate</SelectItem>
-            <SelectItem value="md">Medical Degree (MD)</SelectItem>
-            <SelectItem value="jd">Law Degree (JD)</SelectItem>
-            <SelectItem value="other_professional">Other Professional Degree</SelectItem>
-            <SelectItem value="undecided">Undecided</SelectItem>
-          </SelectContent>
-        </Select>
+      {/* Career Interests - Single Column List */}
+      <div className="mb-8">
+        <Label className="text-sm font-medium mb-3 block">Career Interests (select all that apply)</Label>
+        <div className="border rounded-lg p-4 h-60 overflow-y-auto bg-background">
+          <div className="space-y-2">
+            {careerFields.map(field => (
+              <div key={field} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
+                <Checkbox
+                  id={`career-${field}`}
+                  checked={data.careerInterests.includes(field)}
+                  onCheckedChange={() => setData({
+                    ...data,
+                    careerInterests: toggleArrayItem(data.careerInterests, field)
+                  })}
+                />
+                <Label htmlFor={`career-${field}`} className="text-sm cursor-pointer flex-1">{field}</Label>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
+      {/* College Environment Preferences - Single Column List */}
       <div>
-        <Label>College Environment Preferences (select all that appeal to you)</Label>
-        <div className="grid md:grid-cols-2 gap-3 mt-2">
-          {collegeEnvironments.map(env => (
-            <div key={env} className="flex items-center space-x-2">
-              <Checkbox
-                id={`env-${env}`}
-                checked={data.collegeEnvironment.includes(env)}
-                onCheckedChange={() => setData({
-                  ...data,
-                  collegeEnvironment: toggleArrayItem(data.collegeEnvironment, env)
-                })}
-              />
-              <Label htmlFor={`env-${env}`} className="text-sm">{env}</Label>
-            </div>
-          ))}
+        <Label className="text-sm font-medium mb-3 block">College Environment Preferences (select all that appeal to you)</Label>
+        <div className="border rounded-lg p-4 h-60 overflow-y-auto bg-background">
+          <div className="space-y-2">
+            {collegeEnvironments.map(env => (
+              <div key={env} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
+                <Checkbox
+                  id={`env-${env}`}
+                  checked={data.collegeEnvironment.includes(env)}
+                  onCheckedChange={() => setData({
+                    ...data,
+                    collegeEnvironment: toggleArrayItem(data.collegeEnvironment, env)
+                  })}
+                />
+                <Label htmlFor={`env-${env}`} className="text-sm cursor-pointer flex-1">{env}</Label>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -356,98 +353,107 @@ const ApplicationPlansStep: React.FC<{
 
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <Label htmlFor="uc-application">Planning to apply to UC system schools?</Label>
-          <Select value={data.applyingToUC} onValueChange={(value) => setData({ ...data, applyingToUC: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select option" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="maybe">Maybe</SelectItem>
-            </SelectContent>
-          </Select>
+      <div>
+        <h3 className="text-lg font-medium mb-4">College Application Plans</h3>
+        
+        {/* Application Questions Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div>
+            <Label htmlFor="uc-application" className="text-sm font-medium">Planning to apply to UC system schools?</Label>
+            <Select value={data.applyingToUC} onValueChange={(value) => setData({ ...data, applyingToUC: value })}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select option" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+                <SelectItem value="maybe">Maybe</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="common-app" className="text-sm font-medium">Planning to use the Common Application?</Label>
+            <Select value={data.usingCommonApp} onValueChange={(value) => setData({ ...data, usingCommonApp: value })}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select option" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+                <SelectItem value="maybe">Maybe</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="start-date" className="text-sm font-medium">When do you plan to start college?</Label>
+            <Select value={data.startDate} onValueChange={(value) => setData({ ...data, startDate: value })}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select start date" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="fall_2025">Fall 2025</SelectItem>
+                <SelectItem value="spring_2026">Spring 2026</SelectItem>
+                <SelectItem value="fall_2026">Fall 2026</SelectItem>
+                <SelectItem value="gap_year">Taking a gap year</SelectItem>
+                <SelectItem value="undecided">Undecided</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        <div>
-          <Label htmlFor="common-app">Planning to use the Common Application?</Label>
-          <Select value={data.usingCommonApp} onValueChange={(value) => setData({ ...data, usingCommonApp: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select option" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="maybe">Maybe</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Financial Aid Questions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div>
+            <Label htmlFor="need-based-aid" className="text-sm font-medium">Do you expect to apply for need-based financial aid?</Label>
+            <Select value={data.needBasedAid} onValueChange={(value) => setData({ ...data, needBasedAid: value })}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select option" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+                <SelectItem value="unsure">Unsure</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="merit-scholarships" className="text-sm font-medium">Are you interested in merit-based scholarships?</Label>
+            <Select value={data.meritScholarships} onValueChange={(value) => setData({ ...data, meritScholarships: value })}>
+              <SelectTrigger className="mt-2">
+                <SelectValue placeholder="Select option" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes</SelectItem>
+                <SelectItem value="no">No</SelectItem>
+                <SelectItem value="unsure">Unsure</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-      </div>
 
-      <div>
-        <Label htmlFor="start-date">When do you plan to start college?</Label>
-        <Select value={data.startDate} onValueChange={(value) => setData({ ...data, startDate: value })}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select start date" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="fall_2025">Fall 2025</SelectItem>
-            <SelectItem value="spring_2026">Spring 2026</SelectItem>
-            <SelectItem value="fall_2026">Fall 2026</SelectItem>
-            <SelectItem value="gap_year">Taking a gap year</SelectItem>
-            <SelectItem value="undecided">Undecided</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div>
-        <Label>Geographic Preferences for College (select all that apply)</Label>
-        <div className="grid md:grid-cols-2 gap-3 mt-2">
-          {geographicOptions.map(option => (
-            <div key={option} className="flex items-center space-x-2">
-              <Checkbox
-                id={`geo-${option}`}
-                checked={data.geographicPreferences.includes(option)}
-                onCheckedChange={() => setData({
-                  ...data,
-                  geographicPreferences: toggleArrayItem(data.geographicPreferences, option)
-                })}
-              />
-              <Label htmlFor={`geo-${option}`} className="text-sm">{option}</Label>
+        {/* Geographic Preferences */}
+        <div>
+          <Label className="text-sm font-medium mb-3 block">Geographic Preferences for College (select all that apply)</Label>
+          <div className="border rounded-lg p-4 h-64 overflow-y-auto bg-background">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {geographicOptions.map(option => (
+                <div key={option} className="flex items-center space-x-3 p-2 hover:bg-muted/50 rounded-md transition-colors">
+                  <Checkbox
+                    id={`geo-${option}`}
+                    checked={data.geographicPreferences.includes(option)}
+                    onCheckedChange={() => setData({
+                      ...data,
+                      geographicPreferences: toggleArrayItem(data.geographicPreferences, option)
+                    })}
+                  />
+                  <Label htmlFor={`geo-${option}`} className="text-sm cursor-pointer flex-1">{option}</Label>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <div>
-          <Label htmlFor="need-based-aid">Do you expect to apply for need-based financial aid?</Label>
-          <Select value={data.needBasedAid} onValueChange={(value) => setData({ ...data, needBasedAid: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select option" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="unsure">Unsure</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="merit-scholarships">Are you interested in merit-based scholarships?</Label>
-          <Select value={data.meritScholarships} onValueChange={(value) => setData({ ...data, meritScholarships: value })}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select option" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="yes">Yes</SelectItem>
-              <SelectItem value="no">No</SelectItem>
-              <SelectItem value="unsure">Unsure</SelectItem>
-            </SelectContent>
-          </Select>
+          </div>
         </div>
       </div>
     </div>
