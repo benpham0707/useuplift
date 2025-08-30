@@ -256,20 +256,44 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
   const saveAllExperiences = async () => {
     try {
       setSaving(true);
-      const validExperiences = experiences.filter(exp => 
-        exp.category && exp.title.trim().length >= 2 && exp.description.trim().length >= 10
+      
+      // First, save all current drafts to experiences state
+      setExperiences(prevExperiences => 
+        prevExperiences.map(exp => ({
+          ...exp,
+          description: descriptionDrafts[exp.id] ?? exp.description
+        }))
       );
-      if (validExperiences.length < 3) {
-        toast({ title: 'Minimum requirement not met', description: 'Please complete at least 3 experiences before saving.' });
-        return;
-      }
+      
+      // Wait a bit for state to update, then validate
+      setTimeout(async () => {
+        try {
+          const currentExperiences = experiences.map(exp => ({
+            ...exp,
+            description: descriptionDrafts[exp.id] ?? exp.description
+          }));
+          
+          const validExperiences = currentExperiences.filter(exp => 
+            exp.category && exp.title.trim().length >= 2 && exp.description.trim().length >= 10
+          );
+          
+          if (validExperiences.length < 3) {
+            toast({ title: 'Minimum requirement not met', description: 'Please complete at least 3 experiences before saving.' });
+            setSaving(false);
+            return;
+          }
 
-      await upsertExperiences(true);
-      toast({ title: 'Experiences saved!', description: 'Your experiences have been recorded.' });
-      if (onClose) onClose();
+          await upsertExperiences(true);
+          toast({ title: 'Experiences saved!', description: 'Your experiences have been recorded.' });
+          if (onClose) onClose();
+        } catch (e: any) {
+          toast({ title: 'Save failed', description: e?.message || 'Please try again.' });
+        } finally {
+          setSaving(false);
+        }
+      }, 100);
     } catch (e: any) {
       toast({ title: 'Save failed', description: e?.message || 'Please try again.' });
-    } finally {
       setSaving(false);
     }
   };
@@ -305,11 +329,15 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
     const [localTitle, setLocalTitle] = useState(experience.title);
     const [localOrg, setLocalOrg] = useState(experience.organization);
     const [localTotalHours, setLocalTotalHours] = useState(experience.totalHours);
+    const [localSupervisor, setLocalSupervisor] = useState(experience.supervisorName);
+    const [localVerification, setLocalVerification] = useState(experience.verificationUrl);
 
     useEffect(() => {
       setLocalTitle(experience.title);
       setLocalOrg(experience.organization);
       setLocalTotalHours(experience.totalHours);
+      setLocalSupervisor(experience.supervisorName);
+      setLocalVerification(experience.verificationUrl);
     }, [experience.id]);
     
     return (
@@ -403,9 +431,11 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      // Save current description draft to experience
+                      // Save all current field values to experience
                       const currentDesc = descriptionDrafts[experience.id] ?? experience.description;
                       updateExperience(index, 'description', currentDesc);
+                      updateExperience(index, 'supervisorName', localSupervisor);
+                      updateExperience(index, 'verificationUrl', localVerification);
                       setExpandedIndex(null);
                     }}
                   >
@@ -651,8 +681,9 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                       <Input 
                         id={`supervisor-${experience.id}`}
                         name={`supervisor-${experience.id}`}
-                        value={experience.supervisorName}
-                        onChange={(e) => updateExperience(index, 'supervisorName', e.target.value)}
+                        value={localSupervisor}
+                        onChange={(e) => setLocalSupervisor(e.target.value)}
+                        onBlur={() => updateExperience(index, 'supervisorName', localSupervisor)}
                         placeholder="Name (optional)"
                         className="mt-2"
                       />
@@ -663,8 +694,9 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                       <Input 
                         id={`verify-${experience.id}`}
                         name={`verify-${experience.id}`}
-                        value={experience.verificationUrl}
-                        onChange={(e) => updateExperience(index, 'verificationUrl', e.target.value)}
+                        value={localVerification}
+                        onChange={(e) => setLocalVerification(e.target.value)}
+                        onBlur={() => updateExperience(index, 'verificationUrl', localVerification)}
                         placeholder="https://... (optional)"
                         className="mt-2"
                       />
