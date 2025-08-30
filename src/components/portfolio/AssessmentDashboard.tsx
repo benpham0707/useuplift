@@ -11,6 +11,7 @@ import {
   Target,
   Users2,
   BookOpen,
+  Plus,
   ArrowRight,
   Lock,
   CheckCircle2
@@ -70,7 +71,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       progress: 0,
       status: 'not-started',
       items: ['Family responsibilities', 'Life circumstances'],
-      unlocked: true // TODO: Restore to: currentProgress >= 20
+      unlocked: currentProgress >= 20
     },
     {
       id: 'goals',
@@ -80,7 +81,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       progress: 0,
       status: 'not-started',
       items: ['Academic interests', 'Career goals', 'College application plans'],
-      unlocked: true // TODO: Restore to: currentProgress >= 40
+      unlocked: currentProgress >= 40
     },
     {
       id: 'support',
@@ -90,7 +91,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       progress: 0,
       status: 'not-started',
       items: ['Educational support', 'Community organizations', 'Portfolio items'],
-      unlocked: true // TODO: Restore to: currentProgress >= 60
+      unlocked: currentProgress >= 60
     }
   ]);
 
@@ -261,45 +262,88 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
               </div>
             </div>
             <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-              Ready to Start {/* TODO: Restore to: {currentProgress >= 80 ? 'Ready to Start' : 'Locked'} */}
+              {currentProgress >= 80 ? 'Ready to Start' : 'Locked'}
             </Badge>
           </div>
         </CardHeader>
         <CardContent>
-          {/* TODO: Restore conditional wrapper when re-implementing progress gates */}
-          <div className="space-y-4">
-            <div className="grid md:grid-cols-3 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>Meaningful experiences</span>
+          {currentProgress >= 80 ? (
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span>Meaningful experiences</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span>Personal challenges</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  <span>Additional context</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>Personal challenges</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>Additional context</span>
-              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                This is the most important section of your portfolio. Share the stories that make you unique and help colleges understand who you are beyond grades and test scores.
+              </p>
+              <Button 
+                size="lg" 
+                className="w-full md:w-auto"
+                onClick={() => setOpenSection('growth')}
+              >
+                Start Personal Growth Section
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">
-              This is the most important section of your portfolio. Share the stories that make you unique and help colleges understand who you are beyond grades and test scores.
-            </p>
-            <Button 
-              size="lg" 
-              className="w-full md:w-auto"
-              onClick={() => setOpenSection('growth')}
-            >
-              Start Personal Growth Section
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
+          ) : (
+            <div className="text-center py-8">
+              <Lock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h4 className="font-medium text-lg mb-2">Complete More Sections to Unlock</h4>
+              <p className="text-muted-foreground mb-4">
+                Complete at least 80% of other sections to unlock Personal Growth & Stories
+              </p>
+              <div className="w-full bg-muted rounded-full h-2">
+                <div 
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(currentProgress, 100)}%` }}
+                />
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                {currentProgress}% complete • {80 - currentProgress}% remaining
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Moved Action Recommendations to dedicated Extracurricular Optimizer page */}
-
-
+      {/* Next Steps Recommendations */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recommended Next Steps</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <RecommendationItem
+              title="Add Your Work Experience"
+              description="Transform your part-time jobs into valuable experience stories"
+              priority="high"
+              timeEstimate="10 minutes"
+            />
+            <RecommendationItem
+              title="Document Family Responsibilities"
+              description="Caring for family members shows leadership and maturity"
+              priority="medium"
+              timeEstimate="5 minutes"
+            />
+            <RecommendationItem
+              title="List Academic Achievements"
+              description="Include honors classes, good grades, and improvement trends"
+              priority="medium"
+              timeEstimate="15 minutes"
+            />
+          </div>
+        </CardContent>
+      </Card>
       {/* Wizards */}
       <Dialog open={openSection === 'personal'} onOpenChange={(v) => {
         setOpenSection(v ? 'personal' : null);
@@ -336,7 +380,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       </Dialog>
 
       <Dialog open={openSection === 'experiences'} onOpenChange={(v) => setOpenSection(v ? 'experiences' : null)}>
-        <DialogContent className="max-w-[95vw] w-full max-h-[95vh] overflow-hidden">
+        <DialogContent className="max-w-3xl w-full">
           <ExperiencesWizard
             onAdded={() => {
               setAssessmentSections((prev) => prev.map((s) => s.id === 'experiences' ? { ...s, status: 'in-progress' } : s));
@@ -374,7 +418,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       </Dialog>
 
       <Dialog open={openSection === 'support'} onOpenChange={(v) => setOpenSection(v ? 'support' : null)}>
-        <DialogContent className="max-w-3xl w-full max-h-[95vh] overflow-hidden p-0">
+        <DialogContent className="max-w-3xl w-full">
           <SupportNetworkWizard
             onComplete={() => {
               setAssessmentSections((prev) => prev.map((s) => s.id === 'support' ? { ...s, status: 'completed', progress: 100 } : s));
@@ -489,7 +533,40 @@ const AssessmentSectionCard = ({ section, onOpen, itemStatuses }: AssessmentSect
   );
 };
 
-// Removed unused RecommendationItem component - moved to ExtracurricularOptimizer page
+interface RecommendationItemProps {
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  timeEstimate: string;
+}
+
+const RecommendationItem = ({ title, description, priority, timeEstimate }: RecommendationItemProps) => {
+  const priorityColors = {
+    high: 'bg-red-100 text-red-800',
+    medium: 'bg-yellow-100 text-yellow-800', 
+    low: 'bg-green-100 text-green-800'
+  };
+
+  return (
+    <div className="flex items-center gap-4 p-4 rounded-lg border bg-muted/20 hover:bg-muted/40 transition-colors">
+      <div className="flex-1">
+        <div className="flex items-center gap-2 mb-1">
+          <h4 className="font-medium text-foreground">{title}</h4>
+          <Badge variant="secondary" className={priorityColors[priority]}>
+            {priority}
+          </Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+        <div className="flex items-center gap-2 mt-2">
+          <span className="text-xs text-muted-foreground">Est. {timeEstimate}</span>
+        </div>
+      </div>
+      <Button size="sm" variant="outline">
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+};
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -516,7 +593,5 @@ const getStatusText = (status: string) => {
       return 'Locked';
   }
 };
-
-// Removed ActionRecommendationsSection and related components - moved to dedicated ExtracurricularOptimizer page
 
 export default AssessmentDashboard;
