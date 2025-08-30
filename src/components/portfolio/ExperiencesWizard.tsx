@@ -46,8 +46,11 @@ interface Experience {
   canContact: boolean;
 }
 
+// Counter to ensure stable IDs
+let idCounter = 0;
+
 const createEmptyExperience = (): Experience => ({
-  id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+  id: `exp_${++idCounter}_${Date.now()}`,
   category: '',
   title: '',
   organization: '',
@@ -84,7 +87,7 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
 
   // Ensure stable IDs for any pre-existing items (after hot reloads)
   useEffect(() => {
-    setExperiences((prev) => prev.map((e) => e?.id ? e : { ...e, id: `${Date.now()}_${Math.random().toString(36).slice(2)}` }));
+    setExperiences((prev) => prev.map((e) => e?.id ? e : { ...e, id: `exp_${++idCounter}_${Date.now()}` }));
   }, []);
 
   // Prefill from experiences_activities
@@ -110,7 +113,7 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
 
         const flatten = (arr: any[] | null | undefined) => Array.isArray(arr) ? arr : [];
         const toExp = (item: any, category: string): Experience => ({
-          id: `${Date.now()}_${Math.random().toString(36).slice(2)}`,
+          id: `exp_${++idCounter}_${Date.now()}`,
           category,
           title: item.title || '',
           organization: item.organization || '',
@@ -400,10 +403,9 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      const d = descValue;
-                      if (typeof d === 'string') {
-                        updateExperience(index, 'description', d);
-                      }
+                      // Save current description draft to experience
+                      const currentDesc = descriptionDrafts[experience.id] ?? experience.description;
+                      updateExperience(index, 'description', currentDesc);
                       setExpandedIndex(null);
                     }}
                   >
@@ -550,12 +552,10 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                     <div>
                       <Label className="text-sm font-medium" htmlFor={`desc-${experience.id}`}>Description *</Label>
                       <Textarea 
-                        key={`desc_${experience.id}`}
                         id={`desc-${experience.id}`}
                         name={`desc-${experience.id}`}
-                        defaultValue={descValue}
+                        value={descValue}
                         onChange={(e) => setDescriptionDrafts((prev) => ({ ...prev, [experience.id]: e.target.value }))}
-                        onBlur={() => updateExperience(index, 'description', descriptionDrafts[experience.id] ?? experience.description)}
                         placeholder="Describe what you did, your responsibilities, and impact..."
                         className="mt-2 min-h-[150px] resize-none"
                       />
