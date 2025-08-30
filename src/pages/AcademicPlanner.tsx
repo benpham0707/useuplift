@@ -142,7 +142,6 @@ const AcademicPlanner = () => {
     const positions = {
       current: getPosition(gpaData.current),
       schoolAvg: getPosition(gpaData.schoolAverage),
-      majorRec: getPosition(gpaData.majorRecommended),
       target: getPosition(gpaData.target)
     };
 
@@ -167,14 +166,24 @@ const AcademicPlanner = () => {
               <span>4.0</span>
             </div>
             
+            {/* Dark vertical reference lines */}
+            <div 
+              className="absolute top-0 bottom-0 w-0.5 bg-gray-800"
+              style={{ left: `${positions.schoolAvg}%`, transform: 'translateX(-50%)' }}
+            />
+            <div 
+              className="absolute top-0 bottom-0 w-0.5 bg-blue-800"
+              style={{ left: `${positions.current}%`, transform: 'translateX(-50%)' }}
+            />
+            <div 
+              className="absolute top-0 bottom-0 w-0.5 bg-green-800"
+              style={{ left: `${positions.target}%`, transform: 'translateX(-50%)' }}
+            />
+            
             {/* Markers with enhanced styling */}
             <div 
               className="absolute top-1 w-4 h-4 bg-gray-500 border-2 border-white rounded-full shadow-md transition-all hover:scale-110"
               style={{ left: `${positions.schoolAvg}%`, transform: 'translateX(-50%)' }}
-            />
-            <div 
-              className="absolute top-1 w-4 h-4 bg-orange-500 border-2 border-white rounded-full shadow-md transition-all hover:scale-110"
-              style={{ left: `${positions.majorRec}%`, transform: 'translateX(-50%)' }}
             />
             <div 
               className="absolute top-1 w-5 h-5 bg-blue-600 border-2 border-white rounded-full shadow-lg transition-all hover:scale-110 z-10"
@@ -184,11 +193,69 @@ const AcademicPlanner = () => {
               className="absolute top-1 w-4 h-4 bg-green-600 border-2 border-white rounded-full shadow-md transition-all hover:scale-110"
               style={{ left: `${positions.target}%`, transform: 'translateX(-50%)' }}
             />
+            
+            {/* Horizontal label lines */}
+            <div 
+              className="absolute top-6 h-0.5 bg-gray-600"
+              style={{ 
+                left: `${positions.schoolAvg}%`, 
+                width: `${Math.max(30, 100 - positions.schoolAvg)}px`,
+                transform: 'translateX(-2px)'
+              }}
+            />
+            <div 
+              className="absolute top-6 h-0.5 bg-blue-600"
+              style={{ 
+                left: `${positions.current}%`, 
+                width: `${Math.max(30, 100 - positions.current)}px`,
+                transform: 'translateX(-2px)'
+              }}
+            />
+            <div 
+              className="absolute top-6 h-0.5 bg-green-600"
+              style={{ 
+                left: `${positions.target}%`, 
+                width: `${Math.max(30, 100 - positions.target)}px`,
+                transform: 'translateX(-2px)'
+              }}
+            />
+            
+            {/* Labels */}
+            <div 
+              className="absolute text-xs font-medium text-gray-700"
+              style={{ 
+                left: `${positions.schoolAvg}%`, 
+                top: '28px',
+                transform: 'translateX(32px)'
+              }}
+            >
+              School Avg
+            </div>
+            <div 
+              className="absolute text-xs font-medium text-blue-700"
+              style={{ 
+                left: `${positions.current}%`, 
+                top: '28px',
+                transform: 'translateX(32px)'
+              }}
+            >
+              Your GPA
+            </div>
+            <div 
+              className="absolute text-xs font-medium text-green-700"
+              style={{ 
+                left: `${positions.target}%`, 
+                top: '28px',
+                transform: 'translateX(32px)'
+              }}
+            >
+              Target
+            </div>
           </div>
         </div>
         
         {/* Legend with enhanced styling */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3 mt-12">
           <div className="flex items-center gap-3 p-2 rounded-lg bg-blue-50 border border-blue-200">
             <div className="w-4 h-4 bg-blue-600 rounded-full border-2 border-white shadow-sm"></div>
             <div>
@@ -201,13 +268,6 @@ const AcademicPlanner = () => {
             <div>
               <span className="font-medium text-gray-900">School Avg</span>
               <div className="text-sm text-gray-700">{gpaData.schoolAverage}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 p-2 rounded-lg bg-orange-50 border border-orange-200">
-            <div className="w-3 h-3 bg-orange-500 rounded-full border border-white shadow-sm"></div>
-            <div>
-              <span className="font-medium text-orange-900">Major Rec</span>
-              <div className="text-sm text-orange-700">{gpaData.majorRecommended}</div>
             </div>
           </div>
           <div className="flex items-center gap-3 p-2 rounded-lg bg-green-50 border border-green-200">

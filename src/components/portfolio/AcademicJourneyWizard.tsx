@@ -268,47 +268,51 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
           .maybeSingle();
         if (!aj) return;
 
+        const schoolData = aj.current_school as any;
+        const otherSchoolsData = aj.other_schools as any;
+        const testScoresData = aj.standardized_tests as any;
+        
         setData((prev) => ({
           ...prev,
-          schoolName: (aj.current_school?.name as string) || '',
-          schoolType: (aj.current_school?.type as string) || '',
-          schoolCity: (aj.current_school?.city as string) || '',
-          schoolState: (aj.current_school?.state as string) || '',
-          schoolCountry: (aj.current_school?.country as string) || 'United States',
+          schoolName: schoolData?.name || '',
+          schoolType: schoolData?.type || '',
+          schoolCity: schoolData?.city || '',
+          schoolState: schoolData?.state || '',
+          schoolCountry: schoolData?.country || 'United States',
           currentGrade: aj.current_grade || '',
           expectedGraduation: (aj.expected_grad_date as string)?.slice(0, 7) || '',
-          willGraduateFromSchool: Boolean(aj.will_graduate_from_school),
-          isBoardingSchool: Boolean(aj.is_boarding_school),
+          willGraduateFromSchool: Boolean((aj as any).will_graduate_from_school),
+          isBoardingSchool: Boolean((aj as any).is_boarding_school),
 
           cumulativeGPA: aj.gpa == null ? '' : String(aj.gpa),
           gpaScale: aj.gpa_scale || '4.0',
           gpaType: aj.gpa_type || 'weighted',
-          schoolRanksStudents: aj.rank_reporting_method || 'none',
+          schoolRanksStudents: (aj as any).rank_reporting_method || 'none',
           classRank: aj.class_rank || '',
           totalClassSize: aj.class_size == null ? '' : String(aj.class_size),
 
-          otherSchoolsAttended: (aj.other_schools?.count as number) || 0,
-          previousSchools: (aj.other_schools?.previous_schools as any[]) || [],
-          studiedAbroad: Boolean(aj.studied_abroad),
-          beenHomeschooled: Boolean(aj.homeschooled),
+          otherSchoolsAttended: otherSchoolsData?.count || 0,
+          previousSchools: otherSchoolsData?.previous_schools || [],
+          studiedAbroad: Boolean((aj as any).studied_abroad),
+          beenHomeschooled: Boolean((aj as any).homeschooled),
 
           academicYears: (aj.course_history as any[]) || [],
-          tookMathEarly: Boolean(aj.took_math_early),
-          tookLanguageEarly: Boolean(aj.took_language_early),
+          tookMathEarly: Boolean((aj as any).took_math_early),
+          tookLanguageEarly: Boolean((aj as any).took_language_early),
 
           collegeCoursesTaken: Array.isArray(aj.college_courses) ? ((aj.college_courses as any[])?.length || 0) : 0,
           collegeCoursework: (aj.college_courses as any[]) || [],
 
-          reportTestScores: Boolean(aj.report_test_scores),
-          sat: (aj.standardized_tests?.sat as any) || { readingWriting: '', math: '', total: '', testDate: '', timesTaken: 0 },
-          act: (aj.standardized_tests?.act as any) || { english: '', math: '', reading: '', science: '', composite: '', testDate: '', timesTaken: 0 },
+          reportTestScores: Boolean((aj as any).report_test_scores),
+          sat: testScoresData?.sat || { readingWriting: '', math: '', total: '', testDate: '', timesTaken: 0 },
+          act: testScoresData?.act || { english: '', math: '', reading: '', science: '', composite: '', testDate: '', timesTaken: 0 },
 
-          takingAPExams: Boolean(aj.taking_ap_exams),
+          takingAPExams: Boolean((aj as any).taking_ap_exams),
           apExams: (aj.ap_exams as any[]) || [],
-          inIBProgramme: Boolean(aj.in_ib_programme),
+          inIBProgramme: Boolean((aj as any).in_ib_programme),
           ibExams: (aj.ib_exams as any[]) || [],
 
-          needEnglishProficiency: Boolean(aj.need_english_proficiency),
+          needEnglishProficiency: Boolean((aj as any).english_proficiency),
           englishProficiency: (aj.english_proficiency as any) || { testType: '', testDate: '', scores: '', planToRetake: false },
         }));
       } catch (e) {
