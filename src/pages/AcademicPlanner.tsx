@@ -95,6 +95,7 @@ const AcademicPlanner = () => {
   ];
 
   const [expandedInsights, setExpandedInsights] = useState<string[]>(['course-requirements']);
+  const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([
     {
       role: 'assistant',
@@ -223,182 +224,203 @@ const AcademicPlanner = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="flex">
-        {/* Main Content */}
-        <div className="flex-1 p-6">
-          <div className="max-w-6xl mx-auto">
-            {/* Compact Header */}
-            <div className="mb-6">
-              <h1 className="text-3xl font-bold text-foreground mb-1">Academic Planning</h1>
-              <p className="text-muted-foreground">Track your progress and plan your academic journey strategically</p>
-            </div>
+      {/* Full Width Main Content */}
+      <div className="w-full p-6">
+        <div className="max-w-6xl mx-auto">
+          {/* Compact Header */}
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-foreground mb-1">Academic Planning</h1>
+            <p className="text-muted-foreground">Track your progress and plan your academic journey strategically</p>
+          </div>
 
-            {/* Compact Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              {/* Academic Standing */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <GraduationCap className="h-5 w-5" />
-                    Current Academic Standing
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-2xl font-bold text-blue-600">{currentGPA.weighted}</div>
-                      <div className="text-xs text-blue-700">Weighted GPA</div>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-2xl font-bold text-blue-600">{currentGPA.unweighted}</div>
-                      <div className="text-xs text-blue-700">Unweighted GPA</div>
-                    </div>
-                    <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-2xl font-bold text-blue-600">#{currentGPA.classRank}</div>
-                      <div className="text-xs text-blue-700">of {currentGPA.totalStudents}</div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Degree Progress</span>
-                      <span className="text-sm text-muted-foreground">{currentGPA.creditsCompleted}/{currentGPA.totalCredits}</span>
-                    </div>
-                    <Progress value={(currentGPA.creditsCompleted / currentGPA.totalCredits) * 100} className="h-2" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* GPA Analysis */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <BarChart3 className="h-5 w-5" />
-                    GPA Analysis
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <GPAVisualization />
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Enhanced Expandable Insights */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Academic Insights
-                </CardTitle>
-                <CardDescription>Detailed analysis of your academic progress and recommendations</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {insights.map((insight) => {
-                  const isExpanded = expandedInsights.includes(insight.id);
-                  const IconComponent = insight.icon;
-                  
-                  return (
-                    <Collapsible key={insight.id} open={isExpanded} onOpenChange={() => toggleInsight(insight.id)}>
-                      <CollapsibleTrigger asChild>
-                        <div className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                          insight.color === 'green' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
-                          insight.color === 'orange' ? 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100' :
-                          insight.color === 'blue' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
-                          'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                        }`}>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <IconComponent className={`h-5 w-5 ${
-                                insight.color === 'green' ? 'text-green-600' :
-                                insight.color === 'orange' ? 'text-yellow-600' :
-                                insight.color === 'blue' ? 'text-blue-600' :
-                                'text-gray-600'
-                              }`} />
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium">{insight.title}</span>
-                                  <Badge variant="secondary" className={`${
-                                    insight.color === 'green' ? 'bg-green-100 text-green-800' :
-                                    insight.color === 'orange' ? 'bg-yellow-100 text-yellow-800' :
-                                    insight.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {insight.percentage}%
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground">{insight.summary}</p>
-                              </div>
-                            </div>
-                            {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="px-4 pb-4">
-                          <div className="mt-3 p-4 bg-white rounded-lg border border-gray-200">
-                            <h4 className="font-medium mb-2">Detailed Analysis</h4>
-                            <p className="text-sm text-muted-foreground mb-4">{insight.details}</p>
-                            
-                            <h4 className="font-medium mb-2">Recommendations</h4>
-                            <ul className="space-y-1">
-                              {insight.recommendations.map((rec, idx) => (
-                                <li key={idx} className="flex items-center gap-2 text-sm">
-                                  <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
-                                  <span>{rec}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  );
-                })}
-              </CardContent>
-            </Card>
-
-            {/* Compact Open Inquiries */}
+          {/* Compact Stats Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            {/* Academic Standing */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
-                  <MessageCircle className="h-5 w-5" />
-                  Open Inquiries
+                  <GraduationCap className="h-5 w-5" />
+                  Current Academic Standing
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {[
-                    "Transfer planning",
-                    "Double major", 
-                    "Switch major",
-                    "Graduate prep",
-                    "Summer courses",
-                    "Study abroad"
-                  ].map((inquiry, index) => (
-                    <Button key={index} variant="outline" className="h-16 text-left justify-start p-3">
-                      <div>
-                        <div className="font-medium text-sm">{inquiry}</div>
-                        <div className="text-xs text-muted-foreground">Click to explore</div>
-                      </div>
-                    </Button>
-                  ))}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-2xl font-bold text-blue-600">{currentGPA.weighted}</div>
+                    <div className="text-xs text-blue-700">Weighted GPA</div>
+                  </div>
+                  <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-2xl font-bold text-blue-600">{currentGPA.unweighted}</div>
+                    <div className="text-xs text-blue-700">Unweighted GPA</div>
+                  </div>
+                  <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="text-2xl font-bold text-blue-600">#{currentGPA.classRank}</div>
+                    <div className="text-xs text-blue-700">of {currentGPA.totalStudents}</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Degree Progress</span>
+                    <span className="text-sm text-muted-foreground">{currentGPA.creditsCompleted}/{currentGPA.totalCredits}</span>
+                  </div>
+                  <Progress value={(currentGPA.creditsCompleted / currentGPA.totalCredits) * 100} className="h-2" />
                 </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
 
-        {/* Enhanced Chatbot Sidebar */}
-        <div className="w-80 border-l bg-muted/30">
-          <Card className="h-screen rounded-none border-0 border-l">
-            <CardHeader className="border-b">
+            {/* GPA Analysis */}
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <BarChart3 className="h-5 w-5" />
+                  GPA Analysis
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GPAVisualization />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Enhanced Expandable Insights */}
+          <Card className="mb-6">
+            <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <MessageCircle className="h-5 w-5" />
-                Academic Advisor
+                <Target className="h-5 w-5" />
+                Academic Insights
               </CardTitle>
-              <CardDescription className="text-xs">
-                Get personalized guidance on your academic journey
-              </CardDescription>
+              <CardDescription>Detailed analysis of your academic progress and recommendations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {insights.map((insight) => {
+                const isExpanded = expandedInsights.includes(insight.id);
+                const IconComponent = insight.icon;
+                
+                return (
+                  <Collapsible key={insight.id} open={isExpanded} onOpenChange={() => toggleInsight(insight.id)}>
+                    <CollapsibleTrigger asChild>
+                      <div className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
+                        insight.color === 'green' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
+                        insight.color === 'orange' ? 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100' :
+                        insight.color === 'blue' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
+                        'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                      }`}>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <IconComponent className={`h-5 w-5 ${
+                              insight.color === 'green' ? 'text-green-600' :
+                              insight.color === 'orange' ? 'text-yellow-600' :
+                              insight.color === 'blue' ? 'text-blue-600' :
+                              'text-gray-600'
+                            }`} />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">{insight.title}</span>
+                                <Badge variant="secondary" className={`${
+                                  insight.color === 'green' ? 'bg-green-100 text-green-800' :
+                                  insight.color === 'orange' ? 'bg-yellow-100 text-yellow-800' :
+                                  insight.color === 'blue' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {insight.percentage}%
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">{insight.summary}</p>
+                            </div>
+                          </div>
+                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <div className="px-4 pb-4">
+                        <div className="mt-3 p-4 bg-white rounded-lg border border-gray-200">
+                          <h4 className="font-medium mb-2">Detailed Analysis</h4>
+                          <p className="text-sm text-muted-foreground mb-4">{insight.details}</p>
+                          
+                          <h4 className="font-medium mb-2">Recommendations</h4>
+                          <ul className="space-y-1">
+                            {insight.recommendations.map((rec, idx) => (
+                              <li key={idx} className="flex items-center gap-2 text-sm">
+                                <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
+                                <span>{rec}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
+              })}
+            </CardContent>
+          </Card>
+
+          {/* Compact Open Inquiries */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MessageCircle className="h-5 w-5" />
+                Open Inquiries
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {[
+                  "Transfer planning",
+                  "Double major", 
+                  "Switch major",
+                  "Graduate prep",
+                  "Summer courses",
+                  "Study abroad"
+                ].map((inquiry, index) => (
+                  <Button key={index} variant="outline" className="h-16 text-left justify-start p-3">
+                    <div>
+                      <div className="font-medium text-sm">{inquiry}</div>
+                      <div className="text-xs text-muted-foreground">Click to explore</div>
+                    </div>
+                  </Button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Floating Chat Toggle Button */}
+      <Button
+        onClick={() => setIsChatOpen(!isChatOpen)}
+        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40"
+        size="icon"
+      >
+        <MessageCircle className="h-6 w-6" />
+      </Button>
+
+      {/* Pop-up Chatbot */}
+      {isChatOpen && (
+        <div className="fixed bottom-24 right-6 w-80 h-96 z-50 animate-in slide-in-from-bottom-4">
+          <Card className="h-full shadow-2xl border-2">
+            <CardHeader className="border-b p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <MessageCircle className="h-5 w-5" />
+                    Academic Advisor
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Get personalized guidance on your academic journey
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => setIsChatOpen(false)}
+                  className="h-8 w-8 p-0"
+                >
+                  ×
+                </Button>
+              </div>
             </CardHeader>
             
             <CardContent className="flex-1 flex flex-col p-0 h-full">
@@ -426,7 +448,7 @@ const AcademicPlanner = () => {
               <div className="p-4 border-t bg-background">
                 <p className="text-sm font-medium mb-3">Quick Actions</p>
                 <div className="space-y-2">
-                  {quickActions.map((action, index) => (
+                  {quickActions.slice(0, 3).map((action, index) => (
                     <Button
                       key={index}
                       variant="ghost"
@@ -458,7 +480,7 @@ const AcademicPlanner = () => {
             </CardContent>
           </Card>
         </div>
-      </div>
+      )}
     </div>
   );
 };
