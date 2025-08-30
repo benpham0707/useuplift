@@ -162,20 +162,26 @@ const AcademicPlanner = () => {
       <div className="space-y-6">
         {/* Enhanced Chart */}
         <div className="relative" style={{ height: '100px', marginTop: '20px', marginBottom: '20px' }}>
-          <div className="h-12 bg-gradient-to-r from-red-500 via-yellow-500 via-orange-500 to-green-500 rounded-lg relative overflow-visible" style={{ top: '30px' }}>
+          <div className="h-12 bg-gradient-to-r from-red-500 via-yellow-500 via-orange-500 to-blue-500 rounded-lg relative overflow-visible" style={{ top: '30px' }}>
             {/* Grid lines */}
             <div className="absolute inset-0 flex">
-              {[0, 25, 50, 75, 100].map((pos, i) => (
-                <div key={i} className="flex-1 border-r border-white/40 last:border-r-0" />
+              {[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100].map((pos, i) => (
+                <div key={i} className="absolute top-0 bottom-0 w-px border-r border-white/40" style={{ left: `${pos}%` }} />
               ))}
             </div>
             
             {/* Scale labels */}
             <div className="absolute -bottom-6 inset-x-0 flex justify-between text-xs text-muted-foreground">
               <span>2.0</span>
-              <span>2.5</span>
+              <span>2.2</span>
+              <span>2.4</span>
+              <span>2.6</span>
+              <span>2.8</span>
               <span>3.0</span>
-              <span>3.5</span>
+              <span>3.2</span>
+              <span>3.4</span>
+              <span>3.6</span>
+              <span>3.8</span>
               <span>4.0</span>
             </div>
             
@@ -214,12 +220,12 @@ const AcademicPlanner = () => {
                   style={{ 
                     left: `${item.position}%`, 
                     top: item.isAbove ? '20px' : '64px',
-                    width: '40px',
-                    transform: 'translateX(2px)'
+                    width: '24px',
+                    transform: 'translateX(2.2px)'
                   }}
                 />
                 
-                {/* Label */}
+                 {/* Label */}
                 <div 
                   className={`absolute text-xs font-medium whitespace-nowrap ${
                     item.color === 'gray' ? 'text-gray-700' :
@@ -228,7 +234,7 @@ const AcademicPlanner = () => {
                   style={{ 
                     left: `${item.position}%`, 
                     top: item.isAbove ? '16px' : '68px',
-                    transform: 'translateX(44px)'
+                    transform: 'translateX(28px)'
                   }}
                 >
                   {item.label}
