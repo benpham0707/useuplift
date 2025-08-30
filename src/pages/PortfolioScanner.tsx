@@ -92,60 +92,65 @@ const PortfolioScanner = () => {
     let textShadow = '';
     
     if (score >= 9.8) {
-      // Near-perfect scores - strongest glow but still balanced
+      // Near-perfect scores - strongest glow
       textColor = 'hsl(220, 100%, 65%)';
       borderColor = 'hsl(220, 100%, 60%)';
-      boxShadow = '0 0 8px hsl(220, 100%, 60% / 0.4), 0 0 16px hsl(220, 100%, 60% / 0.2)';
-      textShadow = '0 0 8px hsl(220, 100%, 60% / 0.6)';
+      boxShadow = '0 0 20px hsl(220, 100%, 60% / 0.6), 0 0 40px hsl(220, 100%, 60% / 0.4), 0 0 60px hsl(220, 100%, 60% / 0.2)';
+      textShadow = '0 0 15px hsl(220, 100%, 60% / 0.8), 0 0 25px hsl(220, 100%, 60% / 0.6)';
     } else if (score >= 9.0) {
-      // High scores - blue glow
+      // High scores - strong blue glow
       const intensity = (score - 9) / 0.8;
       const hue = 220 + (intensity * 20);
       const saturation = 90 + (intensity * 10);
       const lightness = 55 + (intensity * 10);
+      const glowIntensity = 0.4 + (intensity * 0.2); // 0.4 to 0.6
       textColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
       borderColor = `hsl(${hue}, ${saturation}%, ${lightness - 10}%)`;
-      boxShadow = `0 0 6px hsl(${hue}, ${saturation}%, ${lightness}% / 0.3), 0 0 12px hsl(${hue}, ${saturation}%, ${lightness}% / 0.15)`;
-      textShadow = `0 0 6px hsl(${hue}, ${saturation}%, ${lightness}% / 0.5)`;
+      boxShadow = `0 0 ${12 + intensity * 8}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity}), 0 0 ${24 + intensity * 16}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity * 0.6})`;
+      textShadow = `0 0 ${8 + intensity * 4}px hsl(${hue}, ${saturation}%, ${lightness}% / ${0.6 + intensity * 0.2})`;
     } else if (score >= 7.0) {
-      // Good scores - green to blue transition
+      // Good scores - medium green to blue glow
       const progress = (score - 7) / 2;
       const hue = 120 + (progress * 100);
       const saturation = 70 + (progress * 20);
       const lightness = 50 + (progress * 15);
+      const glowIntensity = 0.3 + (progress * 0.15); // 0.3 to 0.45
       textColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
       borderColor = `hsl(${hue}, ${saturation}%, ${lightness - 10}%)`;
-      boxShadow = `0 0 5px hsl(${hue}, ${saturation}%, ${lightness}% / 0.25), 0 0 10px hsl(${hue}, ${saturation}%, ${lightness}% / 0.12)`;
-      textShadow = `0 0 5px hsl(${hue}, ${saturation}%, ${lightness}% / 0.4)`;
+      boxShadow = `0 0 ${8 + progress * 6}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity}), 0 0 ${16 + progress * 12}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity * 0.5})`;
+      textShadow = `0 0 ${6 + progress * 3}px hsl(${hue}, ${saturation}%, ${lightness}% / ${0.5 + progress * 0.15})`;
     } else if (score >= 5.0) {
-      // Moderate scores - yellow/orange glow
+      // Moderate scores - moderate yellow/orange glow
       const progress = (score - 5) / 2;
       const hue = 35 + (progress * 25);
       const saturation = 85 + (progress * 10);
       const lightness = 50 + (progress * 10);
+      const glowIntensity = 0.25 + (progress * 0.1); // 0.25 to 0.35
       textColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
       borderColor = `hsl(${hue}, ${saturation}%, ${lightness - 10}%)`;
-      boxShadow = `0 0 4px hsl(${hue}, ${saturation}%, ${lightness}% / 0.25), 0 0 8px hsl(${hue}, ${saturation}%, ${lightness}% / 0.12)`;
-      textShadow = `0 0 4px hsl(${hue}, ${saturation}%, ${lightness}% / 0.4)`;
+      boxShadow = `0 0 ${6 + progress * 4}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity}), 0 0 ${12 + progress * 8}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity * 0.4})`;
+      textShadow = `0 0 ${4 + progress * 2}px hsl(${hue}, ${saturation}%, ${lightness}% / ${0.4 + progress * 0.1})`;
     } else if (score >= 3.0) {
-      // Low-moderate scores - orange glow
+      // Low-moderate scores - mild orange glow
       const progress = (score - 3) / 2;
       const hue = 15 + (progress * 20);
       const saturation = 85 + (progress * 10);
       const lightness = 50 + (progress * 10);
+      const glowIntensity = 0.2 + (progress * 0.08); // 0.2 to 0.28
       textColor = `hsl(${hue}, ${saturation}%, ${lightness}%)`;
       borderColor = `hsl(${hue}, ${saturation}%, ${lightness - 10}%)`;
-      boxShadow = `0 0 4px hsl(${hue}, ${saturation}%, ${lightness}% / 0.2), 0 0 8px hsl(${hue}, ${saturation}%, ${lightness}% / 0.1)`;
-      textShadow = `0 0 4px hsl(${hue}, ${saturation}%, ${lightness}% / 0.35)`;
+      boxShadow = `0 0 ${4 + progress * 3}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity}), 0 0 ${8 + progress * 6}px hsl(${hue}, ${saturation}%, ${lightness}% / ${glowIntensity * 0.3})`;
+      textShadow = `0 0 ${3 + progress * 2}px hsl(${hue}, ${saturation}%, ${lightness}% / ${0.35 + progress * 0.1})`;
     } else {
-      // Low scores - red glow
+      // Low scores - subtle red glow
       const progress = score / 3;
       const saturation = 80 + (progress * 15);
       const lightness = 45 + (progress * 15);
+      const glowIntensity = 0.15 + (progress * 0.05); // 0.15 to 0.2
       textColor = `hsl(0, ${saturation}%, ${lightness}%)`;
       borderColor = `hsl(0, ${saturation}%, ${lightness - 10}%)`;
-      boxShadow = `0 0 3px hsl(0, ${saturation}%, ${lightness}% / 0.2), 0 0 6px hsl(0, ${saturation}%, ${lightness}% / 0.1)`;
-      textShadow = `0 0 3px hsl(0, ${saturation}%, ${lightness}% / 0.3)`;
+      boxShadow = `0 0 ${3 + progress * 2}px hsl(0, ${saturation}%, ${lightness}% / ${glowIntensity}), 0 0 ${6 + progress * 4}px hsl(0, ${saturation}%, ${lightness}% / ${glowIntensity * 0.3})`;
+      textShadow = `0 0 ${2 + progress * 1}px hsl(0, ${saturation}%, ${lightness}% / ${0.3 + progress * 0.1})`;
     }
 
     return {
