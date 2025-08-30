@@ -325,7 +325,6 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
   const ExperienceCard = ({ experience, index }: { experience: Experience; index: number }) => {
     const isExpanded = expandedIndex === index;
     const isComplete = isExperienceComplete(experience);
-    const descValue = descriptionDrafts[experience.id] ?? experience.description;
     const [localTitle, setLocalTitle] = useState(experience.title);
     const [localOrg, setLocalOrg] = useState(experience.organization);
     const [localStartDate, setLocalStartDate] = useState(experience.startDate);
@@ -333,6 +332,7 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
     const [localTotalHours, setLocalTotalHours] = useState(experience.totalHours);
     const [localSupervisor, setLocalSupervisor] = useState(experience.supervisorName);
     const [localVerification, setLocalVerification] = useState(experience.verificationUrl);
+    const [localDescription, setLocalDescription] = useState(experience.description);
 
     useEffect(() => {
       setLocalTitle(experience.title);
@@ -342,7 +342,8 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
       setLocalTotalHours(experience.totalHours);
       setLocalSupervisor(experience.supervisorName);
       setLocalVerification(experience.verificationUrl);
-    }, [experience.id]);
+      setLocalDescription(descriptionDrafts[experience.id] ?? experience.description);
+    }, [experience.id, descriptionDrafts]);
     
     return (
       <Card className={`transition-all duration-200 ${isExpanded ? 'border-primary shadow-lg' : 'shadow-medium hover:shadow-lg'}`}>
@@ -595,8 +596,12 @@ export default function ExperiencesWizard({ onAdded, onClose }: Props) {
                       <Textarea 
                         id={`desc-${experience.id}`}
                         name={`desc-${experience.id}`}
-                        value={descValue}
-                        onChange={(e) => setDescriptionDrafts((prev) => ({ ...prev, [experience.id]: e.target.value }))}
+                        value={localDescription}
+                        onChange={(e) => {
+                          setLocalDescription(e.target.value);
+                          setDescriptionDrafts((prev) => ({ ...prev, [experience.id]: e.target.value }));
+                        }}
+                        onBlur={() => updateExperience(index, 'description', localDescription)}
                         placeholder="Describe what you did, your responsibilities, and impact..."
                         className="mt-2 min-h-[150px] resize-none"
                       />
