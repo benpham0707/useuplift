@@ -287,7 +287,7 @@ const AcademicPlanner = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="grid grid-cols-1 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="text-3xl font-bold text-blue-600">{currentGPA.weighted}</div>
                       <div className="text-sm text-blue-700">Weighted GPA</div>
@@ -297,8 +297,8 @@ const AcademicPlanner = () => {
                       <div className="text-sm text-blue-700">Unweighted GPA</div>
                     </div>
                     <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-3xl font-bold text-blue-600">#{currentGPA.classRank}</div>
-                      <div className="text-sm text-blue-700">of {currentGPA.totalStudents}</div>
+                      <div className="text-3xl font-bold text-blue-600">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}%</div>
+                      <div className="text-sm text-blue-700">Percentile</div>
                     </div>
                   </div>
                   
