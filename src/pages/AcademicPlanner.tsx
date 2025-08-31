@@ -315,25 +315,24 @@ const AcademicPlanner = () => {
                   
                   {/* Academic Requirements Checklist */}
                   <div className="mt-8">
-                    <h3 className="text-sm font-semibold text-foreground mb-3">Academic Course Requirements Checklist</h3>
-                    <div className="space-y-1">
-                      {/* A-G Subject Requirements - Collapsible */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <button 
-                          onClick={() => setExpandedAG(!expandedAG)}
-                          className="flex items-center gap-2 text-xs w-full text-left hover:bg-slate-50 p-1 rounded-md transition-colors"
-                        >
-                          <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
-                            <Check className="h-2 w-2 text-white" />
-                          </div>
-                          <span className="font-medium">A-G Subject Requirements (UC/CSU Foundation)</span>
-                          <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${expandedAG ? 'rotate-180' : ''}`} />
-                        </button>
-                      </div>
+                    <h3 className="text-sm font-semibold text-foreground mb-4">Academic Course Requirements Checklist</h3>
+                    
+                    {/* A-G Subject Requirements - Center aligned at top */}
+                    <div className="text-center mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                      <button 
+                        onClick={() => setExpandedAG(!expandedAG)}
+                        className="flex items-center justify-center gap-2 text-sm w-full hover:bg-blue-100 p-2 rounded-md transition-colors"
+                      >
+                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
+                          <Check className="h-2.5 w-2.5 text-white" />
+                        </div>
+                        <span className="font-semibold">A-G Subject Requirements (UC/CSU Foundation)</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${expandedAG ? 'rotate-180' : ''}`} />
+                      </button>
                         
                       {expandedAG && (
-                        <div className="ml-5 space-y-1 p-2 bg-slate-50 rounded-md text-xs">
-                          <div className="flex items-center gap-2">
+                        <div className="mt-3 p-3 bg-white rounded-md text-xs">
+                          <div className="flex items-center justify-center gap-2">
                             <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
                               <X className="h-2 w-2 text-white" />
                             </div>
@@ -341,68 +340,98 @@ const AcademicPlanner = () => {
                           </div>
                         </div>
                       )}
-                      
-                      {/* Other requirements at same level */}
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                    </div>
+                    
+                    {/* Other requirements in 2 columns */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                           <Check className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">Minimum GPA Requirement (3.0+)</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
                           <X className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">SAT/ACT Test Scores</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                           <Check className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">High School Diploma/Graduation</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
                           <X className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">English Language Proficiency</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                           <Check className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">Application Submission</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
                           <X className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">Personal Insight Questions</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
                           <X className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">Letters of Recommendation</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-xs">
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                           <Check className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium">Extracurricular Activities</span>
                       </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
+                          <X className="h-2 w-2 text-white" />
+                        </div>
+                        <span className="font-medium">Portfolio Documentation</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
+                          <Check className="h-2 w-2 text-white" />
+                        </div>
+                        <span className="font-medium">Community Service Hours</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
+                          <X className="h-2 w-2 text-white" />
+                        </div>
+                        <span className="font-medium">Financial Aid Applications</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
+                          <Check className="h-2 w-2 text-white" />
+                        </div>
+                        <span className="font-medium">Academic References</span>
+                      </div>
+                    </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
             {/* GPA Analysis - Equal Width */}
             <Card className="lg:col-span-1">
@@ -418,105 +447,103 @@ const AcademicPlanner = () => {
             </Card>
           </div>
 
-          {/* Enhanced Expandable Insights */}
+          {/* Academic Insights - News/Announcements Style */}
           <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Academic Insights
-              </CardTitle>
-              <CardDescription>Detailed analysis of your academic progress and recommendations</CardDescription>
+            <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-600 rounded-lg">
+                  <Target className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl">Academic Insights & Updates</CardTitle>
+                  <CardDescription>Latest analysis and recommendations for your academic journey</CardDescription>
+                </div>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {insights.map((insight) => {
-                const isExpanded = expandedInsights.includes(insight.id);
-                const IconComponent = insight.icon;
-                
-                return (
-                  <Collapsible key={insight.id} open={isExpanded} onOpenChange={() => toggleInsight(insight.id)}>
-                    <CollapsibleTrigger asChild>
-                      <div className={`p-4 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
-                        insight.color === 'green' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
-                        insight.color === 'orange' ? 'bg-yellow-50 border-yellow-200 hover:bg-yellow-100' :
-                        insight.color === 'blue' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
-                        'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <IconComponent className={`h-5 w-5 ${
-                              insight.color === 'green' ? 'text-green-600' :
-                              insight.color === 'orange' ? 'text-yellow-600' :
-                              insight.color === 'blue' ? 'text-blue-600' :
-                              'text-gray-600'
-                            }`} />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">{insight.title}</span>
-                                <Badge variant="secondary" className={`${
-                                  insight.color === 'green' ? 'bg-green-100 text-green-800' :
-                                  insight.color === 'orange' ? 'bg-yellow-100 text-yellow-800' :
-                                  insight.color === 'blue' ? 'bg-blue-100 text-blue-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {insight.percentage}%
-                                </Badge>
+            <CardContent className="p-0">
+              <div className="space-y-1">
+                {insights.map((insight, index) => {
+                  const isExpanded = expandedInsights.includes(insight.id);
+                  const IconComponent = insight.icon;
+                  
+                  return (
+                    <div key={insight.id} className="border-b last:border-b-0">
+                      <Collapsible open={isExpanded} onOpenChange={() => toggleInsight(insight.id)}>
+                        <CollapsibleTrigger asChild>
+                          <div className="w-full p-4 hover:bg-slate-50 cursor-pointer transition-colors">
+                            <div className="flex items-start gap-4">
+                              {/* News-style timestamp/badge */}
+                              <div className="flex flex-col items-center gap-1 mt-1">
+                                <div className={`w-3 h-3 rounded-full ${
+                                  insight.color === 'green' ? 'bg-green-500' :
+                                  insight.color === 'orange' ? 'bg-orange-500' :
+                                  insight.color === 'blue' ? 'bg-blue-500' :
+                                  'bg-gray-500'
+                                }`}></div>
+                                <div className="text-xs text-muted-foreground">NEW</div>
                               </div>
-                              <p className="text-sm text-muted-foreground">{insight.summary}</p>
+                              
+                              {/* Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <IconComponent className={`h-4 w-4 ${
+                                    insight.color === 'green' ? 'text-green-600' :
+                                    insight.color === 'orange' ? 'text-orange-600' :
+                                    insight.color === 'blue' ? 'text-blue-600' :
+                                    'text-gray-600'
+                                  }`} />
+                                  <h3 className="font-semibold text-base">{insight.title}</h3>
+                                  <Badge variant="outline" className={`ml-auto ${
+                                    insight.color === 'green' ? 'border-green-300 text-green-700' :
+                                    insight.color === 'orange' ? 'border-orange-300 text-orange-700' :
+                                    insight.color === 'blue' ? 'border-blue-300 text-blue-700' :
+                                    'border-gray-300 text-gray-700'
+                                  }`}>
+                                    {insight.percentage}%
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground leading-relaxed">{insight.summary}</p>
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-xs text-muted-foreground">2 hours ago</span>
+                                  <span className="text-xs text-muted-foreground">•</span>
+                                  <span className="text-xs text-blue-600 hover:text-blue-800">Read more</span>
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-3 w-3 ml-auto text-muted-foreground" />
+                                  ) : (
+                                    <ChevronRight className="h-3 w-3 ml-auto text-muted-foreground" />
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                          {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </div>
-                      </div>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <div className="px-4 pb-4">
-                        <div className="mt-3 p-4 bg-white rounded-lg border border-gray-200">
-                          <h4 className="font-medium mb-2">Detailed Analysis</h4>
-                          <p className="text-sm text-muted-foreground mb-4">{insight.details}</p>
-                          
-                          <h4 className="font-medium mb-2">Recommendations</h4>
-                          <ul className="space-y-1">
-                            {insight.recommendations.map((rec, idx) => (
-                              <li key={idx} className="flex items-center gap-2 text-sm">
-                                <CheckCircle className="h-3 w-3 text-green-600 flex-shrink-0" />
-                                <span>{rec}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
-              })}
-            </CardContent>
-          </Card>
-
-          {/* Compact Open Inquiries */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <MessageCircle className="h-5 w-5" />
-                Open Inquiries
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {[
-                  "Transfer planning",
-                  "Double major", 
-                  "Switch major",
-                  "Graduate prep",
-                  "Summer courses",
-                  "Study abroad"
-                ].map((inquiry, index) => (
-                  <Button key={index} variant="outline" className="h-16 text-left justify-start p-3">
-                    <div>
-                      <div className="font-medium text-sm">{inquiry}</div>
-                      <div className="text-xs text-muted-foreground">Click to explore</div>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent>
+                          <div className="px-4 pb-4 ml-7">
+                            <div className="p-4 bg-slate-50 rounded-lg border">
+                              <h4 className="font-medium mb-2 text-slate-900">Detailed Analysis</h4>
+                              <p className="text-sm text-slate-700 mb-4 leading-relaxed">{insight.details}</p>
+                              
+                              <h4 className="font-medium mb-2 text-slate-900">Action Items</h4>
+                              <ul className="space-y-2">
+                                {insight.recommendations.map((rec, idx) => (
+                                  <li key={idx} className="flex items-start gap-2 text-sm">
+                                    <div className={`w-1.5 h-1.5 rounded-full mt-2 flex-shrink-0 ${
+                                      insight.color === 'green' ? 'bg-green-500' :
+                                      insight.color === 'orange' ? 'bg-orange-500' :
+                                      insight.color === 'blue' ? 'bg-blue-500' :
+                                      'bg-gray-500'
+                                    }`}></div>
+                                    <span className="text-slate-700">{rec}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
-                  </Button>
-                ))}
+                  );
+                })}
               </div>
             </CardContent>
           </Card>
