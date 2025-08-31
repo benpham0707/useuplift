@@ -96,6 +96,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
 
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [personalItemStatuses, setPersonalItemStatuses] = useState<boolean[] | undefined>(undefined);
+  const [growthStatus, setGrowthStatus] = useState<'not-started' | 'in-progress' | 'completed'>('not-started');
 
   // Load personal info progress from DB
   const refreshPersonalProgress = async () => {
@@ -180,7 +181,235 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
 
   useEffect(() => {
     refreshPersonalProgress();
+    refreshExperiencesProgress();
+    refreshGrowthProgress();
+    refreshAcademicProgress();
+    refreshFamilyProgress();
+    refreshGoalsProgress();
+    refreshSupportProgress();
   }, []);
+
+  // Load experiences progress from DB
+  const refreshExperiencesProgress = async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (!prof?.id) return;
+      const { data: ea } = await supabase
+        .from('experiences_activities')
+        .select('*')
+        .eq('profile_id', prof.id)
+        .maybeSingle();
+
+      const flatten = (arr: any) => (Array.isArray(arr) ? arr : []);
+      const allItems = [
+        ...flatten(ea?.work_experiences),
+        ...flatten(ea?.volunteer_service),
+        ...flatten(ea?.extracurriculars),
+        ...flatten(ea?.personal_projects),
+      ];
+
+      const isValid = (item: any) => {
+        const title = (item?.title || '').toString().trim();
+        const desc = (item?.description || '').toString().trim();
+        return title.length >= 2 && desc.length >= 10;
+      };
+
+      const validCount = allItems.filter(isValid).length;
+      const percent = Math.min(100, Math.round((validCount / 3) * 100));
+
+      setAssessmentSections(prev => prev.map(s => s.id === 'experiences' ? {
+        ...s,
+        progress: percent,
+        status: percent === 0 ? 'not-started' : percent === 100 ? 'completed' : 'in-progress'
+      } : s));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not load experiences progress');
+    }
+  };
+
+  // Load Personal Growth status from DB
+  const refreshGrowthProgress = async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (!prof?.id) return;
+
+      const { data: pg } = await supabase
+        .from('personal_growth')
+        .select('meaningful_experiences, additional_context')
+        .eq('profile_id', prof.id)
+        .maybeSingle();
+
+      const getFilled = (obj: any) => {
+        if (!obj || typeof obj !== 'object') return false;
+        return Object.values(obj).some((v: any) => (v || '').toString().trim().length > 0);
+      };
+
+      const essays = getFilled(pg?.meaningful_experiences);
+      const context = getFilled(pg?.additional_context);
+      const percent = Math.round(([essays, context].filter(Boolean).length / 2) * 100);
+      const status: 'not-started' | 'in-progress' | 'completed' = percent === 0 ? 'not-started' : percent === 100 ? 'completed' : 'in-progress';
+      setGrowthStatus(status);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not load personal growth status');
+    }
+  };
+
+  // Academic Journey progress (4 items)
+  const refreshAcademicProgress = async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (!prof?.id) return;
+      const { data: aj } = await supabase
+        .from('academic_journey')
+        .select('*')
+        .eq('profile_id', prof.id)
+        .maybeSingle();
+      const has = (v: any) => {
+        if (!v && v !== 0) return false;
+        if (typeof v === 'string') return v.trim().length > 0;
+        if (typeof v === 'number') return true;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.keys(v || {}).length > 0;
+        return Boolean(v);
+      };
+      const currentSchool = has(aj?.current_school) || has(aj?.current_grade) || has(aj?.expected_grad_date);
+      const academicPerf = has(aj?.gpa) || has(aj?.class_rank) || has(aj?.class_size) || has(aj?.english_proficiency);
+      const courseHistory = has(aj?.course_history) || has(aj?.college_courses) || has(aj?.ap_exams) || has(aj?.ib_exams);
+      const testing = has(aj?.standardized_tests) || aj?.report_test_scores === true;
+      const completed = [currentSchool, academicPerf, courseHistory, testing].filter(Boolean).length;
+      const percent = Math.round((completed / 4) * 100);
+      setAssessmentSections(prev => prev.map(s => s.id === 'academic' ? {
+        ...s,
+        progress: percent,
+        status: percent === 0 ? 'not-started' : percent === 100 ? 'completed' : 'in-progress'
+      } : s));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not load academic progress');
+    }
+  };
+
+  // Family Responsibilities & Circumstances (2 items)
+  const refreshFamilyProgress = async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (!prof?.id) return;
+      const { data: fr } = await supabase
+        .from('family_responsibilities')
+        .select('*')
+        .eq('profile_id', prof.id)
+        .maybeSingle();
+      const responsibilitiesComplete = (Number(fr?.hours_per_week || 0) > 0) || (Array.isArray(fr?.responsibilities) && fr?.responsibilities.length > 0) || ((fr?.other_responsibilities || '').toString().trim().length > 0);
+      const circumstancesComplete = fr?.challenging_circumstances === false || (Array.isArray(fr?.circumstances) && fr?.circumstances.length > 0) || ((fr?.other_circumstances || '').toString().trim().length > 0);
+      const completed = [responsibilitiesComplete, circumstancesComplete].filter(Boolean).length;
+      const percent = Math.round((completed / 2) * 100);
+      setAssessmentSections(prev => prev.map(s => s.id === 'family' ? {
+        ...s,
+        progress: percent,
+        status: percent === 0 ? 'not-started' : percent === 100 ? 'completed' : 'in-progress'
+      } : s));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not load family progress');
+    }
+  };
+
+  // Goals & Aspirations (3 items)
+  const refreshGoalsProgress = async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (!prof?.id) return;
+      const { data: ga } = await supabase
+        .from('goals_aspirations')
+        .select('*')
+        .eq('profile_id', prof.id)
+        .maybeSingle();
+      const hasArr = (a: any) => Array.isArray(a) && a.length > 0;
+      const academicInterests = (ga?.intended_major || '').toString().trim().length > 0 || hasArr(ga?.college_environment);
+      const careerGoals = hasArr(ga?.career_interests) || (ga?.highest_degree || '').toString().trim().length > 0;
+      const appPlans = (ga?.applying_to_uc || ga?.using_common_app || ga?.start_date || ga?.need_based_aid || ga?.merit_scholarships || '').toString().trim().length > 0 || hasArr(ga?.geographic_preferences);
+      const completed = [academicInterests, careerGoals, appPlans].filter(Boolean).length;
+      const percent = Math.round((completed / 3) * 100);
+      setAssessmentSections(prev => prev.map(s => s.id === 'goals' ? {
+        ...s,
+        progress: percent,
+        status: percent === 0 ? 'not-started' : percent === 100 ? 'completed' : 'in-progress'
+      } : s));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not load goals progress');
+    }
+  };
+
+  // Support Network & Resources (3 items)
+  const refreshSupportProgress = async () => {
+    try {
+      const { data: sess } = await supabase.auth.getSession();
+      const uid = sess.session?.user?.id;
+      if (!uid) return;
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('user_id', uid)
+        .maybeSingle();
+      if (!prof?.id) return;
+      const { data: sn } = await supabase
+        .from('support_network')
+        .select('*')
+        .eq('profile_id', prof.id)
+        .maybeSingle();
+      const counselorOrTeachers = ((sn?.counselor?.name || '').toString().trim().length > 0) || ((sn?.counselor?.email || '').toString().trim().length > 0) || (Array.isArray(sn?.teachers) && sn?.teachers.length > 0);
+      const community = (sn?.has_community_support === false) || (Array.isArray(sn?.community_organizations) && sn?.community_organizations.length > 0);
+      const portfolio = (sn?.has_portfolio_items === false) || (Array.isArray(sn?.portfolio_items) && sn?.portfolio_items.length > 0);
+      const completed = [counselorOrTeachers, community, portfolio].filter(Boolean).length;
+      const percent = Math.round((completed / 3) * 100);
+      setAssessmentSections(prev => prev.map(s => s.id === 'support' ? {
+        ...s,
+        progress: percent,
+        status: percent === 0 ? 'not-started' : percent === 100 ? 'completed' : 'in-progress'
+      } : s));
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('Could not load support progress');
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -260,8 +489,17 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
                 <p className="text-muted-foreground">Share your unique experiences, challenges, and personal narrative</p>
               </div>
             </div>
-            <Badge variant="secondary" className="bg-orange-100 text-orange-800">
-              Ready to Start {/* TODO: Restore to: {currentProgress >= 80 ? 'Ready to Start' : 'Locked'} */}
+            <Badge
+              variant="secondary"
+              className={
+                growthStatus === 'completed'
+                  ? 'bg-green-100 text-green-800'
+                  : growthStatus === 'in-progress'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-orange-100 text-orange-800'
+              }
+            >
+              {growthStatus === 'completed' ? 'Completed' : growthStatus === 'in-progress' ? 'In Progress' : 'Ready to Start'}
             </Badge>
           </div>
         </CardHeader>
@@ -328,6 +566,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
               onComplete={() => {
                 setAssessmentSections((prev) => prev.map((s) => s.id === 'academic' ? { ...s, status: 'completed', progress: 100 } : s));
                 setOpenSection(null);
+                refreshAcademicProgress();
               }}
               onCancel={() => setOpenSection(null)}
             />
@@ -344,7 +583,11 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
                 onProgressUpdate(currentProgress);
               }
             }}
-            onClose={() => setOpenSection(null)}
+            onClose={() => {
+              setOpenSection(null);
+              // Refresh progress from DB after closing
+              refreshExperiencesProgress();
+            }}
           />
         </DialogContent>
       </Dialog>
@@ -355,6 +598,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
             onComplete={() => {
               setAssessmentSections((prev) => prev.map((s) => s.id === 'family' ? { ...s, status: 'completed', progress: 100 } : s));
               setOpenSection(null);
+              refreshFamilyProgress();
             }}
             onCancel={() => setOpenSection(null)}
           />
@@ -367,6 +611,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
             onComplete={() => {
               setAssessmentSections((prev) => prev.map((s) => s.id === 'goals' ? { ...s, status: 'completed', progress: 100 } : s));
               setOpenSection(null);
+              refreshGoalsProgress();
             }}
             onCancel={() => setOpenSection(null)}
           />
@@ -379,6 +624,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
             onComplete={() => {
               setAssessmentSections((prev) => prev.map((s) => s.id === 'support' ? { ...s, status: 'completed', progress: 100 } : s));
               setOpenSection(null);
+              refreshSupportProgress();
             }}
             onCancel={() => setOpenSection(null)}
           />
@@ -390,6 +636,8 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
           <PersonalGrowthWizard
             onComplete={() => {
               setOpenSection(null);
+              // Refresh status after completion
+              refreshGrowthProgress();
             }}
             onCancel={() => setOpenSection(null)}
           />

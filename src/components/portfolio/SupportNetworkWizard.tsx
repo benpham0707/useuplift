@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { ArrowRight, ArrowLeft, Users2, Plus, Trash2, Paperclip, Upload } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 interface SupportNetworkData {
   // Educational Support
@@ -49,6 +50,7 @@ interface SupportNetworkData {
 interface Props {
   onComplete: () => void;
   onCancel: () => void;
+  onProgressRefresh?: () => void;
 }
 
 const STEPS = [
@@ -56,7 +58,7 @@ const STEPS = [
   { id: 2, title: 'Documentation & Portfolio', description: 'Supporting materials and uploads' }
 ];
 
-const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
+const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel, onProgressRefresh }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -73,6 +75,67 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
     wantsToUploadDocuments: false,
     documents: []
   });
+
+  // Prefill from latest saved support_network
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!profile?.id) return;
+
+        const { data: sn } = await supabase
+          .from('support_network')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .maybeSingle();
+        if (!sn) return;
+
+        setData((prev) => ({
+          ...prev,
+          counselor: (sn.counselor as any) || { name: '', email: '' },
+          teachers: Array.isArray(sn.teachers) ? sn.teachers : [],
+          communitySupport: Boolean(sn.has_community_support),
+          communityOrganizations: Array.isArray(sn.community_organizations) ? sn.community_organizations : [],
+          hasPortfolioItems: Boolean(sn.has_portfolio_items),
+          portfolioItems: Array.isArray(sn.portfolio_items) ? sn.portfolio_items : [],
+          wantsToUploadDocuments: Boolean(sn.wants_to_upload_documents),
+          documents: Array.isArray(sn.documents) ? sn.documents : []
+        }));
+      } catch (_) {
+        // ignore prefill errors
+      }
+    })();
+  }, []);
+
+  // Progress across two sections
+  const progress = useMemo(() => {
+    const educationalSupportComplete =
+      (data.counselor.name?.trim().length ?? 0) > 0 ||
+      (data.counselor.email?.trim().length ?? 0) > 0 ||
+      (Array.isArray(data.teachers) && data.teachers.length > 0) ||
+      (data.communitySupport && Array.isArray(data.communityOrganizations) && data.communityOrganizations.length > 0);
+
+    const docsPortfolioComplete =
+      (data.hasPortfolioItems && Array.isArray(data.portfolioItems) && data.portfolioItems.length > 0) ||
+      (data.wantsToUploadDocuments && Array.isArray(data.documents) && data.documents.length > 0);
+
+    const completed = [educationalSupportComplete, docsPortfolioComplete].filter(Boolean).length;
+    const percent = Math.round((completed / 2) * 100);
+
+    return {
+      percent,
+      sectionComplete: {
+        educational: educationalSupportComplete,
+        docs: docsPortfolioComplete,
+      },
+    } as const;
+  }, [data]);
 
   const handleNext = () => {
     if (currentStep < STEPS.length) {
@@ -92,14 +155,59 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      // Get profile
+      const { data: profile } = await supabase
         .from('profiles')
-        .update({
-          completion_score: 80 // Update completion score to unlock final section
-        })
-        .eq('user_id', user.id);
+        .select('id, completion_score')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile) throw new Error('Profile not found');
 
-      if (error) throw error;
+      // Prepare payload (strip File objects)
+      const portfolioItems = (data.hasPortfolioItems ? data.portfolioItems : []).map((item) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { attachedFile, ...rest } = item as any;
+        return rest;
+      });
+
+      const snPayload = {
+        profile_id: profile.id,
+        counselor: data.counselor || { name: '', email: '' },
+        teachers: data.teachers || [],
+        has_community_support: Boolean(data.communitySupport),
+        community_organizations: data.communitySupport ? (data.communityOrganizations || []) : [],
+        has_portfolio_items: Boolean(data.hasPortfolioItems),
+        portfolio_items: portfolioItems,
+        wants_to_upload_documents: Boolean(data.wantsToUploadDocuments),
+        documents: data.wantsToUploadDocuments ? (data.documents || []) : [],
+      } as any;
+
+      const { data: existingSN, error: snFetchErr } = await supabase
+        .from('support_network')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+      if (snFetchErr) throw snFetchErr;
+
+      if (existingSN?.id) {
+        const { error: snUpdateErr } = await supabase
+          .from('support_network')
+          .update(snPayload)
+          .eq('id', existingSN.id as string);
+        if (snUpdateErr) throw snUpdateErr;
+      } else {
+        const { error: snInsertErr } = await supabase
+          .from('support_network')
+          .insert(snPayload);
+        if (snInsertErr) throw snInsertErr;
+      }
+
+      const newScore = Math.max(Number(profile.completion_score ?? 0), 0.8);
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ completion_score: newScore })
+        .eq('id', profile.id);
+      if (profileErr) throw profileErr;
 
       toast({
         title: "Support network information saved!",
@@ -140,21 +248,26 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-2 ${
                 currentStep === step.id ? 'text-primary' : 
-                currentStep > step.id ? 'text-green-600' : 'text-muted-foreground'
+                ((step.id === 1 && progress.sectionComplete.educational) || (step.id === 2 && progress.sectionComplete.docs)) ? 'text-green-600' : 'text-muted-foreground'
               }`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   currentStep === step.id ? 'bg-primary text-primary-foreground' :
-                  currentStep > step.id ? 'bg-green-600 text-white' : 'bg-muted'
+                  ((step.id === 1 && progress.sectionComplete.educational) || (step.id === 2 && progress.sectionComplete.docs)) ? 'bg-green-600 text-white' : 'bg-muted'
                 }`}>
                   {step.id}
                 </div>
                 <span className="text-sm font-medium hidden sm:block">{step.title}</span>
               </div>
               {index < STEPS.length - 1 && (
-                <div className={`w-8 h-0.5 ${currentStep > step.id ? 'bg-green-600' : 'bg-muted'}`} />
+                <div className={`w-8 h-0.5 ${
+                  ((step.id === 1 && progress.sectionComplete.educational) || (step.id === 2 && progress.sectionComplete.docs)) ? 'bg-green-600' : 'bg-muted'
+                }`} />
               )}
             </React.Fragment>
           ))}
+        </div>
+        <div className="mt-3 max-w-md mx-auto">
+          <Progress value={progress.percent} className="h-2" />
         </div>
       </div>
 
@@ -182,16 +295,79 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
           {currentStep === 1 ? 'Cancel' : 'Previous'}
         </Button>
 
-        {currentStep < STEPS.length ? (
-          <Button onClick={handleNext}>
-            Continue
-            <ArrowRight className="h-4 w-4 ml-2" />
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="secondary"
+            onClick={async () => {
+              setIsLoading(true);
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('id, completion_score')
+                  .eq('user_id', user.id)
+                  .single();
+                if (!profile) throw new Error('Profile not found');
+
+                const portfolioItems = (data.hasPortfolioItems ? data.portfolioItems : []).map((item) => {
+                  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                  const { attachedFile, ...rest } = item as any;
+                  return rest;
+                });
+
+                const snPayload = {
+                  profile_id: profile.id,
+                  counselor: data.counselor || { name: '', email: '' },
+                  teachers: data.teachers || [],
+                  has_community_support: Boolean(data.communitySupport),
+                  community_organizations: data.communitySupport ? (data.communityOrganizations || []) : [],
+                  has_portfolio_items: Boolean(data.hasPortfolioItems),
+                  portfolio_items: portfolioItems,
+                  wants_to_upload_documents: Boolean(data.wantsToUploadDocuments),
+                  documents: data.wantsToUploadDocuments ? (data.documents || []) : [],
+                } as any;
+
+                const { data: existingSN } = await supabase
+                  .from('support_network')
+                  .select('id')
+                  .eq('profile_id', profile.id)
+                  .maybeSingle();
+                if (existingSN?.id) {
+                  await supabase.from('support_network').update(snPayload).eq('id', existingSN.id);
+                } else {
+                  await supabase.from('support_network').insert(snPayload);
+                }
+
+                await supabase
+                  .from('profiles')
+                  .update({ completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) })
+                  .eq('id', profile.id);
+
+                toast({ title: 'Progress saved', description: 'You can come back anytime.' });
+                onProgressRefresh?.();
+              } catch (error) {
+                toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            disabled={isLoading}
+          >
+            Save & Quit
           </Button>
-        ) : (
-          <Button onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Complete'}
-          </Button>
-        )}
+
+          {currentStep < STEPS.length ? (
+            <Button onClick={handleNext}>
+              Continue
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          ) : (
+            <Button onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Complete'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

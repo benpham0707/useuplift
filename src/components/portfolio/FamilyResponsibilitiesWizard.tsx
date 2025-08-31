@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { ArrowRight, ArrowLeft, Heart, Users } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Users } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 interface FamilyResponsibilitiesData {
   hoursPerWeek: number;
@@ -21,6 +22,7 @@ interface FamilyResponsibilitiesData {
 interface Props {
   onComplete: () => void;
   onCancel: () => void;
+  onProgressRefresh?: () => void;
 }
 
 const STEPS = [
@@ -28,7 +30,7 @@ const STEPS = [
   { id: 2, title: 'Life Circumstances', description: 'Challenging circumstances affecting your education' }
 ];
 
-const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
+const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel, onProgressRefresh }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -40,6 +42,65 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
     circumstances: [],
     otherCircumstances: ''
   });
+
+  // Prefill from latest saved family_responsibilities
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!profile?.id) return;
+
+        const { data: fr } = await supabase
+          .from('family_responsibilities')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .maybeSingle();
+        if (!fr) return;
+
+        setData((prev) => ({
+          ...prev,
+          hoursPerWeek: fr.hours_per_week ?? 0,
+          responsibilities: Array.isArray(fr.responsibilities) ? fr.responsibilities : [],
+          otherResponsibilities: fr.other_responsibilities ?? '',
+          challengingCircumstances: Boolean(fr.challenging_circumstances),
+          circumstances: Array.isArray(fr.circumstances) ? fr.circumstances : [],
+          otherCircumstances: fr.other_circumstances ?? ''
+        }));
+      } catch (_) {
+        // ignore prefill errors
+      }
+    })();
+  }, []);
+
+  // Progress calculation across steps
+  const progress = useMemo(() => {
+    const responsibilitiesComplete =
+      (data.hoursPerWeek ?? 0) > 0 ||
+      (Array.isArray(data.responsibilities) && data.responsibilities.length > 0) ||
+      (data.otherResponsibilities?.trim().length ?? 0) > 0;
+
+    const circumstancesComplete =
+      !data.challengingCircumstances ||
+      (Array.isArray(data.circumstances) && data.circumstances.length > 0);
+
+    const completed = [responsibilitiesComplete, circumstancesComplete].filter(Boolean).length;
+    const percent = Math.round((completed / 2) * 100);
+
+    return {
+      percent,
+      sectionComplete: {
+        responsibilities: responsibilitiesComplete,
+        circumstances: circumstancesComplete,
+      },
+    } as const;
+  }, [data]);
 
   const handleNext = () => {
     if (currentStep < STEPS.length) {
@@ -59,17 +120,52 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Create a simple summary instead of complex nested data
-      const hasChallenges = data.hoursPerWeek > 0 || data.challengingCircumstances;
-      
-      const { error } = await supabase
+      // Get user's profile
+      const { data: profile } = await supabase
         .from('profiles')
-        .update({
-          completion_score: 50 // Update completion score
-        })
-        .eq('user_id', user.id);
+        .select('id, completion_score')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile) throw new Error('Profile not found');
 
-      if (error) throw error;
+      const frPayload = {
+        profile_id: profile.id,
+        hours_per_week: data.hoursPerWeek ?? 0,
+        responsibilities: data.responsibilities ?? [],
+        other_responsibilities: data.otherResponsibilities || '',
+        challenging_circumstances: Boolean(data.challengingCircumstances),
+        circumstances: data.circumstances ?? [],
+        other_circumstances: data.otherCircumstances || '',
+      } as any;
+
+      // Upsert pattern: select existing by profile_id, then update/insert
+      const { data: existingFR, error: frFetchErr } = await supabase
+        .from('family_responsibilities')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+      if (frFetchErr) throw frFetchErr;
+
+      if (existingFR?.id) {
+        const { error: frUpdateErr } = await supabase
+          .from('family_responsibilities')
+          .update(frPayload)
+          .eq('id', existingFR.id as string);
+        if (frUpdateErr) throw frUpdateErr;
+      } else {
+        const { error: frInsertErr } = await supabase
+          .from('family_responsibilities')
+          .insert(frPayload);
+        if (frInsertErr) throw frInsertErr;
+      }
+
+      // Update profile completion score (mirror Basic wizard behavior)
+      const newScore = Math.max(Number(profile.completion_score ?? 0), 0.6);
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ completion_score: newScore })
+        .eq('id', profile.id);
+      if (profileErr) throw profileErr;
 
       toast({
         title: "Family information saved!",
@@ -115,22 +211,25 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-1 ${
                 currentStep === step.id ? 'text-primary' : 
-                currentStep > step.id ? 'text-green-600' : 'text-muted-foreground'
+                ((step.id === 1 && progress.sectionComplete.responsibilities) || (step.id === 2 && progress.sectionComplete.circumstances)) ? 'text-green-600' : 'text-muted-foreground'
               }`}>
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                   currentStep === step.id ? 'bg-primary text-primary-foreground' :
-                  currentStep > step.id ? 'bg-green-600 text-white' : 'bg-muted'
+                  ((step.id === 1 && progress.sectionComplete.responsibilities) || (step.id === 2 && progress.sectionComplete.circumstances)) ? 'bg-green-600 text-white' : 'bg-muted'
                 }`}>
                   {step.id}
                 </div>
                 <span className="text-xs font-medium hidden sm:block">{step.title}</span>
               </div>
               {index < STEPS.length - 1 && (
-                <div className={`w-6 h-0.5 ${currentStep > step.id ? 'bg-green-600' : 'bg-muted'}`} />
+                <div className={`w-6 h-0.5 ${
+                  ((step.id === 1 && progress.sectionComplete.responsibilities) || (step.id === 2 && progress.sectionComplete.circumstances)) ? 'bg-green-600' : 'bg-muted'
+                }`} />
               )}
             </React.Fragment>
           ))}
         </div>
+        <Progress value={progress.percent} className="h-2 max-w-md mx-auto" />
       </div>
 
       {/* Main Content */}
@@ -155,16 +254,72 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel })
           {currentStep === 1 ? 'Cancel' : 'Previous'}
         </Button>
 
-        {currentStep < STEPS.length ? (
-          <Button size="sm" onClick={handleNext}>
-            Continue
-            <ArrowRight className="h-4 w-4 ml-1" />
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              setIsLoading(true);
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('id, completion_score')
+                  .eq('user_id', user.id)
+                  .single();
+                if (!profile) throw new Error('Profile not found');
+
+                const frPayload = {
+                  profile_id: profile.id,
+                  hours_per_week: data.hoursPerWeek ?? 0,
+                  responsibilities: data.responsibilities ?? [],
+                  other_responsibilities: data.otherResponsibilities || '',
+                  challenging_circumstances: Boolean(data.challengingCircumstances),
+                  circumstances: data.circumstances ?? [],
+                  other_circumstances: data.otherCircumstances || '',
+                } as any;
+
+                const { data: existingFR } = await supabase
+                  .from('family_responsibilities')
+                  .select('id')
+                  .eq('profile_id', profile.id)
+                  .maybeSingle();
+                if (existingFR?.id) {
+                  await supabase.from('family_responsibilities').update(frPayload).eq('id', existingFR.id);
+                } else {
+                  await supabase.from('family_responsibilities').insert(frPayload);
+                }
+
+                await supabase
+                  .from('profiles')
+                  .update({ completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) })
+                  .eq('id', profile.id);
+
+                toast({ title: 'Progress saved', description: 'You can come back anytime.' });
+                onProgressRefresh?.();
+              } catch (e) {
+                toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            disabled={isLoading}
+          >
+            Save & Quit
           </Button>
-        ) : (
-          <Button size="sm" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Complete'}
-          </Button>
-        )}
+
+          {currentStep < STEPS.length ? (
+            <Button size="sm" onClick={handleNext}>
+              Continue
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : (
+            <Button size="sm" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Complete'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

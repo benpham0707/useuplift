@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowRight, ArrowLeft, BookOpen, Lightbulb, MessageSquare } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 interface PersonalGrowthData {
   meaningfulExperiences: {
@@ -32,6 +33,7 @@ interface PersonalGrowthData {
 interface Props {
   onComplete: () => void;
   onCancel: () => void;
+  onProgressRefresh?: () => void;
 }
 
 const ESSAY_PROMPTS = [
@@ -126,7 +128,7 @@ const ADDITIONAL_CONTEXT_PROMPTS = [
   }
 ];
 
-const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
+const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel, onProgressRefresh }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('experiences');
   
@@ -150,27 +152,118 @@ const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
     }
   });
 
+  // Prefill from latest saved personal_growth
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!profile?.id) return;
+
+        const { data: pg } = await supabase
+          .from('personal_growth')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .maybeSingle();
+        if (!pg) return;
+
+        setData((prev) => ({
+          meaningfulExperiences: {
+            significantChallenge: pg.meaningful_experiences?.significantChallenge || '',
+            leadershipExample: pg.meaningful_experiences?.leadershipExample || '',
+            academicExcitement: pg.meaningful_experiences?.academicExcitement || '',
+            creativity: pg.meaningful_experiences?.creativity || '',
+            greatestTalent: pg.meaningful_experiences?.greatestTalent || '',
+            communityImpact: pg.meaningful_experiences?.communityImpact || '',
+            uniqueQualities: pg.meaningful_experiences?.uniqueQualities || '',
+            educationalOpportunity: pg.meaningful_experiences?.educationalOpportunity || ''
+          },
+          additionalContext: {
+            backgroundIdentity: pg.additional_context?.backgroundIdentity || '',
+            academicCircumstances: pg.additional_context?.academicCircumstances || '',
+            educationalDisruptions: pg.additional_context?.educationalDisruptions || '',
+            schoolCommunityContext: pg.additional_context?.schoolCommunityContext || '',
+            additionalInfo: pg.additional_context?.additionalInfo || ''
+          }
+        }));
+      } catch (_) {
+        // ignore prefill errors
+      }
+    })();
+  }, []);
+
+  // Progress: based on any content in each tab section
+  const progress = useMemo(() => {
+    const meValues = Object.values(data.meaningfulExperiences || {});
+    const acValues = Object.values(data.additionalContext || {});
+    const essaysComplete = meValues.some(v => (v || '').trim().length > 0);
+    const contextComplete = acValues.some(v => (v || '').trim().length > 0);
+    const completed = [essaysComplete, contextComplete].filter(Boolean).length;
+    const percent = Math.round((completed / 2) * 100);
+    return { percent, sectionComplete: { essays: essaysComplete, context: contextComplete } } as const;
+  }, [data]);
+
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      // Create a concise narrative summary instead of large JSON
+      // Get profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id, completion_score')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile) throw new Error('Profile not found');
+
+      // Upsert into personal_growth
+      const pgPayload = {
+        profile_id: profile.id,
+        meaningful_experiences: data.meaningfulExperiences,
+        additional_context: data.additionalContext,
+      } as any;
+
+      const { data: existingPG, error: pgFetchErr } = await supabase
+        .from('personal_growth')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+      if (pgFetchErr) throw pgFetchErr;
+
+      if (existingPG?.id) {
+        const { error: pgUpdateErr } = await supabase
+          .from('personal_growth')
+          .update(pgPayload)
+          .eq('id', existingPG.id as string);
+        if (pgUpdateErr) throw pgUpdateErr;
+      } else {
+        const { error: pgInsertErr } = await supabase
+          .from('personal_growth')
+          .insert(pgPayload);
+        if (pgInsertErr) throw pgInsertErr;
+      }
+
+      // Create a concise narrative summary
       const meaningfulStories = Object.values(data.meaningfulExperiences)
-        .filter(story => story.length > 0)
-        .slice(0, 3) // Limit to prevent timeouts
+        .filter(story => (story || '').trim().length > 0)
+        .slice(0, 3)
         .join('. ');
 
-      const { error } = await supabase
+      const newScore = Math.max(Number(profile.completion_score ?? 0), 1.0);
+      const { error: profileErr } = await supabase
         .from('profiles')
         .update({
-          narrative_summary: meaningfulStories.substring(0, 1000), // Limit length
-          completion_score: 100 // Mark as fully complete
+          narrative_summary: meaningfulStories.substring(0, 1000),
+          completion_score: newScore
         })
-        .eq('user_id', user.id);
-
-      if (error) throw error;
+        .eq('id', profile.id);
+      if (profileErr) throw profileErr;
 
       toast({
         title: "Personal growth stories saved!",
@@ -226,6 +319,9 @@ const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
           This is your opportunity to share your unique story, experiences, and perspective. 
           These responses help colleges understand who you are beyond grades and test scores.
         </p>
+        <div className="max-w-md mx-auto mt-3">
+          <Progress value={progress.percent} className="h-2" />
+        </div>
       </div>
 
       {/* Main Content */}
@@ -371,10 +467,61 @@ const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
           Cancel
         </Button>
 
-        <Button onClick={handleSubmit} disabled={isLoading}>
-          {isLoading ? 'Saving...' : 'Complete Personal Growth'}
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="secondary"
+            onClick={async () => {
+              setIsLoading(true);
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('id, completion_score')
+                  .eq('user_id', user.id)
+                  .single();
+                if (!profile) throw new Error('Profile not found');
+
+                const pgPayload = {
+                  profile_id: profile.id,
+                  meaningful_experiences: data.meaningfulExperiences,
+                  additional_context: data.additionalContext,
+                } as any;
+
+                const { data: existingPG } = await supabase
+                  .from('personal_growth')
+                  .select('id')
+                  .eq('profile_id', profile.id)
+                  .maybeSingle();
+                if (existingPG?.id) {
+                  await supabase.from('personal_growth').update(pgPayload).eq('id', existingPG.id);
+                } else {
+                  await supabase.from('personal_growth').insert(pgPayload);
+                }
+
+                await supabase
+                  .from('profiles')
+                  .update({ completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) })
+                  .eq('id', profile.id);
+
+                toast({ title: 'Progress saved', description: 'You can come back anytime.' });
+                onProgressRefresh?.();
+              } catch (error) {
+                toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            disabled={isLoading}
+          >
+            Save & Quit
+          </Button>
+
+          <Button onClick={handleSubmit} disabled={isLoading}>
+            {isLoading ? 'Saving...' : 'Complete Personal Growth'}
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+        </div>
       </div>
     </div>
   );

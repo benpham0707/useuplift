@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowRight, ArrowLeft, Target, Lightbulb } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Progress } from '@/components/ui/progress';
 
 interface GoalsAspirationsData {
   // Academic & Career Interests
@@ -28,6 +29,7 @@ interface GoalsAspirationsData {
 interface Props {
   onComplete: () => void;
   onCancel: () => void;
+  onProgressRefresh?: () => void;
 }
 
 const STEPS = [
@@ -35,7 +37,7 @@ const STEPS = [
   { id: 2, title: 'College Application Plans', description: 'Your college application timeline and preferences' }
 ];
 
-const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
+const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel, onProgressRefresh }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -51,6 +53,73 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
     needBasedAid: '',
     meritScholarships: ''
   });
+
+  // Prefill from latest saved goals_aspirations
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!profile?.id) return;
+
+        const { data: ga } = await supabase
+          .from('goals_aspirations')
+          .select('*')
+          .eq('profile_id', profile.id)
+          .maybeSingle();
+        if (!ga) return;
+
+        setData((prev) => ({
+          ...prev,
+          intendedMajor: ga.intended_major || '',
+          careerInterests: Array.isArray(ga.career_interests) ? ga.career_interests : [],
+          highestDegree: ga.highest_degree || '',
+          collegeEnvironment: Array.isArray(ga.college_environment) ? ga.college_environment : [],
+          applyingToUC: ga.applying_to_uc || '',
+          usingCommonApp: ga.using_common_app || '',
+          startDate: ga.start_date || '',
+          geographicPreferences: Array.isArray(ga.geographic_preferences) ? ga.geographic_preferences : [],
+          needBasedAid: ga.need_based_aid || '',
+          meritScholarships: ga.merit_scholarships || ''
+        }));
+      } catch (_) {
+        // ignore prefill errors
+      }
+    })();
+  }, []);
+
+  // Progress calculation across steps (2 sections)
+  const progress = useMemo(() => {
+    const academicComplete =
+      (data.intendedMajor?.trim().length ?? 0) > 0 ||
+      (data.highestDegree?.trim().length ?? 0) > 0 ||
+      (Array.isArray(data.careerInterests) && data.careerInterests.length > 0) ||
+      (Array.isArray(data.collegeEnvironment) && data.collegeEnvironment.length > 0);
+
+    const plansComplete =
+      (data.applyingToUC?.trim().length ?? 0) > 0 ||
+      (data.usingCommonApp?.trim().length ?? 0) > 0 ||
+      (data.startDate?.trim().length ?? 0) > 0 ||
+      (Array.isArray(data.geographicPreferences) && data.geographicPreferences.length > 0) ||
+      (data.needBasedAid?.trim().length ?? 0) > 0 ||
+      (data.meritScholarships?.trim().length ?? 0) > 0;
+
+    const completed = [academicComplete, plansComplete].filter(Boolean).length;
+    const percent = Math.round((completed / 2) * 100);
+
+    return {
+      percent,
+      sectionComplete: {
+        academic: academicComplete,
+        plans: plansComplete,
+      },
+    } as const;
+  }, [data]);
 
   const handleNext = () => {
     if (currentStep < STEPS.length) {
@@ -70,20 +139,56 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
-      const { error } = await supabase
+      // Get user's profile
+      const { data: profile } = await supabase
         .from('profiles')
-        .update({
-          // Store simplified goals data
-          goals: {
-            primaryGoal: data.intendedMajor || 'exploring_options',
-            desiredOutcomes: data.careerInterests.slice(0, 3), // Limit array size
-            timelineUrgency: data.startDate || 'flexible'
-          },
-          completion_score: 70 // Update completion score
-        })
-        .eq('user_id', user.id);
+        .select('id, completion_score')
+        .eq('user_id', user.id)
+        .single();
+      if (!profile) throw new Error('Profile not found');
 
-      if (error) throw error;
+      const gaPayload = {
+        profile_id: profile.id,
+        intended_major: data.intendedMajor || null,
+        career_interests: data.careerInterests || [],
+        highest_degree: data.highestDegree || null,
+        college_environment: data.collegeEnvironment || [],
+        applying_to_uc: data.applyingToUC || null,
+        using_common_app: data.usingCommonApp || null,
+        start_date: data.startDate || null,
+        geographic_preferences: data.geographicPreferences || [],
+        need_based_aid: data.needBasedAid || null,
+        merit_scholarships: data.meritScholarships || null,
+      } as any;
+
+      // Upsert pattern: select existing by profile_id, then update/insert
+      const { data: existingGA, error: gaFetchErr } = await supabase
+        .from('goals_aspirations')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .maybeSingle();
+      if (gaFetchErr) throw gaFetchErr;
+
+      if (existingGA?.id) {
+        const { error: gaUpdateErr } = await supabase
+          .from('goals_aspirations')
+          .update(gaPayload)
+          .eq('id', existingGA.id as string);
+        if (gaUpdateErr) throw gaUpdateErr;
+      } else {
+        const { error: gaInsertErr } = await supabase
+          .from('goals_aspirations')
+          .insert(gaPayload);
+        if (gaInsertErr) throw gaInsertErr;
+      }
+
+      // Update profile completion score (aligned with other wizards)
+      const newScore = Math.max(Number(profile.completion_score ?? 0), 0.6);
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .update({ completion_score: newScore })
+        .eq('id', profile.id);
+      if (profileErr) throw profileErr;
 
       toast({
         title: "Goals & aspirations saved!",
@@ -129,16 +234,23 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
             <React.Fragment key={step.id}>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                 currentStep === step.id ? 'bg-primary text-primary-foreground' :
-                currentStep > step.id ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
+                ((step.id === 1 && progress.sectionComplete.academic) || (step.id === 2 && progress.sectionComplete.plans)) ? 'bg-green-600 text-white' : 'bg-muted text-muted-foreground'
               }`}>
                 {step.id}
               </div>
               {index < STEPS.length - 1 && (
-                <div className={`w-4 h-0.5 ${currentStep > step.id ? 'bg-green-600' : 'bg-muted'}`} />
+                <div className={`w-4 h-0.5 ${
+                  ((step.id === 1 && progress.sectionComplete.academic) || (step.id === 2 && progress.sectionComplete.plans)) ? 'bg-green-600' : 'bg-muted'
+                }`} />
               )}
             </React.Fragment>
           ))}
         </div>
+      </div>
+
+      {/* Overall Progress bar */}
+      <div className="px-3 py-2">
+        <Progress value={progress.percent} className="h-2 max-w-md" />
       </div>
 
       {/* Main Content Area - Full height scrollable */}
@@ -157,16 +269,76 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel }) => {
           {currentStep === 1 ? 'Cancel' : 'Previous'}
         </Button>
 
-        {currentStep < STEPS.length ? (
-          <Button size="sm" onClick={handleNext}>
-            Continue
-            <ArrowRight className="h-4 w-4 ml-1" />
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="secondary"
+            size="sm"
+            onClick={async () => {
+              setIsLoading(true);
+              try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
+                const { data: profile } = await supabase
+                  .from('profiles')
+                  .select('id, completion_score')
+                  .eq('user_id', user.id)
+                  .single();
+                if (!profile) throw new Error('Profile not found');
+
+                const gaPayload = {
+                  profile_id: profile.id,
+                  intended_major: data.intendedMajor || null,
+                  career_interests: data.careerInterests || [],
+                  highest_degree: data.highestDegree || null,
+                  college_environment: data.collegeEnvironment || [],
+                  applying_to_uc: data.applyingToUC || null,
+                  using_common_app: data.usingCommonApp || null,
+                  start_date: data.startDate || null,
+                  geographic_preferences: data.geographicPreferences || [],
+                  need_based_aid: data.needBasedAid || null,
+                  merit_scholarships: data.meritScholarships || null,
+                } as any;
+
+                const { data: existingGA } = await supabase
+                  .from('goals_aspirations')
+                  .select('id')
+                  .eq('profile_id', profile.id)
+                  .maybeSingle();
+                if (existingGA?.id) {
+                  await supabase.from('goals_aspirations').update(gaPayload).eq('id', existingGA.id);
+                } else {
+                  await supabase.from('goals_aspirations').insert(gaPayload);
+                }
+
+                await supabase
+                  .from('profiles')
+                  .update({ completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) })
+                  .eq('id', profile.id);
+
+                toast({ title: 'Progress saved', description: 'You can come back anytime.' });
+                onProgressRefresh?.();
+              } catch (_) {
+                toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
+              } finally {
+                setIsLoading(false);
+              }
+            }}
+            disabled={isLoading}
+          >
+            Save & Quit
           </Button>
-        ) : (
-          <Button size="sm" onClick={handleSubmit} disabled={isLoading}>
-            {isLoading ? 'Saving...' : 'Complete'}
-          </Button>
-        )}
+
+          {currentStep < STEPS.length ? (
+            <Button size="sm" onClick={handleNext}>
+              Continue
+              <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : (
+            <Button size="sm" onClick={handleSubmit} disabled={isLoading}>
+              {isLoading ? 'Saving...' : 'Complete'}
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
