@@ -315,315 +315,88 @@ const AcademicPlanner = () => {
                   
                   {/* Academic Requirements Checklist */}
                   <div className="mt-8">
-                    <h3 className="text-lg font-semibold text-foreground mb-4">Academic Course Requirements Checklist</h3>
-                    <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-foreground mb-3">Academic Course Requirements Checklist</h3>
+                    <div className="space-y-1">
                       {/* A-G Subject Requirements - Collapsible */}
-                      <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-xs">
                         <button 
                           onClick={() => setExpandedAG(!expandedAG)}
-                          className="flex items-center gap-2 text-sm w-full text-left hover:bg-slate-50 p-2 rounded-md transition-colors"
+                          className="flex items-center gap-2 text-xs w-full text-left hover:bg-slate-50 p-1 rounded-md transition-colors"
                         >
-                          <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                            <Check className="h-3 w-3 text-white" />
+                          <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                            <Check className="h-2 w-2 text-white" />
                           </div>
                           <span className="font-medium">A-G Subject Requirements (UC/CSU Foundation)</span>
-                          <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${expandedAG ? 'rotate-180' : ''}`} />
+                          <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${expandedAG ? 'rotate-180' : ''}`} />
                         </button>
+                      </div>
                         
-                        {expandedAG && (
-                          <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-3 p-3 bg-slate-50 rounded-md">
-                            {/* A - History/Social Science */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">A - History/Social Science</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>2 Years Completed - Minimum requirement met</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>3+ Years Completed - Competitive standard achieved</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">AP/Honors History - Advanced coursework in progress/completed</span>
-                                </div>
-                              </div>
+                      {expandedAG && (
+                        <div className="ml-5 space-y-1 p-2 bg-slate-50 rounded-md text-xs">
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                              <X className="h-2 w-2 text-white" />
                             </div>
-                            
-                            {/* B - English */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">B - English</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>4 Years Secured - All required English courses planned/completed</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>AP English Language - Junior year advanced placement</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">AP English Literature - Senior year advanced placement</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* C - Mathematics */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">C - Mathematics</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>Algebra II Completed - Minimum 3-year requirement met</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>Pre-Calculus Completed - College-ready math level achieved</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">Calculus Enrolled - Advanced math track secured</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* D - Laboratory Science */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">D - Laboratory Science</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>2 Lab Sciences Completed - Minimum requirement met</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>3+ Sciences Planned - Competitive science foundation</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">AP Science Enrolled - Advanced laboratory coursework secured</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* E - Language Other Than English */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">E - Language Other Than English</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>2 Years Same Language - Minimum proficiency demonstrated</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">3+ Years Planned - Competitive language study</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">AP/Advanced Language - Mastery-level coursework</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* F - Visual/Performing Arts */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">F - Visual/Performing Arts</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>1 Year Completed - Creative requirement fulfilled</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                                    <X className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span className="text-slate-600">Multi-Year Arts Study - Demonstrated commitment/talent</span>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            {/* G - College Preparatory Elective */}
-                            <div className="space-y-2">
-                              <div className="font-medium text-sm text-slate-700">G - College Preparatory Elective</div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                                    <Check className="h-3 w-3 text-white" />
-                                  </div>
-                                  <span>College Preparatory Elective - Additional academic course completed</span>
-                                </div>
-                              </div>
-                            </div>
+                            <span>Missing: 4th year of math and advanced science courses</span>
                           </div>
-                        )}
-                      </div>
-
-                      {/* All other requirements at the same level */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
                         </div>
-                        <span>4+ AP Courses Completed - High rigor demonstrated</span>
+                      )}
+                      
+                      {/* Other requirements at same level */}
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                          <Check className="h-2 w-2 text-white" />
+                        </div>
+                        <span className="font-medium">Minimum GPA Requirement (3.0+)</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                          <X className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                          <X className="h-2 w-2 text-white" />
                         </div>
-                        <span className="text-slate-600">8+ AP Courses Planned - Exceptional academic challenge</span>
+                        <span className="font-medium">SAT/ACT Test Scores</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                          <X className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                          <Check className="h-2 w-2 text-white" />
                         </div>
-                        <span className="text-slate-600">AP Capstone Program - Research and seminar courses completed</span>
+                        <span className="font-medium">High School Diploma/Graduation</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                          <X className="h-2 w-2 text-white" />
                         </div>
-                        <span>On Track for Graduation - All diploma requirements secured</span>
+                        <span className="font-medium">English Language Proficiency</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                          <X className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                          <Check className="h-2 w-2 text-white" />
                         </div>
-                        <span className="text-slate-600">Early Graduation Possible - Accelerated completion pathway</span>
+                        <span className="font-medium">Application Submission</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                          <X className="h-2 w-2 text-white" />
                         </div>
-                        <span>Honors Diploma Track - Enhanced graduation credentials</span>
+                        <span className="font-medium">Personal Insight Questions</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                          <X className="h-2 w-2 text-white" />
                         </div>
-                        <span>Most Rigorous Available - Counselor recommendation level achieved</span>
+                        <span className="font-medium">Letters of Recommendation</span>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
+                      <div className="flex items-center gap-2 text-xs">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                          <Check className="h-2 w-2 text-white" />
                         </div>
-                        <span>No Study Halls/Fillers - Optimized schedule density</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>4+ Academic Cores Senior Year - Maintained rigor through graduation</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                          <X className="h-3 w-3 text-white" />
-                        </div>
-                        <span className="text-slate-600">Capstone/Research Course - Independent academic project</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-slate-400 bg-slate-400">
-                          <X className="h-3 w-3 text-white" />
-                        </div>
-                        <span className="text-slate-600">College Credit Courses - Dual enrollment or college-level work</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>All Prerequisites Met - No bottlenecks for desired courses</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>Grade Trend Management - Consistent or improving performance</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>Course Load Balance - Sustainable challenge level maintained</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>Intended Major Prerequisites - Required coursework for target field</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>2+ Specialized Coursework - Unique classes demonstrating focused interest</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>Reach School Standards - Course rigor meeting top-choice requirements</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>Safety School Assured - Guaranteed admission standards exceeded</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex items-center justify-center h-4 w-4 rounded-full border-2 border-green-600 bg-green-600">
-                          <Check className="h-3 w-3 text-white" />
-                        </div>
-                        <span>Scholarship Positioning - Academic profile for merit consideration</span>
+                        <span className="font-medium">Extracurricular Activities</span>
                       </div>
                     </div>
                   </div>
