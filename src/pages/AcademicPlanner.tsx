@@ -292,16 +292,16 @@ const AcademicPlanner = () => {
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-3">
                     <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-3xl font-bold text-blue-600">{currentGPA.weighted}</div>
-                      <div className="text-sm text-blue-700">Weighted GPA</div>
+                      <div className="text-3xl font-bold text-blue-800">{currentGPA.weighted}</div>
+                      <div className="text-sm text-blue-900">Weighted GPA</div>
                     </div>
                     <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-3xl font-bold text-blue-600">{currentGPA.unweighted}</div>
-                      <div className="text-sm text-blue-700">Unweighted GPA</div>
+                      <div className="text-3xl font-bold text-blue-800">{currentGPA.unweighted}</div>
+                      <div className="text-sm text-blue-900">Unweighted GPA</div>
                     </div>
                     <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <div className="text-3xl font-bold text-blue-600">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}th</div>
-                      <div className="text-sm text-blue-700">Percentile</div>
+                      <div className="text-3xl font-bold text-blue-800">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}th</div>
+                      <div className="text-sm text-blue-900">Percentile</div>
                     </div>
                   </div>
                   
@@ -622,224 +622,175 @@ const AcademicPlanner = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {/* A-G Requirements Met */}
+              <div className="space-y-3">
+                {/* High Impact Achievements */}
                 <Collapsible>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center h-6 w-6 rounded-full bg-green-600">
-                        <Check className="h-4 w-4 text-white" />
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center h-5 w-5 rounded-full bg-green-600">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold text-green-800">A-G Requirements Met</h3>
-                        <p className="text-sm text-green-600">Core foundation subjects completed</p>
+                        <h3 className="font-medium text-green-800 text-sm">High Impact Achievements</h3>
+                        <p className="text-xs text-green-600">Exceptional and high-value accomplishments</p>
                       </div>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-green-600" />
+                    <ChevronDown className="h-3 w-3 text-green-600" />
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 p-4 border border-green-200 rounded-lg bg-white">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <CollapsibleContent className="mt-2 p-3 border border-green-200 rounded-lg bg-white">
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">4 Years English</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Completed June 2024</span>
-                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">High Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">AP Biology - Score: 5</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Strong writing and communication skills foundation</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: Advanced composition courses, honors programs</p>
+                          <p className="text-xs text-muted-foreground mt-1">College credit + pre-med track eligibility</p>
                         </div>
                       </div>
                       
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">3 Years Mathematics (through Algebra II)</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Completed May 2024</span>
-                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">High Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">Biology Major Prerequisites Complete</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Mathematical reasoning and problem-solving competency</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: STEM major eligibility, engineering programs</p>
-                          <Button size="sm" variant="outline" className="mt-2 h-7 text-xs">
-                            💬 Leverage This
-                          </Button>
+                          <p className="text-xs text-muted-foreground mt-1">Direct admission eligibility secured</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Credit Requirements Complete</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">Early college enrollment possible</p>
                         </div>
                       </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Advanced Coursework Completed */}
+                {/* Medium Impact Achievements */}
                 <Collapsible>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center h-6 w-6 rounded-full bg-blue-600">
-                        <Check className="h-4 w-4 text-white" />
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center h-5 w-5 rounded-full bg-amber-600">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold text-blue-800">Advanced Coursework Completed</h3>
-                        <p className="text-sm text-blue-600">AP scores and honors courses achieved</p>
+                        <h3 className="font-medium text-amber-800 text-sm">Medium Impact Achievements</h3>
+                        <p className="text-xs text-amber-600">Strong foundational accomplishments</p>
                       </div>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-blue-600" />
+                    <ChevronDown className="h-3 w-3 text-amber-600" />
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 p-4 border border-blue-200 rounded-lg bg-white">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <CollapsibleContent className="mt-2 p-3 border border-amber-200 rounded-lg bg-white">
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">AP Biology</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Score: 5</span>
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-xs">Exceptional Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">AP Calculus AB - Score: 4</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Demonstrates mastery of college-level biology concepts</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: College credit, advanced biology courses, pre-med track</p>
-                          <Button size="sm" variant="outline" className="mt-2 h-7 text-xs">
-                            💬 Leverage This
-                          </Button>
+                          <p className="text-xs text-muted-foreground mt-1">Advanced math placement secured</p>
                         </div>
                       </div>
                       
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">AP Calculus AB</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Score: 4</span>
-                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">High Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">4 Years English</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Strong foundation in differential and integral calculus</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: Placement into advanced math, engineering programs</p>
+                          <p className="text-xs text-muted-foreground mt-1">Advanced composition eligibility</p>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">Honors Chemistry</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Grade: A</span>
-                              <Badge variant="secondary" className="bg-slate-100 text-slate-800 border-slate-200 text-xs">Moderate Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">3 Years Mathematics (through Algebra II)</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">Advanced understanding of chemical principles and lab techniques</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: AP Chemistry eligibility, science research opportunities</p>
-                        </div>
-                      </div>
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-
-                {/* Graduation Requirements Secured */}
-                <Collapsible>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center h-6 w-6 rounded-full bg-purple-600">
-                        <Check className="h-4 w-4 text-white" />
-                      </div>
-                      <div className="text-left">
-                        <h3 className="font-semibold text-purple-800">Graduation Requirements Secured</h3>
-                        <p className="text-sm text-purple-600">Diploma and credential milestones achieved</p>
-                      </div>
-                    </div>
-                    <ChevronDown className="h-4 w-4 text-purple-600" />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 p-4 border border-purple-200 rounded-lg bg-white">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">Honors Diploma Eligibility</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Secured</span>
-                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">High Impact</Badge>
-                            </div>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">Enhanced graduation credentials demonstrating academic excellence</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: Honor society membership, scholarship opportunities</p>
-                          <Button size="sm" variant="outline" className="mt-2 h-7 text-xs">
-                            💬 Leverage This
-                          </Button>
+                          <p className="text-xs text-muted-foreground mt-1">STEM major eligibility achieved</p>
                         </div>
                       </div>
 
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">Credit Requirements Complete</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">On Track</span>
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-xs">Exceptional Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">Honors Diploma Eligibility</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">All minimum credit requirements secured for graduation</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: Focus on electives, early college enrollment</p>
+                          <p className="text-xs text-muted-foreground mt-1">Scholarship opportunities unlocked</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Research Experience (Summer 2024)</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">Graduate school recommendations available</p>
                         </div>
                       </div>
                     </div>
                   </CollapsibleContent>
                 </Collapsible>
 
-                {/* Major Prerequisites Fulfilled */}
+                {/* Low Impact Achievements */}
                 <Collapsible>
-                  <CollapsibleTrigger className="flex items-center justify-between w-full p-4 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center justify-center h-6 w-6 rounded-full bg-orange-600">
-                        <Check className="h-4 w-4 text-white" />
+                  <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center h-5 w-5 rounded-full bg-slate-600">
+                        <Check className="h-3 w-3 text-white" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-semibold text-orange-800">Major Prerequisites Fulfilled</h3>
-                        <p className="text-sm text-orange-600">Target major requirements completed</p>
+                        <h3 className="font-medium text-slate-800 text-sm">Low Impact Achievements</h3>
+                        <p className="text-xs text-slate-600">Supporting accomplishments</p>
                       </div>
                     </div>
-                    <ChevronDown className="h-4 w-4 text-orange-600" />
+                    <ChevronDown className="h-3 w-3 text-slate-600" />
                   </CollapsibleTrigger>
-                  <CollapsibleContent className="mt-2 p-4 border border-orange-200 rounded-lg bg-white">
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                  <CollapsibleContent className="mt-2 p-3 border border-slate-200 rounded-lg bg-white">
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">Biology Major Prerequisites</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Completed</span>
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200 text-xs">Exceptional Impact</Badge>
-                            </div>
+                            <span className="text-sm font-medium">Honors Chemistry - Grade: A</span>
+                            <Button size="sm" variant="outline" className="h-6 text-xs px-2">
+                              💬 Leverage This
+                            </Button>
                           </div>
-                          <p className="text-sm text-muted-foreground mt-1">All required coursework for intended biology major completed</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: Direct admission eligibility, advanced standing</p>
-                          <Button size="sm" variant="outline" className="mt-2 h-7 text-xs">
-                            💬 Leverage This
-                          </Button>
-                        </div>
-                      </div>
-
-                      <div className="flex items-start gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium text-foreground">Research Experience Secured</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Summer 2024</span>
-                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 text-xs">High Impact</Badge>
-                            </div>
-                          </div>
-                          <p className="text-sm text-muted-foreground mt-1">Hands-on research experience in molecular biology lab</p>
-                          <p className="text-sm text-blue-600 mt-1">Unlocks: Graduate school recommendations, research positions</p>
+                          <p className="text-xs text-muted-foreground mt-1">AP Chemistry eligibility secured</p>
                         </div>
                       </div>
                     </div>
