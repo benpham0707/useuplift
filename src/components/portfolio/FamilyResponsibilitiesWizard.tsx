@@ -66,12 +66,12 @@ const FamilyResponsibilitiesWizard: React.FC<Props> = ({ onComplete, onCancel, o
 
         setData((prev) => ({
           ...prev,
-          hoursPerWeek: fr.hours_per_week ?? 0,
-          responsibilities: Array.isArray(fr.responsibilities) ? fr.responsibilities : [],
-          otherResponsibilities: fr.other_responsibilities ?? '',
-          challengingCircumstances: Boolean(fr.challenging_circumstances),
-          circumstances: Array.isArray(fr.circumstances) ? fr.circumstances : [],
-          otherCircumstances: fr.other_circumstances ?? ''
+          hoursPerWeek: 0,
+          responsibilities: [],
+          otherResponsibilities: '',
+          challengingCircumstances: false,
+          circumstances: [],
+          otherCircumstances: ''
         }));
       } catch (_) {
         // ignore prefill errors

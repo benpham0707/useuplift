@@ -174,21 +174,21 @@ const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel, onProgres
 
         setData((prev) => ({
           meaningfulExperiences: {
-            significantChallenge: pg.meaningful_experiences?.significantChallenge || '',
-            leadershipExample: pg.meaningful_experiences?.leadershipExample || '',
-            academicExcitement: pg.meaningful_experiences?.academicExcitement || '',
-            creativity: pg.meaningful_experiences?.creativity || '',
-            greatestTalent: pg.meaningful_experiences?.greatestTalent || '',
-            communityImpact: pg.meaningful_experiences?.communityImpact || '',
-            uniqueQualities: pg.meaningful_experiences?.uniqueQualities || '',
-            educationalOpportunity: pg.meaningful_experiences?.educationalOpportunity || ''
+            significantChallenge: '',
+            leadershipExample: '',
+            academicExcitement: '',
+            creativity: '',
+            greatestTalent: '',
+            communityImpact: '',
+            uniqueQualities: '',
+            educationalOpportunity: ''
           },
           additionalContext: {
-            backgroundIdentity: pg.additional_context?.backgroundIdentity || '',
-            academicCircumstances: pg.additional_context?.academicCircumstances || '',
-            educationalDisruptions: pg.additional_context?.educationalDisruptions || '',
-            schoolCommunityContext: pg.additional_context?.schoolCommunityContext || '',
-            additionalInfo: pg.additional_context?.additionalInfo || ''
+            backgroundIdentity: '',
+            academicCircumstances: '',
+            educationalDisruptions: '',
+            schoolCommunityContext: '',
+            additionalInfo: ''
           }
         }));
       } catch (_) {

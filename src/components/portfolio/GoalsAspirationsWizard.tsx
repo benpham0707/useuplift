@@ -79,13 +79,13 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel, onProgr
           intendedMajor: ga.intended_major || '',
           careerInterests: Array.isArray(ga.career_interests) ? ga.career_interests : [],
           highestDegree: ga.highest_degree || '',
-          collegeEnvironment: Array.isArray(ga.college_environment) ? ga.college_environment : [],
-          applyingToUC: ga.applying_to_uc || '',
-          usingCommonApp: ga.using_common_app || '',
-          startDate: ga.start_date || '',
-          geographicPreferences: Array.isArray(ga.geographic_preferences) ? ga.geographic_preferences : [],
-          needBasedAid: ga.need_based_aid || '',
-          meritScholarships: ga.merit_scholarships || ''
+          collegeEnvironment: Array.isArray(ga.preferred_environment) ? ga.preferred_environment : [],
+          applyingToUC: '',
+          usingCommonApp: '',
+          startDate: '',
+          geographicPreferences: [],
+          needBasedAid: '',
+          meritScholarships: ''
         }));
       } catch (_) {
         // ignore prefill errors

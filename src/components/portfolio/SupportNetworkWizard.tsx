@@ -98,14 +98,14 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel, onProgres
 
         setData((prev) => ({
           ...prev,
-          counselor: (sn.counselor as any) || { name: '', email: '' },
-          teachers: Array.isArray(sn.teachers) ? sn.teachers : [],
-          communitySupport: Boolean(sn.has_community_support),
-          communityOrganizations: Array.isArray(sn.community_organizations) ? sn.community_organizations : [],
-          hasPortfolioItems: Boolean(sn.has_portfolio_items),
-          portfolioItems: Array.isArray(sn.portfolio_items) ? sn.portfolio_items : [],
-          wantsToUploadDocuments: Boolean(sn.wants_to_upload_documents),
-          documents: Array.isArray(sn.documents) ? sn.documents : []
+          counselor: { name: '', email: '' },
+          teachers: [],
+          communitySupport: false,
+          communityOrganizations: [],
+          hasPortfolioItems: false,
+          portfolioItems: [],
+          wantsToUploadDocuments: false,
+          documents: []
         }));
       } catch (_) {
         // ignore prefill errors

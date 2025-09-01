@@ -298,7 +298,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       const currentSchool = has(aj?.current_school) || has(aj?.current_grade) || has(aj?.expected_grad_date);
       const academicPerf = has(aj?.gpa) || has(aj?.class_rank) || has(aj?.class_size) || has(aj?.english_proficiency);
       const courseHistory = has(aj?.course_history) || has(aj?.college_courses) || has(aj?.ap_exams) || has(aj?.ib_exams);
-      const testing = has(aj?.standardized_tests) || aj?.report_test_scores === true;
+      const testing = has(aj?.standardized_tests);
       const completed = [currentSchool, academicPerf, courseHistory, testing].filter(Boolean).length;
       const percent = Math.round((completed / 4) * 100);
       setAssessmentSections(prev => prev.map(s => s.id === 'academic' ? {
@@ -329,8 +329,16 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
         .select('*')
         .eq('profile_id', prof.id)
         .maybeSingle();
-      const responsibilitiesComplete = (Number(fr?.hours_per_week || 0) > 0) || (Array.isArray(fr?.responsibilities) && fr?.responsibilities.length > 0) || ((fr?.other_responsibilities || '').toString().trim().length > 0);
-      const circumstancesComplete = fr?.challenging_circumstances === false || (Array.isArray(fr?.circumstances) && fr?.circumstances.length > 0) || ((fr?.other_circumstances || '').toString().trim().length > 0);
+      const has = (v: any) => {
+        if (!v && v !== 0) return false;
+        if (typeof v === 'string') return v.trim().length > 0;
+        if (typeof v === 'number') return true;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.keys(v || {}).length > 0;
+        return Boolean(v);
+      };
+      const responsibilitiesComplete = has(fr?.responsibilities);
+      const circumstancesComplete = has(fr?.life_circumstances);
       const completed = [responsibilitiesComplete, circumstancesComplete].filter(Boolean).length;
       const percent = Math.round((completed / 2) * 100);
       setAssessmentSections(prev => prev.map(s => s.id === 'family' ? {
@@ -361,10 +369,18 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
         .select('*')
         .eq('profile_id', prof.id)
         .maybeSingle();
+      const has = (v: any) => {
+        if (!v && v !== 0) return false;
+        if (typeof v === 'string') return v.trim().length > 0;
+        if (typeof v === 'number') return true;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.keys(v || {}).length > 0;
+        return Boolean(v);
+      };
       const hasArr = (a: any) => Array.isArray(a) && a.length > 0;
-      const academicInterests = (ga?.intended_major || '').toString().trim().length > 0 || hasArr(ga?.college_environment);
+      const academicInterests = (ga?.intended_major || '').toString().trim().length > 0 || hasArr(ga?.preferred_environment);
       const careerGoals = hasArr(ga?.career_interests) || (ga?.highest_degree || '').toString().trim().length > 0;
-      const appPlans = (ga?.applying_to_uc || ga?.using_common_app || ga?.start_date || ga?.need_based_aid || ga?.merit_scholarships || '').toString().trim().length > 0 || hasArr(ga?.geographic_preferences);
+      const appPlans = has(ga?.college_plans);
       const completed = [academicInterests, careerGoals, appPlans].filter(Boolean).length;
       const percent = Math.round((completed / 3) * 100);
       setAssessmentSections(prev => prev.map(s => s.id === 'goals' ? {
@@ -395,9 +411,17 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
         .select('*')
         .eq('profile_id', prof.id)
         .maybeSingle();
-      const counselorOrTeachers = ((sn?.counselor?.name || '').toString().trim().length > 0) || ((sn?.counselor?.email || '').toString().trim().length > 0) || (Array.isArray(sn?.teachers) && sn?.teachers.length > 0);
-      const community = (sn?.has_community_support === false) || (Array.isArray(sn?.community_organizations) && sn?.community_organizations.length > 0);
-      const portfolio = (sn?.has_portfolio_items === false) || (Array.isArray(sn?.portfolio_items) && sn?.portfolio_items.length > 0);
+      const has = (v: any) => {
+        if (!v && v !== 0) return false;
+        if (typeof v === 'string') return v.trim().length > 0;
+        if (typeof v === 'number') return true;
+        if (Array.isArray(v)) return v.length > 0;
+        if (typeof v === 'object') return Object.keys(v || {}).length > 0;
+        return Boolean(v);
+      };
+      const counselorOrTeachers = has(sn?.counselor) || (Array.isArray(sn?.teachers) && sn?.teachers.length > 0);
+      const community = has(sn?.community_support);
+      const portfolio = has(sn?.portfolio_items);
       const completed = [counselorOrTeachers, community, portfolio].filter(Boolean).length;
       const percent = Math.round((completed / 3) * 100);
       setAssessmentSections(prev => prev.map(s => s.id === 'support' ? {
