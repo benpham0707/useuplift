@@ -613,8 +613,6 @@ const AcademicPlanner = () => {
                     <div className="relative flex items-center justify-center h-10 w-10 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 shadow-lg border-4 border-amber-200">
                       <Award className="h-5 w-5 text-white" />
                       <div className="absolute inset-0 rounded-full border-2 border-amber-300 opacity-50"></div>
-                      <div className="absolute -top-1 -left-1 h-3 w-3 bg-gradient-to-br from-yellow-300 to-amber-400 rounded-full shadow-sm"></div>
-                      <div className="absolute -bottom-1 -right-1 h-2 w-2 bg-gradient-to-br from-amber-300 to-yellow-400 rounded-full shadow-sm"></div>
                     </div>
                   </div>
                   Academic Trophy Case
