@@ -647,11 +647,11 @@ const AcademicPlanner = () => {
                         {/* Hard coded data for gold tier count */}
                         3/5
                       </Badge>
-                      <div className="flex-1 bg-amber-200 rounded-full h-2">
+                      <div className="w-16 bg-amber-200 rounded-full h-2">
                         <div className="bg-gradient-to-r from-amber-400 to-yellow-500 h-2 rounded-full" style={{width: '60%'}}></div>
                       </div>
+                      <ChevronDown className="h-5 w-5 text-amber-700 group-hover:scale-110 transition-transform" />
                     </div>
-                    <ChevronDown className="h-5 w-5 text-amber-700 group-hover:scale-110 transition-transform" />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-4">
                     <div className="bg-white rounded-xl border-2 border-yellow-200 shadow-inner p-4">
@@ -733,11 +733,11 @@ const AcademicPlanner = () => {
                         {/* Hard coded data for silver tier count */}
                         5/7
                       </Badge>
-                      <div className="flex-1 bg-slate-200 rounded-full h-2">
+                      <div className="w-16 bg-slate-200 rounded-full h-2">
                         <div className="bg-gradient-to-r from-slate-400 to-gray-500 h-2 rounded-full" style={{width: '71%'}}></div>
                       </div>
+                      <ChevronDown className="h-5 w-5 text-slate-700 group-hover:scale-110 transition-transform" />
                     </div>
-                    <ChevronDown className="h-5 w-5 text-slate-700 group-hover:scale-110 transition-transform" />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-4">
                     <div className="bg-white rounded-xl border-2 border-slate-200 shadow-inner p-4">
@@ -833,11 +833,11 @@ const AcademicPlanner = () => {
                         {/* Hard coded data for bronze tier count */}
                         4/4
                       </Badge>
-                      <div className="flex-1 bg-orange-200 rounded-full h-2">
+                      <div className="w-16 bg-orange-200 rounded-full h-2">
                         <div className="bg-gradient-to-r from-orange-400 to-amber-600 h-2 rounded-full" style={{width: '100%'}}></div>
                       </div>
+                      <ChevronDown className="h-5 w-5 text-orange-700 group-hover:scale-110 transition-transform" />
                     </div>
-                    <ChevronDown className="h-5 w-5 text-orange-700 group-hover:scale-110 transition-transform" />
                   </CollapsibleTrigger>
                   <CollapsibleContent className="mt-4">
                     <div className="bg-white rounded-xl border-2 border-orange-200 shadow-inner p-4">
