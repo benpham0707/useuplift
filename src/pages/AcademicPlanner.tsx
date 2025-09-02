@@ -617,7 +617,7 @@ const AcademicPlanner = () => {
                   </div>
                   Academic Trophy Case
                 </CardTitle>
-                <Badge variant="outline" className="text-amber-700 border-amber-200 font-medium px-3 py-1">
+                <Badge className="bg-amber-100 text-amber-800 border-amber-300 font-medium px-3 py-1">
                   {/* Hard coded data for achievement count */}
                   12 Achievements Unlocked
                 </Badge>
@@ -634,16 +634,21 @@ const AcademicPlanner = () => {
                     <div className="flex items-center gap-4">
                       <div className="relative flex items-center justify-center h-12 w-12 rounded-full bg-gradient-to-br from-yellow-400 to-amber-500 shadow-lg group-hover:shadow-xl transition-all duration-300">
                         <Award className="h-7 w-7 text-white group-hover:scale-110 transition-transform" />
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-300 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
-                          <div className="w-2 h-2 bg-amber-800 rounded-full"></div>
-                        </div>
                       </div>
                       <div className="text-left">
                         <h3 className="font-bold text-amber-900 text-lg flex items-center gap-2">
                           Gold Tier Achievements
-                          <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
                         </h3>
                         <p className="text-sm text-amber-700 font-medium">Elite academic accomplishments</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-amber-200 text-amber-900 text-xs font-bold px-2 py-1">
+                        {/* Hard coded data for gold tier count */}
+                        3/5
+                      </Badge>
+                      <div className="flex-1 bg-amber-200 rounded-full h-2">
+                        <div className="bg-gradient-to-r from-amber-400 to-yellow-500 h-2 rounded-full" style={{width: '60%'}}></div>
                       </div>
                     </div>
                     <ChevronDown className="h-5 w-5 text-amber-700 group-hover:scale-110 transition-transform" />
@@ -715,16 +720,21 @@ const AcademicPlanner = () => {
                     <div className="flex items-center gap-4">
                       <div className="relative flex items-center justify-center h-12 w-12 rounded-full bg-gradient-to-br from-slate-400 to-gray-500 shadow-lg group-hover:shadow-xl transition-all duration-300">
                         <Award className="h-7 w-7 text-white group-hover:scale-110 transition-transform" />
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-slate-300 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
-                          <div className="w-2 h-2 bg-slate-800 rounded-full"></div>
-                        </div>
                       </div>
                       <div className="text-left">
                         <h3 className="font-bold text-slate-900 text-lg flex items-center gap-2">
                           Silver Tier Achievements
-                          <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
                         </h3>
                         <p className="text-sm text-slate-700 font-medium">Strong foundational accomplishments</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-slate-200 text-slate-900 text-xs font-bold px-2 py-1">
+                        {/* Hard coded data for silver tier count */}
+                        5/7
+                      </Badge>
+                      <div className="flex-1 bg-slate-200 rounded-full h-2">
+                        <div className="bg-gradient-to-r from-slate-400 to-gray-500 h-2 rounded-full" style={{width: '71%'}}></div>
                       </div>
                     </div>
                     <ChevronDown className="h-5 w-5 text-slate-700 group-hover:scale-110 transition-transform" />
@@ -810,16 +820,21 @@ const AcademicPlanner = () => {
                     <div className="flex items-center gap-4">
                       <div className="relative flex items-center justify-center h-12 w-12 rounded-full bg-gradient-to-br from-orange-400 to-amber-600 shadow-lg group-hover:shadow-xl transition-all duration-300">
                         <Award className="h-7 w-7 text-white group-hover:scale-110 transition-transform" />
-                        <div className="absolute -top-1 -right-1 w-5 h-5 bg-orange-300 rounded-full flex items-center justify-center border-2 border-white animate-pulse">
-                          <div className="w-2 h-2 bg-orange-800 rounded-full"></div>
-                        </div>
                       </div>
                       <div className="text-left">
                         <h3 className="font-bold text-orange-900 text-lg flex items-center gap-2">
                           Bronze Tier Achievements
-                          <div className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
                         </h3>
                         <p className="text-sm text-orange-700 font-medium">Important supporting accomplishments</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge className="bg-orange-200 text-orange-900 text-xs font-bold px-2 py-1">
+                        {/* Hard coded data for bronze tier count */}
+                        4/4
+                      </Badge>
+                      <div className="flex-1 bg-orange-200 rounded-full h-2">
+                        <div className="bg-gradient-to-r from-orange-400 to-amber-600 h-2 rounded-full" style={{width: '100%'}}></div>
                       </div>
                     </div>
                     <ChevronDown className="h-5 w-5 text-orange-700 group-hover:scale-110 transition-transform" />
@@ -864,7 +879,7 @@ const AcademicPlanner = () => {
                   </div>
                   Academic Action Dashboard
                 </CardTitle>
-                <Badge variant="outline" className="text-red-700 border-red-200 font-medium px-3 py-1">
+                <Badge className="bg-red-100 text-red-800 border-red-300 font-medium px-3 py-1">
                   {/* Hard coded data for task count */}
                   8 Priority Tasks
                 </Badge>
