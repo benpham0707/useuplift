@@ -122,6 +122,7 @@ const AcademicPlanner = () => {
   const [chatPosition, setChatPosition] = useState({ x: window.innerWidth - 420, y: 100 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [quickActionsExpanded, setQuickActionsExpanded] = useState(false);
 
   const handleSendMessage = () => {
     if (userInput.trim()) {
@@ -1106,7 +1107,7 @@ const AcademicPlanner = () => {
       {/* Draggable Chatbot */}
       {isChatOpen && (
         <div 
-          className="fixed w-96 h-[32rem] z-50 animate-in slide-in-from-bottom-4"
+          className="fixed w-96 h-[28rem] z-50 animate-in slide-in-from-bottom-4"
           style={{ 
             left: chatPosition.x, 
             top: chatPosition.y,
@@ -1162,20 +1163,28 @@ const AcademicPlanner = () => {
 
               {/* Quick Actions */}
               <div className="p-4 border-t bg-background">
-                <p className="text-sm font-medium mb-3">Quick Actions</p>
-                <div className="space-y-2">
-                  {quickActions.slice(0, 3).map((action, index) => (
-                    <Button
-                      key={index}
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start text-left h-auto p-2 text-xs"
-                      onClick={() => setUserInput(action)}
-                    >
-                      {action}
-                    </Button>
-                  ))}
-                </div>
+                <button
+                  onClick={() => setQuickActionsExpanded(!quickActionsExpanded)}
+                  className="flex items-center justify-between w-full text-sm font-medium mb-3 hover:text-primary transition-colors"
+                >
+                  <span>Quick Actions</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${quickActionsExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {quickActionsExpanded && (
+                  <div className="space-y-2">
+                    {quickActions.map((action, index) => (
+                      <Button
+                        key={index}
+                        variant="ghost"
+                        size="sm"
+                        className="w-full justify-start text-left h-auto p-2 text-xs"
+                        onClick={() => setUserInput(action)}
+                      >
+                        {action}
+                      </Button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Input Area */}
