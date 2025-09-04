@@ -74,96 +74,171 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
           {/* Left Side - Task Information */}
           <div className="flex-1 border-r overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="p-4 space-y-4 max-w-none">
-                {/* Task Overview */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Brain className="h-4 w-4" />
-                      Task Overview
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <p className="text-muted-foreground leading-relaxed text-sm">
-                      {task.description}
-                    </p>
-                    
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className="flex items-center gap-1.5 text-xs">
-                        <TrendingUp className="h-3 w-3" />
-                        Impact: {task.impact}
-                      </Badge>
-                      <Badge variant="outline" className="flex items-center gap-1.5 text-xs">
-                        <Clock className="h-3 w-3" />
-                        {task.timeframe}
-                      </Badge>
-                      <Badge variant="outline" className="text-xs">
-                        Difficulty: {task.difficulty}
-                      </Badge>
+              <div className="p-6 pb-8 space-y-6 max-w-none">
+                {/* Task Header */}
+                <div className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-semibold tracking-tight">{task.title}</h2>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {task.description}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                  
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary" className="flex items-center gap-1.5">
+                      <TrendingUp className="h-3 w-3" />
+                      {task.impact} Impact
+                    </Badge>
+                    <Badge variant="outline" className="flex items-center gap-1.5">
+                      <Clock className="h-3 w-3" />
+                      {task.timeframe}
+                    </Badge>
+                    <Badge variant="outline">
+                      {task.difficulty} Difficulty
+                    </Badge>
+                  </div>
+                </div>
 
-                {/* Why It's Important */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Lightbulb className="h-4 w-4" />
-                      Why This Matters
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-muted-foreground leading-relaxed text-sm">
-                      {task.importance}
-                    </p>
-                  </CardContent>
-                </Card>
+                <Separator />
 
-                {/* Key Takeaways */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <Award className="h-4 w-4" />
-                      Key Takeaways
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2">
-                      {task.takeaways.map((takeaway, index) => (
-                        <li key={index} className="flex items-start gap-2">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
-                          <span className="text-xs text-muted-foreground leading-relaxed">{takeaway}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+                {/* Task Phases */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Target className="h-4 w-4" />
+                    Implementation Phases
+                  </h3>
+                  
+                  {/* Hard coded data values for task implementation phases specific to academic tutoring sessions */}
+                  <div className="space-y-4">
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">1</div>
+                        <h4 className="font-medium">Planning & Setup</h4>
+                        <Badge variant="outline" className="text-xs">Week 1</Badge>
+                      </div>
+                      <div className="pl-8 space-y-2">
+                        <p className="text-sm text-muted-foreground">Research and identify qualified tutors, establish schedule, set learning objectives</p>
+                        <ul className="text-xs space-y-1 text-muted-foreground">
+                          <li>• Find certified chemistry tutors with proven track record</li>
+                          <li>• Schedule initial assessment session</li>
+                          <li>• Define specific areas of focus and improvement goals</li>
+                        </ul>
+                      </div>
+                    </div>
 
-                {/* Detailed Steps */}
-                <Card className="border-none shadow-sm">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <CheckCircle2 className="h-4 w-4" />
-                      Step-by-Step Guide
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {task.detailedSteps.map((step, index) => (
-                        <div key={index} className="flex gap-3">
-                          <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">
-                            {index + 1}
-                          </div>
-                          <div className="flex-1 pt-0.5">
-                            <p className="text-xs text-muted-foreground leading-relaxed">
-                              {step}
-                            </p>
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">2</div>
+                        <h4 className="font-medium">Regular Sessions</h4>
+                        <Badge variant="outline" className="text-xs">Weeks 2-12</Badge>
+                      </div>
+                      <div className="pl-8 space-y-2">
+                        <p className="text-sm text-muted-foreground">Consistent weekly sessions focusing on problem-solving and concept reinforcement</p>
+                        <ul className="text-xs space-y-1 text-muted-foreground">
+                          <li>• 90-minute sessions covering current coursework</li>
+                          <li>• Practice problems and lab technique improvement</li>
+                          <li>• Regular progress assessments and adjustments</li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">3</div>
+                        <h4 className="font-medium">Assessment & Optimization</h4>
+                        <Badge variant="outline" className="text-xs">Ongoing</Badge>
+                      </div>
+                      <div className="pl-8 space-y-2">
+                        <p className="text-sm text-muted-foreground">Monitor progress and adapt tutoring approach based on performance data</p>
+                        <ul className="text-xs space-y-1 text-muted-foreground">
+                          <li>• Monthly progress reviews with grades and comprehension metrics</li>
+                          <li>• Adjust tutoring focus areas based on performance</li>
+                          <li>• Prepare for major exams and lab practicals</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Strategic Value */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4" />
+                    Strategic Value & Impact
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="border-none shadow-none bg-muted/30">
+                      <CardContent className="p-4">
+                        <h4 className="font-medium text-sm mb-2">Academic Benefits</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {task.importance}
+                        </p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-none shadow-none bg-muted/30">
+                      <CardContent className="p-4">
+                        <h4 className="font-medium text-sm mb-2">Long-term Advantages</h4>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          Strong chemistry foundation supports advanced STEM coursework, pre-med requirements, and demonstrates commitment to academic excellence for college applications.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Success Metrics */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <Award className="h-4 w-4" />
+                    Success Metrics & Outcomes
+                  </h3>
+                  <div className="space-y-3">
+                    {task.takeaways.map((takeaway, index) => (
+                      <div key={index} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20">
+                        <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className="text-sm font-medium">Expected Outcome {index + 1}</span>
+                          <p className="text-xs text-muted-foreground leading-relaxed mt-1">{takeaway}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Detailed Action Steps */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Detailed Action Plan
+                  </h3>
+                  <div className="space-y-4">
+                    {task.detailedSteps.map((step, index) => (
+                      <div key={index} className="flex gap-4 p-4 rounded-lg border bg-card">
+                        <div className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 space-y-2">
+                          <h4 className="font-medium text-sm">Action Step {index + 1}</h4>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            {step}
+                          </p>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>Estimated time: {index < 2 ? '2-3 hours' : index < 4 ? '1-2 hours' : '30-60 minutes'}</span>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </ScrollArea>
           </div>
