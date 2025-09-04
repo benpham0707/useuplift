@@ -834,20 +834,14 @@ const AcademicPlanner = () => {
             </CardContent>
           </Card>
 
-          {/* Section Separator */}
+          {/* Section Header */}
           <div className="my-12">
-            <div className="flex items-center justify-center">
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
-              <div className="mx-6 px-4 py-2 bg-muted/50 rounded-full border">
-                <span className="text-sm font-medium text-muted-foreground">Academic Portfolio</span>
-              </div>
-              <div className="flex-1 h-px bg-gradient-to-r from-transparent via-border to-transparent"></div>
-            </div>
+            <h2 className="text-3xl font-bold text-foreground text-center mb-8">Academic Portfolio</h2>
           </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-6">
           {/* Trophy Case Section */}
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-2 border-slate-200 shadow-xl">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 shadow-xl overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-amber-50 to-yellow-50 border-b-2 border-amber-200">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-3 text-2xl">
@@ -1109,7 +1103,7 @@ const AcademicPlanner = () => {
           </Card>
 
           {/* Academic Task Dashboard */}
-          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 shadow-xl">
+          <Card className="bg-gradient-to-br from-slate-50 to-slate-100 shadow-xl overflow-hidden">
             <CardHeader className="bg-gradient-to-r from-red-50 to-rose-50 border-b-2 border-red-200">
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-3 text-xl">
