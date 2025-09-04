@@ -127,6 +127,23 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                           <li>• Schedule initial assessment session</li>
                           <li>• Define specific areas of focus and improvement goals</li>
                         </ul>
+                        <div className="mt-3 space-y-2">
+                          <h5 className="text-xs font-medium text-muted-foreground">Detailed Action Steps:</h5>
+                          {task.detailedSteps.slice(0, Math.ceil(task.detailedSteps.length / 3)).map((step, index) => (
+                            <div key={index} className="flex gap-3 p-2 rounded bg-muted/30">
+                              <div className="flex-shrink-0 w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs font-semibold">
+                                {index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs text-muted-foreground leading-relaxed">{step}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span>Est. time: 2-3 hours</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -143,6 +160,23 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                           <li>• Practice problems and lab technique improvement</li>
                           <li>• Regular progress assessments and adjustments</li>
                         </ul>
+                        <div className="mt-3 space-y-2">
+                          <h5 className="text-xs font-medium text-muted-foreground">Detailed Action Steps:</h5>
+                          {task.detailedSteps.slice(Math.ceil(task.detailedSteps.length / 3), Math.ceil(task.detailedSteps.length * 2 / 3)).map((step, index) => (
+                            <div key={index} className="flex gap-3 p-2 rounded bg-muted/30">
+                              <div className="flex-shrink-0 w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs font-semibold">
+                                {Math.ceil(task.detailedSteps.length / 3) + index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs text-muted-foreground leading-relaxed">{step}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span>Est. time: 1-2 hours</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
@@ -159,6 +193,23 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                           <li>• Adjust tutoring focus areas based on performance</li>
                           <li>• Prepare for major exams and lab practicals</li>
                         </ul>
+                        <div className="mt-3 space-y-2">
+                          <h5 className="text-xs font-medium text-muted-foreground">Detailed Action Steps:</h5>
+                          {task.detailedSteps.slice(Math.ceil(task.detailedSteps.length * 2 / 3)).map((step, index) => (
+                            <div key={index} className="flex gap-3 p-2 rounded bg-muted/30">
+                              <div className="flex-shrink-0 w-5 h-5 bg-primary/20 text-primary rounded-full flex items-center justify-center text-xs font-semibold">
+                                {Math.ceil(task.detailedSteps.length * 2 / 3) + index + 1}
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs text-muted-foreground leading-relaxed">{step}</p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span>Est. time: 30-60 minutes</span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -213,34 +264,6 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                   </div>
                 </div>
 
-                <Separator />
-
-                {/* Detailed Action Steps */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Detailed Action Plan
-                  </h3>
-                  <div className="space-y-4">
-                    {task.detailedSteps.map((step, index) => (
-                      <div key={index} className="flex gap-4 p-4 rounded-lg border bg-card">
-                        <div className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
-                          {index + 1}
-                        </div>
-                        <div className="flex-1 space-y-2">
-                          <h4 className="font-medium text-sm">Action Step {index + 1}</h4>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            {step}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span>Estimated time: {index < 2 ? '2-3 hours' : index < 4 ? '1-2 hours' : '30-60 minutes'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </div>
             </ScrollArea>
           </div>
