@@ -62,42 +62,42 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl h-[80vh] p-0">
-        <DialogHeader className="px-6 py-4 border-b">
+      <DialogContent className="max-w-7xl h-[85vh] p-0 overflow-hidden">
+        <DialogHeader className="px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <DialogTitle className="flex items-center gap-3 text-xl">
             <Target className="h-6 w-6 text-primary" />
             {task.title}
           </DialogTitle>
         </DialogHeader>
         
-        <div className="flex h-full">
+        <div className="flex h-[calc(100%-80px)]">
           {/* Left Side - Task Information */}
-          <div className="flex-1 border-r">
+          <div className="flex-1 border-r overflow-hidden">
             <ScrollArea className="h-full">
-              <div className="p-6 space-y-6">
+              <div className="p-4 space-y-4 max-w-none">
                 {/* Task Overview */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Brain className="h-5 w-5" />
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Brain className="h-4 w-4" />
                       Task Overview
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground leading-relaxed">
+                  <CardContent className="space-y-3">
+                    <p className="text-muted-foreground leading-relaxed text-sm">
                       {task.description}
                     </p>
                     
-                    <div className="flex flex-wrap gap-3">
-                      <Badge variant="outline" className="flex items-center gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="flex items-center gap-1.5 text-xs">
                         <TrendingUp className="h-3 w-3" />
                         Impact: {task.impact}
                       </Badge>
-                      <Badge variant="outline" className="flex items-center gap-2">
+                      <Badge variant="outline" className="flex items-center gap-1.5 text-xs">
                         <Clock className="h-3 w-3" />
                         {task.timeframe}
                       </Badge>
-                      <Badge variant="outline">
+                      <Badge variant="outline" className="text-xs">
                         Difficulty: {task.difficulty}
                       </Badge>
                     </div>
@@ -105,34 +105,34 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                 </Card>
 
                 {/* Why It's Important */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Lightbulb className="h-5 w-5" />
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Lightbulb className="h-4 w-4" />
                       Why This Matters
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-muted-foreground leading-relaxed">
+                    <p className="text-muted-foreground leading-relaxed text-sm">
                       {task.importance}
                     </p>
                   </CardContent>
                 </Card>
 
                 {/* Key Takeaways */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Award className="h-5 w-5" />
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <Award className="h-4 w-4" />
                       Key Takeaways
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <ul className="space-y-2">
                       {task.takeaways.map((takeaway, index) => (
-                        <li key={index} className="flex items-start gap-3">
-                          <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                          <span className="text-sm text-muted-foreground">{takeaway}</span>
+                        <li key={index} className="flex items-start gap-2">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-primary mt-0.5 flex-shrink-0" />
+                          <span className="text-xs text-muted-foreground leading-relaxed">{takeaway}</span>
                         </li>
                       ))}
                     </ul>
@@ -140,22 +140,22 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                 </Card>
 
                 {/* Detailed Steps */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <CheckCircle2 className="h-5 w-5" />
+                <Card className="border-none shadow-sm">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-lg">
+                      <CheckCircle2 className="h-4 w-4" />
                       Step-by-Step Guide
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {task.detailedSteps.map((step, index) => (
-                        <div key={index} className="flex gap-4">
-                          <div className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-sm font-semibold">
+                        <div key={index} className="flex gap-3">
+                          <div className="flex-shrink-0 w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">
                             {index + 1}
                           </div>
-                          <div className="flex-1 pt-1">
-                            <p className="text-sm text-muted-foreground leading-relaxed">
+                          <div className="flex-1 pt-0.5">
+                            <p className="text-xs text-muted-foreground leading-relaxed">
                               {step}
                             </p>
                           </div>
