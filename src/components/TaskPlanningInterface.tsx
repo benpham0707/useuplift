@@ -114,7 +114,7 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                   
                   {/* Hard coded data values for task implementation phases specific to academic tutoring sessions */}
                   <div className="space-y-4">
-                    <div className="border rounded-lg p-4 space-y-3">
+                    <div className={`border rounded-lg p-4 space-y-3 ${task.impact === 'High' ? 'shadow-[0_0_20px_rgba(59,130,246,0.3)] border-blue-500/50' : ''}`}>
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">1</div>
                         <h4 className="font-medium">Planning & Setup</h4>
@@ -147,7 +147,7 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                       </div>
                     </div>
 
-                    <div className="border rounded-lg p-4 space-y-3">
+                    <div className={`border rounded-lg p-4 space-y-3 ${task.impact === 'High' ? 'shadow-[0_0_20px_rgba(59,130,246,0.3)] border-blue-500/50' : ''}`}>
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">2</div>
                         <h4 className="font-medium">Regular Sessions</h4>
@@ -180,7 +180,7 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                       </div>
                     </div>
 
-                    <div className="border rounded-lg p-4 space-y-3">
+                    <div className={`border rounded-lg p-4 space-y-3 ${task.impact === 'High' ? 'shadow-[0_0_20px_rgba(59,130,246,0.3)] border-blue-500/50' : ''}`}>
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-semibold">3</div>
                         <h4 className="font-medium">Assessment & Optimization</h4>
