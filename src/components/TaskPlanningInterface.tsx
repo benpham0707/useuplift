@@ -246,64 +246,73 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                 <Separator />
 
                 {/* Success Metrics */}
-                <div className="space-y-4">
+                <div className="space-y-6">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Award className="h-4 w-4" />
                     Success Metrics & Outcomes
                   </h3>
+                  
+                  {/* Strategic Visual Hierarchy for Outcomes */}
                   <div className="space-y-4">
                     {task.takeaways.map((takeaway, index) => {
-                      // Hard coded data values - Different outcome format types for varied visual appeal and sense of accomplishment
-                      const formatTypes = [
-                        {
-                          // Achievement Format - Celebratory style
-                          bg: "bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200",
-                          icon: <Award className="h-5 w-5 text-emerald-600" />,
-                          title: "🎯 Achievement Milestone",
-                          titleClass: "text-emerald-800 font-semibold"
-                        },
-                        {
-                          // Progress Format - Data-driven style
-                          bg: "bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200",
-                          icon: <TrendingUp className="h-5 w-5 text-blue-600" />,
-                          title: "📊 Progress Indicator",
-                          titleClass: "text-blue-800 font-semibold"
-                        },
-                        {
-                          // Impact Format - Results-focused style
-                          bg: "bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200",
-                          icon: <Target className="h-5 w-5 text-amber-600" />,
-                          title: "⚡ Impact Outcome",
-                          titleClass: "text-amber-800 font-semibold"
-                        },
-                        {
-                          // Milestone Format - Timeline-based style
-                          bg: "bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200",
-                          icon: <CheckCircle2 className="h-5 w-5 text-purple-600" />,
-                          title: "🚀 Success Milestone",
-                          titleClass: "text-purple-800 font-semibold"
-                        },
-                        {
-                          // Growth Format - Development-focused style
-                          bg: "bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200",
-                          icon: <Brain className="h-5 w-5 text-rose-600" />,
-                          title: "🌱 Growth Outcome",
-                          titleClass: "text-rose-800 font-semibold"
+                      // Hard coded data values - Strategic hierarchy: most impressive first, supporting metrics after
+                      const getOutcomeHierarchy = (index: number) => {
+                        if (index === 0) {
+                          // Hero Outcome - Most impressive and impactful
+                          return {
+                            size: "large",
+                            bg: "bg-gradient-to-r from-primary/10 to-primary/5 border-2 border-primary/30",
+                            icon: <Award className="h-8 w-8 text-primary" />,
+                            title: "Achievement Milestone",
+                            titleClass: "text-xl font-bold text-primary mb-3",
+                            contentClass: "text-base leading-relaxed",
+                            padding: "p-6",
+                            shadow: "shadow-lg hover:shadow-xl"
+                          };
+                        } else if (index === 1) {
+                          // Primary Outcome - Key supporting result
+                          return {
+                            size: "medium", 
+                            bg: "bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200/60",
+                            icon: <TrendingUp className="h-6 w-6 text-emerald-600" />,
+                            title: "Progress Indicator",
+                            titleClass: "text-lg font-semibold text-emerald-800 mb-2",
+                            contentClass: "text-sm leading-relaxed text-emerald-700",
+                            padding: "p-5",
+                            shadow: "shadow-md hover:shadow-lg"
+                          };
+                        } else {
+                          // Supporting Outcomes - Trust builders and additional benefits
+                          return {
+                            size: "small",
+                            bg: "bg-muted/40 border border-muted-foreground/20",
+                            icon: <CheckCircle2 className="h-5 w-5 text-muted-foreground" />,
+                            title: "Success Milestone",
+                            titleClass: "text-sm font-medium text-muted-foreground mb-1",
+                            contentClass: "text-xs leading-relaxed text-muted-foreground/80",
+                            padding: "p-4",
+                            shadow: "hover:shadow-sm"
+                          };
                         }
-                      ];
+                      };
                       
-                      const format = formatTypes[index % formatTypes.length];
+                      const hierarchy = getOutcomeHierarchy(index);
                       
                       return (
-                        <div key={index} className={`flex items-start gap-4 p-4 rounded-xl ${format.bg} hover:shadow-md transition-all duration-300`}>
-                          <div className="flex-shrink-0 mt-0.5">
-                            {format.icon}
+                        <div key={index} className={`flex items-start gap-4 rounded-xl transition-all duration-300 ${hierarchy.bg} ${hierarchy.padding} ${hierarchy.shadow}`}>
+                          <div className="flex-shrink-0 mt-1">
+                            {hierarchy.icon}
                           </div>
                           <div className="flex-1">
-                            <span className={`text-sm ${format.titleClass} block mb-2`}>
-                              {format.title}
-                            </span>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{takeaway}</p>
+                            <div className={hierarchy.titleClass}>
+                              {hierarchy.title}
+                            </div>
+                            <p className={hierarchy.contentClass}>{takeaway}</p>
+                            {index === 0 && (
+                              <div className="mt-3 inline-flex items-center px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-medium">
+                                Primary Goal
+                              </div>
+                            )}
                           </div>
                         </div>
                       );
