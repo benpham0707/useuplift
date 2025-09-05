@@ -18,6 +18,7 @@ import {
   Calendar, 
   BarChart3,
   AlertCircle,
+  Filter,
   CheckCircle,
   Award,
   Users,
@@ -133,6 +134,10 @@ const AcademicPlanner = () => {
   // Task planning interface state
   const [taskPlanningOpen, setTaskPlanningOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
+  
+  // Filter state for insights
+  const [insightFilter, setInsightFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'improvement' | 'strength' | 'concern'>('all');
 
   const handleSendMessage = () => {
     if (userInput.trim()) {
@@ -721,6 +726,74 @@ const AcademicPlanner = () => {
               <p className="text-sm text-muted-foreground mt-1">
                 Showing 3 of 6 insights • Scroll to see more
               </p>
+              
+              {/* Filter controls */}
+              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Filters:</span>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={insightFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setInsightFilter('all')}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    variant={insightFilter === 'high' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setInsightFilter('high')}
+                  >
+                    High Impact
+                  </Button>
+                  <Button
+                    variant={insightFilter === 'medium' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setInsightFilter('medium')}
+                  >
+                    Medium Impact
+                  </Button>
+                  <Button
+                    variant={insightFilter === 'low' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setInsightFilter('low')}
+                  >
+                    Low Impact
+                  </Button>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant={typeFilter === 'all' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTypeFilter('all')}
+                  >
+                    All Types
+                  </Button>
+                  <Button
+                    variant={typeFilter === 'improvement' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTypeFilter('improvement')}
+                  >
+                    Improvements
+                  </Button>
+                  <Button
+                    variant={typeFilter === 'strength' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTypeFilter('strength')}
+                  >
+                    Strengths
+                  </Button>
+                  <Button
+                    variant={typeFilter === 'concern' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setTypeFilter('concern')}
+                  >
+                    Concerns
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div 
@@ -1470,7 +1543,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
       return 'border-2 border-red-500';
     }
     if (impact === 'high') {
-      return 'shadow-[0_0_15px_5px_rgba(59,130,246,0.2)] border-blue-500/50 hover:shadow-[0_0_20px_8px_rgba(59,130,246,0.3)]';
+      return 'border-2 border-blue-500 shadow-[0_0_15px_5px_rgba(59,130,246,0.2)] hover:shadow-[0_0_20px_8px_rgba(59,130,246,0.3)]';
     }
     if (impact === 'medium') {
       return 'border-2 border-green-500';
