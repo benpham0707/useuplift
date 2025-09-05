@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { 
   User, 
   Brain, 
@@ -1067,42 +1068,47 @@ Would you like me to suggest specific modifications to any of the action steps?`
 
   return (
     <div className="space-y-6">
-      {/* Filter Controls */}
-      <div className="flex flex-col sm:flex-row gap-4 p-4 bg-muted/30 rounded-lg">
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Filter by:</span>
-        </div>
-        
-        <div className="flex flex-col sm:flex-row gap-3 flex-1">
-          <div className="flex-1">
-            <select
-              value={selectedFilter}
-              onChange={(e) => setSelectedFilter(e.target.value)}
-              className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-            >
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.name} ({category.count})
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex-1">
-            <select
-              value={priorityFilter}
-              onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full px-3 py-2 text-sm border rounded-md bg-background"
-            >
-              {priorities.map(priority => (
-                <option key={priority.id} value={priority.id}>
-                  {priority.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+      {/* Filter bubble */}
+      <div className="relative">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 w-8 rounded-full p-0 absolute -top-12 right-0">
+              <Filter className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-56 p-0">
+            <div className="p-2">
+              <div className="text-sm font-medium mb-2">Filter Actions</div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide px-2 py-1">Category</div>
+                {categories.map(category => (
+                  <Button
+                    key={category.id}
+                    variant={selectedFilter === category.id ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => setSelectedFilter(category.id)}
+                  >
+                    {category.name} ({category.count})
+                  </Button>
+                ))}
+                
+                <div className="text-xs text-muted-foreground uppercase tracking-wide px-2 py-1 pt-3">Priority</div>
+                {priorities.map(priority => (
+                  <Button
+                    key={priority.id}
+                    variant={priorityFilter === priority.id ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-full justify-start"
+                    onClick={() => setPriorityFilter(priority.id)}
+                  >
+                    {priority.name}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Results Summary */}

@@ -6,6 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import TaskPlanningInterface from '@/components/TaskPlanningInterface';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { 
@@ -727,73 +728,88 @@ const AcademicPlanner = () => {
                 Showing 3 of 6 insights • Scroll to see more
               </p>
               
-              {/* Filter controls */}
-              <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Filters:</span>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={insightFilter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsightFilter('all')}
-                  >
-                    All
+              {/* Filter bubble */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 w-8 rounded-full p-0 absolute top-4 right-4">
+                    <Filter className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant={insightFilter === 'high' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsightFilter('high')}
-                  >
-                    High Impact
-                  </Button>
-                  <Button
-                    variant={insightFilter === 'medium' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsightFilter('medium')}
-                  >
-                    Medium Impact
-                  </Button>
-                  <Button
-                    variant={insightFilter === 'low' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setInsightFilter('low')}
-                  >
-                    Low Impact
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={typeFilter === 'all' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTypeFilter('all')}
-                  >
-                    All Types
-                  </Button>
-                  <Button
-                    variant={typeFilter === 'improvement' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTypeFilter('improvement')}
-                  >
-                    Improvements
-                  </Button>
-                  <Button
-                    variant={typeFilter === 'strength' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTypeFilter('strength')}
-                  >
-                    Strengths
-                  </Button>
-                  <Button
-                    variant={typeFilter === 'concern' ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => setTypeFilter('concern')}
-                  >
-                    Concerns
-                  </Button>
-                </div>
-              </div>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-56 p-0">
+                  <div className="p-2">
+                    <div className="text-sm font-medium mb-2">Filter Insights</div>
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide px-2 py-1">Impact Level</div>
+                      <Button
+                        variant={insightFilter === 'all' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setInsightFilter('all')}
+                      >
+                        All Impacts
+                      </Button>
+                      <Button
+                        variant={insightFilter === 'high' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setInsightFilter('high')}
+                      >
+                        High Impact
+                      </Button>
+                      <Button
+                        variant={insightFilter === 'medium' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setInsightFilter('medium')}
+                      >
+                        Medium Impact
+                      </Button>
+                      <Button
+                        variant={insightFilter === 'low' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setInsightFilter('low')}
+                      >
+                        Low Impact
+                      </Button>
+                      
+                      <div className="text-xs text-muted-foreground uppercase tracking-wide px-2 py-1 pt-3">Insight Type</div>
+                      <Button
+                        variant={typeFilter === 'all' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setTypeFilter('all')}
+                      >
+                        All Types
+                      </Button>
+                      <Button
+                        variant={typeFilter === 'improvement' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setTypeFilter('improvement')}
+                      >
+                        Improvements
+                      </Button>
+                      <Button
+                        variant={typeFilter === 'strength' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setTypeFilter('strength')}
+                      >
+                        Strengths
+                      </Button>
+                      <Button
+                        variant={typeFilter === 'concern' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-full justify-start"
+                        onClick={() => setTypeFilter('concern')}
+                      >
+                        Concerns
+                      </Button>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </CardHeader>
             <CardContent>
               <div 
