@@ -249,35 +249,94 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                 <div className="space-y-6">
                   <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Award className="h-4 w-4" />
-                    Success Metrics & Outcomes
+                    Success Metrics & Progress Tracking
                   </h3>
                   
-                  {/* Grid Layout Based on Count */}
-                  <div className={`grid gap-4 ${
-                    task.takeaways.length === 1 ? 'grid-cols-1' :
-                    task.takeaways.length === 2 ? 'grid-cols-2' :
-                    task.takeaways.length === 3 ? 'grid-cols-3' :
-                    task.takeaways.length === 4 ? 'grid-cols-2' :
-                    task.takeaways.length === 5 ? 'grid-cols-3' :
-                    task.takeaways.length === 6 ? 'grid-cols-3' :
-                    task.takeaways.length <= 8 ? 'grid-cols-2' :
-                    'grid-cols-3'
-                  }`}>
-                    {task.takeaways.map((takeaway, index) => (
-                      <div key={index} className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
-                        <div className="flex items-start gap-3">
-                          <div className="flex-shrink-0 mt-1">
-                            <Award className="h-5 w-5 text-primary" />
+                  {/* Hard coded data values for progress tracking metrics for academic tutoring success measurement */}
+                  <div className="grid gap-4 grid-cols-3">
+                    <div className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <TrendingUp className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground mb-2">
+                            Grade Improvement
                           </div>
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-foreground mb-2">
-                              Success Metric {index + 1}
-                            </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">{takeaway}</p>
-                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">Track test scores and assignment grades weekly to measure academic progress</p>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    <div className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <Clock className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground mb-2">
+                            Session Completion
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">Monitor attendance rate and on-time session completions</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <CheckCircle2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground mb-2">
+                            Concept Mastery
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">Assess understanding through practice problems and concept checks</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <Target className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground mb-2">
+                            Goal Achievement
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">Track progress toward specific learning objectives set at the start</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <Brain className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground mb-2">
+                            Confidence Level
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">Self-assess confidence in chemistry topics on a 1-10 scale monthly</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-muted/30 border border-muted-foreground/20 rounded-xl p-4 hover:shadow-md transition-all duration-300">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-1">
+                          <RefreshCw className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-foreground mb-2">
+                            Study Habits
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed">Monitor independent study time and homework completion rates</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
