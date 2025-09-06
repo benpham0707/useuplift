@@ -69,17 +69,17 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl h-[85vh] p-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0 rounded-t-lg">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pr-8">
             <DialogTitle className="flex items-center gap-3 text-xl">
               <Calendar className="h-6 w-6 text-primary" />
               Next Actions Planning
             </DialogTitle>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <Info className="h-4 w-4" />
+                    <Button variant="ghost" size="sm" className="h-10 w-10 p-0 border border-border/50 hover:border-border">
+                      <Info className="h-5 w-5 text-primary" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="max-w-sm">
@@ -430,7 +430,7 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                         <RefreshCw className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-sm">
+                    <TooltipContent side="left" className="max-w-sm">
                       <p className="text-sm">Regenerate task plan based on our conversation. This will consolidate everything we've discussed into an updated action plan.</p>
                     </TooltipContent>
                   </Tooltip>
