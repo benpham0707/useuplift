@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Target, 
   Lightbulb, 
@@ -17,7 +18,9 @@ import {
   Award,
   TrendingUp,
   Calendar,
-  RefreshCw
+  RefreshCw,
+  Info,
+  CalendarPlus
 } from 'lucide-react';
 
 interface TaskPlanningInterfaceProps {
@@ -66,10 +69,30 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-7xl h-[85vh] p-0 overflow-hidden">
         <DialogHeader className="px-6 py-4 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 flex-shrink-0 rounded-t-lg">
-          <DialogTitle className="flex items-center gap-3 text-xl">
-            <Calendar className="h-6 w-6 text-primary" />
-            Next Actions Planning
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-3 text-xl">
+              <Calendar className="h-6 w-6 text-primary" />
+              Next Actions Planning
+            </DialogTitle>
+            <div className="flex items-center gap-3">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Info className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-sm">
+                    <p className="text-sm">Learn how to use the task planning interface. Chat with the AI to personalize your plan, track your progress with success metrics, and finalize your task to add it to your calendar and dashboard.</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <Button className="flex items-center gap-2 bg-primary hover:bg-primary/90">
+                <CalendarPlus className="h-4 w-4" />
+                Add to Calendar
+              </Button>
+            </div>
+          </div>
         </DialogHeader>
         
         <div className="flex flex-1 min-h-0">
@@ -392,18 +415,27 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                 <Button size="sm" onClick={handleSendMessage}>
                   <Send className="h-4 w-4" />
                 </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        className="h-9 w-9 p-0"
+                        onClick={() => {
+                          // Regenerate task logic would go here
+                          console.log('Regenerating task based on chat discussion...');
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm">
+                      <p className="text-sm">Regenerate task plan based on our conversation. This will consolidate everything we've discussed into an updated action plan.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <Button 
-                variant="outline" 
-                className="w-full flex items-center gap-2 text-sm"
-                onClick={() => {
-                  // Regenerate task logic would go here
-                  console.log('Regenerating task based on chat discussion...');
-                }}
-              >
-                <RefreshCw className="h-4 w-4" />
-                Regenerate Task Plan
-              </Button>
             </div>
           </div>
         </div>
