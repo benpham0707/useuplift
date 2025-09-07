@@ -201,150 +201,156 @@ const AcademicPlanner = () => {
     "Study abroad planning"
   ];
 
-  // Hard coded data values for task planning - defines available academic planning tasks
+  // Hard coded data values for task planning - defines bundled academic planning objectives
   const taskDatabase = {
-    "Schedule weekly chemistry tutoring sessions": {
-      title: "Schedule Weekly Chemistry Tutoring Sessions",
+    "Master Chemistry Performance": {
+      title: "Master Chemistry Performance",
+      impact: "High",
+      difficulty: "Medium", 
+      timeframe: "6-8 weeks",
+      category: "Academic Excellence",
+      description: "Comprehensive strategy to dramatically improve chemistry performance through structured support systems, optimized study methods, and collaborative learning. This multi-phase approach addresses all aspects of chemistry mastery from conceptual understanding to practical application.",
+      importance: "Chemistry is a foundational subject for pre-med tracks and STEM majors that requires both theoretical knowledge and practical laboratory skills. Mastering chemistry demonstrates academic rigor, scientific aptitude, and problem-solving abilities that are crucial for competitive college applications and future academic success.",
+      takeaways: [
+        "Develop comprehensive understanding of chemistry concepts and applications",
+        "Build confidence in laboratory techniques and scientific communication", 
+        "Create sustainable study systems and support networks",
+        "Establish foundation for advanced STEM coursework"
+      ],
+      phases: [
+        {
+          title: "Phase 1: Establish Support Structure",
+          description: "Set up professional tutoring and peer learning systems",
+          steps: [
+            "Research and contact 2-3 qualified chemistry tutors through school resources",
+            "Schedule initial consultation sessions to assess compatibility and teaching style", 
+            "Establish weekly recurring tutoring sessions (1-2 hours each)",
+            "Identify 3-4 high-performing classmates for study group formation",
+            "Approach potential study group members with structured proposal"
+          ]
+        },
+        {
+          title: "Phase 2: Optimize Study Systems", 
+          description: "Create efficient templates and organizational tools",
+          steps: [
+            "Review past lab reports and instructor feedback for common requirements",
+            "Research standard scientific lab report formats and style guides",
+            "Create comprehensive lab report template with all required sections",
+            "Develop shared study materials and practice problem collections",
+            "Establish group guidelines for preparation and participation"
+          ]
+        },
+        {
+          title: "Phase 3: Implement and Refine",
+          description: "Execute the support systems and continuously improve",
+          steps: [
+            "Begin regular tutoring sessions with prepared topics and questions",
+            "Launch weekly study group meetings (2-3 hours each session)",
+            "Test lab report template and refine based on instructor feedback", 
+            "Track progress through shared documentation and grade monitoring",
+            "Evaluate and adjust strategies monthly based on performance improvements"
+          ]
+        }
+      ]
+    },
+    "Optimize Senior Year Academic Planning": {
+      title: "Optimize Senior Year Academic Planning",
       impact: "High",
       difficulty: "Medium",
-      timeframe: "2-3 weeks",
-      category: "Academic Support",
-      description: "Establish consistent, structured chemistry support through professional tutoring to address specific knowledge gaps and improve laboratory skills. This focused approach will enhance your understanding of complex chemical concepts and boost your semester GPA.",
-      importance: "Chemistry is a foundational subject for pre-med tracks and STEM majors. Consistent tutoring sessions provide structured learning, immediate feedback, and personalized attention that classroom instruction may not offer. Strong chemistry performance demonstrates academic rigor and scientific aptitude to college admissions committees.",
+      timeframe: "4-6 weeks", 
+      category: "Strategic Planning",
+      description: "Comprehensive approach to designing the ideal senior year academic experience that maximizes college admissions potential, aligns with career goals, and ensures graduation requirements are exceeded rather than just met.",
+      importance: "Senior year course selection is the final opportunity to demonstrate academic excellence and intellectual curiosity to college admissions committees. Strategic planning ensures optimal balance between academic rigor, graduation requirements, and personal interests while positioning for college success.",
       takeaways: [
-        "Develop stronger problem-solving skills in chemistry",
-        "Build confidence in laboratory techniques and report writing", 
-        "Create study strategies that can be applied to other STEM courses",
-        "Establish a support system for challenging academic content"
+        "Create strategic academic narrative aligned with college and career goals",
+        "Maximize opportunities for college credit and advanced standing",
+        "Ensure graduation requirements are exceeded with distinction", 
+        "Build foundation for competitive college applications"
       ],
-      detailedSteps: [
-        "Research and contact 2-3 qualified chemistry tutors through school resources, online platforms, or peer recommendations",
-        "Schedule initial consultation sessions to assess compatibility and teaching style",
-        "Establish weekly recurring sessions (1-2 hours each) that align with your class schedule",
-        "Prepare specific topics and questions before each session based on current coursework",
-        "Create a shared document to track progress, concepts covered, and areas needing focus",
-        "Schedule sessions strategically before major tests, labs, or assignment due dates",
-        "Evaluate progress monthly and adjust tutoring focus based on grade improvements"
+      phases: [
+        {
+          title: "Phase 1: Requirements Analysis",
+          description: "Comprehensive review of graduation and college admission requirements",
+          steps: [
+            "Schedule appointment with assigned academic counselor",
+            "Prepare detailed questions about graduation requirements and course options",
+            "Bring unofficial transcript and review current academic standing",
+            "Research admission requirements at target colleges and universities",
+            "Identify gaps between current progress and desired outcomes"
+          ]
+        },
+        {
+          title: "Phase 2: Advanced Opportunities Research", 
+          description: "Explore AP courses, dual enrollment, and other advanced options",
+          steps: [
+            "Review available AP courses and their prerequisites at your school",
+            "Research AP credit policies at target colleges for strategic selection",
+            "Meet with current AP teachers to understand expectations and workload",
+            "Investigate dual enrollment partnerships with local colleges",
+            "Evaluate eligibility requirements for advanced learning opportunities"
+          ]
+        },
+        {
+          title: "Phase 3: Strategic Course Selection",
+          description: "Design optimal senior year schedule balancing rigor and interests",
+          steps: [
+            "Assess strengths and interests to select courses for maximum success",
+            "Consider alignment between courses and intended major/career path",
+            "Evaluate overall course load for balance with extracurricular commitments",
+            "Create preliminary schedule and get counselor approval for feasibility",
+            "Complete applications and registration for dual enrollment or special programs"
+          ]
+        }
       ]
     },
-    "Create structured lab report template": {
-      title: "Create Structured Lab Report Template",
-      impact: "High", 
-      difficulty: "Low",
-      timeframe: "1-2 weeks",
-      category: "Study Optimization",
-      description: "Develop a comprehensive, reusable template for chemistry lab reports that ensures consistent quality, reduces preparation time, and maximizes points on every assignment. This systematic approach will improve your lab report grades and streamline your workflow.",
-      importance: "Lab reports often comprise a significant portion of chemistry grades and demonstrate scientific communication skills. A well-structured template ensures you never miss important sections, maintains professional presentation standards, and allows you to focus on analysis rather than formatting.",
-      takeaways: [
-        "Master scientific writing and communication standards",
-        "Develop systematic approach to laboratory work and documentation",
-        "Improve efficiency in completing assignments", 
-        "Create transferable skills for future science courses"
-      ],
-      detailedSteps: [
-        "Review past lab reports and instructor feedback to identify common formatting requirements",
-        "Research standard scientific lab report formats from chemistry style guides and textbooks",
-        "Create template sections: Title, Objective, Materials, Procedure, Data/Observations, Analysis, Conclusion",
-        "Add specific formatting guidelines, citation styles, and common formulas used in your class",
-        "Include checklists for each section to ensure completeness before submission",
-        "Test template with next lab assignment and refine based on instructor feedback",
-        "Share template with study group members to create consistent standards"
-      ]
-    },
-    "Form chemistry study group with high performers": {
-      title: "Form Chemistry Study Group with High Performers", 
-      impact: "High",
-      difficulty: "Medium",
-      timeframe: "2-4 weeks",
-      category: "Peer Learning",
-      description: "Organize a dedicated chemistry study group with academically strong classmates to facilitate collaborative learning, share diverse problem-solving approaches, and create accountability for consistent study habits.",
-      importance: "Peer learning accelerates understanding through diverse perspectives and teaching others solidifies your own knowledge. Study groups with high-performing students expose you to effective study strategies and maintain motivation through healthy academic competition.",
-      takeaways: [
-        "Learn multiple approaches to solving complex chemistry problems",
-        "Develop communication skills by explaining concepts to others",
-        "Build valuable academic and social connections",
-        "Create accountability system for consistent study habits"
-      ],
-      detailedSteps: [
-        "Identify 3-4 high-performing classmates who demonstrate strong chemistry understanding",
-        "Approach potential members with specific study group proposal including meeting frequency and format",
-        "Establish regular meeting schedule (weekly 2-3 hour sessions) and consistent location", 
-        "Create group guidelines for preparation, participation, and shared resources",
-        "Rotate leadership responsibilities for different topics or chapters",
-        "Develop shared study materials, practice problems, and review sheets",
-        "Schedule additional review sessions before major exams and coordinate study strategies"
-      ]
-    },
-    "Research AP courses for senior year": {
-      title: "Research AP Courses for Senior Year",
+    "Strengthen Academic Foundation": {
+      title: "Strengthen Academic Foundation", 
       impact: "Medium",
       difficulty: "Low",
-      timeframe: "2-3 weeks", 
-      category: "Course Planning",
-      description: "Systematically research and evaluate Advanced Placement course options for senior year to maximize academic rigor, align with college goals, and demonstrate intellectual curiosity beyond standard requirements.",
-      importance: "Strategic AP course selection strengthens college applications by showing academic challenge-seeking and preparation for college-level work. The right combination can also provide college credit, advanced standing, and demonstrate expertise in your intended field of study.",
-      takeaways: [
-        "Understand college credit and placement benefits of different AP courses",
-        "Align course selection with intended college major and career goals",
-        "Evaluate course difficulty and time commitment realistically",
-        "Create strategic academic narrative for college applications"
-      ],
-      detailedSteps: [
-        "Review available AP courses at your school and their prerequisites",
-        "Research AP credit policies at target colleges and universities",
-        "Meet with current AP teachers to understand course expectations and workload",
-        "Assess your strengths and interests to select courses where you can excel",
-        "Consider how AP courses align with your intended major or career path",
-        "Evaluate your overall course load to ensure balance with other commitments",
-        "Create a preliminary schedule and get counselor approval for feasibility"
-      ]
-    },
-    "Meet with counselor about course planning": {
-      title: "Meet with Counselor About Course Planning",
-      impact: "High",
-      difficulty: "Low", 
-      timeframe: "1 week",
-      category: "Academic Guidance",
-      description: "Schedule comprehensive meeting with your academic counselor to review graduation requirements, discuss senior year course options, and ensure your academic plan aligns with college and career goals.",
-      importance: "Professional academic counseling ensures you're meeting all requirements while optimizing your course selection for college admissions. Counselors have insights into course difficulty, teacher quality, and can help prevent scheduling conflicts or academic pitfalls.",
-      takeaways: [
-        "Verify you're on track for graduation and college admission requirements", 
-        "Get professional insight into course difficulty and teacher recommendations",
-        "Understand how your academic plan supports your college and career goals",
-        "Receive guidance on balancing academic rigor with realistic expectations"
-      ],
-      detailedSteps: [
-        "Schedule appointment with your assigned academic counselor",
-        "Prepare list of questions about graduation requirements and course options",
-        "Bring unofficial transcript and tentative senior year course preferences",
-        "Discuss your college goals and how courses align with admission requirements",
-        "Review any concerns about course load, difficulty, or scheduling conflicts",
-        "Get recommendations for teachers, course sequences, or alternative options",
-        "Follow up with written summary of decisions and next steps"
-      ]
-    },
-    "Consider dual enrollment opportunities": {
-      title: "Consider Dual Enrollment Opportunities",
-      impact: "High",
-      difficulty: "Medium",
       timeframe: "3-4 weeks",
-      category: "Advanced Learning",
-      description: "Explore dual enrollment programs that allow you to take college courses while in high school, earning both high school and college credit simultaneously.",
-      importance: "Dual enrollment demonstrates college readiness, provides authentic college experience, and can significantly reduce college costs and time to degree. It shows admissions officers you can handle college-level academic challenges while still in high school.",
+      category: "Academic Improvement",
+      description: "Systematic approach to reinforcing core academic skills, addressing any gaps in foundational knowledge, and building study habits that support sustained academic excellence across all subjects.",
+      importance: "Strong foundational skills are essential for success in advanced coursework and college-level academics. Addressing gaps now prevents future struggles and builds confidence for taking on more challenging academic opportunities.",
       takeaways: [
-        "Experience authentic college-level coursework and expectations",
-        "Earn college credit that transfers to most universities", 
-        "Demonstrate advanced academic readiness to college admissions",
-        "Potentially reduce college costs and time to graduation"
+        "Identify and address gaps in foundational knowledge across subjects",
+        "Develop effective study strategies applicable to all academic areas", 
+        "Build confidence and momentum for tackling advanced coursework",
+        "Create sustainable systems for academic success"
       ],
-      detailedSteps: [
-        "Research dual enrollment partnerships between your school and local colleges",
-        "Review eligibility requirements (GPA, test scores, grade level)",
-        "Identify courses that align with your academic goals and interests",
-        "Understand credit transfer policies at your target colleges",
-        "Meet with both high school counselor and college advisor to plan",
-        "Complete application and registration processes for both institutions",
-        "Prepare for increased academic rigor and college-level expectations"
+      phases: [
+        {
+          title: "Phase 1: Academic Assessment",
+          description: "Evaluate current strengths and identify improvement areas",
+          steps: [
+            "Review grades and performance across all current subjects",
+            "Identify patterns in strengths and areas needing improvement",
+            "Gather feedback from teachers on academic performance and potential",
+            "Assess study habits and time management effectiveness",
+            "Create baseline metrics for tracking improvement"
+          ]
+        },
+        {
+          title: "Phase 2: Targeted Skill Development",
+          description: "Focus improvement efforts on highest-impact areas",
+          steps: [
+            "Prioritize improvement areas based on impact and graduation requirements",
+            "Develop specific action plans for each identified weakness",
+            "Utilize school resources like tutoring centers, teacher office hours",
+            "Create study schedules that allocate appropriate time to each subject",
+            "Implement new study techniques and organizational systems"
+          ]
+        },
+        {
+          title: "Phase 3: Monitoring and Adjustment",
+          description: "Track progress and refine strategies for continuous improvement",
+          steps: [
+            "Monitor grade improvements and academic performance weekly",
+            "Adjust study strategies based on what's working most effectively",
+            "Celebrate improvements and maintain motivation for continued growth",
+            "Plan for applying strengthened skills to future advanced coursework",
+            "Document successful strategies for use in college preparation"
+          ]
+        }
       ]
     }
   };
@@ -850,9 +856,7 @@ const AcademicPlanner = () => {
                     stemProfile: 0.31
                   }}
                   actionItems={[
-                    { action: "Schedule weekly chemistry tutoring sessions", buttonText: "Book Tutoring" },
-                    { action: "Create structured lab report template", buttonText: "Optimize Study Methods" },
-                    { action: "Form chemistry study group with high performers", buttonText: "Build Study Network" }
+                    { action: "Master Chemistry Performance", buttonText: "Comprehensive Chemistry Plan" }
                   ]}
                   onActionClick={handleTaskPlanningOpen}
                   connections="Consistent academic performance + work ethic narrative + strategic improvement = compelling resilience story for competitive programs."
@@ -871,9 +875,7 @@ const AcademicPlanner = () => {
                     scholarshipEligibility: 0.22
                   }}
                   actionItems={[
-                    { action: "Research AP courses for senior year", buttonText: "Explore Options" },
-                    { action: "Meet with counselor about course planning", buttonText: "Get Guidance" }, 
-                    { action: "Consider dual enrollment opportunities", buttonText: "Expand Horizons" }
+                    { action: "Optimize Senior Year Academic Planning", buttonText: "Strategic Course Planning" }
                   ]}
                   onActionClick={handleTaskPlanningOpen}
                   connections="Strategic course selection + demonstrated academic ability + career alignment = strong foundation for competitive college admissions."
@@ -892,9 +894,7 @@ const AcademicPlanner = () => {
                     collegeReadiness: 0.15
                   }}
                   actionItems={[
-                    { action: "Document study strategies and time management", buttonText: "Capture Success Methods" },
-                    { action: "Prepare academic achievement portfolio", buttonText: "Showcase Growth" },
-                    { action: "Consider academic honors applications", buttonText: "Seek Recognition" }
+                    { action: "Strengthen Academic Foundation", buttonText: "Build Strong Foundation" }
                   ]}
                   onActionClick={handleTaskPlanningOpen}
                   connections="Consistent performance + time management skills + work experience = demonstrated college readiness and maturity."
@@ -912,8 +912,7 @@ const AcademicPlanner = () => {
                     eleciveFocus: 0.08
                   }}
                   actionItems={[
-                    { action: "Review elective options for senior year", buttonText: "Plan Electives" },
-                    { action: "Confirm graduation requirement completion", buttonText: "Verify Progress" }
+                    { action: "Optimize Senior Year Academic Planning", buttonText: "Plan Final Year" }
                   ]}
                   onActionClick={handleTaskPlanningOpen}
                   connections="On-track graduation + strategic elective use = maximum preparation for post-secondary success."
