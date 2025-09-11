@@ -1617,12 +1617,12 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
             <div className="space-y-2">
               {actionItems.map((item, index) => (
                 <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-foreground/85 flex-1 mr-3 font-medium">{item.action}</span>
+                  <div className="flex items-center justify-between gap-4">
+                    <h6 className="text-foreground font-semibold text-sm flex-1">{item.action}</h6>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="h-7 px-3 text-xs font-semibold bg-background hover:bg-secondary/20 border-2 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
+                      className="h-7 px-3 text-xs font-semibold bg-background hover:bg-blue-50 border-2 border-border hover:border-blue-300 shadow-md hover:shadow-lg hover:shadow-blue-200/50 transition-all duration-200 hover:scale-105 hover:text-blue-600"
                       onClick={() => onActionClick?.(item.action)}
                     >
                       {item.buttonText}
