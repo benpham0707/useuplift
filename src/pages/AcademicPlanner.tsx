@@ -1603,7 +1603,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
           
           <div className="bg-primary/5 rounded-md p-3 border border-primary/20">
             <h5 className="font-medium text-foreground text-sm mb-2 flex items-center gap-2">
-              <Target className="h-4 w-4" />
+              <img src="/lovable-uploads/4a356acb-c810-42e0-9220-69fbe9f267ee.png" alt="Target" className="h-4 w-4 brightness-0 invert opacity-75" />
               Academic Focus Areas
             </h5>
             <p className="text-xs text-foreground/80 italic">{connections}</p>
