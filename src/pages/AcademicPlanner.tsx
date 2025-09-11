@@ -1633,13 +1633,17 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
                     </Button>
                   </div>
                   {item.components && (
-                    <div className="ml-4 space-y-1">
-                      {item.components.map((component, compIndex) => (
-                        <div key={compIndex} className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <div className="w-1 h-1 bg-muted-foreground rounded-full"></div>
-                          <span>{component}</span>
-                        </div>
-                      ))}
+                    <div className="ml-4 mt-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {item.components.map((component, compIndex) => (
+                          <div key={compIndex} className="group relative bg-gradient-to-r from-secondary/20 to-secondary/10 border border-secondary/30 rounded-lg p-3 hover:from-secondary/30 hover:to-secondary/20 transition-all duration-200 hover:scale-[1.02] hover:shadow-sm">
+                            <div className="flex items-start gap-2">
+                              <div className="flex-shrink-0 w-2 h-2 bg-primary rounded-full mt-1.5 group-hover:bg-primary/80 transition-colors"></div>
+                              <span className="text-xs text-foreground/80 leading-relaxed font-medium group-hover:text-foreground transition-colors">{component}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
