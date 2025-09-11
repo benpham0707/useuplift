@@ -1610,10 +1610,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
           </div>
 
           <div className="bg-secondary/10 rounded-md p-3 border border-secondary/30">
-            <h5 className="font-medium text-foreground text-sm mb-2 flex items-center gap-2">
-              <Zap className="h-4 w-4" />
-              Recommended Actions
-            </h5>
             <div className="space-y-2">
               {actionItems.map((item, index) => (
                 <div key={index} className="space-y-2">
