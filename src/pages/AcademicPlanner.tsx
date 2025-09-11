@@ -726,7 +726,7 @@ const AcademicPlanner = () => {
 
           {/* Academic Planning Insights & Recommendations */}
           <Card className="shadow-medium">
-            <CardHeader>
+            <CardHeader className="rounded-t-lg">
               <CardTitle className="flex items-center gap-2">
                 <Brain className="h-5 w-5" />
                 Academic Planning Insights & Recommendations
@@ -753,6 +753,7 @@ const AcademicPlanner = () => {
                 </div>
               </div>
             </CardHeader>
+            <div className="border-t border-border/30 mx-6 rounded-t-lg"></div>
             <CardContent>
               <div 
                 className="insights-scroll h-[600px] overflow-y-auto space-y-6 pr-2 scroll-smooth"
