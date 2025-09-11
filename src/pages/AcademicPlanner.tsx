@@ -1620,9 +1620,9 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-foreground/70 flex-1 mr-3 font-medium">{item.action}</span>
                     <Button 
-                      variant="secondary" 
+                      variant="outline" 
                       size="sm" 
-                      className="h-7 px-3 text-xs font-medium hover:bg-secondary/80 transition-all duration-200"
+                      className="h-7 px-3 text-xs font-semibold bg-background hover:bg-secondary/20 border-2 shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105"
                       onClick={() => onActionClick?.(item.action)}
                     >
                       {item.buttonText}
