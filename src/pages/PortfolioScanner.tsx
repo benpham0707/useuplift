@@ -485,11 +485,11 @@ const PortfolioScanner = () => {
       <section id="overview">
       {/* Dramatic Overall Score Header */}
       <div className="gradient-dashboard text-white">
-        <div className="max-w-7xl mx-auto px-4 py-16 text-center">
-          <div className="mb-8">
-            <div className="text-8xl font-bold mb-4 animate-glow-pulse drop-shadow-2xl">{aiLoading ? '…' : (aiOverall ?? overallScore)}</div>
-            <div className="text-2xl font-medium mb-2">Overall Portfolio Strength</div>
-            <div className="text-lg opacity-90 mt-2">Out of 10.0 • Based on 6 key dimensions</div>
+        <div className="max-w-7xl mx-auto px-4 py-12 text-center">
+          <div className="mb-6">
+            <div className="text-6xl font-bold mb-4 drop-shadow-lg">{aiLoading ? '…' : (aiOverall ?? overallScore)}</div>
+            <div className="text-xl font-medium mb-2 opacity-95">Overall Portfolio Strength</div>
+            <div className="text-sm opacity-80 mt-2">Out of 10.0 • Based on 6 key dimensions</div>
             {aiError && (
               <div className="text-sm opacity-90 mt-2 text-red-200">{aiError}</div>
             )}

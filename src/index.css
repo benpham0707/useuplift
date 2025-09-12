@@ -51,14 +51,13 @@ All colors MUST be HSL.
     --gradient-section: linear-gradient(135deg, hsl(0 0% 100%), hsl(45 15% 99%));
     --gradient-accent: linear-gradient(135deg, hsl(45 15% 98%), hsl(0 0% 100%));
     
-    /* Game-like Vibrant Gradients */
-    --gradient-vibrant-blue: linear-gradient(135deg, hsl(220 100% 55%), hsl(200 100% 65%));
-    --gradient-vibrant-green: linear-gradient(135deg, hsl(120 100% 45%), hsl(140 100% 55%));
-    --gradient-vibrant-purple: linear-gradient(135deg, hsl(280 100% 55%), hsl(260 100% 65%));
-    --gradient-vibrant-orange: linear-gradient(135deg, hsl(30 100% 55%), hsl(20 100% 65%));
-    --gradient-vibrant-cyan: linear-gradient(135deg, hsl(180 100% 45%), hsl(200 100% 55%));
-    --gradient-vibrant-pink: linear-gradient(135deg, hsl(320 100% 55%), hsl(300 100% 65%));
-    --gradient-dashboard: linear-gradient(135deg, hsl(220 100% 20%), hsl(240 100% 30%), hsl(220 100% 40%));
+    /* Enhanced Theme Gradients - Brighter and Glossier */
+    --gradient-dashboard: linear-gradient(135deg, hsl(209 60% 35%), hsl(205 25% 52%));
+    --gradient-card-primary: linear-gradient(135deg, hsl(209 55% 30%), hsl(205 20% 45%));
+    --gradient-card-secondary: linear-gradient(135deg, hsl(205 20% 45%), hsl(210 15% 85%));
+    --gradient-score-excellent: linear-gradient(135deg, hsl(120 60% 45%), hsl(140 50% 55%));
+    --gradient-score-good: linear-gradient(135deg, hsl(200 60% 45%), hsl(220 50% 55%));
+    --gradient-score-average: linear-gradient(135deg, hsl(30 70% 50%), hsl(40 60% 60%));
     
     --shadow-soft: 0 2px 20px -2px hsl(209 52% 25% / 0.1);
     --shadow-medium: 0 8px 30px -4px hsl(209 52% 25% / 0.15);
@@ -170,32 +169,28 @@ All colors MUST be HSL.
     background: var(--gradient-accent);
   }
   
-  .gradient-vibrant-blue {
-    background: var(--gradient-vibrant-blue);
-  }
-  
-  .gradient-vibrant-green {
-    background: var(--gradient-vibrant-green);
-  }
-  
-  .gradient-vibrant-purple {
-    background: var(--gradient-vibrant-purple);
-  }
-  
-  .gradient-vibrant-orange {
-    background: var(--gradient-vibrant-orange);
-  }
-  
-  .gradient-vibrant-cyan {
-    background: var(--gradient-vibrant-cyan);
-  }
-  
-  .gradient-vibrant-pink {
-    background: var(--gradient-vibrant-pink);
-  }
-  
   .gradient-dashboard {
     background: var(--gradient-dashboard);
+  }
+  
+  .gradient-card-primary {
+    background: var(--gradient-card-primary);
+  }
+  
+  .gradient-card-secondary {
+    background: var(--gradient-card-secondary);
+  }
+  
+  .gradient-score-excellent {
+    background: var(--gradient-score-excellent);
+  }
+  
+  .gradient-score-good {
+    background: var(--gradient-score-good);
+  }
+  
+  .gradient-score-average {
+    background: var(--gradient-score-average);
   }
   
   
