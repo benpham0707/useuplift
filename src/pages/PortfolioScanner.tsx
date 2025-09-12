@@ -508,26 +508,26 @@ const PortfolioScanner = () => {
               </div>
               <div className="text-sm text-white/90 font-medium">Leadership</div>
             </div>
-            <div className="gradient-vibrant-orange rounded-xl p-4 transition-all duration-300 hover-lift shadow-xl border-0">
-              <div className="text-2xl font-bold text-white drop-shadow-lg">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+              <div className="text-2xl font-bold text-white drop-shadow-md">
                 {rubricScores.personalGrowth.score == null ? '…' : rubricScores.personalGrowth.score}
               </div>
               <div className="text-sm text-white/90 font-medium">Growth</div>
             </div>
-            <div className="gradient-vibrant-purple rounded-xl p-4 transition-all duration-300 hover-lift shadow-xl border-0">
-              <div className="text-2xl font-bold text-white drop-shadow-lg">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+              <div className="text-2xl font-bold text-white drop-shadow-md">
                 {rubricScores.communityImpact.score == null ? '…' : rubricScores.communityImpact.score}
               </div>
               <div className="text-sm text-white/90 font-medium">Community</div>
             </div>
-            <div className="gradient-vibrant-cyan rounded-xl p-4 transition-all duration-300 hover-lift shadow-xl animate-bounce-subtle border-0">
-              <div className="text-2xl font-bold text-white drop-shadow-lg">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+              <div className="text-2xl font-bold text-white drop-shadow-md">
                 {rubricScores.uniqueValue.score == null ? '…' : rubricScores.uniqueValue.score}
               </div>
               <div className="text-sm text-white/90 font-medium">Uniqueness</div>
             </div>
-            <div className="gradient-vibrant-pink rounded-xl p-4 transition-all duration-300 hover-lift shadow-xl border-0">
-              <div className="text-2xl font-bold text-white drop-shadow-lg">
+            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+              <div className="text-2xl font-bold text-white drop-shadow-md">
                 {rubricScores.futureReadiness.score == null ? '…' : rubricScores.futureReadiness.score}
               </div>
               <div className="text-sm text-white/90 font-medium">Readiness</div>
@@ -537,7 +537,7 @@ const PortfolioScanner = () => {
       </div>
 
       {/* Secondary Header */}
-      <div className="bg-gradient-subtle border-b">
+      <div className="bg-background border-b">
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
