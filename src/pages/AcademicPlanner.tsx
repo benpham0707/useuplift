@@ -491,14 +491,14 @@ const AcademicPlanner = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section with Academic Metrics */}
-      <div className="relative min-h-[500px] bg-gradient-to-br from-primary/20 via-primary/10 to-secondary/20 overflow-hidden">
+      <div className="relative min-h-[500px] hero-gradient overflow-hidden">
         {/* Background Pattern */}
-        <div className="absolute inset-0 bg-[url('/api/placeholder/1920/1080')] bg-cover bg-center opacity-10"></div>
+        <div className="absolute inset-0 bg-[url('/api/placeholder/1920/1080')] bg-cover bg-center opacity-5"></div>
         
         {/* Floating Elements */}
-        <div className="absolute top-20 left-10 w-20 h-20 bg-primary/20 rounded-full animate-pulse"></div>
-        <div className="absolute top-40 right-20 w-16 h-16 bg-secondary/30 rounded-full animate-pulse delay-1000"></div>
-        <div className="absolute bottom-32 left-20 w-12 h-12 bg-accent/25 rounded-full animate-pulse delay-500"></div>
+        <div className="absolute top-20 left-10 w-20 h-20 gradient-gpa rounded-full animate-pulse shadow-glow"></div>
+        <div className="absolute top-40 right-20 w-16 h-16 gradient-percentile rounded-full animate-pulse delay-1000 shadow-glow"></div>
+        <div className="absolute bottom-32 left-20 w-12 h-12 gradient-progress rounded-full animate-pulse delay-500 shadow-glow"></div>
         
         <div className="relative z-10 max-w-7xl mx-auto px-4 py-12">
           {/* Header */}
@@ -513,25 +513,25 @@ const AcademicPlanner = () => {
 
           {/* Academic Metrics Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+            <div className="gradient-gpa rounded-xl p-4 transition-all duration-300 hover-lift shadow-game border-0">
               <div className="text-2xl font-bold text-white drop-shadow-md">
                 {currentGPA.weighted}
               </div>
               <div className="text-sm text-white/90 font-medium">Weighted GPA</div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+            <div className="gradient-gpa rounded-xl p-4 transition-all duration-300 hover-lift shadow-game border-0">
               <div className="text-2xl font-bold text-white drop-shadow-md">
                 {currentGPA.unweighted}
               </div>
               <div className="text-sm text-white/90 font-medium">Unweighted GPA</div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+            <div className="gradient-percentile rounded-xl p-4 transition-all duration-300 hover-lift shadow-game border-0">
               <div className="text-2xl font-bold text-white drop-shadow-md">
                 {Math.round((1 - currentGPA.classRank / currentGPA.totalStudents) * 100)}%
               </div>
               <div className="text-sm text-white/90 font-medium">Percentile</div>
             </div>
-            <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4 transition-all duration-300 hover-lift shadow-lg border border-white/30">
+            <div className="gradient-progress rounded-xl p-4 transition-all duration-300 hover-lift shadow-game border-0">
               <div className="text-2xl font-bold text-white drop-shadow-md">
                 {Math.round((currentGPA.creditsCompleted / currentGPA.totalCredits) * 100)}%
               </div>
@@ -542,7 +542,7 @@ const AcademicPlanner = () => {
           {/* Progress Bar and Requirements Checklist */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Progress Overview */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+            <div className="gradient-card-primary rounded-xl p-6 border-0 shadow-game">
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
                 <TrendingUp className="h-5 w-5 mr-2" />
                 Academic Progress
@@ -566,7 +566,7 @@ const AcademicPlanner = () => {
             </div>
 
             {/* Requirements Checklist */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20">
+            <div className="gradient-requirements rounded-xl p-6 border-0 shadow-game">
               <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
                 <CheckCircle2 className="h-5 w-5 mr-2" />
                 Requirements Status
@@ -574,21 +574,21 @@ const AcademicPlanner = () => {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-white/90">Core Requirements</span>
-                  <Badge variant="secondary" className="bg-green-500/20 text-green-100 border-green-400/30">
+                  <Badge variant="secondary" className="gradient-score-excellent text-white border-0 shadow-soft">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Complete
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-white/90">Major Requirements</span>
-                  <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-100 border-yellow-400/30">
+                  <Badge variant="secondary" className="gradient-score-average text-white border-0 shadow-soft">
                     <Clock className="h-3 w-3 mr-1" />
                     85% Done
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-white/90">Electives</span>
-                  <Badge variant="secondary" className="bg-blue-500/20 text-blue-100 border-blue-400/30">
+                  <Badge variant="secondary" className="gradient-score-good text-white border-0 shadow-soft">
                     <Target className="h-3 w-3 mr-1" />
                     On Track
                   </Badge>

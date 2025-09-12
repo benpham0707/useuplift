@@ -8,79 +8,88 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    /* Uplift Brand Colors */
-    --background: 45 15% 97%;
-    --foreground: 209 52% 25%;
+    /* Game-like Vibrant Brand Colors */
+    --background: 0 0% 100%;
+    --foreground: 235 20% 15%;
 
     --card: 0 0% 100%;
-    --card-foreground: 209 52% 25%;
+    --card-foreground: 235 20% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 209 52% 25%;
+    --popover-foreground: 235 20% 15%;
 
-    /* Primary Navy */
-    --primary: 209 52% 25%;
+    /* Vibrant Primary Purple-Blue */
+    --primary: 250 70% 60%;
     --primary-foreground: 0 0% 100%;
-    --primary-light: 209 52% 35%;
-    --primary-dark: 209 52% 15%;
+    --primary-light: 250 70% 70%;
+    --primary-dark: 250 70% 45%;
 
-    /* Secondary Blue-Gray */
-    --secondary: 205 17% 42%;
+    /* Energetic Secondary Cyan */
+    --secondary: 185 80% 55%;
     --secondary-foreground: 0 0% 100%;
-    --secondary-light: 205 17% 52%;
+    --secondary-light: 185 80% 65%;
 
-    /* Light Gray */
-    --muted: 210 11% 91%;
-    --muted-foreground: 205 17% 42%;
+    /* Game Accent Colors */
+    --accent: 280 90% 65%;
+    --accent-foreground: 0 0% 100%;
 
-    /* Accent variations */
-    --accent: 210 11% 91%;
-    --accent-foreground: 209 52% 25%;
+    /* Success Green */
+    --success: 145 70% 55%;
+    --success-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Warning Orange */
+    --warning: 35 85% 60%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Neutral Grays */
+    --muted: 220 15% 95%;
+    --muted-foreground: 235 20% 45%;
+
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 11% 85%;
-    --input: 210 11% 85%;
-    --ring: 209 52% 25%;
+    --border: 220 15% 90%;
+    --input: 220 15% 90%;
+    --ring: 250 70% 60%;
 
-    /* Design System Extensions */
-    --gradient-primary: linear-gradient(135deg, hsl(209 52% 25%), hsl(205 17% 42%));
-    --gradient-secondary: linear-gradient(135deg, hsl(205 17% 42%), hsl(210 11% 91%));
-    --gradient-hero: linear-gradient(135deg, hsl(209 52% 25%) 0%, hsl(205 17% 42%) 100%);
-    --gradient-section: linear-gradient(135deg, hsl(0 0% 100%), hsl(45 15% 99%));
-    --gradient-accent: linear-gradient(135deg, hsl(45 15% 98%), hsl(0 0% 100%));
+    /* Game-inspired Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(250 70% 60%), hsl(280 90% 65%));
+    --gradient-secondary: linear-gradient(135deg, hsl(185 80% 55%), hsl(200 75% 65%));
+    --gradient-hero: linear-gradient(135deg, hsl(250 70% 60%) 0%, hsl(185 80% 55%) 50%, hsl(280 90% 65%) 100%);
+    --gradient-section: linear-gradient(135deg, hsl(250 30% 98%), hsl(185 30% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(280 50% 95%), hsl(250 40% 98%));
     
-    /* Enhanced Theme Gradients - Brighter and Glossier */
-    --gradient-dashboard: linear-gradient(135deg, hsl(209 60% 35%), hsl(205 25% 52%));
-    --gradient-card-primary: linear-gradient(135deg, hsl(209 55% 30%), hsl(205 20% 45%));
-    --gradient-card-secondary: linear-gradient(135deg, hsl(205 20% 45%), hsl(210 15% 85%));
-    --gradient-score-excellent: linear-gradient(135deg, hsl(120 60% 45%), hsl(140 50% 55%));
-    --gradient-score-good: linear-gradient(135deg, hsl(200 60% 45%), hsl(220 50% 55%));
-    --gradient-score-average: linear-gradient(135deg, hsl(30 70% 50%), hsl(40 60% 60%));
+    /* Enhanced Game-like Gradients */
+    --gradient-dashboard: linear-gradient(135deg, hsl(250 70% 60%), hsl(185 80% 55%));
+    --gradient-card-primary: linear-gradient(135deg, hsl(250 60% 55%), hsl(280 80% 60%));
+    --gradient-card-secondary: linear-gradient(135deg, hsl(185 70% 50%), hsl(200 65% 60%));
+    --gradient-score-excellent: linear-gradient(135deg, hsl(145 70% 55%), hsl(120 65% 65%));
+    --gradient-score-good: linear-gradient(135deg, hsl(200 70% 55%), hsl(220 65% 65%));
+    --gradient-score-average: linear-gradient(135deg, hsl(35 85% 60%), hsl(45 80% 70%));
+    --gradient-score-warning: linear-gradient(135deg, hsl(25 85% 60%), hsl(15 80% 65%));
     
-    --shadow-soft: 0 2px 20px -2px hsl(209 52% 25% / 0.1);
-    --shadow-medium: 0 8px 30px -4px hsl(209 52% 25% / 0.15);
-    --shadow-strong: 0 20px 40px -8px hsl(209 52% 25% / 0.2);
-    --shadow-glow: 0 0 40px hsl(var(--primary) / 0.1);
+    /* Vibrant Academic Metric Gradients */
+    --gradient-gpa: linear-gradient(135deg, hsl(250 70% 60%), hsl(260 80% 65%));
+    --gradient-percentile: linear-gradient(135deg, hsl(185 80% 55%), hsl(195 75% 65%));
+    --gradient-progress: linear-gradient(135deg, hsl(145 70% 55%), hsl(155 65% 65%));
+    --gradient-requirements: linear-gradient(135deg, hsl(280 90% 65%), hsl(290 85% 70%));
+
+    --shadow-soft: 0 2px 20px -2px hsl(250 70% 60% / 0.15);
+    --shadow-medium: 0 8px 30px -4px hsl(250 70% 60% / 0.25);
+    --shadow-strong: 0 20px 40px -8px hsl(250 70% 60% / 0.35);
+    --shadow-glow: 0 0 40px hsl(250 70% 60% / 0.2);
+    --shadow-game: 0 8px 32px -8px hsl(250 70% 60% / 0.3), 0 0 0 1px hsl(250 70% 60% / 0.1);
 
     --radius: 0.75rem;
 
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-foreground: 235 20% 25%;
+    --sidebar-primary: 250 70% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 250 30% 96%;
+    --sidebar-accent-foreground: 235 20% 25%;
+    --sidebar-border: 220 15% 90%;
+    --sidebar-ring: 250 70% 60%;
   }
 
   .dark {
@@ -193,6 +202,29 @@ All colors MUST be HSL.
     background: var(--gradient-score-average);
   }
   
+  .gradient-score-warning {
+    background: var(--gradient-score-warning);
+  }
+  
+  .gradient-gpa {
+    background: var(--gradient-gpa);
+  }
+  
+  .gradient-percentile {
+    background: var(--gradient-percentile);
+  }
+  
+  .gradient-progress {
+    background: var(--gradient-progress);
+  }
+  
+  .gradient-requirements {
+    background: var(--gradient-requirements);
+  }
+  
+  .shadow-game {
+    box-shadow: var(--shadow-game);
+  }
   
   .hover-lift {
     @apply transition-all duration-300 hover:shadow-medium hover:-translate-y-1;
