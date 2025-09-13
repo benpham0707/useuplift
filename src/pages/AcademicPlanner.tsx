@@ -857,607 +857,420 @@ const AcademicPlanner = () => {
                 Detailed analysis of your academic performance organized by subject and year
               </p>
             </CardHeader>
-            <CardContent className="space-y-8">
-              {/* Hard coded data for demonstration - These are placeholder academic performance data organized by year */}
-              
-              {/* 11th Grade Academic Year */}
-              <div className="space-y-4">
-                <Card className="border-primary/30 bg-primary/5">
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between p-6 h-auto text-left hover:bg-primary/10"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="flex flex-col items-start">
-                            <h3 className="text-xl font-semibold text-primary">2023-2024 Academic Year</h3>
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 mt-1">
-                              11th Grade
-                            </Badge>
-                          </div>
-                          <div className="flex flex-col items-end ml-auto mr-8">
-                            <span className="text-sm text-muted-foreground">Overall Performance</span>
-                            <span className="text-lg font-bold text-primary">B+ (87%)</span>
-                          </div>
-                        </div>
-                        <ChevronDown className="h-5 w-5 text-primary" />
-                      </Button>
-                    </CollapsibleTrigger>
-                    
-                    <CollapsibleContent className="px-6 pb-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                        {/* Biology Card */}
-                        <Card className="bg-background border border-border hover:shadow-md transition-all duration-200 cursor-pointer group">
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">Biology</h4>
-                                  <div className="text-right">
-                                    <span className="text-lg font-bold text-primary">A-</span>
-                                    <div className="text-xs text-muted-foreground">92%</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Relevance:</span>
-                                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/30 text-xs">High</Badge>
-                                  </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Trend:</span>
-                                    <span className="text-primary text-xs flex items-center">
-                                      <TrendingUp className="h-3 w-3 mr-1" />
-                                      Improving
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="px-4 pb-4 border-t">
-                              <div className="space-y-3 pt-3">
-                                <div className="text-sm">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Class Average:</span>
-                                    <span className="font-medium">B+ (87%)</span>
-                                  </div>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Quarter Change:</span>
-                                    <span className="text-primary font-medium">+5%</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  <strong>Key Insight:</strong> Excellent performance in a major-relevant subject. Strong lab skills and conceptual understanding.
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </Card>
-
-                        {/* AP Chemistry Card */}
-                        <Card className="bg-background border border-border hover:shadow-md transition-all duration-200 cursor-pointer group">
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">AP Chemistry</h4>
-                                  <div className="text-right">
-                                    <span className="text-lg font-bold text-destructive">C+</span>
-                                    <div className="text-xs text-muted-foreground">78%</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Relevance:</span>
-                                    <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-xs">Medium</Badge>
-                                  </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Trend:</span>
-                                    <span className="text-destructive text-xs flex items-center">
-                                      <AlertTriangle className="h-3 w-3 mr-1" />
-                                      Needs Help
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="px-4 pb-4 border-t">
-                              <div className="space-y-3 pt-3">
-                                <div className="text-sm">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Class Average:</span>
-                                    <span className="font-medium">B- (82%)</span>
-                                  </div>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Quarter Change:</span>
-                                    <span className="text-destructive font-medium">-3%</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground mb-2">
-                                  <strong>Key Issue:</strong> Below class average. Struggles with stoichiometry and lab procedures.
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  <Button size="sm" variant="outline" className="text-xs h-6 px-2 text-primary border-primary/30 hover:bg-primary/5">
-                                    Get Tutor
-                                  </Button>
-                                  <Button size="sm" variant="outline" className="text-xs h-6 px-2 text-primary border-primary/30 hover:bg-primary/5">
-                                    Resources
-                                  </Button>
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </Card>
-
-                        {/* English Literature Card */}
-                        <Card className="bg-background border border-border hover:shadow-md transition-all duration-200 cursor-pointer group">
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">English Lit</h4>
-                                  <div className="text-right">
-                                    <span className="text-lg font-bold text-primary">A</span>
-                                    <div className="text-xs text-muted-foreground">94%</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Relevance:</span>
-                                    <Badge variant="outline" className="bg-primary/5 text-primary border-primary/30 text-xs">Medium</Badge>
-                                  </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Trend:</span>
-                                    <span className="text-primary text-xs flex items-center">
-                                      <Star className="h-3 w-3 mr-1" />
-                                      Excellent
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="px-4 pb-4 border-t">
-                              <div className="space-y-3 pt-3">
-                                <div className="text-sm">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Class Average:</span>
-                                    <span className="font-medium">B+ (88%)</span>
-                                  </div>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Quarter Change:</span>
-                                    <span className="text-primary font-medium">Stable</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  <strong>Strength:</strong> Outstanding analytical writing. Critical thinking skills valuable for medical school applications.
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </Card>
-
-                        {/* Calculus BC Card */}
-                        <Card className="bg-background border border-border hover:shadow-md transition-all duration-200 cursor-pointer group">
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">Calculus BC</h4>
-                                  <div className="text-right">
-                                    <span className="text-lg font-bold">B-</span>
-                                    <div className="text-xs text-muted-foreground">82%</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Relevance:</span>
-                                    <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-xs">Low</Badge>
-                                  </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Trend:</span>
-                                    <span className="text-muted-foreground text-xs flex items-center">
-                                      <Clock className="h-3 w-3 mr-1" />
-                                      Stable
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="px-4 pb-4 border-t">
-                              <div className="space-y-3 pt-3">
-                                <div className="text-sm">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Class Average:</span>
-                                    <span className="font-medium">B (85%)</span>
-                                  </div>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Quarter Change:</span>
-                                    <span className="font-medium">-1%</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  <strong>Note:</strong> Slightly below class average but develops valuable analytical thinking skills.
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </Card>
-
-                        {/* AP Physics Card */}
-                        <Card className="bg-background border border-border hover:shadow-md transition-all duration-200 cursor-pointer group">
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">AP Physics</h4>
-                                  <div className="text-right">
-                                    <span className="text-lg font-bold">B</span>
-                                    <div className="text-xs text-muted-foreground">85%</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Relevance:</span>
-                                    <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-xs">Low</Badge>
-                                  </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Trend:</span>
-                                    <span className="text-primary text-xs flex items-center">
-                                      <TrendingUp className="h-3 w-3 mr-1" />
-                                      Improving
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="px-4 pb-4 border-t">
-                              <div className="space-y-3 pt-3">
-                                <div className="text-sm">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Class Average:</span>
-                                    <span className="font-medium">B- (83%)</span>
-                                  </div>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Quarter Change:</span>
-                                    <span className="text-primary font-medium">+2%</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  <strong>Progress:</strong> Above class average with improving trend. Good problem-solving development.
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </Card>
-
-                        {/* History Card */}
-                        <Card className="bg-background border border-border hover:shadow-md transition-all duration-200 cursor-pointer group">
-                          <Collapsible>
-                            <CollapsibleTrigger asChild>
-                              <div className="p-4">
-                                <div className="flex items-center justify-between mb-3">
-                                  <h4 className="font-semibold text-foreground group-hover:text-primary transition-colors">US History</h4>
-                                  <div className="text-right">
-                                    <span className="text-lg font-bold text-primary">A-</span>
-                                    <div className="text-xs text-muted-foreground">91%</div>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Relevance:</span>
-                                    <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30 text-xs">Low</Badge>
-                                  </div>
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Trend:</span>
-                                    <span className="text-primary text-xs flex items-center">
-                                      <Star className="h-3 w-3 mr-1" />
-                                      Strong
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </CollapsibleTrigger>
-                            
-                            <CollapsibleContent className="px-4 pb-4 border-t">
-                              <div className="space-y-3 pt-3">
-                                <div className="text-sm">
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Class Average:</span>
-                                    <span className="font-medium">B+ (86%)</span>
-                                  </div>
-                                  <div className="flex justify-between mb-1">
-                                    <span className="text-muted-foreground">Quarter Change:</span>
-                                    <span className="text-primary font-medium">+1%</span>
-                                  </div>
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  <strong>Strength:</strong> Excellent research and analytical skills. Strong historical reasoning abilities.
-                                </div>
-                              </div>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        </Card>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </Card>
-              </div>
-
-              {/* 10th Grade Academic Year */}
-              <div className="space-y-4">
-                <Card className="border-muted bg-muted/20">
-                  <Collapsible>
-                    <CollapsibleTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        className="w-full justify-between p-6 h-auto text-left hover:bg-muted/40"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div className="flex flex-col items-start">
-                            <h3 className="text-xl font-semibold">2022-2023 Academic Year</h3>
-                            <Badge variant="secondary" className="bg-muted text-muted-foreground border-muted-foreground/30 mt-1">
-                              10th Grade
-                            </Badge>
-                          </div>
-                          <div className="flex flex-col items-end ml-auto mr-8">
-                            <span className="text-sm text-muted-foreground">Overall Performance</span>
-                            <span className="text-lg font-bold">B (84%)</span>
-                          </div>
-                        </div>
-                        <ChevronDown className="h-5 w-5" />
-                      </Button>
-                    </CollapsibleTrigger>
-                    
-                    <CollapsibleContent className="px-6 pb-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                        {/* Sample 10th grade subjects with condensed info */}
-                        <Card className="bg-background border border-border p-4">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Chemistry</span>
-                            <span className="text-sm font-bold">B+ (88%)</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">Foundation year - solid performance</div>
-                        </Card>
-                        
-                        <Card className="bg-background border border-border p-4">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Biology</span>
-                            <span className="text-sm font-bold text-primary">A- (90%)</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">Early strength identified</div>
-                        </Card>
-                        
-                        <Card className="bg-background border border-border p-4">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">Algebra II</span>
-                            <span className="text-sm font-bold">B (83%)</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">Math foundation building</div>
-                        </Card>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
-                </Card>
-              </div>
-
-              {/* Performance Summary */}
-              <Card className="border-primary/20">
-                <CardHeader>
-                  <CardTitle className="flex items-center space-x-2">
-                    <Lightbulb className="h-5 w-5 text-primary" />
-                    <span>Key Academic Insights</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="bg-primary/5 border-primary/20 p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <Target className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-primary">Strengths</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Excels in life sciences and humanities. Strong analytical and writing skills consistently above average.
-                      </div>
-                    </Card>
-                    
-                    <Card className="bg-muted/20 border-muted p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                        <span className="font-medium text-destructive">Focus Areas</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Chemistry needs attention. Consider tutoring to strengthen MCAT preparation foundation.
-                      </div>
-                    </Card>
-                    
-                    <Card className="bg-primary/5 border-primary/20 p-4">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <TrendingUp className="h-4 w-4 text-primary" />
-                        <span className="font-medium text-primary">Trends</span>
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Overall upward trajectory in major-relevant subjects. Consistent improvement pattern.
-                      </div>
-                    </Card>
-                  </div>
-                </CardContent>
-              </Card>
-            </CardContent>
-          </Card>
-
-          {/* Academic Planning Insights & Recommendations */}
-          <Card className="shadow-medium">
-            <CardHeader className="rounded-t-lg">
-              <CardTitle className="flex items-center gap-2">
-                <Brain className="h-5 w-5" />
-                Academic Planning Insights & Recommendations
-              </CardTitle>
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Showing 3 of 6 insights • Scroll to see more
-                </p>
-                
-                {/* Filter dropdown */}
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <Select value={insightFilter} onValueChange={(value) => setInsightFilter(value as any)}>
-                    <SelectTrigger className="w-[160px] h-8">
-                      <SelectValue placeholder="Filter insights" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Insights</SelectItem>
-                      <SelectItem value="high">High Priority</SelectItem>
-                      <SelectItem value="medium">Medium Priority</SelectItem>
-                      <SelectItem value="low">Low Priority</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </CardHeader>
-            <div className="border-t border-border/30 mx-6 rounded-t-lg"></div>
             <CardContent>
-              <div 
-                className="insights-scroll h-[600px] overflow-y-auto space-y-6 pr-2 scroll-smooth"
-                style={{
-                  scrollbarWidth: 'thin',
-                  scrollbarColor: 'hsl(var(--border)) transparent'
-                }}
-              >
-                <style dangerouslySetInnerHTML={{
-                  __html: `
-                    .insights-scroll::-webkit-scrollbar {
-                      width: 6px;
-                    }
-                    .insights-scroll::-webkit-scrollbar-track {
-                      background: transparent;
-                    }
-                    .insights-scroll::-webkit-scrollbar-thumb {
-                      background: hsl(var(--border));
-                      border-radius: 3px;
-                    }
-                    .insights-scroll::-webkit-scrollbar-thumb:hover {
-                      background: hsl(var(--foreground) / 0.3);
-                    }
-                  `
-                }} />
+              {/* State for subject analytics expansion */}
+              {React.createElement(() => {
+                const [expandedSubjects, setExpandedSubjects] = useState<Record<string, string[]>>({});
+                const [expandedYears, setExpandedYears] = useState<string[]>([]);
 
-                {/* Academic Excellence Insight */}
-                <AcademicInsightItem
-                  title="GPA Trajectory Optimization Opportunity"
-                  description="Your 3.8 GPA while managing work responsibilities demonstrates strong time management, but targeted improvement in AP Chemistry could boost your STEM profile significantly. Strategic focus on lab reports and practice problems could raise your semester GPA to 3.9+, positioning you for competitive pre-med programs."
-                  time="1 hour ago"
-                  type="improvement"
-                  impact="high"
-                  estimatedGains={{
-                    gpaIncrease: 0.15,
-                    competitiveStanding: 0.23,
-                    stemProfile: 0.31
-                  }}
-                  actionItems={[
-                    { 
-                      action: "Master Chemistry Performance", 
-                      buttonText: "Comprehensive Chemistry Plan",
-                      components: [
-                        "Weekly lab report review sessions",
-                        "Practice problem sets (2 hours/week)",
-                        "Chemistry tutor consultation",
-                        "AP Chemistry exam preparation"
-                      ]
+                // Hard coded data for academic years and subject performance  
+                const academicYearsData = {
+                  "2020-2021": {
+                    year: "Freshman Year",
+                    overallGPA: "3.4",
+                    performance: "Foundation Building",
+                    status: "complete",
+                    keyInsights: [
+                      "Adjusted to high school rigor",
+                      "Strongest in English and History", 
+                      "Math and science foundational courses",
+                      "GPA: 3.4 (Above average start)"
+                    ],
+                    detailedMetrics: {
+                      gpaImprovement: "+0.2 from first to second semester",
+                      strongestSubjects: ["English", "History", "Art"],
+                      courseDifficulty: "Standard level courses - appropriate for transition",
+                      notableAchievements: "Made honor roll both semesters"
                     }
-                  ]}
-                  onActionClick={handleTaskPlanningOpen}
-                  connections="Consistent academic performance + work ethic narrative + strategic improvement = compelling resilience story for competitive programs."
-                />
-
-                {/* Course Planning Insight */}
-                <AcademicInsightItem
-                  title="Advanced Coursework Sequence Optimization"
-                  description="Your current AP course load (4 completed) positions you well, but strategic selection of 2-3 additional APs could significantly strengthen your academic profile. Focus on courses that align with your career interests and demonstrate intellectual curiosity beyond graduation requirements."
-                  time="6 hours ago"
-                  type="opportunity"
-                  impact="high"
-                  estimatedGains={{
-                    courseRigor: 0.28,
-                    collegePrepScore: 0.19,
-                    scholarshipEligibility: 0.22
-                  }}
-                  actionItems={[
-                    { 
-                      action: "Optimize Senior Year Academic Planning", 
-                      buttonText: "Strategic Course Planning",
-                      components: [
-                        "AP course selection consultation",
-                        "Schedule optimization for GPA goals",
-                        "College admission course requirements review",
-                        "Academic workload balance planning"
-                      ]
+                  },
+                  "2021-2022": {
+                    year: "Sophomore Year",
+                    overallGPA: "3.6", 
+                    performance: "Steady Growth",
+                    status: "complete",
+                    keyInsights: [
+                      "Consistent GPA improvement (+0.2)",
+                      "First AP course success (AP History)",
+                      "Strong foundation in core subjects",
+                      "Developed better study habits"
+                    ],
+                    detailedMetrics: {
+                      gpaImprovement: "+0.2 from previous year",
+                      strongestSubjects: ["AP History", "English", "Chemistry"],
+                      courseDifficulty: "Mixed standard and honors - 15% harder than average",
+                      notableAchievements: "AP History score of 4, consistently on honor roll"
                     }
-                  ]}
-                  onActionClick={handleTaskPlanningOpen}
-                  connections="Strategic course selection + demonstrated academic ability + career alignment = strong foundation for competitive college admissions."
-                />
-
-                {/* Achievement Recognition */}
-                <AcademicInsightItem
-                  title="Academic Consistency Achievement Pattern"
-                  description="Maintaining 3.8+ GPA for three consecutive semesters while working part-time showcases exceptional time management and academic dedication. This consistency pattern, combined with your upward trajectory in challenging courses, creates a powerful narrative of academic resilience and growth mindset."
-                  time="2 days ago"
-                  type="strength"
-                  impact="medium"
-                  estimatedGains={{
-                    narrativeStrength: 0.25,
-                    workEthicProfile: 0.18,
-                    collegeReadiness: 0.15
-                  }}
-                  actionItems={[
-                    { 
-                      action: "Strengthen Academic Foundation", 
-                      buttonText: "Build Strong Foundation",
-                      components: [
-                        "Study habit optimization assessment",
-                        "Time management skill development",
-                        "Academic support network building",
-                        "Progress tracking system setup"
-                      ]
+                  },
+                  "2022-2023": {
+                    year: "Junior Year", 
+                    overallGPA: "3.8",
+                    performance: "Peak Performance", 
+                    status: "complete",
+                    keyInsights: [
+                      "Significant GPA jump (+0.2)",
+                      "Multiple AP course success",
+                      "Strong in STEM subjects",
+                      "Top 15% class ranking achieved"
+                    ],
+                    detailedMetrics: {
+                      gpaImprovement: "+0.2 from previous year - largest improvement",
+                      strongestSubjects: ["AP Biology", "AP Literature", "Pre-Calculus"],
+                      courseDifficulty: "Rigorous schedule - 25% harder than average",
+                      notableAchievements: "3 AP courses, all honor roll, science fair winner"
                     }
-                  ]}
-                  onActionClick={handleTaskPlanningOpen}
-                  connections="Consistent performance + time management skills + work experience = demonstrated college readiness and maturity."
-                />
-
-                {/* Graduation Timeline */}
-                <AcademicInsightItem
-                  title="Graduation Requirements Progress Check"
-                  description="You've completed 85% of graduation requirements with excellent pacing. Current trajectory shows on-time graduation with opportunities to exceed minimum requirements. Consider using remaining elective slots strategically to strengthen areas of interest or career preparation."
-                  time="1 week ago"
-                  type="strength"
-                  impact="low"
-                  estimatedGains={{
-                    graduationReadiness: 0.12,
-                    eleciveFocus: 0.08
-                  }}
-                  actionItems={[
-                    { 
-                      action: "Optimize Senior Year Academic Planning", 
-                      buttonText: "Plan Final Year",
-                      components: [
-                        "Elective course selection strategy",
-                        "Graduation timeline verification",
-                        "Career-aligned course prioritization",
-                        "Academic transcript optimization"
-                      ]
+                  },
+                  "2023-2024": {
+                    year: "Senior Year",
+                    overallGPA: "3.8",
+                    performance: "Maintaining Excellence",
+                    status: "in-progress", 
+                    keyInsights: [
+                      "Sustained high performance", 
+                      "Most challenging course load",
+                      "College-level coursework success",
+                      "Leadership role development"
+                    ],
+                    detailedMetrics: {
+                      gpaImprovement: "Maintained 3.8 - consistent excellence",
+                      strongestSubjects: ["AP Chemistry", "AP Calculus BC", "AP Physics"],
+                      courseDifficulty: "Maximum rigor - 35% harder than average",
+                      notableAchievements: "5 AP courses, dual enrollment, student government"
                     }
-                  ]}
-                  onActionClick={handleTaskPlanningOpen}
-                  connections="On-track graduation + strategic elective use = maximum preparation for post-secondary success."
-                />
+                  }
+                };
 
-              </div>
+                const subjectPerformanceData = {
+                  "2020-2021": [
+                    {
+                      subject: "English 9",
+                      grade: "A-", 
+                      relevance: "Core",
+                      avgGPA: "3.2",
+                      classRank: "Top 25%",
+                      trend: "stable",
+                      improvement: "Baseline year"
+                    },
+                    {
+                      subject: "Algebra I",
+                      grade: "B+",
+                      relevance: "High",
+                      avgGPA: "3.0", 
+                      classRank: "Top 30%",
+                      trend: "up",
+                      improvement: "Baseline year"
+                    },
+                    {
+                      subject: "Biology",
+                      grade: "A",
+                      relevance: "High",
+                      avgGPA: "3.1",
+                      classRank: "Top 20%",
+                      trend: "stable",
+                      improvement: "Baseline year"
+                    }
+                  ],
+                  "2021-2022": [
+                    {
+                      subject: "English 10",
+                      grade: "A",
+                      relevance: "Core", 
+                      avgGPA: "3.3",
+                      classRank: "Top 20%",
+                      trend: "up",
+                      improvement: "+0.3 grade improvement"
+                    },
+                    {
+                      subject: "Geometry",
+                      grade: "A-",
+                      relevance: "High",
+                      avgGPA: "3.1",
+                      classRank: "Top 25%", 
+                      trend: "up",
+                      improvement: "+0.3 grade improvement"
+                    },
+                    {
+                      subject: "Chemistry",
+                      grade: "B+",
+                      relevance: "High",
+                      avgGPA: "2.9",
+                      classRank: "Top 35%",
+                      trend: "stable",
+                      improvement: "Maintained performance"
+                    },
+                    {
+                      subject: "AP History",
+                      grade: "A-",
+                      relevance: "Medium",
+                      avgGPA: "3.4",
+                      classRank: "Top 20%",
+                      trend: "up", 
+                      improvement: "First AP success"
+                    }
+                  ],
+                  "2022-2023": [
+                    {
+                      subject: "AP Literature",
+                      grade: "A",
+                      relevance: "Core",
+                      avgGPA: "3.5", 
+                      classRank: "Top 15%",
+                      trend: "up",
+                      improvement: "+0.3 from previous English"
+                    },
+                    {
+                      subject: "Pre-Calculus",
+                      grade: "A-",
+                      relevance: "Critical",
+                      avgGPA: "3.2",
+                      classRank: "Top 20%",
+                      trend: "up",
+                      improvement: "+0.3 continued math growth"
+                    },
+                    {
+                      subject: "AP Biology",
+                      grade: "A",
+                      relevance: "Critical",
+                      avgGPA: "3.1", 
+                      classRank: "Top 15%",
+                      trend: "up",
+                      improvement: "Significant STEM improvement"
+                    },
+                    {
+                      subject: "Physics",
+                      grade: "B+",
+                      relevance: "High",
+                      avgGPA: "3.0",
+                      classRank: "Top 30%",
+                      trend: "stable",
+                      improvement: "New subject - solid performance"
+                    }
+                  ],
+                  "2023-2024": [
+                    {
+                      subject: "AP Chemistry",
+                      grade: "A-",
+                      relevance: "Critical",
+                      avgGPA: "2.8",
+                      classRank: "Top 20%",
+                      trend: "up",
+                      improvement: "+0.5 major improvement from Chemistry"
+                    },
+                    {
+                      subject: "AP Calculus BC", 
+                      grade: "A",
+                      relevance: "Critical",
+                      avgGPA: "3.1",
+                      classRank: "Top 15%",
+                      trend: "up",
+                      improvement: "+0.3 continued excellence in math"
+                    },
+                    {
+                      subject: "AP Physics C",
+                      grade: "B+",
+                      relevance: "High",
+                      avgGPA: "2.9",
+                      classRank: "Top 25%",
+                      trend: "up",
+                      improvement: "+0.3 significant physics improvement"
+                    },
+                    {
+                      subject: "AP English Language",
+                      grade: "A",
+                      relevance: "Core",
+                      avgGPA: "3.4",
+                      classRank: "Top 10%",
+                      trend: "stable",
+                      improvement: "Maintained excellence"
+                    },
+                    {
+                      subject: "AP Government",
+                      grade: "A-",
+                      relevance: "Medium",
+                      avgGPA: "3.3",
+                      classRank: "Top 20%",
+                      trend: "stable",
+                      improvement: "Consistent social studies performance"
+                    }
+                  ]
+                };
+
+                const toggleSubject = (year: string, subject: string) => {
+                  setExpandedSubjects(prev => {
+                    const yearSubjects = prev[year] || [];
+                    const subjectIndex = yearSubjects.indexOf(subject);
+                    
+                    if (subjectIndex > -1) {
+                      // Remove subject from expanded list
+                      return {
+                        ...prev,
+                        [year]: yearSubjects.filter(s => s !== subject)
+                      };
+                    } else {
+                      // Add all subjects in the same row (expand entire row)
+                      const currentYearData = subjectPerformanceData[year as keyof typeof subjectPerformanceData] || [];
+                      const currentSubjectIndex = currentYearData.findIndex(s => s.subject === subject);
+                      const rowStartIndex = Math.floor(currentSubjectIndex / 3) * 3;
+                      const rowSubjects = currentYearData.slice(rowStartIndex, rowStartIndex + 3).map(s => s.subject);
+                      
+                      return {
+                        ...prev,
+                        [year]: [...new Set([...yearSubjects, ...rowSubjects])]
+                      };
+                    }
+                  });
+                };
+
+                const toggleYear = (year: string) => {
+                  setExpandedYears(prev => 
+                    prev.includes(year) 
+                      ? prev.filter(y => y !== year)
+                      : [...prev, year]
+                  );
+                };
+
+                return (
+                  <div className="space-y-6">
+                    {/* Academic Years Overview */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-foreground">Academic Performance by Year</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        {Object.entries(academicYearsData).map(([year, data]) => (
+                          <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
+                            <CollapsibleTrigger asChild>
+                              <Card className="cursor-pointer hover:shadow-md transition-shadow border-border">
+                                <CardContent className="p-4">
+                                  <div className="flex flex-col">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="font-medium text-foreground">{data.year}</h4>
+                                      <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                                        expandedYears.includes(year) ? 'rotate-90' : ''
+                                      }`} />
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mb-3">{year}</p>
+                                    <div className="space-y-2">
+                                      <div className="text-2xl font-bold text-primary">{data.overallGPA}</div>
+                                      <div className="text-sm text-muted-foreground">{data.performance}</div>
+                                      {data.keyInsights.map((insight, index) => (
+                                        <div key={index} className="text-xs text-muted-foreground">
+                                          • {insight}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent>
+                              <Card className="mt-2 border-border">
+                                <CardContent className="p-4">
+                                  <h5 className="font-medium mb-3 text-foreground">Detailed Year Analysis</h5>
+                                  <div className="text-sm space-y-3">
+                                    <div>
+                                      <span className="font-medium text-foreground">GPA Progress:</span>
+                                      <p className="text-muted-foreground">{data.detailedMetrics.gpaImprovement}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-foreground">Strongest Subjects:</span>
+                                      <p className="text-muted-foreground">{data.detailedMetrics.strongestSubjects.join(', ')}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-foreground">Course Difficulty:</span>
+                                      <p className="text-muted-foreground">{data.detailedMetrics.courseDifficulty}</p>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-foreground">Notable Achievements:</span>
+                                      <p className="text-muted-foreground">{data.detailedMetrics.notableAchievements}</p>
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </CollapsibleContent>
+                          </Collapsible>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Subject Performance by Year */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-foreground">Subject Performance Analysis</h3>
+                      {Object.entries(subjectPerformanceData).map(([year, subjects]) => (
+                        <div key={year} className="mb-8">
+                          <h4 className="font-medium mb-3 text-foreground">
+                            {academicYearsData[year as keyof typeof academicYearsData]?.year} ({year})
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {subjects.map((subject) => (
+                              <Collapsible 
+                                key={subject.subject} 
+                                open={(expandedSubjects[year] || []).includes(subject.subject)} 
+                                onOpenChange={() => toggleSubject(year, subject.subject)}
+                              >
+                                <CollapsibleTrigger asChild>
+                                  <Card className="cursor-pointer hover:shadow-md transition-shadow border-border">
+                                    <CardContent className="p-4">
+                                      <div className="flex flex-col">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h5 className="font-medium text-foreground">{subject.subject}</h5>
+                                          <div className="flex items-center gap-2">
+                                            {subject.trend === 'up' && <TrendingUp className="h-4 w-4 text-green-500" />}
+                                            {subject.trend === 'down' && <TrendingDown className="h-4 w-4 text-red-500" />}
+                                            {subject.trend === 'stable' && <div className="h-4 w-4" />}
+                                            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                                              (expandedSubjects[year] || []).includes(subject.subject) ? 'rotate-90' : ''
+                                            }`} />
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <div className="text-xl font-bold text-primary">{subject.grade}</div>
+                                          <div className="text-xs text-muted-foreground">
+                                            Avg: {subject.avgGPA} | {subject.classRank}
+                                          </div>
+                                          <Badge variant="outline" className="text-xs w-fit">
+                                            {subject.relevance}
+                                          </Badge>
+                                          <div className="text-xs text-muted-foreground">
+                                            {subject.improvement}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent>
+                                  <Card className="mt-2 border-border">
+                                    <CardContent className="p-4">
+                                      <div className="space-y-3 text-sm">
+                                        <div>
+                                          <span className="font-medium text-foreground">Course Relevance:</span>
+                                          <p className="text-muted-foreground mt-1">
+                                            {subject.relevance === 'Critical' && 'Essential for your intended major and career path'}
+                                            {subject.relevance === 'High' && 'Important for academic foundation and college preparation'}
+                                            {subject.relevance === 'Medium' && 'Contributes to well-rounded academic profile'}
+                                            {subject.relevance === 'Core' && 'Required core curriculum course'}
+                                          </p>
+                                        </div>
+                                        <div>
+                                          <span className="font-medium text-foreground">Performance Metrics:</span>
+                                          <ul className="text-muted-foreground mt-1 space-y-1">
+                                            <li>• Class average GPA: {subject.avgGPA}</li>
+                                            <li>• Your ranking: {subject.classRank}</li>
+                                            <li>• Grade trend: {subject.trend === 'up' ? 'Improving' : subject.trend === 'down' ? 'Declining' : 'Stable'}</li>
+                                            <li>• Year-over-year: {subject.improvement}</li>
+                                          </ul>
+                                        </div>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
             </CardContent>
           </Card>
 
