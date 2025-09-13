@@ -1130,144 +1130,111 @@ const AcademicPlanner = () => {
 
                 return (
                   <div className="space-y-6">
-                    {/* Academic Years Overview */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 text-foreground">Academic Performance by Year</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        {Object.entries(academicYearsData).map(([year, data]) => (
-                          <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
-                            <CollapsibleTrigger asChild>
-                              <Card className="cursor-pointer hover:shadow-md transition-shadow border-border">
-                                <CardContent className="p-4">
-                                  <div className="flex flex-col">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <h4 className="font-medium text-foreground">{data.year}</h4>
-                                      <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                                        expandedYears.includes(year) ? 'rotate-90' : ''
-                                      }`} />
-                                    </div>
-                                    <p className="text-sm text-muted-foreground mb-3">{year}</p>
-                                    <div className="space-y-2">
-                                      <div className="text-2xl font-bold text-primary">{data.overallGPA}</div>
-                                      <div className="text-sm text-muted-foreground">{data.performance}</div>
-                                      {data.keyInsights.map((insight, index) => (
-                                        <div key={index} className="text-xs text-muted-foreground">
-                                          • {insight}
-                                        </div>
-                                      ))}
+                    {/* Academic Years with Enhanced Insights */}
+                    <div className="space-y-4">
+                      {Object.entries(academicYearsData).map(([year, data]) => (
+                        <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
+                          <CollapsibleTrigger asChild>
+                            <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60">
+                              <CardContent className="p-6">
+                                <div className="space-y-4">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className="flex items-center gap-2">
+                                        {expandedYears.includes(year) ? (
+                                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                        )}
+                                        <h3 className="font-semibold text-lg text-foreground">{data.year}</h3>
+                                      </div>
+                                      <Badge variant="secondary" className="text-xs">
+                                        {data.status}
+                                      </Badge>
                                     </div>
                                   </div>
-                                </CardContent>
-                              </Card>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent>
-                              <Card className="mt-2 border-border">
-                                <CardContent className="p-4">
-                                  <h5 className="font-medium mb-3 text-foreground">Detailed Year Analysis</h5>
-                                  <div className="text-sm space-y-3">
-                                    <div>
-                                      <span className="font-medium text-foreground">GPA Progress:</span>
-                                      <p className="text-muted-foreground">{data.detailedMetrics.gpaImprovement}</p>
+                                  
+                                  {/* Enhanced At-a-Glance Metrics */}
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="space-y-1">
+                                      <div className="text-sm text-muted-foreground">Overall GPA</div>
+                                      <div className="text-xl font-bold text-foreground">{data.overallGPA}</div>
                                     </div>
-                                    <div>
-                                      <span className="font-medium text-foreground">Strongest Subjects:</span>
-                                      <p className="text-muted-foreground">{data.detailedMetrics.strongestSubjects.join(', ')}</p>
+                                    <div className="space-y-1">
+                                      <div className="text-sm text-muted-foreground">Performance</div>
+                                      <div className="text-sm font-medium text-foreground">{data.performance}</div>
                                     </div>
-                                    <div>
-                                      <span className="font-medium text-foreground">Course Difficulty:</span>
-                                      <p className="text-muted-foreground">{data.detailedMetrics.courseDifficulty}</p>
+                                    <div className="space-y-1">
+                                      <div className="text-sm text-muted-foreground">GPA Progress</div>
+                                      <div className="text-sm font-medium text-foreground">{data.detailedMetrics.gpaImprovement}</div>
                                     </div>
-                                    <div>
-                                      <span className="font-medium text-foreground">Notable Achievements:</span>
-                                      <p className="text-muted-foreground">{data.detailedMetrics.notableAchievements}</p>
+                                    <div className="space-y-1">
+                                      <div className="text-sm text-muted-foreground">Course Difficulty</div>
+                                      <div className="text-sm font-medium text-foreground">
+                                        {data.detailedMetrics.courseDifficulty.split(' - ')[1] || data.detailedMetrics.courseDifficulty}
+                                      </div>
+                                    </div>
+                                    <div className="space-y-1 col-span-2">
+                                      <div className="text-sm text-muted-foreground">Strongest Subjects</div>
+                                      <div className="text-sm font-medium text-foreground">{data.detailedMetrics.strongestSubjects.join(', ')}</div>
+                                    </div>
+                                    <div className="space-y-1 col-span-2">
+                                      <div className="text-sm text-muted-foreground">Key Achievements</div>
+                                      <div className="text-sm font-medium text-foreground">{data.detailedMetrics.notableAchievements}</div>
                                     </div>
                                   </div>
-                                </CardContent>
-                              </Card>
-                            </CollapsibleContent>
-                          </Collapsible>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Subject Performance by Year */}
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4 text-foreground">Subject Performance Analysis</h3>
-                      {Object.entries(subjectPerformanceData).map(([year, subjects]) => (
-                        <div key={year} className="mb-8">
-                          <h4 className="font-medium mb-3 text-foreground">
-                            {academicYearsData[year as keyof typeof academicYearsData]?.year} ({year})
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {subjects.map((subject) => (
-                              <Collapsible 
-                                key={subject.subject} 
-                                open={(expandedSubjects[year] || []).includes(subject.subject)} 
-                                onOpenChange={() => toggleSubject(year, subject.subject)}
-                              >
-                                <CollapsibleTrigger asChild>
-                                  <Card className="cursor-pointer hover:shadow-md transition-shadow border-border">
-                                    <CardContent className="p-4">
-                                      <div className="flex flex-col">
-                                        <div className="flex items-center justify-between mb-2">
-                                          <h5 className="font-medium text-foreground">{subject.subject}</h5>
-                                          <div className="flex items-center gap-2">
-                                            {subject.trend === 'up' && <TrendingUp className="h-4 w-4 text-green-500" />}
-                                            {subject.trend === 'down' && <TrendingDown className="h-4 w-4 text-red-500" />}
-                                            {subject.trend === 'stable' && <div className="h-4 w-4" />}
-                                            <ChevronRight className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
-                                              (expandedSubjects[year] || []).includes(subject.subject) ? 'rotate-90' : ''
-                                            }`} />
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </CollapsibleTrigger>
+                          
+                          <CollapsibleContent className="mt-4">
+                            {/* Subject Performance for expanded year */}
+                            <Card className="bg-muted/30">
+                              <CardContent className="p-6">
+                                <h4 className="font-medium mb-4 text-foreground">Subject Performance Details</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => (
+                                    <Card key={idx} className="bg-background">
+                                      <CardContent className="p-4">
+                                        <div className="space-y-3">
+                                          <div className="flex items-center justify-between">
+                                            <h5 className="font-medium text-foreground">{subject.subject}</h5>
+                                            <Badge 
+                                              variant={subject.grade.includes('A') ? "default" : subject.grade.includes('B') ? "secondary" : "outline"}
+                                              className="text-xs"
+                                            >
+                                              {subject.grade}
+                                            </Badge>
+                                          </div>
+                                          <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">Relevance:</span>
+                                              <span className="font-medium text-foreground">{subject.relevance}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">Class Avg:</span>
+                                              <span className="font-medium text-foreground">{subject.avgGPA}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">Class Rank:</span>
+                                              <span className="font-medium text-foreground">{subject.classRank}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                              <span className="text-muted-foreground">vs Last Year:</span>
+                                              <span className="font-medium text-foreground">{subject.improvement}</span>
+                                            </div>
                                           </div>
                                         </div>
-                                        <div className="space-y-2">
-                                          <div className="text-xl font-bold text-primary">{subject.grade}</div>
-                                          <div className="text-xs text-muted-foreground">
-                                            Avg: {subject.avgGPA} | {subject.classRank}
-                                          </div>
-                                          <Badge variant="outline" className="text-xs w-fit">
-                                            {subject.relevance}
-                                          </Badge>
-                                          <div className="text-xs text-muted-foreground">
-                                            {subject.improvement}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                </CollapsibleTrigger>
-                                <CollapsibleContent>
-                                  <Card className="mt-2 border-border">
-                                    <CardContent className="p-4">
-                                      <div className="space-y-3 text-sm">
-                                        <div>
-                                          <span className="font-medium text-foreground">Course Relevance:</span>
-                                          <p className="text-muted-foreground mt-1">
-                                            {subject.relevance === 'Critical' && 'Essential for your intended major and career path'}
-                                            {subject.relevance === 'High' && 'Important for academic foundation and college preparation'}
-                                            {subject.relevance === 'Medium' && 'Contributes to well-rounded academic profile'}
-                                            {subject.relevance === 'Core' && 'Required core curriculum course'}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <span className="font-medium text-foreground">Performance Metrics:</span>
-                                          <ul className="text-muted-foreground mt-1 space-y-1">
-                                            <li>• Class average GPA: {subject.avgGPA}</li>
-                                            <li>• Your ranking: {subject.classRank}</li>
-                                            <li>• Grade trend: {subject.trend === 'up' ? 'Improving' : subject.trend === 'down' ? 'Declining' : 'Stable'}</li>
-                                            <li>• Year-over-year: {subject.improvement}</li>
-                                          </ul>
-                                        </div>
-                                      </div>
-                                    </CardContent>
-                                  </Card>
-                                </CollapsibleContent>
-                              </Collapsible>
-                            ))}
-                          </div>
-                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </CollapsibleContent>
+                        </Collapsible>
                       ))}
-                    </div>
                   </div>
                 );
               })}
