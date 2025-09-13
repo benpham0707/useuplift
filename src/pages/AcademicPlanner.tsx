@@ -854,21 +854,21 @@ const AcademicPlanner = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
-                      <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{currentGPA.weighted}</div>
-                      <div className="text-sm text-purple-700">Weighted GPA</div>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-3 bg-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-lg border border-primary/10 animate-[float_6s_ease-in-out_infinite]">
+                        <div className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">{currentGPA.weighted}</div>
+                        <div className="text-sm text-muted-foreground">Weighted GPA</div>
+                      </div>
+                      <div className="text-center p-3 bg-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-lg border border-primary/10 animate-[float_6s_ease-in-out_infinite_1s]">
+                        <div className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">{currentGPA.unweighted}</div>
+                        <div className="text-sm text-muted-foreground">Unweighted GPA</div>
+                      </div>
+                      <div className="text-center p-3 bg-white shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 rounded-lg border border-primary/10 animate-[float_6s_ease-in-out_infinite_2s]">
+                        <div className="text-3xl font-bold bg-gradient-to-r from-primary via-primary/80 to-primary/60 bg-clip-text text-transparent">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}th</div>
+                        <div className="text-sm text-muted-foreground">Percentile</div>
+                      </div>
                     </div>
-                    <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
-                      <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{currentGPA.unweighted}</div>
-                      <div className="text-sm text-purple-700">Unweighted GPA</div>
-                    </div>
-                    <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
-                      <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}th</div>
-                      <div className="text-sm text-purple-700">Percentile</div>
-                    </div>
-                  </div>
                   
                   <div className="space-y-3 mt-6">
                     <div className="flex justify-between items-center">

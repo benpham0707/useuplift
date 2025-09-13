@@ -266,4 +266,20 @@ All colors MUST be HSL.
     background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.1), transparent);
     animation: flow 8s linear infinite;
   }
+
+  /* Floating animation for metric boxes */
+  @keyframes float {
+    0%, 100% {
+      transform: translateY(0px) scale(1);
+    }
+    25% {
+      transform: translateY(-3px) scale(1.01);
+    }
+    50% {
+      transform: translateY(-1px) scale(1.005);
+    }
+    75% {
+      transform: translateY(-2px) scale(1.02);
+    }
+  }
 }
