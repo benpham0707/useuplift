@@ -42,6 +42,203 @@ import {
   Lightbulb
 } from 'lucide-react';
 
+// SubjectPerformanceAnalytics subcomponent for year-based expandable analytics
+const SubjectPerformanceAnalytics: React.FC = () => {
+  // Hard coded data values for 4 academic years and their subjects with key metrics (GPA, progress, strongest subjects, course difficulty, achievements)
+  const [expandedYears, setExpandedYears] = useState<string[]>([]);
+
+  const academicYearsData = {
+    "2020-2021": {
+      year: "Freshman Year",
+      overallGPA: "3.4",
+      performance: "Foundation Building",
+      status: "complete",
+      keyInsights: [
+        "Adjusted to high school rigor",
+        "Strongest in English and History",
+        "Math and science foundational courses",
+        "GPA: 3.4 (Above average start)"
+      ],
+      detailedMetrics: {
+        gpaImprovement: "+0.2 from first to second semester",
+        strongestSubjects: ["English", "History", "Art"],
+        courseDifficulty: "Standard level courses - appropriate for transition",
+        notableAchievements: "Made honor roll both semesters"
+      }
+    },
+    "2021-2022": {
+      year: "Sophomore Year",
+      overallGPA: "3.6",
+      performance: "Steady Growth",
+      status: "complete",
+      keyInsights: [
+        "Consistent GPA improvement (+0.2)",
+        "First AP course success (AP History)",
+        "Strong foundation in core subjects",
+        "Developed better study habits"
+      ],
+      detailedMetrics: {
+        gpaImprovement: "+0.2 from previous year",
+        strongestSubjects: ["AP History", "English", "Chemistry"],
+        courseDifficulty: "Mixed standard and honors - 15% harder than average",
+        notableAchievements: "AP History score of 4, consistently on honor roll"
+      }
+    },
+    "2022-2023": {
+      year: "Junior Year",
+      overallGPA: "3.8",
+      performance: "Peak Performance",
+      status: "complete",
+      keyInsights: [
+        "Significant GPA jump (+0.2)",
+        "Multiple AP course success",
+        "Strong in STEM subjects",
+        "Top 15% class ranking achieved"
+      ],
+      detailedMetrics: {
+        gpaImprovement: "+0.2 from previous year - largest improvement",
+        strongestSubjects: ["AP Biology", "AP Literature", "Pre-Calculus"],
+        courseDifficulty: "Rigorous schedule - 25% harder than average",
+        notableAchievements: "3 AP courses, all honor roll, science fair winner"
+      }
+    },
+    "2023-2024": {
+      year: "Senior Year",
+      overallGPA: "3.8",
+      performance: "Maintaining Excellence",
+      status: "in-progress",
+      keyInsights: [
+        "Sustained high performance",
+        "Most challenging course load",
+        "College-level coursework success",
+        "Leadership role development"
+      ],
+      detailedMetrics: {
+        gpaImprovement: "Maintained 3.8 - consistent excellence",
+        strongestSubjects: ["AP Chemistry", "AP Calculus BC", "AP Physics"],
+        courseDifficulty: "Maximum rigor - 35% harder than average",
+        notableAchievements: "5 AP courses, dual enrollment, student government"
+      }
+    }
+  } as const;
+
+  const subjectPerformanceData = {
+    "2020-2021": [
+      { subject: "English 9", grade: "A-", relevance: "Core", avgGPA: "3.2", classRank: "Top 25%", trend: "stable", improvement: "Baseline year" },
+      { subject: "Algebra I", grade: "B+", relevance: "High", avgGPA: "3.0", classRank: "Top 30%", trend: "up", improvement: "Baseline year" },
+      { subject: "Biology", grade: "A", relevance: "High", avgGPA: "3.1", classRank: "Top 20%", trend: "stable", improvement: "Baseline year" }
+    ],
+    "2021-2022": [
+      { subject: "English 10", grade: "A", relevance: "Core", avgGPA: "3.3", classRank: "Top 20%", trend: "up", improvement: "+0.3 grade improvement" },
+      { subject: "Geometry", grade: "A-", relevance: "High", avgGPA: "3.1", classRank: "Top 25%", trend: "up", improvement: "+0.3 grade improvement" },
+      { subject: "Chemistry", grade: "B+", relevance: "High", avgGPA: "2.9", classRank: "Top 35%", trend: "stable", improvement: "Maintained performance" },
+      { subject: "AP History", grade: "A-", relevance: "Medium", avgGPA: "3.4", classRank: "Top 20%", trend: "up", improvement: "First AP success" }
+    ],
+    "2022-2023": [
+      { subject: "AP Literature", grade: "A", relevance: "Core", avgGPA: "3.5", classRank: "Top 15%", trend: "up", improvement: "+0.3 from previous English" },
+      { subject: "Pre-Calculus", grade: "A-", relevance: "Critical", avgGPA: "3.2", classRank: "Top 20%", trend: "up", improvement: "+0.3 continued math growth" },
+      { subject: "AP Biology", grade: "A", relevance: "Critical", avgGPA: "3.1", classRank: "Top 15%", trend: "up", improvement: "Significant STEM improvement" },
+      { subject: "Physics", grade: "B+", relevance: "High", avgGPA: "3.0", classRank: "Top 30%", trend: "stable", improvement: "New subject - solid performance" }
+    ],
+    "2023-2024": [
+      { subject: "AP Chemistry", grade: "A-", relevance: "Critical", avgGPA: "2.8", classRank: "Top 20%", trend: "up", improvement: "+0.5 major improvement from Chemistry" },
+      { subject: "AP Calculus BC", grade: "A", relevance: "Critical", avgGPA: "3.1", classRank: "Top 15%", trend: "up", improvement: "+0.3 continued excellence in math" },
+      { subject: "AP Physics C", grade: "B+", relevance: "High", avgGPA: "2.9", classRank: "Top 25%", trend: "up", improvement: "+0.3 significant physics improvement" },
+      { subject: "AP English Language", grade: "A", relevance: "Core", avgGPA: "3.4", classRank: "Top 10%", trend: "stable", improvement: "Maintained excellence" },
+      { subject: "AP Government", grade: "A-", relevance: "Medium", avgGPA: "3.3", classRank: "Top 20%", trend: "stable", improvement: "Consistent social studies performance" }
+    ]
+  } as const;
+
+  const toggleYear = (year: string) => {
+    setExpandedYears(prev => prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-4">
+        {Object.entries(academicYearsData).map(([year, data]) => (
+          <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
+            <CollapsibleTrigger asChild>
+              <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          {expandedYears.includes(year) ? (
+                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                          )}
+                          <h3 className="font-semibold text-lg text-foreground">{data.year}</h3>
+                        </div>
+                        <Badge variant="secondary" className="text-xs">{data.status}</Badge>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Overall GPA</div>
+                        <div className="text-xl font-bold text-foreground">{data.overallGPA}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Performance</div>
+                        <div className="text-sm font-medium text-foreground">{data.performance}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">GPA Progress</div>
+                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.gpaImprovement}</div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-sm text-muted-foreground">Course Difficulty</div>
+                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.courseDifficulty.split(' - ')[1] || data.detailedMetrics.courseDifficulty}</div>
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <div className="text-sm text-muted-foreground">Strongest Subjects</div>
+                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.strongestSubjects.join(', ')}</div>
+                      </div>
+                      <div className="space-y-1 col-span-2">
+                        <div className="text-sm text-muted-foreground">Key Achievements</div>
+                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.notableAchievements}</div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-4">
+              <Card className="bg-muted/30">
+                <CardContent className="p-6">
+                  <h4 className="font-medium mb-4 text-foreground">Subject Performance Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => (
+                      <Card key={idx} className="bg-background">
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <h5 className="font-medium text-foreground">{subject.subject}</h5>
+                              <Badge variant={subject.grade.includes('A') ? 'default' : subject.grade.includes('B') ? 'secondary' : 'outline'} className="text-xs">{subject.grade}</Badge>
+                            </div>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between"><span className="text-muted-foreground">Relevance:</span><span className="font-medium text-foreground">{subject.relevance}</span></div>
+                              <div className="flex justify-between"><span className="text-muted-foreground">Class Avg:</span><span className="font-medium text-foreground">{subject.avgGPA}</span></div>
+                              <div className="flex justify-between"><span className="text-muted-foreground">Class Rank:</span><span className="font-medium text-foreground">{subject.classRank}</span></div>
+                              <div className="flex justify-between"><span className="text-muted-foreground">vs Last Year:</span><span className="font-medium text-foreground">{subject.improvement}</span></div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 const AcademicPlanner = () => {
   // Hard coded data values for current academic standing and progress
   const currentGPA = {
@@ -858,386 +1055,7 @@ const AcademicPlanner = () => {
               </p>
             </CardHeader>
             <CardContent>
-              {/* State for subject analytics expansion */}
-              {React.createElement(() => {
-                const [expandedSubjects, setExpandedSubjects] = useState<Record<string, string[]>>({});
-                const [expandedYears, setExpandedYears] = useState<string[]>([]);
-
-                // Hard coded data for academic years and subject performance  
-                const academicYearsData = {
-                  "2020-2021": {
-                    year: "Freshman Year",
-                    overallGPA: "3.4",
-                    performance: "Foundation Building",
-                    status: "complete",
-                    keyInsights: [
-                      "Adjusted to high school rigor",
-                      "Strongest in English and History", 
-                      "Math and science foundational courses",
-                      "GPA: 3.4 (Above average start)"
-                    ],
-                    detailedMetrics: {
-                      gpaImprovement: "+0.2 from first to second semester",
-                      strongestSubjects: ["English", "History", "Art"],
-                      courseDifficulty: "Standard level courses - appropriate for transition",
-                      notableAchievements: "Made honor roll both semesters"
-                    }
-                  },
-                  "2021-2022": {
-                    year: "Sophomore Year",
-                    overallGPA: "3.6", 
-                    performance: "Steady Growth",
-                    status: "complete",
-                    keyInsights: [
-                      "Consistent GPA improvement (+0.2)",
-                      "First AP course success (AP History)",
-                      "Strong foundation in core subjects",
-                      "Developed better study habits"
-                    ],
-                    detailedMetrics: {
-                      gpaImprovement: "+0.2 from previous year",
-                      strongestSubjects: ["AP History", "English", "Chemistry"],
-                      courseDifficulty: "Mixed standard and honors - 15% harder than average",
-                      notableAchievements: "AP History score of 4, consistently on honor roll"
-                    }
-                  },
-                  "2022-2023": {
-                    year: "Junior Year", 
-                    overallGPA: "3.8",
-                    performance: "Peak Performance", 
-                    status: "complete",
-                    keyInsights: [
-                      "Significant GPA jump (+0.2)",
-                      "Multiple AP course success",
-                      "Strong in STEM subjects",
-                      "Top 15% class ranking achieved"
-                    ],
-                    detailedMetrics: {
-                      gpaImprovement: "+0.2 from previous year - largest improvement",
-                      strongestSubjects: ["AP Biology", "AP Literature", "Pre-Calculus"],
-                      courseDifficulty: "Rigorous schedule - 25% harder than average",
-                      notableAchievements: "3 AP courses, all honor roll, science fair winner"
-                    }
-                  },
-                  "2023-2024": {
-                    year: "Senior Year",
-                    overallGPA: "3.8",
-                    performance: "Maintaining Excellence",
-                    status: "in-progress", 
-                    keyInsights: [
-                      "Sustained high performance", 
-                      "Most challenging course load",
-                      "College-level coursework success",
-                      "Leadership role development"
-                    ],
-                    detailedMetrics: {
-                      gpaImprovement: "Maintained 3.8 - consistent excellence",
-                      strongestSubjects: ["AP Chemistry", "AP Calculus BC", "AP Physics"],
-                      courseDifficulty: "Maximum rigor - 35% harder than average",
-                      notableAchievements: "5 AP courses, dual enrollment, student government"
-                    }
-                  }
-                };
-
-                const subjectPerformanceData = {
-                  "2020-2021": [
-                    {
-                      subject: "English 9",
-                      grade: "A-", 
-                      relevance: "Core",
-                      avgGPA: "3.2",
-                      classRank: "Top 25%",
-                      trend: "stable",
-                      improvement: "Baseline year"
-                    },
-                    {
-                      subject: "Algebra I",
-                      grade: "B+",
-                      relevance: "High",
-                      avgGPA: "3.0", 
-                      classRank: "Top 30%",
-                      trend: "up",
-                      improvement: "Baseline year"
-                    },
-                    {
-                      subject: "Biology",
-                      grade: "A",
-                      relevance: "High",
-                      avgGPA: "3.1",
-                      classRank: "Top 20%",
-                      trend: "stable",
-                      improvement: "Baseline year"
-                    }
-                  ],
-                  "2021-2022": [
-                    {
-                      subject: "English 10",
-                      grade: "A",
-                      relevance: "Core", 
-                      avgGPA: "3.3",
-                      classRank: "Top 20%",
-                      trend: "up",
-                      improvement: "+0.3 grade improvement"
-                    },
-                    {
-                      subject: "Geometry",
-                      grade: "A-",
-                      relevance: "High",
-                      avgGPA: "3.1",
-                      classRank: "Top 25%", 
-                      trend: "up",
-                      improvement: "+0.3 grade improvement"
-                    },
-                    {
-                      subject: "Chemistry",
-                      grade: "B+",
-                      relevance: "High",
-                      avgGPA: "2.9",
-                      classRank: "Top 35%",
-                      trend: "stable",
-                      improvement: "Maintained performance"
-                    },
-                    {
-                      subject: "AP History",
-                      grade: "A-",
-                      relevance: "Medium",
-                      avgGPA: "3.4",
-                      classRank: "Top 20%",
-                      trend: "up", 
-                      improvement: "First AP success"
-                    }
-                  ],
-                  "2022-2023": [
-                    {
-                      subject: "AP Literature",
-                      grade: "A",
-                      relevance: "Core",
-                      avgGPA: "3.5", 
-                      classRank: "Top 15%",
-                      trend: "up",
-                      improvement: "+0.3 from previous English"
-                    },
-                    {
-                      subject: "Pre-Calculus",
-                      grade: "A-",
-                      relevance: "Critical",
-                      avgGPA: "3.2",
-                      classRank: "Top 20%",
-                      trend: "up",
-                      improvement: "+0.3 continued math growth"
-                    },
-                    {
-                      subject: "AP Biology",
-                      grade: "A",
-                      relevance: "Critical",
-                      avgGPA: "3.1", 
-                      classRank: "Top 15%",
-                      trend: "up",
-                      improvement: "Significant STEM improvement"
-                    },
-                    {
-                      subject: "Physics",
-                      grade: "B+",
-                      relevance: "High",
-                      avgGPA: "3.0",
-                      classRank: "Top 30%",
-                      trend: "stable",
-                      improvement: "New subject - solid performance"
-                    }
-                  ],
-                  "2023-2024": [
-                    {
-                      subject: "AP Chemistry",
-                      grade: "A-",
-                      relevance: "Critical",
-                      avgGPA: "2.8",
-                      classRank: "Top 20%",
-                      trend: "up",
-                      improvement: "+0.5 major improvement from Chemistry"
-                    },
-                    {
-                      subject: "AP Calculus BC", 
-                      grade: "A",
-                      relevance: "Critical",
-                      avgGPA: "3.1",
-                      classRank: "Top 15%",
-                      trend: "up",
-                      improvement: "+0.3 continued excellence in math"
-                    },
-                    {
-                      subject: "AP Physics C",
-                      grade: "B+",
-                      relevance: "High",
-                      avgGPA: "2.9",
-                      classRank: "Top 25%",
-                      trend: "up",
-                      improvement: "+0.3 significant physics improvement"
-                    },
-                    {
-                      subject: "AP English Language",
-                      grade: "A",
-                      relevance: "Core",
-                      avgGPA: "3.4",
-                      classRank: "Top 10%",
-                      trend: "stable",
-                      improvement: "Maintained excellence"
-                    },
-                    {
-                      subject: "AP Government",
-                      grade: "A-",
-                      relevance: "Medium",
-                      avgGPA: "3.3",
-                      classRank: "Top 20%",
-                      trend: "stable",
-                      improvement: "Consistent social studies performance"
-                    }
-                  ]
-                };
-
-                const toggleSubject = (year: string, subject: string) => {
-                  setExpandedSubjects(prev => {
-                    const yearSubjects = prev[year] || [];
-                    const subjectIndex = yearSubjects.indexOf(subject);
-                    
-                    if (subjectIndex > -1) {
-                      // Remove subject from expanded list
-                      return {
-                        ...prev,
-                        [year]: yearSubjects.filter(s => s !== subject)
-                      };
-                    } else {
-                      // Add all subjects in the same row (expand entire row)
-                      const currentYearData = subjectPerformanceData[year as keyof typeof subjectPerformanceData] || [];
-                      const currentSubjectIndex = currentYearData.findIndex(s => s.subject === subject);
-                      const rowStartIndex = Math.floor(currentSubjectIndex / 3) * 3;
-                      const rowSubjects = currentYearData.slice(rowStartIndex, rowStartIndex + 3).map(s => s.subject);
-                      
-                      return {
-                        ...prev,
-                        [year]: [...new Set([...yearSubjects, ...rowSubjects])]
-                      };
-                    }
-                  });
-                };
-
-                const toggleYear = (year: string) => {
-                  setExpandedYears(prev => 
-                    prev.includes(year) 
-                      ? prev.filter(y => y !== year)
-                      : [...prev, year]
-                  );
-                };
-
-                return (
-                  <div className="space-y-6">
-                    {/* Academic Years with Enhanced Insights */}
-                    <div className="space-y-4">
-                      {Object.entries(academicYearsData).map(([year, data]) => (
-                        <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
-                          <CollapsibleTrigger asChild>
-                            <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60">
-                              <CardContent className="p-6">
-                                <div className="space-y-4">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex items-center gap-2">
-                                        {expandedYears.includes(year) ? (
-                                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                        ) : (
-                                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                                        )}
-                                        <h3 className="font-semibold text-lg text-foreground">{data.year}</h3>
-                                      </div>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {data.status}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Enhanced At-a-Glance Metrics */}
-                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    <div className="space-y-1">
-                                      <div className="text-sm text-muted-foreground">Overall GPA</div>
-                                      <div className="text-xl font-bold text-foreground">{data.overallGPA}</div>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <div className="text-sm text-muted-foreground">Performance</div>
-                                      <div className="text-sm font-medium text-foreground">{data.performance}</div>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <div className="text-sm text-muted-foreground">GPA Progress</div>
-                                      <div className="text-sm font-medium text-foreground">{data.detailedMetrics.gpaImprovement}</div>
-                                    </div>
-                                    <div className="space-y-1">
-                                      <div className="text-sm text-muted-foreground">Course Difficulty</div>
-                                      <div className="text-sm font-medium text-foreground">
-                                        {data.detailedMetrics.courseDifficulty.split(' - ')[1] || data.detailedMetrics.courseDifficulty}
-                                      </div>
-                                    </div>
-                                    <div className="space-y-1 col-span-2">
-                                      <div className="text-sm text-muted-foreground">Strongest Subjects</div>
-                                      <div className="text-sm font-medium text-foreground">{data.detailedMetrics.strongestSubjects.join(', ')}</div>
-                                    </div>
-                                    <div className="space-y-1 col-span-2">
-                                      <div className="text-sm text-muted-foreground">Key Achievements</div>
-                                      <div className="text-sm font-medium text-foreground">{data.detailedMetrics.notableAchievements}</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </CollapsibleTrigger>
-                          
-                          <CollapsibleContent className="mt-4">
-                            {/* Subject Performance for expanded year */}
-                            <Card className="bg-muted/30">
-                              <CardContent className="p-6">
-                                <h4 className="font-medium mb-4 text-foreground">Subject Performance Details</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                  {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => (
-                                    <Card key={idx} className="bg-background">
-                                      <CardContent className="p-4">
-                                        <div className="space-y-3">
-                                          <div className="flex items-center justify-between">
-                                            <h5 className="font-medium text-foreground">{subject.subject}</h5>
-                                            <Badge 
-                                              variant={subject.grade.includes('A') ? "default" : subject.grade.includes('B') ? "secondary" : "outline"}
-                                              className="text-xs"
-                                            >
-                                              {subject.grade}
-                                            </Badge>
-                                          </div>
-                                          <div className="space-y-2 text-sm">
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">Relevance:</span>
-                                              <span className="font-medium text-foreground">{subject.relevance}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">Class Avg:</span>
-                                              <span className="font-medium text-foreground">{subject.avgGPA}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">Class Rank:</span>
-                                              <span className="font-medium text-foreground">{subject.classRank}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                              <span className="text-muted-foreground">vs Last Year:</span>
-                                              <span className="font-medium text-foreground">{subject.improvement}</span>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          </CollapsibleContent>
-                        </Collapsible>
-                      ))}
-                  </div>
-                );
-              })}
+              <SubjectPerformanceAnalytics />
             </CardContent>
           </Card>
 
