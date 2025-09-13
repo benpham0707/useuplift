@@ -580,7 +580,7 @@ const AcademicPlanner = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-white/90">Electives</span>
-                  <Badge className="bg-blue-500/20 text-blue-200 border-blue-400/30">
+                  <Badge className="bg-purple-500/20 text-purple-200 border-purple-400/30">
                     <Target className="h-3 w-3 mr-1" />
                     On Track
                   </Badge>
@@ -632,17 +632,17 @@ const AcademicPlanner = () => {
               <CardContent>
                 <div className="space-y-4">
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center p-3 bg-blue-100 rounded-lg border border-blue-300">
-                      <div className="text-3xl font-bold text-blue-900">{currentGPA.weighted}</div>
-                      <div className="text-sm text-blue-950">Weighted GPA</div>
+                    <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{currentGPA.weighted}</div>
+                      <div className="text-sm text-purple-700">Weighted GPA</div>
                     </div>
-                    <div className="text-center p-3 bg-blue-100 rounded-lg border border-blue-300">
-                      <div className="text-3xl font-bold text-blue-900">{currentGPA.unweighted}</div>
-                      <div className="text-sm text-blue-950">Unweighted GPA</div>
+                    <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{currentGPA.unweighted}</div>
+                      <div className="text-sm text-purple-700">Unweighted GPA</div>
                     </div>
-                    <div className="text-center p-3 bg-blue-100 rounded-lg border border-blue-300">
-                      <div className="text-3xl font-bold text-blue-900">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}th</div>
-                      <div className="text-sm text-blue-950">Percentile</div>
+                    <div className="text-center p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200 shadow-sm">
+                      <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">{Math.round(((currentGPA.totalStudents - currentGPA.classRank + 1) / currentGPA.totalStudents) * 100)}th</div>
+                      <div className="text-sm text-purple-700">Percentile</div>
                     </div>
                   </div>
                   
@@ -1618,7 +1618,7 @@ interface AcademicInsightItemProps {
 const AcademicInsightItem = ({ title, description, time, type, impact, estimatedGains, actionItems, connections, onActionClick }: AcademicInsightItemProps) => {
   const typeColors = {
     strength: 'text-green-600',
-    opportunity: 'text-blue-600',
+    opportunity: 'text-purple-600',
     improvement: 'text-purple-600',
     warning: 'text-orange-600',
     concern: 'text-red-600'
@@ -1634,7 +1634,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
     
     switch (impact) {
       case 'high':
-        return 'text-blue-500';
+        return 'text-purple-500';
       case 'medium':
         return 'text-green-500';
       case 'low':
@@ -1652,7 +1652,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
       return 'border-2 border-red-500';
     }
     if (impact === 'high') {
-      return 'border-2 border-blue-500 shadow-[0_0_15px_5px_rgba(59,130,246,0.2)] hover:shadow-[0_0_20px_8px_rgba(59,130,246,0.3)]';
+      return 'border-2 border-purple-500 shadow-[0_0_15px_5px_rgba(147,51,234,0.2)] hover:shadow-[0_0_20px_8px_rgba(147,51,234,0.3)]';
     }
     if (impact === 'medium') {
       return 'border-2 border-green-500';
@@ -1670,7 +1670,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
     
     switch (impact) {
       case 'high':
-        return 'bg-blue-100 text-blue-700 border-blue-300';
+        return 'bg-purple-100 text-purple-700 border-purple-300';
       case 'medium':
         return 'bg-green-100 text-green-700 border-green-300';
       case 'low':
@@ -1738,7 +1738,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="h-7 px-3 text-xs font-semibold bg-background hover:bg-blue-50 border-2 border-border hover:border-blue-300 shadow-md hover:shadow-lg hover:shadow-blue-200/50 transition-all duration-200 hover:scale-105 hover:text-blue-600"
+                      className="h-7 px-3 text-xs font-semibold bg-background hover:bg-purple-50 border-2 border-border hover:border-purple-300 shadow-md hover:shadow-lg hover:shadow-purple-200/50 transition-all duration-200 hover:scale-105 hover:text-purple-600"
                       onClick={() => onActionClick?.(item.action)}
                     >
                       {item.buttonText}
