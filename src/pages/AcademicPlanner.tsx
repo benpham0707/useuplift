@@ -1079,21 +1079,12 @@ const AcademicPlanner = () => {
                 AI-powered analysis of your academic performance and strategic recommendations
               </CardDescription>
             </CardHeader>
-            
-            {/* Soft Border Separator */}
-            <div className="relative px-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full h-px bg-gradient-to-r from-transparent via-border/50 to-transparent"></div>
-              </div>
-              <div className="relative flex justify-center">
-                <div className="bg-background px-3">
-                  <div className="w-1.5 h-1.5 rounded-full bg-gradient-to-r from-primary/40 to-accent/40"></div>
-                </div>
-              </div>
-            </div>
-            
-            <CardContent className="pt-4">
+            <CardContent>
               <ScrollArea className="h-96">
+                {/* Soft Border at Scroll Cutoff */}
+                <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 mb-4">
+                  <div className="h-3 bg-gradient-to-b from-border/30 to-transparent"></div>
+                </div>
                 <div className="space-y-4">
                   {insights.map((insight) => (
                     <AcademicInsightItem
