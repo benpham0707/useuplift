@@ -109,7 +109,7 @@ const AcademicPlanner = () => {
       status: 'excellent',
       percentage: 95,
       icon: Star,
-      color: 'blue',
+      color: 'purple',
       summary: 'Top 5% of class performance',
       details: 'Your academic performance places you in the top 5% of your graduating class. This strong standing positions you well for competitive opportunities.',
       recommendations: ['Apply for honors programs', 'Consider research opportunities', 'Explore leadership positions']
@@ -450,10 +450,10 @@ const AcademicPlanner = () => {
               <Line 
                 type="monotone" 
                 dataKey="majorAverage"
-                stroke="#1e3a8a" 
+                stroke="#3b82f6" 
                 strokeWidth={4}
-                dot={{ fill: '#1e3a8a', strokeWidth: 3, r: 6, stroke: '#ffffff' }}
-                activeDot={{ r: 8, stroke: '#1e3a8a', strokeWidth: 3, fill: '#ffffff' }}
+                dot={{ fill: '#3b82f6', strokeWidth: 3, r: 6, stroke: '#ffffff' }}
+                activeDot={{ r: 8, stroke: '#3b82f6', strokeWidth: 3, fill: '#ffffff' }}
                 name="Major Average"
               />
             </LineChart>
@@ -463,17 +463,17 @@ const AcademicPlanner = () => {
         {/* Compact summary stats */}
         <div className="flex justify-center gap-8 pt-1">
           <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-blue-700 rounded-full"></div>
+            <div className="w-3 h-3 bg-purple-600 rounded-full"></div>
             <div className="text-sm">
               <span className="font-semibold text-slate-700">Your GPA:</span>
-              <span className="ml-1 font-bold text-blue-700">{gpaData.current}</span>
+              <span className="ml-1 font-bold text-purple-600">{gpaData.current}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#84A59D' }}></div>
+            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
             <div className="text-sm">
               <span className="font-semibold text-slate-700">Major Average:</span>
-              <span className="ml-1 font-bold" style={{ color: '#84A59D' }}>{gpaData.majorRecommended}</span>
+              <span className="ml-1 font-bold" style={{ color: '#3b82f6' }}>{gpaData.majorRecommended}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
