@@ -40,7 +40,8 @@ import {
   Link,
   CheckCircle2,
   Lightbulb,
-  Minus
+  Minus,
+  ArrowRight
 } from 'lucide-react';
 
 // SubjectPerformanceAnalytics subcomponent for year-based expandable analytics
@@ -581,15 +582,13 @@ const AcademicPlanner = () => {
     }
   };
 
-  // Function to handle opening task planning interface
+  // Open the task planning interface; fallback to a default plan if no direct match
   const handleTaskPlanningOpen = (actionText: string) => {
-    const task = taskDatabase[actionText as keyof typeof taskDatabase];
-    if (task) {
-      setSelectedTask(task);
-      setTaskPlanningOpen(true);
-    }
+    const task = taskDatabase[actionText as keyof typeof taskDatabase] ?? taskDatabase["Strengthen Academic Foundation"];
+    // If a matching structured plan isn't found for the clicked action, we still open with a relevant default
+    setSelectedTask(task);
+    setTaskPlanningOpen(true);
   };
-
   // GPA Line Chart Component
   const GPALineChart = () => {
     return (
@@ -1094,10 +1093,12 @@ const AcademicPlanner = () => {
                             insight.status === 'warning' ? 'warning' : 'improvement'}
                       impact={insight.percentage > 90 ? 'high' : 
                              insight.percentage > 70 ? 'medium' : 'low'}
-                      estimatedGains={{ GPA: 0.2, Ranking: 5 }}
+                      pendingGains={{ overall: 0.2, GPA: 0.2 }}
+                      relatedFeatures={['Academic Planner','GPA Analysis']}
                       actionItems={insight.recommendations.map(rec => ({
                         action: rec,
-                        buttonText: "Start Planning"
+                        link: '#',
+                        buttonText: 'Start Planning'
                       }))}
                       connections={`Based on ${insight.title.toLowerCase()} patterns`}
                       onActionClick={handleTaskPlanningOpen}
@@ -1707,43 +1708,49 @@ const AcademicPlanner = () => {
   );
 };
 
-// Academic Insight Item Component for Academic Planning specific insights
+// Academic Insight Item Component (restored to match original design from Portfolio Scanner)
 interface AcademicInsightItemProps {
   title: string;
   description: string;
   time: string;
   type: 'strength' | 'opportunity' | 'improvement' | 'warning' | 'concern';
   impact: 'high' | 'medium' | 'low';
-  estimatedGains: Record<string, number>;
+  pendingGains: {
+    overall: number;
+    [key: string]: number;
+  };
+  relatedFeatures: string[];
   actionItems: Array<{
     action: string;
+    link: string;
     buttonText: string;
-    components?: string[];
   }>;
   connections: string;
   onActionClick?: (action: string) => void;
 }
 
-const AcademicInsightItem = ({ title, description, time, type, impact, estimatedGains, actionItems, connections, onActionClick }: AcademicInsightItemProps) => {
+const AcademicInsightItem = ({ title, description, time, type, impact, pendingGains, relatedFeatures, actionItems, connections, onActionClick }: AcademicInsightItemProps) => {
   const typeColors = {
     strength: 'text-green-600',
-    opportunity: 'text-purple-600',
+    opportunity: 'text-blue-600',
     improvement: 'text-purple-600',
     warning: 'text-orange-600',
     concern: 'text-red-600'
   };
 
   const getCheckmarkColor = (type: string, impact: string) => {
+    // Handle special types first
     if (type === 'warning' && impact === 'medium') {
-      return 'text-muted-foreground';
+      return 'text-muted-foreground'; // Gray for missed opportunity
     }
     if (type === 'concern') {
-      return 'text-red-500';
+      return 'text-red-500'; // Red for negative impact
     }
     
+    // Use impact-based colors for regular items
     switch (impact) {
       case 'high':
-        return 'text-purple-500';
+        return 'text-blue-500';
       case 'medium':
         return 'text-green-500';
       case 'low':
@@ -1755,13 +1762,13 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
 
   const getBorderClass = (type: string, impact: string) => {
     if (type === 'warning' && impact === 'medium') {
-      return 'border-2 border-muted-foreground/30';
+      return 'border-2 border-muted-foreground/30'; // Gray for missed opportunity
     }
     if (type === 'concern') {
       return 'border-2 border-red-500';
     }
     if (impact === 'high') {
-      return 'border-2 border-purple-500 shadow-[0_0_15px_5px_rgba(147,51,234,0.2)] hover:shadow-[0_0_20px_8px_rgba(147,51,234,0.3)]';
+      return 'border-2 border-blue-500 shadow-[0_0_15px_5px_rgba(59,130,246,0.2)] hover:shadow-[0_0_20px_8px_rgba(59,130,246,0.3)]';
     }
     if (impact === 'medium') {
       return 'border-2 border-green-500';
@@ -1770,16 +1777,18 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
   };
 
   const getImpactBadgeColors = (type: string, impact: string) => {
+    // Handle special types first
     if (type === 'warning' && impact === 'medium') {
-      return 'bg-muted text-muted-foreground border-muted';
+      return 'bg-muted text-muted-foreground border-muted'; // Gray for missed opportunity
     }
     if (type === 'concern') {
-      return 'bg-red-100 text-red-700 border-red-300';
+      return 'bg-red-100 text-red-700 border-red-300'; // Red for negative impact
     }
     
+    // Use impact-based colors for regular items
     switch (impact) {
       case 'high':
-        return 'bg-purple-100 text-purple-700 border-purple-300';
+        return 'bg-blue-100 text-blue-700 border-blue-300';
       case 'medium':
         return 'bg-green-100 text-green-700 border-green-300';
       case 'low':
@@ -1812,7 +1821,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
                   {getImpactText(type, impact)}
                 </Badge>
               </div>
-              <p className="text-sm text-foreground/85 mt-2 leading-relaxed">{description}</p>
+              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{description}</p>
             </div>
             <div className="text-right ml-4 min-w-[140px]">
               <div className="text-xs text-muted-foreground mb-2 flex items-center justify-end gap-1 font-medium">
@@ -1820,10 +1829,10 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
                 Estimated Impact
               </div>
               <div className="space-y-1 opacity-50">
-                {Object.entries(estimatedGains).map(([key, value]) => (
+                {Object.entries(pendingGains).map(([key, value]) => (
                   <div key={key} className="text-xs font-medium text-muted-foreground">
-                    {value >= 0 ? '+' : ''}
-                    {value.toFixed(2)} {key}
+                    {key === 'missedOpportunity' ? 'Missed: ' : value >= 0 ? '+' : ''}
+                    {value.toFixed(2)} {key === 'missedOpportunity' ? 'potential' : key}
                   </div>
                 ))}
               </div>
@@ -1832,55 +1841,52 @@ const AcademicInsightItem = ({ title, description, time, type, impact, estimated
           
           <div className="bg-primary/5 rounded-md p-3 border border-primary/20">
             <h5 className="font-medium text-foreground text-sm mb-2 flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Academic Focus Areas
+              <Link className="h-4 w-4" />
+              Feature Connections
             </h5>
-            <p className="text-xs text-foreground/80 italic">{connections}</p>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {relatedFeatures.map((feature, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {feature}
+                </Badge>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground italic">{connections}</p>
           </div>
 
           <div className="bg-secondary/10 rounded-md p-3 border border-secondary/30">
+            <h5 className="font-medium text-foreground text-sm mb-2 flex items-center gap-2">
+              <Zap className="h-4 w-4" />
+              Recommended Actions
+            </h5>
             <div className="space-y-2">
               {actionItems.map((item, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex items-center justify-between gap-4">
-                    <h6 className="text-foreground font-semibold text-sm flex-1">{item.action}</h6>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="h-7 px-3 text-xs font-semibold bg-background hover:bg-purple-50 border-2 border-border hover:border-purple-300 shadow-md hover:shadow-lg hover:shadow-purple-200/50 transition-all duration-200 hover:scale-105 hover:text-purple-600"
-                      onClick={() => onActionClick?.(item.action)}
-                    >
-                      {item.buttonText}
-                    </Button>
-                  </div>
-                  {item.components && (
-                    <div className="ml-4 mt-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {item.components.map((component, compIndex) => (
-                          <div key={compIndex} className="group relative bg-gradient-to-r from-secondary/20 to-secondary/10 border border-secondary/30 rounded-md p-2 hover:from-secondary/30 hover:to-secondary/20 transition-all duration-200 hover:scale-[1.01] hover:shadow-sm">
-                            <span className="text-xs text-foreground/90 leading-snug font-normal group-hover:text-foreground transition-colors block">
-                              {component}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                <div key={index} className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground flex-1">{item.action}</span>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-xs h-7 ml-2 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                    onClick={() => onActionClick ? onActionClick(item.action) : (window.location.href = item.link)}
+                  >
+                    {item.buttonText}
+                    <ArrowRight className="h-3 w-3 ml-1" />
+                  </Button>
                 </div>
               ))}
             </div>
           </div>
-          
-          <div className="flex items-center justify-between pt-2 border-t border-border/50">
-            <div className="text-xs text-muted-foreground flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {time}
-            </div>
+
+          <div className="flex items-center justify-between pt-2">
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+              <Clock className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">{time}</span>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" className="text-xs h-7">
                 Record in Journal
               </Button>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs">
+              <Button variant="ghost" size="sm" className="text-xs h-7">
                 View Full Analysis
               </Button>
             </div>
