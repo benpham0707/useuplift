@@ -1069,96 +1069,44 @@ const AcademicPlanner = () => {
             </Card>
           </div>
 
-          {/* Recent Insights and Next Action Engine Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-            {/* Recent Insights - 2 columns */}
-            <Card className="lg:col-span-2 bg-gradient-to-br from-background via-background to-accent/10 border-accent/20">
-              <CardHeader className="space-y-1">
-                <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Lightbulb className="w-5 h-5 text-primary" />
-                  Recent Insights
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  AI-powered analysis of your academic performance
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-96">
-                  <div className="space-y-4">
-                    {insights.map((insight) => (
-                      <AcademicInsightItem
-                        key={insight.id}
-                        title={insight.title}
-                        description={insight.details}
-                        time="Just now"
-                        type={insight.status === 'complete' ? 'strength' : 
-                              insight.status === 'excellent' ? 'opportunity' : 
-                              insight.status === 'warning' ? 'warning' : 'improvement'}
-                        impact={insight.percentage > 90 ? 'high' : 
-                               insight.percentage > 70 ? 'medium' : 'low'}
-                        estimatedGains={{ GPA: 0.2, Ranking: 5 }}
-                        actionItems={insight.recommendations.map(rec => ({
-                          action: rec,
-                          buttonText: "Start Planning"
-                        }))}
-                        connections={`Based on ${insight.title.toLowerCase()} patterns`}
-                        onActionClick={handleTaskPlanningOpen}
-                      />
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-
-            {/* Next Action Engine - 1 column */}
-            <Card className="bg-gradient-to-br from-background via-background to-accent/10 border-accent/20">
-              <CardHeader className="space-y-1">
-                <CardTitle className="flex items-center gap-2 text-foreground">
-                  <Zap className="w-5 h-5 text-primary" />
-                  Next Action Engine
-                </CardTitle>
-                <CardDescription className="text-muted-foreground">
-                  Priority actions for academic success
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+          {/* Recent Insights Section */}
+          <Card className="bg-gradient-to-br from-background via-background to-accent/10 border-accent/20 mb-8">
+            <CardHeader className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-foreground">
+                <Lightbulb className="w-5 h-5 text-primary" />
+                Recent Insights
+              </CardTitle>
+              <CardDescription className="text-muted-foreground">
+                AI-powered analysis of your academic performance and strategic recommendations
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-96">
                 <div className="space-y-4">
-                  <div className="p-4 rounded-lg border-l-4 border-l-green-500 bg-green-50/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">Enroll in Advanced Statistics</h4>
-                      <Badge variant="secondary" className="text-xs">High Priority</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">Complete major requirements for graduation timeline</p>
-                    <Button size="sm" className="w-full" onClick={() => handleTaskPlanningOpen("Enroll in Advanced Statistics")}>
-                      Plan This Action
-                    </Button>
-                  </div>
-
-                  <div className="p-4 rounded-lg border-l-4 border-l-blue-500 bg-blue-50/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">Improve Study Habits</h4>
-                      <Badge variant="secondary" className="text-xs">Medium Priority</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">Address GPA decline trend for better outcomes</p>
-                    <Button size="sm" variant="outline" className="w-full" onClick={() => handleTaskPlanningOpen("Improve Study Habits")}>
-                      Plan This Action
-                    </Button>
-                  </div>
-
-                  <div className="p-4 rounded-lg border-l-4 border-l-purple-500 bg-purple-50/50">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">Apply for Honors Programs</h4>
-                      <Badge variant="secondary" className="text-xs">Opportunity</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground mb-3">Leverage top 5% performance for competitive advantages</p>
-                    <Button size="sm" variant="outline" className="w-full" onClick={() => handleTaskPlanningOpen("Apply for Honors Programs")}>
-                      Plan This Action
-                    </Button>
-                  </div>
+                  {insights.map((insight) => (
+                    <AcademicInsightItem
+                      key={insight.id}
+                      title={insight.title}
+                      description={insight.details}
+                      time="Just now"
+                      type={insight.status === 'complete' ? 'strength' : 
+                            insight.status === 'excellent' ? 'opportunity' : 
+                            insight.status === 'warning' ? 'warning' : 'improvement'}
+                      impact={insight.percentage > 90 ? 'high' : 
+                             insight.percentage > 70 ? 'medium' : 'low'}
+                      estimatedGains={{ GPA: 0.2, Ranking: 5 }}
+                      actionItems={insight.recommendations.map(rec => ({
+                        action: rec,
+                        buttonText: "Start Planning"
+                      }))}
+                      connections={`Based on ${insight.title.toLowerCase()} patterns`}
+                      onActionClick={handleTaskPlanningOpen}
+                    />
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
           {/* Subject Performance Analytics */}
           <Card className="shadow-medium mb-6">
