@@ -758,53 +758,53 @@ const AcademicPlanner = () => {
           {/* Progress Bar and Requirements Checklist */}
           <div className="grid md:grid-cols-2 gap-6">
             {/* Progress Overview */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 shadow-lg">
-              <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <TrendingUp className="h-5 w-5 mr-2" />
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6 border border-primary/20 shadow-xl hover:shadow-2xl transition-all duration-300">
+              <h3 className="text-xl font-semibold mb-4 flex items-center bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">
+                <TrendingUp className="h-5 w-5 mr-2 text-primary" />
                 Academic Progress
               </h3>
               <div className="space-y-4">
                 <div>
-                  <div className="flex justify-between text-sm text-white/90 mb-2">
+                  <div className="flex justify-between text-sm text-foreground/90 mb-2">
                     <span>Credits Completed</span>
-                    <span>{currentGPA.creditsCompleted}/{currentGPA.totalCredits}</span>
+                    <span className="font-semibold bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">{currentGPA.creditsCompleted}/{currentGPA.totalCredits}</span>
                   </div>
-                  <Progress value={(currentGPA.creditsCompleted / currentGPA.totalCredits) * 100} className="h-3 bg-white/20" />
+                  <Progress value={(currentGPA.creditsCompleted / currentGPA.totalCredits) * 100} className="h-3" />
                 </div>
                 <div>
-                  <div className="flex justify-between text-sm text-white/90 mb-2">
+                  <div className="flex justify-between text-sm text-foreground/90 mb-2">
                     <span>Class Rank</span>
-                    <span>{currentGPA.classRank}/{currentGPA.totalStudents}</span>
+                    <span className="font-semibold bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">{currentGPA.classRank}/{currentGPA.totalStudents}</span>
                   </div>
-                  <Progress value={(1 - currentGPA.classRank / currentGPA.totalStudents) * 100} className="h-3 bg-white/20" />
+                  <Progress value={(1 - currentGPA.classRank / currentGPA.totalStudents) * 100} className="h-3" />
                 </div>
               </div>
             </div>
 
             {/* Requirements Checklist */}
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-6 border border-white/20 shadow-lg">
-              <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                <CheckCircle2 className="h-5 w-5 mr-2" />
+            <div className="bg-white/95 backdrop-blur-sm rounded-xl p-6 border border-primary/20 shadow-xl hover:shadow-2xl transition-all duration-300">
+              <h3 className="text-xl font-semibold mb-4 flex items-center bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">
+                <CheckCircle2 className="h-5 w-5 mr-2 text-primary" />
                 Requirements Status
               </h3>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-white/90">Core Requirements</span>
-                  <Badge className="bg-green-500/20 text-green-200 border-green-400/30">
+                  <span className="text-foreground/90">Core Requirements</span>
+                  <Badge className="bg-green-500/20 text-green-700 border-green-400/30">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Complete
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-white/90">Major Requirements</span>
-                  <Badge className="bg-orange-500/20 text-orange-200 border-orange-400/30">
+                  <span className="text-foreground/90">Major Requirements</span>
+                  <Badge className="bg-orange-500/20 text-orange-700 border-orange-400/30">
                     <Clock className="h-3 w-3 mr-1" />
                     85% Done
                   </Badge>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-white/90">Electives</span>
-                  <Badge className="bg-purple-500/20 text-purple-200 border-purple-400/30">
+                  <span className="text-foreground/90">Electives</span>
+                  <Badge className="bg-purple-500/20 text-purple-700 border-purple-400/30">
                     <Target className="h-3 w-3 mr-1" />
                     On Track
                   </Badge>
