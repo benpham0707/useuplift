@@ -160,46 +160,65 @@ const SubjectPerformanceAnalytics: React.FC = () => {
           <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
             <CollapsibleTrigger asChild>
               <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60">
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2">
-                          {expandedYears.includes(year) ? (
-                            <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                          )}
-                          <h3 className="font-semibold text-lg text-foreground">{data.year}</h3>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        {expandedYears.includes(year) ? (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                        )}
+                        <h3 className="font-semibold text-base text-foreground">{data.year}</h3>
+                      </div>
+                      <Badge variant="secondary" className="text-xs">{data.status}</Badge>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-primary">{data.overallGPA}</div>
+                        <div className="text-xs text-muted-foreground">GPA</div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-lg font-semibold text-foreground">
+                          {data.detailedMetrics.strongestSubjects.length}
                         </div>
-                        <Badge variant="secondary" className="text-xs">{data.status}</Badge>
+                        <div className="text-xs text-muted-foreground">Top Subjects</div>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="space-y-1">
-                        <div className="text-sm text-muted-foreground">Overall GPA</div>
-                        <div className="text-xl font-bold text-foreground">{data.overallGPA}</div>
+                  </div>
+                  
+                  <div className="grid grid-cols-4 gap-3 mt-3 pt-3 border-t border-border">
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-foreground">
+                        {data.detailedMetrics.gpaImprovement.includes('+') ? 
+                          data.detailedMetrics.gpaImprovement.match(/\+([0-9.]+)/)?.[1] || '0.0' : 
+                          '0.0'
+                        }
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-sm text-muted-foreground">Performance</div>
-                        <div className="text-sm font-medium text-foreground">{data.performance}</div>
+                      <div className="text-xs text-muted-foreground">GPA Δ</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-foreground">
+                        {data.detailedMetrics.courseDifficulty.match(/(\d+)%/)?.[1] || '0'}%
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-sm text-muted-foreground">GPA Progress</div>
-                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.gpaImprovement}</div>
+                      <div className="text-xs text-muted-foreground">Difficulty</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-foreground">
+                        {data.detailedMetrics.notableAchievements.includes('AP') ? 
+                          data.detailedMetrics.notableAchievements.match(/(\d+)\s*AP/)?.[1] || '0' : 
+                          '0'
+                        }
                       </div>
-                      <div className="space-y-1">
-                        <div className="text-sm text-muted-foreground">Course Difficulty</div>
-                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.courseDifficulty.split(' - ')[1] || data.detailedMetrics.courseDifficulty}</div>
+                      <div className="text-xs text-muted-foreground">AP Courses</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-semibold text-foreground">
+                        {data.detailedMetrics.notableAchievements.includes('honor roll') ? '✓' : 
+                         data.detailedMetrics.notableAchievements.includes('science fair') ? '★' : 
+                         data.detailedMetrics.notableAchievements.includes('government') ? '👑' : '—'}
                       </div>
-                      <div className="space-y-1 col-span-2">
-                        <div className="text-sm text-muted-foreground">Strongest Subjects</div>
-                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.strongestSubjects.join(', ')}</div>
-                      </div>
-                      <div className="space-y-1 col-span-2">
-                        <div className="text-sm text-muted-foreground">Key Achievements</div>
-                        <div className="text-sm font-medium text-foreground">{data.detailedMetrics.notableAchievements}</div>
-                      </div>
+                      <div className="text-xs text-muted-foreground">Awards</div>
                     </div>
                   </div>
                 </CardContent>
