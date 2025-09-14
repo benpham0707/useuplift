@@ -436,8 +436,8 @@ const ProjectIncubationSystem = () => {
               Active Projects ({projectPipeline.filter(p => p.status === 'active').length})
             </h3>
             
-            <ScrollArea className="w-full">
-              <div className="flex space-x-6 pb-4">
+            <div className="w-full overflow-x-auto">
+              <div className="flex space-x-6 pb-4 min-w-max">
                 {projectPipeline.filter(project => project.status === 'active').map((project) => (
                   <Card key={project.id} className="min-w-[700px] max-w-[700px] border-l-4 border-l-green-500 hover:shadow-lg transition-all duration-300">
                     <CardHeader className="pb-4">
@@ -543,7 +543,7 @@ const ProjectIncubationSystem = () => {
                   </Card>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
           </div>
 
           {/* Paused Projects */}
@@ -554,8 +554,8 @@ const ProjectIncubationSystem = () => {
                 Paused Projects ({projectPipeline.filter(p => p.status === 'paused').length})
               </h3>
               
-              <ScrollArea className="w-full">
-                <div className="flex space-x-6 pb-4">
+              <div className="w-full overflow-x-auto">
+                <div className="flex space-x-6 pb-4 min-w-max">
                   {projectPipeline.filter(project => project.status === 'paused').map((project) => (
                     <Card key={project.id} className="min-w-[700px] max-w-[700px] border-l-4 border-l-yellow-500 hover:shadow-lg transition-all duration-300 opacity-75">
                       <CardHeader className="pb-4">
@@ -661,7 +661,7 @@ const ProjectIncubationSystem = () => {
                     </Card>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
           )}
         </div>
