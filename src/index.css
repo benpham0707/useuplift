@@ -276,16 +276,24 @@ All colors MUST be HSL.
       transform: translateY(-2px) scale(1.01);
     }
   }
-  /* Extra sparse float for header metrics */
-  @keyframes float-sparse {
-    0%, 97%, 100% {
+  /* Elegant floating animation for header metrics */
+  @keyframes float-elegant {
+    0%, 100% {
       transform: translateY(0px) scale(1);
     }
-    2% {
-      transform: translateY(-1px) scale(1.004);
+    50% {
+      transform: translateY(-8px) scale(1.02);
     }
-    3% {
-      transform: translateY(0px) scale(1);
+  }
+  
+  /* Subtle pulse glow effect */
+  @keyframes pulse-glow {
+    0%, 100% {
+      box-shadow: 0 4px 20px rgba(139, 92, 246, 0.1);
     }
+    50% {
+      box-shadow: 0 8px 30px rgba(139, 92, 246, 0.25);
+    }
+  }
   }
 }
