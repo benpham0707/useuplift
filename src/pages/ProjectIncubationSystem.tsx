@@ -910,80 +910,98 @@ const ProjectIncubationSystem = () => {
                           <Card className="bg-muted/30">
                             <CardContent className="p-6">
                               <div className="space-y-6">
-                                {/* Top Section: Why Pick This Project */}
-                                <div className="bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 rounded-lg p-4">
-                                  <h5 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                                    <Star className="w-4 h-4 text-primary" />
-                                    Why Choose This Project?
-                                  </h5>
-                                  <p className="text-sm text-muted-foreground">{project.whyPick}</p>
+                                {/* Top Section: Why Choose This Project - Center */}
+                                <div className="flex justify-center">
+                                  <div className="bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 rounded-lg p-4 max-w-2xl w-full">
+                                    <h5 className="font-medium text-foreground mb-3 flex items-center justify-center gap-2">
+                                      <Star className="w-4 h-4 text-primary" />
+                                      Why Choose This Project?
+                                    </h5>
+                                    <p className="text-sm text-muted-foreground text-center">{project.whyPick}</p>
+                                  </div>
                                 </div>
 
-                                {/* Middle Section: Key Findings & Connections */}
+                                {/* Second Row: Skills & Outcomes - Side by Side */}
                                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                  <div className="space-y-4">
-                                    <h6 className="font-semibold text-foreground flex items-center gap-2">
-                                      <Brain className="w-4 h-4 text-primary" />
-                                      Key Findings
-                                    </h6>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
-                                      {project.findings?.map((finding: string, index: number) => (
-                                        <li key={index} className="flex items-start gap-2">
-                                          <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                          {finding}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
+                                  <Card className="bg-muted/20">
+                                    <CardContent className="p-4">
+                                      <h6 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                                        <Target className="w-4 h-4 text-primary" />
+                                        Skills You'll Develop
+                                      </h6>
+                                      <div className="flex flex-wrap gap-2">
+                                        {project.skills.map((skill, idx) => (
+                                          <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
+                                        ))}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
                                   
-                                  <div className="space-y-4">
-                                    <h6 className="font-semibold text-foreground flex items-center gap-2">
-                                      <Link className="w-4 h-4 text-primary" />
-                                      Connections to Your Profile
-                                    </h6>
-                                    <ul className="space-y-2 text-sm text-muted-foreground">
-                                      {project.connections?.map((connection: string, index: number) => (
-                                        <li key={index} className="flex items-start gap-2">
-                                          <ArrowRight className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                                          {connection}
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  </div>
+                                  <Card className="bg-muted/20">
+                                    <CardContent className="p-4">
+                                      <h6 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                                        <CheckCircle className="w-4 h-4 text-primary" />
+                                        Expected Outcomes
+                                      </h6>
+                                      <div className="space-y-2">
+                                        {project.outcomes.map((outcome, idx) => (
+                                          <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                            {outcome}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
                                 </div>
 
-                                {/* Bottom Section: Skills, Outcomes & Impact */}
+                                {/* Third Row: Analysis Sections - Three Equal Boxes */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                  <div className="space-y-3">
-                                    <h6 className="font-medium text-foreground mb-2">Skills You'll Develop:</h6>
-                                    <div className="flex flex-wrap gap-2">
-                                      {project.skills.map((skill, idx) => (
-                                        <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
-                                      ))}
-                                    </div>
-                                  </div>
+                                  <Card className="bg-muted/20">
+                                    <CardContent className="p-4">
+                                      <h6 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                        <Brain className="w-4 h-4 text-primary" />
+                                        Key Findings
+                                      </h6>
+                                      <ul className="space-y-2 text-sm text-muted-foreground">
+                                        {project.findings?.map((finding: string, index: number) => (
+                                          <li key={index} className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                            {finding}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </CardContent>
+                                  </Card>
                                   
-                                  <div className="space-y-3">
-                                    <h6 className="font-medium text-foreground mb-2">Expected Outcomes:</h6>
-                                    <div className="space-y-1">
-                                      {project.outcomes.map((outcome, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                          <CheckCircle className="w-3 h-3 text-green-600" />
-                                          {outcome}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
+                                  <Card className="bg-muted/20">
+                                    <CardContent className="p-4">
+                                      <h6 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                        <Link className="w-4 h-4 text-primary" />
+                                        Connections to Your Profile
+                                      </h6>
+                                      <ul className="space-y-2 text-sm text-muted-foreground">
+                                        {project.connections?.map((connection: string, index: number) => (
+                                          <li key={index} className="flex items-start gap-2">
+                                            <ArrowRight className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                            {connection}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </CardContent>
+                                  </Card>
                                   
-                                  <div className="space-y-3">
-                                    <h6 className="font-semibold text-foreground flex items-center gap-2">
-                                      <Scale className="w-4 h-4 text-primary" />
-                                      Impact Assessment
-                                    </h6>
-                                    <p className="text-sm text-muted-foreground leading-relaxed">
-                                      {project.impact}
-                                    </p>
-                                  </div>
+                                  <Card className="bg-muted/20">
+                                    <CardContent className="p-4">
+                                      <h6 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                        <Scale className="w-4 h-4 text-primary" />
+                                        Impact Assessment
+                                      </h6>
+                                      <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {project.impact}
+                                      </p>
+                                    </CardContent>
+                                  </Card>
                                 </div>
 
                                 {/* Action Button */}
