@@ -909,87 +909,90 @@ const ProjectIncubationSystem = () => {
                         <CollapsibleContent className="mt-4">
                           <Card className="bg-muted/30">
                             <CardContent className="p-6">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Why Pick This Project */}
-                                <div>
+                              <div className="space-y-6">
+                                {/* Top Section: Why Pick This Project */}
+                                <div className="bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 rounded-lg p-4">
                                   <h5 className="font-medium text-foreground mb-3 flex items-center gap-2">
                                     <Star className="w-4 h-4 text-primary" />
                                     Why Choose This Project?
                                   </h5>
-                                  <p className="text-sm text-muted-foreground mb-4">{project.whyPick}</p>
-                                  
-                                  <h6 className="font-medium text-foreground mb-2">Skills You'll Develop:</h6>
-                                  <div className="flex flex-wrap gap-2 mb-4">
-                                    {project.skills.map((skill, idx) => (
-                                      <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
-                                    ))}
+                                  <p className="text-sm text-muted-foreground">{project.whyPick}</p>
+                                </div>
+
+                                {/* Middle Section: Key Findings & Connections */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                  <div className="space-y-4">
+                                    <h6 className="font-semibold text-foreground flex items-center gap-2">
+                                      <Brain className="w-4 h-4 text-primary" />
+                                      Key Findings
+                                    </h6>
+                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                                      {project.findings?.map((finding: string, index: number) => (
+                                        <li key={index} className="flex items-start gap-2">
+                                          <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                          {finding}
+                                        </li>
+                                      ))}
+                                    </ul>
                                   </div>
                                   
-                                  <h6 className="font-medium text-foreground mb-2">Expected Outcomes:</h6>
-                                  <div className="space-y-1">
-                                    {project.outcomes.map((outcome, idx) => (
-                                      <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                        <CheckCircle className="w-3 h-3 text-green-600" />
-                                        {outcome}
-                                      </div>
-                                    ))}
+                                  <div className="space-y-4">
+                                    <h6 className="font-semibold text-foreground flex items-center gap-2">
+                                      <Link className="w-4 h-4 text-primary" />
+                                      Connections to Your Profile
+                                    </h6>
+                                    <ul className="space-y-2 text-sm text-muted-foreground">
+                                      {project.connections?.map((connection: string, index: number) => (
+                                        <li key={index} className="flex items-start gap-2">
+                                          <ArrowRight className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                          {connection}
+                                        </li>
+                                      ))}
+                                    </ul>
                                   </div>
                                 </div>
-                                
-                                {/* Recommendation Insights */}
-                                <div className="space-y-6">
-                                  <div className="flex items-center gap-3">
-                                    <Lightbulb className="w-5 h-5 text-primary" />
-                                    <h5 className="text-lg font-semibold">Why We Recommend This Project</h5>
-                                  </div>
-                                  <div className="bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 rounded-lg p-6 space-y-4">
-                                    <div className="grid grid-cols-1 gap-6">
-                                      <div className="space-y-4">
-                                        <h6 className="font-semibold text-foreground flex items-center gap-2">
-                                          <Brain className="w-4 h-4 text-primary" />
-                                          Key Findings
-                                        </h6>
-                                        <ul className="space-y-2 text-sm text-muted-foreground">
-                                          {project.findings?.map((finding: string, index: number) => (
-                                            <li key={index} className="flex items-start gap-2">
-                                              <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
-                                              {finding}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                      <div className="space-y-4">
-                                        <h6 className="font-semibold text-foreground flex items-center gap-2">
-                                          <Link className="w-4 h-4 text-primary" />
-                                          Connections to Your Profile
-                                        </h6>
-                                        <ul className="space-y-2 text-sm text-muted-foreground">
-                                          {project.connections?.map((connection: string, index: number) => (
-                                            <li key={index} className="flex items-start gap-2">
-                                              <ArrowRight className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                                              {connection}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    </div>
-                                    <div className="pt-4 border-t border-border/50">
-                                      <h6 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                                        <Scale className="w-4 h-4 text-primary" />
-                                        Impact Assessment
-                                      </h6>
-                                      <p className="text-sm text-muted-foreground leading-relaxed">
-                                        {project.impact}
-                                      </p>
+
+                                {/* Bottom Section: Skills, Outcomes & Impact */}
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                  <div className="space-y-3">
+                                    <h6 className="font-medium text-foreground mb-2">Skills You'll Develop:</h6>
+                                    <div className="flex flex-wrap gap-2">
+                                      {project.skills.map((skill, idx) => (
+                                        <Badge key={idx} variant="outline" className="text-xs">{skill}</Badge>
+                                      ))}
                                     </div>
                                   </div>
-                                  <div className="flex justify-center pt-4">
-                                    <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-medium">
-                                      <Calendar className="w-4 h-4 mr-2" />
-                                      Start Planning & Customize Project
-                                      <ArrowRight className="w-4 h-4 ml-2" />
-                                    </Button>
+                                  
+                                  <div className="space-y-3">
+                                    <h6 className="font-medium text-foreground mb-2">Expected Outcomes:</h6>
+                                    <div className="space-y-1">
+                                      {project.outcomes.map((outcome, idx) => (
+                                        <div key={idx} className="flex items-center gap-2 text-sm text-muted-foreground">
+                                          <CheckCircle className="w-3 h-3 text-green-600" />
+                                          {outcome}
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
+                                  
+                                  <div className="space-y-3">
+                                    <h6 className="font-semibold text-foreground flex items-center gap-2">
+                                      <Scale className="w-4 h-4 text-primary" />
+                                      Impact Assessment
+                                    </h6>
+                                    <p className="text-sm text-muted-foreground leading-relaxed">
+                                      {project.impact}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Action Button */}
+                                <div className="flex justify-center pt-4 border-t border-border/50">
+                                  <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-medium">
+                                    <Calendar className="w-4 h-4 mr-2" />
+                                    Start Planning & Customize Project
+                                    <ArrowRight className="w-4 h-4 ml-2" />
+                                  </Button>
                                 </div>
                               </div>
                             </CardContent>
