@@ -444,12 +444,22 @@ const ProjectIncubationSystem = () => {
       if (!el) return;
 
       const onWheel = (e: WheelEvent) => {
-        // Prevent default scrolling and history swipe when over this element
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
-
         const dx = e.deltaX || 0;
         const dy = e.deltaY || 0;
+
+        // Check if we're at the edges of horizontal scroll
+        const atLeftEdge = el.scrollLeft <= 0;
+        const atRightEdge = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+
+        // If we're at the edges and trying to scroll beyond, allow vertical scroll
+        if ((atLeftEdge && dy < 0) || (atRightEdge && dy > 0)) {
+          // Allow normal page scrolling
+          return;
+        }
+
+        // Otherwise, prevent default and convert to horizontal scroll
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
 
         // Prefer vertical delta to drive horizontal movement
         const delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
@@ -520,18 +530,17 @@ const ProjectIncubationSystem = () => {
       {/* Smooth transition spacer between header and dashboards */}
       <div aria-hidden="true" className="h-8 md:h-14 bg-gradient-to-b from-transparent to-background/80"></div>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 pb-20 space-y-16">
+      {/* Full-width Dashboard Sections */}
+      <div className="w-full px-4 pb-8">
         {/* Active & Paused Projects Section */}
         <section className="relative">
-
           {/* Section Content Card */}
           <Card className="gradient-project-card border-purple-200/30 shadow-soft">
             <CardContent className="p-8">
               <div className="flex items-center justify-between mb-8">
                 <h2 className="text-2xl font-bold text-foreground flex items-center">
                   <BarChart3 className="h-6 w-6 mr-2 text-primary" />
-                  Active Project Dashboard
+                  Project Dashboard
                 </h2>
                 <div className="flex items-center space-x-3">
                   <Button variant="outline" size="sm">
@@ -686,119 +695,123 @@ const ProjectIncubationSystem = () => {
                      touchAction: 'pan-x',
                      WebkitOverflowScrolling: 'touch'
                    }}>
-                <div className="flex space-x-6 pb-4 min-w-max"
-                     style={{ touchAction: 'pan-x' }}>
-                  {projectPipeline.filter(project => project.status === 'paused').map((project) => (
-                    <Card key={project.id} className="min-w-[700px] max-w-[700px] gradient-project-paused border border-red-200/30 hover:shadow-medium transition-all duration-300 opacity-80">
-                      <CardHeader className="pb-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <Badge variant="secondary" style={{ backgroundColor: 'hsl(0 75% 60% / 0.1)', color: 'hsl(0 75% 40%)', border: '1px solid hsl(0 75% 60% / 0.2)' }} className="px-3 py-1">
-                            {project.stage} • Paused
-                          </Badge>
-                          <div className="flex items-center space-x-3">
-                            {project.type === 'technical' && <Code className="h-5 w-5" style={{ color: 'hsl(280 50% 50%)' }} />}
-                            {project.type === 'social-impact' && <Heart className="h-5 w-5" style={{ color: 'hsl(0 50% 50%)' }} />}
-                            {project.type === 'creative' && <Palette className="h-5 w-5" style={{ color: 'hsl(280 50% 50%)' }} />}
-                            {project.type === 'entrepreneurial' && <Briefcase className="h-5 w-5" style={{ color: 'hsl(0 50% 50%)' }} />}
-                            <Badge variant={project.priorityRating === 'High' ? 'destructive' : project.priorityRating === 'Medium' ? 'secondary' : 'outline'} className="text-xs px-2 py-1">
-                              {project.priorityRating}
-                            </Badge>
-                          </div>
-                        </div>
-                        <CardTitle className="text-xl mb-2">{project.project}</CardTitle>
-                        <CardDescription className="text-sm leading-relaxed">{project.description}</CardDescription>
-                      </CardHeader>
-                      
-                      <CardContent className="space-y-4">
-                        {/* Progress & Completion Section */}
-                        <div className="bg-white/60 rounded-lg p-4 border border-red-200/30">
-                          <div className="flex justify-between items-center mb-2">
-                            <span className="text-sm font-semibold text-foreground">Project Completion</span>
-                            <span className="font-bold text-foreground">{project.progress}%</span>
-                          </div>
-                          <Progress value={project.progress} className="h-3 mb-2" />
-                          <div className="text-xs text-muted-foreground text-center">
-                            Status: {project.completionPrediction}
-                          </div>
-                        </div>
-                        
-                        {/* Key Metrics Grid - Horizontal Layout */}
-                        <div className="grid grid-cols-4 gap-6">
-                          {/* Deadline */}
-                          <div className="text-center p-3 bg-white/70 rounded-lg border border-purple-200/30">
-                            <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(280 50% 50%)' }}>
-                              <Calendar className="h-3 w-3 mr-1" />
-                              Deadline
-                            </div>
-                            <div className="text-sm font-semibold text-foreground">
-                              {new Date(project.deadline).toLocaleDateString()}
-                            </div>
-                          </div>
-                          
-                          {/* Time Invested */}
-                          <div className="text-center p-3 bg-white/70 rounded-lg border border-purple-200/30">
-                            <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(280 50% 50%)' }}>
-                              <Clock className="h-3 w-3 mr-1" />
-                              Time Invested
-                            </div>
-                            <div className="text-sm font-semibold text-foreground">
-                              {project.timeInvested}h / {project.totalTimeEstimate}h
-                            </div>
-                          </div>
-                          
-                          {/* Impact Rating */}
-                          <div className="text-center p-3 bg-white/70 rounded-lg border border-red-200/30">
-                            <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(0 50% 50%)' }}>
-                              <Star className="h-3 w-3 mr-1" />
-                              Impact Rating
-                            </div>
-                            <div className="text-sm font-semibold text-foreground flex items-center justify-center">
-                              {project.impactRating}/10
-                            </div>
-                          </div>
-                          
-                          {/* Last Active */}
-                          <div className="text-center p-3 bg-white/70 rounded-lg border border-red-200/30">
-                            <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(0 50% 50%)' }}>
-                              <Eye className="h-3 w-3 mr-1" />
-                              Last Active
-                            </div>
-                            <div className="text-sm font-semibold text-foreground">
-                              {project.recentActivity}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Next Milestone Section */}
-                        <div className="bg-white/70 rounded-lg p-4 border border-purple-200/30">
-                          <div className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center" style={{ color: 'hsl(280 50% 50%)' }}>
-                            <Target className="h-3 w-3 mr-1" />
-                            Next Milestone
-                          </div>
-                          <div className="text-sm text-muted-foreground">{project.nextMilestone}</div>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <Button size="sm" variant="outline" className="h-9 border-purple-300/50 hover:bg-purple-50">
-                            <PlayCircle className="h-4 w-4 mr-2" />
-                            Resume Work
-                          </Button>
-                          <Button size="sm" variant="secondary" className="h-9 bg-red-100/50 hover:bg-red-100">
-                            <Eye className="h-4 w-4 mr-2" />
-                            Update Navigation
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+                 <div className="flex space-x-6 pb-4 min-w-max"
+                      style={{ touchAction: 'pan-x' }}>
+                   {projectPipeline.filter(project => project.status === 'paused').map((project) => (
+                     <Card key={project.id} className="min-w-[700px] max-w-[700px] gradient-project-paused border border-red-200/30 hover:shadow-medium transition-all duration-300 opacity-80">
+                       <CardHeader className="pb-4">
+                         <div className="flex items-center justify-between mb-3">
+                           <Badge variant="secondary" style={{ backgroundColor: 'hsl(0 75% 60% / 0.1)', color: 'hsl(0 75% 40%)', border: '1px solid hsl(0 75% 60% / 0.2)' }} className="px-3 py-1">
+                             {project.stage} • Paused
+                           </Badge>
+                           <div className="flex items-center space-x-3">
+                             {project.type === 'technical' && <Code className="h-5 w-5" style={{ color: 'hsl(280 50% 50%)' }} />}
+                             {project.type === 'social-impact' && <Heart className="h-5 w-5" style={{ color: 'hsl(0 50% 50%)' }} />}
+                             {project.type === 'creative' && <Palette className="h-5 w-5" style={{ color: 'hsl(280 50% 50%)' }} />}
+                             {project.type === 'entrepreneurial' && <Briefcase className="h-5 w-5" style={{ color: 'hsl(0 50% 50%)' }} />}
+                             <Badge variant={project.priorityRating === 'High' ? 'destructive' : project.priorityRating === 'Medium' ? 'secondary' : 'outline'} className="text-xs px-2 py-1">
+                               {project.priorityRating}
+                             </Badge>
+                           </div>
+                         </div>
+                         <CardTitle className="text-xl mb-2">{project.project}</CardTitle>
+                         <CardDescription className="text-sm leading-relaxed">{project.description}</CardDescription>
+                       </CardHeader>
+                       
+                       <CardContent className="space-y-4">
+                         {/* Progress & Completion Section */}
+                         <div className="bg-white/60 rounded-lg p-4 border border-red-200/30">
+                           <div className="flex justify-between items-center mb-2">
+                             <span className="text-sm font-semibold text-foreground">Project Completion</span>
+                             <span className="font-bold text-foreground">{project.progress}%</span>
+                           </div>
+                           <Progress value={project.progress} className="h-3 mb-2" />
+                           <div className="text-xs text-muted-foreground text-center">
+                             Status: {project.completionPrediction}
+                           </div>
+                         </div>
+                         
+                         {/* Key Metrics Grid - Horizontal Layout */}
+                         <div className="grid grid-cols-4 gap-6">
+                           {/* Deadline */}
+                           <div className="text-center p-3 bg-white/70 rounded-lg border border-purple-200/30">
+                             <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(280 50% 50%)' }}>
+                               <Calendar className="h-3 w-3 mr-1" />
+                               Deadline
+                             </div>
+                             <div className="text-sm font-semibold text-foreground">
+                               {new Date(project.deadline).toLocaleDateString()}
+                             </div>
+                           </div>
+                           
+                           {/* Time Invested */}
+                           <div className="text-center p-3 bg-white/70 rounded-lg border border-purple-200/30">
+                             <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(280 50% 50%)' }}>
+                               <Clock className="h-3 w-3 mr-1" />
+                               Time Invested
+                             </div>
+                             <div className="text-sm font-semibold text-foreground">
+                               {project.timeInvested}h / {project.totalTimeEstimate}h
+                             </div>
+                           </div>
+                           
+                           {/* Impact Rating */}
+                           <div className="text-center p-3 bg-white/70 rounded-lg border border-red-200/30">
+                             <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(0 50% 50%)' }}>
+                               <Star className="h-3 w-3 mr-1" />
+                               Impact Rating
+                             </div>
+                             <div className="text-sm font-semibold text-foreground flex items-center justify-center">
+                               {project.impactRating}/10
+                             </div>
+                           </div>
+                           
+                           {/* Last Active */}
+                           <div className="text-center p-3 bg-white/70 rounded-lg border border-red-200/30">
+                             <div className="text-xs font-bold uppercase tracking-wide mb-1 flex items-center justify-center" style={{ color: 'hsl(0 50% 50%)' }}>
+                               <Eye className="h-3 w-3 mr-1" />
+                               Last Active
+                             </div>
+                             <div className="text-sm font-semibold text-foreground">
+                               {project.recentActivity}
+                             </div>
+                           </div>
+                         </div>
+                         
+                         {/* Next Milestone Section */}
+                         <div className="bg-white/70 rounded-lg p-4 border border-purple-200/30">
+                           <div className="text-xs font-bold uppercase tracking-wide mb-2 flex items-center" style={{ color: 'hsl(280 50% 50%)' }}>
+                             <Target className="h-3 w-3 mr-1" />
+                             Next Milestone
+                           </div>
+                           <div className="text-sm text-muted-foreground">{project.nextMilestone}</div>
+                         </div>
+                         
+                         {/* Action Buttons */}
+                         <div className="grid grid-cols-2 gap-3">
+                           <Button size="sm" variant="outline" className="h-9 border-purple-300/50 hover:bg-purple-50">
+                             <PlayCircle className="h-4 w-4 mr-2" />
+                             Resume Work
+                           </Button>
+                           <Button size="sm" variant="secondary" className="h-9 bg-red-100/50 hover:bg-red-100">
+                             <Eye className="h-4 w-4 mr-2" />
+                             Update Navigation
+                           </Button>
+                         </div>
+                       </CardContent>
+                     </Card>
+                   ))}
+                 </div>
+               </div>
             </div>
           )}
             </CardContent>
           </Card>
         </section>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 pb-20 space-y-16">
 
         {/* Project Discovery & Planning Section */}
         <section className="relative">
