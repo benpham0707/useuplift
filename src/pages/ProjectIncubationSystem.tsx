@@ -771,7 +771,20 @@ const ProjectIncubationSystem = () => {
                         difficulty: 'Medium',
                         whyPick: 'Builds leadership skills, creates lasting community connections, and demonstrates commitment to social responsibility',
                         skills: ['Leadership', 'Project Management', 'Community Engagement'],
-                        outcomes: ['Local impact', 'Network building', 'Personal fulfillment']
+                        outcomes: ['Local impact', 'Network building', 'Personal fulfillment'],
+                        findings: [
+                          'Strong community service background with 200+ volunteer hours',
+                          'Leadership experience in student government and clubs',
+                          'Interest in social justice and community development',
+                          'Previous success organizing group events and initiatives'
+                        ],
+                        connections: [
+                          'Aligns with your declared sociology major and career interests',
+                          'Builds on your existing volunteer coordinator experience',
+                          'Complements your goal of attending graduate school in social work',
+                          'Matches your expressed interest in local community development'
+                        ],
+                        impact: 'This project leverages your existing community connections and leadership skills while addressing your career goal of making meaningful social impact. Based on your academic performance in sociology courses and volunteer history, you have the foundational knowledge and passion to create lasting change in your community.'
                       },
                       {
                         id: 'research-project',
@@ -783,7 +796,20 @@ const ProjectIncubationSystem = () => {
                         difficulty: 'High',
                         whyPick: 'Develops critical thinking, research methodology skills, and positions you for graduate school or academic careers',
                         skills: ['Research Methods', 'Data Analysis', 'Academic Writing'],
-                        outcomes: ['Publications', 'Conference presentations', 'Graduate school preparation']
+                        outcomes: ['Publications', 'Conference presentations', 'Graduate school preparation'],
+                        findings: [
+                          'Excellent academic performance with 3.8+ GPA in major courses',
+                          'Strong analytical and writing skills demonstrated in coursework',
+                          'Professor recommendations noting research potential',
+                          'Interest in pursuing graduate studies or PhD programs'
+                        ],
+                        connections: [
+                          'Builds on your A-level performance in research methodology courses',
+                          'Leverages your relationship with Dr. Smith who offered mentorship',
+                          'Supports your graduate school application goals for next year',
+                          'Aligns with your academic interests in behavioral psychology'
+                        ],
+                        impact: 'Your strong academic foundation and faculty relationships position you perfectly for research success. This project will differentiate your graduate school applications while providing real experience in your chosen field.'
                       },
                       {
                         id: 'startup-venture',
@@ -910,23 +936,58 @@ const ProjectIncubationSystem = () => {
                                   </div>
                                 </div>
                                 
-                                {/* Project Customization Interface */}
-                                <div className="bg-background border rounded-lg p-4">
-                                  <h5 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                                    <MessageCircle className="w-4 h-4 text-primary" />
-                                    Project Planning Assistant
-                                  </h5>
-                                  <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
-                                    <div className="bg-muted/50 p-3 rounded-lg">
-                                      <p className="text-sm text-foreground">
-                                        Great choice! I'll help you customize this {project.title.toLowerCase()} project. What specific goals do you want to achieve?
+                                {/* Recommendation Insights */}
+                                <div className="space-y-6">
+                                  <div className="flex items-center gap-3">
+                                    <Lightbulb className="w-5 h-5 text-primary" />
+                                    <h5 className="text-lg font-semibold">Why We Recommend This Project</h5>
+                                  </div>
+                                  <div className="bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20 rounded-lg p-6 space-y-4">
+                                    <div className="grid grid-cols-1 gap-6">
+                                      <div className="space-y-4">
+                                        <h6 className="font-semibold text-foreground flex items-center gap-2">
+                                          <Brain className="w-4 h-4 text-primary" />
+                                          Key Findings
+                                        </h6>
+                                        <ul className="space-y-2 text-sm text-muted-foreground">
+                                          {project.findings?.map((finding: string, index: number) => (
+                                            <li key={index} className="flex items-start gap-2">
+                                              <CheckCircle2 className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                              {finding}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                      <div className="space-y-4">
+                                        <h6 className="font-semibold text-foreground flex items-center gap-2">
+                                          <Link className="w-4 h-4 text-primary" />
+                                          Connections to Your Profile
+                                        </h6>
+                                        <ul className="space-y-2 text-sm text-muted-foreground">
+                                          {project.connections?.map((connection: string, index: number) => (
+                                            <li key={index} className="flex items-start gap-2">
+                                              <ArrowRight className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                              {connection}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    </div>
+                                    <div className="pt-4 border-t border-border/50">
+                                      <h6 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                                        <Scale className="w-4 h-4 text-primary" />
+                                        Impact Assessment
+                                      </h6>
+                                      <p className="text-sm text-muted-foreground leading-relaxed">
+                                        {project.impact}
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="flex gap-2">
-                                    <Input placeholder="Type your goals and preferences..." className="flex-1 text-sm" />
-                                    <Button size="sm">
-                                      <Send className="w-4 h-4" />
+                                  <div className="flex justify-center pt-4">
+                                    <Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-medium">
+                                      <Calendar className="w-4 h-4 mr-2" />
+                                      Start Planning & Customize Project
+                                      <ArrowRight className="w-4 h-4 ml-2" />
                                     </Button>
                                   </div>
                                 </div>
