@@ -305,6 +305,77 @@ const ProjectIncubationSystem = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [quickActionsExpanded, setQuickActionsExpanded] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+
+  // Hard coded data for suggested project types and ideas for discovery dashboard
+  const suggestedProjects = [
+    {
+      id: 'ai-study-planner',
+      title: 'AI-Powered Study Planner',
+      category: 'Academic Enhancement',
+      description: 'Personalized study schedule optimization using machine learning to adapt to your learning patterns',
+      estimatedTime: '6-8 weeks',
+      impactScore: 8.5,
+      skillsRequired: ['React', 'Python', 'Machine Learning'],
+      uniquenessRating: 'High',
+      icon: Brain
+    },
+    {
+      id: 'campus-sustainability',
+      title: 'Campus Sustainability Tracker',
+      category: 'Environmental Impact',
+      description: 'Real-time tracking of campus environmental metrics with student engagement features',
+      estimatedTime: '4-6 weeks',
+      impactScore: 9.2,
+      skillsRequired: ['IoT', 'Data Visualization', 'Mobile Development'],
+      uniquenessRating: 'Very High',
+      icon: Globe
+    },
+    {
+      id: 'peer-mentorship',
+      title: 'Peer Mentorship Platform',
+      category: 'Community Building',
+      description: 'Connect students across different academic years for mentorship and knowledge sharing',
+      estimatedTime: '5-7 weeks',
+      impactScore: 7.8,
+      skillsRequired: ['Full-Stack Development', 'UI/UX Design', 'Database Design'],
+      uniquenessRating: 'Medium',
+      icon: Users
+    },
+    {
+      id: 'local-business-connector',
+      title: 'Local Business Connector',
+      category: 'Economic Development',
+      description: 'Platform connecting students with local businesses for internships and projects',
+      estimatedTime: '8-10 weeks',
+      impactScore: 8.9,
+      skillsRequired: ['Business Development', 'Web Development', 'Marketing'],
+      uniquenessRating: 'High',
+      icon: Building
+    },
+    {
+      id: 'creative-collaboration',
+      title: 'Creative Collaboration Hub',
+      category: 'Arts & Media',
+      description: 'Digital space for artists, writers, and creators to collaborate on multimedia projects',
+      estimatedTime: '6-8 weeks',
+      impactScore: 7.3,
+      skillsRequired: ['Creative Direction', 'Web Development', 'Content Management'],
+      uniquenessRating: 'Medium',
+      icon: Palette
+    },
+    {
+      id: 'research-network',
+      title: 'Student Research Network',
+      category: 'Academic Research',
+      description: 'Platform for sharing research interests, finding collaborators, and tracking progress',
+      estimatedTime: '7-9 weeks',
+      impactScore: 8.1,
+      skillsRequired: ['Research Methods', 'Database Design', 'Academic Writing'],
+      uniquenessRating: 'High',
+      icon: Search
+    }
+  ];
 
   const toggleInsight = (insightId: string) => {
     setExpandedInsights(prev => 
@@ -410,12 +481,168 @@ const ProjectIncubationSystem = () => {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 pb-20">
+        {/* Project Discovery & Planning Dashboard */}
+        <div className="mb-12">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-foreground flex items-center">
+              <LightbulbIcon className="h-6 w-6 mr-2 text-primary" />
+              Project Discovery & Planning
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            {/* Left Side - Suggested Projects */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                <Search className="h-5 w-5 mr-2 text-blue-500" />
+                Suggested Project Directions
+              </h3>
+              
+              <div className="space-y-3">
+                {suggestedProjects.map((project) => (
+                  <Card 
+                    key={project.id} 
+                    className={`cursor-pointer transition-all duration-300 border-2 ${
+                      selectedProject === project.id 
+                        ? 'border-primary shadow-lg scale-[1.02] bg-primary/5' 
+                        : 'border-border hover:border-primary/50 hover:shadow-md'
+                    }`}
+                    onClick={() => setSelectedProject(project.id)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="p-2 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5">
+                          <project.icon className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold text-foreground truncate">{project.title}</h4>
+                            <Badge variant="outline" className="text-xs ml-2">
+                              {project.category}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">
+                            {project.description}
+                          </p>
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-4">
+                              <span className="flex items-center">
+                                <Clock className="h-3 w-3 mr-1 text-muted-foreground" />
+                                {project.estimatedTime}
+                              </span>
+                              <span className="flex items-center">
+                                <Star className="h-3 w-3 mr-1 text-yellow-500" />
+                                {project.impactScore}
+                              </span>
+                            </div>
+                            <Badge 
+                              variant={project.uniquenessRating === 'Very High' ? 'default' : 
+                                     project.uniquenessRating === 'High' ? 'secondary' : 'outline'}
+                              className="text-xs"
+                            >
+                              {project.uniquenessRating}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+
+            {/* Right Side - Chat Interface */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center">
+                <MessageCircle className="h-5 w-5 mr-2 text-green-500" />
+                Personalize Your Project Plan
+              </h3>
+              
+              <Card className={`h-[600px] transition-all duration-300 ${
+                selectedProject 
+                  ? 'border-green-500/30 shadow-lg' 
+                  : 'border-muted bg-muted/20 opacity-60'
+              }`}>
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-3 h-3 rounded-full ${
+                        selectedProject ? 'bg-green-500' : 'bg-muted-foreground'
+                      }`}></div>
+                      <span className={`text-sm font-medium ${
+                        selectedProject ? 'text-foreground' : 'text-muted-foreground'
+                      }`}>
+                        Chat with our AI to customize this project
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+                
+                <CardContent className="flex flex-col h-[480px]">
+                  {/* Chat Messages Area */}
+                  <div className={`flex-1 overflow-y-auto space-y-4 mb-4 ${
+                    !selectedProject ? 'pointer-events-none' : ''
+                  }`}>
+                    {selectedProject ? (
+                      <>
+                        <div className="bg-muted/30 rounded-lg p-4">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Brain className="h-4 w-4 text-primary" />
+                            </div>
+                            <div>
+                              <p className="text-sm text-foreground">
+                                Hi! I'm your Project Planning Assistant. I'll help you customize this project to fit your specific needs and circumstances.
+                              </p>
+                              <p className="text-sm text-muted-foreground mt-2">
+                                Let's start with <strong>{suggestedProjects.find(p => p.id === selectedProject)?.title}</strong>. What aspects would you like to personalize?
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full text-center">
+                        <div className="text-muted-foreground">
+                          <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                          <p className="text-sm">Select a project from the left to start planning</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chat Input */}
+                  <div className={`border-t pt-4 ${!selectedProject ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <div className="flex space-x-2">
+                      <Input
+                        placeholder="Ask about customizing this project..."
+                        value={userInput}
+                        onChange={(e) => setUserInput(e.target.value)}
+                        className="flex-1"
+                        disabled={!selectedProject}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                      />
+                      <Button 
+                        onClick={handleSendMessage}
+                        disabled={!selectedProject || !userInput.trim()}
+                        className="px-3"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+
         {/* Project Dashboard */}
         <div className="mb-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-2xl font-bold text-foreground flex items-center">
               <BarChart3 className="h-6 w-6 mr-2 text-primary" />
-              Project Dashboard
+              Active Project Dashboard
             </h2>
             <div className="flex items-center space-x-3">
               <Button variant="outline" size="sm">
