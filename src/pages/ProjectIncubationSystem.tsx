@@ -437,38 +437,48 @@ const ProjectIncubationSystem = () => {
     }
   }, [isDragging, dragOffset]);
 
-  // Hook: convert vertical wheel to horizontal scroll reliably and block page/back navigation when hovering
+  // Hook: convert vertical wheel to horizontal scroll with damped edge handoff
   const useHorizontalWheel = (ref: React.RefObject<HTMLDivElement | null>) => {
     React.useEffect(() => {
       const el = ref.current;
       if (!el) return;
 
-        const onWheel = (e: WheelEvent) => {
-          const dx = e.deltaX || 0;
-          const dy = e.deltaY || 0;
+      const HSCROLL_FACTOR = 0.85; // horizontal sensitivity (lower = slower)
+      const VSCROLL_DAMPING = 0.3; // how much of the leftover vertical scroll passes to the page
 
-          // Check if we're at the edges of horizontal scroll
-          const atLeftEdge = el.scrollLeft <= 0;
-          const atRightEdge = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+      const onWheel = (e: WheelEvent) => {
+        const dx = e.deltaX || 0;
+        const dy = e.deltaY || 0;
 
-          // If we're at the edges and trying to scroll beyond, pass vertical scroll to the page
-          if ((atLeftEdge && dy < 0) || (atRightEdge && dy > 0)) {
-            if (e.cancelable) e.preventDefault();
-            e.stopPropagation();
-            window.scrollBy({ top: dy, left: 0, behavior: 'auto' });
-            return;
-          }
+        // Prevent native behavior so we can fully control scroll without "shooting" the page
+        if (e.cancelable) e.preventDefault();
+        e.stopPropagation();
 
-          // Otherwise, prevent default and convert to horizontal scroll
-          if (e.cancelable) e.preventDefault();
-          e.stopPropagation();
+        const maxScrollLeft = el.scrollWidth - el.clientWidth;
+        const current = el.scrollLeft;
 
-          // Prefer vertical delta to drive horizontal movement
-          const delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
-          if (delta !== 0) {
-            el.scrollLeft += delta;
-          }
-        };
+        // Prefer vertical delta to drive horizontal movement
+        const driver = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
+        const desiredDX = driver * HSCROLL_FACTOR;
+
+        // Clamp to avoid overshoot
+        const allowedLeft = -current;
+        const allowedRight = maxScrollLeft - current;
+        const clampedDX = Math.max(allowedLeft, Math.min(allowedRight, desiredDX));
+
+        // Apply horizontal scroll
+        if (clampedDX !== 0) {
+          el.scrollLeft = current + clampedDX;
+        }
+
+        // Compute leftover that couldn't move horizontally (edge handoff)
+        const leftoverDX = desiredDX - clampedDX;
+        if (leftoverDX !== 0) {
+          const leftoverDY = leftoverDX / HSCROLL_FACTOR; // convert back to vertical intent
+          // Dampen the page scroll to avoid sudden jumps
+          window.scrollBy({ top: leftoverDY * VSCROLL_DAMPING, left: 0, behavior: 'auto' });
+        }
+      };
 
       el.addEventListener('wheel', onWheel as EventListener, { passive: false });
       return () => {
