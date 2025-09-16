@@ -5,12 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { PortfolioMetricsDashboard } from '@/components/PortfolioMetricsDashboard';
 import { 
   Lightbulb, 
   TrendingUp, 
@@ -541,6 +541,11 @@ const ProjectIncubationSystem = () => {
 
       {/* Smooth transition spacer between header and dashboards */}
       <div aria-hidden="true" className="h-8 md:h-14 bg-gradient-to-b from-transparent to-background/80"></div>
+
+      {/* Portfolio Metrics & Insights Dashboard */}
+      <div className="mb-16">
+        <PortfolioMetricsDashboard />
+      </div>
 
       {/* Full-width Dashboard Sections */}
       <div className="w-full pb-8">
