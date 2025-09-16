@@ -927,9 +927,9 @@ const PortfolioMetricsDashboard: React.FC = () => {
       </div>
 
       <div className="container mx-auto px-6 py-8">
-        {/* Portfolio Summary Cards */}
+        {/* Portfolio Summary Cards & Analytics */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-          <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/20 backdrop-blur-sm">
+          <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-primary/20">
@@ -937,13 +937,13 @@ const PortfolioMetricsDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.totalProjects}</p>
-                  <p className="text-sm text-foreground/70">Total Projects</p>
+                  <p className="text-sm text-muted-foreground">Total Projects</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-success/10 to-primary/10 border-success/20 backdrop-blur-sm">
+          <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-success/20">
@@ -951,13 +951,13 @@ const PortfolioMetricsDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.avgImpactScore}</p>
-                  <p className="text-sm text-foreground/70">Avg Impact Score</p>
+                  <p className="text-sm text-muted-foreground">Avg Impact Score</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-accent/10 to-primary/10 border-accent/20 backdrop-blur-sm">
+          <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-accent/20">
@@ -965,13 +965,13 @@ const PortfolioMetricsDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.avgStoryPotential}</p>
-                  <p className="text-sm text-foreground/70">Story Potential</p>
+                  <p className="text-sm text-muted-foreground">Story Potential</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-secondary/10 to-accent/10 border-secondary/20 backdrop-blur-sm">
+          <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-secondary/20">
@@ -979,13 +979,13 @@ const PortfolioMetricsDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.avgAdmissionsValue}</p>
-                  <p className="text-sm text-foreground/70">Admissions Value</p>
+                  <p className="text-sm text-muted-foreground">Admissions Value</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-gradient-to-br from-warning/10 to-success/10 border-warning/20 backdrop-blur-sm">
+          <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-warning/20">
@@ -993,8 +993,188 @@ const PortfolioMetricsDashboard: React.FC = () => {
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.verifiedProjects}</p>
-                  <p className="text-sm text-foreground/70">Verified</p>
+                  <p className="text-sm text-muted-foreground">Verified</p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Portfolio Analytics Dashboard */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Skills Progression Chart */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5 text-primary" />
+                Skills Development Timeline
+              </CardTitle>
+              <CardDescription>
+                Progression across all technical and leadership skills
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[
+                    { month: "Jan", technical: 65, leadership: 70, impact: 60 },
+                    { month: "Feb", technical: 72, leadership: 75, impact: 68 },
+                    { month: "Mar", technical: 78, leadership: 80, impact: 75 },
+                    { month: "Apr", technical: 85, leadership: 85, impact: 82 },
+                    { month: "May", technical: 90, leadership: 88, impact: 88 },
+                    { month: "Jun", technical: 95, leadership: 92, impact: 94 }
+                  ]}>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="month" className="text-muted-foreground" />
+                    <YAxis className="text-muted-foreground" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Legend />
+                    <Line type="monotone" dataKey="technical" stroke="hsl(var(--primary))" strokeWidth={3} name="Technical Skills" />
+                    <Line type="monotone" dataKey="leadership" stroke="hsl(var(--accent))" strokeWidth={3} name="Leadership" />
+                    <Line type="monotone" dataKey="impact" stroke="hsl(var(--success))" strokeWidth={3} name="Impact Score" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Portfolio Strength Radar */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PieChart className="h-5 w-5 text-primary" />
+                Portfolio Strength Analysis
+              </CardTitle>
+              <CardDescription>
+                Comprehensive evaluation across all dimensions
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={[
+                    { subject: 'Technical Skills', A: 90, B: 85 },
+                    { subject: 'Leadership', A: 88, B: 82 },
+                    { subject: 'Impact', A: 95, B: 78 },
+                    { subject: 'Innovation', A: 92, B: 80 },
+                    { subject: 'Communication', A: 85, B: 75 },
+                    { subject: 'Uniqueness', A: 89, B: 70 }
+                  ]}>
+                    <PolarGrid />
+                    <PolarAngleAxis dataKey="subject" className="text-muted-foreground text-sm" />
+                    <PolarRadiusAxis angle={90} domain={[0, 100]} className="text-muted-foreground" />
+                    <Radar name="Your Portfolio" dataKey="A" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} strokeWidth={2} />
+                    <Radar name="Avg Applicant" dataKey="B" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted-foreground))" fillOpacity={0.1} strokeWidth={2} />
+                    <Legend />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Essay Potential & Competitive Analysis */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Essay Topic Distribution */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Essay Topic Strength
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  { topic: "Personal Growth", score: 96, essays: 12 },
+                  { topic: "Leadership", score: 88, essays: 8 },
+                  { topic: "Innovation", score: 92, essays: 6 },
+                  { topic: "Community Impact", score: 94, essays: 10 },
+                  { topic: "Overcoming Challenges", score: 85, essays: 5 }
+                ].map((item, i) => (
+                  <div key={i} className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-medium text-foreground">{item.topic}</span>
+                      <span className="text-muted-foreground">{item.score}/100</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Progress value={item.score} className="flex-1" />
+                      <Badge variant="outline" className="text-xs">{item.essays} stories</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Competitive Positioning */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Trophy className="h-5 w-5 text-primary" />
+                Competitive Position
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="text-center p-4 bg-gradient-to-br from-success/20 to-primary/20 rounded-lg border border-success/30">
+                  <p className="text-2xl font-bold text-foreground">Top 5%</p>
+                  <p className="text-sm text-muted-foreground">Among similar applicants</p>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Technical Depth</span>
+                    <Badge className="bg-success/20 text-success">Exceptional</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Social Impact</span>
+                    <Badge className="bg-success/20 text-success">Outstanding</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Leadership Style</span>
+                    <Badge className="bg-primary/20 text-primary">Unique</Badge>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Story Authenticity</span>
+                    <Badge className="bg-success/20 text-success">Verified</Badge>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Action Items */}
+          <Card className="bg-card border-border">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Target className="h-5 w-5 text-primary" />
+                Priority Actions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[
+                  { action: "Quantify community garden impact metrics", priority: "High", color: "destructive" },
+                  { action: "Document peer support program outcomes", priority: "High", color: "destructive" },
+                  { action: "Create technical portfolio showcase", priority: "Medium", color: "warning" },
+                  { action: "Draft leadership philosophy essay", priority: "Medium", color: "warning" },
+                  { action: "Prepare interview stories", priority: "Low", color: "muted" }
+                ].map((item, i) => (
+                  <div key={i} className="p-3 rounded-lg border bg-card/50">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm text-foreground flex-1">{item.action}</p>
+                      <Badge variant={item.color === "destructive" ? "destructive" : item.color === "warning" ? "secondary" : "outline"} className="text-xs">
+                        {item.priority}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
