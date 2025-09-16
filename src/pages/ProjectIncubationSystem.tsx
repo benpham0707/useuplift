@@ -1100,46 +1100,44 @@ const ProjectIncubationSystem = () => {
                                   </CardContent>
                                 </Card>
 
-                {/* Third Section: Key Findings & Profile Connections (Full Width Side by Side) */}
-                <Card className="bg-gradient-to-r from-amber-500/8 to-indigo-500/8 border-amber-500/20 shadow-md hover:shadow-lg transition-all duration-300">
-                  <CardContent className="p-4">
-                    <div className="grid grid-cols-2 gap-4">
-                                      {/* Key Findings - Left Half */}
-                                      <div className="space-y-4">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <Brain className="w-5 h-5 text-amber-600" />
-                                          <h6 className="text-lg font-bold text-foreground">Key Findings</h6>
-                                        </div>
-                                        
-                                        <div className="space-y-3">
-                                          {project.findings?.slice(0, 4).map((finding: string, index: number) => (
-                                            <div key={index} className="flex items-start gap-3 text-sm text-muted-foreground leading-relaxed">
-                                              <div className="w-2 h-2 rounded-full bg-amber-500 mt-2 flex-shrink-0"></div>
-                                              <span>{finding}</span>
-                                            </div>
-                                          ))}
-                                        </div>
+                                {/* Third Section: Key Findings & Profile Connections (Compact Side by Side) */}
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                  <Card className="bg-gradient-to-br from-amber-500/6 to-orange-500/6 border-amber-500/15 shadow-md hover:shadow-lg transition-all duration-300 group">
+                                    <CardContent className="p-3">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <Brain className="w-4 h-4 text-amber-600" />
+                                        <h6 className="text-sm font-bold text-foreground">Key Findings</h6>
                                       </div>
                                       
-                                      {/* Profile Alignment - Right Half */}
-                                      <div className="space-y-4 border-l border-indigo-500/20 pl-8">
-                                        <div className="flex items-center gap-2 mb-4">
-                                          <Link className="w-5 h-5 text-indigo-600" />
-                                          <h6 className="text-lg font-bold text-foreground">Profile Alignment</h6>
-                                        </div>
-                                        
-                                        <div className="space-y-3">
-                                          {project.connections?.slice(0, 4).map((connection: string, index: number) => (
-                                            <div key={index} className="flex items-start gap-3 text-sm text-muted-foreground leading-relaxed">
-                                              <div className="w-2 h-2 rounded-full bg-indigo-500 mt-2 flex-shrink-0"></div>
-                                              <span>{connection}</span>
-                                            </div>
-                                          ))}
-                                        </div>
+                                      <div className="space-y-2 max-h-24 overflow-y-auto">
+                                        {project.findings?.slice(0, 3).map((finding: string, index: number) => (
+                                          <div key={index} className="flex items-start gap-2 text-xs text-muted-foreground leading-tight">
+                                            <div className="w-1 h-1 rounded-full bg-amber-500 mt-1.5 flex-shrink-0"></div>
+                                            <span className="line-clamp-2">{finding}</span>
+                                          </div>
+                                        ))}
                                       </div>
-                                    </div>
-                                  </CardContent>
-                                </Card>
+                                    </CardContent>
+                                  </Card>
+                                  
+                                  <Card className="bg-gradient-to-br from-indigo-500/6 to-purple-500/6 border-indigo-500/15 shadow-md hover:shadow-lg transition-all duration-300 group">
+                                    <CardContent className="p-3">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <Link className="w-4 h-4 text-indigo-600" />
+                                        <h6 className="text-sm font-bold text-foreground">Profile Alignment</h6>
+                                      </div>
+                                      
+                                      <div className="space-y-2 max-h-24 overflow-y-auto">
+                                        {project.connections?.slice(0, 3).map((connection: string, index: number) => (
+                                          <div key={index} className="flex items-start gap-2 text-xs text-muted-foreground leading-tight">
+                                            <div className="w-1 h-1 rounded-full bg-indigo-500 mt-1.5 flex-shrink-0"></div>
+                                            <span className="line-clamp-2">{connection}</span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                </div>
 
                                 {/* Bottom Section: Impact Assessment (Compact Full Width) */}
                                 <Card className="bg-gradient-to-r from-rose-500/6 to-purple-500/6 border-rose-500/15 shadow-md hover:shadow-lg transition-all duration-300">
