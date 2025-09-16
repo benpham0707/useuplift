@@ -443,30 +443,32 @@ const ProjectIncubationSystem = () => {
       const el = ref.current;
       if (!el) return;
 
-      const onWheel = (e: WheelEvent) => {
-        const dx = e.deltaX || 0;
-        const dy = e.deltaY || 0;
+        const onWheel = (e: WheelEvent) => {
+          const dx = e.deltaX || 0;
+          const dy = e.deltaY || 0;
 
-        // Check if we're at the edges of horizontal scroll
-        const atLeftEdge = el.scrollLeft <= 0;
-        const atRightEdge = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
+          // Check if we're at the edges of horizontal scroll
+          const atLeftEdge = el.scrollLeft <= 0;
+          const atRightEdge = el.scrollLeft + el.clientWidth >= el.scrollWidth - 1;
 
-        // If we're at the edges and trying to scroll beyond, allow vertical scroll
-        if ((atLeftEdge && dy < 0) || (atRightEdge && dy > 0)) {
-          // Allow normal page scrolling
-          return;
-        }
+          // If we're at the edges and trying to scroll beyond, pass vertical scroll to the page
+          if ((atLeftEdge && dy < 0) || (atRightEdge && dy > 0)) {
+            if (e.cancelable) e.preventDefault();
+            e.stopPropagation();
+            window.scrollBy({ top: dy, left: 0, behavior: 'auto' });
+            return;
+          }
 
-        // Otherwise, prevent default and convert to horizontal scroll
-        if (e.cancelable) e.preventDefault();
-        e.stopPropagation();
+          // Otherwise, prevent default and convert to horizontal scroll
+          if (e.cancelable) e.preventDefault();
+          e.stopPropagation();
 
-        // Prefer vertical delta to drive horizontal movement
-        const delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
-        if (delta !== 0) {
-          el.scrollLeft += delta;
-        }
-      };
+          // Prefer vertical delta to drive horizontal movement
+          const delta = Math.abs(dy) >= Math.abs(dx) ? dy : dx;
+          if (delta !== 0) {
+            el.scrollLeft += delta;
+          }
+        };
 
       el.addEventListener('wheel', onWheel as EventListener, { passive: false });
       return () => {
@@ -531,7 +533,7 @@ const ProjectIncubationSystem = () => {
       <div aria-hidden="true" className="h-8 md:h-14 bg-gradient-to-b from-transparent to-background/80"></div>
 
       {/* Full-width Dashboard Sections */}
-      <div className="w-full px-4 pb-8">
+      <div className="w-full pb-8">
         {/* Active & Paused Projects Section */}
         <section className="relative">
           {/* Section Content Card */}
@@ -565,14 +567,14 @@ const ProjectIncubationSystem = () => {
                  ref={activeProjectsRef}
                  style={{ 
                    overscrollBehaviorX: 'contain',
-                   overscrollBehaviorY: 'contain',
+                   overscrollBehaviorY: 'auto',
                    touchAction: 'pan-x',
                    WebkitOverflowScrolling: 'touch'
                  }}>
               <div className="flex space-x-6 pb-4 min-w-max"
                    style={{ touchAction: 'pan-x' }}>
                 {projectPipeline.filter(project => project.status === 'active').map((project) => (
-                  <Card key={project.id} className="min-w-[700px] max-w-[700px] gradient-project-card border border-purple-200/50 shadow-project hover:shadow-strong transition-all duration-300">
+                  <Card key={project.id} className="min-w-[860px] max-w-[860px] gradient-project-card border border-purple-200/50 shadow-project hover:shadow-strong transition-all duration-300">
                     <CardHeader className="pb-4">
                       <div className="flex items-center justify-between mb-3">
                         <Badge variant="default" style={{ backgroundColor: 'hsl(280 70% 60% / 0.1)', color: 'hsl(280 70% 40%)', border: '1px solid hsl(280 70% 60% / 0.2)' }} className="px-3 py-1">
@@ -691,14 +693,14 @@ const ProjectIncubationSystem = () => {
                    ref={pausedProjectsRef}
                    style={{ 
                      overscrollBehaviorX: 'contain',
-                     overscrollBehaviorY: 'contain',
+                     overscrollBehaviorY: 'auto',
                      touchAction: 'pan-x',
                      WebkitOverflowScrolling: 'touch'
                    }}>
                  <div className="flex space-x-6 pb-4 min-w-max"
                       style={{ touchAction: 'pan-x' }}>
                    {projectPipeline.filter(project => project.status === 'paused').map((project) => (
-                     <Card key={project.id} className="min-w-[700px] max-w-[700px] gradient-project-paused border border-red-200/30 hover:shadow-medium transition-all duration-300 opacity-80">
+                     <Card key={project.id} className="min-w-[860px] max-w-[860px] gradient-project-paused border border-red-200/30 hover:shadow-medium transition-all duration-300 opacity-80">
                        <CardHeader className="pb-4">
                          <div className="flex items-center justify-between mb-3">
                            <Badge variant="secondary" style={{ backgroundColor: 'hsl(0 75% 60% / 0.1)', color: 'hsl(0 75% 40%)', border: '1px solid hsl(0 75% 60% / 0.2)' }} className="px-3 py-1">
@@ -1162,256 +1164,8 @@ const ProjectIncubationSystem = () => {
           </Card>
         </section>
 
-        {/* Project Types & Strategies Section */}
-        <section className="relative">
-          {/* Section Header with Visual Separator */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500/10 to-red-500/10 rounded-full px-6 py-3 mb-4 border border-purple-200/50">
-              <Code className="h-5 w-5 text-purple-600" />
-              <span className="text-lg font-semibold text-foreground">Project Types & Strategic Focus</span>
-            </div>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Explore different project categories and strategic approaches to build a comprehensive portfolio
-            </p>
-          </div>
 
-          {/* Section Content Card */}
-          <Card className="gradient-project-card border-purple-200/30 shadow-soft">
-            <CardContent className="p-8">
-          <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center">
-            <Target className="h-6 w-6 mr-2 text-primary" />
-            Project Types & Strategic Focus
-          </h2>
-          
-          <Tabs value={selectedProjectType} onValueChange={setSelectedProjectType} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              {projectTypes.map((type) => {
-                const Icon = type.icon;
-                return (
-                  <TabsTrigger key={type.id} value={type.id} className="flex items-center space-x-2">
-                    <Icon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{type.name.split(' ')[0]}</span>
-                  </TabsTrigger>
-                );
-              })}
-            </TabsList>
-            
-            {projectTypes.map((type) => (
-              <TabsContent key={type.id} value={type.id} className="mt-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className={`p-3 rounded-lg bg-${type.color}-500/10`}>
-                          <type.icon className={`h-6 w-6 text-${type.color}-500`} />
-                        </div>
-                        <div>
-                          <CardTitle className="text-xl">{type.name}</CardTitle>
-                          <CardDescription>
-                            {type.count} active • {type.avgImpact > 0 ? `${type.avgImpact}/10 avg impact` : 'No projects yet'}
-                          </CardDescription>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        Start New
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-6">
-                    {/* Strategic Approaches */}
-                    <div>
-                      <h4 className="font-semibold text-foreground mb-3">Strategic Approaches</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {type.strategies.map((strategy, index) => (
-                          <div key={index} className="flex items-center space-x-2 p-3 bg-muted/30 rounded-lg">
-                            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-                            <span className="text-sm text-foreground">{strategy}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    {/* Example Projects */}
-                    <div>
-                      <h4 className="font-semibold text-foreground mb-3">Your Projects</h4>
-                      <div className="space-y-3">
-                        {type.examples.map((example, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                            <div className="flex items-center space-x-3">
-                              <div className={`w-2 h-2 rounded-full bg-${example.status === 'active' ? 'green' : example.status === 'planning' ? 'yellow' : 'gray'}-500`}></div>
-                              <span className="font-medium text-foreground">{example.name}</span>
-                              <Badge variant="outline" className="text-xs">
-                                {example.uniqueness} Uniqueness
-                              </Badge>
-                            </div>
-                            <Badge variant={example.status === 'active' ? 'default' : 'secondary'} className="text-xs capitalize">
-                              {example.status}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            ))}
-          </Tabs>
-            </CardContent>
-          </Card>
-        </section>
 
-        {/* AI Collaboration Modes Section */}
-        <section className="relative">
-          {/* Section Header with Visual Separator */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500/10 to-red-500/10 rounded-full px-6 py-3 mb-4 border border-purple-200/50">
-              <Brain className="h-5 w-5 text-purple-600" />
-              <span className="text-lg font-semibold text-foreground">AI Collaboration Modes</span>
-            </div>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Choose your AI collaboration style to optimize project development and learning outcomes
-            </p>
-          </div>
-
-          {/* Section Content Card */}
-          <Card className="gradient-project-card border-purple-200/30 shadow-soft">
-            <CardContent className="p-8">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {Object.entries(aiCollaborationModes).map(([mode, data]) => {
-              const Icon = data.icon;
-              return (
-                <Card key={mode} className="relative overflow-hidden">
-                  <CardHeader>
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-3 rounded-lg bg-${data.color}-500/10`}>
-                        <Icon className={`h-6 w-6 text-${data.color}-500`} />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg">{data.name}</CardTitle>
-                        <CardDescription>{data.description}</CardDescription>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  
-                  <CardContent className="space-y-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Usage This Month:</span>
-                      <span className="font-medium text-foreground">{data.usageTime}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Effectiveness:</span>
-                      <span className="font-medium text-foreground">{data.effectiveness}</span>
-                    </div>
-                    
-                    <div>
-                      <h5 className="font-medium text-foreground mb-2">
-                        {mode === 'socratic' ? 'Recent Questions:' : 'Recent Topics:'}
-                      </h5>
-                      <div className="space-y-2">
-                        {(mode === 'socratic' ? (data as any).recentQuestions : (data as any).recentTopics).map((item, index) => (
-                          <div key={index} className="p-2 bg-muted/30 rounded text-sm text-foreground">
-                            "{item}"
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    
-                    <Button variant="outline" className="w-full">
-                      Start {data.name} Session
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* Uniqueness Preservation Section */}
-        <section className="relative">
-          {/* Section Header with Visual Separator */}
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500/10 to-red-500/10 rounded-full px-6 py-3 mb-4 border border-purple-200/50">
-              <Star className="h-5 w-5 text-purple-600" />
-              <span className="text-lg font-semibold text-foreground">Uniqueness Preservation</span>
-            </div>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Advanced metrics and tracking to ensure your projects stand out and maintain competitive advantage
-            </p>
-          </div>
-
-          {/* Section Content Card */}
-          <Card className="gradient-project-card border-purple-200/30 shadow-soft">
-            <CardContent className="p-8">
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Saturation Tracking</CardTitle>
-                <CardDescription>Monitor what others are building</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Total Projects Monitored:</span>
-                    <span className="font-medium text-foreground">{uniquenessMetrics.saturationTracking.totalProjects.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Similar to Yours:</span>
-                    <span className="font-medium text-foreground">{uniquenessMetrics.saturationTracking.similarToYours}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Saturation Level:</span>
-                    <Badge variant={uniquenessMetrics.saturationTracking.saturationLevel === 'Low' ? 'default' : 'secondary'} className="text-xs">
-                      {uniquenessMetrics.saturationTracking.saturationLevel}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Opportunity Score:</span>
-                    <Badge variant="default" className="text-xs text-green-600">
-                      {uniquenessMetrics.saturationTracking.opportunity}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Personal Story Integration</CardTitle>
-                <CardDescription>Make projects uniquely yours</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Integration Score:</span>
-                    <span className="font-medium text-foreground">{uniquenessMetrics.personalStory.integration}%</span>
-                  </div>
-                  <Progress value={uniquenessMetrics.personalStory.integration} className="h-2" />
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Authenticity:</span>
-                    <span className="font-medium text-foreground">{uniquenessMetrics.personalStory.authenticity}%</span>
-                  </div>
-                  <Progress value={uniquenessMetrics.personalStory.authenticity} className="h-2" />
-                </div>
-                
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <div className="text-xs text-muted-foreground mb-1">Your Narrative</div>
-                  <div className="text-sm text-foreground">{uniquenessMetrics.personalStory.narrative}</div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-            </CardContent>
-          </Card>
-        </section>
       </div>
 
       {/* Floating AI Chat Assistant */}
