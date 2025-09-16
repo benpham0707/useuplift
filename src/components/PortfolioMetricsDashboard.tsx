@@ -86,7 +86,9 @@ import {
   Legend,
   ScatterChart,
   Scatter,
-  Cell
+  Cell,
+  PieChart as PieChartRecharts,
+  Pie
 } from "recharts";
 
 // Enhanced Portfolio Data with Deep Insights - Hard coded mock data values representing comprehensive student project analytics
@@ -106,6 +108,39 @@ const portfolioData = [
       storyPotential: 96,
       admissionsValue: 92,
       uniqueness: 89
+    },
+
+    // Chart Data - Hard coded mock data for comprehensive project analytics visualization
+    chartData: {
+      monthlyImpact: [
+        { month: 'Jan', users: 45, gardens: 8, satisfaction: 78 },
+        { month: 'Feb', users: 89, gardens: 12, satisfaction: 82 },
+        { month: 'Mar', users: 156, gardens: 18, satisfaction: 87 },
+        { month: 'Apr', users: 234, gardens: 25, satisfaction: 91 },
+        { month: 'May', users: 312, gardens: 31, satisfaction: 94 },
+        { month: 'Jun', users: 478, gardens: 42, satisfaction: 96 }
+      ],
+      skillProgression: [
+        { skill: 'Frontend', month1: 20, month3: 45, month6: 88 },
+        { skill: 'Backend', month1: 15, month3: 38, month6: 82 },
+        { skill: 'Database', month1: 10, month3: 35, month6: 79 },
+        { skill: 'DevOps', month1: 5, month3: 25, month6: 71 },
+        { skill: 'UI/UX', month1: 25, month3: 52, month6: 85 }
+      ],
+      storyThemes: [
+        { theme: 'Technical Innovation', score: 92, essays: 8 },
+        { theme: 'Community Impact', score: 96, essays: 12 },
+        { theme: 'Leadership Growth', score: 87, essays: 6 },
+        { theme: 'Problem Solving', score: 94, essays: 9 },
+        { theme: 'Cultural Bridge', score: 89, essays: 7 }
+      ],
+      careerAlignment: [
+        { career: 'Software Engineer', probability: 85, growth: 12 },
+        { career: 'Product Manager', probability: 78, growth: 15 },
+        { career: 'Social Entrepreneur', probability: 92, growth: 18 },
+        { career: 'UX Designer', probability: 71, growth: 10 },
+        { career: 'Non-profit Tech', probability: 88, growth: 14 }
+      ]
     },
 
     impactAnalysis: {
@@ -164,7 +199,7 @@ const portfolioData = [
         {
           hook: "The day I learned that my code could grow tomatoes was the day I understood that technology isn't about the future—it's about remembering who we've always been.",
           essayPrompt: "Personal statement / Why Major",
-          emotionalResonance: "High - bridges technology and humanity",
+          emotionalResonance: "High",
           uniquenessScore: 95,
           developmentPath: "Could explore journey from tech-focused to community-centered mindset"
         }
@@ -257,6 +292,39 @@ const portfolioData = [
       uniqueness: 91
     },
 
+    // Chart Data - Hard coded mock data for mental health project analytics visualization
+    chartData: {
+      monthlyImpact: [
+        { month: 'Mar', participants: 12, sessions: 24, wellbeing: 72 },
+        { month: 'Apr', participants: 28, sessions: 45, wellbeing: 78 },
+        { month: 'May', participants: 52, sessions: 78, wellbeing: 85 },
+        { month: 'Jun', participants: 89, sessions: 134, wellbeing: 89 },
+        { month: 'Jul', participants: 156, sessions: 201, wellbeing: 92 },
+        { month: 'Aug', participants: 234, sessions: 298, wellbeing: 94 }
+      ],
+      skillProgression: [
+        { skill: 'Crisis Intervention', month1: 35, month3: 68, month6: 92 },
+        { skill: 'Group Facilitation', month1: 20, month3: 55, month6: 87 },
+        { skill: 'Peer Counseling', month1: 40, month3: 72, month6: 95 },
+        { skill: 'Program Development', month1: 15, month3: 48, month6: 84 },
+        { skill: 'Training Others', month1: 10, month3: 38, month6: 78 }
+      ],
+      storyThemes: [
+        { theme: 'Personal Growth', score: 98, essays: 15 },
+        { theme: 'Community Healing', score: 95, essays: 12 },
+        { theme: 'Peer Leadership', score: 91, essays: 8 },
+        { theme: 'System Change', score: 87, essays: 6 },
+        { theme: 'Vulnerability as Strength', score: 94, essays: 10 }
+      ],
+      careerAlignment: [
+        { career: 'Clinical Psychology', probability: 94, growth: 22 },
+        { career: 'Social Work', probability: 88, growth: 18 },
+        { career: 'Counseling', probability: 91, growth: 19 },
+        { career: 'Public Health', probability: 76, growth: 14 },
+        { career: 'Youth Programs', probability: 85, growth: 16 }
+      ]
+    },
+
     impactAnalysis: {
       summary: "Peer support program reaching 300+ students across 4 schools with documented mental health improvements",
       deepDive: {
@@ -313,7 +381,7 @@ const portfolioData = [
         {
           hook: "The text came at 2:17 AM: 'I can't do this anymore.' Three months earlier, I wouldn't have known what to say. Now, I had fifteen trained peer counselors I could connect her with in minutes.",
           essayPrompt: "Community impact / Leadership",
-          emotionalResonance: "Very High - immediate stakes, personal growth",
+          emotionalResonance: "Very High",
           uniquenessScore: 94,
           developmentPath: "Story of building systems that save lives through peer support"
         }
@@ -392,7 +460,622 @@ const portfolioData = [
   }
 ];
 
-// Enhanced Expandable Insight Card Component
+// Enhanced Project Detail View Component with Rich Charts and Analysis
+const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, onBack }) => (
+  <div className="min-h-screen bg-gradient-to-br from-background via-primary/3 to-accent/3">
+    {/* Project Header */}
+    <div className="sticky top-0 z-10 bg-card/90 backdrop-blur-md border-b border-border/50">
+      <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" onClick={onBack} className="p-2">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
+              <div className="flex items-center gap-3 mt-1">
+                <Badge variant="outline" className="border-primary/50 text-primary">
+                  {project.type}
+                </Badge>
+                <Badge variant="outline" className="border-accent/50 text-accent">
+                  {project.category}
+                </Badge>
+                {project.verified && (
+                  <Badge className="bg-success/20 text-success border-success/30">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Verified
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm">
+              <ExternalLink className="h-4 w-4 mr-2" />
+              View Project
+            </Button>
+            <Button variant="outline" size="sm">
+              <FileEdit className="h-4 w-4 mr-2" />
+              Edit Details
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Project Content */}
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Quick Metrics Overview */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        {Object.entries(project.quickMetrics).map(([key, value]: [string, any]) => (
+          <Card key={key} className="bg-card/70 border-border/50 backdrop-blur-sm">
+            <CardContent className="p-4 text-center">
+              <div className="text-2xl font-bold text-foreground mb-1">{value}</div>
+              <div className="text-xs text-muted-foreground capitalize">
+                {key.replace(/([A-Z])/g, ' $1').trim()}
+              </div>
+              <Progress value={value} className="mt-2 h-2" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Detailed Analysis Tabs */}
+      <Tabs defaultValue="impact" className="space-y-8">
+        <TabsList className="grid w-full grid-cols-4 bg-card/50 border border-border/50 sticky top-20 z-10">
+          <TabsTrigger value="impact" className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Impact Analysis
+          </TabsTrigger>
+          <TabsTrigger value="skills" className="flex items-center gap-2">
+            <Brain className="h-4 w-4" />
+            Skills Deep Dive
+          </TabsTrigger>
+          <TabsTrigger value="essays" className="flex items-center gap-2">
+            <Gem className="h-4 w-4" />
+            Essay Goldmine
+          </TabsTrigger>
+          <TabsTrigger value="future" className="flex items-center gap-2">
+            <Compass className="h-4 w-4" />
+            Future Trajectory
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Impact Analysis Tab - Full Width with Charts */}
+        <TabsContent value="impact" className="space-y-8">
+          {/* Impact Growth Chart */}
+          <Card className="bg-card/70 border-border/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-success" />
+                Project Impact Growth Over Time
+              </CardTitle>
+              <CardDescription>Monthly progression of key impact metrics</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={project.chartData.monthlyImpact}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="month" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Legend />
+                    {Object.keys(project.chartData.monthlyImpact[0]).filter(key => key !== 'month').map((key, index) => (
+                      <Line 
+                        key={key}
+                        type="monotone" 
+                        dataKey={key} 
+                        stroke={index === 0 ? "hsl(var(--primary))" : index === 1 ? "hsl(var(--success))" : "hsl(var(--accent))"} 
+                        strokeWidth={3} 
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Two Column Layout for Impact Details */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Impact Genesis Deep Dive */}
+            <Card className="bg-gradient-to-br from-primary/10 to-accent/10 border-primary/30 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  Impact Genesis & Evolution
+                </CardTitle>
+                <CardDescription className="text-foreground/80">
+                  {project.impactAnalysis.summary}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="p-4 rounded-lg bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30">
+                  <h4 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                    <Flame className="h-4 w-4 text-primary" />
+                    The Trigger Moment
+                  </h4>
+                  <p className="text-foreground/80 text-sm italic">"{project.impactAnalysis.deepDive.genesis.trigger}"</p>
+                </div>
+                
+                <div className="p-4 rounded-lg bg-card/50 border border-border/50">
+                  <h4 className="font-semibold text-foreground mb-2">Personal Connection</h4>
+                  <p className="text-foreground/80 text-sm">{project.impactAnalysis.deepDive.genesis.personalConnection}</p>
+                </div>
+
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/30">
+                  <h4 className="font-semibold text-destructive mb-2">Initial Failures (Learning Moments)</h4>
+                  <p className="text-foreground/80 text-sm">{project.impactAnalysis.deepDive.genesis.initialFailures}</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Breakthrough Moments */}
+            <Card className="bg-gradient-to-br from-success/10 to-primary/10 border-success/30 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Crown className="h-5 w-5 text-success" />
+                  Breakthrough Moments
+                </CardTitle>
+                <CardDescription>Key turning points that defined the project's impact</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {project.impactAnalysis.deepDive.breakthroughMoments?.map((moment: any, i: number) => (
+                  <div key={i} className="space-y-4">
+                    <div className="space-y-3 text-sm">
+                      <p className="text-foreground/90">
+                        <strong>The Moment:</strong> {moment.moment}
+                      </p>
+                      <p className="text-foreground/90">
+                        <strong>Why It Mattered:</strong> {moment.significance}
+                      </p>
+                      <p className="text-foreground/90">
+                        <strong>How I Grew:</strong> {moment.characterGrowth}
+                      </p>
+                      <div className="p-3 rounded-md bg-primary/20 border border-primary/30">
+                        <h5 className="font-medium text-primary text-xs mb-1">ESSAY GOLD</h5>
+                        <p className="italic text-foreground/90 text-sm">"{moment.essayGold}"</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Skills Deep Dive Tab - Full Width with Charts */}
+        <TabsContent value="skills" className="space-y-8">
+          {/* Skills Progression Chart */}
+          <Card className="bg-card/70 border-border/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Brain className="h-5 w-5 text-primary" />
+                Skill Development Progression
+              </CardTitle>
+              <CardDescription>Growth trajectory across key competencies over 6 months</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={project.chartData.skillProgression}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="skill" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Legend />
+                    <Bar dataKey="month1" fill="hsl(var(--muted))" name="Month 1" />
+                    <Bar dataKey="month3" fill="hsl(var(--primary))" name="Month 3" />
+                    <Bar dataKey="month6" fill="hsl(var(--success))" name="Month 6" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Technical Skills Deep Dive */}
+          <div className="space-y-6">
+            {project.skillsAnalysis.technicalSkills.map((skill: any, i: number) => (
+              <Card key={i} className="bg-gradient-to-br from-primary/5 to-accent/5 border-primary/20">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Code className="h-5 w-5 text-primary" />
+                    {skill.skill}
+                  </CardTitle>
+                  <CardDescription>Comprehensive analysis of development and transferable value</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Development Journey */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-success" />
+                      Development Journey
+                    </h4>
+                    <div className="grid gap-4">
+                      {Object.entries(skill.progressionStory).map(([phase, description]: [string, any]) => (
+                        <div key={phase} className="flex gap-4 p-3 rounded-lg bg-card/50 border border-border/30">
+                          <div className="w-3 h-3 rounded-full bg-primary mt-1 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="font-medium text-foreground capitalize text-sm">{phase}:</p>
+                            <p className="text-foreground/80 text-sm mt-1">{description}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Two Column Layout for Transferable Value and Evidence */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <Target className="h-4 w-4 text-accent" />
+                        Transferable Value
+                      </h4>
+                      <div className="space-y-3">
+                        {Object.entries(skill.transferableValue).map(([key, value]: [string, any]) => (
+                          <div key={key} className="p-3 bg-accent/10 rounded-lg border border-accent/20">
+                            <p className="font-medium text-foreground capitalize text-sm">
+                              {key.replace(/([A-Z])/g, ' $1').trim()}:
+                            </p>
+                            <p className="text-foreground/80 text-sm mt-1">{value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {skill.evidenceOfExcellence && (
+                      <div>
+                        <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 text-success" />
+                          Evidence of Excellence
+                        </h4>
+                        <ul className="space-y-3">
+                          {skill.evidenceOfExcellence.map((evidence: string, j: number) => (
+                            <li key={j} className="flex items-start gap-3 p-3 bg-success/10 rounded-lg border border-success/20">
+                              <Trophy className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
+                              <span className="text-foreground/80 text-sm">{evidence}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Essay Goldmine Tab - Full Width Rich Content */}
+        <TabsContent value="essays" className="space-y-8">
+          {/* Story Themes Chart */}
+          <Card className="bg-card/70 border-border/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gem className="h-5 w-5 text-accent" />
+                Essay Story Theme Analysis
+              </CardTitle>
+              <CardDescription>Strength and essay potential across different narrative themes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart data={project.chartData.storyThemes}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="score" domain={[80, 100]} name="Theme Strength" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis dataKey="essays" name="Essay Count" stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value, name, props) => [value, name === 'score' ? 'Theme Strength' : 'Essay Count']}
+                      labelFormatter={(value) => `Theme: ${project.chartData.storyThemes.find((item: any) => item.score === value)?.theme || ''}`}
+                    />
+                    <Scatter dataKey="score" fill="hsl(var(--primary))" />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Powerful Opening Hooks - Large Cards */}
+          <Card className="bg-gradient-to-br from-accent/20 to-primary/20 border-accent/30 shadow-lg">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Gem className="h-5 w-5 text-accent" />
+                Powerful Opening Hooks
+                <Badge className="bg-accent/20 text-accent border-accent/30 ml-2">Essay Ready</Badge>
+              </CardTitle>
+              <CardDescription>Attention-grabbing essay openers with high uniqueness ratings</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {project.essayGoldmine.powerfulOpeningHooks.map((hook: any, i: number) => (
+                <div key={i} className="p-6 rounded-lg bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/30">
+                  <div className="flex items-start justify-between mb-3">
+                    <h4 className="font-semibold text-foreground">Hook #{i + 1}: {hook.essayPrompt}</h4>
+                    <div className="flex gap-2">
+                      <Badge variant="outline" className="border-accent/50 text-accent text-xs">
+                        {hook.emotionalResonance} Resonance
+                      </Badge>
+                      <Badge className="bg-primary/20 text-primary border-primary/30 text-xs">
+                        {hook.uniquenessScore}% Unique
+                      </Badge>
+                    </div>
+                  </div>
+                  <blockquote className="text-foreground/90 italic text-lg border-l-4 border-accent pl-4 bg-card/30 p-4 rounded-r-lg">
+                    "{hook.hook}"
+                  </blockquote>
+                  <p className="text-foreground/70 text-sm mt-3">
+                    <strong>Development Path:</strong> {hook.developmentPath}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Two Column Layout for Character Arcs and Story Moments */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            {/* Character Development Arcs */}
+            <Card className="bg-gradient-to-br from-primary/10 to-success/10 border-primary/30 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Map className="h-5 w-5 text-primary" />
+                  Character Development Arcs
+                </CardTitle>
+                <CardDescription>Complete narrative progressions showing personal growth</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {project.essayGoldmine.characterDevelopmentArcs.map((arc: any, i: number) => (
+                  <div key={i} className="p-4 rounded-lg bg-card/50 border border-primary/30">
+                    <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                      <Crown className="h-4 w-4 text-primary" />
+                      {arc.theme}
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <h5 className="font-medium text-foreground mb-2">Progression:</h5>
+                        <ol className="space-y-2">
+                          {arc.progression.map((step: string, j: number) => (
+                            <li key={j} className="text-sm text-foreground/80 flex gap-3">
+                              <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                                {j + 1}
+                              </span>
+                              {step}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          <span className="font-medium text-foreground text-sm">Character Strengths:</span>
+                          {arc.characterStrengths.map((strength: string, j: number) => (
+                            <Badge key={j} variant="outline" className="text-xs border-success/50 text-success">
+                              {strength}
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="font-medium text-foreground text-sm">Essay Applications:</span>
+                          {arc.essayApplications.map((app: string, j: number) => (
+                            <Badge key={j} className="text-xs bg-primary/20 text-primary border-primary/30">
+                              {app}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Specific Story Moments */}
+            <Card className="bg-gradient-to-br from-warning/10 to-destructive/10 border-warning/30 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Quote className="h-5 w-5 text-warning" />
+                  Specific Story Moments
+                </CardTitle>
+                <CardDescription>Detailed narratives ready for essay development</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {project.essayGoldmine.specificStoryMoments.map((story: any, i: number) => (
+                  <div key={i} className="p-4 rounded-lg bg-gradient-to-br from-warning/5 to-destructive/5 border border-warning/30">
+                    <h4 className="font-semibold text-foreground mb-3">{story.storyTitle}</h4>
+                    <div className="space-y-3 text-sm">
+                      <p className="text-foreground/80"><strong>Setup:</strong> {story.setup}</p>
+                      <p className="text-foreground/80"><strong>Conflict:</strong> {story.conflict}</p>
+                      <p className="text-foreground/80"><strong>My Role:</strong> {story.myRole}</p>
+                      <p className="text-foreground/80"><strong>Resolution:</strong> {story.resolution}</p>
+                      <div className="p-3 bg-primary/20 rounded-md border border-primary/30">
+                        <p className="font-medium text-primary">Deeper Meaning:</p>
+                        <p className="italic text-foreground/90">{story.deeperMeaning}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <Badge className="bg-success/20 text-success text-xs border-success/30">
+                          {story.essayPotential}
+                        </Badge>
+                        {story.characterQualities.map((quality: string, j: number) => (
+                          <Badge key={j} variant="outline" className="text-xs border-warning/50 text-foreground/80">
+                            {quality}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Future Trajectory Tab - Full Width with Charts */}
+        <TabsContent value="future" className="space-y-8">
+          {/* Career Alignment Chart */}
+          <Card className="bg-card/70 border-border/50 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Compass className="h-5 w-5 text-accent" />
+                Career Path Probability Analysis
+              </CardTitle>
+              <CardDescription>AI-predicted career alignment based on demonstrated skills and interests</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={project.chartData.careerAlignment}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis dataKey="career" stroke="hsl(var(--muted-foreground))" />
+                    <YAxis stroke="hsl(var(--muted-foreground))" />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }} 
+                    />
+                    <Legend />
+                    <Bar dataKey="probability" fill="hsl(var(--primary))" name="Probability %" />
+                    <Bar dataKey="growth" fill="hsl(var(--success))" name="Growth Potential" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Two Column Layout for Career Analysis */}
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+            {/* Career Trajectory Predictions */}
+            <Card className="bg-gradient-to-br from-accent/10 to-primary/10 border-accent/30 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Rocket className="h-5 w-5 text-accent" />
+                  Career Trajectory Predictions
+                </CardTitle>
+                <CardDescription>Most likely career paths with evidence and next steps</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {project.futureAnalysis.careerTrajectoryPredictions.map((path: any, i: number) => (
+                  <div key={i} className="p-4 rounded-lg bg-gradient-to-r from-accent/5 to-primary/5 border border-accent/30">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="font-semibold text-foreground">{path.path}</h4>
+                      <Badge className="bg-success/20 text-success border-success/30">
+                        {path.probability}% probability
+                      </Badge>
+                    </div>
+                    <div className="space-y-4 text-sm">
+                      <div>
+                        <p className="font-medium text-foreground mb-2">Evidence:</p>
+                        <ul className="space-y-2">
+                          {path.evidence.map((evidence: string, j: number) => (
+                            <li key={j} className="flex items-start gap-2">
+                              <CheckCircle className="h-3 w-3 text-success mt-1 flex-shrink-0" />
+                              <span className="text-foreground/80">{evidence}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="font-medium text-foreground mb-2">Recommended Next Steps:</p>
+                        <ul className="space-y-2">
+                          {path.recommendedSteps.map((step: string, j: number) => (
+                            <li key={j} className="flex items-start gap-2">
+                              <ChevronRight className="h-3 w-3 text-primary mt-1 flex-shrink-0" />
+                              <span className="text-foreground/80">{step}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+
+            {/* Admissions Competitive Positioning */}
+            <Card className="bg-gradient-to-br from-success/10 to-warning/10 border-success/30 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5 text-success" />
+                  Admissions Competitive Positioning
+                </CardTitle>
+                <CardDescription>How this project positions you in the admissions landscape</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h4 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-success" />
+                    Competitive Advantages
+                  </h4>
+                  <div className="space-y-4">
+                    {project.futureAnalysis.admissionsPositioning.competitiveAdvantages.map((advantage: any, i: number) => (
+                      <div key={i} className="p-3 rounded-lg bg-success/10 border border-success/30">
+                        <h5 className="font-medium text-success mb-2">{advantage.advantage}</h5>
+                        <p className="text-sm text-foreground/80 mb-2">
+                          <strong>Rarity:</strong> {advantage.rarity}
+                        </p>
+                        <p className="text-sm text-foreground/80 mb-3">
+                          <strong>Strength:</strong> {advantage.strength}
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          <span className="text-xs font-medium text-foreground">Best School Fits:</span>
+                          {advantage.schoolFit.map((school: string, j: number) => (
+                            <Badge key={j} variant="outline" className="text-xs border-success/50 text-success">
+                              {school}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {project.futureAnalysis.admissionsPositioning.potentialConcerns && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-4 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-warning" />
+                      Potential Concerns & Mitigations
+                    </h4>
+                    <div className="space-y-4">
+                      {project.futureAnalysis.admissionsPositioning.potentialConcerns.map((concern: any, i: number) => (
+                        <div key={i} className="p-3 rounded-lg bg-warning/10 border border-warning/30">
+                          <h5 className="font-medium text-warning mb-2">{concern.concern}</h5>
+                          <p className="text-sm text-foreground/80 mb-2">{concern.explanation}</p>
+                          <p className="text-sm text-foreground/80 mb-2">
+                            <strong>Mitigation:</strong> {concern.mitigation}
+                          </p>
+                          <p className="text-sm text-foreground/80">
+                            <strong>Recommendation:</strong> {concern.recommendation}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  </div>
+);
+
+// Enhanced Expandable Insight Card Component  
 const InsightCard: React.FC<{
   title: string;
   summary: string;
@@ -427,28 +1110,29 @@ const InsightCard: React.FC<{
                     {icon}
                   </div>
                   <div>
-                    <CardTitle className="text-lg text-foreground">{title}</CardTitle>
-                    <CardDescription className="text-foreground/80 text-sm mt-1">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      {title}
+                      {badge && (
+                        <Badge variant="outline" className="border-primary/50 text-primary text-xs">
+                          {badge}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription className="text-sm text-foreground/70">
                       {summary}
                     </CardDescription>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
                   {score && (
-                    <Badge variant="secondary" className="bg-primary/20 text-primary border-primary/30">
-                      {score}/100
-                    </Badge>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-primary">{score}</div>
+                      <div className="text-xs text-muted-foreground">Score</div>
+                    </div>
                   )}
-                  {badge && (
-                    <Badge variant="outline" className="border-primary/50 text-primary">
-                      {badge}
-                    </Badge>
-                  )}
-                  {isExpanded ? (
-                    <ChevronUp className="h-5 w-5 text-foreground/60" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-foreground/60" />
-                  )}
+                  <div className="p-2 rounded-full bg-primary/10">
+                    {isExpanded ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4 text-primary" />}
+                  </div>
                 </div>
               </div>
             </CardHeader>
@@ -456,9 +1140,7 @@ const InsightCard: React.FC<{
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0">
-            <div className="border-t border-border/50 pt-4">
-              {children}
-            </div>
+            {children}
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
@@ -474,398 +1156,26 @@ const StoryFragment: React.FC<{
   essayPotential: string;
   uniqueness: number;
 }> = ({ title, content, tags, essayPotential, uniqueness }) => (
-  <div className="p-4 rounded-lg bg-gradient-to-br from-primary/5 to-accent/5 border border-primary/20">
+  <div className="p-4 rounded-lg bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/20">
     <div className="flex items-start justify-between mb-3">
       <h4 className="font-semibold text-foreground">{title}</h4>
-      <Badge className="bg-primary/20 text-primary border-primary/30">
-        {uniqueness}% unique
-      </Badge>
-    </div>
-    <p className="text-foreground/90 text-sm mb-3 leading-relaxed">"{content}"</p>
-    <div className="flex flex-wrap gap-2 mb-2">
-      {tags.map((tag, i) => (
-        <Badge key={i} variant="outline" className="text-xs border-primary/30 text-foreground/80">
-          {tag}
-        </Badge>
-      ))}
-    </div>
-    <p className="text-xs text-muted-foreground">
-      <span className="font-medium">Essay fit:</span> {essayPotential}
-    </p>
-  </div>
-);
-
-// Enhanced Project Card with Deep Analysis
-const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, onBack }) => (
-  <div className="min-h-screen bg-gradient-to-br from-background via-primary/3 to-accent/3">
-    {/* Header with Navigation */}
-    <div className="sticky top-0 z-10 bg-card/90 backdrop-blur-md border-b border-border/50">
-      <div className="container mx-auto px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" onClick={onBack} className="text-foreground hover:bg-primary/10">
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Dashboard
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{project.title}</h1>
-              <p className="text-foreground/70">{project.category} • {project.projectPhase}</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10">
-              <Download className="h-4 w-4 mr-2" />
-              Export Analysis
-            </Button>
-            <Button variant="outline" size="sm" className="border-primary/30 text-primary hover:bg-primary/10">
-              <FileEdit className="h-4 w-4 mr-2" />
-              Generate Essays
-            </Button>
-          </div>
-        </div>
+      <div className="flex gap-2">
+        {tags.map((tag, i) => (
+          <Badge key={i} variant="outline" className="border-accent/50 text-accent text-xs">
+            {tag}
+          </Badge>
+        ))}
       </div>
     </div>
-
-    <div className="container mx-auto px-6 py-8">
-      <Tabs defaultValue="impact" className="space-y-6">
-        <TabsList className="grid grid-cols-4 w-full bg-card/70 backdrop-blur-sm">
-          <TabsTrigger value="impact" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            Impact Analysis
-          </TabsTrigger>
-          <TabsTrigger value="skills" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            Skills Deep Dive
-          </TabsTrigger>
-          <TabsTrigger value="essays" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            Essay Goldmine
-          </TabsTrigger>
-          <TabsTrigger value="future" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-            Future Trajectory
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Impact Analysis Tab */}
-        <TabsContent value="impact" className="space-y-6">
-          <InsightCard
-            title="Project Genesis & Evolution"
-            summary={project.impactAnalysis.summary}
-            icon={<Rocket />}
-            score={project.quickMetrics.impactScore}
-            variant="premium"
-          >
-            <div className="space-y-6">
-              <div>
-                <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Sparkles className="h-4 w-4" />
-                  Origin Story
-                </h4>
-                <div className="bg-gradient-to-r from-primary/10 to-accent/10 p-4 rounded-lg border border-primary/20">
-                  <p className="text-foreground/90 leading-relaxed mb-3">
-                    <strong>Trigger:</strong> {project.impactAnalysis.deepDive.genesis.trigger}
-                  </p>
-                  <p className="text-foreground/90 leading-relaxed mb-3">
-                    <strong>Personal Connection:</strong> {project.impactAnalysis.deepDive.genesis.personalConnection}
-                  </p>
-                  <p className="text-foreground/90 leading-relaxed">
-                    <strong>Initial Struggles:</strong> {project.impactAnalysis.deepDive.genesis.initialFailures}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Breakthrough Moments
-                </h4>
-                <div className="space-y-4">
-                  {project.impactAnalysis.deepDive.breakthroughMoments.map((moment: any, i: number) => (
-                    <div key={i} className="p-4 rounded-lg bg-card/50 border border-primary/20">
-                      <h5 className="font-medium text-foreground mb-2">{moment.moment}</h5>
-                      <div className="space-y-2 text-sm">
-                        <p className="text-foreground/80"><strong>Significance:</strong> {moment.significance}</p>
-                        <p className="text-foreground/80"><strong>Character Growth:</strong> {moment.characterGrowth}</p>
-                        <div className="p-3 bg-gradient-to-r from-accent/20 to-primary/20 rounded-md border border-primary/20">
-                          <p className="font-medium text-primary">Essay Gold:</p>
-                          <p className="italic text-foreground/90">"{moment.essayGold}"</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </InsightCard>
-        </TabsContent>
-
-        {/* Skills Deep Dive Tab */}
-        <TabsContent value="skills" className="space-y-6">
-          <div className="space-y-6">
-            {project.skillsAnalysis.technicalSkills.map((skill: any, i: number) => (
-              <InsightCard
-                key={i}
-                title={skill.skill}
-                summary="Detailed progression and transferable value analysis"
-                icon={<Code />}
-                variant="default"
-              >
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-3">Development Journey</h4>
-                    <div className="space-y-3">
-                      {Object.entries(skill.progressionStory).map(([phase, description]: [string, any]) => (
-                        <div key={phase} className="flex gap-3">
-                          <div className="w-2 h-2 rounded-full bg-primary mt-2 flex-shrink-0" />
-                          <div>
-                            <p className="font-medium text-foreground capitalize">{phase}:</p>
-                            <p className="text-foreground/80 text-sm">{description}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="font-semibold text-foreground mb-3">Transferable Value</h4>
-                    <div className="grid gap-3">
-                      {Object.entries(skill.transferableValue).map(([key, value]: [string, any]) => (
-                        <div key={key} className="p-3 bg-card/30 rounded-lg border border-border/30">
-                          <p className="font-medium text-foreground capitalize">
-                            {key.replace(/([A-Z])/g, ' $1').trim()}:
-                          </p>
-                          <p className="text-foreground/80 text-sm">{value}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {skill.evidenceOfExcellence && (
-                    <div>
-                      <h4 className="font-semibold text-foreground mb-3">Evidence of Excellence</h4>
-                      <ul className="space-y-2">
-                        {skill.evidenceOfExcellence.map((evidence: string, j: number) => (
-                          <li key={j} className="flex items-start gap-2">
-                            <CheckCircle className="h-4 w-4 text-success mt-0.5 flex-shrink-0" />
-                            <span className="text-foreground/80 text-sm">{evidence}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </InsightCard>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Essay Goldmine Tab */}
-        <TabsContent value="essays" className="space-y-6">
-          <InsightCard
-            title="Powerful Opening Hooks"
-            summary="Attention-grabbing essay openers with high uniqueness ratings"
-            icon={<Gem />}
-            variant="premium"
-            badge="Essay Ready"
-          >
-            <div className="space-y-4">
-              {project.essayGoldmine.powerfulOpeningHooks.map((hook: any, i: number) => (
-                <StoryFragment
-                  key={i}
-                  title={`Hook ${i + 1}: ${hook.essayPrompt}`}
-                  content={hook.hook}
-                  tags={[hook.emotionalResonance + " Resonance", `${hook.uniquenessScore}% Unique`]}
-                  essayPotential={hook.essayPrompt}
-                  uniqueness={hook.uniquenessScore}
-                />
-              ))}
-            </div>
-          </InsightCard>
-
-          <InsightCard
-            title="Character Development Arcs"
-            summary="Complete narrative progressions showing personal growth"
-            icon={<Map />}
-            variant="premium"
-          >
-            <div className="space-y-6">
-              {project.essayGoldmine.characterDevelopmentArcs.map((arc: any, i: number) => (
-                <div key={i} className="p-4 rounded-lg bg-card/30 border border-primary/20">
-                  <h4 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-                    <Crown className="h-4 w-4 text-primary" />
-                    {arc.theme}
-                  </h4>
-                  <div className="space-y-3">
-                    <div>
-                      <h5 className="font-medium text-foreground mb-2">Progression:</h5>
-                      <ol className="space-y-2">
-                        {arc.progression.map((step: string, j: number) => (
-                          <li key={j} className="text-sm text-foreground/80 flex gap-3">
-                            <span className="w-6 h-6 rounded-full bg-primary/20 text-primary text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-                              {j + 1}
-                            </span>
-                            {step}
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="font-medium text-foreground text-sm">Character Strengths:</span>
-                      {arc.characterStrengths.map((strength: string, j: number) => (
-                        <Badge key={j} variant="outline" className="text-xs border-success/50 text-success">
-                          {strength}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <span className="font-medium text-foreground text-sm">Essay Applications:</span>
-                      {arc.essayApplications.map((app: string, j: number) => (
-                        <Badge key={j} className="text-xs bg-primary/20 text-primary border-primary/30">
-                          {app}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </InsightCard>
-
-          <InsightCard
-            title="Specific Story Moments"
-            summary="Detailed narratives ready for essay development"
-            icon={<Quote />}
-            variant="critical"
-          >
-            <div className="space-y-4">
-              {project.essayGoldmine.specificStoryMoments.map((story: any, i: number) => (
-                <div key={i} className="p-4 rounded-lg bg-gradient-to-br from-destructive/5 to-warning/5 border border-destructive/20">
-                  <h4 className="font-semibold text-foreground mb-3">{story.storyTitle}</h4>
-                  <div className="grid gap-3 text-sm">
-                    <p className="text-foreground/80"><strong>Setup:</strong> {story.setup}</p>
-                    <p className="text-foreground/80"><strong>Conflict:</strong> {story.conflict}</p>
-                    <p className="text-foreground/80"><strong>My Role:</strong> {story.myRole}</p>
-                    <p className="text-foreground/80"><strong>Resolution:</strong> {story.resolution}</p>
-                    <div className="p-3 bg-primary/10 rounded-md border border-primary/20">
-                      <p className="font-medium text-primary">Deeper Meaning:</p>
-                      <p className="italic text-foreground/90">{story.deeperMeaning}</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <Badge className="bg-success/20 text-success text-xs border-success/30">
-                        {story.essayPotential}
-                      </Badge>
-                      {story.characterQualities.map((quality: string, j: number) => (
-                        <Badge key={j} variant="outline" className="text-xs border-primary/50 text-foreground/80">
-                          {quality}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </InsightCard>
-        </TabsContent>
-
-        {/* Future Trajectory Tab */}
-        <TabsContent value="future" className="space-y-6">
-          <InsightCard
-            title="Career Trajectory Predictions"
-            summary="AI-powered analysis of most likely career paths based on demonstrated interests and skills"
-            icon={<Compass />}
-            score={87}
-            variant="premium"
-          >
-            <div className="space-y-4">
-              {project.futureAnalysis.careerTrajectoryPredictions.map((path: any, i: number) => (
-                <div key={i} className="p-4 rounded-lg bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="font-semibold text-foreground">{path.path}</h4>
-                    <Badge className="bg-success/20 text-success border-success/30">
-                      {path.probability}% probability
-                    </Badge>
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="font-medium text-foreground mb-1">Evidence:</p>
-                      <ul className="space-y-1">
-                        {path.evidence.map((evidence: string, j: number) => (
-                          <li key={j} className="flex items-start gap-2">
-                            <CheckCircle className="h-3 w-3 text-success mt-1 flex-shrink-0" />
-                            <span className="text-foreground/80">{evidence}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground mb-1">Recommended Next Steps:</p>
-                      <ul className="space-y-1">
-                        {path.recommendedSteps.map((step: string, j: number) => (
-                          <li key={j} className="flex items-start gap-2">
-                            <ChevronRight className="h-3 w-3 text-primary mt-1 flex-shrink-0" />
-                            <span className="text-foreground/80">{step}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </InsightCard>
-
-          <InsightCard
-            title="Admissions Competitive Positioning"
-            summary="Analysis of how this project positions you in the admissions landscape"
-            icon={<Trophy />}
-            variant="critical"
-          >
-            <div className="space-y-4">
-              <div>
-                <h4 className="font-semibold text-foreground mb-3">Competitive Advantages</h4>
-                <div className="space-y-3">
-                  {project.futureAnalysis.admissionsPositioning.competitiveAdvantages.map((advantage: any, i: number) => (
-                    <div key={i} className="p-3 rounded-lg bg-success/10 border border-success/30">
-                      <h5 className="font-medium text-success mb-1">{advantage.advantage}</h5>
-                      <p className="text-sm text-foreground/80 mb-2">
-                        <strong>Rarity:</strong> {advantage.rarity}
-                      </p>
-                      <p className="text-sm text-foreground/80 mb-2">
-                        <strong>Strength:</strong> {advantage.strength}
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        <span className="text-xs font-medium text-foreground">Best School Fits:</span>
-                        {advantage.schoolFit.map((school: string, j: number) => (
-                          <Badge key={j} variant="outline" className="text-xs border-success/50 text-success">
-                            {school}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {project.futureAnalysis.admissionsPositioning.potentialConcerns && (
-                <div>
-                  <h4 className="font-semibold text-foreground mb-3">Potential Concerns & Mitigations</h4>
-                  <div className="space-y-3">
-                    {project.futureAnalysis.admissionsPositioning.potentialConcerns.map((concern: any, i: number) => (
-                      <div key={i} className="p-3 rounded-lg bg-warning/10 border border-warning/30">
-                        <h5 className="font-medium text-warning mb-1">{concern.concern}</h5>
-                        <p className="text-sm text-foreground/80 mb-2">{concern.explanation}</p>
-                        <p className="text-sm text-foreground/80 mb-1">
-                          <strong>Mitigation:</strong> {concern.mitigation}
-                        </p>
-                        <p className="text-sm text-foreground/80">
-                          <strong>Recommendation:</strong> {concern.recommendation}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </InsightCard>
-        </TabsContent>
-      </Tabs>
+    <blockquote className="text-foreground/90 italic border-l-4 border-accent pl-4 bg-card/30 p-3 rounded-r-lg">
+      "{content}"
+    </blockquote>
+    <div className="flex items-center justify-between mt-3">
+      <span className="text-xs text-foreground/70">Essay Potential: {essayPotential}</span>
+      <div className="flex items-center gap-2">
+        <Progress value={uniqueness} className="w-16 h-2" />
+        <span className="text-xs text-foreground/70">{uniqueness}%</span>
+      </div>
     </div>
   </div>
 );
@@ -974,8 +1284,8 @@ const PortfolioMetricsDashboard: React.FC = () => {
           <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-secondary/20">
-                  <GraduationCap className="h-5 w-5 text-secondary" />
+                <div className="p-2 rounded-lg bg-warning/20">
+                  <Trophy className="h-5 w-5 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.avgAdmissionsValue}</p>
@@ -988,320 +1298,72 @@ const PortfolioMetricsDashboard: React.FC = () => {
           <Card className="bg-card border-border backdrop-blur-sm">
             <CardContent className="p-6">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-warning/20">
-                  <Shield className="h-5 w-5 text-warning" />
+                <div className="p-2 rounded-lg bg-success/20">
+                  <CheckCircle className="h-5 w-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-foreground">{portfolioSummary.verifiedProjects}</p>
-                  <p className="text-sm text-muted-foreground">Verified</p>
+                  <p className="text-sm text-muted-foreground">Verified Projects</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Portfolio Analytics Dashboard */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {/* Skills Progression Chart */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Skills Development Timeline
-              </CardTitle>
-              <CardDescription>
-                Progression across all technical and leadership skills
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={[
-                    { month: "Jan", technical: 65, leadership: 70, impact: 60 },
-                    { month: "Feb", technical: 72, leadership: 75, impact: 68 },
-                    { month: "Mar", technical: 78, leadership: 80, impact: 75 },
-                    { month: "Apr", technical: 85, leadership: 85, impact: 82 },
-                    { month: "May", technical: 90, leadership: 88, impact: 88 },
-                    { month: "Jun", technical: 95, leadership: 92, impact: 94 }
-                  ]}>
-                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                    <XAxis dataKey="month" className="text-muted-foreground" />
-                    <YAxis className="text-muted-foreground" />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '8px'
-                      }} 
-                    />
-                    <Legend />
-                    <Line type="monotone" dataKey="technical" stroke="hsl(var(--primary))" strokeWidth={3} name="Technical Skills" />
-                    <Line type="monotone" dataKey="leadership" stroke="hsl(var(--accent))" strokeWidth={3} name="Leadership" />
-                    <Line type="monotone" dataKey="impact" stroke="hsl(var(--success))" strokeWidth={3} name="Impact Score" />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Portfolio Strength Radar */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <PieChart className="h-5 w-5 text-primary" />
-                Portfolio Strength Analysis
-              </CardTitle>
-              <CardDescription>
-                Comprehensive evaluation across all dimensions
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RadarChart data={[
-                    { subject: 'Technical Skills', A: 90, B: 85 },
-                    { subject: 'Leadership', A: 88, B: 82 },
-                    { subject: 'Impact', A: 95, B: 78 },
-                    { subject: 'Innovation', A: 92, B: 80 },
-                    { subject: 'Communication', A: 85, B: 75 },
-                    { subject: 'Uniqueness', A: 89, B: 70 }
-                  ]}>
-                    <PolarGrid />
-                    <PolarAngleAxis dataKey="subject" className="text-muted-foreground text-sm" />
-                    <PolarRadiusAxis angle={90} domain={[0, 100]} className="text-muted-foreground" />
-                    <Radar name="Your Portfolio" dataKey="A" stroke="hsl(var(--primary))" fill="hsl(var(--primary))" fillOpacity={0.3} strokeWidth={2} />
-                    <Radar name="Avg Applicant" dataKey="B" stroke="hsl(var(--muted-foreground))" fill="hsl(var(--muted-foreground))" fillOpacity={0.1} strokeWidth={2} />
-                    <Legend />
-                  </RadarChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Essay Potential & Competitive Analysis */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Essay Topic Distribution */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-primary" />
-                Essay Topic Strength
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {[
-                  { topic: "Personal Growth", score: 96, essays: 12 },
-                  { topic: "Leadership", score: 88, essays: 8 },
-                  { topic: "Innovation", score: 92, essays: 6 },
-                  { topic: "Community Impact", score: 94, essays: 10 },
-                  { topic: "Overcoming Challenges", score: 85, essays: 5 }
-                ].map((item, i) => (
-                  <div key={i} className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="font-medium text-foreground">{item.topic}</span>
-                      <span className="text-muted-foreground">{item.score}/100</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Progress value={item.score} className="flex-1" />
-                      <Badge variant="outline" className="text-xs">{item.essays} stories</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Competitive Positioning */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-primary" />
-                Competitive Position
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="text-center p-4 bg-gradient-to-br from-success/20 to-primary/20 rounded-lg border border-success/30">
-                  <p className="text-2xl font-bold text-foreground">Top 5%</p>
-                  <p className="text-sm text-muted-foreground">Among similar applicants</p>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Technical Depth</span>
-                    <Badge className="bg-success/20 text-success">Exceptional</Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Social Impact</span>
-                    <Badge className="bg-success/20 text-success">Outstanding</Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Leadership Style</span>
-                    <Badge className="bg-primary/20 text-primary">Unique</Badge>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Story Authenticity</span>
-                    <Badge className="bg-success/20 text-success">Verified</Badge>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Items */}
-          <Card className="bg-card border-border">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Target className="h-5 w-5 text-primary" />
-                Priority Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  { action: "Quantify community garden impact metrics", priority: "High", color: "destructive" },
-                  { action: "Document peer support program outcomes", priority: "High", color: "destructive" },
-                  { action: "Create technical portfolio showcase", priority: "Medium", color: "warning" },
-                  { action: "Draft leadership philosophy essay", priority: "Medium", color: "warning" },
-                  { action: "Prepare interview stories", priority: "Low", color: "muted" }
-                ].map((item, i) => (
-                  <div key={i} className="p-3 rounded-lg border bg-card/50">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm text-foreground flex-1">{item.action}</p>
-                      <Badge variant={item.color === "destructive" ? "destructive" : item.color === "warning" ? "secondary" : "outline"} className="text-xs">
-                        {item.priority}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Project Grid */}
+        {/* Projects Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {portfolioData.map((project) => (
             <Card 
               key={project.id} 
-              className="bg-card/70 backdrop-blur-sm border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10 cursor-pointer"
+              className="bg-card/70 border-border/50 backdrop-blur-sm hover:shadow-lg transition-all duration-300 cursor-pointer"
               onClick={() => handleProjectSelect(project)}
             >
-              <CardHeader className="pb-3">
+              <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-xl text-foreground mb-2">{project.title}</CardTitle>
-                    <CardDescription className="text-foreground/70">
-                      {project.category} • {project.type}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {project.verified && (
-                      <Badge className="bg-success/20 text-success border-success/30">
-                        <Shield className="h-3 w-3 mr-1" />
-                        Verified
+                    <CardTitle className="text-xl mb-2 flex items-center gap-2">
+                      {project.title}
+                      {project.verified && (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      )}
+                    </CardTitle>
+                    <div className="flex gap-2 mb-3">
+                      <Badge variant="outline" className="border-primary/50 text-primary">
+                        {project.type}
                       </Badge>
-                    )}
-                    <Badge variant="outline" className="border-primary/50 text-primary">
-                      {project.projectPhase}
-                    </Badge>
+                      <Badge variant="outline" className="border-accent/50 text-accent">
+                        {project.category}
+                      </Badge>
+                    </div>
+                    <CardDescription>
+                      {project.impactAnalysis.summary}
+                    </CardDescription>
                   </div>
                 </div>
               </CardHeader>
-
-              <CardContent className="space-y-4">
-                {/* Quick Metrics Grid */}
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-primary/5 to-accent/5">
-                    <p className="text-lg font-bold text-foreground">{project.quickMetrics.impactScore}</p>
-                    <p className="text-xs text-foreground/70">Impact</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-success/5 to-primary/5">
-                    <p className="text-lg font-bold text-foreground">{project.quickMetrics.skillDevelopment}</p>
-                    <p className="text-xs text-foreground/70">Skills</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-accent/5 to-secondary/5">
-                    <p className="text-lg font-bold text-foreground">{project.quickMetrics.storyPotential}</p>
-                    <p className="text-xs text-foreground/70">Story</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-secondary/5 to-accent/5">
-                    <p className="text-lg font-bold text-foreground">{project.quickMetrics.admissionsValue}</p>
-                    <p className="text-xs text-foreground/70">Admissions</p>
-                  </div>
-                  <div className="text-center p-3 rounded-lg bg-gradient-to-br from-warning/5 to-success/5">
-                    <p className="text-lg font-bold text-foreground">{project.quickMetrics.uniqueness}</p>
-                    <p className="text-xs text-foreground/70">Unique</p>
-                  </div>
-                  <div className="flex items-center justify-center p-3 rounded-lg bg-gradient-to-br from-primary/10 to-accent/10">
-                    <Eye className="h-5 w-5 text-primary" />
-                  </div>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {Object.entries(project.quickMetrics).slice(0, 4).map(([key, value]: [string, any]) => (
+                    <div key={key} className="text-center">
+                      <div className="text-lg font-bold text-foreground">{value}</div>
+                      <div className="text-xs text-muted-foreground capitalize">
+                        {key.replace(/([A-Z])/g, ' $1').trim()}
+                      </div>
+                      <Progress value={value} className="mt-1 h-1" />
+                    </div>
+                  ))}
                 </div>
-
-                {/* Quick Preview */}
-                <div className="p-3 rounded-lg bg-gradient-to-r from-primary/5 to-accent/5 border border-primary/20">
-                  <p className="text-sm text-foreground/90 leading-relaxed">
-                    {project.impactAnalysis.summary}
-                  </p>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2 pt-2">
-                  <Button 
-                    size="sm" 
-                    className="flex-1 bg-primary hover:bg-primary/90"
-                    onClick={(e) => { e.stopPropagation(); handleProjectSelect(project); }}
-                  >
-                    <Microscope className="h-4 w-4 mr-2" />
-                    Deep Analysis
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    className="border-primary/30 text-primary hover:bg-primary/10"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <FileEdit className="h-4 w-4 mr-2" />
-                    Essays
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="text-foreground/70 hover:text-primary hover:bg-primary/10"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <ExternalLink className="h-4 w-4" />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Completed: {new Date(project.completedDate).toLocaleDateString()}
+                  </span>
+                  <Button variant="ghost" size="sm" className="text-primary hover:bg-primary/10">
+                    View Details <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
               </CardContent>
             </Card>
           ))}
-        </div>
-
-        {/* Action Panel */}
-        <div className="mt-12 p-6 rounded-xl bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 backdrop-blur-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-xl font-semibold text-foreground mb-2">Ready to Take Action?</h3>
-              <p className="text-foreground/70">
-                Transform your portfolio insights into compelling application materials
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
-                <FileText className="h-4 w-4 mr-2" />
-                Generate Essay Drafts
-              </Button>
-              <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
-                <MessageCircle className="h-4 w-4 mr-2" />
-                Interview Prep
-              </Button>
-              <Button className="bg-primary hover:bg-primary/90">
-                <Download className="h-4 w-4 mr-2" />
-                Export Portfolio Summary
-              </Button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
