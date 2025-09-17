@@ -577,7 +577,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                       onClick={() => setInsightDepth(level)}
                       className={`capitalize ${insightDepth === level ? 'bg-gradient-primary text-white shadow-soft' : 'hover-lift'}`}
                     >
-                      {level}
+                      {level === 'surface' ? 'Surface' : 'Expert'}
                     </Button>
                   ))}
                 </div>
