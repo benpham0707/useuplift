@@ -779,17 +779,153 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                     </div>
 
                     {insightDepth === 'expert' && (
-                      <div className="p-5 rounded-xl bg-gradient-to-r from-success/10 to-accent/10 border border-success/30 shadow-soft">
-                        <h4 className="font-semibold text-success mb-2 flex items-center gap-2">
-                          <Crown className="h-4 w-4" />
-                          Expert Analysis: Admissions Strategy
-                        </h4>
-                        <p className="text-foreground/80 text-sm leading-relaxed">
-                          This project demonstrates the rare "Personal Pain Point → Community Solution" pattern that admissions committees highly value. 
-                          The authentic progression from personal experience to systematic change shows intellectual maturity, cultural competence, 
-                          and leadership potential that distinguishes you from typical "tech for good" applications.
-                        </p>
-                      </div>
+                      <>
+                        <div className="p-6 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg border-l-4 border-primary mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Crown className="h-5 w-5 text-primary" />
+                            <h4 className="font-semibold text-primary">Expert Deep Dive: Systemic Impact Analysis</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                            This project demonstrates sophisticated systems thinking by creating sustainable behavior change across multiple community layers. The 300% growth in active gardens indicates not just user adoption, but fundamental shifts in how communities approach food security and social connection.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Most impressive is the ripple effect: participating families report 67% increase in neighborhood social connections, suggesting the app catalyzed broader community cohesion beyond its direct functionality.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Microscope className="h-5 w-5 text-purple-600" />
+                            <h4 className="font-semibold text-purple-600">Deep Psychology Analysis</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The behavioral psychology underlying this project's success reveals sophisticated understanding of intrinsic vs. extrinsic motivation. By gamifying community connection rather than individual achievement, you tapped into powerful social cohesion drives that sustain long-term engagement.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your decision to prioritize elder community members as "wisdom keepers" in the app hierarchy demonstrates advanced emotional intelligence - recognizing that technology adoption requires honoring existing social structures rather than disrupting them.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The 94% user satisfaction score indicates mastery of user psychology principles: progressive disclosure of complexity, social validation loops, and authentic relationship building through digital interfaces.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Most remarkably, your pivot from "disruption" to "amplification" mindset shows sophisticated identity formation - evolving from tech-centric to human-centric worldview while maintaining technical excellence.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Network className="h-5 w-5 text-green-600" />
+                            <h4 className="font-semibold text-green-600">Advanced Stakeholder Mapping</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your stakeholder ecosystem reveals sophisticated political awareness: Successfully navigating relationships between community elders, tech-skeptical residents, local government officials, and enthusiastic early adopters required advanced diplomacy skills.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The fact that you secured support from both the neighborhood association president (traditional power structure) and the community college urban planning department (academic legitimacy) shows strategic relationship building across generational and institutional lines.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your approach to power dynamics - positioning yourself as facilitator rather than leader - demonstrates understanding that sustainable community change requires distributed ownership rather than centralized control.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            The coalition you built now functions independently, indicating mastery of leadership development: creating systems where your presence becomes less necessary over time, not more.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Target className="h-5 w-5 text-orange-600" />
+                            <h4 className="font-semibold text-orange-600">Systems Thinking Deep Dive</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your root cause analysis went beyond surface-level food access issues to identify underlying social isolation as the core problem. This systems thinking approach - recognizing that food insecurity is often a symptom of community disconnection - shows sophisticated analytical capabilities.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The feedback loops you created are particularly elegant: successful gardens → increased social connection → more community knowledge sharing → better gardens → stronger relationships. This positive reinforcement cycle demonstrates understanding of sustainable system design.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your anticipation of unintended consequences was remarkable - proactively addressing potential gentrification effects by ensuring community ownership of the platform and data, showing awareness of how tech can inadvertently displace communities it aims to help.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Most sophisticated was your optimization of information flow patterns: creating multi-directional knowledge exchange rather than top-down expert guidance, allowing community wisdom to emerge organically while maintaining quality standards.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <AlertCircle className="h-5 w-5 text-indigo-600" />
+                            <h4 className="font-semibold text-indigo-600">Failure Analysis & Recovery</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your initial failures were actually sophisticated experiments in disguise. The three failed community outreach attempts weren't random setbacks - they systematically tested different approaches to technology adoption, yielding valuable data about community priorities and trust-building processes.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The pivot from "tech-first" to "relationship-first" approach demonstrates advanced learning agility. Most developers would have doubled down on technical features; instead, you recognized that adoption barriers were social, not technological.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your recovery strategy showed remarkable emotional intelligence - instead of defending your original design, you used each failure as community engagement opportunity, turning setbacks into relationship-building moments that ultimately strengthened community buy-in.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            This pattern of "failing forward" - where each iteration brought you closer to community needs rather than further from technical vision - demonstrates anti-fragility: becoming stronger through adversity rather than just resilient to it.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-pink-50 to-rose-50 rounded-lg mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Trophy className="h-5 w-5 text-pink-600" />
+                            <h4 className="font-semibold text-pink-600">Competitive Landscape Analysis</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Unlike existing gardening apps focused on individual plant tracking, your community-centered approach addresses the gap between individual knowledge and collective wisdom. This positioning differentiates you from both commercial gardening platforms and traditional community organizing tools.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your unique value proposition combines technical sophistication with cultural humility - rare in the "tech for social good" space, where products typically prioritize scalability over community ownership.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The defensibility of your approach lies not in proprietary technology but in community relationships and trust - creating network effects that competitors cannot easily replicate without years of authentic community engagement.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            Your model's sustainability advantage: as community ownership increases, your platform becomes more valuable to users while becoming less dependent on your technical maintenance - the opposite of typical tech platforms.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg mb-6">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Rocket className="h-5 w-5 text-cyan-600" />
+                            <h4 className="font-semibold text-cyan-600">Scaling Strategy & Sustainability</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your scaling strategy demonstrates sophisticated understanding of organic growth vs. forced expansion. Rather than pursuing rapid user acquisition, you prioritized deep community integration that creates authentic demand for expansion to neighboring areas.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The sustainability model is particularly elegant: each community becomes a training ground for the next, with established users becoming ambassadors and mentors, creating self-perpetuating growth cycles without requiring centralized resources.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your resource optimization shows systems thinking - leveraging existing community assets (elder knowledge, unused land, social networks) rather than requiring external inputs, making the model sustainable even without continued technical development.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            The transition strategy toward community ownership demonstrates long-term vision: building systems designed to eventually function independently, showing understanding that true impact comes from empowering communities to solve their own problems.
+                          </p>
+                        </div>
+
+                        <div className="p-6 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-4">
+                            <Globe className="h-5 w-5 text-emerald-600" />
+                            <h4 className="font-semibold text-emerald-600">Cultural Impact Assessment</h4>
+                          </div>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your project catalyzed measurable behavioral change in community interaction patterns. Post-implementation surveys show 73% increase in cross-generational conversations and 45% increase in neighbor-to-neighbor resource sharing - indicating cultural shift beyond app usage.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            The preservation vs. innovation balance you achieved is particularly sophisticated - using digital tools to amplify traditional knowledge rather than replace it, creating cultural continuity while enabling adaptation to modern challenges.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                            Your approach to intergenerational knowledge transfer - positioning elders as experts and young people as facilitators - reversed typical tech adoption patterns and strengthened rather than disrupted existing cultural hierarchies.
+                          </p>
+                          <p className="text-sm text-muted-foreground leading-relaxed">
+                            The lasting cultural change: community members now default to collaborative problem-solving approaches even for issues unrelated to gardening, suggesting your platform shifted fundamental social interaction patterns toward collective rather than individual solutions.
+                          </p>
+                        </div>
+                      </>
                     )}
                   </div>
                 </CardContent>
@@ -1066,18 +1202,137 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                 </div>
 
                 {insightDepth === 'expert' && (
-                  <div className="p-5 rounded-xl bg-gradient-to-r from-success/10 to-accent/10 border border-success/30 shadow-soft">
-                    <h4 className="font-semibold text-success mb-3 flex items-center gap-2">
-                      <Crown className="h-4 w-4" />
-                      Expert Career Strategy
-                    </h4>
-                    <p className="text-foreground/80 text-sm leading-relaxed">
-                      This skill combination positions you for high-impact roles in social enterprise technology, 
-                      B-Corps, or mission-driven startups. Consider highlighting the rare combination of technical excellence 
-                      with cultural competence and community organizing experience - this profile is exceptionally valuable 
-                      in today's market where companies increasingly focus on social impact and inclusive design.
-                    </p>
-                  </div>
+                  <>
+                    <div className="p-6 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Crown className="h-5 w-5 text-blue-600" />
+                        <h4 className="font-semibold text-blue-600">Meta-Cognitive Skills Development</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your learning progression reveals sophisticated meta-cognition: recognizing when initial approaches weren't working, analyzing why, and systematically developing new learning strategies. The shift from tutorial-based learning to community-problem-driven development shows advanced learning agility.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Pattern recognition across domains is evident: you applied community organizing principles to technical architecture decisions, demonstrating ability to transfer insights between disparate fields - a hallmark of innovative thinking.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your knowledge transfer mechanisms show teaching mastery: the ability to break down complex technical concepts for community members while learning community wisdom suggests sophisticated bidirectional learning capabilities.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Most remarkably, you developed learning-how-to-learn skills under pressure: debugging real-world problems while maintaining community trust requires advanced stress management and iterative improvement capabilities.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Code className="h-5 w-5 text-purple-600" />
+                        <h4 className="font-semibold text-purple-600">Advanced Technical Architecture</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your offline-first architecture decision demonstrates sophisticated understanding of technical constraints in underserved communities. This wasn't just feature addition - it required fundamental rethinking of data flow, conflict resolution, and user experience design.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        The performance optimization you achieved (99.8% uptime) while serving diverse user bases shows advanced system design thinking: anticipating load patterns, implementing graceful degradation, and building resilient infrastructure under resource constraints.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Security considerations reveal mature engineering mindset: protecting community data privacy while enabling sharing required sophisticated understanding of encryption, access control, and trust boundaries in social applications.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your database design philosophy - prioritizing community ownership over traditional efficiency metrics - shows ability to align technical decisions with social values, rare in engineering programs.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        The modular architecture you created enables community customization without breaking core functionality, demonstrating understanding of extensibility and maintainability principles beyond typical student projects.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Heart className="h-5 w-5 text-green-600" />
+                        <h4 className="font-semibold text-green-600">Emotional Intelligence Mastery</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your interpersonal skill development shows sophisticated emotional intelligence: navigating tensions between different community factions while maintaining neutrality and trust required advanced diplomatic capabilities.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Conflict resolution techniques you developed - using data as neutral ground for disagreements - demonstrates innovative approach to mediation that honors both logical analysis and emotional needs of stakeholders.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Cultural sensitivity development is evident in your iteration process: each redesign showed deeper understanding of community values, indicating sophisticated cultural learning and adaptation capabilities.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Your leadership evolution from individual contributor to community facilitator shows advanced understanding that sustainable change requires building others' capacity rather than centralizing authority.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Compass className="h-5 w-5 text-orange-600" />
+                        <h4 className="font-semibold text-orange-600">Strategic Decision-Making Framework</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your decision-making methodology reveals sophisticated analytical frameworks: consistently evaluating technical choices through community impact lens while balancing short-term needs with long-term sustainability shows advanced strategic thinking.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Risk assessment capabilities are evident in proactive mitigation of gentrification effects: anticipating unintended consequences and building preventive measures demonstrates mature understanding of complex system dynamics.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Stakeholder impact analysis shows political sophistication: understanding how technical decisions affect different community segments and adjusting implementation to minimize negative impacts while maximizing collective benefit.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Your framework development - creating reusable decision-making processes for community technology projects - demonstrates ability to extract generalizable principles from specific experiences.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-pink-50 to-red-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Lightbulb className="h-5 w-5 text-pink-600" />
+                        <h4 className="font-semibold text-pink-600">Innovation & Creative Problem-Solving</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your creative thinking processes reveal sophisticated innovation methodology: combining existing technologies in novel ways to address community-specific needs shows ability to think beyond conventional solutions.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Breakthrough moment analysis shows pattern recognition capabilities: identifying the "wisdom keeper" insight that transformed your entire approach demonstrates ability to recognize paradigm-shifting information.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Your innovation methodology - iterative co-creation with community members - represents advanced understanding that breakthrough solutions emerge from collaborative rather than isolated genius.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Calendar className="h-5 w-5 text-indigo-600" />
+                        <h4 className="font-semibold text-indigo-600">Advanced Project Management</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your agile methodology adaptation for community context shows sophisticated project management thinking: modifying technical frameworks to accommodate community decision-making processes while maintaining development velocity.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Resource allocation under uncertainty reveals advanced planning capabilities: managing technical development while building community relationships required sophisticated prioritization and time management skills.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Timeline management shows understanding of community rhythms vs. technical schedules: successfully coordinating two different pacing cultures demonstrates advanced cross-cultural project management capabilities.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-teal-50 to-green-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-4">
+                        <MessageCircle className="h-5 w-5 text-teal-600" />
+                        <h4 className="font-semibold text-teal-600">Expert-Level Communication</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Technical translation skills are evident throughout: ability to explain complex backend processes to community members while incorporating their feedback into technical specifications shows sophisticated communication bridging.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Presentation mastery is shown in securing support from diverse stakeholders: convincing both technical reviewers and community leaders requires advanced audience adaptation and persuasive communication skills.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Documentation excellence is evident in knowledge transfer success: other communities successfully replicating your model indicates sophisticated documentation and training capability development.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Your communication evolution from tech-centric to human-centric language demonstrates advanced adaptability and cultural competence in professional communication contexts.
+                      </p>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1329,17 +1584,143 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                 ))}
 
                 {insightDepth === 'expert' && (
-                  <div className="p-5 rounded-xl bg-gradient-to-r from-success/10 to-accent/10 border border-success/30 shadow-soft">
-                    <h4 className="font-semibold text-success mb-3 flex items-center gap-2">
-                      <Crown className="h-4 w-4" />
-                      Expert Essay Strategy
-                    </h4>
-                    <p className="text-foreground/80 text-sm leading-relaxed">
-                      These stories showcase the rare combination of technical skill, cultural intelligence, and community impact that 
-                      sets you apart from typical applicants. Focus on the moments where technology met human connection - 
-                      these demonstrate both innovation and empathy, highly valued by competitive programs.
-                    </p>
-                  </div>
+                  <>
+                    <div className="p-6 bg-gradient-to-r from-purple-50 to-indigo-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Crown className="h-5 w-5 text-purple-600" />
+                        <h4 className="font-semibold text-purple-600">Advanced Narrative Architecture</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your story structure demonstrates sophisticated narrative development: the progression from personal struggle → community observation → systematic solution → broader impact follows classic hero's journey while maintaining authenticity and avoiding cliché.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Character development frameworks within your experience show advanced self-awareness: tracking your evolution from tech-focused problem-solver to community-centered facilitator provides rich material for growth-oriented essay prompts.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Tension building techniques are naturally embedded: the contrast between initial failures and eventual success creates compelling narrative arc while demonstrating resilience and learning agility valued by admissions committees.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Your story offers multiple entry points for different essay types: technical innovation essays, leadership essays, community impact essays, and personal growth essays can all draw from this single experience while maintaining consistency.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        The nested story structure - individual moments within broader project narrative - provides perfect material for both broad vision essays and specific anecdotal responses, maximizing application portfolio coherence.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Target className="h-5 w-5 text-blue-600" />
+                        <h4 className="font-semibold text-blue-600">Admissions Strategy Deep Dive</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        School-specific positioning opportunities: MIT's mens et manus philosophy aligns perfectly with your hands-on community engagement; Stanford's d.school would appreciate your human-centered design evolution; Berkeley's social impact focus matches your community-first approach.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Competitive differentiation analysis: while many applicants claim social impact interest, your documented community ownership transfer and measured behavior change outcomes provide concrete evidence of authentic commitment and execution capability.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Application portfolio strategy: use this project as the central narrative thread connecting all application components - research interests in human-computer interaction, recommendation letters from community leaders and technical mentors, supplemental essays about specific moments.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Risk mitigation for potential concerns: address "narrow focus" perception by highlighting transferable skills developed and connections to broader interests in technology policy, urban planning, or social entrepreneurship.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Strategic positioning: present yourself as bridge-builder between technical and social domains rather than choosing one side - increasingly valuable as technology's social impact becomes central to computer science education.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Brain className="h-5 w-5 text-green-600" />
+                        <h4 className="font-semibold text-green-600">Psychological Appeal Analysis</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Memorable story elements: the "grandmother's seed collection" moment taps into universal themes of intergenerational wisdom and cultural preservation, creating emotional resonance that admissions officers will remember weeks later during committee discussions.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Emotional triggers identification: your story activates multiple psychological appeal points - underdog narrative (failed attempts), transformation arc (mindset shift), community connection (belonging), and legacy building (sustainable impact).
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Admissions officer psychology insights: your narrative addresses key concerns about Gen Z applicants - depth vs. breadth (deep community engagement), authenticity vs. resume padding (genuine relationships), and impact vs. intention (measured outcomes).
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Cognitive anchoring effects: positioning technology as amplification rather than disruption creates positive associations with wisdom and collaboration rather than typical "tech will save the world" narratives that feel naive to experienced readers.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <FileEdit className="h-5 w-5 text-orange-600" />
+                        <h4 className="font-semibold text-orange-600">Advanced Essay Techniques</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Show-don't-tell mastery opportunities: instead of stating "I learned community engagement," describe the moment you realized your app needed a "wisdom keeper" hierarchy - let readers discover your growth through narrative rather than exposition.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Sensory detail integration: the kitchen scene with Mrs. Rodriguez's seed collection provides rich material - sounds, smells, textures that ground abstract concepts in concrete, memorable experiences.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Metaphor development potential: gardens as community networks, seeds as wisdom/knowledge, growth as both plants and relationships - these natural metaphors can thread through entire essays without feeling forced.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Dialogue integration: conversations with community members provide authentic voice and perspective-taking opportunities that demonstrate listening skills and cultural competence more effectively than direct statements.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Gem className="h-5 w-5 text-pink-600" />
+                        <h4 className="font-semibold text-pink-600">Multi-Application Story Mining</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Technical innovation angle: focus on offline-first architecture decisions and community-driven feature development for engineering school supplements and technical challenge essays.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Leadership development angle: emphasize facilitation skills and coalition-building for leadership scholarship applications and "describe a time you led" prompts.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Social impact angle: highlight measured behavior change and sustainable ownership transfer for public policy, social work, or urban planning program applications.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Personal growth angle: focus on mindset evolution from disruption to amplification for character development and overcoming challenges essays.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Research interest angle: connect community technology experiences to potential research in human-computer interaction, digital equity, or participatory design for research university applications.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <User className="h-5 w-5 text-indigo-600" />
+                        <h4 className="font-semibold text-indigo-600">Voice & Authenticity Development</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Personal voice identification: your natural communication style balances technical precision with community warmth - maintain this authentic tone rather than adopting overly formal academic voice that feels inauthentic.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Authenticity vs. polish balance: share genuine moments of uncertainty and learning rather than presenting yourself as having all the answers - admissions officers value growth mindset over perfection.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Compelling vulnerability integration: your willingness to admit initial failures and seek community guidance demonstrates strength through openness rather than defensive perfectionism.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-teal-50 to-green-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-4">
+                        <BookOpen className="h-5 w-5 text-teal-600" />
+                        <h4 className="font-semibold text-teal-600">Essay Portfolio Strategy</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Cohesive narrative creation: use garden/growth metaphors consistently across all essays while varying specific focus areas to create thematic unity without repetitive content.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Avoiding repetition while maintaining consistency: highlight different aspects of the project for different prompts while maintaining consistent voice and values throughout application materials.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Strategic essay distribution: use main personal statement for transformation narrative, supplemental essays for specific technical or community details, and short answers for concrete examples and metrics.
+                      </p>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -1676,18 +2057,146 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                 </div>
 
                 {insightDepth === 'expert' && (
-                  <div className="p-5 rounded-xl bg-gradient-to-r from-success/10 to-accent/10 border border-success/30 shadow-soft">
-                    <h4 className="font-semibold text-success mb-3 flex items-center gap-2">
-                      <Crown className="h-4 w-4" />
-                      Expert Strategic Guidance
-                    </h4>
-                    <p className="text-foreground/80 text-sm leading-relaxed">
-                      Your project portfolio demonstrates exceptional combination of technical excellence, cultural intelligence, 
-                      and community impact that positions you uniquely for top-tier programs. Focus on schools that value 
-                      both innovation and social responsibility. Consider reaching out to faculty in human-computer interaction, 
-                      social computing, or technology policy programs who would appreciate your community-centered approach to technology development.
-                    </p>
-                  </div>
+                  <>
+                    <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Crown className="h-5 w-5 text-blue-600" />
+                        <h4 className="font-semibold text-blue-600">Advanced Career Scenario Planning</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Multiple pathway analysis reveals sophisticated career strategic thinking: your community technology experience creates unique positioning for emerging roles in civic technology, social entrepreneurship, and human-computer interaction research.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Contingency planning advantages: if traditional tech careers become oversaturated, your community organizing experience positions you for policy roles, nonprofit leadership, or social enterprise development - creating career resilience through skill diversification.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Pivot strategy development: your bridge-building skills between technical and social domains create opportunities in emerging fields like digital equity policy, participatory design research, or community-centered AI development.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Risk mitigation through portfolio approach: combining technical depth with community credibility creates multiple career entry points rather than single-track dependency on one industry or role type.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Long-term adaptability positioning: as technology increasingly requires social and ethical considerations, your integrated skillset becomes more valuable over time rather than less relevant.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <TrendingUp className="h-5 w-5 text-green-600" />
+                        <h4 className="font-semibold text-green-600">Market Trend Analysis</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Industry evolution predictions: the growing emphasis on ESG (Environmental, Social, Governance) metrics in tech companies creates increasing demand for professionals who can navigate both technical excellence and social impact measurement.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Emerging field identification: civic technology, community-centered AI, digital equity policy, and participatory design research are rapidly growing fields where your unique combination of skills provides competitive advantage.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Skill demand forecasting: as AI automates routine coding tasks, the premium on skills like community engagement, cultural translation, and ethical technology development increases - areas where you have documented expertise.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Market positioning advantages: few professionals combine deep technical skills with authentic community organizing experience - this rarity creates premium value in mission-driven organizations and socially conscious enterprises.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Technology trend integration: as platforms become more community-focused and user ownership increases (Web3, cooperative platforms), your experience building community-owned technology systems provides relevant expertise for emerging business models.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Network className="h-5 w-5 text-purple-600" />
+                        <h4 className="font-semibold text-purple-600">Network Effects & Relationship Capital</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Strategic relationship building foundation: your authentic community relationships create unusual professional network spanning grassroots organizers, local government officials, urban planners, and technology professionals.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Mentorship pathway development: your experience as both technology learner and community teacher positions you uniquely to connect diverse mentor types - technical experts, social entrepreneurs, policy makers, and community leaders.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Professional network evolution: as your community partners advance in their careers (local government, nonprofit leadership, academic positions), your relationship capital compounds across multiple sectors simultaneously.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Cross-sector bridge value: your ability to translate between technical and community contexts makes you valuable connector for others, creating reciprocal relationship building opportunities.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Network sustainability through value creation: rather than transactional networking, your approach of building systems that serve others creates lasting relationship foundation based on mutual benefit and shared values.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Sparkles className="h-5 w-5 text-orange-600" />
+                        <h4 className="font-semibold text-orange-600">Expert-Level Synergistic Connections</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Project compounding effects: your community garden platform creates foundation for related initiatives - digital literacy programs, civic engagement apps, neighborhood economic development tools - each building on established trust and technical infrastructure.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Cross-pollination opportunity identification: techniques developed for garden community engagement transfer to other domains - elderly care coordination, youth development programs, small business networks - multiplying impact potential.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Portfolio effect maximization: rather than pursuing separate projects, build connected ecosystem where each initiative strengthens others through shared community relationships, technical infrastructure, and trust capital.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Innovation pipeline development: your community relationships create natural feedback mechanism for identifying next-generation opportunities before they become obvious to outsiders or competitors.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Systematic impact scaling: by creating replicable models rather than one-off solutions, your work generates compounding returns as other communities adapt and improve upon your frameworks.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-cyan-50 to-blue-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <GraduationCap className="h-5 w-5 text-cyan-600" />
+                        <h4 className="font-semibold text-cyan-600">Advanced Academic Strategy</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Graduate school positioning advantages: your community technology experience provides unique research opportunities in human-computer interaction, digital equity, participatory design, or technology policy programs.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Research opportunity identification: existing community relationships create natural laboratory for continuing research in community technology adoption, digital divide issues, or civic engagement platforms.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Academic network building strategy: your work connects to multiple academic disciplines - computer science, urban planning, public policy, sociology - creating interdisciplinary collaboration opportunities.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Research sustainability through community partnerships: unlike theoretical academic projects, your community-grounded work provides ongoing research opportunities with built-in implementation pathways and impact measurement.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-pink-50 to-red-50 rounded-lg mb-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Rocket className="h-5 w-5 text-pink-600" />
+                        <h4 className="font-semibold text-pink-600">Innovation Pipeline Development</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Next-generation project identification: your community relationships create early-warning system for emerging needs - digital literacy gaps, civic engagement challenges, economic development opportunities.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Technology trend integration opportunities: as new technologies emerge (AI, blockchain, IoT), your community context provides grounding for practical applications rather than theoretical implementations.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Market gap identification through community insight: your grassroots perspective reveals unserved needs that typical market research misses, creating innovation opportunities with built-in validation and implementation pathways.
+                      </p>
+                    </div>
+
+                    <div className="p-6 bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Shield className="h-5 w-5 text-emerald-600" />
+                        <h4 className="font-semibold text-emerald-600">Legacy & Long-term Impact Planning</h4>
+                      </div>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Ten-year vision development: your community ownership transfer model creates template for sustainable technology initiatives that continue growing impact even after your direct involvement ends.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                        Sustainable impact creation framework: by teaching others to replicate your model, you create exponential rather than linear impact growth - each community becomes training ground for the next.
+                      </p>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Knowledge transfer planning excellence: your documentation and training systems enable community ownership transition while preserving institutional knowledge, creating model for sustainable technology transfer in underserved communities.
+                      </p>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
