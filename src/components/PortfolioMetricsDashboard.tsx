@@ -6,6 +6,9 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { ComingSoonOverlay } from "@/components/dashboard/ComingSoonOverlay";
 import { InsightCard as BeautifulInsightCard } from "@/components/dashboard/InsightCard";
 import { MetricCard as BeautifulMetricCard } from "@/components/dashboard/MetricCard";
 import { QuoteCard } from "@/components/dashboard/QuoteCard";
@@ -619,7 +622,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
           <TabsList className="grid w-full grid-cols-4 bg-card/80 backdrop-blur-xl border border-border/50 sticky top-24 z-10 shadow-medium rounded-xl p-2">
             <TabsTrigger value="impact" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-soft">
               <TrendingUp className="h-4 w-4" />
-              Impact Analysis
+              Foundation
             </TabsTrigger>
             <TabsTrigger value="skills" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-soft">
               <Brain className="h-4 w-4" />
@@ -635,547 +638,494 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
             </TabsTrigger>
           </TabsList>
 
-          {/* Enhanced Impact Analysis Tab with Multiple Chart Types */}
+          {/* Foundation Tab - Core Essential Content */}
           <TabsContent value="impact" className="space-y-8">
-            {/* Enhanced Hero Metrics */}
+            {/* Enhanced Hero Metrics - Foundation Content */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
               <BeautifulMetricCard
                 title="Active Users"
                 value="500+"
                 subtitle="Community Members"
                 trend="up"
-                trendValue="+234% growth"
-                variant="primary"
-              />
-              <BeautifulMetricCard
-                title="Gardens Connected"
-                value="42"
-                subtitle="Neighborhood Networks"
-                trend="up"
-                trendValue="+300% expansion"
-                variant="secondary"
-              />
-              <BeautifulMetricCard
-                title="User Satisfaction"
-                value="96%"
-                subtitle="Community Approval"
-                trend="up"
-                trendValue="+24 points"
-                variant="success"
+                className="glass-card border-success/30 bg-gradient-to-br from-success/5 to-success/10"
               />
               <BeautifulMetricCard
                 title="Impact Score"
-                value={project.quickMetrics.impactScore}
-                subtitle="Overall Rating"
+                value="94/100"
+                subtitle="Measurable Outcomes"
                 trend="up"
-                trendValue="Excellent"
-                variant="warning"
+                className="glass-card border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10"
+              />
+              <BeautifulMetricCard
+                title="Story Potential"
+                value="96/100" 
+                subtitle="Essay Applications"
+                trend="up"
+                className="glass-card border-accent/30 bg-gradient-to-br from-accent/5 to-accent/10"
+              />
+              <BeautifulMetricCard
+                title="Admissions Value"
+                value="92/100"
+                subtitle="College Application Strength"
+                trend="neutral"
+                className="glass-card border-warning/30 bg-gradient-to-br from-warning/5 to-warning/10"
               />
             </div>
 
-            {/* Project Genesis Story */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <BeautifulInsightCard
-                title="The Spark: Food Insecurity Crisis"
-                icon={Heart}
-                variant="primary"
-                content={
-                  <div className="space-y-4">
-                    <p>During pandemic lockdowns, I witnessed food insecurity firsthand in historically underserved neighborhoods. Families struggled not just with access to fresh produce, but with the knowledge and community connections needed for sustainable food security.</p>
-                    <p>The trigger moment came when I realized that individual solutions couldn't address systemic community disconnection. This project emerged from understanding that food security is fundamentally about community resilience, not individual resources.</p>
-                  </div>
-                }
-              />
-
-              <QuoteCard
-                quote={project.impactAnalysis.deepDive.genesis.personalConnection}
-                author="Personal Reflection"
-                context="Project Genesis"
-                variant="secondary"
-              />
-            </div>
-
-            {/* Breakthrough Moment */}
-            <div className="mb-8">
-              <TimelineCard
-                variant="primary"
-                events={[
-                  {
-                    title: "Initial Community Research",
-                    description: "Conducted interviews with 40+ families to understand barriers to food security. Discovered that isolation, not resources, was the primary challenge.",
-                    date: "January 2024",
-                    location: "East Oakland",
-                    participants: "40+ families",
-                    impact: "Identified root cause: social disconnection, not resource scarcity"
-                  },
-                  {
-                    title: "The Grandmother's Kitchen Moment",
-                    description: project.impactAnalysis.deepDive.breakthroughMoments[0].moment,
-                    date: "March 2024", 
-                    location: "Mrs. Rodriguez's Home",
-                    impact: project.impactAnalysis.deepDive.breakthroughMoments[0].significance
-                  },
-                  {
-                    title: "Community Ownership Transfer",
-                    description: "Transitioned platform governance to community leaders, ensuring sustainable local ownership and continued growth without external dependency.",
-                    date: "June 2024",
-                    participants: "Community Leadership Council",
-                    impact: "100% community-owned platform with 96% user satisfaction"
-                  }
-                ]}
-              />
-            </div>
-
-            {/* Personal Transformation Journey */}
-            <TransformationCard
-              title="Personal Transformation: From Disruption to Amplification"
-              progression={[
-                {
-                  title: "Tech-First Mindset",
-                  description: "Initially believed technology could replace inefficient human systems. Led with features instead of relationships.",
-                  keyLearning: "Technology without community trust creates barriers, not solutions.",
-                  milestone: "3 failed outreach attempts"
-                },
-                {
-                  title: "Community Listening Phase",
-                  description: "Realized existing systems contained wisdom I didn't understand. Started attending community meetings as learner, not teacher.",
-                  keyLearning: "Every 'inefficiency' serves a purpose - I needed to understand before optimizing.",
-                  milestone: "First meaningful conversations"
-                },
-                {
-                  title: "Collaborative Design Approach",
-                  description: "Shifted from 'How can tech solve this?' to 'How can tech amplify what already works?' Co-created solutions with community members.",
-                  keyLearning: "The best technology makes people more human, not less.",
-                  milestone: "Community co-design sessions"
-                },
-                {
-                  title: "Amplification Leadership",
-                  description: "Now design solutions that honor existing community knowledge while expanding possibilities. Technology bridges generations instead of replacing wisdom.",
-                  keyLearning: "True innovation happens when technology serves community needs, not when community adapts to technology.",
-                  milestone: "Community ownership transfer"
-                }
-              ]}
-              characterStrengths={["Humility", "Systems Thinking", "Cultural Sensitivity", "Adaptive Leadership"]}
-            />
-
-            {/* Stakeholder Ecosystem Analysis */}
-            <StakeholderCard
-              stakeholderGroups={[
-                {
-                  type: 'beneficiaries',
-                  title: 'Community Gardeners',
-                  members: ['Mrs. Rodriguez (seed collection keeper)', 'Young families', 'Elder wisdom keepers', 'New residents'],
-                  relationship: 'Primary users who shaped every feature through feedback and testing',
-                  impact: '500+ active users with 96% satisfaction and sustained engagement',
-                  keyInsight: 'Success depends on making everyone feel like an expert contributor, not just a user'
-                },
-                {
-                  type: 'mentors',
-                  title: 'Community Leaders & Advisors',
-                  members: ['Neighborhood Association President', 'Community College Urban Planning Dept', 'Local Tech Mentors', 'Elder Council'],
-                  relationship: 'Provided guidance on community dynamics and technical architecture',
-                  impact: 'Secured institutional support and legitimacy for long-term sustainability',
-                  keyInsight: 'Bridging traditional power structures with innovation requires patience and respect'
-                },
-                {
-                  type: 'partners',
-                  title: 'Implementation Partners',
-                  members: ['Local Government Officials', 'School Districts', 'Community Organizations', 'Environmental Groups'],
-                  relationship: 'Formal partnerships that enabled resource sharing and program expansion',
-                  impact: 'Scaled model to 4 additional neighborhoods with sustained funding',
-                  keyInsight: 'Sustainable community tech requires institutional backing, not just grassroots enthusiasm'
-                },
-                {
-                  type: 'challengers',
-                  title: 'Skeptics & Critical Voices',
-                  members: ['Tech-wary residents', 'Traditional gardening purists', 'Privacy advocates', 'Resource competition concerns'],
-                  relationship: 'Initially resistant but became valuable critics who improved the solution',
-                  impact: 'Their challenges led to better privacy protections and more inclusive design',
-                  keyInsight: 'Skeptics often identify real problems that enthusiasts overlook'
-                }
-              ]}
-              conflictResolution={{
-                situation: 'Heated debate between older gardeners preferring heirloom varieties and younger ones wanting higher-yield hybrids',
-                approach: 'Used app data to show both approaches worked in different soil conditions, created neighborhood seed swap feature',
-                outcome: 'Technology became neutral ground for bridging generational differences, both groups now share knowledge actively'
-              }}
-            />
-
-            {/* Systems Thinking Deep Dive */}
-            <SystemsThinkingCard
-              problemStatement="Community food insecurity appeared to be resource scarcity but root cause analysis revealed social isolation as core issue"
-              rootCauses={[
-                'Social isolation preventing knowledge sharing between experienced and new gardeners',
-                'Language barriers limiting access to gardening resources and community connections',
-                'Generational divides between traditional methods and modern approaches',
-                'Lack of coordination leading to resource waste and duplicated efforts',
-                'Absence of year-round engagement causing seasonal knowledge loss'
-              ]}
-              systemsMap={[
-                {
-                  id: 'root-1',
-                  label: 'Social Isolation',
-                  type: 'root-cause',
-                  description: 'Neighbors with gardening knowledge not connected to those who need help'
-                },
-                {
-                  id: 'symptom-1',
-                  label: 'Failed Gardens',
-                  type: 'symptom',
-                  description: 'High failure rate among new gardeners due to lack of guidance'
-                },
-                {
-                  id: 'intervention-1',
-                  label: 'Community Platform',
-                  type: 'intervention',
-                  description: 'Digital space for knowledge sharing and relationship building'
-                },
-                {
-                  id: 'outcome-1',
-                  label: 'Sustainable Food Network',
-                  type: 'outcome',
-                  description: '96% user satisfaction with sustained community ownership'
-                }
-              ]}
-              feedbackLoops={[
-                {
-                  title: 'Knowledge Sharing Reinforcement',
-                  description: 'Successful gardens → increased social connection → more knowledge sharing → better gardens → stronger relationships',
-                  type: 'reinforcing',
-                  impact: 'positive'
-                },
-                {
-                  title: 'Trust Building Cycle',
-                  description: 'Platform use → successful interactions → increased trust → more platform engagement → deeper community bonds',
-                  type: 'reinforcing',
-                  impact: 'positive'
-                },
-                {
-                  title: 'Gentrification Mitigation',
-                  description: 'Community ownership → local control → resistance to displacement → sustained neighborhood character',
-                  type: 'balancing',
-                  impact: 'positive'
-                }
-              ]}
-              beforeAfter={{
-                before: 'Fragmented community with individuals struggling in isolation, high garden failure rates, knowledge hoarding by experienced gardeners',
-                after: 'Connected network where success is collective, knowledge flows freely between generations, 67% increase in neighborhood social connections',
-                keyChanges: ['Centralized knowledge sharing', 'Intergenerational connection', 'Community ownership model', 'Sustainable engagement patterns']
-              }}
-            />
-
-            {/* Technical Skills Mastery */}
-            <TechnicalSkillsCard
-              skillProgression={[
-                {
-                  skill: 'Full-Stack Development',
-                  category: 'programming',
-                  before: 35,
-                  current: 92,
-                  evidence: ['React/Node.js architecture', '500+ concurrent users', '99.8% uptime', 'Senior developer code review praise'],
-                  keyProject: 'Community gardening platform with real-time collaboration features'
-                },
-                {
-                  skill: 'Database Architecture',
-                  category: 'systems',
-                  before: 20,
-                  current: 85,
-                  evidence: ['Offline-first design', 'Real-time sync', 'Data conflict resolution', 'Performance optimization'],
-                  keyProject: 'Scalable community data management system'
-                },
-                {
-                  skill: 'User Experience Design',
-                  category: 'tools',
-                  before: 25,
-                  current: 95,
-                  evidence: ['3 complete UI rebuilds', '95% user satisfaction', 'Community-driven design process', 'Accessibility compliance'],
-                  keyProject: 'Community-centered interface design with elder-friendly features'
-                },
-                {
-                  skill: 'System Administration',
-                  category: 'systems',
-                  before: 15,
-                  current: 78,
-                  evidence: ['AWS deployment', 'Load balancing', 'Monitoring setup', 'Security implementation'],
-                  keyProject: 'Production infrastructure serving 500+ users reliably'
-                }
-              ]}
-              majorAchievements={[
-                {
-                  title: 'Offline-First Community Platform',
-                  description: 'Built resilient platform working without internet connectivity, crucial for low-resource areas',
-                  technicalComplexity: 5,
-                  innovation: 'Implemented conflict-free data synchronization for community knowledge sharing',
-                  metrics: [
-                    { label: 'Uptime', value: '99.8%' },
-                    { label: 'Users', value: '500+' },
-                    { label: 'Satisfaction', value: '96%' },
-                    { label: 'Response Time', value: '<200ms' }
-                  ]
-                },
-                {
-                  title: 'Community Ownership Transfer System',
-                  description: 'Created sustainable model for community-controlled technology with knowledge transfer protocols',
-                  technicalComplexity: 4,
-                  innovation: 'Developed training systems enabling non-technical community ownership',
-                  metrics: [
-                    { label: 'Communities', value: '4' },
-                    { label: 'Retention', value: '94%' },
-                    { label: 'Local Control', value: '100%' },
-                    { label: 'Sustainability', value: '2+ years' }
-                  ]
-                }
-              ]}
-              technologyStack={{
-                languages: ['JavaScript', 'TypeScript', 'Python', 'SQL'],
-                frameworks: ['React', 'Node.js', 'Express', 'PostgreSQL'],
-                tools: ['Git', 'Docker', 'AWS', 'Figma'],
-                systems: ['Linux', 'nginx', 'Redis', 'CI/CD']
-              }}
-            />
-
-            {/* Leadership Evolution Journey */}
-            <LeadershipCard
-              evolution={[
-                {
-                  phase: 'Individual Contributor',
-                  timeframe: 'Months 1-2',
-                  leadershipStyle: 'Technical expert trying to lead through expertise',
-                  situationHandled: 'First community meetings where I presented technical solutions',
-                  keyDecision: 'Realized I needed to listen more than I spoke',
-                  outcome: 'Failed to gain community buy-in but learned valuable lessons about communication',
-                  skillsDeveloped: ['Active listening', 'Cultural humility', 'Assumption questioning']
-                },
-                {
-                  phase: 'Collaborative Facilitator',
-                  timeframe: 'Months 3-4',
-                  leadershipStyle: 'Servant leadership focused on enabling others',
-                  situationHandled: 'Mediating conflicts between different gardening approaches',
-                  keyDecision: 'Positioned technology as neutral ground for bridging differences',
-                  outcome: 'Successfully unified competing factions around shared goals',
-                  skillsDeveloped: ['Conflict mediation', 'Stakeholder management', 'Diplomatic communication']
-                },
-                {
-                  phase: 'Community Organizer',
-                  timeframe: 'Months 5-8',
-                  leadershipStyle: 'Distributed leadership empowering community ownership',
-                  situationHandled: 'Scaling platform to multiple neighborhoods while maintaining local control',
-                  keyDecision: 'Created training systems for community leaders rather than centralizing control',
-                  outcome: '4 communities successfully running independent programs with 94% retention',
-                  skillsDeveloped: ['Systems thinking', 'Sustainable scaling', 'Knowledge transfer']
-                },
-                {
-                  phase: 'Strategic Advisor',
-                  timeframe: 'Months 9-12',
-                  leadershipStyle: 'Behind-the-scenes guidance supporting community-led initiatives',
-                  situationHandled: 'Transitioning from active leadership to supportive advisory role',
-                  keyDecision: 'Stepped back to let community leaders take ownership while remaining available for support',
-                  outcome: 'Communities continue thriving with 96% satisfaction and expanding to new areas',
-                  skillsDeveloped: ['Leadership transition', 'Legacy building', 'Sustainable impact creation']
-                }
-              ]}
-              teamFormation={{
-                challenge: 'Building diverse coalition including tech-skeptical elders, enthusiastic young families, and institutional partners',
-                teamBuilding: 'Created structured dialogue sessions where every voice was heard and valued, established rotating leadership roles',
-                conflictResolution: 'Developed framework for addressing disagreements through data-driven discussion and consensus building',
-                results: '15-member community leadership council with 94% retention rate and expanding influence',
-                teamGrowth: ['Increased technical literacy', 'Enhanced communication skills', 'Stronger neighborhood bonds', 'Leadership capacity building']
-              }}
-              decisionFramework={[
-                {
-                  principle: 'Community Ownership First',
-                  application: 'All major decisions must enhance community control rather than centralize power',
-                  example: 'Chose open-source technology and trained local leaders rather than maintaining proprietary control'
-                },
-                {
-                  principle: 'Wisdom Before Innovation',
-                  application: 'Understand existing community knowledge before introducing new solutions',
-                  example: 'Spent 3 months learning traditional gardening methods before suggesting any technological improvements'
-                },
-                {
-                  principle: 'Amplification Over Replacement',
-                  application: 'Technology should enhance human connections, not substitute for them',
-                  example: 'Platform encourages face-to-face meetings and in-person skill sharing rather than purely digital interaction'
-                }
-              ]}
-              impactMetrics={{
-                teamsLed: 4,
-                peopleInfluenced: 500,
-                initiativesLaunched: 12,
-                conflictsResolved: 8
-              }}
-            />
-
-            {/* Expert Analysis Section */}
-            {insightDepth === 'expert' && (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <ExpertAnalysisCard
-                    title="Deep Psychology Analysis"
-                    category="Behavioral Insights"
-                    content={
-                      <div className="space-y-4">
-                        <p>Your behavioral psychology understanding reveals sophisticated grasp of intrinsic vs. extrinsic motivation. By gamifying community connection rather than individual achievement, you tapped into powerful social cohesion drives that sustain long-term engagement.</p>
-                        <p>The decision to prioritize elder community members as "wisdom keepers" demonstrates advanced emotional intelligence - recognizing that technology adoption requires honoring existing social structures rather than disrupting them.</p>
-                        <p>The 94% user satisfaction score indicates mastery of user psychology principles: progressive disclosure of complexity, social validation loops, and authentic relationship building through digital interfaces.</p>
-                      </div>
-                    }
-                  />
-
-                  <ExpertAnalysisCard
-                    title="Advanced Stakeholder Mapping"
-                    category="Political Strategy"
-                    content={
-                      <div className="space-y-4">
-                        <p>Your stakeholder ecosystem reveals sophisticated political awareness. Successfully navigating relationships between community elders, tech-skeptical residents, local government officials, and enthusiastic early adopters required advanced diplomacy skills.</p>
-                        <p>Securing support from both the neighborhood association president (traditional power structure) and the community college urban planning department (academic legitimacy) shows strategic relationship building across generational and institutional lines.</p>
-                        <p>Your approach to power dynamics - positioning yourself as facilitator rather than leader - demonstrates understanding that sustainable community change requires distributed ownership rather than centralized control.</p>
-                      </div>
-                    }
-                  />
+            {/* Timeline - Foundation Content */}
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
+                  <Calendar className="h-5 w-5" />
                 </div>
-
-                <ExpertAnalysisCard
-                  title="Systems Thinking Deep Dive"
-                  category="Advanced Analysis"
-                  content={
-                    <div className="space-y-4">
-                      <p>Your root cause analysis went beyond surface-level food access issues to identify underlying social isolation as the core problem. This systems thinking approach - recognizing that food insecurity is often a symptom of community disconnection - shows sophisticated analytical capabilities.</p>
-                      <p>The feedback loops you created are particularly elegant: successful gardens → increased social connection → more community knowledge sharing → better gardens → stronger relationships. This positive reinforcement cycle demonstrates understanding of sustainable system design.</p>
-                      <p>Your anticipation of unintended consequences was remarkable - proactively addressing potential gentrification effects by ensuring community ownership of the platform and data, showing awareness of how tech can inadvertently displace communities it aims to help.</p>
-                      <p>Most sophisticated was your optimization of information flow patterns: creating multi-directional knowledge exchange rather than top-down expert guidance, allowing community wisdom to emerge organically while maintaining quality standards.</p>
+                Project Development Timeline
+              </h3>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="glass-card">
+                  <CardContent className="p-6">
+                    <div className="text-center mb-3">
+                      <div className="text-sm text-muted-foreground mb-1">Jan-Mar 2024</div>
+                      <h4 className="font-semibold text-sm">Foundation & Discovery</h4>
+                      <Badge variant="secondary" className="text-xs mt-2">Completed</Badge>
                     </div>
-                  }
-                />
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <ExpertAnalysisCard
-                    title="Failure Analysis & Recovery"
-                    category="Learning Agility"
-                    content={
-                      <div className="space-y-4">
-                        <p>Your initial failures were sophisticated experiments in disguise. The three failed community outreach attempts systematically tested different approaches to technology adoption, yielding valuable data about community priorities and trust-building processes.</p>
-                        <p>The pivot from "tech-first" to "relationship-first" approach demonstrates advanced learning agility. Most developers would have doubled down on technical features; instead, you recognized that adoption barriers were social, not technological.</p>
-                        <p>This pattern of "failing forward" demonstrates anti-fragility: becoming stronger through adversity rather than just resilient to it.</p>
+                    <div className="space-y-2">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Community Interviews:</span> 45
                       </div>
-                    }
-                  />
-
-                  <ExpertAnalysisCard
-                    title="Competitive Landscape Analysis"
-                    category="Strategic Positioning"
-                    content={
-                      <div className="space-y-4">
-                        <p>Unlike existing gardening apps focused on individual plant tracking, your community-centered approach addresses the gap between individual knowledge and collective wisdom. This positioning differentiates you from both commercial gardening platforms and traditional community organizing tools.</p>
-                        <p>Your unique value proposition combines technical sophistication with cultural humility - rare in the "tech for social good" space, where products typically prioritize scalability over community ownership.</p>
-                        <p>The defensibility of your approach lies not in proprietary technology but in community relationships and trust - creating network effects that competitors cannot easily replicate without years of authentic community engagement.</p>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Technical Prototypes:</span> 3
                       </div>
-                    }
-                  />
-                </div>
-
-                <ExpertAnalysisCard
-                  title="Cultural Impact Assessment"
-                  category="Anthropological Analysis"
-                  content={
-                    <div className="space-y-4">
-                      <p>Your project achieved remarkable cultural preservation while enabling innovation. By positioning technology as amplification rather than replacement, you created space for traditional knowledge to flourish alongside modern tools.</p>
-                      <p>The intergenerational knowledge transfer your platform facilitated represents a sophisticated solution to cultural continuity challenges facing many communities. Elder gardeners report feeling valued and heard, while younger participants gain access to traditional wisdom they might otherwise never encounter.</p>
-                      <p>The behavioral changes in your community extend beyond gardening: participating families report 67% increase in neighborhood social connections, suggesting your app catalyzed broader community cohesion beyond its direct functionality.</p>
-                      <p>Most significantly, you've demonstrated that technology can be a tool for cultural healing rather than disruption - a model that could transform how we approach community-centered innovation across diverse cultural contexts.</p>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">User Feedback Sessions:</span> 12
+                      </div>
                     </div>
-                  }
-                />
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardContent className="p-6">
+                    <div className="text-center mb-3">
+                      <div className="text-sm text-muted-foreground mb-1">Apr-Jun 2024</div>
+                      <h4 className="font-semibold text-sm">Development & Testing</h4>
+                      <Badge variant="secondary" className="text-xs mt-2">Completed</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Beta Users:</span> 89
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Feature Iterations:</span> 18
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Code Commits:</span> 234
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardContent className="p-6">
+                    <div className="text-center mb-3">
+                      <div className="text-sm text-muted-foreground mb-1">Jul-Present</div>
+                      <h4 className="font-semibold text-sm">Launch & Scale</h4>
+                      <Badge variant="secondary" className="text-xs mt-2">Current</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Active Gardens:</span> 42
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Monthly Active Users:</span> 478
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Community Partnerships:</span> 8
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+            </div>
+
+            {/* Systems Thinking Analysis - Foundation Content */}
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
+                  <Network className="h-5 w-5" />
+                </div>
+                Systems Thinking Analysis
+              </h3>
+              
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="glass-card shadow-large">
+                  <CardHeader>
+                    <CardTitle>Stakeholder Ecosystem</CardTitle>
+                    <CardDescription>Key relationships and influence mapping</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-card/50">
+                        <div>
+                          <div className="font-medium">Community Gardeners</div>
+                          <div className="text-xs text-muted-foreground">Primary Users</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold">95%</div>
+                          <div className="text-xs text-muted-foreground">Influence</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-card/50">
+                        <div>
+                          <div className="font-medium">Local Government</div>
+                          <div className="text-xs text-muted-foreground">Policy Support</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold">80%</div>
+                          <div className="text-xs text-muted-foreground">Influence</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-3 rounded-lg bg-card/50">
+                        <div>
+                          <div className="font-medium">Tech Volunteers</div>
+                          <div className="text-xs text-muted-foreground">Development Team</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-bold">75%</div>
+                          <div className="text-xs text-muted-foreground">Influence</div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="glass-card shadow-large">
+                  <CardHeader>
+                    <CardTitle>Feedback Loops</CardTitle>
+                    <CardDescription>System dynamics and reinforcing patterns</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-4">
+                      <div className="p-4 rounded-lg border border-success/30 bg-success/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="border-success text-success">Reinforcing</Badge>
+                          <span className="text-xs text-success">Strong</span>
+                        </div>
+                        <p className="text-sm">More users → Better data → Improved recommendations → Higher satisfaction → More users</p>
+                      </div>
+                      <div className="p-4 rounded-lg border border-warning/30 bg-warning/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant="outline" className="border-warning text-warning">Balancing</Badge>
+                          <span className="text-xs text-warning">Moderate</span>
+                        </div>
+                        <p className="text-sm">Rapid growth → Resource strain → Quality concerns → Slower expansion</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* Leadership Evolution - Moved from Skills Deep Dive */}
+            <div className="space-y-6">
+              <h3 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
+                  <Crown className="h-5 w-5" />
+                </div>
+                Leadership Evolution Journey
+              </h3>
+              
+              {/* Leadership Impact Metrics */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <Card className="glass-card">
+                  <CardContent className="p-4 text-center">
+                    <Users className="h-8 w-8 mx-auto text-primary mb-2" />
+                    <div className="text-2xl font-bold">18</div>
+                    <div className="text-xs text-muted-foreground">Team Members Led</div>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardContent className="p-4 text-center">
+                    <Heart className="h-8 w-8 mx-auto text-success mb-2" />
+                    <div className="text-2xl font-bold">500+</div>
+                    <div className="text-xs text-muted-foreground">Community Members Influenced</div>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardContent className="p-4 text-center">
+                    <Award className="h-8 w-8 mx-auto text-warning mb-2" />
+                    <div className="text-2xl font-bold">96%</div>
+                    <div className="text-xs text-muted-foreground">Team Satisfaction</div>
+                  </CardContent>
+                </Card>
+                <Card className="glass-card">
+                  <CardContent className="p-4 text-center">
+                    <Target className="h-8 w-8 mx-auto text-accent mb-2" />
+                    <div className="text-2xl font-bold">95%</div>
+                    <div className="text-xs text-muted-foreground">Goal Achievement</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Leadership Evolution Timeline - Foundation Content */}
+              <LeadershipSkillsJourney />
+            </div>
+
+            {/* Expert Content with Coming Soon Overlay - Always show in Foundation mode */}
+            <ComingSoonOverlay
+              <ComingSoonOverlay 
+                title="Advanced Impact Analysis"
+                description="Deep-dive analytics, expert insights, and advanced visualizations"
+                className="mt-8"
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-[400px]">
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle>Advanced Stakeholder Analysis</CardTitle>
+                      <CardDescription>Comprehensive relationship mapping and influence analysis</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-32 bg-muted rounded animate-pulse"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle>Impact Prediction Models</CardTitle>
+                      <CardDescription>AI-powered forecasting and scenario analysis</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-32 bg-muted rounded animate-pulse"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </ComingSoonOverlay>
             )}
           </TabsContent>
 
-          {/* Enhanced Skills Deep Dive Tab */}
+          {/* Skills Deep Dive Tab - Foundation Content Only */}
           <TabsContent value="skills" className="space-y-8">
+            {/* Foundation Content: Skills Dashboard */}
             <SkillsDashboard />
             
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              <TechnicalSkillsShowcase />
-              <LeadershipSkillsJourney />
-            </div>
+            {/* Foundation Content: Technical Skills */}
+            <TechnicalSkillsShowcase />
             
+            {/* Foundation Content: Soft Skills Evidence */}
             <SoftSkillsEvidence />
             
-            <SkillsExpertAnalysis />
+            {/* Expert Content with Coming Soon Overlay */}
+            <ComingSoonOverlay
+            <ComingSoonOverlay 
+              title="Advanced Skills Analysis"
+              description="Expert-level skill assessment, gap analysis, and strategic development recommendations"
+            >
+                <div className="space-y-8 min-h-[600px]">
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle>Expert Skills Assessment</CardTitle>
+                      <CardDescription>AI-powered competency evaluation and benchmarking</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-64 bg-muted rounded animate-pulse"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Skills Gap Analysis</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-32 bg-muted rounded animate-pulse"></div>
+                      </CardContent>
+                    </Card>
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Learning Pathway Recommendations</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-32 bg-muted rounded animate-pulse"></div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              </ComingSoonOverlay>
           </TabsContent>
 
-          {/* Enhanced Essay Goldmine Tab */}
+          {/* Essay Goldmine Tab - Foundation + Expert Content */}
           <TabsContent value="essays" className="space-y-8">
-            <ApplicationStrategyDashboard />
-            <ApplicationDescriptionWorkshop />
-            <NarrativeArchitectureBuilder />
-            <StrategicWritingEnhancement />
-            <PortfolioCoherenceStrategist />
-            <ExpertApplicationIntelligence />
+            {analysisMode === 'foundation' ? (
+            <div className="space-y-8">
+              {/* Foundation Content: Core Essay Components */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  {/* Project Mapping - Foundation */}
+                  <Card className="glass-card shadow-large">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
+                          <Map className="h-5 w-5" />
+                        </div>
+                        Project Mapping
+                      </CardTitle>
+                      <CardDescription>Connect your projects to essay opportunities</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="p-4 rounded-lg border bg-card/50">
+                          <h4 className="font-semibold mb-2">Community Garden App</h4>
+                          <div className="flex flex-wrap gap-2">
+                            <Badge variant="secondary">Technical Innovation</Badge>
+                            <Badge variant="secondary">Community Impact</Badge>
+                            <Badge variant="secondary">Leadership Growth</Badge>
+                          </div>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Applicable to 12+ essay prompts across top universities
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Portfolio Coherence - Foundation */}
+                  <Card className="glass-card shadow-large">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-gradient-to-r from-success to-success/80 text-white shadow-soft">
+                          <Layers className="h-5 w-5" />
+                        </div>
+                        Portfolio Coherence
+                      </CardTitle>
+                      <CardDescription>How your projects create a unified narrative</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium">Narrative Strength</span>
+                          <Badge variant="secondary">94%</Badge>
+                        </div>
+                        <Progress value={94} className="h-2" />
+                        <p className="text-sm text-muted-foreground">
+                          Strong coherence around community-tech bridge building theme
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Expert Content with Coming Soon Overlay */}
+                <ComingSoonOverlay 
+                  title="Advanced Essay Intelligence"
+                  description="AI-powered essay optimization, narrative architecture, and strategic writing enhancement"
+                >
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 min-h-[500px]">
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Narrative Architecture</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="h-6 bg-muted rounded animate-pulse"></div>
+                          <div className="h-6 bg-muted rounded animate-pulse"></div>
+                          <div className="h-24 bg-muted rounded animate-pulse"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Strategic Writing Enhancement</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="h-6 bg-muted rounded animate-pulse"></div>
+                          <div className="h-6 bg-muted rounded animate-pulse"></div>
+                          <div className="h-24 bg-muted rounded animate-pulse"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="glass-card">
+                      <CardHeader>
+                        <CardTitle>Expert Application Intelligence</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="h-6 bg-muted rounded animate-pulse"></div>
+                          <div className="h-6 bg-muted rounded animate-pulse"></div>
+                          <div className="h-24 bg-muted rounded animate-pulse"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </ComingSoonOverlay>
+              </div>
+            </div>
           </TabsContent>
 
-          {/* Enhanced Future Trajectory Tab */}
+          {/* Future Trajectory Tab - Foundation + Expert Content */}
           <TabsContent value="future" className="space-y-8">
-            {/* Career Alignment Chart */}
-            <Card className="glass-card shadow-large overflow-hidden">
-              <CardHeader className="bg-gradient-to-r from-primary/10 to-accent/10 border-b border-gradient">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-3 rounded-xl bg-gradient-primary text-white shadow-soft">
-                      <Compass className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl">Career Path Analysis</CardTitle>
-                      <CardDescription>Data-driven insights into future opportunities and growth potential</CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    {chartOptions.future.map((chartType) => (
-                      <Button
-                        key={chartType}
-                        variant={activeChartTypes.future === chartType ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setActiveChartTypes({...activeChartTypes, future: chartType})}
-                        className={`capitalize ${activeChartTypes.future === chartType ? 'bg-gradient-primary text-white' : 'hover-lift'}`}
-                      >
-                        {chartType}
-                      </Button>
-                    ))}
-                  </div>
+            {/* Foundation Content: Career Path Strategy Dashboard */}
+            <CareerPathStrategyDashboard />
+            
+            {/* Foundation Content: Project Evolution Workshop */}
+            <ProjectEvolutionWorkshop />
+            
+            {/* Expert Content with Coming Soon Overlay */}
+            {analysisMode === 'foundation' ? (
+              <ComingSoonOverlay 
+                title="Advanced Future Intelligence"
+                description="AI-powered career forecasting, strategic planning, and personalized growth pathways"
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 min-h-[600px]">
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle>Academic Journey Planner</CardTitle>
+                      <CardDescription>Strategic course selection and academic optimization</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-32 bg-muted rounded animate-pulse"></div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="h-16 bg-muted rounded animate-pulse"></div>
+                          <div className="h-16 bg-muted rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="glass-card">
+                    <CardHeader>
+                      <CardTitle>Strategic Skill Development</CardTitle>
+                      <CardDescription>Personalized learning roadmaps and skill gap analysis</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="h-8 bg-muted rounded animate-pulse"></div>
+                        <div className="h-32 bg-muted rounded animate-pulse"></div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="h-16 bg-muted rounded animate-pulse"></div>
+                          <div className="h-16 bg-muted rounded animate-pulse"></div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
-              </CardHeader>
-              <CardContent className="p-8">
-                <div className="h-96">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={project.chartData.careerAlignment}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="career" stroke="hsl(var(--muted-foreground))" />
-                      <YAxis stroke="hsl(var(--muted-foreground))" />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'hsl(var(--card))', 
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '12px'
-                        }} 
-                      />
-                      <Legend />
-                      <Bar dataKey="probability" fill="hsl(var(--primary))" name="Career Probability %" />
-                      <Bar dataKey="growth" fill="hsl(var(--success))" name="Growth Potential %" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Interactive Future Trajectory Components */}
-            <div className="space-y-6">
-              <CareerPathStrategyDashboard />
-              <AcademicJourneyPlanner />
-              <ProjectEvolutionWorkshop />
-              <StrategicSkillDevelopmentRoadmap />
-              <NetworkRelationshipCapitalBuilder />
-              <StrategicFutureIntelligence />
-            </div>
+              </ComingSoonOverlay>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <AcademicJourneyPlanner />
+                <StrategicSkillDevelopmentRoadmap />
+                <NetworkRelationshipCapitalBuilder />
+                <StrategicFutureIntelligence />
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </div>
@@ -1292,6 +1242,7 @@ const StoryFragment: React.FC<{
 const PortfolioMetricsDashboard: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'project'>('dashboard');
+  const [analysisMode, setAnalysisMode] = useState<'foundation' | 'expert'>('foundation');
 
   const handleProjectSelect = (project: any) => {
     setSelectedProject(project);
@@ -1324,21 +1275,41 @@ const PortfolioMetricsDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground">Portfolio Intelligence Dashboard</h1>
-              <p className="text-foreground/70 mt-1">Deep analysis of your project portfolio with AI-powered insights</p>
+              <p className="text-foreground/70 mt-1">
+                {analysisMode === 'foundation' ? 'Essential insights and core metrics' : 'Comprehensive analysis and advanced features'}
+              </p>
             </div>
-            <div className="flex gap-3">
-              <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
-                <Search className="h-4 w-4 mr-2" />
-                Search Projects
-              </Button>
-              <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
-                <Filter className="h-4 w-4 mr-2" />
-                Filter & Sort
-              </Button>
-              <Button className="bg-primary hover:bg-primary/90">
-                <Download className="h-4 w-4 mr-2" />
-                Export Portfolio
-              </Button>
+            <div className="flex items-center gap-6">
+              {/* View Mode Toggle */}
+              <div className="flex items-center space-x-3">
+                <Label htmlFor="analysis-mode" className="text-sm font-medium">
+                  Foundation
+                </Label>
+                <Switch
+                  id="analysis-mode"
+                  checked={analysisMode === 'expert'}
+                  onCheckedChange={(checked) => setAnalysisMode(checked ? 'expert' : 'foundation')}
+                />
+                <Label htmlFor="analysis-mode" className="text-sm font-medium flex items-center gap-1">
+                  Expert
+                  <Badge variant="outline" className="text-xs">Preview</Badge>
+                </Label>
+              </div>
+              
+              <div className="flex gap-3">
+                <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+                  <Search className="h-4 w-4 mr-2" />
+                  Search Projects
+                </Button>
+                <Button variant="outline" className="border-primary/30 text-primary hover:bg-primary/10">
+                  <Filter className="h-4 w-4 mr-2" />
+                  Filter & Sort
+                </Button>
+                <Button className="bg-primary hover:bg-primary/90">
+                  <Download className="h-4 w-4 mr-2" />
+                  Export Portfolio
+                </Button>
+              </div>
             </div>
           </div>
         </div>
