@@ -22,6 +22,12 @@ import { TechnicalSkillsShowcase } from "@/components/dashboard/TechnicalSkillsS
 import { LeadershipSkillsJourney } from "@/components/dashboard/LeadershipSkillsJourney";
 import { SoftSkillsEvidence } from "@/components/dashboard/SoftSkillsEvidence";
 import { SkillsExpertAnalysis } from "@/components/dashboard/SkillsExpertAnalysis";
+import ApplicationStrategyDashboard from "@/components/dashboard/ApplicationStrategyDashboard";
+import ApplicationDescriptionWorkshop from "@/components/dashboard/ApplicationDescriptionWorkshop";
+import NarrativeArchitectureBuilder from "@/components/dashboard/NarrativeArchitectureBuilder";
+import StrategicWritingEnhancement from "@/components/dashboard/StrategicWritingEnhancement";
+import PortfolioCoherenceStrategist from "@/components/dashboard/PortfolioCoherenceStrategist";
+import ExpertApplicationIntelligence from "@/components/dashboard/ExpertApplicationIntelligence";
 import { 
   TrendingUp, 
   Award, 
