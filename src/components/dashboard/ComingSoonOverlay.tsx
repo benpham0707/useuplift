@@ -24,7 +24,7 @@ export const ComingSoonOverlay: React.FC<ComingSoonOverlayProps> = ({
       </div>
       
       {/* Overlay with shiny gradient border */}
-      <div className="absolute inset-0 flex items-center justify-center bg-background/30 backdrop-blur-sm">
+      <div className="absolute inset-4 flex items-center justify-center bg-background/30 backdrop-blur-sm rounded-lg">
         <Card className="max-w-lg mx-auto shadow-large border-4 bg-gradient-to-br from-primary/5 to-accent/5 backdrop-blur-md rounded-2xl"
               style={{
                 borderImage: 'linear-gradient(135deg, hsl(var(--primary) / 0.8), hsl(var(--accent) / 0.8), hsl(var(--primary) / 0.8)) 1'
