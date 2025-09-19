@@ -19,6 +19,7 @@ import {
 
 interface PortfolioCoherenceStrategistProps {
   projectData?: any;
+  enabledTabs?: Array<'coordination'|'repetition'|'committee'|'customization'>;
 }
 
 // Hard-coded mock data - represents comprehensive application orchestration
@@ -171,33 +172,43 @@ const mockCoherenceData = {
   ]
 };
 
-const PortfolioCoherenceStrategist: React.FC<PortfolioCoherenceStrategistProps> = ({ projectData }) => {
+const PortfolioCoherenceStrategist: React.FC<PortfolioCoherenceStrategistProps> = ({ 
+  projectData, 
+  enabledTabs = ['coordination', 'repetition', 'committee', 'customization'] 
+}) => {
   const [selectedPlatform, setSelectedPlatform] = useState("commonapp");
   const [selectedSchool, setSelectedSchool] = useState(0);
 
+  const tabConfig = {
+    coordination: { value: 'coordination', icon: Layers, label: 'Multi-Platform' },
+    repetition: { value: 'repetition', icon: GitMerge, label: 'Avoid Repetition' },
+    committee: { value: 'committee', icon: Eye, label: 'Reader View' },
+    customization: { value: 'customization', icon: School, label: 'School-Specific' }
+  };
+
+  const defaultValue = enabledTabs[0] || 'coordination';
+  const shouldShowTabsList = enabledTabs.length > 1;
+
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="coordination" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="coordination" className="flex items-center gap-2">
-            <Layers className="h-4 w-4" />
-            Multi-Platform
-          </TabsTrigger>
-          <TabsTrigger value="repetition" className="flex items-center gap-2">
-            <GitMerge className="h-4 w-4" />
-            Avoid Repetition
-          </TabsTrigger>
-          <TabsTrigger value="committee" className="flex items-center gap-2">
-            <Eye className="h-4 w-4" />
-            Reader View
-          </TabsTrigger>
-          <TabsTrigger value="customization" className="flex items-center gap-2">
-            <School className="h-4 w-4" />
-            School-Specific
-          </TabsTrigger>
-        </TabsList>
+      <Tabs defaultValue={defaultValue} className="w-full">
+        {shouldShowTabsList && (
+          <TabsList className={`grid w-full grid-cols-${enabledTabs.length}`}>
+            {enabledTabs.map(tab => {
+              const config = tabConfig[tab];
+              const IconComponent = config.icon;
+              return (
+                <TabsTrigger key={tab} value={config.value} className="flex items-center gap-2">
+                  <IconComponent className="h-4 w-4" />
+                  {config.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        )}
 
-        <TabsContent value="coordination" className="space-y-4">
+        {enabledTabs.includes('coordination') && (
+          <TabsContent value="coordination" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -339,8 +350,10 @@ const PortfolioCoherenceStrategist: React.FC<PortfolioCoherenceStrategistProps> 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        <TabsContent value="repetition" className="space-y-4">
+        {enabledTabs.includes('repetition') && (
+          <TabsContent value="repetition" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -413,8 +426,10 @@ const PortfolioCoherenceStrategist: React.FC<PortfolioCoherenceStrategistProps> 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        <TabsContent value="committee" className="space-y-4">
+        {enabledTabs.includes('committee') && (
+          <TabsContent value="committee" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -504,8 +519,10 @@ const PortfolioCoherenceStrategist: React.FC<PortfolioCoherenceStrategistProps> 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        <TabsContent value="customization" className="space-y-4">
+        {enabledTabs.includes('customization') && (
+          <TabsContent value="customization" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -570,6 +587,7 @@ const PortfolioCoherenceStrategist: React.FC<PortfolioCoherenceStrategistProps> 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );

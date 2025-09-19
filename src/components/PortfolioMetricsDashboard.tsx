@@ -95,7 +95,8 @@ import {
   Crown,
   Map,
   Play,
-  User
+  User,
+  PenTool
 } from "lucide-react";
 import { 
   LineChart, 
@@ -1199,173 +1200,30 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
 
           {/* Enhanced Essay Goldmine Tab */}
           <TabsContent value="essays" className="space-y-8">
-            {/* FOUNDATION CONTENT - Restored rich Essay Goldmine UI/UX using project.essayGoldmine mock data */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <Card className="glass-card shadow-large">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    Powerful Opening Hooks
-                  </CardTitle>
-                  <CardDescription>High-impact openings mapped to prompts with uniqueness</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  {/* Hard coded data values: displaying project.essayGoldmine.powerfulOpeningHooks with prompt, resonance, uniqueness, and development path */}
-                  {project.essayGoldmine?.powerfulOpeningHooks?.map((hook: any, idx: number) => (
-                    <div key={idx} className="p-4 rounded-xl bg-card/70 border border-border/50">
-                      <blockquote className="text-foreground/90 italic border-l-4 border-primary/40 pl-4 bg-card/40 p-3 rounded-r-lg">
-                        "{hook.hook}"
-                      </blockquote>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <Badge variant="outline" className="border-primary/50 text-primary text-xs">{hook.essayPrompt}</Badge>
-                        <Badge variant="secondary" className="text-xs">Resonance: {hook.emotionalResonance}</Badge>
-                        <div className="ml-auto flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Uniqueness</span>
-                          <Progress value={hook.uniquenessScore} className="w-24 h-2" />
-                          <span className="text-xs text-muted-foreground">{hook.uniquenessScore}%</span>
-                        </div>
-                      </div>
-                      {hook.developmentPath && (
-                        <p className="mt-2 text-xs text-muted-foreground">Dev path: {hook.developmentPath}</p>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card shadow-large">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-gradient-secondary text-white shadow-soft">
-                      <Gem className="h-5 w-5" />
-                    </div>
-                    Theme Coherence Analysis
-                  </CardTitle>
-                  <CardDescription>Strength of themes and essay opportunities</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Hard coded data values: using project.chartData.storyThemes to visualize theme strength and count */}
-                  <div className="space-y-3">
-                    {project.chartData?.storyThemes?.map((t: any, i: number) => (
-                      <div key={i} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium">{t.theme}</span>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <Badge variant="secondary">{t.essays} essays</Badge>
-                            <span>{t.score}%</span>
-                          </div>
-                        </div>
-                        <Progress value={t.score} className="h-2" />
-                      </div>
-                    ))}
+            {/* FOUNDATION CONTENT - Original rich Essay Goldmine UI/UX restored */}
+            <div className="space-y-8">
+              <div className="mb-8">
+                <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
+                    <Layers className="h-5 w-5" />
                   </div>
-                </CardContent>
-              </Card>
+                  Multi-Platform Coordination
+                </h3>
+                <p className="text-muted-foreground mb-6">Strategic use of project elements across different application components</p>
+                <PortfolioCoherenceStrategist enabledTabs={['coordination']} />
+              </div>
+              
+              <div className="mb-8">
+                <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-gradient-primary text-white shadow-soft">
+                    <PenTool className="h-5 w-5" />
+                  </div>
+                  Essay Analysis
+                </h3>
+                <p className="text-muted-foreground mb-6">Detailed assessment and improvement roadmap for existing essays</p>
+                <StrategicWritingEnhancement enabledTabs={['analysis']} />
+              </div>
             </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-              <Card className="glass-card shadow-large">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-primary/20 text-primary shadow-soft">
-                      <Sparkles className="h-5 w-5" />
-                    </div>
-                    Story Fragments & Moments
-                  </CardTitle>
-                  <CardDescription>High-yield story beats and how to use them</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Hard coded data values: mapping project.essayGoldmine.specificStoryMoments; uniqueness uses project.quickMetrics.uniqueness as a placeholder */}
-                  {project.essayGoldmine?.specificStoryMoments?.map((m: any, idx: number) => (
-                    <div key={idx} className="p-4 rounded-lg bg-gradient-to-r from-accent/10 to-primary/10 border border-accent/20">
-                      <div className="flex items-start justify-between mb-2">
-                        <h4 className="font-semibold text-foreground">{m.storyTitle}</h4>
-                        <div className="flex gap-2">
-                          {m.characterQualities?.map((q: string, qi: number) => (
-                            <Badge key={qi} variant="outline" className="border-accent/50 text-accent text-xs">{q}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <p className="text-sm text-muted-foreground mb-2"><span className="font-medium">Setup:</span> {m.setup}</p>
-                      <p className="text-sm text-muted-foreground mb-2"><span className="font-medium">Conflict:</span> {m.conflict}</p>
-                      <p className="text-sm text-muted-foreground"><span className="font-medium">Resolution:</span> {m.resolution}</p>
-                      <div className="mt-3 flex items-center justify-between">
-                        <span className="text-xs text-foreground/70">Essay Potential: {m.essayPotential}</span>
-                        <div className="flex items-center gap-2">
-                          <Progress value={project.quickMetrics?.uniqueness ?? 90} className="w-16 h-2" />
-                          <span className="text-xs text-foreground/70">{project.quickMetrics?.uniqueness ?? 90}%</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="glass-card shadow-large">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-3">
-                    <div className="p-2 rounded-xl bg-warning/20 text-warning shadow-soft">
-                      <Quote className="h-5 w-5" />
-                    </div>
-                    Character Development Arcs
-                  </CardTitle>
-                  <CardDescription>Evolution, applications, and strengths</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Hard coded data values: mapping project.essayGoldmine.characterDevelopmentArcs including progression timeline */}
-                  {project.essayGoldmine?.characterDevelopmentArcs?.map((arc: any, aIdx: number) => (
-                    <div key={aIdx} className="p-4 rounded-xl bg-card/70 border border-border/50">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold text-foreground">{arc.theme}</h4>
-                        <Badge variant="secondary" className="text-xs">{arc.essayApplications?.length ?? 0} uses</Badge>
-                      </div>
-                      <ol className="list-decimal ml-5 space-y-2 text-sm text-muted-foreground">
-                        {arc.progression?.map((step: string, sIdx: number) => (
-                          <li key={sIdx}>{step}</li>
-                        ))}
-                      </ol>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {arc.essayApplications?.map((app: string, i: number) => (
-                          <Badge key={i} variant="outline" className="border-primary/40 text-primary text-xs">{app}</Badge>
-                        ))}
-                      </div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {arc.characterStrengths?.map((c: string, i: number) => (
-                          <Badge key={i} variant="outline" className="border-success/40 text-success text-xs">{c}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-
-            <Card className="glass-card shadow-large">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-primary/10 text-primary shadow-soft">
-                    <Award className="h-5 w-5" />
-                  </div>
-                  Ready-to-Use Insights
-                </CardTitle>
-                <CardDescription>Direct lines you can drop into essays with evidence</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Hard coded data values: mapping project.essayGoldmine.readyToUseInsights with application context and evidence */}
-                {project.essayGoldmine?.readyToUseInsights?.map((ins: any, i: number) => (
-                  <div key={i} className="p-4 rounded-xl bg-card/70 border border-border/50">
-                    <p className="text-foreground font-medium">{ins.insight}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Context: {ins.applicationContext}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Evidence: {ins.supportingEvidence}</p>
-                    {ins.essayIntegration && (
-                      <p className="text-xs text-muted-foreground mt-1">Use in essay: {ins.essayIntegration}</p>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
             
             {/* Expert-only essay components */}
             {insightDepth === 'expert' ? (

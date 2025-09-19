@@ -20,6 +20,7 @@ import {
 
 interface StrategicWritingEnhancementProps {
   projectData?: any;
+  enabledTabs?: Array<'analysis'|'evidence'|'advantage'|'techniques'>;
 }
 
 // Hard-coded mock data - represents essay analysis and improvement suggestions
@@ -138,10 +139,22 @@ const mockWritingData = {
   ]
 };
 
-const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = ({ projectData }) => {
+const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = ({ 
+  projectData, 
+  enabledTabs = ['analysis', 'evidence', 'advantage', 'techniques'] 
+}) => {
   const [selectedEssay, setSelectedEssay] = useState(0);
-  const [activeTab, setActiveTab] = useState("analysis");
+  const [activeTab, setActiveTab] = useState<string>(enabledTabs[0] || 'analysis');
   const [userEssayText, setUserEssayText] = useState("");
+
+  const tabConfig = {
+    analysis: { value: 'analysis', icon: PenTool, label: 'Essay Analysis' },
+    evidence: { value: 'evidence', icon: Zap, label: 'Evidence Upgrades' },
+    advantage: { value: 'advantage', icon: Star, label: 'Competitive Edge' },
+    techniques: { value: 'techniques', icon: Sparkles, label: 'Writing Mastery' }
+  };
+
+  const shouldShowTabsList = enabledTabs.length > 1;
 
   const getStrengthColor = (strength: number) => {
     if (strength >= 90) return "text-success";
@@ -153,26 +166,23 @@ const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = 
   return (
     <div className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="analysis" className="flex items-center gap-2">
-            <PenTool className="h-4 w-4" />
-            Essay Analysis
-          </TabsTrigger>
-          <TabsTrigger value="evidence" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Evidence Upgrades
-          </TabsTrigger>
-          <TabsTrigger value="advantage" className="flex items-center gap-2">
-            <Star className="h-4 w-4" />
-            Competitive Edge
-          </TabsTrigger>
-          <TabsTrigger value="techniques" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            Writing Mastery
-          </TabsTrigger>
-        </TabsList>
+        {shouldShowTabsList && (
+          <TabsList className={`grid w-full grid-cols-${enabledTabs.length}`}>
+            {enabledTabs.map(tab => {
+              const config = tabConfig[tab];
+              const IconComponent = config.icon;
+              return (
+                <TabsTrigger key={tab} value={config.value} className="flex items-center gap-2">
+                  <IconComponent className="h-4 w-4" />
+                  {config.label}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        )}
 
-        <TabsContent value="analysis" className="space-y-4">
+        {enabledTabs.includes('analysis') && (
+          <TabsContent value="analysis" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -267,8 +277,10 @@ const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        <TabsContent value="evidence" className="space-y-4">
+        {enabledTabs.includes('evidence') && (
+          <TabsContent value="evidence" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -320,8 +332,10 @@ const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        <TabsContent value="advantage" className="space-y-4">
+        {enabledTabs.includes('advantage') && (
+          <TabsContent value="advantage" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -366,8 +380,10 @@ const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
-        <TabsContent value="techniques" className="space-y-4">
+        {enabledTabs.includes('techniques') && (
+          <TabsContent value="techniques" className="space-y-4">
           <Card className="glass-card">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
@@ -422,6 +438,7 @@ const StrategicWritingEnhancement: React.FC<StrategicWritingEnhancementProps> = 
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
     </div>
   );
