@@ -34,6 +34,7 @@ import ProjectEvolutionWorkshop from "@/components/dashboard/ProjectEvolutionWor
 import StrategicSkillDevelopmentRoadmap from "@/components/dashboard/StrategicSkillDevelopmentRoadmap";
 import NetworkRelationshipCapitalBuilder from "@/components/dashboard/NetworkRelationshipCapitalBuilder";
 import StrategicFutureIntelligence from "@/components/dashboard/StrategicFutureIntelligence";
+import { ComingSoonOverlay } from "@/components/dashboard/ComingSoonOverlay";
 import { 
   TrendingUp, 
   Award, 
@@ -498,7 +499,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
     essays: 'scatter',
     future: 'bar'
   });
-  const [insightDepth, setInsightDepth] = useState('surface'); // surface, expert
+  const [insightDepth, setInsightDepth] = useState<'foundation' | 'expert'>('foundation'); // foundation, expert
 
   const chartOptions = {
     impact: ['line', 'area', 'radar'],
@@ -597,7 +598,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                   <p className="text-sm text-muted-foreground">Choose how deep you want to dive into the insights</p>
                 </div>
                 <div className="flex gap-2">
-                  {['surface', 'expert'].map((level) => (
+                  {(['foundation', 'expert'] as const).map((level) => (
                     <Button
                       key={level}
                       variant={insightDepth === level ? 'default' : 'outline'}
@@ -605,7 +606,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                       onClick={() => setInsightDepth(level)}
                       className={`capitalize ${insightDepth === level ? 'bg-gradient-primary text-white shadow-soft' : 'hover-lift'}`}
                     >
-                      {level === 'surface' ? 'Surface' : 'Expert'}
+                      {level === 'foundation' ? 'Foundation' : 'Expert'}
                     </Button>
                   ))}
                 </div>
@@ -619,7 +620,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
           <TabsList className="grid w-full grid-cols-4 bg-card/80 backdrop-blur-xl border border-border/50 sticky top-24 z-10 shadow-medium rounded-xl p-2">
             <TabsTrigger value="impact" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-soft">
               <TrendingUp className="h-4 w-4" />
-              Impact Analysis
+              Foundation
             </TabsTrigger>
             <TabsTrigger value="skills" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-gradient-primary data-[state=active]:text-white data-[state=active]:shadow-soft">
               <Brain className="h-4 w-4" />
@@ -1006,8 +1007,11 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
               }}
             />
 
+            {/* Leadership Evolution Journey - MOVED FROM SKILLS TAB */}
+            <LeadershipSkillsJourney />
+
             {/* Expert Analysis Section */}
-            {insightDepth === 'expert' && (
+            {insightDepth === 'expert' ? (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <ExpertAnalysisCard
@@ -1087,6 +1091,39 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                   }
                 />
               </div>
+            ) : (
+              <ComingSoonOverlay
+                title="Advanced Impact Intelligence"
+                description="Unlock deep psychological analysis, advanced stakeholder mapping, systems thinking insights, and cultural impact assessment in Expert Mode."
+              >
+                <div className="space-y-8">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <ExpertAnalysisCard
+                      title="Deep Psychology Analysis"
+                      category="Behavioral Insights"
+                      content={
+                        <div className="space-y-4">
+                          <p>Your behavioral psychology understanding reveals sophisticated grasp of intrinsic vs. extrinsic motivation. By gamifying community connection rather than individual achievement, you tapped into powerful social cohesion drives that sustain long-term engagement.</p>
+                          <p>The decision to prioritize elder community members as "wisdom keepers" demonstrates advanced emotional intelligence - recognizing that technology adoption requires honoring existing social structures rather than disrupting them.</p>
+                          <p>The 94% user satisfaction score indicates mastery of user psychology principles: progressive disclosure of complexity, social validation loops, and authentic relationship building through digital interfaces.</p>
+                        </div>
+                      }
+                    />
+
+                    <ExpertAnalysisCard
+                      title="Advanced Stakeholder Mapping"
+                      category="Political Strategy"
+                      content={
+                        <div className="space-y-4">
+                          <p>Your stakeholder ecosystem reveals sophisticated political awareness. Successfully navigating relationships between community elders, tech-skeptical residents, local government officials, and enthusiastic early adopters required advanced diplomacy skills.</p>
+                          <p>Securing support from both the neighborhood association president (traditional power structure) and the community college urban planning department (academic legitimacy) shows strategic relationship building across generational and institutional lines.</p>
+                          <p>Your approach to power dynamics - positioning yourself as facilitator rather than leader - demonstrates understanding that sustainable community change requires distributed ownership rather than centralized control.</p>
+                        </div>
+                      }
+                    />
+                  </div>
+                </div>
+              </ComingSoonOverlay>
             )}
           </TabsContent>
 
@@ -1094,24 +1131,59 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
           <TabsContent value="skills" className="space-y-8">
             <SkillsDashboard />
             
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-              <TechnicalSkillsShowcase />
-              <LeadershipSkillsJourney />
+            {/* Skills Distribution Chart & Skills Progression Chart - FOUNDATION CONTENT */}
+            <div className="space-y-8">
+              {/* Detailed Skills Analysis - FOUNDATION CONTENT */}
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <TechnicalSkillsShowcase />
+                {/* LeadershipSkillsJourney MOVED TO FOUNDATION TAB */}
+              </div>
+              
+              <SoftSkillsEvidence />
             </div>
             
-            <SoftSkillsEvidence />
-            
-            <SkillsExpertAnalysis />
+            {/* Expert-only content */}
+            {insightDepth === 'expert' ? (
+              <SkillsExpertAnalysis />
+            ) : (
+              <ComingSoonOverlay
+                title="Advanced Skills Intelligence"
+                description="Unlock expert skills analysis, competency mapping, and advanced skill development strategies in Expert Mode."
+              >
+                <SkillsExpertAnalysis />
+              </ComingSoonOverlay>
+            )}
           </TabsContent>
 
           {/* Enhanced Essay Goldmine Tab */}
           <TabsContent value="essays" className="space-y-8">
-            <ApplicationStrategyDashboard />
-            <ApplicationDescriptionWorkshop />
-            <NarrativeArchitectureBuilder />
-            <StrategicWritingEnhancement />
-            <PortfolioCoherenceStrategist />
-            <ExpertApplicationIntelligence />
+            {/* Basic Essay Components - FOUNDATION CONTENT (kept as is) */}
+            
+            {/* Expert-only essay components */}
+            {insightDepth === 'expert' ? (
+              <div className="space-y-8">
+                <ApplicationStrategyDashboard />
+                <ApplicationDescriptionWorkshop />
+                <NarrativeArchitectureBuilder />
+                <StrategicWritingEnhancement />
+                <PortfolioCoherenceStrategist />
+                <ExpertApplicationIntelligence />
+              </div>
+            ) : (
+              <ComingSoonOverlay
+                title="Advanced Essay Workshop"
+                description="Unlock application strategy dashboards, narrative architecture builders, strategic writing enhancement, and expert application intelligence in Expert Mode."
+              >
+                <div className="space-y-8">
+                  <ApplicationStrategyDashboard />
+                  <ApplicationDescriptionWorkshop />
+                  <NarrativeArchitectureBuilder />
+                  <StrategicWritingEnhancement />
+                  <PortfolioCoherenceStrategist />
+                  <ExpertApplicationIntelligence />
+                </div>
+              </ComingSoonOverlay>
+            )}
           </TabsContent>
 
           {/* Enhanced Future Trajectory Tab */}
@@ -1169,12 +1241,31 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
 
             {/* Interactive Future Trajectory Components */}
             <div className="space-y-6">
+              {/* FOUNDATION CONTENT - Always visible */}
               <CareerPathStrategyDashboard />
-              <AcademicJourneyPlanner />
               <ProjectEvolutionWorkshop />
-              <StrategicSkillDevelopmentRoadmap />
-              <NetworkRelationshipCapitalBuilder />
-              <StrategicFutureIntelligence />
+              
+              {/* EXPERT CONTENT - Behind ComingSoonOverlay in Foundation mode */}
+              {insightDepth === 'expert' ? (
+                <div className="space-y-6">
+                  <AcademicJourneyPlanner />
+                  <StrategicSkillDevelopmentRoadmap />
+                  <NetworkRelationshipCapitalBuilder />
+                  <StrategicFutureIntelligence />
+                </div>
+              ) : (
+                <ComingSoonOverlay
+                  title="Advanced Future Planning"
+                  description="Unlock academic journey planning, strategic skill development roadmaps, network relationship capital building, and strategic future intelligence in Expert Mode."
+                >
+                  <div className="space-y-6">
+                    <AcademicJourneyPlanner />
+                    <StrategicSkillDevelopmentRoadmap />
+                    <NetworkRelationshipCapitalBuilder />
+                    <StrategicFutureIntelligence />
+                  </div>
+                </ComingSoonOverlay>
+              )}
             </div>
           </TabsContent>
         </Tabs>
