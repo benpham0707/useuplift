@@ -35,6 +35,7 @@ import StrategicSkillDevelopmentRoadmap from "@/components/dashboard/StrategicSk
 import NetworkRelationshipCapitalBuilder from "@/components/dashboard/NetworkRelationshipCapitalBuilder";
 import StrategicFutureIntelligence from "@/components/dashboard/StrategicFutureIntelligence";
 import { ComingSoonOverlay } from "@/components/dashboard/ComingSoonOverlay";
+import { SectionSpecificOverlay } from "@/components/dashboard/SectionSpecificOverlay";
 import { 
   TrendingUp, 
   Award, 
@@ -1015,19 +1016,12 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                 />
               </div>
             ) : (
-              <ComingSoonOverlay
-                title="Advanced Impact Analysis"
-                description="Unlock personal transformation journeys, stakeholder ecosystem analysis, systems thinking deep dives, technical skills mastery, and leadership evolution tracking in Expert Mode."
-              >
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
                 <div className="space-y-8">
                   <TransformationCard
                     title="Personal Transformation: From Disruption to Amplification"
                     progression={[]}
                     characterStrengths={["Humility", "Systems Thinking", "Cultural Sensitivity", "Adaptive Leadership"]}
-                  />
-                  <StakeholderCard
-                    stakeholderGroups={[]}
-                    conflictResolution={{ situation: '', approach: '', outcome: '' }}
                   />
                   <SystemsThinkingCard
                     problemStatement=""
@@ -1036,19 +1030,28 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                     feedbackLoops={[]}
                     beforeAfter={{ before: '', after: '', keyChanges: [] }}
                   />
-                  <TechnicalSkillsCard
-                    skillProgression={[]}
-                    majorAchievements={[]}
-                    technologyStack={{ languages: [], frameworks: [], tools: [], systems: [] }}
-                  />
-                  <LeadershipCard
-                    evolution={[]}
-                    teamFormation={{ challenge: '', teamBuilding: '', conflictResolution: '', results: '', teamGrowth: [] }}
-                    decisionFramework={[]}
-                    impactMetrics={{ teamsLed: 0, peopleInfluenced: 0, initiativesLaunched: 0, conflictsResolved: 0 }}
-                  />
                 </div>
-              </ComingSoonOverlay>
+                
+                <SectionSpecificOverlay section="foundation">
+                  <div className="space-y-8">
+                    <StakeholderCard
+                      stakeholderGroups={[]}
+                      conflictResolution={{ situation: '', approach: '', outcome: '' }}
+                    />
+                    <TechnicalSkillsCard
+                      skillProgression={[]}
+                      majorAchievements={[]}
+                      technologyStack={{ languages: [], frameworks: [], tools: [], systems: [] }}
+                    />
+                    <LeadershipCard
+                      evolution={[]}
+                      teamFormation={{ challenge: '', teamBuilding: '', conflictResolution: '', results: '', teamGrowth: [] }}
+                      decisionFramework={[]}
+                      impactMetrics={{ teamsLed: 0, peopleInfluenced: 0, initiativesLaunched: 0, conflictsResolved: 0 }}
+                    />
+                  </div>
+                </SectionSpecificOverlay>
+              </div>
             )}
 
             {/* Expert Analysis Section */}
@@ -1207,40 +1210,7 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                   }
                 />
               </div>
-            ) : (
-              <div className="space-y-8">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                  <ExpertAnalysisCard
-                    title="Deep Psychology Analysis"
-                    category="Behavioral Insights"
-                    content={
-                      <div className="space-y-4">
-                        <p>Your behavioral psychology understanding reveals sophisticated grasp of intrinsic vs. extrinsic motivation. By gamifying community connection rather than individual achievement, you tapped into powerful social cohesion drives that sustain long-term engagement.</p>
-                        <p>The decision to prioritize elder community members as "wisdom keepers" demonstrates advanced emotional intelligence - recognizing that technology adoption requires honoring existing social structures rather than disrupting them.</p>
-                        <p>The 94% user satisfaction score indicates mastery of user psychology principles: progressive disclosure of complexity, social validation loops, and authentic relationship building through digital interfaces.</p>
-                      </div>
-                    }
-                  />
-
-                  <ComingSoonOverlay
-                    title="Advanced Impact Intelligence"
-                    description="Unlock stakeholder mapping, systems thinking insights, and cultural impact assessment in Expert Mode."
-                  >
-                    <ExpertAnalysisCard
-                      title="Advanced Stakeholder Mapping"
-                      category="Political Strategy"
-                      content={
-                        <div className="space-y-4">
-                          <p>Your stakeholder ecosystem reveals sophisticated political awareness. Successfully navigating relationships between community elders, tech-skeptical residents, local government officials, and enthusiastic early adopters required advanced diplomacy skills.</p>
-                          <p>Securing support from both the neighborhood association president (traditional power structure) and the community college urban planning department (academic legitimacy) shows strategic relationship building across generational and institutional lines.</p>
-                          <p>Your approach to power dynamics - positioning yourself as facilitator rather than leader - demonstrates understanding that sustainable community change requires distributed ownership rather than centralized control.</p>
-                        </div>
-                      }
-                    />
-                  </ComingSoonOverlay>
-                </div>
-              </div>
-            )}
+              ) : null}
           </TabsContent>
 
           {/* Enhanced Skills Deep Dive Tab */}
@@ -1258,18 +1228,16 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                 <SkillsExpertAnalysis />
               </div>
             ) : (
-              <ComingSoonOverlay
-                title="Advanced Skills Analysis"
-                description="Unlock technical skills showcase, soft skills evidence, expert skills analysis, and competency mapping in Expert Mode."
-              >
-                <div className="space-y-8">
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                    <TechnicalSkillsShowcase />
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                <TechnicalSkillsShowcase />
+                
+                <SectionSpecificOverlay section="skills">
+                  <div className="space-y-8">
                     <SoftSkillsEvidence />
+                    <SkillsExpertAnalysis />
                   </div>
-                  <SkillsExpertAnalysis />
-                </div>
-              </ComingSoonOverlay>
+                </SectionSpecificOverlay>
+              </div>
             )}
           </TabsContent>
 
@@ -1300,21 +1268,25 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
                       enabledTabs={['threads', 'development', 'integration', 'coherence']}
                     />
                     
-                    <ComingSoonOverlay
-                      title="Advanced Essay Workshop"
-                      description="Unlock interactive essay builders and AI intelligence in Expert Mode."
-                    >
-                      <StrategicWritingEnhancement 
-                        projectData={portfolioData[0]} 
-                        enabledTabs={['analysis', 'evidence', 'advantage', 'techniques']}
-                      />
-                    </ComingSoonOverlay>
+                    <StrategicWritingEnhancement 
+                      projectData={portfolioData[0]} 
+                      enabledTabs={['analysis', 'evidence', 'advantage', 'techniques']}
+                    />
                   </div>
                   
                   <PortfolioCoherenceStrategist 
                     projectData={portfolioData[0]} 
                     enabledTabs={['coordination']}
                   />
+                  
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div />
+                    <SectionSpecificOverlay section="essays">
+                      <ApplicationDescriptionWorkshop 
+                        projectData={portfolioData[0]}
+                      />
+                    </SectionSpecificOverlay>
+                  </div>
                 </div>
               </div>
             </TabsContent>
@@ -1331,21 +1303,20 @@ const ProjectCard: React.FC<{ project: any; onBack: () => void }> = ({ project, 
               {/* EXPERT CONTENT - Behind ComingSoonOverlay in Foundation mode */}
               {insightDepth === 'expert' ? (
                 <div className="space-y-6">
-                  <AcademicJourneyPlanner />
                   <StrategicSkillDevelopmentRoadmap />
                   <NetworkRelationshipCapitalBuilder />
                   <StrategicFutureIntelligence />
                 </div>
               ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-                  <AcademicJourneyPlanner />
+                  <NetworkRelationshipCapitalBuilder />
                   
-                  <ComingSoonOverlay
-                    title="Advanced Future Planning"
-                    description="Unlock strategic skill development and network building in Expert Mode."
-                  >
-                    <StrategicSkillDevelopmentRoadmap />
-                  </ComingSoonOverlay>
+                  <SectionSpecificOverlay section="future">
+                    <div className="space-y-6">
+                      <StrategicSkillDevelopmentRoadmap />
+                      <StrategicFutureIntelligence />
+                    </div>
+                  </SectionSpecificOverlay>
                 </div>
               )}
             </div>
