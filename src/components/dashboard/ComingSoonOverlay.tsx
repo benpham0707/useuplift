@@ -24,8 +24,8 @@ export const ComingSoonOverlay: React.FC<ComingSoonOverlayProps> = ({
       </div>
       
       {/* Overlay with shiny gradient border */}
-      <div className="absolute inset-0 flex items-center justify-center bg-background/90 backdrop-blur-sm">
-        <Card className="max-w-md mx-auto shadow-large border-4 bg-gradient-to-br from-primary/5 to-accent/5 backdrop-blur-md"
+      <div className="absolute inset-0 flex items-center justify-center bg-background/30 backdrop-blur-sm">
+        <Card className="max-w-lg mx-auto shadow-large border-4 bg-gradient-to-br from-primary/5 to-accent/5 backdrop-blur-md rounded-2xl"
               style={{
                 borderImage: 'linear-gradient(135deg, hsl(var(--primary) / 0.8), hsl(var(--accent) / 0.8), hsl(var(--primary) / 0.8)) 1'
               }}>
@@ -48,6 +48,19 @@ export const ComingSoonOverlay: React.FC<ComingSoonOverlayProps> = ({
             <p className="text-muted-foreground text-sm leading-relaxed">
               {description}
             </p>
+            
+            <div className="pt-3">
+              <p className="text-xs font-medium text-muted-foreground mb-2">Coming in Expert Mode:</p>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <div>• AI Application Description Workshop</div>
+                <div>• Advanced Portfolio Intelligence Engine</div>
+                <div>• Strategic Narrative Architecture</div>
+                <div>• Competitive Positioning Analytics</div>
+                <div>• Multi-Platform Essay Optimization</div>
+                <div>• Real-time Writing Enhancement AI</div>
+                <div>• Comprehensive Impact Assessment</div>
+              </div>
+            </div>
             
             <div className="pt-4 border-t border-border/50">
               <p className="text-xs text-muted-foreground">
