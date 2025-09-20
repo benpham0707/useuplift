@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import PathwayNode from './PathwayNode';
 import PathwayConnection from './PathwayConnection';
+import PathwayTip from './PathwayTip';
 import BasicInformationWizard from './BasicInformationWizard';
 import AcademicJourneyWizard from './AcademicJourneyWizard';
 import ExperiencesWizard from './ExperiencesWizard';
@@ -291,24 +292,84 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
           </div>
         </div>
 
-        {/* Simple Vertical Pathway */}
-        <div className="relative flex flex-col items-center space-y-12">
-          {pathwaySections.map((section, index) => (
-            <div key={section.id} className="relative">
-              {/* Simple Connection Line */}
-              {index < pathwaySections.length - 1 && (
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0.5 h-12 bg-gradient-to-b from-border to-transparent z-0" />
-              )}
-              
-              {/* Pathway Node */}
-              <div className="relative z-10">
-                <PathwayNode
-                  section={section}
-                  onClick={() => handleSectionClick(section.id, section.status)}
-                />
+        {/* Alternating Pathway Layout */}
+        <div className="relative max-w-5xl mx-auto">
+          {pathwaySections.map((section, index) => {
+            const isLeft = index % 2 === 0;
+            const hasNext = index < pathwaySections.length - 1;
+            
+            // Hard coded contextual tips for each section - These provide guidance specific to portfolio building
+            const tips = [
+              { title: "Start Strong", description: "Complete your basic profile to unlock advanced features and personalized recommendations.", actionText: "Begin your journey" },
+              { title: "Academic Foundation", description: "Strong grades in core subjects demonstrate college readiness and academic potential.", actionText: "Track your progress" },
+              { title: "Quality over Quantity", description: "Focus on meaningful activities that show leadership, commitment, and personal growth.", actionText: "Build your story" },
+              { title: "Your Unique Context", description: "Share your family circumstances and responsibilities - they're part of your strength.", actionText: "Tell your story" },
+              { title: "Vision and Purpose", description: "Clear goals show direction, motivation, and your commitment to growth and impact.", actionText: "Define your path" },
+              { title: "Strong Relationships", description: "Meaningful connections with mentors indicate your ability to grow and collaborate.", actionText: "Build your network" },
+              { title: "Reflection and Growth", description: "Self-awareness and learning from experiences demonstrate maturity and readiness.", actionText: "Share your insights" }
+            ];
+            
+            return (
+              <div key={section.id} className="relative mb-32">
+                {/* Grid Layout for Alternating Positions */}
+                <div className="grid grid-cols-3 gap-8 items-center min-h-[200px]">
+                  {/* Left Content */}
+                  <div className="flex justify-end">
+                    {isLeft ? (
+                      <PathwayNode
+                        section={section}
+                        onClick={() => handleSectionClick(section.id, section.status)}
+                      />
+                    ) : null}
+                  </div>
+                  
+                  {/* Center Content - Tips */}
+                  <div className="flex justify-center">
+                    {hasNext && (
+                      <PathwayTip
+                        title={tips[index]?.title || "Keep Going"}
+                        description={tips[index]?.description || "Continue building your comprehensive portfolio."}
+                        actionText={tips[index]?.actionText || "Next step"}
+                      />
+                    )}
+                  </div>
+                  
+                  {/* Right Content */}
+                  <div className="flex justify-start">
+                    {!isLeft ? (
+                      <PathwayNode
+                        section={section}
+                        onClick={() => handleSectionClick(section.id, section.status)}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+                
+                {/* Curved Connection Line */}
+                {hasNext && (
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-px h-20 z-0">
+                    <div className="w-full h-full bg-gradient-to-b from-primary/30 to-transparent"></div>
+                    
+                    {/* Curved path indicator */}
+                    <svg 
+                      className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-20" 
+                      viewBox="0 0 128 80" 
+                      fill="none"
+                    >
+                      <path
+                        d={isLeft ? "M64 0 Q32 40 96 80" : "M64 0 Q96 40 32 80"}
+                        stroke="hsl(var(--primary))"
+                        strokeWidth="1"
+                        strokeOpacity="0.2"
+                        fill="none"
+                        strokeDasharray="4 4"
+                      />
+                    </svg>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
         {/* Completion Celebration */}
