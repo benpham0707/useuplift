@@ -33,7 +33,9 @@ import {
   BookOpen,
   Users,
   Settings,
-  Plus
+  Plus,
+  GraduationCap,
+  Heart
 } from 'lucide-react';
 import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import PortfolioPathway from '@/components/portfolio/PortfolioPathway';
@@ -424,18 +426,12 @@ const PortfolioScanner = () => {
               </div>
             </div>
 
-            {/* Right Side - User Actions */}
+            {/* User Menu */}
             <div className="flex items-center space-x-4">
-              <Button variant="outline" size="sm">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
+              <Button variant="ghost" size="sm">
+                <Settings className="h-4 w-4" />
               </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => signOut()}
-                className="text-muted-foreground hover:text-foreground"
-              >
+              <Button variant="ghost" size="sm" onClick={signOut}>
                 Sign Out
               </Button>
             </div>
@@ -443,15 +439,102 @@ const PortfolioScanner = () => {
         </div>
       </nav>
 
-      {/* Portfolio Pathway Section */}
-      <section id="assessment" className="w-full bg-background min-h-screen">
-        <div className="w-full px-4 lg:px-6 xl:px-8 py-8">
-          <PortfolioPathway
-            onProgressUpdate={setOverallProgress}
-            currentProgress={overallProgress}
-          />
+      {/* Header Section with Scores */}
+      <div className="bg-gradient-to-r from-background via-primary/5 to-secondary/5 border-b border-border/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="text-center mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-4">
+              Portfolio Scanner
+            </h1>
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+              Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
+            </p>
+          </div>
+
+          {/* Progress & Level Display */}
+          <div className="flex flex-col md:flex-row items-center justify-center gap-8 mb-8">
+            <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
+              <CardContent className="p-6 text-center">
+                <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
+                  {overallProgress}%
+                </div>
+                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Complete</div>
+                <Progress value={overallProgress} className="mt-3 h-2" />
+              </CardContent>
+            </Card>
+
+            <Card className={`${currentLevel.color} text-white border-0`}>
+              <CardContent className="p-6 text-center">
+                <div className="text-2xl font-bold mb-2">{currentLevel.level}</div>
+                <div className="text-sm opacity-90">{currentLevel.description}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Rubric Scores Display */}
+          {(rubricScores.academicExcellence.score !== null) && (
+            <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6 mb-8">
+              <h3 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                Portfolio Assessment
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {[
+                  { key: 'academicExcellence', label: 'Academic Excellence', icon: GraduationCap },
+                  { key: 'leadershipPotential', label: 'Leadership Potential', icon: Users },
+                  { key: 'personalGrowth', label: 'Personal Growth', icon: TrendingUp },
+                  { key: 'communityImpact', label: 'Community Impact', icon: Heart },
+                  { key: 'uniqueValue', label: 'Unique Value', icon: Sparkles },
+                  { key: 'futureReadiness', label: 'Future Readiness', icon: Target }
+                ].map(({ key, label, icon: Icon }) => {
+                  const score = rubricScores[key as keyof typeof rubricScores]?.score;
+                  if (score === null || score === undefined) return null;
+                  
+                  const styles = getScoreStyles(score);
+                  
+                  return (
+                    <Card key={key} className="relative overflow-hidden" style={styles.boxStyle}>
+                      <CardContent className="p-4 text-center">
+                        <Icon className="h-8 w-8 mx-auto mb-3 text-primary" />
+                        <div className="text-2xl font-bold mb-1" style={styles.textStyle}>
+                          {score.toFixed(1)}
+                        </div>
+                        <div className="text-sm text-muted-foreground font-medium">
+                          {label}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+
+              {/* Overall Score */}
+              {aiOverall !== null && (
+                <div className="text-center">
+                  <Card className="inline-block bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/30">
+                    <CardContent className="p-6">
+                      <div className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">
+                        Overall Portfolio Strength
+                      </div>
+                      <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                        {aiOverall.toFixed(1)}/10
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      </section>
+      </div>
+
+      {/* Main Content Area */}
+      <main className="relative">
+        <PortfolioPathway 
+          onProgressUpdate={setOverallProgress}
+          currentProgress={overallProgress}
+        />
+      </main>
     </div>
   );
 };

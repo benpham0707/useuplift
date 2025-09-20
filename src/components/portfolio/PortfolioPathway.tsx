@@ -149,7 +149,7 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
     fetchProgress();
   }, [user]);
 
-  // Calculate section status based on progress and dependencies
+  // Calculate section status - ALL UNLOCKED FOR TESTING
   const pathwaySections: PathwaySection[] = useMemo(() => [
     {
       id: 'personal-info',
@@ -157,7 +157,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Basic profile and demographics',
       icon: User,
       progress: sectionProgress['personal-info'],
-      status: 'available', // Always available as starting point
+      status: sectionProgress['personal-info'] === 100 ? 'completed' : 
+               sectionProgress['personal-info'] > 0 ? 'in-progress' : 'available',
     },
     {
       id: 'academic-journey',
@@ -165,10 +166,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Courses, grades, and achievements',
       icon: GraduationCap,
       progress: sectionProgress['academic-journey'],
-      status: sectionProgress['personal-info'] >= 25 ? 
-        (sectionProgress['academic-journey'] === 100 ? 'completed' : 
-         sectionProgress['academic-journey'] > 0 ? 'in-progress' : 'available') : 'locked',
-      unlockThreshold: 'Complete 25% of Personal Information'
+      status: sectionProgress['academic-journey'] === 100 ? 'completed' : 
+               sectionProgress['academic-journey'] > 0 ? 'in-progress' : 'available',
     },
     {
       id: 'experiences',
@@ -176,10 +175,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Extracurriculars and leadership',
       icon: Briefcase,
       progress: sectionProgress['experiences'],
-      status: sectionProgress['academic-journey'] >= 25 ? 
-        (sectionProgress['experiences'] === 100 ? 'completed' : 
-         sectionProgress['experiences'] > 0 ? 'in-progress' : 'available') : 'locked',
-      unlockThreshold: 'Complete 25% of Academic Journey'
+      status: sectionProgress['experiences'] === 100 ? 'completed' : 
+               sectionProgress['experiences'] > 0 ? 'in-progress' : 'available',
     },
     {
       id: 'family',
@@ -187,10 +184,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Background and circumstances',
       icon: Heart,
       progress: sectionProgress['family'],
-      status: sectionProgress['experiences'] >= 25 ? 
-        (sectionProgress['family'] === 100 ? 'completed' : 
-         sectionProgress['family'] > 0 ? 'in-progress' : 'available') : 'locked',
-      unlockThreshold: 'Complete 25% of Experiences'
+      status: sectionProgress['family'] === 100 ? 'completed' : 
+               sectionProgress['family'] > 0 ? 'in-progress' : 'available',
     },
     {
       id: 'goals',
@@ -198,10 +193,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Future plans and motivations',
       icon: Target,
       progress: sectionProgress['goals'],
-      status: sectionProgress['family'] >= 25 ? 
-        (sectionProgress['goals'] === 100 ? 'completed' : 
-         sectionProgress['goals'] > 0 ? 'in-progress' : 'available') : 'locked',
-      unlockThreshold: 'Complete 25% of Family Responsibilities'
+      status: sectionProgress['goals'] === 100 ? 'completed' : 
+               sectionProgress['goals'] > 0 ? 'in-progress' : 'available',
     },
     {
       id: 'support',
@@ -209,10 +202,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Mentors and connections',
       icon: Users2,
       progress: sectionProgress['support'],
-      status: sectionProgress['goals'] >= 25 ? 
-        (sectionProgress['support'] === 100 ? 'completed' : 
-         sectionProgress['support'] > 0 ? 'in-progress' : 'available') : 'locked',
-      unlockThreshold: 'Complete 25% of Goals & Aspirations'
+      status: sectionProgress['support'] === 100 ? 'completed' : 
+               sectionProgress['support'] > 0 ? 'in-progress' : 'available',
     },
     {
       id: 'growth',
@@ -220,10 +211,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       description: 'Stories and reflections',
       icon: BookOpen,
       progress: sectionProgress['growth'],
-      status: sectionProgress['support'] >= 25 ? 
-        (sectionProgress['growth'] === 100 ? 'completed' : 
-         sectionProgress['growth'] > 0 ? 'in-progress' : 'available') : 'locked',
-      unlockThreshold: 'Complete 25% of Support Network'
+      status: sectionProgress['growth'] === 100 ? 'completed' : 
+               sectionProgress['growth'] > 0 ? 'in-progress' : 'available',
     }
   ], [sectionProgress]);
 
@@ -368,60 +357,88 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
         )}
       </div>
 
-      {/* Wizard Dialogs */}
+      {/* Wizard Dialogs - Properly Formatted */}
       <Dialog open={openSection === 'personal-info'} onOpenChange={() => setOpenSection(null)}>
-        <BasicInformationWizard 
-          onComplete={handleProgressRefresh}
-          onCancel={() => setOpenSection(null)}
-          onProgressRefresh={handleProgressRefresh}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <BasicInformationWizard 
+              onComplete={handleProgressRefresh}
+              onCancel={() => setOpenSection(null)}
+              onProgressRefresh={handleProgressRefresh}
+            />
+          </div>
+        </div>
       </Dialog>
 
       <Dialog open={openSection === 'academic-journey'} onOpenChange={() => setOpenSection(null)}>
-        <AcademicJourneyWizard 
-          onComplete={handleProgressRefresh}
-          onCancel={() => setOpenSection(null)}
-          onProgressRefresh={handleProgressRefresh}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <AcademicJourneyWizard 
+              onComplete={handleProgressRefresh}
+              onCancel={() => setOpenSection(null)}
+              onProgressRefresh={handleProgressRefresh}
+            />
+          </div>
+        </div>
       </Dialog>
 
       <Dialog open={openSection === 'experiences'} onOpenChange={() => setOpenSection(null)}>
-        <ExperiencesWizard 
-          onAdded={() => handleProgressRefresh()}
-          onClose={() => setOpenSection(null)}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <ExperiencesWizard 
+              onAdded={() => handleProgressRefresh()}
+              onClose={() => setOpenSection(null)}
+            />
+          </div>
+        </div>
       </Dialog>
 
       <Dialog open={openSection === 'family'} onOpenChange={() => setOpenSection(null)}>
-        <FamilyResponsibilitiesWizard 
-          onComplete={handleProgressRefresh}
-          onCancel={() => setOpenSection(null)}
-          onProgressRefresh={handleProgressRefresh}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <FamilyResponsibilitiesWizard 
+              onComplete={handleProgressRefresh}
+              onCancel={() => setOpenSection(null)}
+              onProgressRefresh={handleProgressRefresh}
+            />
+          </div>
+        </div>
       </Dialog>
 
       <Dialog open={openSection === 'goals'} onOpenChange={() => setOpenSection(null)}>
-        <GoalsAspirationsWizard 
-          onComplete={handleProgressRefresh}
-          onCancel={() => setOpenSection(null)}
-          onProgressRefresh={handleProgressRefresh}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <GoalsAspirationsWizard 
+              onComplete={handleProgressRefresh}
+              onCancel={() => setOpenSection(null)}
+              onProgressRefresh={handleProgressRefresh}
+            />
+          </div>
+        </div>
       </Dialog>
 
       <Dialog open={openSection === 'support'} onOpenChange={() => setOpenSection(null)}>
-        <SupportNetworkWizard 
-          onComplete={handleProgressRefresh}
-          onCancel={() => setOpenSection(null)}
-          onProgressRefresh={handleProgressRefresh}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <SupportNetworkWizard 
+              onComplete={handleProgressRefresh}
+              onCancel={() => setOpenSection(null)}
+              onProgressRefresh={handleProgressRefresh}
+            />
+          </div>
+        </div>
       </Dialog>
 
       <Dialog open={openSection === 'growth'} onOpenChange={() => setOpenSection(null)}>
-        <PersonalGrowthWizard 
-          onComplete={handleProgressRefresh}
-          onCancel={() => setOpenSection(null)}
-          onProgressRefresh={handleProgressRefresh}
-        />
+        <div className="fixed inset-0 z-50 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0">
+          <div className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg max-h-[90vh] overflow-y-auto">
+            <PersonalGrowthWizard 
+              onComplete={handleProgressRefresh}
+              onCancel={() => setOpenSection(null)}
+              onProgressRefresh={handleProgressRefresh}
+            />
+          </div>
+        </div>
       </Dialog>
     </div>
   );

@@ -73,33 +73,34 @@ const PathwayNode = ({ section, onClick, isFirst, isLast, position }: PathwayNod
   const statusConfig = getStatusConfig();
 
   return (
-    <div className="w-full max-w-sm mx-auto group">
-      {/* Background Glow */}
-      <div className={`absolute inset-0 rounded-3xl ${statusConfig.bgGlow} blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500 -z-10`} />
+    <div className="w-full max-w-md mx-auto group">
+      {/* Enhanced Background Glow */}
+      <div className={`absolute inset-0 rounded-3xl ${statusConfig.bgGlow} blur-2xl opacity-0 group-hover:opacity-70 transition-all duration-700 -z-10`} />
       
       {/* Main Node Container */}
       <div className="relative">
         {/* Large Progress Ring & Node */}
-        <div className="relative flex justify-center mb-6">
-          <div className="relative w-32 h-32">
-            {/* Background Circle */}
-            <div className="absolute inset-0 w-32 h-32 rounded-full bg-background/50 backdrop-blur-sm" />
+        <div className="relative flex justify-center mb-8">
+          <div className="relative w-40 h-40">
+            {/* Background Circle with Gradient */}
+            <div className="absolute inset-0 w-40 h-40 rounded-full bg-gradient-to-br from-background/80 via-background/60 to-background/40 backdrop-blur-md border border-border/30" />
             
             {/* Progress Ring */}
             {progress > 0 && (
-              <svg className="absolute inset-0 w-32 h-32 -rotate-90" viewBox="0 0 128 128">
+              <svg className="absolute inset-0 w-40 h-40 -rotate-90" viewBox="0 0 160 160">
                 <circle
-                  cx="64"
-                  cy="64"
-                  r="58"
+                  cx="80"
+                  cy="80"
+                  r="72"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="6"
-                  strokeDasharray={`${(progress / 100) * 364.4} 364.4`}
+                  strokeWidth="8"
+                  strokeDasharray={`${(progress / 100) * 452.4} 452.4`}
+                  strokeLinecap="round"
                   className={cn(
-                    "transition-all duration-700 drop-shadow-sm",
-                    status === 'completed' ? 'text-success' : 
-                    status === 'in-progress' ? 'text-primary' :
+                    "transition-all duration-1000 drop-shadow-lg",
+                    status === 'completed' ? 'text-success animate-pulse' : 
+                    status === 'in-progress' ? 'text-primary animate-pulse' :
                     status === 'available' ? 'text-secondary' : 'text-muted'
                   )}
                 />
@@ -111,20 +112,26 @@ const PathwayNode = ({ section, onClick, isFirst, isLast, position }: PathwayNod
               onClick={statusConfig.clickable ? onClick : undefined}
               disabled={!statusConfig.clickable}
               className={cn(
-                "absolute inset-3 w-26 h-26 rounded-full transition-all duration-500 p-0 text-xl font-bold",
+                "absolute inset-4 w-32 h-32 rounded-full transition-all duration-500 p-0 text-2xl font-bold group-hover:scale-110",
                 statusConfig.nodeClass,
                 statusConfig.ringClass,
-                statusConfig.clickable && "active:scale-90"
+                statusConfig.clickable && "active:scale-95 hover:animate-bounce"
               )}
             >
               {statusConfig.iconElement}
               
-              {/* Celebration Sparkles */}
+              {/* Enhanced Celebration Effects */}
               {statusConfig.celebration && (
                 <>
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full animate-ping opacity-75" />
-                  <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-yellow-300 rounded-full animate-ping opacity-50" style={{ animationDelay: '0.5s' }} />
+                  <div className="absolute -top-3 -right-3 w-8 h-8 bg-gradient-to-r from-yellow-400 to-orange-400 rounded-full animate-ping opacity-75" />
+                  <div className="absolute -bottom-3 -left-3 w-6 h-6 bg-gradient-to-r from-yellow-300 to-yellow-400 rounded-full animate-ping opacity-60" style={{ animationDelay: '0.5s' }} />
+                  <div className="absolute top-0 left-1/2 w-4 h-4 bg-gradient-to-r from-green-400 to-emerald-400 rounded-full animate-ping opacity-50" style={{ animationDelay: '1s' }} />
                 </>
+              )}
+              
+              {/* Pulsing Ring for Available/In-Progress */}
+              {(status === 'available' || status === 'in-progress') && (
+                <div className="absolute inset-0 rounded-full border-4 border-current opacity-30 animate-ping" />
               )}
             </Button>
           </div>
@@ -152,17 +159,17 @@ const PathwayNode = ({ section, onClick, isFirst, isLast, position }: PathwayNod
         {/* Enhanced Content Card */}
         <Card 
           className={cn(
-            "transition-all duration-500 cursor-pointer shadow-medium border-2",
-            statusConfig.clickable && "hover:shadow-strong hover:border-primary/30 hover:-translate-y-1",
+            "transition-all duration-700 cursor-pointer shadow-strong border-2 backdrop-blur-sm",
+            statusConfig.clickable && "hover:shadow-[0_10px_40px_rgba(0,0,0,0.2)] hover:border-primary/50 hover:-translate-y-2 hover:scale-105",
             !statusConfig.clickable && "opacity-60 cursor-not-allowed",
-            status === 'completed' && "border-success/30 bg-success/5",
-            status === 'in-progress' && "border-primary/30 bg-primary/5", 
-            status === 'available' && "border-secondary/30 bg-secondary/5",
-            status === 'locked' && "border-muted/20 bg-muted/5"
+            status === 'completed' && "border-success/40 bg-gradient-to-br from-success/10 via-success/5 to-transparent",
+            status === 'in-progress' && "border-primary/40 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent", 
+            status === 'available' && "border-secondary/40 bg-gradient-to-br from-secondary/10 via-secondary/5 to-transparent",
+            status === 'locked' && "border-muted/30 bg-gradient-to-br from-muted/10 via-muted/5 to-transparent"
           )}
           onClick={statusConfig.clickable ? onClick : undefined}
         >
-          <CardContent className="p-6 text-center">
+          <CardContent className="p-8 text-center">
             <div className="space-y-4">
               {/* Title */}
               <h3 className={cn(
