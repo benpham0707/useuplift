@@ -3,75 +3,137 @@ import { cn } from '@/lib/utils';
 interface PathwayConnectionProps {
   fromStatus: 'completed' | 'in-progress' | 'available' | 'locked';
   toStatus: 'completed' | 'in-progress' | 'available' | 'locked';
+  fromPosition?: string;
+  toPosition?: string;
+  isZigzag?: boolean;
 }
 
-const PathwayConnection = ({ fromStatus, toStatus }: PathwayConnectionProps) => {
+const PathwayConnection = ({ fromStatus, toStatus, fromPosition, toPosition, isZigzag = false }: PathwayConnectionProps) => {
   const getConnectionStyle = () => {
-    // Connection is active if the 'from' section has progress and 'to' section is not locked
     const isActive = fromStatus !== 'locked' && toStatus !== 'locked';
     const isCompleted = fromStatus === 'completed' && (toStatus === 'completed' || toStatus === 'in-progress' || toStatus === 'available');
     
     if (isCompleted) {
       return {
-        lineColor: 'stroke-success',
-        opacity: 'opacity-80',
-        animation: ''
+        color: 'hsl(var(--success))',
+        opacity: 0.8,
+        strokeWidth: 4,
+        animation: 'none'
       };
     } else if (isActive) {
       return {
-        lineColor: 'stroke-primary',
-        opacity: 'opacity-60',
-        animation: fromStatus === 'in-progress' ? 'animate-pulse' : ''
+        color: 'hsl(var(--primary))',
+        opacity: 0.6,
+        strokeWidth: 3,
+        animation: fromStatus === 'in-progress' ? 'dash' : 'none'
       };
     } else {
       return {
-        lineColor: 'stroke-muted-foreground',
-        opacity: 'opacity-30',
-        animation: ''
+        color: 'hsl(var(--muted-foreground))',
+        opacity: 0.3,
+        strokeWidth: 2,
+        animation: 'none'
       };
     }
   };
 
   const connectionStyle = getConnectionStyle();
 
+  // Helper function to get position coordinates
+  const getPositionCoords = (position: string) => {
+    if (position?.includes('justify-start')) return { x: 25, side: 'left' };
+    if (position?.includes('justify-end')) return { x: 75, side: 'right' };
+    return { x: 50, side: 'center' };
+  };
+
+  const fromCoords = getPositionCoords(fromPosition || '');
+  const toCoords = getPositionCoords(toPosition || '');
+
+  if (!isZigzag) {
+    // Simple vertical connection for non-zigzag layouts
+    return (
+      <div className="absolute left-1/2 top-32 w-0.5 h-16 z-0 transform -translate-x-1/2">
+        <div 
+          className="w-full h-full transition-all duration-500"
+          style={{ 
+            backgroundColor: connectionStyle.color,
+            opacity: connectionStyle.opacity
+          }} 
+        />
+      </div>
+    );
+  }
+
+  // Zigzag curved connection using SVG
   return (
-    <div className="absolute left-10 top-20 w-0.5 h-16 z-0">
-      {/* Main connection line */}
-      <div className={cn(
-        "w-full h-full bg-current transition-all duration-500",
-        connectionStyle.lineColor,
-        connectionStyle.opacity,
-        connectionStyle.animation
-      )} />
-      
-      {/* Flowing animation for active connections */}
-      {fromStatus === 'in-progress' && toStatus !== 'locked' && (
-        <div className="absolute inset-0 w-full">
-          <div className="w-full h-2 bg-gradient-to-b from-transparent via-primary to-transparent animate-flow opacity-60" 
-               style={{ 
-                 background: 'linear-gradient(to bottom, transparent 0%, hsl(var(--primary)) 50%, transparent 100%)',
-                 animation: 'flow-vertical 2s ease-in-out infinite'
-               }} 
-          />
-        </div>
-      )}
-      
-      {/* Connection dots */}
-      <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1">
-        <div className={cn(
-          "w-2 h-2 rounded-full transition-all duration-500",
-          connectionStyle.lineColor.replace('stroke', 'bg'),
-          connectionStyle.opacity
-        )} />
-      </div>
-      
-      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1">
-        <div className={cn(
-          "w-2 h-2 rounded-full transition-all duration-500",
-          connectionStyle.lineColor.replace('stroke', 'bg'),
-          connectionStyle.opacity
-        )} />
-      </div>
+    <div className="absolute inset-0 w-full h-20 z-0 pointer-events-none">
+      <svg className="w-full h-full" viewBox="0 0 100 20" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={`gradient-${fromStatus}-${toStatus}`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor={connectionStyle.color} stopOpacity={connectionStyle.opacity} />
+            <stop offset="50%" stopColor={connectionStyle.color} stopOpacity={connectionStyle.opacity * 0.7} />
+            <stop offset="100%" stopColor={connectionStyle.color} stopOpacity={connectionStyle.opacity} />
+          </linearGradient>
+          
+          {/* Animated dashes for in-progress connections */}
+          {connectionStyle.animation === 'dash' && (
+            <pattern id={`dash-${fromStatus}-${toStatus}`} patternUnits="userSpaceOnUse" width="8" height="2">
+              <rect width="4" height="2" fill={connectionStyle.color} opacity={connectionStyle.opacity}>
+                <animateTransform 
+                  attributeName="transform" 
+                  type="translate" 
+                  values="0,0; 8,0; 0,0" 
+                  dur="2s" 
+                  repeatCount="indefinite"
+                />
+              </rect>
+            </pattern>
+          )}
+        </defs>
+        
+        {/* Curved Path */}
+        <path
+          d={`M ${fromCoords.x} 2 Q ${(fromCoords.x + toCoords.x) / 2} 10 ${toCoords.x} 18`}
+          fill="none"
+          stroke={connectionStyle.animation === 'dash' ? `url(#dash-${fromStatus}-${toStatus})` : `url(#gradient-${fromStatus}-${toStatus})`}
+          strokeWidth={connectionStyle.strokeWidth / 10} // Scale for viewBox
+          strokeLinecap="round"
+          className="transition-all duration-700"
+        />
+        
+        {/* Connection dots */}
+        <circle 
+          cx={fromCoords.x} 
+          cy="2" 
+          r="0.8" 
+          fill={connectionStyle.color} 
+          opacity={connectionStyle.opacity}
+          className="transition-all duration-500"
+        />
+        <circle 
+          cx={toCoords.x} 
+          cy="18" 
+          r="0.8" 
+          fill={connectionStyle.color} 
+          opacity={connectionStyle.opacity}
+          className="transition-all duration-500"
+        />
+        
+        {/* Flowing particle effect for in-progress connections */}
+        {connectionStyle.animation === 'dash' && (
+          <circle 
+            r="0.6" 
+            fill={connectionStyle.color}
+            opacity={connectionStyle.opacity * 0.8}
+          >
+            <animateMotion 
+              dur="3s" 
+              repeatCount="indefinite"
+              path={`M ${fromCoords.x} 2 Q ${(fromCoords.x + toCoords.x) / 2} 10 ${toCoords.x} 18`}
+            />
+          </circle>
+        )}
+      </svg>
     </div>
   );
 };

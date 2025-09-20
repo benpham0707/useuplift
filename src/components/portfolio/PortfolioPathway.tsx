@@ -261,72 +261,112 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
     setOpenSection(null);
   };
 
+  // Helper function to get node position for zigzag layout
+  const getNodePosition = (index: number) => {
+    const positions = [
+      'justify-center',      // 0: center
+      'justify-end pr-12',   // 1: right
+      'justify-start pl-12', // 2: left  
+      'justify-end pr-12',   // 3: right
+      'justify-center',      // 4: center
+      'justify-start pl-12', // 5: left
+      'justify-end pr-12'    // 6: right
+    ];
+    return positions[index] || 'justify-center';
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Pathway Header */}
-      <div className="text-center mb-12 animate-fade-in">
-        <h2 className="text-3xl font-bold text-foreground mb-4">
-          Your Portfolio Journey
-        </h2>
-        <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          Complete each section to build a comprehensive profile. Your progress unlocks new sections as you advance.
-        </p>
-        
-        {/* Progress Summary */}
-        <div className="mt-6 flex items-center justify-center space-x-8">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-primary">{currentProgress}%</div>
-            <div className="text-sm text-muted-foreground">Complete</div>
+    <div className="min-h-screen bg-gradient-to-br from-background via-primary/5 to-secondary/5 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 opacity-30">
+        <div className="absolute top-20 left-20 w-32 h-32 bg-primary/10 rounded-full blur-xl animate-pulse" />
+        <div className="absolute top-40 right-32 w-24 h-24 bg-secondary/10 rounded-full blur-lg animate-pulse" style={{ animationDelay: '1s' }} />
+        <div className="absolute bottom-40 left-32 w-40 h-40 bg-accent/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '2s' }} />
+      </div>
+
+      {/* Main Content */}
+      <div className="relative z-10 max-w-6xl mx-auto px-4 py-12">
+        {/* Pathway Header */}
+        <div className="text-center mb-16 animate-fade-in">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary to-secondary rounded-2xl mb-6 shadow-strong">
+            <BookOpen className="h-10 w-10 text-white" />
           </div>
-          <ArrowRight className="h-5 w-5 text-muted-foreground" />
-          <div className="text-center">
-            <div className="text-2xl font-bold text-secondary">
-              {pathwaySections.filter(s => s.status === 'completed').length}/7
+          
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-6">
+            Your Portfolio Journey
+          </h1>
+          
+          <p className="text-muted-foreground text-xl max-w-3xl mx-auto leading-relaxed">
+            Complete each step to unlock your next milestone. Your progress creates a comprehensive profile that showcases your unique story.
+          </p>
+          
+          {/* Progress Summary */}
+          <div className="mt-8 flex items-center justify-center space-x-12">
+            <div className="text-center">
+              <div className="text-5xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
+                {currentProgress}%
+              </div>
+              <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Complete</div>
             </div>
-            <div className="text-sm text-muted-foreground">Sections</div>
+            
+            <div className="h-16 w-px bg-gradient-to-b from-transparent via-border to-transparent"></div>
+            
+            <div className="text-center">
+              <div className="text-5xl font-bold bg-gradient-to-r from-secondary to-accent bg-clip-text text-transparent mb-2">
+                {pathwaySections.filter(s => s.status === 'completed').length}<span className="text-2xl text-muted-foreground">/7</span>
+              </div>
+              <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Sections</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Pathway Visualization */}
-      <div className="relative max-w-md mx-auto">
-        {pathwaySections.map((section, index) => (
-          <div key={section.id} className="relative">
-            {/* Connection Line */}
-            {index < pathwaySections.length - 1 && (
-              <PathwayConnection 
-                fromStatus={section.status}
-                toStatus={pathwaySections[index + 1].status}
-              />
-            )}
-            
-            {/* Pathway Node */}
-            <div className="relative z-10 mb-8">
-              <PathwayNode
-                section={section}
-                onClick={() => handleSectionClick(section.id, section.status)}
-                isFirst={index === 0}
-                isLast={index === pathwaySections.length - 1}
-              />
+        {/* Zigzag Pathway Visualization */}
+        <div className="relative w-full">
+          {pathwaySections.map((section, index) => (
+            <div key={section.id} className="relative w-full">
+              {/* Connection Line */}
+              {index < pathwaySections.length - 1 && (
+                <PathwayConnection 
+                  fromStatus={section.status}
+                  toStatus={pathwaySections[index + 1].status}
+                  fromPosition={getNodePosition(index)}
+                  toPosition={getNodePosition(index + 1)}
+                  isZigzag={true}
+                />
+              )}
+              
+              {/* Pathway Node Container */}
+              <div className={`flex w-full mb-20 ${getNodePosition(index)} animate-fade-in`} 
+                   style={{ animationDelay: `${index * 0.2}s` }}>
+                <div className="relative z-10 max-w-md">
+                  <PathwayNode
+                    section={section}
+                    onClick={() => handleSectionClick(section.id, section.status)}
+                    isFirst={index === 0}
+                    isLast={index === pathwaySections.length - 1}
+                    position={getNodePosition(index)}
+                  />
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
 
-      {/* Completion Celebration */}
-      {currentProgress === 100 && (
-        <Card className="mt-12 border-success bg-gradient-to-r from-success/5 to-secondary/5 shadow-medium">
-          <CardContent className="p-6 text-center">
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <Check className="h-8 w-8 text-success" />
-              <h3 className="text-2xl font-bold text-foreground">Portfolio Complete!</h3>
-            </div>
-            <p className="text-muted-foreground mb-4">
-              Congratulations! You've completed your comprehensive portfolio. Your profile is now ready for college applications.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+        {/* Completion Celebration */}
+        {currentProgress === 100 && (
+          <Card className="mt-12 border-success bg-gradient-to-r from-success/5 to-secondary/5 shadow-medium">
+            <CardContent className="p-6 text-center">
+              <div className="flex items-center justify-center space-x-2 mb-4">
+                <Check className="h-8 w-8 text-success" />
+                <h3 className="text-2xl font-bold text-foreground">Portfolio Complete!</h3>
+              </div>
+              <p className="text-muted-foreground mb-4">
+                Congratulations! You've completed your comprehensive portfolio. Your profile is now ready for college applications.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
 
       {/* Wizard Dialogs */}
       <Dialog open={openSection === 'personal-info'} onOpenChange={() => setOpenSection(null)}>

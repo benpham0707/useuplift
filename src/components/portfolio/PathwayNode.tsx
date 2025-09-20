@@ -19,48 +19,53 @@ interface PathwayNodeProps {
   onClick: () => void;
   isFirst?: boolean;
   isLast?: boolean;
+  position?: string;
 }
 
-const PathwayNode = ({ section, onClick, isFirst, isLast }: PathwayNodeProps) => {
+const PathwayNode = ({ section, onClick, isFirst, isLast, position }: PathwayNodeProps) => {
   const { title, description, icon: Icon, progress, status, unlockThreshold } = section;
 
   const getStatusConfig = () => {
     switch (status) {
       case 'completed':
         return {
-          nodeClass: 'bg-gradient-to-br from-success to-success/80 border-success text-success-foreground shadow-medium hover:shadow-strong',
-          ringClass: 'ring-2 ring-success/20',
-          iconElement: <Check className="h-6 w-6" />,
-          progressColor: 'text-success-foreground',
+          nodeClass: 'bg-gradient-to-br from-success via-success to-success/90 border-2 border-success/30 text-white shadow-strong hover:shadow-[0_0_30px_hsl(var(--success)/0.6)] hover:scale-105',
+          ringClass: 'ring-4 ring-success/30 hover:ring-success/50',
+          iconElement: <Check className="h-8 w-8" />,
+          progressColor: 'text-white',
           clickable: true,
-          glow: 'hover:shadow-[0_0_20px_hsl(var(--success)/0.4)]'
+          celebration: true,
+          bgGlow: 'bg-success/20'
         };
       case 'in-progress':
         return {
-          nodeClass: 'bg-gradient-to-br from-primary to-primary/80 border-primary text-primary-foreground shadow-medium hover:shadow-strong animate-glow-pulse',
-          ringClass: 'ring-2 ring-primary/20',
-          iconElement: <Icon className="h-6 w-6" />,
-          progressColor: 'text-primary-foreground',
+          nodeClass: 'bg-gradient-to-br from-primary via-primary to-primary/90 border-2 border-primary/30 text-white shadow-strong hover:shadow-[0_0_30px_hsl(var(--primary)/0.6)] hover:scale-105 animate-pulse',
+          ringClass: 'ring-4 ring-primary/30 hover:ring-primary/50 animate-pulse',
+          iconElement: <Icon className="h-8 w-8" />,
+          progressColor: 'text-white',
           clickable: true,
-          glow: 'hover:shadow-[0_0_20px_hsl(var(--primary)/0.4)]'
+          celebration: false,
+          bgGlow: 'bg-primary/20'
         };
       case 'available':
         return {
-          nodeClass: 'bg-card border-border hover:border-primary/50 shadow-soft hover:shadow-medium hover:bg-primary/5',
-          ringClass: 'ring-2 ring-primary/10 hover:ring-primary/20',
-          iconElement: <Icon className="h-6 w-6 text-primary" />,
-          progressColor: 'text-muted-foreground',
+          nodeClass: 'bg-gradient-to-br from-secondary via-secondary to-secondary/90 border-2 border-secondary/30 text-white shadow-medium hover:shadow-strong hover:shadow-[0_0_25px_hsl(var(--secondary)/0.5)] hover:scale-105',
+          ringClass: 'ring-3 ring-secondary/20 hover:ring-secondary/40',
+          iconElement: <Icon className="h-8 w-8" />,
+          progressColor: 'text-white',
           clickable: true,
-          glow: 'hover:shadow-[0_0_15px_hsl(var(--primary)/0.2)]'
+          celebration: false,
+          bgGlow: 'bg-secondary/20'
         };
       case 'locked':
         return {
-          nodeClass: 'bg-muted/50 border-muted text-muted-foreground cursor-not-allowed',
-          ringClass: 'ring-1 ring-muted/30',
-          iconElement: <Lock className="h-5 w-5" />,
+          nodeClass: 'bg-gradient-to-br from-muted via-muted to-muted/80 border-2 border-muted/50 text-muted-foreground cursor-not-allowed opacity-60',
+          ringClass: 'ring-2 ring-muted/20',
+          iconElement: <Lock className="h-6 w-6" />,
           progressColor: 'text-muted-foreground',
           clickable: false,
-          glow: ''
+          celebration: false,
+          bgGlow: 'bg-muted/10'
         };
     }
   };
@@ -68,130 +73,154 @@ const PathwayNode = ({ section, onClick, isFirst, isLast }: PathwayNodeProps) =>
   const statusConfig = getStatusConfig();
 
   return (
-    <div className="flex items-center space-x-6 animate-fade-in">
-      {/* Progress Ring & Node */}
-      <div className="relative flex-shrink-0">
-        {/* Outer Progress Ring */}
-        <div className="relative w-20 h-20">
-          {/* Background Circle */}
-          <div className="absolute inset-0 w-20 h-20 rounded-full bg-muted/20" />
-          
-          {/* Progress Ring */}
-          {progress > 0 && (
-            <svg className="absolute inset-0 w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-              <circle
-                cx="40"
-                cy="40"
-                r="36"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="4"
-                strokeDasharray={`${(progress / 100) * 226.2} 226.2`}
-                className={cn(
-                  "transition-all duration-500",
-                  status === 'completed' ? 'text-success' : 'text-primary'
-                )}
-              />
-            </svg>
-          )}
-          
-          {/* Center Node */}
-          <Button
-            onClick={statusConfig.clickable ? onClick : undefined}
-            disabled={!statusConfig.clickable}
-            className={cn(
-              "absolute inset-2 w-16 h-16 rounded-full transition-all duration-300 p-0",
-              statusConfig.nodeClass,
-              statusConfig.ringClass,
-              statusConfig.glow,
-              statusConfig.clickable && "hover:scale-105 active:scale-95"
+    <div className="w-full max-w-sm mx-auto group">
+      {/* Background Glow */}
+      <div className={`absolute inset-0 rounded-3xl ${statusConfig.bgGlow} blur-xl opacity-0 group-hover:opacity-100 transition-all duration-500 -z-10`} />
+      
+      {/* Main Node Container */}
+      <div className="relative">
+        {/* Large Progress Ring & Node */}
+        <div className="relative flex justify-center mb-6">
+          <div className="relative w-32 h-32">
+            {/* Background Circle */}
+            <div className="absolute inset-0 w-32 h-32 rounded-full bg-background/50 backdrop-blur-sm" />
+            
+            {/* Progress Ring */}
+            {progress > 0 && (
+              <svg className="absolute inset-0 w-32 h-32 -rotate-90" viewBox="0 0 128 128">
+                <circle
+                  cx="64"
+                  cy="64"
+                  r="58"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="6"
+                  strokeDasharray={`${(progress / 100) * 364.4} 364.4`}
+                  className={cn(
+                    "transition-all duration-700 drop-shadow-sm",
+                    status === 'completed' ? 'text-success' : 
+                    status === 'in-progress' ? 'text-primary' :
+                    status === 'available' ? 'text-secondary' : 'text-muted'
+                  )}
+                />
+              </svg>
             )}
-          >
-            {statusConfig.iconElement}
-          </Button>
+            
+            {/* Center Node */}
+            <Button
+              onClick={statusConfig.clickable ? onClick : undefined}
+              disabled={!statusConfig.clickable}
+              className={cn(
+                "absolute inset-3 w-26 h-26 rounded-full transition-all duration-500 p-0 text-xl font-bold",
+                statusConfig.nodeClass,
+                statusConfig.ringClass,
+                statusConfig.clickable && "active:scale-90"
+              )}
+            >
+              {statusConfig.iconElement}
+              
+              {/* Celebration Sparkles */}
+              {statusConfig.celebration && (
+                <>
+                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-yellow-400 rounded-full animate-ping opacity-75" />
+                  <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-yellow-300 rounded-full animate-ping opacity-50" style={{ animationDelay: '0.5s' }} />
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Progress Percentage */}
+          {progress > 0 && progress < 100 && (
+            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+              <div className="bg-gradient-to-r from-primary to-secondary text-white text-sm px-3 py-1 rounded-full font-bold shadow-medium">
+                {progress}%
+              </div>
+            </div>
+          )}
+
+          {/* Completion Badge */}
+          {status === 'completed' && (
+            <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+              <div className="bg-gradient-to-r from-success to-success/80 text-white text-sm px-3 py-1 rounded-full font-bold shadow-medium flex items-center space-x-1">
+                <Check className="h-4 w-4" />
+                <span>Complete</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Progress Percentage */}
-        {progress > 0 && progress < 100 && (
-          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-            <div className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full font-medium">
-              {progress}%
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Content Card */}
-      <Card 
-        className={cn(
-          "flex-1 transition-all duration-300 cursor-pointer hover:shadow-medium",
-          statusConfig.clickable && "hover:border-primary/30",
-          !statusConfig.clickable && "opacity-60 cursor-not-allowed"
-        )}
-        onClick={statusConfig.clickable ? onClick : undefined}
-      >
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-3 mb-2">
-                <h3 className={cn(
-                  "font-semibold text-lg",
-                  status === 'completed' && "text-success",
-                  status === 'in-progress' && "text-primary",
-                  status === 'locked' && "text-muted-foreground"
-                )}>
-                  {title}
-                </h3>
-                {status === 'completed' && (
-                  <Check className="h-5 w-5 text-success" />
-                )}
-              </div>
+        {/* Enhanced Content Card */}
+        <Card 
+          className={cn(
+            "transition-all duration-500 cursor-pointer shadow-medium border-2",
+            statusConfig.clickable && "hover:shadow-strong hover:border-primary/30 hover:-translate-y-1",
+            !statusConfig.clickable && "opacity-60 cursor-not-allowed",
+            status === 'completed' && "border-success/30 bg-success/5",
+            status === 'in-progress' && "border-primary/30 bg-primary/5", 
+            status === 'available' && "border-secondary/30 bg-secondary/5",
+            status === 'locked' && "border-muted/20 bg-muted/5"
+          )}
+          onClick={statusConfig.clickable ? onClick : undefined}
+        >
+          <CardContent className="p-6 text-center">
+            <div className="space-y-4">
+              {/* Title */}
+              <h3 className={cn(
+                "font-bold text-xl leading-tight",
+                status === 'completed' && "text-success",
+                status === 'in-progress' && "text-primary",
+                status === 'available' && "text-secondary",
+                status === 'locked' && "text-muted-foreground"
+              )}>
+                {title}
+              </h3>
               
-              <p className="text-muted-foreground text-sm mb-3">
+              {/* Description */}
+              <p className="text-muted-foreground text-sm leading-relaxed">
                 {description}
               </p>
 
               {/* Progress Bar for in-progress sections */}
               {status === 'in-progress' && progress > 0 && progress < 100 && (
-                <div className="mb-3">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs text-muted-foreground">Progress</span>
-                    <span className="text-xs font-medium text-primary">{progress}%</span>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-medium text-muted-foreground">Progress</span>
+                    <span className="text-xs font-bold text-primary">{progress}%</span>
                   </div>
-                  <Progress value={progress} className="h-2" />
+                  <Progress value={progress} className="h-3" />
                 </div>
               )}
 
               {/* Unlock requirement for locked sections */}
               {status === 'locked' && unlockThreshold && (
-                <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
-                  <Lock className="h-3 w-3 inline mr-1" />
+                <div className="text-xs text-muted-foreground bg-muted/30 px-4 py-3 rounded-lg border border-muted/50">
+                  <Lock className="h-4 w-4 inline mr-2" />
                   {unlockThreshold}
                 </div>
               )}
 
-              {/* Status indicator */}
-              <div className="flex items-center space-x-2">
+              {/* Enhanced Status indicator */}
+              <div className="flex items-center justify-center space-x-3">
                 <div className={cn(
-                  "h-2 w-2 rounded-full",
-                  status === 'completed' && "bg-success",
+                  "h-3 w-3 rounded-full",
+                  status === 'completed' && "bg-success animate-pulse",
                   status === 'in-progress' && "bg-primary animate-pulse",
                   status === 'available' && "bg-secondary",
                   status === 'locked' && "bg-muted-foreground"
                 )} />
-                <span className="text-xs font-medium capitalize text-muted-foreground">
+                <span className="text-sm font-semibold capitalize">
                   {status === 'in-progress' ? 'In Progress' : status.replace('-', ' ')}
                 </span>
+                
+                {/* Action Arrow */}
+                {statusConfig.clickable && (
+                  <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-current transition-colors ml-2" />
+                )}
               </div>
             </div>
-
-            {/* Action Arrow */}
-            {statusConfig.clickable && (
-              <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" />
-            )}
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
