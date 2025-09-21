@@ -1,178 +1,91 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { 
   Target, 
-  TrendingUp, 
   Lightbulb, 
-  Pause,
   BarChart3,
   Clock,
-  Award,
   ArrowRight
 } from 'lucide-react';
 
 const ProjectIncubationHub = () => {
   const navigate = useNavigate();
 
-  // Hard coded data values for navigation cards overview
-  const overviewStats = {
-    activeProjects: 3,
-    pausedProjects: 2,
-    discoveryIdeas: 6,
-    totalProgress: 65
-  };
-
+  // Hard coded data values - Project metrics and key performance indicators
   const navigationCards = [
     {
-      id: 'foundation',
-      title: 'Foundation',
-      description: 'View metrics, analytics, and project performance dashboard',
+      id: 'portfolio',
+      title: 'Project Portfolio',
+      description: 'View analytics & performance',
       icon: BarChart3,
-      color: 'blue',
-      stats: [
-        { label: 'Portfolio Strength', value: '78%' },
-        { label: 'Impact Score', value: '8.2' }
-      ],
+      metric: { label: 'Portfolio Strength', value: '78%' },
       route: '/project-incubation/foundation'
     },
     {
       id: 'projects',
       title: 'Project Management',
-      description: 'Manage active and paused projects in one place',
+      description: 'Manage active & paused work',
       icon: Target,
-      color: 'green',
-      stats: [
-        { label: 'Active Projects', value: overviewStats.activeProjects },
-        { label: 'Paused Projects', value: overviewStats.pausedProjects }
-      ],
+      metric: { label: 'Active Projects', value: '5' },
       route: '/project-incubation/projects'
     },
     {
       id: 'discovery',
       title: 'Project Discovery',
-      description: 'Explore new project ideas and start planning',
+      description: 'Explore new opportunities',
       icon: Lightbulb,
-      color: 'purple',
-      stats: [
-        { label: 'Ideas Available', value: overviewStats.discoveryIdeas },
-        { label: 'Uniqueness', value: 'High' }
-      ],
+      metric: { label: 'Ideas Ready', value: '6' },
       route: '/project-incubation/discovery'
     }
   ];
 
-  const getColorClasses = (color: string) => {
-    switch (color) {
-      case 'blue':
-        return 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-200';
-      case 'green':
-        return 'text-green-600 bg-green-50 hover:bg-green-100 border-green-200';
-      case 'purple':
-        return 'text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-200';
-      case 'orange':
-        return 'text-orange-600 bg-orange-50 hover:bg-orange-100 border-orange-200';
-      default:
-        return 'text-gray-600 bg-gray-50 hover:bg-gray-100 border-gray-200';
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-foreground mb-4">Project Incubation System</h1>
-          <p className="text-lg text-muted-foreground max-w-3xl">
-            Transform your ideas into meaningful projects that stand out. Navigate through different sections 
-            to manage your project pipeline, discover new opportunities, and track your progress.
+    <div className="min-h-screen bg-background">
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Compact Header */}
+        <header className="text-center mb-16">
+          <h1 className="text-3xl font-bold text-foreground mb-3">Project Incubation System</h1>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Transform your ideas into meaningful projects that stand out
           </p>
-        </div>
+        </header>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Active Projects</p>
-                  <p className="text-2xl font-semibold">{overviewStats.activeProjects}</p>
-                </div>
-                <Target className="h-5 w-5 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Discovery Ideas</p>
-                  <p className="text-2xl font-semibold">{overviewStats.discoveryIdeas}</p>
-                </div>
-                <Lightbulb className="h-5 w-5 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Avg Progress</p>
-                  <p className="text-2xl font-semibold">{overviewStats.totalProgress}%</p>
-                </div>
-                <TrendingUp className="h-5 w-5 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Impact Rating</p>
-                  <p className="text-2xl font-semibold">8.2</p>
-                </div>
-                <Award className="h-5 w-5 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Navigation Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Navigation Cards - 3 Column Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
           {navigationCards.map((card) => {
             const IconComponent = card.icon;
             return (
               <Card 
                 key={card.id} 
-                className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 border-2 ${getColorClasses(card.color)}`}
+                className="cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-2 border group"
                 onClick={() => navigate(card.route)}
               >
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`p-2 rounded-lg ${getColorClasses(card.color)}`}>
-                        <IconComponent className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-xl">{card.title}</CardTitle>
-                      </div>
+                <CardContent className="p-6">
+                  <div className="flex flex-col items-center text-center space-y-4">
+                    {/* Icon */}
+                    <div className="p-3 rounded-xl bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                      <IconComponent className="h-6 w-6 text-primary" />
                     </div>
-                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <CardDescription className="text-base mt-2">
-                    {card.description}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="flex items-center justify-between">
-                    {card.stats.map((stat, index) => (
-                      <div key={index} className="text-center">
-                        <p className="text-sm text-muted-foreground">{stat.label}</p>
-                        <p className="font-semibold text-lg">{stat.value}</p>
-                      </div>
-                    ))}
+                    
+                    {/* Title & Description */}
+                    <div className="space-y-2">
+                      <h3 className="text-lg font-semibold text-foreground">{card.title}</h3>
+                      <p className="text-sm text-muted-foreground">{card.description}</p>
+                    </div>
+                    
+                    {/* Metric */}
+                    <div className="pt-2 border-t border-border/50 w-full">
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide">
+                        {card.metric.label}
+                      </p>
+                      <p className="text-xl font-bold text-primary mt-1">
+                        {card.metric.value}
+                      </p>
+                    </div>
+                    
+                    {/* Action indicator */}
+                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-1 transition-all" />
                   </div>
                 </CardContent>
               </Card>
@@ -180,36 +93,37 @@ const ProjectIncubationHub = () => {
           })}
         </div>
 
-        {/* Recent Activity */}
-        <Card className="mt-8">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
+        {/* Recent Activity - Below the fold */}
+        <Card className="max-w-4xl mx-auto">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center space-x-2 text-lg">
               <Clock className="h-5 w-5" />
               <span>Recent Activity</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div className="space-y-3">
+              {/* Hard coded data values - Recent project activity timeline */}
+              <div className="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Photography Portfolio Site - Progress updated to 90%</span>
+                  <span className="text-sm">Photography Portfolio Site - Progress updated to 90%</span>
                 </div>
-                <span className="text-sm text-muted-foreground">4 hours ago</span>
+                <span className="text-xs text-muted-foreground">4 hours ago</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>Study Group Matcher Algorithm - MVP testing milestone reached</span>
+                  <span className="text-sm">Study Group Matcher Algorithm - MVP testing milestone reached</span>
                 </div>
-                <span className="text-sm text-muted-foreground">1 day ago</span>
+                <span className="text-xs text-muted-foreground">1 day ago</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+              <div className="flex items-center justify-between py-3 px-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-3">
                   <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                  <span>New project idea added - AI-Powered Study Planner</span>
+                  <span className="text-sm">New project idea added - AI-Powered Study Planner</span>
                 </div>
-                <span className="text-sm text-muted-foreground">2 days ago</span>
+                <span className="text-xs text-muted-foreground">2 days ago</span>
               </div>
             </div>
           </CardContent>
