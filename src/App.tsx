@@ -8,7 +8,11 @@ import Index from "./pages/Index";
 import PortfolioScanner from "./pages/PortfolioScanner";
 import ExtracurricularOptimizer from "./pages/ExtracurricularOptimizer";
 import AcademicPlanner from "./pages/AcademicPlanner";
-import ProjectIncubationSystem from "./pages/ProjectIncubationSystem";
+import ProjectIncubationHub from "./pages/ProjectIncubationHub";
+import ProjectFoundation from "./pages/ProjectFoundation";
+import ActiveProjects from "./pages/ActiveProjects";
+import ProjectDiscovery from "./pages/ProjectDiscovery";
+import PausedProjects from "./pages/PausedProjects";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -26,7 +30,14 @@ const App = () => (
             <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
             <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
             <Route path="/academic-planner" element={<AcademicPlanner />} />
-            <Route path="/project-incubation" element={<ProjectIncubationSystem />} />
+            <Route path="/project-incubation" element={<ProjectIncubationHub />} />
+            <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/active" element={<ActiveProjects />} />
+            <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
+            <Route path="/project-incubation/paused" element={<PausedProjects />} />
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
