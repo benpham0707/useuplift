@@ -446,73 +446,53 @@ const PortfolioScanner = () => {
             <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-4">
               Portfolio Dashboard
             </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-6">
               Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
             </p>
-          </div>
-
-          {/* Progress & Level Display */}
-          <div className="flex flex-col md:flex-row items-center justify-center gap-8 mb-8">
-            <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-              <CardContent className="p-6 text-center">
-                <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent mb-2">
+            
+            {/* Overall Portfolio Strength and Completion */}
+            <div className="flex items-center justify-center gap-8 mb-8">
+              <div className="text-center">
+                <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                  {(aiOverall || overallScore).toFixed(1)}/10
+                </div>
+                <div className="text-sm text-muted-foreground font-medium">Portfolio Strength</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                   {overallProgress}%
                 </div>
-                <div className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Complete</div>
-                <Progress value={overallProgress} className="mt-3 h-2" />
-              </CardContent>
-            </Card>
-
-            <Card className={`${currentLevel.color} text-white border-0`}>
-              <CardContent className="p-6 text-center">
-                <div className="text-2xl font-bold mb-2">{currentLevel.level}</div>
-                <div className="text-sm opacity-90">{currentLevel.description}</div>
-              </CardContent>
-            </Card>
+                <div className="text-sm text-muted-foreground font-medium">Complete</div>
+              </div>
+            </div>
           </div>
 
-          {/* Rubric Scores Display */}
-          <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-              {[
-                { key: 'academicExcellence', label: 'Academic Excellence', icon: GraduationCap },
-                { key: 'leadershipPotential', label: 'Leadership Potential', icon: Users },
-                { key: 'personalGrowth', label: 'Personal Growth', icon: TrendingUp },
-                { key: 'communityImpact', label: 'Community Impact', icon: Heart },
-                { key: 'uniqueValue', label: 'Unique Value', icon: Sparkles },
-                { key: 'futureReadiness', label: 'Future Readiness', icon: Target }
-               ].map(({ key, label, icon: Icon }) => {
-                 const score = rubricScores[key as keyof typeof rubricScores]?.score || 0;
-                
-                return (
-                  <Card key={key} className="bg-background border border-border hover-lift transition-all duration-300">
-                    <CardContent className="p-4 text-center">
-                      <Icon className="h-5 w-5 mx-auto mb-2 text-primary" />
-                      <div className="text-lg font-semibold mb-1 text-foreground">
-                        {score.toFixed(1)}
-                      </div>
-                      <div className="text-xs text-muted-foreground font-medium">
-                        {label}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-
-            {/* Overall Score */}
-            <div className="text-center">
-              <Card className="inline-block bg-gradient-to-r from-primary/10 to-secondary/10 border-primary/30">
-                <CardContent className="p-6">
-                  <div className="text-sm font-medium text-muted-foreground mb-2 uppercase tracking-wide">
-                    Overall Portfolio Strength
-                  </div>
-                  <div className="text-4xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                    {(aiOverall || overallScore).toFixed(1)}/10
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+          {/* Metric Boxes */}
+          <div className="flex flex-wrap justify-center gap-3 mb-8">
+            {[
+              { key: 'academicExcellence', label: 'Academic Excellence', icon: GraduationCap },
+              { key: 'leadershipPotential', label: 'Leadership Potential', icon: Users },
+              { key: 'personalGrowth', label: 'Personal Growth', icon: TrendingUp },
+              { key: 'communityImpact', label: 'Community Impact', icon: Heart },
+              { key: 'uniqueValue', label: 'Unique Value', icon: Sparkles },
+              { key: 'futureReadiness', label: 'Future Readiness', icon: Target }
+             ].map(({ key, label, icon: Icon }) => {
+               const score = rubricScores[key as keyof typeof rubricScores]?.score || 0;
+              
+              return (
+                <Card key={key} className="bg-background border border-border hover-lift transition-all duration-300 w-auto min-w-[140px]">
+                  <CardContent className="p-3 text-center">
+                    <Icon className="h-4 w-4 mx-auto mb-1 text-primary" />
+                    <div className="text-sm font-semibold mb-1 text-foreground">
+                      {score.toFixed(1)}
+                    </div>
+                    <div className="text-xs text-muted-foreground font-medium">
+                      {label}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </div>
