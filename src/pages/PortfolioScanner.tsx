@@ -444,7 +444,7 @@ const PortfolioScanner = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-4">
-              Portfolio Scanner
+              Portfolio Dashboard
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
@@ -473,11 +473,7 @@ const PortfolioScanner = () => {
 
           {/* Rubric Scores Display */}
           <div className="bg-card/50 backdrop-blur-sm rounded-2xl border border-border/50 p-6 mb-8">
-            <h3 className="text-2xl font-bold text-center mb-6 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              Portfolio Assessment
-            </h3>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
               {[
                 { key: 'academicExcellence', label: 'Academic Excellence', icon: GraduationCap },
                 { key: 'leadershipPotential', label: 'Leadership Potential', icon: Users },
@@ -488,16 +484,14 @@ const PortfolioScanner = () => {
                ].map(({ key, label, icon: Icon }) => {
                  const score = rubricScores[key as keyof typeof rubricScores]?.score || 0;
                 
-                const styles = getScoreStyles(score);
-                
                 return (
-                  <Card key={key} className="relative overflow-hidden" style={styles.boxStyle}>
+                  <Card key={key} className="bg-background border border-border hover-lift transition-all duration-300">
                     <CardContent className="p-4 text-center">
-                      <Icon className="h-8 w-8 mx-auto mb-3 text-primary" />
-                      <div className="text-2xl font-bold mb-1" style={styles.textStyle}>
+                      <Icon className="h-5 w-5 mx-auto mb-2 text-primary" />
+                      <div className="text-lg font-semibold mb-1 text-foreground">
                         {score.toFixed(1)}
                       </div>
-                      <div className="text-sm text-muted-foreground font-medium">
+                      <div className="text-xs text-muted-foreground font-medium">
                         {label}
                       </div>
                     </CardContent>
