@@ -299,6 +299,9 @@ const PortfolioMetricsDashboard: React.FC = () => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'dashboard' | 'project'>('dashboard');
 
+  // Debug log to help identify any lingering references
+  console.log('PortfolioMetricsDashboard loaded successfully');
+
   const handleProjectSelect = (project: any) => {
     setSelectedProject(project);
     setViewMode('project');
