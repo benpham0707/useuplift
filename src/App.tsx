@@ -10,9 +10,8 @@ import ExtracurricularOptimizer from "./pages/ExtracurricularOptimizer";
 import AcademicPlanner from "./pages/AcademicPlanner";
 import ProjectIncubationHub from "./pages/ProjectIncubationHub";
 import ProjectFoundation from "./pages/ProjectFoundation";
-import ActiveProjects from "./pages/ActiveProjects";
+import ProjectManagement from "./pages/ProjectManagement";
 import ProjectDiscovery from "./pages/ProjectDiscovery";
-import PausedProjects from "./pages/PausedProjects";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -35,9 +34,8 @@ const App = () => (
             <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
             <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
             <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
-            <Route path="/project-incubation/active" element={<ActiveProjects />} />
+            <Route path="/project-incubation/projects" element={<ProjectManagement />} />
             <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
-            <Route path="/project-incubation/paused" element={<PausedProjects />} />
             <Route path="/auth" element={<Auth />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -39,16 +39,16 @@ const ProjectIncubationHub = () => {
       route: '/project-incubation/foundation'
     },
     {
-      id: 'active',
-      title: 'Active Projects',
-      description: 'Manage your current projects and track progress',
+      id: 'projects',
+      title: 'Project Management',
+      description: 'Manage active and paused projects in one place',
       icon: Target,
       color: 'green',
       stats: [
         { label: 'Active Projects', value: overviewStats.activeProjects },
-        { label: 'Avg Progress', value: `${overviewStats.totalProgress}%` }
+        { label: 'Paused Projects', value: overviewStats.pausedProjects }
       ],
-      route: '/project-incubation/active'
+      route: '/project-incubation/projects'
     },
     {
       id: 'discovery',
@@ -61,18 +61,6 @@ const ProjectIncubationHub = () => {
         { label: 'Uniqueness', value: 'High' }
       ],
       route: '/project-incubation/discovery'
-    },
-    {
-      id: 'paused',
-      title: 'Paused Projects',
-      description: 'Review suspended projects and plan resumption',
-      icon: Pause,
-      color: 'orange',
-      stats: [
-        { label: 'Paused Projects', value: overviewStats.pausedProjects },
-        { label: 'Ready to Resume', value: '1' }
-      ],
-      route: '/project-incubation/paused'
     }
   ];
 
