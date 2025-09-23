@@ -440,10 +440,10 @@ const PortfolioScanner = () => {
       </nav>
 
       {/* Header Section with Scores */}
-      <div className="bg-gradient-to-r from-background via-primary/5 to-secondary/5 border-b border-border/20">
+      <div className="bg-gradient-to-r from-purple-500/15 via-purple-400/10 to-blue-500/15 border-b border-border/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent mb-4">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4" style={{ textShadow: '0 0 14px rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.08)' }}>
               Portfolio Dashboard
             </h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-6">
@@ -453,13 +453,13 @@ const PortfolioScanner = () => {
             {/* Overall Portfolio Strength and Completion */}
             <div className="flex items-center justify-center gap-8 mb-8">
               <div className="text-center">
-                <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                <div className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.06)' }}>
                   {(aiOverall || overallScore).toFixed(1)}/10
                 </div>
                 <div className="text-sm text-muted-foreground font-medium">Portfolio Strength</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                <div className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.06)' }}>
                   {overallProgress}%
                 </div>
                 <div className="text-sm text-muted-foreground font-medium">Complete</div>
