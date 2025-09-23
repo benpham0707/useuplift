@@ -440,13 +440,13 @@ const PortfolioScanner = () => {
       </nav>
 
       {/* Header Section with Scores */}
-      <div className="bg-gradient-to-r from-purple-500/15 via-purple-400/10 to-blue-500/15 border-b border-border/20">
+      <div className="bg-gradient-to-br from-[#6B5BFF]/20 via-[#7E8BFF]/16 to-[#2FD7C0]/20 border-b border-border/20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="text-center mb-8">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4" style={{ textShadow: '0 0 14px rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.08)' }}>
               Portfolio Dashboard
             </h1>
-            <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-6">
+            <p className="text-white/85 text-lg max-w-2xl mx-auto mb-6" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.15)' }}>
               Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
             </p>
             
@@ -456,13 +456,13 @@ const PortfolioScanner = () => {
                 <div className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.06)' }}>
                   {(aiOverall || overallScore).toFixed(1)}/10
                 </div>
-                <div className="text-sm text-muted-foreground font-medium">Portfolio Strength</div>
+                <div className="text-sm text-white/80 font-medium">Portfolio Strength</div>
               </div>
               <div className="text-center">
                 <div className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.06)' }}>
                   {overallProgress}%
                 </div>
-                <div className="text-sm text-muted-foreground font-medium">Complete</div>
+                <div className="text-sm text-white/80 font-medium">Complete</div>
               </div>
             </div>
           </div>
@@ -483,7 +483,7 @@ const PortfolioScanner = () => {
                 <Card key={key} className="bg-background border border-border hover-lift transition-all duration-300 w-auto min-w-[150px]">
                   <CardContent className="p-3 text-center">
                     <Icon className="h-5 w-5 mx-auto mb-1 text-primary" />
-                    <div className="text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                    <div className="text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-[#6B5BFF] to-[#2FD7C0] bg-clip-text text-transparent">
                       {score.toFixed(1)}
                     </div>
                     <div className="text-sm text-muted-foreground font-medium">
