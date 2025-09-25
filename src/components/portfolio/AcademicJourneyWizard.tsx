@@ -522,7 +522,7 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
         <Progress value={progress.percent} className="h-2 max-w-md mx-auto" />
 
         {/* Progress Steps */}
-        <div className="flex items-center justify-center space-x-2 mb-6">
+        <div className="flex flex-wrap items-center justify-center gap-2 mb-6">
           {STEPS.map((step, index) => (
             <React.Fragment key={step.id}>
               <div className={`flex items-center gap-2 ${
