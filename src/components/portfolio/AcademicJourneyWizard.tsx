@@ -227,7 +227,7 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
     ];
     const step7 = [!data.needEnglishProficiency || isFilled(data.englishProficiency?.testType)];
 
-    const required = [...step1, ...step2, ...step6, ...step9];
+    const required = [...step1, ...step2, ...step6, ...step7];
     const completed = required.filter(isFilled).length;
     const total = required.length || 1;
     const percent = Math.round((completed / total) * 100);
@@ -239,7 +239,6 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
       step_4: step4.every(Boolean),
       step_5: step5.every(Boolean),
       step_6: step6.every(Boolean),
-      step_7: step7.every(Boolean),
       step_7: step7.every(Boolean),
     } as const;
 
