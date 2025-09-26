@@ -258,39 +258,7 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
 
       {/* Main Content */}
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-12">
-        {/* Pathway Header */}
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-primary to-secondary rounded-xl mb-4">
-            <BookOpen className="h-8 w-8 text-white" />
-          </div>
-          
-          <h1 className="text-3xl font-bold text-foreground mb-4">
-            Your Portfolio Journey
-          </h1>
-          
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-8">
-            Complete each step to build your comprehensive profile that showcases your unique story.
-          </p>
-          
-          {/* Progress Summary */}
-          <div className="flex items-center justify-center space-x-8 mb-8">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary mb-1">
-                {currentProgress}%
-              </div>
-              <div className="text-sm text-muted-foreground">Complete</div>
-            </div>
-            
-            <div className="h-8 w-px bg-border"></div>
-            
-            <div className="text-center">
-              <div className="text-3xl font-bold text-secondary mb-1">
-                {pathwaySections.filter(s => s.status === 'completed').length}/7
-              </div>
-              <div className="text-sm text-muted-foreground">Sections</div>
-            </div>
-          </div>
-        </div>
+        {/* Header removed for a cleaner, cohesive layout */}
 
         {/* Centered Pathway */}
         <div className="relative flex flex-col items-center space-y-20">
