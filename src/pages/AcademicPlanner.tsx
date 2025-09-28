@@ -162,7 +162,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
           <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
             <CollapsibleTrigger asChild>
               <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60">
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
@@ -171,17 +171,17 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                         ) : (
                           <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         )}
-                        <h3 className="font-semibold text-base text-foreground">{data.year}</h3>
+                        <h3 className="font-semibold text-sm text-foreground">{data.year}</h3>
                         <Badge variant="secondary" className="text-xs">{data.status}</Badge>
                       </div>
                       <div className="ml-6">
-                        <div className="text-xl font-bold text-primary">{data.overallGPA}</div>
+                        <div className="text-lg font-bold text-primary">{data.overallGPA}</div>
                         <div className="text-xs text-muted-foreground">GPA</div>
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-6">
-                      <div className="flex flex-col items-center p-3 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
+                    <div className="flex items-center gap-3">
+                      <div className="flex flex-col items-center p-2 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
                         <div className="flex items-center gap-1">
                           {data.detailedMetrics.gpaImprovement.includes('+') ? (
                             <TrendingUp className="w-3 h-3 text-green-600" />
@@ -190,7 +190,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                           ) : (
                             <TrendingDown className="w-3 h-3 text-orange-600" />
                           )}
-                          <span className="text-sm font-semibold text-foreground">
+                          <span className="text-xs font-semibold text-foreground">
                             {data.detailedMetrics.gpaImprovement.includes('+') ? 
                               '+' + (data.detailedMetrics.gpaImprovement.match(/\+([0-9.]+)/)?.[1] || '0.0') : 
                               data.detailedMetrics.gpaImprovement.includes('Maintained') ? '0.0' : 
@@ -198,13 +198,13 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                             }
                           </span>
                         </div>
-                        <div className="text-xs text-muted-foreground">GPA Trend</div>
+                        <div className="text-xs text-muted-foreground">Trend</div>
                       </div>
                       
-                      <div className="flex flex-col items-center p-3 rounded-lg bg-gradient-to-br from-amber/10 to-amber/5 border border-amber/20">
+                      <div className="flex flex-col items-center p-2 rounded-lg bg-gradient-to-br from-amber/10 to-amber/5 border border-amber/20">
                         <div className="flex items-center gap-1">
                           <Brain className="w-3 h-3 text-amber-600" />
-                          <span className="text-sm font-semibold text-foreground">
+                          <span className="text-xs font-semibold text-foreground">
                             {data.detailedMetrics.courseDifficulty.includes('Standard') ? '2.5' :
                              data.detailedMetrics.courseDifficulty.includes('15%') ? '3.0' :
                              data.detailedMetrics.courseDifficulty.includes('25%') ? '4.0' :
@@ -215,37 +215,37 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                         <div className="text-xs text-muted-foreground">Difficulty</div>
                       </div>
                       
-                      <div className="flex flex-col items-center p-3 rounded-lg bg-gradient-to-br from-blue/10 to-blue/5 border border-blue/20">
+                      <div className="flex flex-col items-center p-2 rounded-lg bg-gradient-to-br from-blue/10 to-blue/5 border border-blue/20">
                         <div className="flex items-center gap-1">
                           <Star className="w-3 h-3 text-blue-600" />
-                          <span className="text-sm font-semibold text-foreground">
+                          <span className="text-xs font-semibold text-foreground">
                             {data.detailedMetrics.notableAchievements.includes('AP') ? 
                               data.detailedMetrics.notableAchievements.match(/(\d+)\s*AP/)?.[1] || '0' : 
                               '0'
                             }
                           </span>
                         </div>
-                        <div className="text-xs text-muted-foreground">AP Courses</div>
+                        <div className="text-xs text-muted-foreground">AP</div>
                       </div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </CollapsibleTrigger>
-            <CollapsibleContent className="mt-4">
+            <CollapsibleContent className="mt-3">
               <Card className="bg-muted/30">
-                <CardContent className="p-6">
-                  <h4 className="font-medium mb-4 text-foreground">Subject Performance Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <CardContent className="p-4">
+                  <h4 className="font-medium mb-3 text-foreground text-sm">Subject Performance Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => (
                       <Card key={idx} className="bg-background">
-                        <CardContent className="p-4">
-                          <div className="space-y-3">
+                        <CardContent className="p-3">
+                          <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                              <h5 className="font-medium text-foreground">{subject.subject}</h5>
+                              <h5 className="font-medium text-foreground text-sm">{subject.subject}</h5>
                               <Badge variant={subject.grade.includes('A') ? 'default' : subject.grade.includes('B') ? 'secondary' : 'outline'} className="text-xs">{subject.grade}</Badge>
                             </div>
-                            <div className="space-y-2 text-sm">
+                            <div className="space-y-1 text-xs">
                               <div className="flex justify-between"><span className="text-muted-foreground">Relevance:</span><span className="font-medium text-foreground">{subject.relevance}</span></div>
                               <div className="flex justify-between"><span className="text-muted-foreground">Class Avg:</span><span className="font-medium text-foreground">{subject.avgGPA}</span></div>
                               <div className="flex justify-between"><span className="text-muted-foreground">Class Rank:</span><span className="font-medium text-foreground">{subject.classRank}</span></div>
@@ -1080,12 +1080,12 @@ const AcademicPlanner = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-96">
+              <ScrollArea className="h-60">
                 {/* Soft Border at Scroll Cutoff */}
-                <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 mb-4">
-                  <div className="h-3 bg-gradient-to-b from-border/30 to-transparent"></div>
+                <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border/60 mb-3">
+                  <div className="h-2 bg-gradient-to-b from-border/30 to-transparent"></div>
                 </div>
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {insights.map((insight) => (
                     <AcademicInsightItem
                       key={insight.id}
@@ -1734,6 +1734,8 @@ interface AcademicInsightItemProps {
 }
 
 const AcademicInsightItem = ({ title, description, time, type, impact, pendingGains, relatedFeatures, actionItems, connections, onActionClick }: AcademicInsightItemProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  
   const typeColors = {
     strength: 'text-green-600',
     opportunity: 'text-blue-600',
@@ -1813,26 +1815,38 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
   };
 
   return (
-    <div className={`p-5 rounded-lg shadow-soft hover:shadow-medium transition-all duration-200 ${getBorderClass(type, impact)}`}>
-      <div className="flex items-start gap-3">
-        <CheckCircle2 className={`h-6 w-6 mt-0.5 ${getCheckmarkColor(type, impact)} flex-shrink-0`} />
-        <div className="flex-1 space-y-3">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <h4 className="font-semibold text-foreground text-lg">{title}</h4>
-                <Badge className={`text-xs px-2 py-1 ${getImpactBadgeColors(type, impact)}`}>
-                  {getImpactText(type, impact)}
-                </Badge>
+    <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+      <CollapsibleTrigger asChild>
+        <div className={`p-3 rounded-lg shadow-soft hover:shadow-medium transition-all duration-200 cursor-pointer ${getBorderClass(type, impact)}`}>
+          <div className="flex items-center gap-3">
+            <CheckCircle2 className={`h-5 w-5 ${getCheckmarkColor(type, impact)} flex-shrink-0`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <h4 className="font-semibold text-foreground text-sm truncate">{title}</h4>
+                <div className="flex items-center gap-2 ml-2">
+                  <Badge className={`text-xs px-2 py-1 ${getImpactBadgeColors(type, impact)}`}>
+                    {getImpactText(type, impact)}
+                  </Badge>
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{description}</p>
+              <p className="text-xs text-muted-foreground mt-1">{time}</p>
             </div>
-            <div className="text-right ml-4 min-w-[140px]">
+          </div>
+        </div>
+      </CollapsibleTrigger>
+      
+      <CollapsibleContent className="mt-2">
+        <div className={`p-4 rounded-lg border ${getBorderClass(type, impact)} bg-background/50`}>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">{description}</p>
+            
+            <div className="text-right">
               <div className="text-xs text-muted-foreground mb-2 flex items-center justify-end gap-1 font-medium">
                 <Scale className="h-3 w-3" />
                 Estimated Impact
               </div>
-              <div className="space-y-1 opacity-50">
+              <div className="space-y-1 opacity-75">
                 {Object.entries(pendingGains).map(([key, value]) => (
                   <div key={key} className="text-xs font-medium text-muted-foreground">
                     {key === 'missedOpportunity' ? 'Missed: ' : value >= 0 ? '+' : ''}
@@ -1841,63 +1855,47 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
                 ))}
               </div>
             </div>
-          </div>
-          
-          <div className="bg-primary/5 rounded-md p-3 border border-primary/20">
-            <h5 className="font-medium text-foreground text-sm mb-2 flex items-center gap-2">
-              <Link className="h-4 w-4" />
-              Feature Connections
-            </h5>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {relatedFeatures.map((feature, index) => (
-                <Badge key={index} variant="secondary" className="text-xs">
-                  {feature}
-                </Badge>
-              ))}
+            
+            <div className="bg-primary/5 rounded-md p-2 border border-primary/20">
+              <h5 className="font-medium text-foreground text-xs mb-2 flex items-center gap-2">
+                <Link className="h-3 w-3" />
+                Feature Connections
+              </h5>
+              <div className="flex flex-wrap gap-1 mb-2">
+                {relatedFeatures.map((feature, index) => (
+                  <Badge key={index} variant="secondary" className="text-xs px-1 py-0">
+                    {feature}
+                  </Badge>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground italic">{connections}</p>
             </div>
-            <p className="text-xs text-muted-foreground italic">{connections}</p>
-          </div>
 
-          <div className="bg-secondary/10 rounded-md p-3 border border-secondary/30">
-            <h5 className="font-medium text-foreground text-sm mb-2 flex items-center gap-2">
-              <Zap className="h-4 w-4" />
-              Recommended Actions
-            </h5>
-            <div className="space-y-2">
-              {actionItems.map((item, index) => (
-                <div key={index} className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex-1">{item.action}</span>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="text-xs h-7 ml-2 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-                    onClick={() => onActionClick ? onActionClick(item.action) : (window.location.href = item.link)}
-                  >
-                    {item.buttonText}
-                    <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3 text-muted-foreground" />
-              <span className="text-xs text-muted-foreground">{time}</span>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" className="text-xs h-7">
-                Record in Journal
-              </Button>
-              <Button variant="ghost" size="sm" className="text-xs h-7">
-                View Full Analysis
-              </Button>
+            <div className="bg-secondary/10 rounded-md p-2 border border-secondary/30">
+              <h5 className="font-medium text-foreground text-xs mb-2 flex items-center gap-2">
+                <Zap className="h-3 w-3" />
+                Recommended Actions
+              </h5>
+              <div className="space-y-2">
+                {actionItems.map((item, index) => (
+                  <div key={index} className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground flex-1">{item.action}</span>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="text-xs h-6 ml-2 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
+                      onClick={() => onActionClick?.(item.action)}
+                    >
+                      {item.buttonText}
+                    </Button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 };
 
