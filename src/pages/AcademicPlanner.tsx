@@ -799,7 +799,7 @@ const AcademicPlanner = () => {
                 <CollapsibleContent className="mt-3">
                   <ScrollArea className="h-[120px] pr-4">
                     {/* A-G Subject Requirements - Smaller emphasis */}
-                    <div className="mb-3">
+                    <div className="mb-3 pt-1">
                       <button 
                         onClick={() => setExpandedAG(!expandedAG)}
                         className="flex items-center gap-2 text-xs w-full hover:bg-muted p-2 rounded-md transition-colors"
