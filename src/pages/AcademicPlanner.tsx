@@ -784,7 +784,7 @@ const AcademicPlanner = () => {
 
             {/* Academic Course Requirements Checklist */}
             <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-primary/20 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col">
-              <Collapsible defaultOpen={false}>
+              <Collapsible defaultOpen={true}>
                 <CollapsibleTrigger asChild>
                   <button className="flex items-center gap-2 text-base font-semibold text-foreground hover:text-primary transition-colors w-full group">
                     <CheckCircle2 className="h-5 w-5 text-primary" />
@@ -796,10 +796,10 @@ const AcademicPlanner = () => {
                   </button>
                 </CollapsibleTrigger>
                 
-                <CollapsibleContent className="mt-3">
+                <CollapsibleContent className="mt-1">
                   <ScrollArea className="h-[120px] pr-4">
                     {/* A-G Subject Requirements - Smaller emphasis */}
-                    <div className="mb-3">
+                    <div className="mb-3 -mt-1">
                       <button 
                         onClick={() => setExpandedAG(!expandedAG)}
                         className="flex items-center gap-2 text-xs w-full hover:bg-muted p-2 rounded-md transition-colors"
