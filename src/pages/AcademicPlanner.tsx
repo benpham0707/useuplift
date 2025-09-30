@@ -854,32 +854,10 @@ const AcademicPlanner = () => {
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400 flex-shrink-0">
-                        <X className="h-2 w-2 text-white" />
-                      </div>
-                      <span className="font-medium">Early Graduation Possible</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
                       <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                         <Check className="h-2 w-2 text-white" />
                       </div>
                       <span className="font-medium">Honors Diploma Track</span>
-                    </div>
-                    
-                    {/* Schedule Rigor */}
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
-                        <Check className="h-2 w-2 text-white" />
-                      </div>
-                      <span className="font-medium">Most Rigorous Available</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
-                        <Check className="h-2 w-2 text-white" />
-                      </div>
-                      <span className="font-medium">No Study Halls/Fillers</span>
                     </div>
                     
                     {/* Senior Year Requirements */}
@@ -910,20 +888,6 @@ const AcademicPlanner = () => {
                         <Check className="h-2 w-2 text-white" />
                       </div>
                       <span className="font-medium">All Prerequisites Met</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
-                        <Check className="h-2 w-2 text-white" />
-                      </div>
-                      <span className="font-medium">Grade Trend Management</span>
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
-                        <Check className="h-2 w-2 text-white" />
-                      </div>
-                      <span className="font-medium">Course Load Balance</span>
                     </div>
                     
                     {/* Major-Specific Requirements */}
