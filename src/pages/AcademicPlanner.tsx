@@ -236,7 +236,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
               <Card className="bg-muted/30">
                 <CardContent className="p-4">
                   <h4 className="font-medium mb-3 text-foreground text-sm">Subject Performance Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => (
                       <Card key={idx} className="bg-background">
                         <CardContent className="p-3">
