@@ -1010,36 +1010,20 @@ const AcademicPlanner = () => {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Subject Performance Analytics - Main Focus (2/3 width) */}
                 <div className="lg:col-span-2">
                   <SubjectPerformanceAnalytics />
                 </div>
                 
                 {/* GPA Analysis - Supplemental Visual (1/3 width) */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-1">
                   <div className="sticky top-4">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
                       GPA Trends
                     </h3>
                     <GPALineChart />
-                    
-                    {/* Compact metrics */}
-                    <div className="mt-6 space-y-3">
-                      <div className="p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                        <div className="text-xs text-purple-700 mb-1">Current Weighted</div>
-                        <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                          {currentGPA.weighted}
-                        </div>
-                      </div>
-                      <div className="p-3 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                        <div className="text-xs text-purple-700 mb-1">Class Rank</div>
-                        <div className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                          {currentGPA.classRank}/{currentGPA.totalStudents}
-                        </div>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
