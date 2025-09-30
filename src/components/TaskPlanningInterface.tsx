@@ -80,8 +80,8 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
               Next Actions Planning
             </DialogTitle>
             <div className="flex items-center gap-4">
-              <TooltipProvider>
-                <Tooltip>
+              <TooltipProvider delayDuration={120}>
+                <Tooltip disableHoverableContent>
                   <TooltipTrigger asChild>
                     <Button 
                       variant="ghost" 
@@ -357,8 +357,8 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                 <Button size="sm" onClick={handleSendMessage}>
                   <Send className="h-4 w-4" />
                 </Button>
-                <TooltipProvider>
-                  <Tooltip>
+                <TooltipProvider delayDuration={120}>
+                  <Tooltip disableHoverableContent>
                     <TooltipTrigger asChild>
                       <Button 
                         variant="outline" 
