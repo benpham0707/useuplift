@@ -918,7 +918,7 @@ const AcademicPlanner = () => {
                 
                 {/* GPA Analysis - Half width */}
                 <div>
-                  <div className="sticky top-4">
+                  <div className="sticky top-0">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
                       GPA Trends
