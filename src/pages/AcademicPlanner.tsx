@@ -784,22 +784,17 @@ const AcademicPlanner = () => {
 
             {/* Academic Course Requirements Checklist */}
             <div className="bg-white/95 backdrop-blur-sm rounded-xl p-4 border border-primary/20 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col">
-              <Collapsible defaultOpen={true}>
-                <CollapsibleTrigger asChild>
-                  <button className="flex items-center gap-2 text-base font-semibold text-foreground hover:text-primary transition-colors w-full group">
-                    <CheckCircle2 className="h-5 w-5 text-primary" />
-                    <span className="bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">
-                      Academic Course Requirements Checklist
-                    </span>
-                    <Badge variant="secondary" className="ml-auto">15 of 18 met ✓</Badge>
-                    <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
-                  </button>
-                </CollapsibleTrigger>
-                
-                <CollapsibleContent className="mt-1">
-                  <ScrollArea className="h-[120px] pr-4">
-                    {/* A-G Subject Requirements - Smaller emphasis */}
-                    <div className="mb-3 -mt-1">
+              <div className="flex items-center gap-2 text-base font-semibold text-foreground mb-3">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+                <span className="bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">
+                  Academic Course Requirements Checklist
+                </span>
+                <Badge variant="secondary" className="ml-auto">15 of 18 met ✓</Badge>
+              </div>
+              
+              <ScrollArea className="h-[120px] pr-4">
+                {/* A-G Subject Requirements - Smaller emphasis */}
+                <div className="mb-3">
                       <button 
                         onClick={() => setExpandedAG(!expandedAG)}
                         className="flex items-center gap-2 text-xs w-full hover:bg-muted p-2 rounded-md transition-colors"
@@ -930,8 +925,6 @@ const AcademicPlanner = () => {
                       </div>
                     </div>
                   </ScrollArea>
-                </CollapsibleContent>
-              </Collapsible>
             </div>
           </div>
         </div>
