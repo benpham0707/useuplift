@@ -494,26 +494,42 @@ const AcademicPlanner = () => {
     // Card 4: Recent Insights (Large - 4x1)
     {
       content: (
-        <div className="h-full flex flex-col">
+        <div className="h-full flex flex-col overflow-hidden">
           <div className="card__header mb-4">
             <div className="card__label text-purple-300">Insights</div>
           </div>
-          <div className="card__content flex-1">
+          <div className="card__content flex-1 overflow-auto">
             <h2 className="card__title text-xl font-bold text-white mb-2">AI Recommendations</h2>
             <p className="card__description text-white/70 mb-4 text-sm">Strategic academic guidance</p>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {insights.map((insight) => (
-                <div key={insight.id} className="bg-white/5 rounded-lg p-3 border border-white/10">
-                  <div className="flex items-center gap-2 mb-2">
-                    <insight.icon className="h-4 w-4 text-purple-400" />
-                    <h3 className="text-white text-sm font-semibold">{insight.title}</h3>
-                  </div>
-                  <p className="text-white/60 text-xs mb-2">{insight.summary}</p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="text-xs">{insight.percentage}%</Badge>
-                    <Badge variant={insight.status === 'complete' ? 'default' : insight.status === 'warning' ? 'destructive' : 'secondary'} className="text-xs">{insight.status}</Badge>
-                  </div>
-                </div>
+                <Collapsible key={insight.id}>
+                  <CollapsibleTrigger asChild>
+                    <div className="bg-white/5 rounded-lg p-3 border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
+                      <div className="flex items-center gap-2 mb-2">
+                        <insight.icon className="h-4 w-4 text-purple-400" />
+                        <h3 className="text-white text-xs font-semibold">{insight.title}</h3>
+                        <ChevronDown className="h-3 w-3 text-white/50 ml-auto" />
+                      </div>
+                      <p className="text-white/60 text-[10px] mb-2">{insight.summary}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-[10px] h-4">{insight.percentage}%</Badge>
+                        <Badge variant={insight.status === 'complete' || insight.status === 'excellent' ? 'default' : insight.status === 'warning' ? 'destructive' : 'secondary'} className="text-[10px] h-4">{insight.status}</Badge>
+                      </div>
+                    </div>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="mt-2 bg-white/5 rounded-lg p-3 border border-white/10">
+                      <p className="text-white/70 text-[10px] mb-2">{insight.details}</p>
+                      <div className="space-y-1">
+                        <p className="text-white/90 text-[10px] font-semibold">Recommendations:</p>
+                        {insight.recommendations.map((rec, idx) => (
+                          <p key={idx} className="text-white/60 text-[10px] pl-2">• {rec}</p>
+                        ))}
+                      </div>
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               ))}
             </div>
           </div>
@@ -531,27 +547,108 @@ const AcademicPlanner = () => {
             <h2 className="card__title text-xl font-bold text-white mb-2">Trophy Case</h2>
             <p className="card__description text-white/70 mb-4 text-sm">Your academic accomplishments</p>
             <div className="space-y-3">
-              <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 rounded-lg p-3 border border-yellow-500/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Award className="h-5 w-5 text-yellow-400" />
-                  <h3 className="text-white font-bold">Gold Tier</h3>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="text-white/90">• AP Biology - Perfect Score: 5</div>
-                  <div className="text-white/90">• Science Fair Winner</div>
-                  <div className="text-white/90">• Honor Roll (All Semesters)</div>
-                </div>
-              </div>
-              <div className="bg-gradient-to-r from-gray-300/20 to-gray-400/20 rounded-lg p-3 border border-gray-400/30">
-                <div className="flex items-center gap-2 mb-2">
-                  <Star className="h-5 w-5 text-gray-300" />
-                  <h3 className="text-white font-bold">Silver Tier</h3>
-                </div>
-                <div className="space-y-1 text-sm">
-                  <div className="text-white/90">• AP History Score: 4</div>
-                  <div className="text-white/90">• Top 15% Class Ranking</div>
-                </div>
-              </div>
+              {/* Gold Tier - Expandable */}
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 rounded-lg p-3 border border-yellow-500/30 cursor-pointer hover:from-yellow-500/30 hover:to-amber-500/30 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award className="h-5 w-5 text-yellow-400" />
+                      <h3 className="text-white font-bold text-sm">Gold Tier</h3>
+                      <Badge className="ml-auto bg-yellow-500/20 text-yellow-400 text-xs">3 Achievements</Badge>
+                      <ChevronDown className="h-4 w-4 text-white/50" />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 space-y-2 pl-2">
+                    <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">AP Biology - Perfect Score: 5</div>
+                      <p className="text-white/60 text-xs mb-2">Exceptional mastery of advanced biological concepts</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                    <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">Science Fair Winner</div>
+                      <p className="text-white/60 text-xs mb-2">First place in regional science competition</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                    <div className="bg-yellow-500/10 rounded-lg p-2 border border-yellow-500/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">Honor Roll (All Semesters)</div>
+                      <p className="text-white/60 text-xs mb-2">Consistent academic excellence throughout high school</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Silver Tier - Expandable */}
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <div className="bg-gradient-to-r from-gray-300/20 to-gray-400/20 rounded-lg p-3 border border-gray-400/30 cursor-pointer hover:from-gray-300/30 hover:to-gray-400/30 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Star className="h-5 w-5 text-gray-300" />
+                      <h3 className="text-white font-bold text-sm">Silver Tier</h3>
+                      <Badge className="ml-auto bg-gray-400/20 text-gray-300 text-xs">2 Achievements</Badge>
+                      <ChevronDown className="h-4 w-4 text-white/50" />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 space-y-2 pl-2">
+                    <div className="bg-gray-400/10 rounded-lg p-2 border border-gray-400/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">AP History Score: 4</div>
+                      <p className="text-white/60 text-xs mb-2">Strong performance in AP coursework</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-gray-400/30 text-gray-300 hover:bg-gray-400/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                    <div className="bg-gray-400/10 rounded-lg p-2 border border-gray-400/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">Top 15% Class Ranking</div>
+                      <p className="text-white/60 text-xs mb-2">Competitive academic standing</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-gray-400/30 text-gray-300 hover:bg-gray-400/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Bronze Tier - Expandable */}
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <div className="bg-gradient-to-r from-orange-700/20 to-amber-700/20 rounded-lg p-3 border border-orange-700/30 cursor-pointer hover:from-orange-700/30 hover:to-amber-700/30 transition-colors">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Award className="h-5 w-5 text-orange-500" />
+                      <h3 className="text-white font-bold text-sm">Bronze Tier</h3>
+                      <Badge className="ml-auto bg-orange-700/20 text-orange-500 text-xs">2 Achievements</Badge>
+                      <ChevronDown className="h-4 w-4 text-white/50" />
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 space-y-2 pl-2">
+                    <div className="bg-orange-700/10 rounded-lg p-2 border border-orange-700/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">Academic Improvement</div>
+                      <p className="text-white/60 text-xs mb-2">+0.6 GPA improvement over 4 years</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-orange-700/30 text-orange-500 hover:bg-orange-700/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                    <div className="bg-orange-700/10 rounded-lg p-2 border border-orange-700/20">
+                      <div className="text-white/90 text-sm font-semibold mb-1">Leadership Participation</div>
+                      <p className="text-white/60 text-xs mb-2">Student government involvement</p>
+                      <Button size="sm" variant="outline" className="h-6 text-xs border-orange-700/30 text-orange-500 hover:bg-orange-700/10">
+                        Leverage This <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </div>
         </div>
@@ -568,30 +665,136 @@ const AcademicPlanner = () => {
             <h2 className="card__title text-xl font-bold text-white mb-2">Academic Tasks</h2>
             <p className="card__description text-white/70 mb-4 text-sm">Prioritized action dashboard</p>
             <div className="space-y-3">
-              <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/30">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-white font-bold text-sm">High Priority</h3>
-                  <Badge variant="destructive" className="text-xs">Urgent</Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/90">Master Chemistry Performance</span>
-                    <Button size="sm" variant="outline" className="h-6 text-xs" onClick={() => handleTaskPlanningOpen("Master Chemistry Performance")}>Plan</Button>
+              {/* High Priority - Expandable */}
+              <Collapsible defaultOpen>
+                <CollapsibleTrigger asChild>
+                  <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-400" />
+                        <h3 className="text-white font-bold text-sm">High Priority</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="destructive" className="text-xs">Urgent</Badge>
+                        <ChevronDown className="h-4 w-4 text-white/50" />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div className="bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/30">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-white font-bold text-sm">Medium Priority</h3>
-                  <Badge variant="secondary" className="text-xs">Soon</Badge>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-white/90">Optimize Senior Year Planning</span>
-                    <Button size="sm" variant="outline" className="h-6 text-xs">Plan</Button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 space-y-2 pl-2">
+                    <div className="bg-red-500/5 rounded-lg p-2 border border-red-500/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/90 text-sm font-semibold">Master Chemistry Performance</span>
+                        <Button size="sm" variant="outline" className="h-6 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => handleTaskPlanningOpen("Master Chemistry Performance")}>
+                          Plan This <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                      <p className="text-white/60 text-xs mb-1">6-8 week improvement strategy</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary" className="text-[10px] h-4">High Impact</Badge>
+                        <Badge variant="secondary" className="text-[10px] h-4">Medium Difficulty</Badge>
+                      </div>
+                    </div>
+                    <div className="bg-red-500/5 rounded-lg p-2 border border-red-500/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/90 text-sm font-semibold">Secure Strong Recommendation Letters</span>
+                        <Button size="sm" variant="outline" className="h-6 text-xs border-red-500/30 text-red-400 hover:bg-red-500/10">
+                          Plan This <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                      <p className="text-white/60 text-xs mb-1">Build relationships with 3-4 potential recommenders</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary" className="text-[10px] h-4">Critical</Badge>
+                        <Badge variant="secondary" className="text-[10px] h-4">4-6 weeks</Badge>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Medium Priority - Expandable */}
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <div className="bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/30 cursor-pointer hover:bg-yellow-500/20 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-400" />
+                        <h3 className="text-white font-bold text-sm">Medium Priority</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">Soon</Badge>
+                        <ChevronDown className="h-4 w-4 text-white/50" />
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 space-y-2 pl-2">
+                    <div className="bg-yellow-500/5 rounded-lg p-2 border border-yellow-500/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/90 text-sm font-semibold">Optimize Senior Year Planning</span>
+                        <Button size="sm" variant="outline" className="h-6 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
+                          Plan This <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                      <p className="text-white/60 text-xs mb-1">Strategic course selection and scheduling</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary" className="text-[10px] h-4">Planning</Badge>
+                        <Badge variant="secondary" className="text-[10px] h-4">3-4 weeks</Badge>
+                      </div>
+                    </div>
+                    <div className="bg-yellow-500/5 rounded-lg p-2 border border-yellow-500/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/90 text-sm font-semibold">Explore Summer Research Opportunities</span>
+                        <Button size="sm" variant="outline" className="h-6 text-xs border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10">
+                          Plan This <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                      <p className="text-white/60 text-xs mb-1">Identify and apply to relevant programs</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary" className="text-[10px] h-4">Enrichment</Badge>
+                        <Badge variant="secondary" className="text-[10px] h-4">8-12 weeks</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+
+              {/* Future Planning - Expandable */}
+              <Collapsible>
+                <CollapsibleTrigger asChild>
+                  <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/30 cursor-pointer hover:bg-blue-500/20 transition-colors">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-blue-400" />
+                        <h3 className="text-white font-bold text-sm">Future Planning</h3>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">Long-term</Badge>
+                        <ChevronDown className="h-4 w-4 text-white/50" />
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="mt-2 space-y-2 pl-2">
+                    <div className="bg-blue-500/5 rounded-lg p-2 border border-blue-500/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-white/90 text-sm font-semibold">Prepare for AP Exams</span>
+                        <Button size="sm" variant="outline" className="h-6 text-xs border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
+                          Plan This <ArrowRight className="h-3 w-3 ml-1" />
+                        </Button>
+                      </div>
+                      <p className="text-white/60 text-xs mb-1">Comprehensive review schedule for spring exams</p>
+                      <div className="flex items-center gap-2 text-xs">
+                        <Badge variant="secondary" className="text-[10px] h-4">Test Prep</Badge>
+                        <Badge variant="secondary" className="text-[10px] h-4">12+ weeks</Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </div>
         </div>
