@@ -10,58 +10,19 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import TaskPlanningInterface from '@/components/TaskPlanningInterface';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
-import { 
-  GraduationCap, 
-  TrendingUp, 
-  MessageCircle, 
-  Send, 
-  BookOpen, 
-  Target, 
-  Calendar, 
-  BarChart3,
-  AlertCircle,
-  AlertTriangle,
-  Filter,
-  CheckCircle,
-  Award,
-  Users,
-  MapPin,
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  TrendingDown,
-  Clock,
-  Star,
-  Calculator,
-  X,
-  Check,
-  Zap,
-  Brain,
-  Scale,
-  Link,
-  CheckCircle2,
-  Lightbulb,
-  Minus,
-  ArrowRight
-} from 'lucide-react';
+import { GraduationCap, TrendingUp, MessageCircle, Send, BookOpen, Target, Calendar, BarChart3, AlertCircle, AlertTriangle, Filter, CheckCircle, Award, Users, MapPin, ChevronDown, ChevronRight, ChevronUp, TrendingDown, Clock, Star, Calculator, X, Check, Zap, Brain, Scale, Link, CheckCircle2, Lightbulb, Minus, ArrowRight } from 'lucide-react';
 
 // SubjectPerformanceAnalytics subcomponent for year-based expandable analytics
 const SubjectPerformanceAnalytics: React.FC = () => {
   // Hard coded data values for 4 academic years and their subjects with key metrics (GPA, progress, strongest subjects, course difficulty, achievements)
   const [expandedYears, setExpandedYears] = useState<string[]>([]);
-
   const academicYearsData = {
     "2020-2021": {
       year: "Freshman Year",
       overallGPA: "3.4",
       performance: "Foundation Building",
       status: "complete",
-      keyInsights: [
-        "Adjusted to high school rigor",
-        "Strongest in English and History",
-        "Math and science foundational courses",
-        "GPA: 3.4 (Above average start)"
-      ],
+      keyInsights: ["Adjusted to high school rigor", "Strongest in English and History", "Math and science foundational courses", "GPA: 3.4 (Above average start)"],
       detailedMetrics: {
         gpaImprovement: "+0.2 from first to second semester",
         strongestSubjects: ["English", "History", "Art"],
@@ -74,12 +35,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
       overallGPA: "3.6",
       performance: "Steady Growth",
       status: "complete",
-      keyInsights: [
-        "Consistent GPA improvement (+0.2)",
-        "First AP course success (AP History)",
-        "Strong foundation in core subjects",
-        "Developed better study habits"
-      ],
+      keyInsights: ["Consistent GPA improvement (+0.2)", "First AP course success (AP History)", "Strong foundation in core subjects", "Developed better study habits"],
       detailedMetrics: {
         gpaImprovement: "+0.2 from previous year",
         strongestSubjects: ["AP History", "English", "Chemistry"],
@@ -92,12 +48,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
       overallGPA: "3.8",
       performance: "Peak Performance",
       status: "complete",
-      keyInsights: [
-        "Significant GPA jump (+0.2)",
-        "Multiple AP course success",
-        "Strong in STEM subjects",
-        "Top 15% class ranking achieved"
-      ],
+      keyInsights: ["Significant GPA jump (+0.2)", "Multiple AP course success", "Strong in STEM subjects", "Top 15% class ranking achieved"],
       detailedMetrics: {
         gpaImprovement: "+0.2 from previous year - largest improvement",
         strongestSubjects: ["AP Biology", "AP Literature", "Pre-Calculus"],
@@ -110,12 +61,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
       overallGPA: "3.8",
       performance: "Maintaining Excellence",
       status: "in-progress",
-      keyInsights: [
-        "Sustained high performance",
-        "Most challenging course load",
-        "College-level coursework success",
-        "Leadership role development"
-      ],
+      keyInsights: ["Sustained high performance", "Most challenging course load", "College-level coursework success", "Leadership role development"],
       detailedMetrics: {
         gpaImprovement: "Maintained 3.8 - consistent excellence",
         strongestSubjects: ["AP Chemistry", "AP Calculus BC", "AP Physics"],
@@ -124,54 +70,153 @@ const SubjectPerformanceAnalytics: React.FC = () => {
       }
     }
   } as const;
-
   const subjectPerformanceData = {
-    "2020-2021": [
-      { subject: "English 9", grade: "A-", relevance: "Core", avgGPA: "3.2", classRank: "Top 25%", trend: "stable", improvement: "Baseline year" },
-      { subject: "Algebra I", grade: "B+", relevance: "High", avgGPA: "3.0", classRank: "Top 30%", trend: "up", improvement: "Baseline year" },
-      { subject: "Biology", grade: "A", relevance: "High", avgGPA: "3.1", classRank: "Top 20%", trend: "stable", improvement: "Baseline year" }
-    ],
-    "2021-2022": [
-      { subject: "English 10", grade: "A", relevance: "Core", avgGPA: "3.3", classRank: "Top 20%", trend: "up", improvement: "+0.3 grade improvement" },
-      { subject: "Geometry", grade: "A-", relevance: "High", avgGPA: "3.1", classRank: "Top 25%", trend: "up", improvement: "+0.3 grade improvement" },
-      { subject: "Chemistry", grade: "B+", relevance: "High", avgGPA: "2.9", classRank: "Top 35%", trend: "stable", improvement: "Maintained performance" },
-      { subject: "AP History", grade: "A-", relevance: "Medium", avgGPA: "3.4", classRank: "Top 20%", trend: "up", improvement: "First AP success" }
-    ],
-    "2022-2023": [
-      { subject: "AP Literature", grade: "A", relevance: "Core", avgGPA: "3.5", classRank: "Top 15%", trend: "up", improvement: "+0.3 from previous English" },
-      { subject: "Pre-Calculus", grade: "A-", relevance: "Critical", avgGPA: "3.2", classRank: "Top 20%", trend: "up", improvement: "+0.3 continued math growth" },
-      { subject: "AP Biology", grade: "A", relevance: "Critical", avgGPA: "3.1", classRank: "Top 15%", trend: "up", improvement: "Significant STEM improvement" },
-      { subject: "Physics", grade: "B+", relevance: "High", avgGPA: "3.0", classRank: "Top 30%", trend: "stable", improvement: "New subject - solid performance" }
-    ],
-    "2023-2024": [
-      { subject: "AP Chemistry", grade: "A-", relevance: "Critical", avgGPA: "2.8", classRank: "Top 20%", trend: "up", improvement: "+0.5 major improvement from Chemistry" },
-      { subject: "AP Calculus BC", grade: "A", relevance: "Critical", avgGPA: "3.1", classRank: "Top 15%", trend: "up", improvement: "+0.3 continued excellence in math" },
-      { subject: "AP Physics C", grade: "B+", relevance: "High", avgGPA: "2.9", classRank: "Top 25%", trend: "up", improvement: "+0.3 significant physics improvement" },
-      { subject: "AP English Language", grade: "A", relevance: "Core", avgGPA: "3.4", classRank: "Top 10%", trend: "stable", improvement: "Maintained excellence" },
-      { subject: "AP Government", grade: "A-", relevance: "Medium", avgGPA: "3.3", classRank: "Top 20%", trend: "stable", improvement: "Consistent social studies performance" }
-    ]
+    "2020-2021": [{
+      subject: "English 9",
+      grade: "A-",
+      relevance: "Core",
+      avgGPA: "3.2",
+      classRank: "Top 25%",
+      trend: "stable",
+      improvement: "Baseline year"
+    }, {
+      subject: "Algebra I",
+      grade: "B+",
+      relevance: "High",
+      avgGPA: "3.0",
+      classRank: "Top 30%",
+      trend: "up",
+      improvement: "Baseline year"
+    }, {
+      subject: "Biology",
+      grade: "A",
+      relevance: "High",
+      avgGPA: "3.1",
+      classRank: "Top 20%",
+      trend: "stable",
+      improvement: "Baseline year"
+    }],
+    "2021-2022": [{
+      subject: "English 10",
+      grade: "A",
+      relevance: "Core",
+      avgGPA: "3.3",
+      classRank: "Top 20%",
+      trend: "up",
+      improvement: "+0.3 grade improvement"
+    }, {
+      subject: "Geometry",
+      grade: "A-",
+      relevance: "High",
+      avgGPA: "3.1",
+      classRank: "Top 25%",
+      trend: "up",
+      improvement: "+0.3 grade improvement"
+    }, {
+      subject: "Chemistry",
+      grade: "B+",
+      relevance: "High",
+      avgGPA: "2.9",
+      classRank: "Top 35%",
+      trend: "stable",
+      improvement: "Maintained performance"
+    }, {
+      subject: "AP History",
+      grade: "A-",
+      relevance: "Medium",
+      avgGPA: "3.4",
+      classRank: "Top 20%",
+      trend: "up",
+      improvement: "First AP success"
+    }],
+    "2022-2023": [{
+      subject: "AP Literature",
+      grade: "A",
+      relevance: "Core",
+      avgGPA: "3.5",
+      classRank: "Top 15%",
+      trend: "up",
+      improvement: "+0.3 from previous English"
+    }, {
+      subject: "Pre-Calculus",
+      grade: "A-",
+      relevance: "Critical",
+      avgGPA: "3.2",
+      classRank: "Top 20%",
+      trend: "up",
+      improvement: "+0.3 continued math growth"
+    }, {
+      subject: "AP Biology",
+      grade: "A",
+      relevance: "Critical",
+      avgGPA: "3.1",
+      classRank: "Top 15%",
+      trend: "up",
+      improvement: "Significant STEM improvement"
+    }, {
+      subject: "Physics",
+      grade: "B+",
+      relevance: "High",
+      avgGPA: "3.0",
+      classRank: "Top 30%",
+      trend: "stable",
+      improvement: "New subject - solid performance"
+    }],
+    "2023-2024": [{
+      subject: "AP Chemistry",
+      grade: "A-",
+      relevance: "Critical",
+      avgGPA: "2.8",
+      classRank: "Top 20%",
+      trend: "up",
+      improvement: "+0.5 major improvement from Chemistry"
+    }, {
+      subject: "AP Calculus BC",
+      grade: "A",
+      relevance: "Critical",
+      avgGPA: "3.1",
+      classRank: "Top 15%",
+      trend: "up",
+      improvement: "+0.3 continued excellence in math"
+    }, {
+      subject: "AP Physics C",
+      grade: "B+",
+      relevance: "High",
+      avgGPA: "2.9",
+      classRank: "Top 25%",
+      trend: "up",
+      improvement: "+0.3 significant physics improvement"
+    }, {
+      subject: "AP English Language",
+      grade: "A",
+      relevance: "Core",
+      avgGPA: "3.4",
+      classRank: "Top 10%",
+      trend: "stable",
+      improvement: "Maintained excellence"
+    }, {
+      subject: "AP Government",
+      grade: "A-",
+      relevance: "Medium",
+      avgGPA: "3.3",
+      classRank: "Top 20%",
+      trend: "stable",
+      improvement: "Consistent social studies performance"
+    }]
   } as const;
-
   const toggleYear = (year: string) => {
     setExpandedYears(prev => prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]);
   };
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div className="space-y-4">
-        {Object.entries(academicYearsData).map(([year, data]) => (
-          <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
+        {Object.entries(academicYearsData).map(([year, data]) => <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
             <CollapsibleTrigger asChild>
               <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60">
                 <CardContent className="p-2">
                   <div className="flex items-center justify-between">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
-                        {expandedYears.includes(year) ? (
-                          <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        )}
+                        {expandedYears.includes(year) ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                         <h3 className="font-semibold text-sm text-foreground">{data.year}</h3>
                         <Badge variant="secondary" className="text-xs">{data.status}</Badge>
                       </div>
@@ -184,19 +229,9 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <div className="flex flex-col items-center p-1.5 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20">
                         <div className="flex items-center gap-1">
-                          {data.detailedMetrics.gpaImprovement.includes('+') ? (
-                            <TrendingUp className="w-3 h-3 text-green-600" />
-                          ) : data.detailedMetrics.gpaImprovement.includes('Maintained') ? (
-                            <Minus className="w-3 h-3 text-blue-600" />
-                          ) : (
-                            <TrendingDown className="w-3 h-3 text-orange-600" />
-                          )}
+                          {data.detailedMetrics.gpaImprovement.includes('+') ? <TrendingUp className="w-3 h-3 text-green-600" /> : data.detailedMetrics.gpaImprovement.includes('Maintained') ? <Minus className="w-3 h-3 text-blue-600" /> : <TrendingDown className="w-3 h-3 text-orange-600" />}
                           <span className="text-[11px] font-semibold text-foreground">
-                            {data.detailedMetrics.gpaImprovement.includes('+') ? 
-                              '+' + (data.detailedMetrics.gpaImprovement.match(/\+([0-9.]+)/)?.[1] || '0.0') : 
-                              data.detailedMetrics.gpaImprovement.includes('Maintained') ? '0.0' : 
-                              '-0.1'
-                            }
+                            {data.detailedMetrics.gpaImprovement.includes('+') ? '+' + (data.detailedMetrics.gpaImprovement.match(/\+([0-9.]+)/)?.[1] || '0.0') : data.detailedMetrics.gpaImprovement.includes('Maintained') ? '0.0' : '-0.1'}
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground">Trend</div>
@@ -206,11 +241,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                         <div className="flex items-center gap-1">
                           <Brain className="w-3 h-3 text-amber-600" />
                           <span className="text-[11px] font-semibold text-foreground">
-                            {data.detailedMetrics.courseDifficulty.includes('Standard') ? '2.5' :
-                             data.detailedMetrics.courseDifficulty.includes('15%') ? '3.0' :
-                             data.detailedMetrics.courseDifficulty.includes('25%') ? '4.0' :
-                             data.detailedMetrics.courseDifficulty.includes('35%') ? '4.5' : '2.0'
-                            }/5
+                            {data.detailedMetrics.courseDifficulty.includes('Standard') ? '2.5' : data.detailedMetrics.courseDifficulty.includes('15%') ? '3.0' : data.detailedMetrics.courseDifficulty.includes('25%') ? '4.0' : data.detailedMetrics.courseDifficulty.includes('35%') ? '4.5' : '2.0'}/5
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground">Difficulty</div>
@@ -220,10 +251,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                         <div className="flex items-center gap-1">
                           <Star className="w-3 h-3 text-blue-600" />
                           <span className="text-[11px] font-semibold text-foreground">
-                            {data.detailedMetrics.notableAchievements.includes('AP') ? 
-                              data.detailedMetrics.notableAchievements.match(/(\d+)\s*AP/)?.[1] || '0' : 
-                              '0'
-                            }
+                            {data.detailedMetrics.notableAchievements.includes('AP') ? data.detailedMetrics.notableAchievements.match(/(\d+)\s*AP/)?.[1] || '0' : '0'}
                           </span>
                         </div>
                         <div className="text-[10px] text-muted-foreground">AP</div>
@@ -238,8 +266,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                 <CardContent className="p-4">
                   <h4 className="font-medium mb-3 text-foreground text-sm">Subject Performance Details</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => (
-                      <Card key={idx} className="bg-background">
+                    {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => <Card key={idx} className="bg-background">
                         <CardContent className="p-3">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between">
@@ -254,19 +281,15 @@ const SubjectPerformanceAnalytics: React.FC = () => {
                             </div>
                           </div>
                         </CardContent>
-                      </Card>
-                    ))}
+                      </Card>)}
                   </div>
                 </CardContent>
               </Card>
             </CollapsibleContent>
-          </Collapsible>
-        ))}
+          </Collapsible>)}
       </div>
-    </div>
-  );
+    </div>;
 };
-
 const AcademicPlanner = () => {
   // Hard coded data values for current academic standing and progress
   const currentGPA = {
@@ -287,93 +310,107 @@ const AcademicPlanner = () => {
   };
 
   // Hard coded data for GPA over time line chart
-  const gpaTimeData = [
-    { semester: 'Fall 2022', yourGPA: 3.5, majorAverage: 3.1 },
-    { semester: 'Spring 2023', yourGPA: 3.6, majorAverage: 3.2 },
-    { semester: 'Fall 2023', yourGPA: 3.7, majorAverage: 3.2 },
-    { semester: 'Spring 2024', yourGPA: 3.8, majorAverage: 3.3 },
-    { semester: 'Fall 2024', yourGPA: 3.8, majorAverage: 3.2 },
-  ];
+  const gpaTimeData = [{
+    semester: 'Fall 2022',
+    yourGPA: 3.5,
+    majorAverage: 3.1
+  }, {
+    semester: 'Spring 2023',
+    yourGPA: 3.6,
+    majorAverage: 3.2
+  }, {
+    semester: 'Fall 2023',
+    yourGPA: 3.7,
+    majorAverage: 3.2
+  }, {
+    semester: 'Spring 2024',
+    yourGPA: 3.8,
+    majorAverage: 3.3
+  }, {
+    semester: 'Fall 2024',
+    yourGPA: 3.8,
+    majorAverage: 3.2
+  }];
 
   // Hard coded data for expandable insights
-  const insights = [
-    {
-      id: 'course-requirements',
-      title: 'Course Requirements Analysis',
-      status: 'complete',
-      percentage: 85,
-      icon: CheckCircle,
-      color: 'green',
-      summary: 'On track with core requirements',
-      details: 'You have completed 85% of your major requirements. Remaining courses include Advanced Statistics, Research Methods, and Senior Capstone. Current trajectory shows completion by graduation.',
-      recommendations: ['Enroll in Advanced Statistics next semester', 'Consider Research Methods over summer']
-    },
-    {
-      id: 'gpa-trajectory',
-      title: 'GPA Trajectory Analysis',
-      status: 'warning',
-      percentage: 78,
-      icon: TrendingUp,
-      color: 'orange',
-      summary: 'Slight decline trend detected',
-      details: 'Your GPA has decreased by 0.1 points over the last semester. This trend, if continued, may impact your target GPA goals and competitive graduate school applications.',
-      recommendations: ['Focus on improving study habits', 'Consider tutoring for challenging subjects', 'Meet with academic advisor']
-    },
-    {
-      id: 'graduation-timeline',
-      title: 'Graduation Timeline',
-      status: 'complete',
-      percentage: 92,
-      icon: Clock,
-      color: 'green',
-      summary: 'On schedule for timely graduation',
-      details: 'Based on current credit completion rate, you are projected to graduate on time in Spring 2025. All prerequisite chains are being followed correctly.',
-      recommendations: ['Maintain current course load', 'Consider adding electives of interest']
-    },
-    {
-      id: 'competitive-standing',
-      title: 'Competitive Standing',
-      status: 'excellent',
-      percentage: 95,
-      icon: Star,
-      color: 'purple',
-      summary: 'Top 5% of class performance',
-      details: 'Your academic performance places you in the top 5% of your graduating class. This strong standing positions you well for competitive opportunities.',
-      recommendations: ['Apply for honors programs', 'Consider research opportunities', 'Explore leadership positions']
-    }
-  ];
-
+  const insights = [{
+    id: 'course-requirements',
+    title: 'Course Requirements Analysis',
+    status: 'complete',
+    percentage: 85,
+    icon: CheckCircle,
+    color: 'green',
+    summary: 'On track with core requirements',
+    details: 'You have completed 85% of your major requirements. Remaining courses include Advanced Statistics, Research Methods, and Senior Capstone. Current trajectory shows completion by graduation.',
+    recommendations: ['Enroll in Advanced Statistics next semester', 'Consider Research Methods over summer']
+  }, {
+    id: 'gpa-trajectory',
+    title: 'GPA Trajectory Analysis',
+    status: 'warning',
+    percentage: 78,
+    icon: TrendingUp,
+    color: 'orange',
+    summary: 'Slight decline trend detected',
+    details: 'Your GPA has decreased by 0.1 points over the last semester. This trend, if continued, may impact your target GPA goals and competitive graduate school applications.',
+    recommendations: ['Focus on improving study habits', 'Consider tutoring for challenging subjects', 'Meet with academic advisor']
+  }, {
+    id: 'graduation-timeline',
+    title: 'Graduation Timeline',
+    status: 'complete',
+    percentage: 92,
+    icon: Clock,
+    color: 'green',
+    summary: 'On schedule for timely graduation',
+    details: 'Based on current credit completion rate, you are projected to graduate on time in Spring 2025. All prerequisite chains are being followed correctly.',
+    recommendations: ['Maintain current course load', 'Consider adding electives of interest']
+  }, {
+    id: 'competitive-standing',
+    title: 'Competitive Standing',
+    status: 'excellent',
+    percentage: 95,
+    icon: Star,
+    color: 'purple',
+    summary: 'Top 5% of class performance',
+    details: 'Your academic performance places you in the top 5% of your graduating class. This strong standing positions you well for competitive opportunities.',
+    recommendations: ['Apply for honors programs', 'Consider research opportunities', 'Explore leadership positions']
+  }];
   const [expandedInsights, setExpandedInsights] = useState<string[]>(['course-requirements']);
   const [expandedAG, setExpandedAG] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      role: 'assistant',
-      content: "Hi! I'm here to help with your academic planning. Ask me about course selection, GPA goals, or any academic concerns."
-    }
-  ]);
+  const [chatMessages, setChatMessages] = useState([{
+    role: 'assistant',
+    content: "Hi! I'm here to help with your academic planning. Ask me about course selection, GPA goals, or any academic concerns."
+  }]);
   const [userInput, setUserInput] = useState('');
-  
+
   // Draggable chatbot state
-  const [chatPosition, setChatPosition] = useState({ x: window.innerWidth - 420, y: 100 });
+  const [chatPosition, setChatPosition] = useState({
+    x: window.innerWidth - 420,
+    y: 100
+  });
   const [isDragging, setIsDragging] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [dragOffset, setDragOffset] = useState({
+    x: 0,
+    y: 0
+  });
   const [quickActionsExpanded, setQuickActionsExpanded] = useState(false);
-  
+
   // Task planning interface state
   const [taskPlanningOpen, setTaskPlanningOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
-  
+
   // Filter state for insights
   const [insightFilter, setInsightFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'improvement' | 'strength' | 'concern'>('all');
-
   const handleSendMessage = () => {
     if (userInput.trim()) {
-      setChatMessages([...chatMessages, 
-        { role: 'user', content: userInput },
-        { role: 'assistant', content: "I'll help you with that! Let me analyze your academic situation and provide recommendations." }
-      ]);
+      setChatMessages([...chatMessages, {
+        role: 'user',
+        content: userInput
+      }, {
+        role: 'assistant',
+        content: "I'll help you with that! Let me analyze your academic situation and provide recommendations."
+      }]);
       setUserInput('');
     }
   };
@@ -386,7 +423,6 @@ const AcademicPlanner = () => {
       y: e.clientY - chatPosition.y
     });
   };
-
   const handleMouseMove = (e: MouseEvent) => {
     if (isDragging) {
       setChatPosition({
@@ -395,191 +431,96 @@ const AcademicPlanner = () => {
       });
     }
   };
-
   const handleMouseUp = () => {
     setIsDragging(false);
   };
-
   React.useEffect(() => {
     if (isDragging) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
     }
-
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
   }, [isDragging, dragOffset]);
-
   const toggleInsight = (insightId: string) => {
-    setExpandedInsights(prev => 
-      prev.includes(insightId) 
-        ? prev.filter(id => id !== insightId)
-        : [...prev, insightId]
-    );
+    setExpandedInsights(prev => prev.includes(insightId) ? prev.filter(id => id !== insightId) : [...prev, insightId]);
   };
 
   // Hard coded data for quick action scenarios
-  const quickActions = [
-    "Plan next semester",
-    "Check graduation requirements", 
-    "GPA calculation help",
-    "Course difficulty analysis",
-    "Study abroad planning"
-  ];
+  const quickActions = ["Plan next semester", "Check graduation requirements", "GPA calculation help", "Course difficulty analysis", "Study abroad planning"];
 
   // Hard coded data values for task planning - defines bundled academic planning objectives
   const taskDatabase = {
     "Master Chemistry Performance": {
       title: "Master Chemistry Performance",
       impact: "High",
-      difficulty: "Medium", 
+      difficulty: "Medium",
       timeframe: "6-8 weeks",
       category: "Academic Excellence",
       description: "Comprehensive strategy to dramatically improve chemistry performance through structured support systems, optimized study methods, and collaborative learning. This multi-phase approach addresses all aspects of chemistry mastery from conceptual understanding to practical application.",
       importance: "Chemistry is a foundational subject for pre-med tracks and STEM majors that requires both theoretical knowledge and practical laboratory skills. Mastering chemistry demonstrates academic rigor, scientific aptitude, and problem-solving abilities that are crucial for competitive college applications and future academic success.",
-      takeaways: [
-        "Develop comprehensive understanding of chemistry concepts and applications",
-        "Build confidence in laboratory techniques and scientific communication", 
-        "Create sustainable study systems and support networks",
-        "Establish foundation for advanced STEM coursework"
-      ],
-      phases: [
-        {
-          title: "Phase 1: Establish Support Structure",
-          description: "Set up professional tutoring and peer learning systems",
-          steps: [
-            "Research and contact 2-3 qualified chemistry tutors through school resources",
-            "Schedule initial consultation sessions to assess compatibility and teaching style", 
-            "Establish weekly recurring tutoring sessions (1-2 hours each)",
-            "Identify 3-4 high-performing classmates for study group formation",
-            "Approach potential study group members with structured proposal"
-          ]
-        },
-        {
-          title: "Phase 2: Optimize Study Systems", 
-          description: "Create efficient templates and organizational tools",
-          steps: [
-            "Review past lab reports and instructor feedback for common requirements",
-            "Research standard scientific lab report formats and style guides",
-            "Create comprehensive lab report template with all required sections",
-            "Develop shared study materials and practice problem collections",
-            "Establish group guidelines for preparation and participation"
-          ]
-        },
-        {
-          title: "Phase 3: Implement and Refine",
-          description: "Execute the support systems and continuously improve",
-          steps: [
-            "Begin regular tutoring sessions with prepared topics and questions",
-            "Launch weekly study group meetings (2-3 hours each session)",
-            "Test lab report template and refine based on instructor feedback", 
-            "Track progress through shared documentation and grade monitoring",
-            "Evaluate and adjust strategies monthly based on performance improvements"
-          ]
-        }
-      ]
+      takeaways: ["Develop comprehensive understanding of chemistry concepts and applications", "Build confidence in laboratory techniques and scientific communication", "Create sustainable study systems and support networks", "Establish foundation for advanced STEM coursework"],
+      phases: [{
+        title: "Phase 1: Establish Support Structure",
+        description: "Set up professional tutoring and peer learning systems",
+        steps: ["Research and contact 2-3 qualified chemistry tutors through school resources", "Schedule initial consultation sessions to assess compatibility and teaching style", "Establish weekly recurring tutoring sessions (1-2 hours each)", "Identify 3-4 high-performing classmates for study group formation", "Approach potential study group members with structured proposal"]
+      }, {
+        title: "Phase 2: Optimize Study Systems",
+        description: "Create efficient templates and organizational tools",
+        steps: ["Review past lab reports and instructor feedback for common requirements", "Research standard scientific lab report formats and style guides", "Create comprehensive lab report template with all required sections", "Develop shared study materials and practice problem collections", "Establish group guidelines for preparation and participation"]
+      }, {
+        title: "Phase 3: Implement and Refine",
+        description: "Execute the support systems and continuously improve",
+        steps: ["Begin regular tutoring sessions with prepared topics and questions", "Launch weekly study group meetings (2-3 hours each session)", "Test lab report template and refine based on instructor feedback", "Track progress through shared documentation and grade monitoring", "Evaluate and adjust strategies monthly based on performance improvements"]
+      }]
     },
     "Optimize Senior Year Academic Planning": {
       title: "Optimize Senior Year Academic Planning",
       impact: "High",
       difficulty: "Medium",
-      timeframe: "4-6 weeks", 
+      timeframe: "4-6 weeks",
       category: "Strategic Planning",
       description: "Comprehensive approach to designing the ideal senior year academic experience that maximizes college admissions potential, aligns with career goals, and ensures graduation requirements are exceeded rather than just met.",
       importance: "Senior year course selection is the final opportunity to demonstrate academic excellence and intellectual curiosity to college admissions committees. Strategic planning ensures optimal balance between academic rigor, graduation requirements, and personal interests while positioning for college success.",
-      takeaways: [
-        "Create strategic academic narrative aligned with college and career goals",
-        "Maximize opportunities for college credit and advanced standing",
-        "Ensure graduation requirements are exceeded with distinction", 
-        "Build foundation for competitive college applications"
-      ],
-      phases: [
-        {
-          title: "Phase 1: Requirements Analysis",
-          description: "Comprehensive review of graduation and college admission requirements",
-          steps: [
-            "Schedule appointment with assigned academic counselor",
-            "Prepare detailed questions about graduation requirements and course options",
-            "Bring unofficial transcript and review current academic standing",
-            "Research admission requirements at target colleges and universities",
-            "Identify gaps between current progress and desired outcomes"
-          ]
-        },
-        {
-          title: "Phase 2: Advanced Opportunities Research", 
-          description: "Explore AP courses, dual enrollment, and other advanced options",
-          steps: [
-            "Review available AP courses and their prerequisites at your school",
-            "Research AP credit policies at target colleges for strategic selection",
-            "Meet with current AP teachers to understand expectations and workload",
-            "Investigate dual enrollment partnerships with local colleges",
-            "Evaluate eligibility requirements for advanced learning opportunities"
-          ]
-        },
-        {
-          title: "Phase 3: Strategic Course Selection",
-          description: "Design optimal senior year schedule balancing rigor and interests",
-          steps: [
-            "Assess strengths and interests to select courses for maximum success",
-            "Consider alignment between courses and intended major/career path",
-            "Evaluate overall course load for balance with extracurricular commitments",
-            "Create preliminary schedule and get counselor approval for feasibility",
-            "Complete applications and registration for dual enrollment or special programs"
-          ]
-        }
-      ]
+      takeaways: ["Create strategic academic narrative aligned with college and career goals", "Maximize opportunities for college credit and advanced standing", "Ensure graduation requirements are exceeded with distinction", "Build foundation for competitive college applications"],
+      phases: [{
+        title: "Phase 1: Requirements Analysis",
+        description: "Comprehensive review of graduation and college admission requirements",
+        steps: ["Schedule appointment with assigned academic counselor", "Prepare detailed questions about graduation requirements and course options", "Bring unofficial transcript and review current academic standing", "Research admission requirements at target colleges and universities", "Identify gaps between current progress and desired outcomes"]
+      }, {
+        title: "Phase 2: Advanced Opportunities Research",
+        description: "Explore AP courses, dual enrollment, and other advanced options",
+        steps: ["Review available AP courses and their prerequisites at your school", "Research AP credit policies at target colleges for strategic selection", "Meet with current AP teachers to understand expectations and workload", "Investigate dual enrollment partnerships with local colleges", "Evaluate eligibility requirements for advanced learning opportunities"]
+      }, {
+        title: "Phase 3: Strategic Course Selection",
+        description: "Design optimal senior year schedule balancing rigor and interests",
+        steps: ["Assess strengths and interests to select courses for maximum success", "Consider alignment between courses and intended major/career path", "Evaluate overall course load for balance with extracurricular commitments", "Create preliminary schedule and get counselor approval for feasibility", "Complete applications and registration for dual enrollment or special programs"]
+      }]
     },
     "Strengthen Academic Foundation": {
-      title: "Strengthen Academic Foundation", 
+      title: "Strengthen Academic Foundation",
       impact: "Medium",
       difficulty: "Low",
       timeframe: "3-4 weeks",
       category: "Academic Improvement",
       description: "Systematic approach to reinforcing core academic skills, addressing any gaps in foundational knowledge, and building study habits that support sustained academic excellence across all subjects.",
       importance: "Strong foundational skills are essential for success in advanced coursework and college-level academics. Addressing gaps now prevents future struggles and builds confidence for taking on more challenging academic opportunities.",
-      takeaways: [
-        "Identify and address gaps in foundational knowledge across subjects",
-        "Develop effective study strategies applicable to all academic areas", 
-        "Build confidence and momentum for tackling advanced coursework",
-        "Create sustainable systems for academic success"
-      ],
-      phases: [
-        {
-          title: "Phase 1: Academic Assessment",
-          description: "Evaluate current strengths and identify improvement areas",
-          steps: [
-            "Review grades and performance across all current subjects",
-            "Identify patterns in strengths and areas needing improvement",
-            "Gather feedback from teachers on academic performance and potential",
-            "Assess study habits and time management effectiveness",
-            "Create baseline metrics for tracking improvement"
-          ]
-        },
-        {
-          title: "Phase 2: Targeted Skill Development",
-          description: "Focus improvement efforts on highest-impact areas",
-          steps: [
-            "Prioritize improvement areas based on impact and graduation requirements",
-            "Develop specific action plans for each identified weakness",
-            "Utilize school resources like tutoring centers, teacher office hours",
-            "Create study schedules that allocate appropriate time to each subject",
-            "Implement new study techniques and organizational systems"
-          ]
-        },
-        {
-          title: "Phase 3: Monitoring and Adjustment",
-          description: "Track progress and refine strategies for continuous improvement",
-          steps: [
-            "Monitor grade improvements and academic performance weekly",
-            "Adjust study strategies based on what's working most effectively",
-            "Celebrate improvements and maintain motivation for continued growth",
-            "Plan for applying strengthened skills to future advanced coursework",
-            "Document successful strategies for use in college preparation"
-          ]
-        }
-      ]
+      takeaways: ["Identify and address gaps in foundational knowledge across subjects", "Develop effective study strategies applicable to all academic areas", "Build confidence and momentum for tackling advanced coursework", "Create sustainable systems for academic success"],
+      phases: [{
+        title: "Phase 1: Academic Assessment",
+        description: "Evaluate current strengths and identify improvement areas",
+        steps: ["Review grades and performance across all current subjects", "Identify patterns in strengths and areas needing improvement", "Gather feedback from teachers on academic performance and potential", "Assess study habits and time management effectiveness", "Create baseline metrics for tracking improvement"]
+      }, {
+        title: "Phase 2: Targeted Skill Development",
+        description: "Focus improvement efforts on highest-impact areas",
+        steps: ["Prioritize improvement areas based on impact and graduation requirements", "Develop specific action plans for each identified weakness", "Utilize school resources like tutoring centers, teacher office hours", "Create study schedules that allocate appropriate time to each subject", "Implement new study techniques and organizational systems"]
+      }, {
+        title: "Phase 3: Monitoring and Adjustment",
+        description: "Track progress and refine strategies for continuous improvement",
+        steps: ["Monitor grade improvements and academic performance weekly", "Adjust study strategies based on what's working most effectively", "Celebrate improvements and maintain motivation for continued growth", "Plan for applying strengthened skills to future advanced coursework", "Document successful strategies for use in college preparation"]
+      }]
     }
   };
 
@@ -592,95 +533,98 @@ const AcademicPlanner = () => {
   };
   // GPA Line Chart Component
   const GPALineChart = () => {
-    return (
-      <div className="space-y-2">
+    return <div className="space-y-2">
         <div className="h-[380px]">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={gpaTimeData}
-              margin={{
-                top: 20,
-                right: 10,
-                left: 20,
-                bottom: 20,
-              }}
-            >
+            <LineChart data={gpaTimeData} margin={{
+            top: 20,
+            right: 10,
+            left: 20,
+            bottom: 20
+          }}>
               <CartesianGrid strokeDasharray="2 2" stroke="#f1f5f9" strokeWidth={1} />
-              <XAxis 
-                dataKey="semester" 
-                tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }}
-                axisLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                tickLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                height={50}
-              />
-              <YAxis 
-                domain={[2.8, 4.0]}
-                ticks={[2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0]}
-                tick={{ fontSize: 13, fill: '#64748b', fontWeight: 500 }}
-                axisLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                tickLine={{ stroke: '#cbd5e1', strokeWidth: 1 }}
-                label={{ 
-                  value: 'GPA', 
-                  angle: -90, 
-                  position: 'insideLeft',
-                  style: { textAnchor: 'middle', fontSize: '14px', fontWeight: '600', fill: '#475569' }
-                }}
-                width={50}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'white',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-                labelStyle={{ color: '#334155', fontWeight: '600' }}
-              />
-              <Legend 
-                wrapperStyle={{ 
-                  paddingTop: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                }}
-              />
+              <XAxis dataKey="semester" tick={{
+              fontSize: 13,
+              fill: '#64748b',
+              fontWeight: 500
+            }} axisLine={{
+              stroke: '#cbd5e1',
+              strokeWidth: 1
+            }} tickLine={{
+              stroke: '#cbd5e1',
+              strokeWidth: 1
+            }} height={50} />
+              <YAxis domain={[2.8, 4.0]} ticks={[2.8, 3.0, 3.2, 3.4, 3.6, 3.8, 4.0]} tick={{
+              fontSize: 13,
+              fill: '#64748b',
+              fontWeight: 500
+            }} axisLine={{
+              stroke: '#cbd5e1',
+              strokeWidth: 1
+            }} tickLine={{
+              stroke: '#cbd5e1',
+              strokeWidth: 1
+            }} label={{
+              value: 'GPA',
+              angle: -90,
+              position: 'insideLeft',
+              style: {
+                textAnchor: 'middle',
+                fontSize: '14px',
+                fontWeight: '600',
+                fill: '#475569'
+              }
+            }} width={50} />
+              <Tooltip contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #e2e8f0',
+              borderRadius: '12px',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
+              fontSize: '14px',
+              fontWeight: '500'
+            }} labelStyle={{
+              color: '#334155',
+              fontWeight: '600'
+            }} />
+              <Legend wrapperStyle={{
+              paddingTop: '8px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }} />
               
               {/* Reference line for target GPA only */}
-              <ReferenceLine 
-                y={gpaData.target} 
-                stroke="#dc2626" 
-                strokeDasharray="6 3" 
-                strokeWidth={2}
-                label={{ 
-                  value: "Target GPA", 
-                  position: "top", 
-                  fill: "#dc2626", 
-                  fontSize: "13px",
-                  fontWeight: "600",
-                  offset: 10
-                }}
-              />
+              <ReferenceLine y={gpaData.target} stroke="#dc2626" strokeDasharray="6 3" strokeWidth={2} label={{
+              value: "Target GPA",
+              position: "top",
+              fill: "#dc2626",
+              fontSize: "13px",
+              fontWeight: "600",
+              offset: 10
+            }} />
               
               {/* GPA lines with professional styling */}
-              <Line 
-                type="monotone" 
-                dataKey="yourGPA" 
-                stroke="#9333ea" 
-                strokeWidth={4}
-                dot={{ fill: '#9333ea', strokeWidth: 3, r: 6, stroke: '#ffffff' }}
-                activeDot={{ r: 8, stroke: '#9333ea', strokeWidth: 3, fill: '#ffffff' }}
-                name="Your GPA"
-              />
-              <Line 
-                type="monotone" 
-                dataKey="majorAverage"
-                stroke="#3b82f6" 
-                strokeWidth={4}
-                dot={{ fill: '#3b82f6', strokeWidth: 3, r: 6, stroke: '#ffffff' }}
-                activeDot={{ r: 8, stroke: '#3b82f6', strokeWidth: 3, fill: '#ffffff' }}
-                name="Major Average"
-              />
+              <Line type="monotone" dataKey="yourGPA" stroke="#9333ea" strokeWidth={4} dot={{
+              fill: '#9333ea',
+              strokeWidth: 3,
+              r: 6,
+              stroke: '#ffffff'
+            }} activeDot={{
+              r: 8,
+              stroke: '#9333ea',
+              strokeWidth: 3,
+              fill: '#ffffff'
+            }} name="Your GPA" />
+              <Line type="monotone" dataKey="majorAverage" stroke="#3b82f6" strokeWidth={4} dot={{
+              fill: '#3b82f6',
+              strokeWidth: 3,
+              r: 6,
+              stroke: '#ffffff'
+            }} activeDot={{
+              r: 8,
+              stroke: '#3b82f6',
+              strokeWidth: 3,
+              fill: '#ffffff'
+            }} name="Major Average" />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -695,10 +639,14 @@ const AcademicPlanner = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+            <div className="w-3 h-3 rounded-full" style={{
+            backgroundColor: '#3b82f6'
+          }}></div>
             <div className="text-sm">
               <span className="font-semibold text-slate-700">Major Average:</span>
-              <span className="ml-1 font-bold" style={{ color: '#3b82f6' }}>{gpaData.majorRecommended}</span>
+              <span className="ml-1 font-bold" style={{
+              color: '#3b82f6'
+            }}>{gpaData.majorRecommended}</span>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -709,12 +657,9 @@ const AcademicPlanner = () => {
             </div>
           </div>
         </div>
-      </div>
-    );
+      </div>;
   };
-
-  return (
-    <div className="min-h-screen bg-background">
+  return <div className="min-h-screen bg-background">
       {/* Hero Section with Academic Metrics */}
       <div className="gradient-dashboard text-white">
         <div className="max-w-7xl mx-auto px-4 py-12">
@@ -750,7 +695,7 @@ const AcademicPlanner = () => {
             </div>
             <div className="text-center p-4 bg-gradient-to-br from-purple-50 to-blue-50 rounded-xl border border-purple-200 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
               <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                {Math.round((currentGPA.creditsCompleted / currentGPA.totalCredits) * 100)}%
+                {Math.round(currentGPA.creditsCompleted / currentGPA.totalCredits * 100)}%
               </div>
               <div className="text-sm text-purple-700 font-medium mt-1">Progress</div>
             </div>
@@ -770,7 +715,7 @@ const AcademicPlanner = () => {
                     <span>Credits Completed</span>
                     <span className="font-semibold bg-gradient-to-r from-primary via-primary/90 to-primary/70 bg-clip-text text-transparent">{currentGPA.creditsCompleted}/{currentGPA.totalCredits}</span>
                   </div>
-                  <Progress value={(currentGPA.creditsCompleted / currentGPA.totalCredits) * 100} className="h-3" />
+                  <Progress value={currentGPA.creditsCompleted / currentGPA.totalCredits * 100} className="h-3" />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm text-foreground/90 mb-2">
@@ -798,10 +743,7 @@ const AcademicPlanner = () => {
                   <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-foreground">
                     {/* A-G Subject Requirements - aligned with other items */}
                     <div className="flex items-center gap-2 col-span-2">
-                      <button 
-                        onClick={() => setExpandedAG(!expandedAG)}
-                        className="flex items-center gap-2 text-xs w-full hover:bg-muted p-2 rounded-md transition-colors"
-                      >
+                      <button onClick={() => setExpandedAG(!expandedAG)} className="flex items-center gap-2 text-xs w-full hover:bg-muted p-2 rounded-md transition-colors text-left">
                         <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                           <Check className="h-2 w-2 text-white" />
                         </div>
@@ -810,16 +752,14 @@ const AcademicPlanner = () => {
                       </button>
                     </div>
                     
-                    {expandedAG && (
-                      <div className="col-span-2 mb-2 p-2 bg-muted rounded-md text-xs text-foreground">
+                    {expandedAG && <div className="col-span-2 mb-2 p-2 bg-muted rounded-md text-xs text-foreground">
                         <div className="flex items-center gap-2">
                           <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
                             <X className="h-2 w-2 text-white" />
                           </div>
                           <span>Missing: 4th year of math and advanced science courses</span>
                         </div>
-                      </div>
-                    )}
+                      </div>}
                     
                       {/* AP & Course Rigor */}
                       <div className="flex items-center gap-2">
@@ -967,9 +907,7 @@ const AcademicPlanner = () => {
                 <BarChart3 className="h-5 w-5 text-primary" />
                 Subject Performance & GPA Analytics
               </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Comprehensive analysis of your academic performance with year-by-year trends and GPA visualization
-              </p>
+              <p className="text-sm text-muted-foreground">Analysis of your academic performance with trends and GPA visualization</p>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1005,28 +943,14 @@ const AcademicPlanner = () => {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {insights.map((insight) => (
-                  <AcademicInsightItem
-                    key={insight.id}
-                    title={insight.title}
-                    description={insight.details}
-                    time="Just now"
-                    type={insight.status === 'complete' ? 'strength' : 
-                          insight.status === 'excellent' ? 'opportunity' : 
-                          insight.status === 'warning' ? 'warning' : 'improvement'}
-                    impact={insight.percentage > 90 ? 'high' : 
-                           insight.percentage > 70 ? 'medium' : 'low'}
-                    pendingGains={{ overall: 0.2, GPA: 0.2 }}
-                    relatedFeatures={['Academic Planner','GPA Analysis']}
-                    actionItems={insight.recommendations.map(rec => ({
-                      action: rec,
-                      link: '#',
-                      buttonText: 'Start Planning'
-                    }))}
-                    connections={`Based on ${insight.title.toLowerCase()} patterns`}
-                    onActionClick={handleTaskPlanningOpen}
-                  />
-                ))}
+                {insights.map(insight => <AcademicInsightItem key={insight.id} title={insight.title} description={insight.details} time="Just now" type={insight.status === 'complete' ? 'strength' : insight.status === 'excellent' ? 'opportunity' : insight.status === 'warning' ? 'warning' : 'improvement'} impact={insight.percentage > 90 ? 'high' : insight.percentage > 70 ? 'medium' : 'low'} pendingGains={{
+                overall: 0.2,
+                GPA: 0.2
+              }} relatedFeatures={['Academic Planner', 'GPA Analysis']} actionItems={insight.recommendations.map(rec => ({
+                action: rec,
+                link: '#',
+                buttonText: 'Start Planning'
+              }))} connections={`Based on ${insight.title.toLowerCase()} patterns`} onActionClick={handleTaskPlanningOpen} />)}
               </div>
             </CardContent>
           </Card>
@@ -1087,7 +1011,9 @@ const AcademicPlanner = () => {
                         3/5
                       </Badge>
                       <div className="w-16 bg-amber-200 rounded-full h-2">
-                        <div className="bg-gradient-to-r from-amber-400 to-yellow-500 h-2 rounded-full" style={{width: '60%'}}></div>
+                        <div className="bg-gradient-to-r from-amber-400 to-yellow-500 h-2 rounded-full" style={{
+                          width: '60%'
+                        }}></div>
                       </div>
                       <ChevronDown className="h-5 w-5 text-amber-700 group-hover:scale-110 transition-transform" />
                     </div>
@@ -1173,7 +1099,9 @@ const AcademicPlanner = () => {
                         5/7
                       </Badge>
                       <div className="w-16 bg-slate-200 rounded-full h-2">
-                        <div className="bg-gradient-to-r from-slate-400 to-gray-500 h-2 rounded-full" style={{width: '71%'}}></div>
+                        <div className="bg-gradient-to-r from-slate-400 to-gray-500 h-2 rounded-full" style={{
+                          width: '71%'
+                        }}></div>
                       </div>
                       <ChevronDown className="h-5 w-5 text-slate-700 group-hover:scale-110 transition-transform" />
                     </div>
@@ -1273,7 +1201,9 @@ const AcademicPlanner = () => {
                         4/4
                       </Badge>
                       <div className="w-16 bg-orange-200 rounded-full h-2">
-                        <div className="bg-gradient-to-r from-orange-400 to-amber-600 h-2 rounded-full" style={{width: '100%'}}></div>
+                        <div className="bg-gradient-to-r from-orange-400 to-amber-600 h-2 rounded-full" style={{
+                          width: '100%'
+                        }}></div>
                       </div>
                       <ChevronDown className="h-5 w-5 text-orange-700 group-hover:scale-110 transition-transform" />
                     </div>
@@ -1493,29 +1423,18 @@ const AcademicPlanner = () => {
     </div>
 
       {/* Floating Chat Toggle Button */}
-      <Button
-        onClick={() => setIsChatOpen(!isChatOpen)}
-        className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40"
-        size="icon"
-      >
+      <Button onClick={() => setIsChatOpen(!isChatOpen)} className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg z-40" size="icon">
         <MessageCircle className="h-6 w-6" />
       </Button>
 
       {/* Draggable Chatbot */}
-      {isChatOpen && (
-        <div 
-          className="fixed w-96 h-[28rem] z-50 animate-in slide-in-from-bottom-4"
-          style={{ 
-            left: chatPosition.x, 
-            top: chatPosition.y,
-            cursor: isDragging ? 'grabbing' : 'default'
-          }}
-        >
+      {isChatOpen && <div className="fixed w-96 h-[28rem] z-50 animate-in slide-in-from-bottom-4" style={{
+      left: chatPosition.x,
+      top: chatPosition.y,
+      cursor: isDragging ? 'grabbing' : 'default'
+    }}>
           <Card className="h-full shadow-2xl border-2">
-            <CardHeader 
-              className="border-b p-4 cursor-grab active:cursor-grabbing select-none"
-              onMouseDown={handleMouseDown}
-            >
+            <CardHeader className="border-b p-4 cursor-grab active:cursor-grabbing select-none" onMouseDown={handleMouseDown}>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg pointer-events-none">
@@ -1526,12 +1445,7 @@ const AcademicPlanner = () => {
                     Get personalized guidance on your academic journey
                   </CardDescription>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsChatOpen(false)}
-                  className="h-8 w-8 p-0 pointer-events-auto"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setIsChatOpen(false)} className="h-8 w-8 p-0 pointer-events-auto">
                   ×
                 </Button>
               </div>
@@ -1540,60 +1454,30 @@ const AcademicPlanner = () => {
             <CardContent className="flex-1 flex flex-col p-0 h-full">
               {/* Chat Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {chatMessages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
-                    <div
-                      className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
-                        message.role === 'user'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-white border shadow-sm'
-                      }`}
-                    >
+                {chatMessages.map((message, index) => <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${message.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-white border shadow-sm'}`}>
                       {message.content}
                     </div>
-                  </div>
-                ))}
+                  </div>)}
               </div>
 
               {/* Quick Actions */}
               <div className="p-4 border-t bg-background">
-                <button
-                  onClick={() => setQuickActionsExpanded(!quickActionsExpanded)}
-                  className="flex items-center justify-between w-full text-sm font-medium mb-3 hover:text-primary transition-colors"
-                >
+                <button onClick={() => setQuickActionsExpanded(!quickActionsExpanded)} className="flex items-center justify-between w-full text-sm font-medium mb-3 hover:text-primary transition-colors">
                   <span>Quick Actions</span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${quickActionsExpanded ? 'rotate-180' : ''}`} />
                 </button>
-                {quickActionsExpanded && (
-                  <div className="space-y-2">
-                    {quickActions.map((action, index) => (
-                      <Button
-                        key={index}
-                        variant="ghost"
-                        size="sm"
-                        className="w-full justify-start text-left h-auto p-2 text-xs"
-                        onClick={() => setUserInput(action)}
-                      >
+                {quickActionsExpanded && <div className="space-y-2">
+                    {quickActions.map((action, index) => <Button key={index} variant="ghost" size="sm" className="w-full justify-start text-left h-auto p-2 text-xs" onClick={() => setUserInput(action)}>
                         {action}
-                      </Button>
-                    ))}
-                  </div>
-                )}
+                      </Button>)}
+                  </div>}
               </div>
 
               {/* Input Area */}
               <div className="p-4 border-t bg-background">
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="Ask about your academics..."
-                    value={userInput}
-                    onChange={(e) => setUserInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    className="flex-1 text-sm"
-                  />
+                  <Input placeholder="Ask about your academics..." value={userInput} onChange={e => setUserInput(e.target.value)} onKeyPress={e => e.key === 'Enter' && handleSendMessage()} className="flex-1 text-sm" />
                   <Button onClick={handleSendMessage} size="icon" className="flex-shrink-0">
                     <Send className="h-4 w-4" />
                   </Button>
@@ -1601,17 +1485,11 @@ const AcademicPlanner = () => {
               </div>
             </CardContent>
           </Card>
-        </div>
-      )}
+        </div>}
 
       {/* Task Planning Interface */}
-      <TaskPlanningInterface 
-        isOpen={taskPlanningOpen}
-        onClose={() => setTaskPlanningOpen(false)}
-        task={selectedTask}
-      />
-    </div>
-  );
+      <TaskPlanningInterface isOpen={taskPlanningOpen} onClose={() => setTaskPlanningOpen(false)} task={selectedTask} />
+    </div>;
 };
 
 // Academic Insight Item Component (restored to match original design from Portfolio Scanner)
@@ -1634,8 +1512,18 @@ interface AcademicInsightItemProps {
   connections: string;
   onActionClick?: (action: string) => void;
 }
-
-const AcademicInsightItem = ({ title, description, time, type, impact, pendingGains, relatedFeatures, actionItems, connections, onActionClick }: AcademicInsightItemProps) => {
+const AcademicInsightItem = ({
+  title,
+  description,
+  time,
+  type,
+  impact,
+  pendingGains,
+  relatedFeatures,
+  actionItems,
+  connections,
+  onActionClick
+}: AcademicInsightItemProps) => {
   const typeColors = {
     strength: 'text-green-600',
     opportunity: 'text-blue-600',
@@ -1643,7 +1531,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
     warning: 'text-orange-600',
     concern: 'text-red-600'
   };
-
   const getCheckmarkColor = (type: string, impact: string) => {
     if (type === 'warning' && impact === 'medium') {
       return 'text-muted-foreground';
@@ -1651,7 +1538,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
     if (type === 'concern') {
       return 'text-red-500';
     }
-    
     switch (impact) {
       case 'high':
         return 'text-blue-500';
@@ -1663,7 +1549,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
         return 'text-muted-foreground';
     }
   };
-
   const getBorderClass = (type: string, impact: string) => {
     if (type === 'warning' && impact === 'medium') {
       return 'border border-muted-foreground/30';
@@ -1679,7 +1564,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
     }
     return 'border border-yellow-500/50';
   };
-
   const getImpactBadgeColors = (type: string, impact: string) => {
     if (type === 'warning' && impact === 'medium') {
       return 'bg-muted text-muted-foreground border-muted';
@@ -1687,7 +1571,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
     if (type === 'concern') {
       return 'bg-red-100 text-red-700 border-red-300';
     }
-    
     switch (impact) {
       case 'high':
         return 'bg-blue-100 text-blue-700 border-blue-300';
@@ -1699,7 +1582,6 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
         return 'bg-muted text-muted-foreground border-muted';
     }
   };
-
   const getImpactText = (type: string, impact: string) => {
     if (type === 'warning' && impact === 'medium') {
       return 'missed opportunity';
@@ -1709,9 +1591,7 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
     }
     return `${impact} impact`;
   };
-
-  return (
-    <div className={`p-3 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 bg-card ${getBorderClass(type, impact)}`}>
+  return <div className={`p-3 rounded-lg shadow-sm hover:shadow-md transition-all duration-200 bg-card ${getBorderClass(type, impact)}`}>
       <div className="space-y-3">
         {/* Header */}
         <div className="flex items-start gap-3">
@@ -1729,19 +1609,12 @@ const AcademicInsightItem = ({ title, description, time, type, impact, pendingGa
         
         {/* Action Button */}
         <div className="flex justify-end">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="text-xs h-7 font-medium hover:bg-primary hover:text-primary-foreground transition-colors"
-            onClick={() => onActionClick?.(actionItems[0]?.action || title)}
-          >
+          <Button variant="outline" size="sm" className="text-xs h-7 font-medium hover:bg-primary hover:text-primary-foreground transition-colors" onClick={() => onActionClick?.(actionItems[0]?.action || title)}>
             <ArrowRight className="h-3 w-3 mr-1" />
             {actionItems[0]?.buttonText || 'View Details'}
           </Button>
         </div>
       </div>
-    </div>
-  );
+    </div>;
 };
-
 export default AcademicPlanner;
