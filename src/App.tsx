@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
-import ClickSpark from "@/components/ui/ClickSpark";
+import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
 import Index from "./pages/Index";
 import PortfolioScanner from "./pages/PortfolioScanner";
 import ExtracurricularOptimizer from "./pages/ExtracurricularOptimizer";
@@ -24,26 +24,25 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <ClickSpark sparkColor="#a855f7" sparkSize={10} sparkRadius={18} sparkCount={12} duration={450} extraScale={1.15}>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
-              <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
-              <Route path="/academic-planner" element={<AcademicPlanner />} />
-              <Route path="/project-incubation" element={<ProjectIncubationHub />} />
-              <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/projects" element={<ProjectManagement />} />
-              <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
-              <Route path="/auth" element={<Auth />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </ClickSpark>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
+            <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
+            <Route path="/academic-planner" element={<AcademicPlanner />} />
+            <Route path="/project-incubation" element={<ProjectIncubationHub />} />
+            <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
+            <Route path="/project-incubation/projects" element={<ProjectManagement />} />
+            <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
+            <Route path="/auth" element={<Auth />} />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+          <ClickSparkGlobal />
+        </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
