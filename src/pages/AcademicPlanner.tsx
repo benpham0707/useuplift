@@ -629,34 +629,7 @@ const AcademicPlanner = () => {
           </ResponsiveContainer>
         </div>
         
-        {/* Compact summary stats */}
-        <div className="flex justify-center gap-8 pt-1 pb-3">
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-purple-600 rounded-full"></div>
-            <div className="text-sm">
-              <span className="font-semibold text-slate-700">Your GPA:</span>
-              <span className="ml-1 font-bold text-purple-600">{gpaData.current}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 rounded-full" style={{
-            backgroundColor: '#3b82f6'
-          }}></div>
-            <div className="text-sm">
-              <span className="font-semibold text-slate-700">Major Average:</span>
-              <span className="ml-1 font-bold" style={{
-              color: '#3b82f6'
-            }}>{gpaData.majorRecommended}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-            <div className="text-sm">
-              <span className="font-semibold text-slate-700">Target:</span>
-              <span className="ml-1 font-bold text-red-600">{gpaData.target}</span>
-            </div>
-          </div>
-        </div>
+        
       </div>;
   };
   return <div className="min-h-screen bg-background">
@@ -902,7 +875,7 @@ const AcademicPlanner = () => {
 
           {/* Combined Performance Analytics Section */}
           <Card className="shadow-medium mb-8">
-              <CardHeader className="rounded-t-lg pb-2">
+              <CardHeader className="rounded-t-lg pb-1">
               <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-primary" />
                 Subject Performance & GPA Analytics
@@ -917,8 +890,8 @@ const AcademicPlanner = () => {
                 </div>
                 
                 {/* GPA Analysis - Half width */}
-                 <div>
-                   <div className="">
+                 <div className="self-stretch flex flex-col">
+                   <div className="flex-1">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
                       GPA Trends
