@@ -972,14 +972,14 @@ const AcademicPlanner = () => {
               </p>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Subject Performance Analytics - Narrower (1/3 width) */}
-                <div className="lg:col-span-1">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Subject Performance Analytics - Half width */}
+                <div>
                   <SubjectPerformanceAnalytics />
                 </div>
                 
-                {/* GPA Analysis - More space (2/3 width) */}
-                <div className="lg:col-span-2">
+                {/* GPA Analysis - Half width */}
+                <div>
                   <div className="sticky top-4">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
                       <TrendingUp className="h-5 w-5 text-primary" />
