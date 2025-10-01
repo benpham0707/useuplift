@@ -793,33 +793,34 @@ const AcademicPlanner = () => {
               </div>
               
               <ScrollArea className="h-[120px] pr-4">
-                {/* A-G Subject Requirements - Smaller emphasis */}
-                <div className="mb-3">
+                <div className="-mt-2">
+                  {/* Academic Achievement Requirements in 2 columns */}
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-foreground">
+                    {/* A-G Subject Requirements - aligned with other items */}
+                    <div className="flex items-center gap-2 col-span-2">
                       <button 
                         onClick={() => setExpandedAG(!expandedAG)}
                         className="flex items-center gap-2 text-xs w-full hover:bg-muted p-2 rounded-md transition-colors"
                       >
-                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600">
+                        <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
                           <Check className="h-2 w-2 text-white" />
                         </div>
                         <span className="font-medium text-foreground">A-G Subject Requirements (UC/CSU Foundation)</span>
-                        <ChevronDown className={`h-3 w-3 transition-transform ${expandedAG ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`h-3 w-3 ml-auto transition-transform ${expandedAG ? 'rotate-180' : ''}`} />
                       </button>
-                        
-                      {expandedAG && (
-                        <div className="mt-2 p-2 bg-muted rounded-md text-xs text-foreground">
-                          <div className="flex items-center gap-2">
-                            <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
-                              <X className="h-2 w-2 text-white" />
-                            </div>
-                            <span>Missing: 4th year of math and advanced science courses</span>
-                          </div>
-                        </div>
-                      )}
                     </div>
                     
-                    {/* Academic Achievement Requirements in 2 columns */}
-                    <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs text-foreground">
+                    {expandedAG && (
+                      <div className="col-span-2 mb-2 p-2 bg-muted rounded-md text-xs text-foreground">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-slate-400 bg-slate-400">
+                            <X className="h-2 w-2 text-white" />
+                          </div>
+                          <span>Missing: 4th year of math and advanced science courses</span>
+                        </div>
+                      </div>
+                    )}
+                    
                       {/* AP & Course Rigor */}
                       <div className="flex items-center gap-2">
                         <div className="flex items-center justify-center h-3 w-3 rounded-full border-2 border-green-600 bg-green-600 flex-shrink-0">
@@ -924,7 +925,8 @@ const AcademicPlanner = () => {
                         <span className="font-medium">Scholarship Positioning</span>
                       </div>
                     </div>
-                  </ScrollArea>
+                  </div>
+                </ScrollArea>
             </div>
           </div>
         </div>
