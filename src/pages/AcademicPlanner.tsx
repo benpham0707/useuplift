@@ -857,7 +857,7 @@ const AcademicPlanner = () => {
       </div>
 
       {/* MagicBento Grid Section */}
-      <div className="w-full p-6 hero-gradient">
+      <div className="w-full p-6 bg-white">
         <div className="max-w-7xl mx-auto">
           <MagicBento 
             cards={bentoCards}
