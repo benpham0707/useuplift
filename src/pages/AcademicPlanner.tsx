@@ -773,7 +773,7 @@ const AcademicPlanner = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section with Academic Metrics */}
-      <div className="gradient-dashboard text-white">
+      <div className="hero-gradient text-white">
         <div className="max-w-7xl mx-auto px-4 py-12">
           {/* Header */}
           <div className="text-center mb-12">
