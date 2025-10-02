@@ -310,7 +310,7 @@ const PortfolioScanner = () => {
   return (
     <div className="min-h-screen gradient-dashboard">
       {/* Uplift Platform Navigation */}
-      <nav className="sticky top-0 z-50 w-full bg-gradient-to-r from-primary/10 to-secondary/10 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/20">
+      <nav className="sticky top-0 z-50 w-full bg-white/10 dark:bg-black/10 backdrop-blur-md supports-[backdrop-filter]:bg-white/5 dark:supports-[backdrop-filter]:bg-black/5 border-b border-white/20 dark:border-white/10 shadow-lg shadow-black/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Uplift Logo */}

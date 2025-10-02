@@ -9,7 +9,7 @@ const Navigation = () => {
   const { user, signOut, loading } = useAuth();
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border">
+    <nav className="sticky top-0 z-50 w-full bg-white/10 dark:bg-black/10 backdrop-blur-md supports-[backdrop-filter]:bg-white/5 dark:supports-[backdrop-filter]:bg-black/5 border-b border-white/20 dark:border-white/10 shadow-lg shadow-black/5">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
@@ -24,19 +24,19 @@ const Navigation = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#platform" className="text-foreground hover:text-primary transition-colors">
+            <a href="#platform" className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Platform
             </a>
-            <a href="#features" className="text-foreground hover:text-primary transition-colors">
+            <a href="#features" className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Features
             </a>
-            <a href="#paths" className="text-foreground hover:text-primary transition-colors">
+            <a href="#paths" className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Paths
             </a>
-            <a href="#pricing" className="text-foreground hover:text-primary transition-colors">
+            <a href="#pricing" className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Pricing
             </a>
-            <a href="#schools" className="text-foreground hover:text-primary transition-colors">
+            <a href="#schools" className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               For Schools
             </a>
           </div>
@@ -87,20 +87,20 @@ const Navigation = () => {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden py-4 space-y-2">
-            <a href="#platform" className="block px-3 py-2 text-foreground hover:text-primary transition-colors">
+          <div className="md:hidden py-4 space-y-2 bg-white/5 dark:bg-black/5 backdrop-blur-sm border-t border-white/10 dark:border-white/5">
+            <a href="#platform" className="block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Platform
             </a>
-            <a href="#features" className="block px-3 py-2 text-foreground hover:text-primary transition-colors">
+            <a href="#features" className="block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Features
             </a>
-            <a href="#paths" className="block px-3 py-2 text-foreground hover:text-primary transition-colors">
+            <a href="#paths" className="block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Paths
             </a>
-            <a href="#pricing" className="block px-3 py-2 text-foreground hover:text-primary transition-colors">
+            <a href="#pricing" className="block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               Pricing
             </a>
-            <a href="#schools" className="block px-3 py-2 text-foreground hover:text-primary transition-colors">
+            <a href="#schools" className="block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5">
               For Schools
             </a>
             <div className="pt-2 space-y-2">
