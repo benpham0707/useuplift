@@ -211,7 +211,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
   return <div className="space-y-4">
       {Object.entries(academicYearsData).map(([year, data]) => <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
           <CollapsibleTrigger asChild>
-            <Card className="cursor-pointer hover:bg-accent/50 transition-colors border-l-4 border-l-primary/60 bg-background">
+            <Card className="cursor-pointer transition-colors border-l-4 border-l-primary/60 bg-gradient-to-br from-purple-950/60 to-indigo-950/40 border border-purple-500/30 hover:from-purple-900/60 hover:to-indigo-900/40">
               <CardContent className="p-2">
                 <div className="flex items-center justify-between">
                   <div className="flex flex-col gap-1">
@@ -262,11 +262,11 @@ const SubjectPerformanceAnalytics: React.FC = () => {
             </Card>
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
-            <Card className="bg-muted/30">
+            <Card className="bg-background/60 border border-purple-500/20">
               <CardContent className="p-4">
                 <h4 className="font-medium mb-3 text-white text-sm">Subject Performance Details</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => <Card key={idx} className="bg-background/50">
+                  {(subjectPerformanceData[year as keyof typeof subjectPerformanceData] || []).map((subject, idx) => <Card key={idx} className="bg-gradient-to-br from-purple-900/30 to-indigo-900/20 border border-purple-500/20">
                       <CardContent className="p-3">
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
