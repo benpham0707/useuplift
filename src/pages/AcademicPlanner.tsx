@@ -206,7 +206,7 @@ const SubjectPerformanceAnalytics: React.FC = () => {
     }]
   } as const;
   const toggleYear = (year: string) => {
-    setExpandedYears(prev => prev.includes(year) ? prev.filter(y => y !== year) : [...prev, year]);
+    setExpandedYears(prev => prev.includes(year) ? [] : [year]);
   };
   return <div className="space-y-4">
       {Object.entries(academicYearsData).map(([year, data]) => <Collapsible key={year} open={expandedYears.includes(year)} onOpenChange={() => toggleYear(year)}>
@@ -378,6 +378,21 @@ const AcademicPlanner = () => {
   const [expandedAG, setExpandedAG] = useState(false);
   const [taskPlanningOpen, setTaskPlanningOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<any>(null);
+  const [expandedInsight, setExpandedInsight] = useState<string | null>(null);
+  const [expandedTrophyTier, setExpandedTrophyTier] = useState<string | null>(null);
+  const [expandedTaskPriority, setExpandedTaskPriority] = useState<string | null>(null);
+
+  const toggleInsight = (insightId: string) => {
+    setExpandedInsight(prev => prev === insightId ? null : insightId);
+  };
+
+  const toggleTrophyTier = (tier: string) => {
+    setExpandedTrophyTier(prev => prev === tier ? null : tier);
+  };
+
+  const toggleTaskPriority = (priority: string) => {
+    setExpandedTaskPriority(prev => prev === priority ? null : priority);
+  };
 
   // Hard coded data values for task planning - defines bundled academic planning objectives
   const taskDatabase = {
@@ -468,7 +483,7 @@ const AcademicPlanner = () => {
             <p className="card__description text-white/70 mb-4 text-sm">Strategic academic guidance</p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {insights.map((insight) => (
-                <Collapsible key={insight.id}>
+                <Collapsible key={insight.id} open={expandedInsight === insight.id} onOpenChange={() => toggleInsight(insight.id)}>
                   <CollapsibleTrigger asChild>
                     <div className="bg-white/5 rounded-lg p-3 border border-white/10 cursor-pointer hover:bg-white/10 transition-colors">
                       <div className="flex items-center gap-2 mb-2">
@@ -514,7 +529,7 @@ const AcademicPlanner = () => {
             <p className="card__description text-white/70 mb-4 text-sm">Your academic accomplishments</p>
             <div className="space-y-3">
               {/* Gold Tier - Expandable */}
-              <Collapsible defaultOpen>
+              <Collapsible open={expandedTrophyTier === 'gold'} onOpenChange={() => toggleTrophyTier('gold')}>
                 <CollapsibleTrigger asChild>
                   <div className="bg-gradient-to-r from-yellow-500/20 to-amber-500/20 rounded-lg p-3 border border-yellow-500/30 cursor-pointer hover:from-yellow-500/30 hover:to-amber-500/30 transition-colors">
                     <div className="flex items-center gap-2 mb-2">
@@ -553,7 +568,7 @@ const AcademicPlanner = () => {
               </Collapsible>
 
               {/* Silver Tier - Expandable */}
-              <Collapsible>
+              <Collapsible open={expandedTrophyTier === 'silver'} onOpenChange={() => toggleTrophyTier('silver')}>
                 <CollapsibleTrigger asChild>
                   <div className="bg-gradient-to-r from-gray-300/20 to-gray-400/20 rounded-lg p-3 border border-gray-400/30 cursor-pointer hover:from-gray-300/30 hover:to-gray-400/30 transition-colors">
                     <div className="flex items-center gap-2 mb-2">
@@ -585,7 +600,7 @@ const AcademicPlanner = () => {
               </Collapsible>
 
               {/* Bronze Tier - Expandable */}
-              <Collapsible>
+              <Collapsible open={expandedTrophyTier === 'bronze'} onOpenChange={() => toggleTrophyTier('bronze')}>
                 <CollapsibleTrigger asChild>
                   <div className="bg-gradient-to-r from-orange-700/20 to-amber-700/20 rounded-lg p-3 border border-orange-700/30 cursor-pointer hover:from-orange-700/30 hover:to-amber-700/30 transition-colors">
                     <div className="flex items-center gap-2 mb-2">
@@ -633,7 +648,7 @@ const AcademicPlanner = () => {
             <p className="card__description text-white/70 mb-4 text-sm">Prioritized action dashboard</p>
             <div className="space-y-3">
               {/* High Priority - Expandable */}
-              <Collapsible defaultOpen>
+              <Collapsible open={expandedTaskPriority === 'high'} onOpenChange={() => toggleTaskPriority('high')}>
                 <CollapsibleTrigger asChild>
                   <div className="bg-red-500/10 rounded-lg p-3 border border-red-500/30 cursor-pointer hover:bg-red-500/20 transition-colors">
                     <div className="flex items-center justify-between mb-2">
@@ -681,7 +696,7 @@ const AcademicPlanner = () => {
               </Collapsible>
 
               {/* Medium Priority - Expandable */}
-              <Collapsible>
+              <Collapsible open={expandedTaskPriority === 'medium'} onOpenChange={() => toggleTaskPriority('medium')}>
                 <CollapsibleTrigger asChild>
                   <div className="bg-yellow-500/10 rounded-lg p-3 border border-yellow-500/30 cursor-pointer hover:bg-yellow-500/20 transition-colors">
                     <div className="flex items-center justify-between mb-2">
@@ -729,7 +744,7 @@ const AcademicPlanner = () => {
               </Collapsible>
 
               {/* Future Planning - Expandable */}
-              <Collapsible>
+              <Collapsible open={expandedTaskPriority === 'future'} onOpenChange={() => toggleTaskPriority('future')}>
                 <CollapsibleTrigger asChild>
                   <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/30 cursor-pointer hover:bg-blue-500/20 transition-colors">
                     <div className="flex items-center justify-between mb-2">
