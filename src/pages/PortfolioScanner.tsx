@@ -42,6 +42,7 @@ import PortfolioPathway from '@/components/portfolio/PortfolioPathway';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import GradientText from '@/components/ui/GradientText';
 
 const PortfolioScanner = () => {
   const { user, loading, signOut } = useAuth();
@@ -91,6 +92,31 @@ const PortfolioScanner = () => {
      (rubricScores.uniqueValue.score || 0) + 
      (rubricScores.futureReadiness.score || 0)) / 6 * 10
   ) / 10;
+
+  const getHoloToneClass = (value: number) => {
+    if (value < 5) return 'red';
+    if (value < 7) return 'yellow';
+    if (value < 9) return 'green';
+    return 'blue';
+  };
+
+  const toneToColors = (tone: 'red' | 'yellow' | 'green' | 'blue') => {
+    switch (tone) {
+      case 'red':
+        // Deeper, more saturated red without yellow bleed
+        return ['#ff3b3b', '#ff6b6b', '#ff3b3b', '#ff6b6b', '#ff3b3b'];
+      case 'yellow':
+        // Amber/Orange → Yellow gradient for warmer energy
+        return ['#ff9f1a', '#ffd166', '#ff9f1a', '#ffd166', '#ff9f1a'];
+      case 'green':
+        // Dark → Light green gradient (emerald to mint)
+        return ['#0f9d58', '#34d399', '#0f9d58', '#34d399', '#0f9d58'];
+      case 'blue':
+      default:
+        // Azure to lavender matching platform hero gradient
+        return ['#60a5fa', '#a78bfa', '#60a5fa', '#a78bfa', '#60a5fa'];
+    }
+  };
 
   // Function to get score styling based on value
   const getScoreStyles = (score: number) => {
@@ -452,60 +478,75 @@ const PortfolioScanner = () => {
             </p>
           </div>
 
-          {/* Strength and Completion Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="text-center p-4 rounded-xl border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-purple-900/40 to-indigo-900/30 border-purple-500/30">
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                {(aiOverall || overallScore).toFixed(1)}
-              </div>
-              <div className="text-sm text-purple-700 font-medium mt-1">Portfolio Strength</div>
-            </div>
-            <div className="text-center p-4 rounded-xl border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-purple-900/40 to-indigo-900/30 border-purple-500/30">
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                {overallProgress}%
-              </div>
-              <div className="text-sm text-purple-700 font-medium mt-1">Complete</div>
-            </div>
-            <div className="text-center p-4 rounded-xl border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-purple-900/40 to-indigo-900/30 border-purple-500/30">
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                {(rubricScores.academicExcellence.score || 0).toFixed(1)}
-              </div>
-              <div className="text-sm text-purple-700 font-medium mt-1">Academic Excellence</div>
-            </div>
-            <div className="text-center p-4 rounded-xl border shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 bg-gradient-to-br from-purple-900/40 to-indigo-900/30 border-purple-500/30">
-              <div className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                {(rubricScores.leadershipPotential.score || 0).toFixed(1)}
-              </div>
-              <div className="text-sm text-purple-700 font-medium mt-1">Leadership Potential</div>
-            </div>
-          </div>
+          {/* Strength and Completion Grid - holographic (demo values to preview all tones) */}
+          {(() => {
+            const showColorDemo = true;
+            const demo = {
+              overall: 9.4,      // blue
+              completion: 62,    // yellow
+              academic: 8.1,     // green
+              leadership: 4.5,   // red
+            };
+            const overallVal = showColorDemo ? demo.overall : (aiOverall || overallScore);
+            const completionVal = showColorDemo ? demo.completion : overallProgress;
+            const academicVal = showColorDemo ? demo.academic : (rubricScores.academicExcellence.score || 0);
+            const leadershipVal = showColorDemo ? demo.leadership : (rubricScores.leadershipPotential.score || 0);
 
-          {/* Metrics Glass Grid */}
-          <div className="bg-background/70 backdrop-blur-md rounded-xl p-4 border border-primary/20 shadow-glow">
-            <div className="flex flex-wrap justify-center gap-4">
-              {[
-                { key: 'personalGrowth', label: 'Personal Growth', icon: TrendingUp },
-                { key: 'communityImpact', label: 'Community Impact', icon: Heart },
-                { key: 'uniqueValue', label: 'Unique Value', icon: Sparkles },
-                { key: 'futureReadiness', label: 'Future Readiness', icon: Target }
-              ].map(({ key, label, icon: Icon }) => {
-                const score = rubricScores[key as keyof typeof rubricScores]?.score || 0;
-                return (
-                  <Card key={key} className="bg-white/80 backdrop-blur-sm rounded-lg border border-white/20 shadow-sm hover:shadow-md transition-all duration-200 min-w-[160px]">
-                    <CardContent className="p-3 text-center">
-                      <Icon className="h-5 w-5 mx-auto mb-1 text-purple-600" />
-                      <div className="text-lg font-bold mb-1 bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                        {score.toFixed(1)}
-                      </div>
-                      <div className="text-xs text-gray-700 font-medium">
-                        {label}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText 
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass(overallVal) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {overallVal.toFixed(1)}
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Portfolio Strength</div>
+                </div>
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass((completionVal) / 10) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {completionVal}%
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Complete</div>
+                </div>
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass(academicVal) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {academicVal.toFixed(1)}
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Academic Excellence</div>
+                </div>
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass(leadershipVal) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {leadershipVal.toFixed(1)}
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Leadership Potential</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Secondary metrics row removed to avoid repetition */}
         </div>
       </div>
 

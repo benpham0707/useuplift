@@ -71,7 +71,7 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
   return (
     <GlowEffect
       className={cn("rounded-xl")}
-      style={{ overflow: 'visible' }}
+      style={{ overflow: 'visible', willChange: 'transform', transform: 'translateZ(0)' }}
       glowColor="147, 51, 234"
       enableBorderGlow={true}
       enableSpotlight={true}
@@ -97,9 +97,9 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
         onClick={config.clickable ? onClick : undefined}
       >
       {/* Color tint overlay for depth */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-500/12 via-blue-500/10 to-cyan-400/12" />
+      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/12 via-blue-500/10 to-cyan-400/12" />
       {/* Subtle vignette */}
-      <div className="pointer-events-none absolute inset-0" style={{ background: 'radial-gradient(120% 90% at 50% 40%, rgba(0,0,0,0) 55%, rgba(124,58,237,0.05) 100%)' }} />
+      <div className="pointer-events-none absolute inset-0 rounded-xl" style={{ background: 'radial-gradient(120% 90% at 50% 40%, rgba(0,0,0,0) 55%, rgba(124,58,237,0.05) 100%)' }} />
       {/* Progress Ring */}
       <div className="absolute -top-10 left-1/2 transform -translate-x-1/2">
         <div className="relative w-20 h-20">

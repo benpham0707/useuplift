@@ -155,6 +155,145 @@ All colors MUST be HSL.
     background: var(--gradient-hero);
   }
   
+  /* Holographic + Sheen utilities for magical look */
+  .holo-surface {
+    position: relative;
+    background: linear-gradient(135deg,
+      hsl(0 0% 100% / 0.65),
+      hsl(250 100% 98% / 0.65) 30%,
+      hsl(185 100% 97% / 0.65) 60%,
+      hsl(300 100% 98% / 0.65)
+    );
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 10px -6px hsl(235 45% 20% / 0.22), 0 16px 36px -12px hsl(250 70% 60% / 0.22);
+    border: none;
+    border-radius: var(--radius);
+    overflow: hidden; /* ensure ring aligns and clips to radius */
+  }
+
+  /* Iridescent border using double backgrounds */
+  .holo-surface::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 3px; /* thicker metallic border */
+    background: conic-gradient(from 180deg at 50% 50%,
+      hsl(220 90% 68% / 0.9),
+      hsl(185 85% 64% / 0.9),
+      hsl(290 85% 72% / 0.9),
+      hsl(45 90% 68% / 0.9),
+      hsl(220 90% 68% / 0.9)
+    );
+    -webkit-mask: 
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+  }
+
+  /* Soft inner glow */
+  .holo-surface::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 3px; /* match base ring thickness */
+    background: conic-gradient(
+      from 0deg at 50% 50%,
+      transparent 0deg 332deg,
+      hsl(205 100% 80% / 0.95) 332deg,
+      hsl(290 100% 80% / 0.95) 348deg,
+      transparent 360deg
+    );
+    -webkit-mask: 
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    animation: ring-orbit 6s linear infinite;
+    will-change: transform;
+    pointer-events: none;
+  }
+
+  @keyframes ring-orbit {
+    to { transform: rotate(360deg); }
+  }
+
+  /* Strong elevation utility */
+  .elev-strong { box-shadow: 0 8px 22px -6px hsl(240 45% 20% / 0.28), 0 24px 64px -16px hsl(250 70% 60% / 0.35); }
+  .elev-hover  { transition: box-shadow 200ms ease, transform 200ms ease; }
+  .elev-hover:hover { box-shadow: 0 10px 28px -6px hsl(240 50% 20% / 0.36), 0 28px 80px -18px hsl(250 70% 60% / 0.45); transform: translateY(-1px); }
+
+  /* High-contrast metric typography */
+  .metric-value {
+    letter-spacing: -0.005em;
+    font-weight: 700;
+    text-shadow:
+      0 1px 0 hsl(0 0% 100% / 0.65),
+      0 0 14px hsl(230 95% 70% / 0.18);
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    -webkit-text-stroke: 0.35px hsl(230 35% 20% / 0.28);
+  }
+  .metric-label {
+    color: hsl(248 40% 28%);
+    font-weight: 600;
+    text-shadow: 0 1px 0 hsl(0 0% 100% / 0.65);
+    background: linear-gradient(180deg, hsl(258 60% 50%), hsl(230 60% 48%));
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: hsl(248 40% 28%);
+  }
+
+  /* Game-like bright gradients for values */
+  .tone-red {
+    background-image: linear-gradient(180deg, hsl(0 95% 64%), hsl(20 95% 62%));
+    text-shadow: 0 1px 0 hsl(0 0% 100% / 0.7), 0 0 14px hsl(10 95% 66% / 0.35);
+  }
+  .tone-yellow {
+    background-image: linear-gradient(180deg, #ff9f1a, #ffd166);
+    text-shadow: 0 1px 0 hsl(0 0% 100% / 0.7), 0 0 14px hsl(40 100% 70% / 0.3);
+  }
+  .tone-green {
+    background-image: linear-gradient(180deg, #0f9d58, #34d399);
+    text-shadow: 0 1px 0 hsl(0 0% 100% / 0.7), 0 0 14px hsl(150 80% 60% / 0.32);
+  }
+  .tone-blue {
+    background-image: linear-gradient(180deg, hsl(210 90% 62%), hsl(255 95% 66%));
+    text-shadow: 0 1px 0 hsl(0 0% 100% / 0.7), 0 0 14px hsl(235 95% 70% / 0.35);
+  }
+
+  .holo-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .holo-sheen::after {
+    content: '';
+    position: absolute;
+    top: -150%;
+    left: -50%;
+    width: 200%;
+    height: 400%;
+    transform: rotate(25deg);
+    background: radial-gradient(60% 20% at 50% 50%,
+      hsl(0 0% 100% / 0.35),
+      transparent 60%
+    );
+    animation: sheen-move 8s linear infinite;
+    pointer-events: none;
+  }
+
+  @keyframes sheen-move {
+    0% { transform: rotate(25deg) translateX(-30%); }
+    50% { transform: rotate(25deg) translateX(30%); }
+    100% { transform: rotate(25deg) translateX(110%); }
+  }
+  
   .gradient-primary {
     background: var(--gradient-primary);
   }
