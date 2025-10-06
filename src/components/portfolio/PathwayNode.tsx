@@ -72,8 +72,8 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
   const config = getStatusConfig();
 
   return (
-    <div className="relative z-10">
-      <FlowingBanner 
+    <div className="relative z-10 overflow-visible">
+      <FlowingBanner
         isCompleted={status === 'completed'}
         sectionId={section.id}
         isHovered={isHovered}

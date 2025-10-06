@@ -46,11 +46,15 @@ const FlowingBanner = ({ isCompleted, sectionId, completionMessage, isHovered }:
   }, [isHovered]);
 
   const message = completionMessage || COMPLETION_MESSAGES[sectionId] || (isCompleted ? 'Complete!' : 'Uncompleted');
+  
+  // Decorative icons based on completion status
+  const icons = isCompleted ? ['🏆', '⭐', '✨'] : ['🔒', '⏳'];
 
-  // Repeat message 6 times for marquee effect
-  const repeatedContent = Array.from({ length: 6 }).map((_, idx) => (
+  // Repeat message 8 times with alternating icons for marquee effect
+  const repeatedContent = Array.from({ length: 8 }).map((_, idx) => (
     <span key={idx} className="flowing-banner__text">
       {message}
+      <span className="flowing-banner__icon">{icons[idx % icons.length]}</span>
     </span>
   ));
 
