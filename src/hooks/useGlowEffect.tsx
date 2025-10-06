@@ -404,8 +404,9 @@ export const useGlowEffect = (options: GlowEffectOptions = {}) => {
       element.removeEventListener('mousemove', handleMouseMove);
       element.removeEventListener('click', handleClick);
       
-      if (config.enableSpotlight && spotlightRef.current) {
-        spotlightRef.current.remove();
+      if (config.enableSpotlight) {
+        document.removeEventListener('mousemove', updateSpotlight as EventListener);
+        document.removeEventListener('mouseleave', () => {});
       }
       
       clearAllParticles();

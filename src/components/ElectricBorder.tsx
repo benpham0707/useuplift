@@ -60,9 +60,9 @@ const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thi
 
     requestAnimationFrame(() => {
       [...dyAnims, ...dxAnims].forEach(a => {
-        if (typeof (a as SVGAnimateElement).beginElement === 'function') {
+        if (typeof a.beginElement === 'function') {
           try {
-            (a as SVGAnimateElement).beginElement();
+            a.beginElement();
           } catch {
             console.warn('ElectricBorder: beginElement failed, this may be due to a browser limitation.');
           }
