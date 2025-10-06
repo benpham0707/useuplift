@@ -1,4 +1,4 @@
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useEffect } from 'react';
 import { gsap } from 'gsap';
 import './FlowingBanner.css';
 
@@ -6,6 +6,7 @@ interface FlowingBannerProps {
   isCompleted: boolean;
   sectionId: string;
   completionMessage?: string;
+  isHovered: boolean;
 }
 
 // Section-specific completion messages
@@ -19,51 +20,30 @@ const COMPLETION_MESSAGES: Record<string, string> = {
   'growth': 'Your Story Has Power! ✨'
 };
 
-const FlowingBanner = ({ isCompleted, sectionId, completionMessage }: FlowingBannerProps) => {
-  const bannerRef = useRef<HTMLDivElement>(null);
+const FlowingBanner = ({ isCompleted, sectionId, completionMessage, isHovered }: FlowingBannerProps) => {
   const marqueeRef = useRef<HTMLDivElement>(null);
   const marqueeInnerRef = useRef<HTMLDivElement>(null);
 
   const animationDefaults = { duration: 0.6, ease: 'expo' };
 
-  const findClosestEdge = (mouseX: number, mouseY: number, width: number, height: number) => {
-    const topEdgeDist = distMetric(mouseX, mouseY, width / 2, 0);
-    const bottomEdgeDist = distMetric(mouseX, mouseY, width / 2, height);
-    return topEdgeDist < bottomEdgeDist ? 'top' : 'bottom';
-  };
+  useEffect(() => {
+    if (!marqueeRef.current || !marqueeInnerRef.current) return;
 
-  const distMetric = (x: number, y: number, x2: number, y2: number) => {
-    const xDiff = x - x2;
-    const yDiff = y - y2;
-    return xDiff * xDiff + yDiff * yDiff;
-  };
-
-  const handleMouseEnter = useCallback((ev: React.MouseEvent) => {
-    if (!bannerRef.current || !marqueeRef.current || !marqueeInnerRef.current) return;
-    const rect = bannerRef.current.getBoundingClientRect();
-    const x = ev.clientX - rect.left;
-    const y = ev.clientY - rect.top;
-    const edge = findClosestEdge(x, y, rect.width, rect.height);
-
-    gsap
-      .timeline({ defaults: animationDefaults })
-      .set(marqueeRef.current, { y: edge === 'top' ? '-101%' : '101%' }, 0)
-      .set(marqueeInnerRef.current, { y: edge === 'top' ? '101%' : '-101%' }, 0)
-      .to([marqueeRef.current, marqueeInnerRef.current], { y: '0%' }, 0);
-  }, []);
-
-  const handleMouseLeave = useCallback((ev: React.MouseEvent) => {
-    if (!bannerRef.current || !marqueeRef.current || !marqueeInnerRef.current) return;
-    const rect = bannerRef.current.getBoundingClientRect();
-    const x = ev.clientX - rect.left;
-    const y = ev.clientY - rect.top;
-    const edge = findClosestEdge(x, y, rect.width, rect.height);
-
-    gsap
-      .timeline({ defaults: animationDefaults })
-      .to(marqueeRef.current, { y: edge === 'top' ? '-101%' : '101%' }, 0)
-      .to(marqueeInnerRef.current, { y: edge === 'top' ? '101%' : '-101%' }, 0);
-  }, []);
+    if (isHovered) {
+      // Slide in from bottom
+      gsap
+        .timeline({ defaults: animationDefaults })
+        .set(marqueeRef.current, { y: '101%' }, 0)
+        .set(marqueeInnerRef.current, { y: '-101%' }, 0)
+        .to([marqueeRef.current, marqueeInnerRef.current], { y: '0%' }, 0);
+    } else {
+      // Slide out to bottom
+      gsap
+        .timeline({ defaults: animationDefaults })
+        .to(marqueeRef.current, { y: '101%' }, 0)
+        .to(marqueeInnerRef.current, { y: '-101%' }, 0);
+    }
+  }, [isHovered]);
 
   const message = completionMessage || COMPLETION_MESSAGES[sectionId] || (isCompleted ? 'Complete!' : 'Uncompleted');
 
@@ -77,9 +57,6 @@ const FlowingBanner = ({ isCompleted, sectionId, completionMessage }: FlowingBan
   return (
     <div 
       className={`flowing-banner ${isCompleted ? 'flowing-banner--completed' : 'flowing-banner--uncompleted'}`}
-      ref={bannerRef}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
     >
       <div className="flowing-banner__marquee" ref={marqueeRef}>
         <div className="flowing-banner__marquee-inner-wrap" ref={marqueeInnerRef}>

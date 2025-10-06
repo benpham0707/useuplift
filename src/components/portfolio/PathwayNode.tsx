@@ -2,6 +2,7 @@ import { Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GlowEffect from '@/components/ui/GlowEffect';
 import FlowingBanner from '@/components/ui/FlowingBanner';
+import { useState } from 'react';
 
 interface PathwaySection {
   id: string;
@@ -25,6 +26,7 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
   const { title, description, icon: Icon, progress, status, unlockThreshold } = section;
   const gradientId = `progressGradient_${section.id}`;
   const filterId = `ringGlow_${section.id}`;
+  const [isHovered, setIsHovered] = useState(false);
 
   const getStatusConfig = () => {
     switch (status) {
@@ -70,23 +72,25 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
   const config = getStatusConfig();
 
   return (
-    <GlowEffect
-      className={cn("rounded-xl relative")}
-      style={{ overflow: 'visible', willChange: 'transform', transform: 'translateZ(0)' }}
-      glowColor="147, 51, 234"
-      enableBorderGlow={true}
-      enableSpotlight={true}
-      enableParticles={false}
-      enableTilt={true}
-      enableMagnetism={false}
-      clickEffect={false}
-      spotlightRadius={220}
-    >
+    <div className="relative">
       <FlowingBanner 
         isCompleted={status === 'completed'}
         sectionId={section.id}
+        isHovered={isHovered}
       />
-      <div 
+      <GlowEffect
+        className={cn("rounded-xl relative")}
+        style={{ overflow: 'visible', willChange: 'transform', transform: 'translateZ(0)' }}
+        glowColor="147, 51, 234"
+        enableBorderGlow={true}
+        enableSpotlight={true}
+        enableParticles={false}
+        enableTilt={true}
+        enableMagnetism={false}
+        clickEffect={false}
+        spotlightRadius={220}
+      >
+        <div
         className={cn(
           "relative z-10 w-[34rem] md:w-[40rem] p-12 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-visible",
           // Pastel glass background for contrast without murkiness
@@ -100,6 +104,8 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
           boxShadow: '0 8px 30px rgba(147, 51, 234, 0.15), 0 0 30px rgba(59, 130, 246, 0.10), inset 0 0 0 1px rgba(255,255,255,0.25)'
         }}
         onClick={config.clickable ? onClick : undefined}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
       {/* Color tint overlay for depth */}
       <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/12 via-blue-500/10 to-cyan-400/12" />
@@ -195,7 +201,8 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
         )}
       </div>
       </div>
-    </GlowEffect>
+      </GlowEffect>
+    </div>
   );
 };
 
