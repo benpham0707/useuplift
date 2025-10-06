@@ -72,7 +72,7 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
   const config = getStatusConfig();
 
   return (
-    <div className="relative">
+    <div className="relative z-10">
       <FlowingBanner 
         isCompleted={status === 'completed'}
         sectionId={section.id}
