@@ -1,6 +1,7 @@
 import { Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import GlowEffect from '@/components/ui/GlowEffect';
+import FlowingBanner from '@/components/ui/FlowingBanner';
 
 interface PathwaySection {
   id: string;
@@ -70,7 +71,7 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
 
   return (
     <GlowEffect
-      className={cn("rounded-xl")}
+      className={cn("rounded-xl relative")}
       style={{ overflow: 'visible', willChange: 'transform', transform: 'translateZ(0)' }}
       glowColor="147, 51, 234"
       enableBorderGlow={true}
@@ -81,9 +82,13 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
       clickEffect={false}
       spotlightRadius={220}
     >
+      <FlowingBanner 
+        isCompleted={status === 'completed'}
+        sectionId={section.id}
+      />
       <div 
         className={cn(
-          "relative w-[34rem] md:w-[40rem] p-12 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-visible",
+          "relative z-10 w-[34rem] md:w-[40rem] p-12 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-visible",
           // Pastel glass background for contrast without murkiness
           "border-purple-400/40",
           "bg-gradient-to-br from-purple-50/80 via-indigo-50/70 to-blue-50/80",
