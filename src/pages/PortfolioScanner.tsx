@@ -42,6 +42,7 @@ import PortfolioPathway from '@/components/portfolio/PortfolioPathway';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import GradientText from '@/components/ui/GradientText';
 
 const PortfolioScanner = () => {
   const { user, loading, signOut } = useAuth();
@@ -91,6 +92,31 @@ const PortfolioScanner = () => {
      (rubricScores.uniqueValue.score || 0) + 
      (rubricScores.futureReadiness.score || 0)) / 6 * 10
   ) / 10;
+
+  const getHoloToneClass = (value: number) => {
+    if (value < 5) return 'red';
+    if (value < 7) return 'yellow';
+    if (value < 9) return 'green';
+    return 'blue';
+  };
+
+  const toneToColors = (tone: 'red' | 'yellow' | 'green' | 'blue') => {
+    switch (tone) {
+      case 'red':
+        // Deeper, more saturated red without yellow bleed
+        return ['#ff3b3b', '#ff6b6b', '#ff3b3b', '#ff6b6b', '#ff3b3b'];
+      case 'yellow':
+        // Amber/Orange → Yellow gradient for warmer energy
+        return ['#ff9f1a', '#ffd166', '#ff9f1a', '#ffd166', '#ff9f1a'];
+      case 'green':
+        // Dark → Light green gradient (emerald to mint)
+        return ['#0f9d58', '#34d399', '#0f9d58', '#34d399', '#0f9d58'];
+      case 'blue':
+      default:
+        // Azure to lavender matching platform hero gradient
+        return ['#60a5fa', '#a78bfa', '#60a5fa', '#a78bfa', '#60a5fa'];
+    }
+  };
 
   // Function to get score styling based on value
   const getScoreStyles = (score: number) => {
@@ -308,9 +334,9 @@ const PortfolioScanner = () => {
   }
 
   return (
-    <div className="min-h-screen gradient-dashboard">
+    <div className="min-h-screen bg-background">
       {/* Uplift Platform Navigation */}
-      <nav className="sticky top-0 z-50 w-full bg-gradient-to-r from-primary/10 to-secondary/10 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/20">
+      <nav className="sticky top-0 z-50 w-full bg-white/10 dark:bg-black/10 backdrop-blur-md supports-[backdrop-filter]:bg-white/5 dark:supports-[backdrop-filter]:bg-black/5 border-b border-white/20 dark:border-white/10 shadow-lg shadow-black/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             {/* Uplift Logo */}
@@ -439,61 +465,88 @@ const PortfolioScanner = () => {
         </div>
       </nav>
 
-      {/* Header Section with Scores */}
-      <div className="bg-gradient-to-br from-[#6B5BFF]/20 via-[#7E8BFF]/16 to-[#2FD7C0]/20 border-b border-border/20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4" style={{ textShadow: '0 0 14px rgba(255,255,255,0.35), 0 2px 10px rgba(0,0,0,0.08)' }}>
+      {/* Header Section with Scores - AcademicPlanner aesthetic */}
+      <div className="hero-gradient text-white">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
               Portfolio Dashboard
             </h1>
-            <p className="text-white/85 text-lg max-w-2xl mx-auto mb-6" style={{ textShadow: '0 1px 6px rgba(0,0,0,0.15)' }}>
+            <p className="text-xl text-white/90 max-w-2xl mx-auto drop-shadow-md">
               Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
             </p>
-            
-            {/* Overall Portfolio Strength and Completion */}
-            <div className="flex items-center justify-center gap-8 mb-8">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.06)' }}>
-                  {(aiOverall || overallScore).toFixed(1)}/10
-                </div>
-                <div className="text-sm text-white/80 font-medium">Portfolio Strength</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-white" style={{ textShadow: '0 0 10px rgba(255,255,255,0.3), 0 2px 8px rgba(0,0,0,0.06)' }}>
-                  {overallProgress}%
-                </div>
-                <div className="text-sm text-white/80 font-medium">Complete</div>
-              </div>
-            </div>
           </div>
 
-          {/* Metric Boxes */}
-          <div className="flex flex-wrap justify-center gap-5 mb-8">
-            {[
-              { key: 'academicExcellence', label: 'Academic Excellence', icon: GraduationCap },
-              { key: 'leadershipPotential', label: 'Leadership Potential', icon: Users },
-              { key: 'personalGrowth', label: 'Personal Growth', icon: TrendingUp },
-              { key: 'communityImpact', label: 'Community Impact', icon: Heart },
-              { key: 'uniqueValue', label: 'Unique Value', icon: Sparkles },
-              { key: 'futureReadiness', label: 'Future Readiness', icon: Target }
-             ].map(({ key, label, icon: Icon }) => {
-               const score = rubricScores[key as keyof typeof rubricScores]?.score || 0;
-              
-              return (
-                <Card key={key} className="bg-background border border-border hover-lift transition-all duration-300 w-auto min-w-[150px]">
-                  <CardContent className="p-3 text-center">
-                    <Icon className="h-5 w-5 mx-auto mb-1 text-primary" />
-                    <div className="text-lg md:text-xl font-bold mb-1 bg-gradient-to-r from-[#6B5BFF] to-[#2FD7C0] bg-clip-text text-transparent">
-                      {score.toFixed(1)}
-                    </div>
-                    <div className="text-sm text-muted-foreground font-medium">
-                      {label}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          {/* Strength and Completion Grid - holographic (demo values to preview all tones) */}
+          {(() => {
+            const showColorDemo = true;
+            const demo = {
+              overall: 9.4,      // blue
+              completion: 62,    // yellow
+              academic: 8.1,     // green
+              leadership: 4.5,   // red
+            };
+            const overallVal = showColorDemo ? demo.overall : (aiOverall || overallScore);
+            const completionVal = showColorDemo ? demo.completion : overallProgress;
+            const academicVal = showColorDemo ? demo.academic : (rubricScores.academicExcellence.score || 0);
+            const leadershipVal = showColorDemo ? demo.leadership : (rubricScores.leadershipPotential.score || 0);
+
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText 
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass(overallVal) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {overallVal.toFixed(1)}
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Portfolio Strength</div>
+                </div>
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass((completionVal) / 10) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {completionVal}%
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Complete</div>
+                </div>
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass(academicVal) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {academicVal.toFixed(1)}
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Academic Excellence</div>
+                </div>
+                <div className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover">
+                  <GradientText
+                    className="text-3xl font-bold metric-value"
+                    colors={toneToColors(getHoloToneClass(leadershipVal) as any)}
+                    animationSpeed={10}
+                    showBorder={false}
+                    textOnly
+                  >
+                    {leadershipVal.toFixed(1)}
+                  </GradientText>
+                  <div className="text-sm metric-label font-semibold mt-1">Leadership Potential</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Secondary metrics row removed to avoid repetition */}
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogOverlay } from '@/components/ui/dialog';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import PathwayNode from './PathwayNode';
+import AnimatedContent from './AnimatedContent';
 import PathwayConnection from './PathwayConnection';
 import BasicInformationWizard from './BasicInformationWizard';
 import AcademicJourneyWizard from './AcademicJourneyWizard';
@@ -261,20 +262,33 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
         {/* Header removed for a cleaner, cohesive layout */}
 
         {/* Centered Pathway */}
-        <div className="relative flex flex-col items-center space-y-20">
+        <div className="relative flex flex-col items-center space-y-44">
           {pathwaySections.map((section, index) => (
             <div key={section.id} className="relative">
               {/* Simple Connection Line */}
               {index < pathwaySections.length - 1 && (
-                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0.5 h-20 bg-gradient-to-b from-border to-transparent z-0" />
+                <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0.5 h-44 bg-gradient-to-b from-border to-transparent z-0" />
               )}
               
               {/* Pathway Node */}
               <div className="relative z-10">
-                <PathwayNode
-                  section={section}
-                  onClick={() => handleSectionClick(section.id, section.status)}
-                />
+                <AnimatedContent
+                  distance={220}
+                  direction="vertical"
+                  reverse={false}
+                  duration={1.6}
+                  ease="power3.out"
+                  initialOpacity={0}
+                  animateOpacity
+                  scale={1.02}
+                  threshold={0.08}
+                  delay={0.03 * index}
+                >
+                  <PathwayNode
+                    section={section}
+                    onClick={() => handleSectionClick(section.id, section.status)}
+                  />
+                </AnimatedContent>
               </div>
             </div>
           ))}

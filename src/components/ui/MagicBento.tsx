@@ -2,8 +2,8 @@ import { useRef, useEffect, useCallback, useState, ReactNode } from 'react';
 import { gsap } from 'gsap';
 import './MagicBento.css';
 
-const DEFAULT_PARTICLE_COUNT = 12;
-const DEFAULT_SPOTLIGHT_RADIUS = 300;
+const DEFAULT_PARTICLE_COUNT = 6;
+const DEFAULT_SPOTLIGHT_RADIUS = 120;
 const DEFAULT_GLOW_COLOR = '132, 0, 255';
 const MOBILE_BREAKPOINT = 768;
 
@@ -360,19 +360,19 @@ const GlobalSpotlight: React.FC<GlobalSpotlightProps> = ({
 
     const spotlight = document.createElement('div');
     spotlight.className = 'global-spotlight';
+    const size = Math.max(140, Math.round(spotlightRadius * 2));
     spotlight.style.cssText = `
       position: fixed;
-      width: 800px;
-      height: 800px;
+      width: ${size}px;
+      height: ${size}px;
       border-radius: 50%;
       pointer-events: none;
       background: radial-gradient(circle,
-        rgba(${glowColor}, 0.15) 0%,
-        rgba(${glowColor}, 0.08) 15%,
-        rgba(${glowColor}, 0.04) 25%,
-        rgba(${glowColor}, 0.02) 40%,
-        rgba(${glowColor}, 0.01) 65%,
-        transparent 70%
+        rgba(${glowColor}, 0.22) 0%,
+        rgba(${glowColor}, 0.12) 18%,
+        rgba(${glowColor}, 0.06) 32%,
+        rgba(${glowColor}, 0.03) 44%,
+        transparent 56%
       );
       z-index: 200;
       opacity: 0;
@@ -443,9 +443,9 @@ const GlobalSpotlight: React.FC<GlobalSpotlightProps> = ({
 
       const targetOpacity =
         minDistance <= proximity
-          ? 0.8
+          ? 0.6
           : minDistance <= fadeDistance
-            ? ((fadeDistance - minDistance) / (fadeDistance - proximity)) * 0.8
+            ? ((fadeDistance - minDistance) / (fadeDistance - proximity)) * 0.6
             : 0;
 
       gsap.to(spotlightRef.current, {
@@ -532,15 +532,15 @@ const MagicBento: React.FC<MagicBentoProps> = ({
   cards,
   textAutoHide = true,
   enableStars = true,
-  enableSpotlight = true,
+  enableSpotlight = false,
   enableBorderGlow = true,
   disableAnimations = false,
   spotlightRadius = DEFAULT_SPOTLIGHT_RADIUS,
   particleCount = DEFAULT_PARTICLE_COUNT,
   enableTilt = false,
   glowColor = DEFAULT_GLOW_COLOR,
-  clickEffect = true,
-  enableMagnetism = true,
+  clickEffect = false,
+  enableMagnetism = false,
 }) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const isMobile = useMobileDetection();
