@@ -329,8 +329,8 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
                   animateOpacity
                   scale={1.02}
                   threshold={0.24}
-                  enterThreshold={(section.id === 'support' || section.id === 'growth') ? 0.30 : 0.26}
-                  leaveThreshold={(section.id === 'support' || section.id === 'growth') ? 0.46 : 0.40}
+                  enterThreshold={(section.id === 'academic-journey') ? 0.24 : ((section.id === 'support' || section.id === 'growth') ? 0.30 : 0.26)}
+                  leaveThreshold={(section.id === 'personal-info') ? 0.52 : ((section.id === 'support' || section.id === 'growth') ? 0.46 : 0.40)}
                   delay={0.05 * index}
                   reversible
                   leaveOpacity={0}
