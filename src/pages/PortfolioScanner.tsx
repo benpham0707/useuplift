@@ -905,7 +905,7 @@ const PortfolioScanner = () => {
                           {/* Unify Card */}
                           <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
                             <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs uppercase tracking-wide text-white/80">Unify</div>
+                              <div className="text-xs uppercase tracking-wide">Unify</div>
                               <div className="flex items-center gap-1">
                                 <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setUnifyIndex((i) => (i + 2) % 3)} aria-label="Prev unify insight">
                                   <ChevronLeft className="h-3.5 w-3.5 text-white" />
@@ -930,7 +930,7 @@ const PortfolioScanner = () => {
                           {/* Make Proof Visible Card */}
                           <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
                             <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs uppercase tracking-wide text-white/80">Make proof visible</div>
+                              <div className="text-xs uppercase tracking-wide">Make proof visible</div>
                               <div className="flex items-center gap-1">
                                 <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setProofIndex((i) => (i + 2) % 3)} aria-label="Prev proof insight">
                                   <ChevronLeft className="h-3.5 w-3.5 text-white" />
@@ -955,7 +955,7 @@ const PortfolioScanner = () => {
                           {/* Sequence Card */}
                           <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
                             <div className="flex items-center justify-between mb-1">
-                              <div className="text-xs uppercase tracking-wide text-white/80">Sequence</div>
+                              <div className="text-xs uppercase tracking-wide">Sequence</div>
                               <div className="flex items-center gap-1">
                                 <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setSequenceIndex((i) => (i + 2) % 3)} aria-label="Prev sequence insight">
                                   <ChevronLeft className="h-3.5 w-3.5 text-white" />
