@@ -1,0 +1,129 @@
+.banner-surface {
+  position: relative; /* parent decides absolute layout */
+  display: block;
+  width: 100%;
+  pointer-events: none; /* keep parent interactive */
+  opacity: 0;
+  transform: translateY(28px) scale(0.985);
+  /* Even longer fade for a slower, more graceful entrance */
+  transition: opacity 3600ms cubic-bezier(0.22, 1, 0.36, 1), transform 1600ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--banner-appear-delay, 120ms);
+}
+
+/* Tone variants */
+.banner-surface.completed .marquee {
+  background: linear-gradient(90deg, rgba(99,102,241,1) 0%, rgba(20,184,166,1) 100%);
+  box-shadow: 0 0 42px rgba(99,102,241,0.55), 0 0 80px rgba(20,184,166,0.45), inset 0 0 0 1px rgba(255,255,255,0.28);
+  position: relative;
+  animation: banner-pulse 4.5s ease-in-out infinite;
+}
+
+.banner-surface.in-progress .marquee {
+  background: linear-gradient(90deg, rgba(168,85,247,1) 0%, rgba(59,130,246,1) 100%);
+}
+
+.banner-surface.uncompleted .marquee {
+  background: #ffffff;
+  filter: grayscale(1);
+}
+
+.banner-surface.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Ensure the banner is fully hidden when not visible (prevents lingering in layout on some browsers) */
+.banner-surface:not(.is-visible) .marquee {
+  visibility: hidden;
+}
+
+.marquee {
+  position: relative;
+  left: 0;
+  width: 100%; /* inherit from container; container defines span */
+  height: 96px; /* ribbon height */
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: 0; /* rectangular ends */
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15) inset, 0 0 0 1px rgba(255,255,255,0.25) inset;
+}
+
+/* Shimmer sweep for completed */
+.banner-surface.completed .marquee::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -40%;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.55) 50%, rgba(255,255,255,0) 100%);
+  transform: skewX(-18deg);
+  filter: blur(1px);
+  animation: banner-sheen 2.8s linear infinite;
+  pointer-events: none;
+}
+
+.marquee__inner-wrap {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.marquee__inner {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  height: 100%;
+  width: max-content;
+  will-change: transform;
+  animation: banner-scroll var(--banner-duration, 16s) linear infinite;
+}
+
+.marquee__inner.ltr { animation-direction: normal; }
+.marquee__inner.rtl { animation-direction: reverse; }
+
+@keyframes banner-scroll {
+  0% { transform: translateX(-25%); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes banner-sheen {
+  0% { left: -50%; }
+  100% { left: 110%; }
+}
+
+@keyframes banner-pulse {
+  0%, 100% { box-shadow: 0 0 34px rgba(99,102,241,0.45), 0 0 64px rgba(20,184,166,0.35), inset 0 0 0 1px rgba(255,255,255,0.24); }
+  50% { box-shadow: 0 0 60px rgba(99,102,241,0.7), 0 0 100px rgba(20,184,166,0.55), inset 0 0 0 1px rgba(255,255,255,0.32); }
+}
+
+.marquee span {
+  color: #060010;
+  white-space: nowrap;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  padding: 0 24px;
+}
+
+.banner-surface.completed .marquee span,
+.banner-surface.in-progress .marquee span {
+  color: #ffffff;
+}
+
+.marquee__img {
+  width: 220px;
+  height: 72px;
+  margin: 0 24px;
+  border-radius: 40px;
+  background-size: cover;
+  background-position: 50% 50%;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.25) inset, 0 0 0 1px rgba(255,255,255,0.35) inset;
+}
+
+/* animation driven via CSS variables updated globally */
+
+
