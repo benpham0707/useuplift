@@ -20,7 +20,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { MetricCard } from '@/components/dashboard/MetricCard';
+import { OverallStrengthHero } from '@/components/dashboard/OverallStrengthHero';
+import { QuickMetricCard } from '@/components/dashboard/QuickMetricCard';
 import { DimensionInsightCard } from '@/components/portfolio/DimensionInsightCard';
 import { RecommendationInsightCard } from '@/components/portfolio/RecommendationInsightCard';
 import { GapAnalysisCard } from '@/components/portfolio/GapAnalysisCard';
@@ -336,63 +337,64 @@ export default function PortfolioInsights() {
 
       <div className="max-w-7xl mx-auto px-6 py-12 space-y-16">
         {/* Section 1: Key Findings Grid (MagicBento 2x2) */}
+        {/* Section 1: Key Findings (Hero + Supporting Metrics) */}
         <section className="space-y-6 animate-fade-in">
           <div className="flex items-center gap-3">
-            <FileText className="h-7 w-7 text-purple-600" />
+            <Target className="h-7 w-7 text-purple-600" />
             <h2 className="text-3xl font-bold">Key Findings</h2>
           </div>
-          
-          <MagicBento 
-            cards={[
-              {
-                content: (
-                  <MetricCard
-                    title="Overall Portfolio Strength"
-                    value={overall?.toFixed(1) || '—'}
-                    subtitle={tierInfo.name}
-                    variant="primary"
-                  />
-                )
-              },
-              {
-                content: (
-                  <MetricCard
-                    title="Dimensions Excelling"
-                    value={dimensionsExcellingCount}
-                    subtitle={`${dimensionsExcellingCount} dimension${dimensionsExcellingCount !== 1 ? 's' : ''} scoring >8.0`}
-                    variant="secondary"
-                  />
-                )
-              },
-              {
-                content: (
-                  <MetricCard
-                    title="Unique Differentiators"
-                    value={hiddenStrengthsCount}
-                    subtitle="Hidden strengths discovered"
-                    variant="success"
-                  />
-                )
-              },
-              {
-                content: (
-                  <MetricCard
-                    title="Priority Focus Areas"
-                    value={priorityActionsCount}
-                    subtitle="High-impact recommendations"
-                    variant="warning"
-                  />
-                )
-              }
-            ]}
-            textAutoHide={false}
-            enableStars={true}
-            enableSpotlight={true}
-            enableBorderGlow={true}
-            enableTilt={true}
-            particleCount={6}
-            glowColor="280, 80%, 65%"
-          />
+          <p className="text-muted-foreground leading-relaxed">
+            High-level summary of your portfolio strengths and priority areas for focused improvement.
+          </p>
+
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            {/* Hero Card - 3 columns */}
+            <div className="lg:col-span-3">
+              <OverallStrengthHero
+                score={overall || 0}
+                tierName={tierInfo.name}
+                tierColor={tierInfo.color}
+                tierGradient={tierInfo.gradient}
+                excellingCount={dimensionsExcellingCount}
+                totalDimensions={6}
+              />
+            </div>
+
+            {/* Supporting Metrics - 2 columns, stacked */}
+            <div className="lg:col-span-2 space-y-4">
+              <QuickMetricCard
+                title="Dimensions Excelling"
+                value={dimensionsExcellingCount}
+                subtitle={`Scoring above 8.0 threshold`}
+                icon={Award}
+                colorClasses="bg-gradient-to-br from-cyan-50 to-cyan-100"
+                borderColor="hsl(195, 85%, 55%)"
+                visualIndicator={
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-500" />
+                  </div>
+                }
+              />
+              <QuickMetricCard
+                title="Unique Differentiators"
+                value={hiddenStrengthsCount}
+                subtitle="Hidden strengths discovered"
+                icon={Sparkles}
+                colorClasses="bg-gradient-to-br from-emerald-50 to-emerald-100"
+                borderColor="hsl(145, 70%, 50%)"
+              />
+              <QuickMetricCard
+                title="Priority Focus Areas"
+                value={priorityActionsCount}
+                subtitle="High-impact recommendations"
+                icon={TrendingUp}
+                colorClasses="bg-gradient-to-br from-amber-50 to-amber-100"
+                borderColor="hsl(35, 90%, 60%)"
+              />
+            </div>
+          </div>
         </section>
 
         {/* Section 2: Dimensional Analysis (MagicBento 3x2) */}
