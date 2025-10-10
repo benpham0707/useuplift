@@ -415,6 +415,19 @@ All colors MUST be HSL.
     text-shadow: 0 0 10px hsl(220 100% 65% / 0.6);
   }
 
+  /* High-contrast white text with layered shadows for readability on bright backgrounds */
+  .text-hero-contrast {
+    color: #fff;
+    text-shadow:
+      0 1px 2px rgba(0,0,0,0.45),
+      0 2px 8px rgba(0,0,0,0.25);
+    font-weight: 600;
+  }
+
+  .no-text-shadow {
+    text-shadow: none !important;
+  }
+
   /* Enhanced Visual Effects for Portfolio Dashboard */
   .glass-card {
     @apply bg-card/70 backdrop-blur-md border border-border/50 shadow-soft;

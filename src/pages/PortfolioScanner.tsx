@@ -70,6 +70,9 @@ const PortfolioScanner = () => {
   const [isEditingNarrative, setIsEditingNarrative] = useState(false);
   const [narrativeDraft, setNarrativeDraft] = useState('');
   const [narratives, setNarratives] = useState<string[]>([]);
+  const [unifyIndex, setUnifyIndex] = useState(0);
+  const [proofIndex, setProofIndex] = useState(0);
+  const [sequenceIndex, setSequenceIndex] = useState(0);
 
   // Compute top two strengths for narrative generation
   const getTopTwo = () => {
@@ -764,12 +767,30 @@ const PortfolioScanner = () => {
           {/* Portfolio Overview (shown when insights panel is collapsed) */}
           {!isInsightsOpen && (
             <div className="mt-6">
-              <Card className="border-2 border-white/30 bg-white/20 text-white backdrop-blur-md shadow-medium overflow-hidden">
-                <div className="h-1 w-full" style={{ backgroundImage: getMetricTheme('overall').gradientCss }} />
+              <Card className="relative border-2 border-white/40 bg-white/20 text-white backdrop-blur-xl shadow-strong overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-white/10 to-transparent pointer-events-none" aria-hidden="true" />
+                <div className="relative h-1 w-full" style={{ backgroundImage: getMetricTheme('overall').gradientCss }} />
                 <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between gap-4">
-                    <CardTitle className="text-white">Portfolio Overview</CardTitle>
-                    <span className="px-2.5 py-1 rounded-full text-sm font-semibold bg-white/25">{((aiOverall ?? overallScore) || 0).toFixed(1)} / 10</span>
+                  <div className="flex items-center justify-between gap-4 text-hero-contrast">
+                    <CardTitle className="">Portfolio Overview</CardTitle>
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1.5 rounded-md text-sm font-semibold bg-white/25 no-text-shadow">
+                        {(() => {
+                          const showDemo = true;
+                          const demo = { impact: 8.2, academic: 8.1, curiosity: 7.6, story: 7.9, character: 7.3 };
+                          const impactVal = showDemo ? demo.impact : (rubricScores.leadershipPotential.score || 0);
+                          const academicVal = showDemo ? demo.academic : (rubricScores.academicExcellence.score || 0);
+                          const curiosityVal = showDemo ? demo.curiosity : (rubricScores.futureReadiness.score || 0);
+                          const storyVal = showDemo ? demo.story : (aiOverall || overallScore || 0);
+                          const characterVal = showDemo ? demo.character : (rubricScores.communityImpact.score || 0);
+                          const avg = (impactVal + academicVal + curiosityVal + Number(storyVal) + characterVal) / 5;
+                          return avg.toFixed(1);
+                        })()} / 10
+                      </span>
+                      <Button size="sm" variant="secondary" onClick={() => navigate('/portfolio-insights?metric=overall')} className="text-hero-contrast no-text-shadow">
+                        View full insights
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -797,21 +818,21 @@ const PortfolioScanner = () => {
 
                     return (
                       <div className="space-y-5">
-                        <div className="text-white/90 text-[15px] leading-7">
+                        <div className="text-[15px] leading-7 text-hero-contrast">
                           {(() => {
                             const overall = toFixed((aiOverall ?? overallScore) || 0);
                             const strengthText = top2.map(d => d.key).join(' and ');
                             const focusText = bottom2.map(d => d.key).join(' and ');
-                            if (overall >= 8.8) return `You’re operating at an application‑ready level with clear strengths in ${strengthText}. Protect focus and keep outcomes visible. Your next gains come from crisp storytelling and evidence density rather than adding more activities.`;
-                            if (overall >= 7.8) return `You have a strong foundation with standout momentum in ${strengthText}. To break into top‑tier, shape a single narrative throughline and convert work into public, measurable outcomes. Primary attention: ${focusText}.`;
-                            if (overall >= 6.8) return `Good velocity and emerging strengths in ${strengthText}. The portfolio needs tighter coherence and proof of impact. Prioritize ${focusText} and publish small, frequent artifacts that make your direction undeniable.`;
-                            return `You’re early in the build. Clarify a direction, choose one lane to push, and make progress visible every 2–3 weeks. Start by strengthening ${focusText} while preserving the spark in ${strengthText}.`;
+                            if (overall >= 8.8) return `You’re operating at an application‑ready level with clear strengths in ${strengthText}. Evidence is visible and pace is consistent; your job now is to keep outcomes dense and avoid diluting the story. Prioritize depth over breadth and tighten the line from problem → action → result. Add a one‑sentence “why this matters” to each activity so the arc is unmistakable.`;
+                            if (overall >= 7.8) return `You have a strong foundation with standout momentum in ${strengthText}. To hit top‑tier, unify everything under one throughline and convert more work into public, measurable outcomes. Trim or reframe items that don’t advance the arc, and add before/after numbers wherever possible. Focus attention on ${focusText} to raise the ceiling.`;
+                            if (overall >= 6.8) return `You’ve built solid early progress with emerging strengths in ${strengthText}. The portfolio reads a bit fragmented—coherence and proof are the main unlocks. Choose one lane to lead with and stack small, visible artifacts around it. Concentrate on ${focusText} to create noticeable lift in the next 60–90 days.`;
+                            return `This is an early‑stage profile with limited public proof. Start by naming a direction and publishing small, measurable artifacts on a two‑week cadence. Use each artifact to state the problem, what you tried, and what changed. Strengthen ${focusText} while nurturing the spark in ${strengthText}.`;
                           })()}
                         </div>
 
-                        <div className="rounded-lg border border-white/25 bg-white/10 p-4">
+                        <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-4 text-hero-contrast">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="text-xs uppercase tracking-wide text-white/80">Suggested narrative</div>
+                            <div className="text-xs uppercase tracking-wide">Portfolio narrative</div>
                             <div className="flex items-center gap-2">
                               {!isEditingNarrative && (
                                 <button
@@ -870,28 +891,83 @@ const PortfolioScanner = () => {
                         </div>
 
                         <div className="grid md:grid-cols-3 gap-4">
-                          <div className="rounded-lg border border-white/20 bg-white/10 p-3">
-                            <div className="text-xs uppercase tracking-wide text-white/80 mb-1">Unify</div>
-                            <div className="text-white/95 text-sm">Rename and reorder activities to reinforce one throughline; remove or downsize items that don’t fit.</div>
+                          {/* Unify Card */}
+                          <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs uppercase tracking-wide text-white/80">Unify</div>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setUnifyIndex((i) => (i + 2) % 3)} aria-label="Prev unify insight">
+                                  <ChevronLeft className="h-3.5 w-3.5 text-white" />
+                                </button>
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setUnifyIndex((i) => (i + 1) % 3)} aria-label="Next unify insight">
+                                  <ChevronRight className="h-3.5 w-3.5 text-white" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-white/95 text-sm">
+                              {(() => {
+                                const unify = [
+                                  'Rename and reorder activities to reinforce one throughline; remove or downsize items that don’t fit.',
+                                  'Group efforts under 2–3 themes (e.g., education equity, health tech); explain how each activity advances one theme.',
+                                  'Rewrite activity blurbs to lead with outcomes and tie each result to the same purpose statement.',
+                                ];
+                                return unify[unifyIndex];
+                              })()}
+                            </div>
                           </div>
-                          <div className="rounded-lg border border-white/20 bg-white/10 p-3">
-                            <div className="text-xs uppercase tracking-wide text-white/80 mb-1">Make proof visible</div>
-                            <div className="text-white/95 text-sm">Publish a small artifact every 2–3 weeks (demo, write‑up, repo, testimonial) tied to a number.</div>
+
+                          {/* Make Proof Visible Card */}
+                          <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs uppercase tracking-wide text-white/80">Make proof visible</div>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setProofIndex((i) => (i + 2) % 3)} aria-label="Prev proof insight">
+                                  <ChevronLeft className="h-3.5 w-3.5 text-white" />
+                                </button>
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setProofIndex((i) => (i + 1) % 3)} aria-label="Next proof insight">
+                                  <ChevronRight className="h-3.5 w-3.5 text-white" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-white/95 text-sm">
+                              {(() => {
+                                const proof = [
+                                  'Publish a small artifact every 2–3 weeks (demo, write‑up, repo, testimonial) tied to a number.',
+                                  'Track impact with three metrics (people reached, hours saved, dollars raised) and show a simple before/after.',
+                                  'Create a single hub page linking evidence: timeline of artifacts, quick metrics, and 1–2 quotes from beneficiaries.',
+                                ];
+                                return proof[proofIndex];
+                              })()}
+                            </div>
                           </div>
-                          <div className="rounded-lg border border-white/20 bg-white/10 p-3">
-                            <div className="text-xs uppercase tracking-wide text-white/80 mb-1">Sequence</div>
-                            <div className="text-white/95 text-sm">Commit to one 60–90 day push in the weakest area; schedule weekly check‑ins and a public update.</div>
+
+                          {/* Sequence Card */}
+                          <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs uppercase tracking-wide text-white/80">Sequence</div>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setSequenceIndex((i) => (i + 2) % 3)} aria-label="Prev sequence insight">
+                                  <ChevronLeft className="h-3.5 w-3.5 text-white" />
+                                </button>
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setSequenceIndex((i) => (i + 1) % 3)} aria-label="Next sequence insight">
+                                  <ChevronRight className="h-3.5 w-3.5 text-white" />
+                                </button>
+                              </div>
+                            </div>
+                            <div className="text-white/95 text-sm">
+                              {(() => {
+                                const seq = [
+                                  'Commit to one 60–90 day push in the weakest area; schedule weekly check‑ins and a public update.',
+                                  'Plan three milestones (week 3, 6, 9) with deliverables; each milestone ends with a visible proof post.',
+                                  'Pick a mentor or peer for accountability; share progress every two weeks and ask one specific question.',
+                                ];
+                                return seq[sequenceIndex];
+                              })()}
+                            </div>
                           </div>
                         </div>
 
-                        <div>
-                          <div className="text-xs uppercase tracking-wide text-white/80 mb-1">30 / 60 / 90 plan</div>
-                          <ul className="text-sm text-white/95 space-y-1">
-                            <li className="flex items-start gap-2"><Target className="h-4 w-4 mt-0.5" /> Choose one focus lane and define a numeric goal.</li>
-                            <li className="flex items-start gap-2"><Lightbulb className="h-4 w-4 mt-0.5" /> Ship one public artifact; request feedback from a mentor.</li>
-                            <li className="flex items-start gap-2"><TrendingUp className="h-4 w-4 mt-0.5" /> Quantify impact and update your portfolio with outcomes.</li>
-                          </ul>
-                        </div>
+                        
                       </div>
                     );
                   })()}
