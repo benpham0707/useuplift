@@ -20,7 +20,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { apiFetch } from '@/lib/utils';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { DimensionInsightCard } from '@/components/portfolio/DimensionInsightCard';
 import { RecommendationInsightCard } from '@/components/portfolio/RecommendationInsightCard';
@@ -143,20 +142,20 @@ export default function PortfolioInsights() {
       try {
         setLoading(true);
         setError(null);
-        const session = await supabase.auth.getSession();
-        const token = session.data.session?.access_token;
-        const resp = await apiFetch('/api/v1/analytics/portfolio-strength', {
-          headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
+        
+        const { data, error } = await supabase.functions.invoke('analyze-portfolio');
+        
+        if (error) {
+          if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+            throw new Error('Please sign in again to view insights.');
           }
-        });
-        if (!resp.ok) {
-          const text = await resp.text();
-          if (resp.status === 401) throw new Error('Please sign in again to view insights (401).');
-          if (resp.status === 404) throw new Error('We need a profile to compute insights. Complete setup in Portfolio Scanner.');
-          throw new Error(text || `Request failed: ${resp.status}`);
+          if (error.message?.includes('404') || error.message?.includes('not found')) {
+            throw new Error('We need a profile to compute insights. Complete setup in Portfolio Scanner.');
+          }
+          throw new Error(error.message || 'Failed to analyze portfolio');
         }
-        const json = await resp.json();
+        
+        const json = data;
         if (cancelled) return;
         setOverall(typeof json?.overall === 'number' ? Number(json.overall) : null);
         const normalizedDims = normalizeDimensions(json?.dimensions || {});
