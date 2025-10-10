@@ -434,7 +434,7 @@ export default function PortfolioInsights() {
           />
         </section>
 
-        {/* Section 3: Hidden Strengths (Non-MagicBento) */}
+        {/* Section 3: Hidden Strengths (GapAnalysisCard-style) */}
         {hiddenStrengthsCount > 0 && (
           <section className="space-y-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
             <div className="flex items-center gap-3">
@@ -445,16 +445,44 @@ export default function PortfolioInsights() {
               Hidden strengths identified through cross-dimensional analysis of your experiences and achievements.
             </p>
 
-            <Card className="bg-white/80 backdrop-blur border-2">
-              <CardContent className="p-8">
-                <div className="flex flex-wrap gap-3">
+            <Card 
+              className="bg-white border-2 transition-all duration-300 hover:shadow-lg border-l-4"
+              style={{ borderLeftColor: 'hsl(280, 80%, 65%)' }}
+            >
+              <CardContent className="p-6 space-y-4">
+                {/* Header with Progress Indicator */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-lg flex items-center justify-center text-white shadow"
+                      style={{ background: 'linear-gradient(135deg, hsl(280, 80%, 65%), hsl(280, 80%, 55%))' }}
+                    >
+                      <Sparkles className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm leading-tight">Unique Strengths Unlocked</h3>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {hiddenStrengthsCount} differentiators identified
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold" style={{ color: 'hsl(280, 80%, 65%)' }}>
+                      {hiddenStrengthsCount}
+                    </div>
+                    <div className="text-xs text-muted-foreground">found</div>
+                  </div>
+                </div>
+
+                {/* Badges Grid */}
+                <div className="flex flex-wrap gap-2 pt-2">
                   {detailed?.hiddenStrengths?.map((strength, idx) => (
                     <Badge
                       key={idx}
-                      className="px-4 py-2 text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-lg animate-fade-in"
+                      className="px-3 py-1.5 text-xs bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-md animate-fade-in hover:scale-105 transition-transform"
                       style={{ animationDelay: `${idx * 0.05}s` }}
                     >
-                      <Sparkles className="h-3.5 w-3.5 mr-2" />
+                      <Sparkles className="h-3 w-3 mr-1.5" />
                       {strength}
                     </Badge>
                   ))}

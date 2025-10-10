@@ -61,12 +61,12 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   return (
     <Card className={cn(
-      'group hover-lift transition-all duration-300 shadow-soft',
+      'group hover-lift transition-all duration-300 shadow-soft relative overflow-hidden',
       getVariantClasses(),
       className
     )}>
-      <CardContent className="p-6">
-        <div className="space-y-4">
+      <CardContent className="p-6 relative z-10">
+        <div className="space-y-3">
           <h3 className={cn(
             'text-sm font-medium tracking-wide uppercase',
             variant === 'default' ? 'text-muted-foreground' : 'text-white/80'
@@ -75,16 +75,44 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           </h3>
           
           <div className="space-y-2">
-            <div className={cn(
-              'text-3xl font-bold tracking-tight',
-              variant === 'default' ? 'text-foreground' : 'text-white'
-            )}>
-              {value}
+            <div className="flex items-end justify-between">
+              <div className={cn(
+                'text-3xl font-bold tracking-tight',
+                variant === 'default' ? 'text-foreground' : 'text-white'
+              )}>
+                {value}
+              </div>
+              
+              {/* Mini circular progress indicator for visual interest */}
+              {variant !== 'default' && typeof value === 'number' && (
+                <div className="relative w-12 h-12">
+                  <svg className="w-12 h-12 transform -rotate-90" viewBox="0 0 36 36">
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="14"
+                      fill="none"
+                      className="stroke-current text-white/20"
+                      strokeWidth="3"
+                    />
+                    <circle
+                      cx="18"
+                      cy="18"
+                      r="14"
+                      fill="none"
+                      className="stroke-current text-white"
+                      strokeWidth="3"
+                      strokeDasharray={`${(value / 10) * 88}, 88`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </div>
+              )}
             </div>
             
             {subtitle && (
               <p className={cn(
-                'text-sm',
+                'text-sm leading-snug',
                 variant === 'default' ? 'text-muted-foreground' : 'text-white/70'
               )}>
                 {subtitle}
@@ -103,6 +131,11 @@ export const MetricCard: React.FC<MetricCardProps> = ({
           </div>
         </div>
       </CardContent>
+      
+      {/* Subtle decorative gradient overlay */}
+      {variant !== 'default' && (
+        <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+      )}
     </Card>
   );
 };

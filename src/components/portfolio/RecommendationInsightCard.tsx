@@ -70,7 +70,7 @@ export const RecommendationInsightCard: React.FC<RecommendationInsightCardProps>
       )}
       style={{ borderLeftColor: getPriorityColor() }}
     >
-      <CardContent className="p-6 space-y-4">
+      <CardContent className="p-6 space-y-3">
         {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
@@ -96,42 +96,41 @@ export const RecommendationInsightCard: React.FC<RecommendationInsightCardProps>
           )}
         </div>
 
-        {/* Impact */}
-        {impact && (
-          <div className="space-y-2 pt-2 border-t border-border">
-            <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wide flex items-center gap-1.5">
-              <TrendingUp className="h-3.5 w-3.5" />
-              Impact Analysis
-            </div>
-            <div className="flex items-start gap-2 text-xs">
-              <span className="text-muted-foreground">{impact}</span>
-            </div>
-          </div>
-        )}
-        
-        {/* Timeline */}
-        {timeline && (
-          <div className="space-y-2 pt-2 border-t border-border">
-            <div className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              Implementation Timeline
-            </div>
-            <div className="flex items-start gap-2 text-xs">
-              <span className="text-muted-foreground">{timeline}</span>
-            </div>
+        {/* Two-Column Grid for Impact & Timeline */}
+        {(impact || timeline) && (
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            {/* Impact Column */}
+            {impact && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wide flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" />
+                  Impact
+                </div>
+                <p className="text-xs text-muted-foreground leading-snug">{impact}</p>
+              </div>
+            )}
+            
+            {/* Timeline Column */}
+            {timeline && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-semibold text-blue-600 uppercase tracking-wide flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Timeline
+                </div>
+                <p className="text-xs text-muted-foreground leading-snug">{timeline}</p>
+              </div>
+            )}
           </div>
         )}
 
-        {/* Rationale */}
+        {/* Rationale with line clamp */}
         {rationale && (
-          <div className="space-y-2 pt-2 border-t border-border">
-            <div className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
-              <Lightbulb className="h-3.5 w-3.5" />
-              Strategic Rationale
+          <div className="space-y-1.5 pt-2">
+            <div className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1">
+              <Lightbulb className="h-3 w-3" />
+              Rationale
             </div>
-            <div className="flex items-start gap-2 text-xs">
-              <span className="text-muted-foreground leading-relaxed">{rationale}</span>
-            </div>
+            <p className="text-xs text-muted-foreground leading-snug line-clamp-3">{rationale}</p>
           </div>
         )}
       </CardContent>
