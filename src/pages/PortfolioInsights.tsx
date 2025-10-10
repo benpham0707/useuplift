@@ -1,19 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, Award, Target, Sparkles, Trophy, Lock, Zap, BookOpen, Crown, Brain, Feather, Heart, Compass } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { 
+  ArrowLeft, 
+  Sparkles, 
+  BookOpen, 
+  Crown, 
+  Brain, 
+  Feather, 
+  Heart, 
+  Compass,
+  Target,
+  TrendingUp,
+  FileText,
+  Award
+} from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { apiFetch } from '@/lib/utils';
+import { MetricCard } from '@/components/dashboard/MetricCard';
+import { DimensionInsightCard } from '@/components/portfolio/DimensionInsightCard';
+import { RecommendationInsightCard } from '@/components/portfolio/RecommendationInsightCard';
+import { GapAnalysisCard } from '@/components/portfolio/GapAnalysisCard';
+import MagicBento, { BentoCard } from '@/components/ui/MagicBento';
 
 type DetailedInsights = {
   overallScore?: number;
   narrativeSummary?: string;
   hiddenStrengths?: string[];
-  prioritizedRecommendations?: { priority: number; action: string; impact?: string; timeline?: string }[];
+  prioritizedRecommendations?: { 
+    priority: number; 
+    action: string; 
+    impact?: string; 
+    timeline?: string;
+    rationale?: string;
+  }[];
   dimensions?: Record<string, {
     score?: number;
     evidence?: string[];
@@ -25,9 +49,9 @@ type DetailedInsights = {
 
 const DIMENSION_META = [
   { label: 'Academic Excellence', key: 'academicExcellence', icon: BookOpen, color: 'hsl(250 70% 60%)' },
-  { label: 'Leadership', key: 'leadershipPotential', icon: Crown, color: 'hsl(145 70% 50%)' },
+  { label: 'Leadership Potential', key: 'leadershipPotential', icon: Crown, color: 'hsl(145 70% 50%)' },
   { label: 'Intellectual Curiosity', key: 'futureReadiness', icon: Brain, color: 'hsl(195 85% 55%)' },
-  { label: 'Storytelling', key: 'overall', icon: Feather, color: 'hsl(280 80% 65%)' },
+  { label: 'Storytelling Ability', key: 'overall', icon: Feather, color: 'hsl(280 80% 65%)' },
   { label: 'Character & Community', key: 'communityImpact', icon: Heart, color: 'hsl(35 90% 60%)' },
   { label: 'Future Readiness', key: 'futureReadiness', icon: Compass, color: 'hsl(200 85% 60%)' },
 ];
@@ -45,7 +69,6 @@ export default function PortfolioInsights() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const { search } = useLocation();
-  const qp = useMemo(() => new URLSearchParams(search), [search]);
   const [initializing, setInitializing] = useState(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -54,7 +77,7 @@ export default function PortfolioInsights() {
   const [dimensions, setDimensions] = useState<Record<string, number>>({});
   const [detailed, setDetailed] = useState<DetailedInsights | null>(null);
 
-  // Ensure profile exists and determine onboarding state (mirrors scanner)
+  // Ensure profile exists and determine onboarding state
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -129,7 +152,6 @@ export default function PortfolioInsights() {
         });
         if (!resp.ok) {
           const text = await resp.text();
-          // Surface clearer messages for common statuses
           if (resp.status === 401) throw new Error('Please sign in again to view insights (401).');
           if (resp.status === 404) throw new Error('We need a profile to compute insights. Complete setup in Portfolio Scanner.');
           throw new Error(text || `Request failed: ${resp.status}`);
@@ -155,35 +177,57 @@ export default function PortfolioInsights() {
   }, [user, hasCompletedOnboarding, initializing]);
 
   const targetTop25 = 9.2;
-  const gapToTop25 = overall ? Math.max(0, Number((targetTop25 - overall).toFixed(1))) : null;
   const tierInfo = getTierInfo(overall);
-  const progress = overall ? (overall / 10) * 100 : 0;
 
-  // Calculate stats
-  const masteredCount = Object.values(dimensions).filter(score => score > 8).length;
+  // Calculate stats for quick metrics
+  const dimensionsExcellingCount = Object.values(dimensions).filter(score => score > 8).length;
   const hiddenStrengthsCount = detailed?.hiddenStrengths?.length || 0;
-  const questsCount = detailed?.prioritizedRecommendations?.length || 0;
+  const priorityActionsCount = detailed?.prioritizedRecommendations?.filter(r => r.priority === 1)?.length || 0;
+  const portfolioStrength = overall ? (overall >= 8.5 ? 'Strong' : overall >= 7 ? 'Good' : 'Developing') : 'Unknown';
+
+  // Calculate top 3 gaps for gap analysis
+  const gaps = DIMENSION_META.map(dim => {
+    const dimData = detailed?.dimensions?.[dim.key];
+    const score = typeof dimData?.score === 'number' ? dimData.score : dimensions[dim.key] || 0;
+    return {
+      ...dim,
+      currentScore: score,
+      gap: targetTop25 - score,
+      dimData
+    };
+  })
+  .filter(g => g.gap > 0)
+  .sort((a, b) => b.gap - a.gap)
+  .slice(0, 3);
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
-        <div className="text-muted-foreground text-lg">Loading your character sheet...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <div className="text-muted-foreground text-lg">Loading insights...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center">
-        <div className="text-destructive text-lg">{error}</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-8 text-center space-y-4">
+            <div className="text-destructive font-semibold text-lg">Unable to Load Insights</div>
+            <div className="text-sm text-muted-foreground">{error}</div>
+            <Button onClick={() => navigate('/portfolio-scanner')}>
+              Return to Portfolio Scanner
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-border/50 shadow-sm">
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate('/portfolio-scanner')}>
@@ -191,349 +235,337 @@ export default function PortfolioInsights() {
               Back
             </Button>
             <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${tierInfo.gradient} flex items-center justify-center text-white font-bold shadow-lg`}>
+              <div 
+                className={`w-10 h-10 rounded-full bg-gradient-to-br ${tierInfo.gradient} flex items-center justify-center text-white font-bold shadow-lg text-sm`}
+              >
                 {overall?.toFixed(1) || '—'}
               </div>
               <div>
-                <div className="font-semibold text-sm">Character Stats</div>
-                <div className="text-xs text-muted-foreground">{tierInfo.name}</div>
+                <div className="font-semibold text-sm">Portfolio Insights</div>
+                <div className="text-xs text-muted-foreground">Research Analysis</div>
               </div>
             </div>
           </div>
-          <div className="text-sm text-muted-foreground">Updated in real-time</div>
+          <div className="text-sm text-muted-foreground hidden sm:block">Live Analytics</div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12 space-y-16">
-        {/* Hero Section - Character Card */}
-        <section className="animate-fade-in">
-          <Card className="relative overflow-hidden bg-gradient-to-br from-white via-purple-50/30 to-blue-50/30 border-2 shadow-2xl">
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-blue-500/5" />
-            <div className="relative p-12">
-              <div className="grid md:grid-cols-3 gap-12 items-center">
-                {/* Left: Score Circle */}
-                <div className="flex justify-center">
-                  <div className="relative">
-                    <svg className="w-48 h-48 transform -rotate-90">
-                      <circle
-                        cx="96"
-                        cy="96"
-                        r="88"
-                        stroke="hsl(220 15% 90%)"
-                        strokeWidth="12"
-                        fill="none"
-                      />
-                      <circle
-                        cx="96"
-                        cy="96"
-                        r="88"
-                        stroke={tierInfo.color}
-                        strokeWidth="12"
-                        fill="none"
-                        strokeDasharray={`${progress * 5.53} ${553 - progress * 5.53}`}
-                        className="transition-all duration-1000"
-                        style={{ filter: 'drop-shadow(0 0 8px currentColor)' }}
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <div className="text-6xl font-bold" style={{ color: tierInfo.color }}>
-                        {overall?.toFixed(1) || '—'}
-                      </div>
-                      <div className="text-sm text-muted-foreground">/ 10</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Center: Character Info */}
-                <div className="space-y-4">
-                  <div>
-                    <Badge className={`bg-gradient-to-r ${tierInfo.gradient} text-white border-0 px-4 py-1 text-sm font-semibold mb-3`}>
-                      {tierInfo.name}
-                    </Badge>
-                    <h1 className="text-4xl font-bold bg-gradient-to-br from-purple-600 to-blue-600 bg-clip-text text-transparent mb-2">
-                      Your Character Profile
-                    </h1>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {detailed?.narrativeSummary || 'Your unique journey is being analyzed. Complete your profile to unlock your personalized narrative.'}
-                    </p>
-                  </div>
-                  {gapToTop25 !== null && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">XP to Elite Tier</span>
-                        <span className="font-semibold">{gapToTop25} points</span>
-                      </div>
-                      <div className="relative h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div 
-                          className="absolute inset-y-0 left-0 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-1000"
-                          style={{ width: `${(overall || 0) / 10 * 100}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: Quick Stats */}
-                <div className="space-y-3">
-                  <div className="flex items-center gap-3 p-4 bg-white/60 rounded-xl border border-purple-200/50">
-                    <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg flex items-center justify-center">
-                      <Trophy className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold">{masteredCount}</div>
-                      <div className="text-xs text-muted-foreground">Dimensions Mastered</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-white/60 rounded-xl border border-blue-200/50">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                      <Sparkles className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold">{hiddenStrengthsCount}</div>
-                      <div className="text-xs text-muted-foreground">Hidden Abilities</div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 p-4 bg-white/60 rounded-xl border border-orange-200/50">
-                    <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg flex items-center justify-center">
-                      <Target className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold">{questsCount}</div>
-                      <div className="text-xs text-muted-foreground">Active Quests</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </Card>
+        {/* Section 1: Key Findings Grid (MagicBento 2x2) */}
+        <section className="space-y-6 animate-fade-in">
+          <div className="flex items-center gap-3">
+            <FileText className="h-7 w-7 text-purple-600" />
+            <h2 className="text-3xl font-bold">Key Findings</h2>
+          </div>
+          
+          <MagicBento 
+            cards={[
+              {
+                content: (
+                  <MetricCard
+                    title="Overall Portfolio Strength"
+                    value={overall?.toFixed(1) || '—'}
+                    subtitle={tierInfo.name}
+                    variant="primary"
+                  />
+                )
+              },
+              {
+                content: (
+                  <MetricCard
+                    title="Dimensions Excelling"
+                    value={dimensionsExcellingCount}
+                    subtitle={`${dimensionsExcellingCount} dimension${dimensionsExcellingCount !== 1 ? 's' : ''} scoring >8.0`}
+                    variant="secondary"
+                  />
+                )
+              },
+              {
+                content: (
+                  <MetricCard
+                    title="Unique Differentiators"
+                    value={hiddenStrengthsCount}
+                    subtitle="Hidden strengths discovered"
+                    variant="success"
+                  />
+                )
+              },
+              {
+                content: (
+                  <MetricCard
+                    title="Priority Focus Areas"
+                    value={priorityActionsCount}
+                    subtitle="High-impact recommendations"
+                    variant="warning"
+                  />
+                )
+              }
+            ]}
+            textAutoHide={false}
+            enableStars={true}
+            enableSpotlight={true}
+            enableBorderGlow={true}
+            enableTilt={true}
+            particleCount={6}
+            glowColor="280, 80%, 65%"
+          />
         </section>
 
-        {/* Skills Tree - Dimensional Breakdown */}
-        <section className="space-y-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+        {/* Section 2: Dimensional Analysis (MagicBento 3x2) */}
+        <section className="space-y-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
           <div className="flex items-center gap-3">
-            <Zap className="h-8 w-8 text-purple-600" />
-            <h2 className="text-3xl font-bold">Skills & Attributes</h2>
+            <Award className="h-7 w-7 text-purple-600" />
+            <h2 className="text-3xl font-bold">Dimensional Analysis</h2>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {DIMENSION_META.map((dim, idx) => {
+          <p className="text-muted-foreground leading-relaxed">
+            Detailed breakdown of each assessment dimension with identified strengths and development opportunities.
+          </p>
+
+          <MagicBento 
+            cards={DIMENSION_META.map((dim, idx) => {
               const dimData = detailed?.dimensions?.[dim.key] || {};
-              const score = typeof dimData?.score === 'number' ? Number(dimData.score) : (dimensions as any)?.[dim.key] || null;
-              const Icon = dim.icon;
+              const score = typeof dimData?.score === 'number' ? dimData.score : dimensions[dim.key] || null;
               
+              return {
+                content: (
+                  <DimensionInsightCard
+                    label={dim.label}
+                    icon={dim.icon}
+                    color={dim.color}
+                    score={score}
+                    strengths={dimData.strengths}
+                    growthAreas={dimData.growthAreas}
+                    insight={dimData.feedback}
+                  />
+                )
+              };
+            })}
+            textAutoHide={false}
+            enableStars={true}
+            enableSpotlight={true}
+            enableBorderGlow={true}
+            enableTilt={true}
+            particleCount={6}
+            glowColor="280, 80%, 65%"
+          />
+        </section>
+
+        {/* Section 3: Hidden Strengths (Non-MagicBento) */}
+        {hiddenStrengthsCount > 0 && (
+          <section className="space-y-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+            <div className="flex items-center gap-3">
+              <Sparkles className="h-7 w-7 text-purple-600" />
+              <h2 className="text-3xl font-bold">Unique Differentiators Discovered</h2>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Hidden strengths identified through cross-dimensional analysis of your experiences and achievements.
+            </p>
+
+            <Card className="bg-white/80 backdrop-blur border-2">
+              <CardContent className="p-8">
+                <div className="flex flex-wrap gap-3">
+                  {detailed?.hiddenStrengths?.map((strength, idx) => (
+                    <Badge
+                      key={idx}
+                      className="px-4 py-2 text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-lg animate-fade-in"
+                      style={{ animationDelay: `${idx * 0.05}s` }}
+                    >
+                      <Sparkles className="h-3.5 w-3.5 mr-2" />
+                      {strength}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {/* Section 4: Strategic Recommendations (MagicBento) */}
+        {detailed?.prioritizedRecommendations && detailed.prioritizedRecommendations.length > 0 && (
+          <section className="space-y-6 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+            <div className="flex items-center gap-3">
+              <Target className="h-7 w-7 text-amber-600" />
+              <h2 className="text-3xl font-bold">Strategic Recommendations</h2>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Prioritized actions based on comprehensive analysis of your portfolio strengths and development areas.
+            </p>
+
+            <MagicBento 
+              cards={detailed.prioritizedRecommendations.slice(0, 4).map((rec, idx) => {
+                const priority = rec.priority === 1 ? 'high' : rec.priority === 2 ? 'medium' : 'low';
+                return {
+                  content: (
+                    <RecommendationInsightCard
+                      title={rec.action}
+                      priority={priority}
+                      impact={rec.impact}
+                      timeline={rec.timeline}
+                      rationale={rec.rationale}
+                    />
+                  )
+                };
+              })}
+              textAutoHide={false}
+              enableStars={true}
+              enableSpotlight={true}
+              enableBorderGlow={true}
+              enableTilt={true}
+              particleCount={6}
+              glowColor="35, 90%, 60%"
+            />
+          </section>
+        )}
+
+        {/* Section 5: Gap Analysis (MagicBento) */}
+        {gaps.length > 0 && (
+          <section className="space-y-6 animate-fade-in" style={{ animationDelay: '0.4s' }}>
+            <div className="flex items-center gap-3">
+              <TrendingUp className="h-7 w-7 text-amber-600" />
+              <h2 className="text-3xl font-bold">Growth Opportunities</h2>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              Dimensions with the largest opportunity for improvement, along with actionable strategies to close the gaps.
+            </p>
+
+            <MagicBento 
+              cards={gaps.map((gap, idx) => ({
+                content: (
+                  <GapAnalysisCard
+                    dimensionLabel={gap.label}
+                    dimensionIcon={gap.icon}
+                    color={gap.color}
+                    currentScore={gap.currentScore}
+                    targetScore={targetTop25}
+                    factors={gap.dimData?.growthAreas?.slice(0, 2)}
+                    quickWins={gap.dimData?.growthAreas?.slice(0, 3) || ['Continue building experience in this area', 'Seek mentorship and feedback', 'Document your progress']}
+                    projectedImpact={`Closing this gap could increase your overall score by ${(gap.gap * 0.15).toFixed(1)} points`}
+                  />
+                )
+              }))}
+              textAutoHide={false}
+              enableStars={true}
+              enableSpotlight={true}
+              enableBorderGlow={true}
+              enableTilt={true}
+              particleCount={6}
+              glowColor="35, 90%, 60%"
+            />
+          </section>
+        )}
+
+        {/* Section 6: Detailed Evidence Breakdown (Accordion) */}
+        <section className="space-y-6 animate-fade-in" style={{ animationDelay: '0.5s' }}>
+          <div className="flex items-center gap-3">
+            <BookOpen className="h-7 w-7 text-purple-600" />
+            <h2 className="text-3xl font-bold">Detailed Evidence Breakdown</h2>
+          </div>
+          <p className="text-muted-foreground leading-relaxed">
+            Comprehensive analysis of each dimension including evidence, expert feedback, and detailed recommendations.
+          </p>
+
+          <Accordion type="single" collapsible className="space-y-4">
+            {DIMENSION_META.map((dim) => {
+              const dimData = detailed?.dimensions?.[dim.key];
+              if (!dimData) return null;
+
+              const Icon = dim.icon;
+              const score = typeof dimData?.score === 'number' ? dimData.score : dimensions[dim.key] || null;
+
               return (
-                <Card 
+                <AccordionItem 
                   key={dim.key} 
-                  className="relative overflow-hidden border-2 hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-                  style={{ animationDelay: `${idx * 0.1}s` }}
+                  value={dim.key}
+                  className="border-2 rounded-xl overflow-hidden bg-white"
                 >
-                  <div className="absolute top-0 right-0 w-32 h-32 opacity-5">
-                    <Icon className="w-full h-full" />
-                  </div>
-                  <div className="relative p-6 space-y-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg"
-                          style={{ background: `linear-gradient(135deg, ${dim.color}, ${dim.color}dd)` }}
-                        >
-                          <Icon className="h-6 w-6" />
-                        </div>
-                        <div>
-                          <h3 className="font-bold text-lg">{dim.label}</h3>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold" style={{ color: dim.color }}>
-                              {score !== null ? score.toFixed(1) : '—'}
-                            </span>
-                            <span className="text-sm text-muted-foreground">/10</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <AccordionTrigger className="px-6 py-4 hover:no-underline hover:bg-slate-50">
+                    <div className="flex items-center gap-4 text-left w-full">
                       <div 
-                        className="absolute inset-y-0 left-0 rounded-full transition-all duration-1000"
-                        style={{ 
-                          width: `${Math.min(100, Math.max(0, (score || 0) * 10))}%`,
-                          background: `linear-gradient(90deg, ${dim.color}, ${dim.color}dd)`
-                        }}
-                      />
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg flex-shrink-0"
+                        style={{ background: `linear-gradient(135deg, ${dim.color}, ${dim.color}dd)` }}
+                      >
+                        <Icon className="h-6 w-6" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-semibold text-lg">{dim.label}</div>
+                        <div className="text-sm text-muted-foreground">
+                          Score: <span className="font-semibold" style={{ color: dim.color }}>
+                            {score !== null ? score.toFixed(1) : '—'}
+                          </span>/10
+                        </div>
+                      </div>
                     </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 pb-6 pt-2 space-y-6">
+                    {/* Evidence */}
+                    {dimData.evidence && dimData.evidence.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-sm uppercase tracking-wide text-foreground">
+                          Evidence Collected
+                        </h4>
+                        <ul className="space-y-2">
+                          {dimData.evidence.map((item, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2 leading-relaxed">
+                              <span className="text-purple-500 mt-1">•</span>
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
+                    {/* Expert Feedback */}
+                    {dimData.feedback && (
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-sm uppercase tracking-wide text-foreground">
+                          Expert Analysis
+                        </h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {dimData.feedback}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Strengths */}
                     {dimData.strengths && dimData.strengths.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-green-600 uppercase tracking-wide">✓ Perks Unlocked</div>
-                        {dimData.strengths.slice(0, 2).map((s: string, i: number) => (
-                          <div key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                            <Award className="h-4 w-4 text-green-500 mt-0.5 flex-shrink-0" />
-                            <span>{s}</span>
-                          </div>
-                        ))}
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-sm uppercase tracking-wide text-emerald-600">
+                          Identified Strengths
+                        </h4>
+                        <ul className="space-y-2">
+                          {dimData.strengths.map((strength, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2 leading-relaxed">
+                              <Award className="h-4 w-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                              <span>{strength}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
 
+                    {/* Growth Areas */}
                     {dimData.growthAreas && dimData.growthAreas.length > 0 && (
-                      <div className="space-y-2">
-                        <div className="text-xs font-semibold text-orange-600 uppercase tracking-wide">⚡ Skill Points to Unlock</div>
-                        {dimData.growthAreas.slice(0, 2).map((s: string, i: number) => (
-                          <div key={i} className="text-sm text-muted-foreground flex items-start gap-2">
-                            <Lock className="h-4 w-4 text-orange-500 mt-0.5 flex-shrink-0" />
-                            <span>{s}</span>
-                          </div>
-                        ))}
+                      <div className="space-y-3">
+                        <h4 className="font-semibold text-sm uppercase tracking-wide text-amber-600">
+                          Development Recommendations
+                        </h4>
+                        <ul className="space-y-2">
+                          {dimData.growthAreas.map((area, idx) => (
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2 leading-relaxed">
+                              <Target className="h-4 w-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                              <span>{area}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
                     )}
-                  </div>
-                </Card>
+                  </AccordionContent>
+                </AccordionItem>
               );
             })}
-          </div>
-        </section>
-
-        {/* Quest Board - Priority Actions */}
-        <section className="space-y-6 animate-slide-up" style={{ animationDelay: '0.4s' }}>
-          <div className="flex items-center gap-3">
-            <Target className="h-8 w-8 text-orange-600" />
-            <h2 className="text-3xl font-bold">Quest Board</h2>
-          </div>
-          <div className="grid md:grid-cols-2 gap-4">
-            {detailed?.prioritizedRecommendations && detailed.prioritizedRecommendations.length > 0 ? (
-              detailed.prioritizedRecommendations.map((rec, i) => (
-                <Card key={i} className="relative overflow-hidden border-2 border-orange-200/50 bg-gradient-to-br from-orange-50/50 to-yellow-50/50 hover:shadow-lg transition-all">
-                  <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-orange-400/10 to-yellow-400/10 rounded-bl-full" />
-                  <div className="relative p-6 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <h3 className="font-bold text-lg pr-4">{rec.action}</h3>
-                      <Badge variant="secondary" className="flex-shrink-0">
-                        {'★'.repeat(rec.priority || 1)}
-                      </Badge>
-                    </div>
-                    {rec.impact && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Trophy className="h-4 w-4 text-yellow-600" />
-                        <span className="text-muted-foreground">Reward:</span>
-                        <span className="font-semibold text-yellow-700">{rec.impact}</span>
-                      </div>
-                    )}
-                    {rec.timeline && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">⏳ Duration:</span>
-                        <span className="font-semibold">{rec.timeline}</span>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              ))
-            ) : (
-              <Card className="p-12 text-center col-span-2 bg-gradient-to-br from-gray-50 to-gray-100">
-                <Target className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-muted-foreground">Complete your profile assessment to unlock personalized quests</p>
-              </Card>
-            )}
-          </div>
-        </section>
-
-        {/* Hidden Abilities */}
-        <section className="space-y-6 animate-slide-up" style={{ animationDelay: '0.6s' }}>
-          <div className="flex items-center gap-3">
-            <Sparkles className="h-8 w-8 text-purple-600" />
-            <h2 className="text-3xl font-bold">Hidden Abilities Discovered</h2>
-          </div>
-          {detailed?.hiddenStrengths && detailed.hiddenStrengths.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
-              {detailed.hiddenStrengths.map((s, i) => (
-                <Badge 
-                  key={i} 
-                  className="px-6 py-3 text-sm bg-gradient-to-r from-purple-500 to-pink-500 text-white border-0 shadow-lg hover:shadow-xl transition-all hover:scale-105"
-                  style={{ animationDelay: `${i * 0.1}s` }}
-                >
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  {s}
-                </Badge>
-              ))}
-            </div>
-          ) : (
-            <Card className="p-12 text-center bg-gradient-to-br from-purple-50 to-pink-50">
-              <Lock className="h-16 w-16 text-purple-400 mx-auto mb-4" />
-              <p className="text-muted-foreground">Hidden strengths will be revealed as you complete your profile</p>
-            </Card>
-          )}
-        </section>
-
-        {/* Power-Up Opportunities */}
-        <section className="space-y-6 animate-slide-up" style={{ animationDelay: '0.8s' }}>
-          <div className="flex items-center gap-3">
-            <Zap className="h-8 w-8 text-red-600" />
-            <h2 className="text-3xl font-bold">Power-Up Opportunities</h2>
-          </div>
-          <div className="grid md:grid-cols-3 gap-6">
-            {(() => {
-              const entries = Object.entries((detailed?.dimensions || {})).map(([key, val]: any) => ({
-                key,
-                score: typeof val?.score === 'number' ? Number(val.score) : (dimensions as any)?.[key] ?? null,
-                growthAreas: val?.growthAreas || [],
-              })).filter(e => e.score !== null);
-              const target = 9.2;
-              const sorted = entries
-                .map(e => ({ ...e, gap: Math.max(0, Number((target - (e.score as number)).toFixed(1))) }))
-                .sort((a, b) => b.gap - a.gap)
-                .slice(0, 3);
-              
-              if (sorted.length === 0) {
-                return (
-                  <Card className="p-12 text-center col-span-3 bg-gradient-to-br from-green-50 to-emerald-50">
-                    <Trophy className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                    <p className="text-lg font-semibold text-green-700">All systems optimal! Keep up the great work.</p>
-                  </Card>
-                );
-              }
-              
-              return sorted.map((e) => {
-                const meta = DIMENSION_META.find(m => m.key === e.key);
-                return (
-                  <Card 
-                    key={e.key} 
-                    className="relative overflow-hidden border-2 border-red-200 bg-gradient-to-br from-red-50 to-orange-50"
-                  >
-                    <div className="absolute top-0 right-0 text-8xl opacity-5">⚠️</div>
-                    <div className="relative p-6 space-y-4">
-                      <div>
-                        <Badge className="bg-red-500 text-white border-0 mb-2">Needs Attention</Badge>
-                        <h3 className="font-bold text-xl">{meta?.label || e.key}</h3>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-red-600">-{e.gap}</span>
-                        <span className="text-sm text-muted-foreground">point gap</span>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Current</span>
-                          <span className="font-semibold">{(e.score as number).toFixed(1)}</span>
-                        </div>
-                        <Progress value={(e.score as number) * 10} className="h-2" />
-                        <div className="flex justify-between text-sm text-muted-foreground">
-                          <span>Target</span>
-                          <span>{target}</span>
-                        </div>
-                      </div>
-                      {e.growthAreas.length > 0 && (
-                        <div className="space-y-1 pt-2 border-t border-red-200">
-                          <div className="text-xs font-semibold uppercase tracking-wide">Quick Wins:</div>
-                          {e.growthAreas.slice(0, 2).map((ga: string, idx: number) => (
-                            <div key={idx} className="text-sm">• {ga}</div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                );
-              });
-            })()}
-          </div>
+          </Accordion>
         </section>
       </div>
     </div>
   );
 }
-
-
