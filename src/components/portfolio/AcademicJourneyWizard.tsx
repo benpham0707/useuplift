@@ -13,6 +13,7 @@ import { Plus, Trash2, ArrowRight, ArrowLeft, GraduationCap, X, ChevronDown, Che
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { apiFetch } from '@/lib/utils';
 
 interface AcademicJourneyData {
   // Current School

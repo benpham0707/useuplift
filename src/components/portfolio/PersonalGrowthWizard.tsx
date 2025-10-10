@@ -9,6 +9,7 @@ import { ArrowRight, ArrowLeft, BookOpen, Lightbulb, MessageSquare } from 'lucid
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { apiFetch } from '@/lib/utils';
 
 interface PersonalGrowthData {
   meaningfulExperiences: {

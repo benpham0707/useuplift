@@ -405,7 +405,7 @@ export const useGlowEffect = (options: GlowEffectOptions = {}) => {
       element.removeEventListener('click', handleClick);
       
       if (config.enableSpotlight) {
-        document.removeEventListener('mousemove', updateSpotlight as EventListener);
+        document.removeEventListener('mousemove', updateSpotlight as any);
         document.removeEventListener('mouseleave', () => {});
       }
       

@@ -88,20 +88,22 @@ const GlowEffect = forwardRef<HTMLElement, GlowEffectProps>(
       className
     );
 
-    const glowStyle: React.CSSProperties = {
-      '--glow-color': config.glowColor,
+    const glowStyle = {
+      ['--glow-color' as any]: config.glowColor,
       ...style,
-    };
+    } as React.CSSProperties;
+
+    const Comp = Component as any;
 
     return (
-      <Component
+      <Comp
         ref={combinedRef}
         className={glowClasses}
         style={glowStyle}
         {...props}
       >
         {children}
-      </Component>
+      </Comp>
     );
   }
 );

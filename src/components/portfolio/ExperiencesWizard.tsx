@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
 import { Trash2, Plus, Edit, ChevronDown } from 'lucide-react';
+import { apiFetch } from '@/lib/utils';
 
 const EXPERIENCE_TYPE = [
   { id: 'work', label: 'Work' },

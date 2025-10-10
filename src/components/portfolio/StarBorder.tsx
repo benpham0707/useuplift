@@ -1,4 +1,14 @@
 import './StarBorder.css';
+import { ComponentType, HTMLAttributes } from 'react';
+
+interface StarBorderProps extends Omit<HTMLAttributes<HTMLElement>, 'as'> {
+  as?: ComponentType<any> | keyof JSX.IntrinsicElements;
+  className?: string;
+  color?: string;
+  speed?: string;
+  thickness?: number;
+  children?: React.ReactNode;
+}
 
 const StarBorder = ({
   as: Component = 'button',
@@ -7,14 +17,15 @@ const StarBorder = ({
   speed = '6s',
   thickness = 1,
   children,
+  style,
   ...rest
-}) => {
+}: StarBorderProps) => {
   return (
     <Component
       className={`star-border-container ${className}`}
       style={{
         padding: `${thickness}px 0`,
-        ...rest.style
+        ...style
       }}
       {...rest}
     >

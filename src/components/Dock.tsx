@@ -90,11 +90,11 @@ function DockItem({
   );
 }
 
-function DockLabel({ children, className = '', ...rest }: { children: ReactNode; className?: string; isHovered: MotionValue<number> }) {
-  const { isHovered } = rest as { isHovered: MotionValue<number> };
+function DockLabel({ children, className = '', isHovered, ...rest }: { children: ReactNode; className?: string; isHovered?: MotionValue<number> }) {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
+    if (!isHovered) return;
     const unsubscribe = isHovered.on('change', (latest) => {
       setIsVisible(latest === 1);
     });
