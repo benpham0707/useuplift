@@ -81,6 +81,7 @@ const PortfolioScanner = () => {
   const [proofIndex, setProofIndex] = useState(0);
   const [sequenceIndex, setSequenceIndex] = useState(0);
   const activeTweenRef = useRef<any>(null);
+  const restoreSnapRef = useRef<null | (() => void)>(null);
 
   useEffect(() => {
     try {
@@ -92,17 +93,15 @@ const PortfolioScanner = () => {
   const disableScrollSnap = () => {
     const root = document.documentElement;
     const body = document.body;
-    const prevRoot = root.style.scrollSnapType;
-    const prevBody = body.style.scrollSnapType;
     root.style.scrollSnapType = 'none';
     body.style.scrollSnapType = 'none';
     let restored = false;
     return () => {
       if (restored) return;
       restored = true;
-      // Restore to mandatory snapping for this page
-      root.style.scrollSnapType = prevRoot || 'y mandatory';
-      body.style.scrollSnapType = prevBody || 'y mandatory';
+      // Always restore to mandatory snapping for this page
+      root.style.scrollSnapType = 'y mandatory';
+      body.style.scrollSnapType = 'y mandatory';
     };
   };
 
@@ -127,24 +126,8 @@ const PortfolioScanner = () => {
 
   const alignAfterRestore = (sectionId: string, element: HTMLElement) => {
     try {
-      // Avoid second snap for header — GSAP already used offset
-      if (sectionId === 'overview') return;
       window.setTimeout(() => {
-        const rect = element.getBoundingClientRect();
-        const viewportH = window.innerHeight || document.documentElement.clientHeight;
-        const bottomPad = parseInt(getComputedStyle(document.documentElement).scrollPaddingBottom || '0', 10) || 0;
-        const visualCenter = viewportH / 2 - bottomPad / 2;
-        const delta = Math.abs(rect.top + rect.height / 2 - visualCenter);
-        // Only correct if we're noticeably off-center (>6px)
-        if (delta > 6) {
-          // compute a corrected center that accounts for bottom padding
-          const targetY = window.scrollY + rect.top + rect.height / 2 - visualCenter;
-          try {
-            gsap.to(window, { duration: 0.3, ease: 'power2.out', scrollTo: { y: targetY, autoKill: true } });
-          } catch {
-            window.scrollTo({ top: targetY });
-          }
-        }
+        element.scrollIntoView({ behavior: 'auto', block: sectionId === 'overview' ? 'start' : 'center' });
         try { (ScrollTrigger as any)?.refresh?.(); } catch {}
       }, 30);
     } catch {}
@@ -228,10 +211,16 @@ const PortfolioScanner = () => {
     if (!element) return;
     const durationSec = 1.0;
     const hasScrollTo = Boolean((gsap as any)?.plugins && (gsap as any).plugins.ScrollToPlugin);
-    const restore = disableScrollSnap();
-    // Kill any active tween to prevent leaving snap disabled
+    // If a previous animation left snap disabled, restore it first
     try { activeTweenRef.current?.kill?.(); } catch {}
+    try { restoreSnapRef.current?.(); } catch {}
     activeTweenRef.current = null;
+    restoreSnapRef.current = null;
+
+    const restore = disableScrollSnap();
+    restoreSnapRef.current = restore;
+    // Kill any active tween to prevent leaving snap disabled
+    // (already killed above)
 
     if (hasScrollTo) {
       if (sectionId === 'overview') {
@@ -239,26 +228,39 @@ const PortfolioScanner = () => {
           duration: durationSec,
           ease: 'power2.out',
           scrollTo: { y: element, offsetY: 64, autoKill: true },
-          onComplete: () => { restore(); alignAfterRestore(sectionId, element); activeTweenRef.current = null; },
-          onInterrupt: () => { restore(); alignAfterRestore(sectionId, element); activeTweenRef.current = null; }
+          onComplete: () => { restore(); restoreSnapRef.current = null; alignAfterRestore(sectionId, element); activeTweenRef.current = null; },
+          onInterrupt: () => { restore(); restoreSnapRef.current = null; alignAfterRestore(sectionId, element); activeTweenRef.current = null; }
         });
         activeTweenRef.current = tween;
         // hard fallback restore
-        window.setTimeout(restore, Math.ceil(durationSec * 1000) + 100);
+        window.setTimeout(() => { try { restore(); } finally { restoreSnapRef.current = null; } }, Math.ceil(durationSec * 1000) + 100);
         return;
       }
       const rect = element.getBoundingClientRect();
       const viewportH = window.innerHeight || document.documentElement.clientHeight;
-      const targetY = window.scrollY + rect.top + rect.height / 2 - viewportH / 2;
+      const bottomPad = parseInt(getComputedStyle(document.documentElement).scrollPaddingBottom || '0', 10) || 0;
+      const visualCenter = viewportH / 2 - bottomPad / 2;
+      const targetY = window.scrollY + rect.top + rect.height / 2 - visualCenter;
       const tween = gsap.to(window, {
         duration: durationSec,
         ease: 'power2.inOut',
         scrollTo: { y: targetY, autoKill: true },
-        onComplete: () => { restore(); alignAfterRestore(sectionId, element); activeTweenRef.current = null; },
-        onInterrupt: () => { restore(); alignAfterRestore(sectionId, element); activeTweenRef.current = null; }
+        onComplete: () => {
+          restore(); restoreSnapRef.current = null;
+          // Nudge to exact snap to re-enable natural snapping next scroll
+          try { element.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
+          try { (ScrollTrigger as any)?.refresh?.(); } catch {}
+          activeTweenRef.current = null;
+        },
+        onInterrupt: () => {
+          restore(); restoreSnapRef.current = null;
+          try { element.scrollIntoView({ behavior: 'auto', block: 'center' }); } catch {}
+          try { (ScrollTrigger as any)?.refresh?.(); } catch {}
+          activeTweenRef.current = null;
+        }
       });
       activeTweenRef.current = tween;
-      window.setTimeout(restore, Math.ceil(durationSec * 1000) + 100);
+      window.setTimeout(() => { try { restore(); } finally { restoreSnapRef.current = null; } }, Math.ceil(durationSec * 1000) + 100);
       return;
     }
 
@@ -266,10 +268,12 @@ const PortfolioScanner = () => {
     try {
       const rect = element.getBoundingClientRect();
       const viewportH = window.innerHeight || document.documentElement.clientHeight;
+      const bottomPad = parseInt(getComputedStyle(document.documentElement).scrollPaddingBottom || '0', 10) || 0;
+      const visualCenter = viewportH / 2 - bottomPad / 2;
       const targetY = sectionId === 'overview'
         ? Math.max(0, window.scrollY + rect.top - 64)
-        : window.scrollY + rect.top + rect.height / 2 - viewportH / 2;
-      animateScrollFallback(targetY, durationSec * 1000).finally(() => { restore(); alignAfterRestore(sectionId, element); });
+        : window.scrollY + rect.top + rect.height / 2 - visualCenter;
+      animateScrollFallback(targetY, durationSec * 1000).finally(() => { restore(); restoreSnapRef.current = null; alignAfterRestore(sectionId, element); });
     } catch {
       element.scrollIntoView({ behavior: 'smooth', block: sectionId === 'overview' ? 'start' : 'center' });
       restore();
@@ -591,10 +595,19 @@ const PortfolioScanner = () => {
     // Account for sticky navbar height (h-16 ~ 64px)
     (root.style as any).scrollPaddingTop = '64px';
     (body.style as any).scrollPaddingTop = '64px';
-    // Account for dock height at bottom so snap-center appears visually centered
-    const dockSafePx = 84; // panel ~68px + margins
-    (root.style as any).scrollPaddingBottom = `${dockSafePx}px`;
-    (body.style as any).scrollPaddingBottom = `${dockSafePx}px`;
+
+    const updateSnapPadding = () => {
+      try {
+        const dock = document.querySelector('.dock-panel') as HTMLElement | null;
+        const dockH = Math.ceil((dock?.getBoundingClientRect().height || 68) + 24); // include margin/hover room
+        (root.style as any).scrollPaddingBottom = `${dockH}px`;
+        (body.style as any).scrollPaddingBottom = `${dockH}px`;
+      } catch {}
+    };
+
+    updateSnapPadding();
+    window.addEventListener('resize', updateSnapPadding);
+    window.addEventListener('orientationchange', updateSnapPadding);
 
     return () => {
       root.style.scrollSnapType = prevSnapType;
@@ -605,6 +618,8 @@ const PortfolioScanner = () => {
       (body.style as any).scrollPaddingTop = prevScrollPaddingBody || '';
       (root.style as any).scrollPaddingBottom = prevScrollPaddingBottomRoot || '';
       (body.style as any).scrollPaddingBottom = prevScrollPaddingBottomBody || '';
+      window.removeEventListener('resize', updateSnapPadding);
+      window.removeEventListener('orientationchange', updateSnapPadding);
     };
   }, []);
 
