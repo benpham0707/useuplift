@@ -38,14 +38,54 @@ const DIMENSION_META: Record<string, { label: string; key: string; tone: 'overal
 
 export default function PortfolioInsights() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { search } = useLocation();
   const qp = useMemo(() => new URLSearchParams(search), [search]);
+  const [initializing, setInitializing] = useState(true);
+  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [overall, setOverall] = useState<number | null>(null);
   const [dimensions, setDimensions] = useState<Record<string, number>>({});
   const [detailed, setDetailed] = useState<DetailedInsights | null>(null);
+
+  // Ensure profile exists and determine onboarding state (mirrors scanner)
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      navigate('/auth');
+      return;
+    }
+    let cancelled = false;
+    const ensureProfile = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, has_completed_assessment')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (error) throw error;
+
+        if (!cancelled && !data) {
+          const { data: created, error: insertError } = await supabase
+            .from('profiles')
+            .insert({ user_id: user.id, user_context: 'high_school_11th', has_completed_assessment: false })
+            .select('id, has_completed_assessment')
+            .single();
+          if (insertError) throw insertError;
+          if (!cancelled) setHasCompletedOnboarding(Boolean(created?.has_completed_assessment));
+        } else if (!cancelled) {
+          setHasCompletedOnboarding(Boolean(data?.has_completed_assessment));
+        }
+      } catch {
+        // If profile creation fails, let fetch show a helpful error later
+      } finally {
+        if (!cancelled) setInitializing(false);
+      }
+    };
+    ensureProfile();
+    return () => { cancelled = true; };
+  }, [user, authLoading, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -82,7 +122,13 @@ export default function PortfolioInsights() {
             ...(token ? { Authorization: `Bearer ${token}` } : {})
           }
         });
-        if (!resp.ok) throw new Error(await resp.text());
+        if (!resp.ok) {
+          const text = await resp.text();
+          // Surface clearer messages for common statuses
+          if (resp.status === 401) throw new Error('Please sign in again to view insights (401).');
+          if (resp.status === 404) throw new Error('We need a profile to compute insights. Complete setup in Portfolio Scanner.');
+          throw new Error(text || `Request failed: ${resp.status}`);
+        }
         const json = await resp.json();
         if (cancelled) return;
         setOverall(typeof json?.overall === 'number' ? Number(json.overall) : null);
@@ -99,9 +145,9 @@ export default function PortfolioInsights() {
         if (!cancelled) setLoading(false);
       }
     }
-    if (user) fetchInsights();
+    if (user && hasCompletedOnboarding && !initializing) fetchInsights();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, hasCompletedOnboarding, initializing]);
 
   const targetTop25 = 9.2;
   const gapToTop25 = overall ? Math.max(0, Number((targetTop25 - overall).toFixed(1))) : null;
@@ -370,7 +416,14 @@ export default function PortfolioInsights() {
 
       <div className="w-full p-6 bg-white">
         <div className="max-w-7xl mx-auto">
-          {loading ? (
+          {initializing || authLoading ? (
+            <div className="text-muted-foreground">Preparing your insights…</div>
+          ) : !hasCompletedOnboarding ? (
+            <div className="space-y-3">
+              <div className="text-sm text-muted-foreground">Complete your initial profile to generate insights.</div>
+              <Button onClick={() => navigate('/portfolio-scanner')}>Go to Portfolio Scanner</Button>
+            </div>
+          ) : loading ? (
             <div className="text-muted-foreground">Loading insights…</div>
           ) : error ? (
             <div className="text-destructive">{error}</div>
