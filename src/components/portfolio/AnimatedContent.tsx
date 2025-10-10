@@ -29,6 +29,8 @@ interface AnimatedContentProps {
   initialReveal?: boolean; // if true and already in view on mount, reveal immediately
   endExtendPct?: number; // extend end boundary percentage for reversible triggers
   hideDuration?: number; // duration for hide animation
+  // If true, force opacity to 1 when element center hits viewport center
+  snapOpacityAtCenter?: boolean;
 }
 
 const AnimatedContent = ({
@@ -54,7 +56,8 @@ const AnimatedContent = ({
   enterBackDurationMultiplier = 1.3,
   initialReveal = false,
   endExtendPct = 0,
-  hideDuration
+  hideDuration,
+  snapOpacityAtCenter = false
 }: PropsWithChildren<AnimatedContentProps>) => {
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -76,6 +79,7 @@ const AnimatedContent = ({
     let stEnter: ScrollTrigger | null = null;
     let stLeaveTop: ScrollTrigger | null = null;
     let stLeaveBottom: ScrollTrigger | null = null;
+    let stOpacitySnap: ScrollTrigger | null = null;
 
     if (reversible) {
       const distanceAbs = Math.abs(distance);
@@ -95,7 +99,8 @@ const AnimatedContent = ({
 
         // Opacity tween (shorter) so the box becomes solid early
         if (animateOpacity) {
-          const opacityDur = Math.max(0.9, dur * (isBack ? 0.9 : 1.05));
+          // Reach full opacity quickly; motion continues longer
+          const opacityDur = Math.max(0.18, Math.min(0.4, dur * 0.45));
           tl.to(el, { autoAlpha: 1, duration: opacityDur, ease: 'power2.out', delay: del } as any, 0);
         } else {
           gsap.set(el, { autoAlpha: 1 } as any);
@@ -167,6 +172,18 @@ const AnimatedContent = ({
           if (onActiveChange) onActiveChange(false);
         }
       }
+
+      // Ensure opacity is fully solid when element center reaches viewport center
+      if (snapOpacityAtCenter && animateOpacity) {
+        stOpacitySnap = ScrollTrigger.create({
+          trigger: el,
+          start: 'center 50%',
+          end: 'center 50%',
+          onEnter: () => { gsap.to(el, { autoAlpha: 1, duration: 0.12, overwrite: 'auto' } as any); },
+          onEnterBack: () => { gsap.to(el, { autoAlpha: 1, duration: 0.12, overwrite: 'auto' } as any); },
+          invalidateOnRefresh: true
+        });
+      }
     } else {
       gsap.to(el, {
         [axis]: 0,
@@ -191,6 +208,7 @@ const AnimatedContent = ({
       if (stEnter) stEnter.kill();
       if (stLeaveTop) stLeaveTop.kill();
       if (stLeaveBottom) stLeaveBottom.kill();
+      if (stOpacitySnap) stOpacitySnap.kill();
       gsap.killTweensOf(el);
     };
   }, [
@@ -212,7 +230,8 @@ const AnimatedContent = ({
     leaveScale,
     initialReveal,
     endExtendPct,
-    hideDuration
+    hideDuration,
+    snapOpacityAtCenter
   ]);
 
   return <div ref={ref}>{children}</div>;

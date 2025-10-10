@@ -35,7 +35,11 @@ import {
   Settings,
   Plus,
   GraduationCap,
-  Heart
+  Heart,
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Check
 } from 'lucide-react';
 import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import PortfolioPathway from '@/components/portfolio/PortfolioPathway';
@@ -44,6 +48,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import GradientText from '@/components/ui/GradientText';
 // StarBorder removed per revert
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
 
 const PortfolioScanner = () => {
   const { user, loading, signOut } = useAuth();
@@ -60,8 +65,72 @@ const PortfolioScanner = () => {
   type MetricId = 'impact' | 'academic' | 'curiosity' | 'story' | 'character';
   const [selectedMetric, setSelectedMetric] = useState<MetricId | null>(null);
   const [isInsightsOpen, setIsInsightsOpen] = useState(false);
+  const [narrativeIndex, setNarrativeIndex] = useState(0);
+  const [isEditingNarrative, setIsEditingNarrative] = useState(false);
+  const [narrativeDraft, setNarrativeDraft] = useState('');
+  const [narratives, setNarratives] = useState<string[]>([]);
+
+  // Compute top two strengths for narrative generation
+  const getTopTwo = () => {
+    const toFixed = (n: number | null | undefined) => Number(((n ?? 0)).toFixed(1));
+    const dims = [
+      { key: 'Academic Rigor', code: 'academic', value: toFixed(rubricScores.academicExcellence.score) },
+      { key: 'Impact & Leadership', code: 'leadership', value: toFixed(rubricScores.leadershipPotential.score) },
+      { key: 'Personal Growth', code: 'growth', value: toFixed(rubricScores.personalGrowth.score) },
+      { key: 'Character & Community', code: 'community', value: toFixed(rubricScores.communityImpact.score) },
+      { key: 'Uniqueness', code: 'uniqueness', value: toFixed(rubricScores.uniqueValue.score) },
+    ] as const;
+    const sorted = [...dims].sort((a, b) => b.value - a.value);
+    return [sorted[0]?.key || 'your best lane', sorted[1]?.key || 'supporting lane'] as const;
+  };
+
+  const generateNarrativeVariant = (variant: number) => {
+    const [a, b] = getTopTwo();
+    const al = a.toLowerCase();
+    const bl = b.toLowerCase();
+    const overall = Number(((aiOverall ?? overallScore) || 0).toFixed(1));
+    switch (variant % 6) {
+      case 0:
+        return `Growing up with a single mother, I learned to take initiative early and shoulder responsibility. I now channel that resilience into ${al} and programs that support families, turning ideas into repeatable systems with measurable outcomes.`;
+      case 1:
+        return `I’m building depth in ${al} and translating it into community benefit through ${bl}. I publish work with clear numbers so progress compounds, attracts collaborators, and tells a credible story at an overall level around ${overall}.`;
+      case 2:
+        return `Curiosity leads me to turn questions into projects that serve real people. By focusing on ${al} and amplifying it with ${bl}, I make learning visible through artifacts others can use and improve.`;
+      case 3:
+        return `I combine ${al} with leadership so good ideas become deliverables that matter. I organize people and resources around targets, then publish results so impact lasts beyond me.`;
+      case 4:
+        return `My work connects personal experience with service, using ${al} and ${bl} as the engine. I build repeatable programs with feedback loops so each iteration raises the ceiling for the community.`;
+      default:
+        return `I’m shaping a cohesive profile by leaning into ${al} while reinforcing it with ${bl}. Each month I ship a public proof of progress, tightening the narrative and scaling real-world outcomes.`;
+    }
+  };
+
+  const storageKey = user ? `uplift:narratives:${user.id}` : 'uplift:narratives:anon';
+
+  // Initialize narratives from storage or generate defaults
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length) {
+          setNarratives(parsed as string[]);
+          return;
+        }
+      }
+    } catch {}
+    const defaults = Array.from({ length: 5 }, (_, i) => generateNarrativeVariant(i));
+    setNarratives(defaults);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  const persistNarratives = (next: string[]) => {
+    setNarratives(next);
+    try { localStorage.setItem(storageKey, JSON.stringify(next)); } catch {}
+  };
   const metricRefs = useRef<Record<MetricId, HTMLDivElement | null>>({ impact: null, academic: null, curiosity: null, story: null, character: null });
   const insightsPanelRef = useRef<HTMLDivElement | null>(null);
+  const overviewRef = useRef<HTMLDivElement | null>(null); // header container
   const [carrotLeft, setCarrotLeft] = useState<number | null>(null);
   
 
@@ -326,6 +395,38 @@ const PortfolioScanner = () => {
     return () => window.removeEventListener('analytics:reconciled', onReconciled);
   }, [user, hasCompletedOnboarding]);
 
+  // Enable scroll snapping on this page only
+  useEffect(() => {
+    const root = document.documentElement;
+    const body = document.body;
+    const prevSnapType = root.style.scrollSnapType;
+    const prevBodySnapType = body.style.scrollSnapType;
+    const prevOverscrollRoot = root.style.overscrollBehaviorY;
+    const prevOverscrollBody = body.style.overscrollBehaviorY;
+    const prevScrollPaddingRoot = (root.style as any).scrollPaddingTop;
+    const prevScrollPaddingBody = (body.style as any).scrollPaddingTop;
+
+    // Apply scroll snap to the viewport and contain momentum chaining
+    root.style.scrollSnapType = 'y mandatory';
+    body.style.scrollSnapType = 'y mandatory';
+    root.style.overscrollBehaviorY = 'contain';
+    body.style.overscrollBehaviorY = 'contain';
+    // Account for sticky navbar height (h-16 ~ 64px)
+    (root.style as any).scrollPaddingTop = '64px';
+    (body.style as any).scrollPaddingTop = '64px';
+
+    return () => {
+      root.style.scrollSnapType = prevSnapType;
+      body.style.scrollSnapType = prevBodySnapType;
+      root.style.overscrollBehaviorY = prevOverscrollRoot;
+      body.style.overscrollBehaviorY = prevOverscrollBody;
+      (root.style as any).scrollPaddingTop = prevScrollPaddingRoot || '';
+      (body.style as any).scrollPaddingTop = prevScrollPaddingBody || '';
+    };
+  }, []);
+
+  // Keep mandatory snapping regardless of insights state for consistent alignment
+
   const completionLevels = [
     { level: 'Bronze', min: 20, color: 'bg-amber-600', description: 'Foundation Set' },
     { level: 'Silver', min: 45, color: 'bg-slate-400', description: 'Profile Building' },
@@ -375,6 +476,30 @@ const PortfolioScanner = () => {
       window.removeEventListener('scroll', updateCarrot);
     };
   }, [selectedMetric, isInsightsOpen]);
+
+  // When insights toggle/metric changes, refresh thresholds and nudge scroll to the header snap point for alignment
+  useEffect(() => {
+    // small timeout to allow layout to settle
+    const t = window.setTimeout(() => {
+      // Keep a consistent snap padding so center alignment remains correct
+      const root = document.documentElement;
+      const body = document.body;
+      (root.style as any).scrollPaddingTop = '64px';
+      (body.style as any).scrollPaddingTop = '64px';
+      // If insights are open and we're within the header viewport range, nudge to its snap-start to realign
+      if (isInsightsOpen && overviewRef.current) {
+        const rect = overviewRef.current.getBoundingClientRect();
+        const viewportH = window.innerHeight || document.documentElement.clientHeight;
+        const isHeaderMostlyInView = rect.top > -rect.height * 0.5 && rect.bottom < viewportH + rect.height * 0.5;
+        if (isHeaderMostlyInView) {
+          overviewRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }
+      // refresh ScrollTrigger so thresholds account for new layout
+      try { (ScrollTrigger as any)?.refresh?.(); } catch {}
+    }, 10);
+    return () => window.clearTimeout(t);
+  }, [isInsightsOpen, selectedMetric]);
 
   if (initializing) {
     return (
@@ -534,7 +659,7 @@ const PortfolioScanner = () => {
       </nav>
 
       {/* Header Section with Scores - AcademicPlanner aesthetic */}
-      <div className="hero-gradient text-white">
+      <div id="overview" ref={overviewRef} className="hero-gradient text-white snap-start snap-always">
         <div className="max-w-7xl mx-auto px-4 py-12">
           {/* Header */}
           <div className="text-center mb-12">
@@ -634,6 +759,145 @@ const PortfolioScanner = () => {
               </div>
             );
           })()}
+
+          {/* Portfolio Overview (shown when insights panel is collapsed) */}
+          {!isInsightsOpen && (
+            <div className="mt-6">
+              <Card className="border-2 border-white/30 bg-white/20 text-white backdrop-blur-md shadow-medium overflow-hidden">
+                <div className="h-1 w-full" style={{ backgroundImage: getMetricTheme('overall').gradientCss }} />
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-4">
+                    <CardTitle className="text-white">Portfolio Overview</CardTitle>
+                    <span className="px-2.5 py-1 rounded-full text-sm font-semibold bg-white/25">{((aiOverall ?? overallScore) || 0).toFixed(1)} / 10</span>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const toFixed = (n: number | null | undefined) => Number(((n ?? 0)).toFixed(1));
+                    const dims = [
+                      { key: 'Academic Rigor', code: 'academic', value: toFixed(rubricScores.academicExcellence.score) },
+                      { key: 'Impact & Leadership', code: 'leadership', value: toFixed(rubricScores.leadershipPotential.score) },
+                      { key: 'Personal Growth', code: 'growth', value: toFixed(rubricScores.personalGrowth.score) },
+                      { key: 'Character & Community', code: 'community', value: toFixed(rubricScores.communityImpact.score) },
+                      { key: 'Uniqueness', code: 'uniqueness', value: toFixed(rubricScores.uniqueValue.score) },
+                    ] as const;
+
+                    const sorted = [...dims].sort((a, b) => b.value - a.value);
+                    const top2 = sorted.slice(0, 2);
+                    const bottom2 = sorted.slice(-2).reverse();
+
+                    const tips: Record<string, string> = {
+                      academic: 'Increase course challenge with a pre-planned support system and external benchmarks.',
+                      leadership: 'Own outcomes with clear numbers; lead a small team or train peers.',
+                      growth: 'Ship a public artifact every 4–6 weeks and reflect briefly on the result.',
+                      community: 'Show consistent service with before/after proof and a stakeholder quote.',
+                      uniqueness: 'Clarify the throughline and trim activities that don’t reinforce it.',
+                    };
+
+                    return (
+                      <div className="space-y-5">
+                        <div className="text-white/90 text-[15px] leading-7">
+                          {(() => {
+                            const overall = toFixed((aiOverall ?? overallScore) || 0);
+                            const strengthText = top2.map(d => d.key).join(' and ');
+                            const focusText = bottom2.map(d => d.key).join(' and ');
+                            if (overall >= 8.8) return `You’re operating at an application‑ready level with clear strengths in ${strengthText}. Protect focus and keep outcomes visible. Your next gains come from crisp storytelling and evidence density rather than adding more activities.`;
+                            if (overall >= 7.8) return `You have a strong foundation with standout momentum in ${strengthText}. To break into top‑tier, shape a single narrative throughline and convert work into public, measurable outcomes. Primary attention: ${focusText}.`;
+                            if (overall >= 6.8) return `Good velocity and emerging strengths in ${strengthText}. The portfolio needs tighter coherence and proof of impact. Prioritize ${focusText} and publish small, frequent artifacts that make your direction undeniable.`;
+                            return `You’re early in the build. Clarify a direction, choose one lane to push, and make progress visible every 2–3 weeks. Start by strengthening ${focusText} while preserving the spark in ${strengthText}.`;
+                          })()}
+                        </div>
+
+                        <div className="rounded-lg border border-white/25 bg-white/10 p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-xs uppercase tracking-wide text-white/80">Suggested narrative</div>
+                            <div className="flex items-center gap-2">
+                              {!isEditingNarrative && (
+                                <button
+                                  className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition"
+                                  onClick={() => { setNarrativeDraft(narratives[narrativeIndex] || ''); setIsEditingNarrative(true); }}
+                                  aria-label="Edit narrative"
+                                >
+                                  <Pencil className="h-4 w-4 text-white" />
+                                </button>
+                              )}
+                              <button
+                                className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition"
+                                onClick={() => setNarrativeIndex((i) => (i - 1 + 5) % 5)}
+                                aria-label="Previous narrative"
+                              >
+                                <ChevronLeft className="h-4 w-4 text-white" />
+                              </button>
+                              <button
+                                className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition"
+                                onClick={() => setNarrativeIndex((i) => (i + 1) % 5)}
+                                aria-label="Next narrative"
+                              >
+                                <ChevronRight className="h-4 w-4 text-white" />
+                              </button>
+                              {!isEditingNarrative && (
+                                <button
+                                  className="ml-1 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs transition"
+                                  onClick={() => {
+                                    const next = [...narratives];
+                                    next[narrativeIndex] = generateNarrativeVariant(narrativeIndex + Math.floor(Math.random() * 6));
+                                    persistNarratives(next);
+                                  }}
+                                >Regenerate</button>
+                              )}
+                            </div>
+                          </div>
+                          {!isEditingNarrative ? (
+                            <div className="text-white/95 text-sm leading-6">
+                              {narratives[narrativeIndex]}
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Textarea
+                                value={narrativeDraft}
+                                onChange={(e) => setNarrativeDraft(e.target.value)}
+                                placeholder="Write your narrative angle here..."
+                                className="bg-white/20 text-white placeholder:text-white/60 min-h-[80px]"
+                              />
+                              <div className="flex justify-end">
+                                <Button size="sm" variant="secondary" onClick={() => { const next = [...narratives]; next[narrativeIndex] = narrativeDraft.trim(); persistNarratives(next); setIsEditingNarrative(false); }}>
+                                  <Check className="h-4 w-4 mr-1" /> Save
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="grid md:grid-cols-3 gap-4">
+                          <div className="rounded-lg border border-white/20 bg-white/10 p-3">
+                            <div className="text-xs uppercase tracking-wide text-white/80 mb-1">Unify</div>
+                            <div className="text-white/95 text-sm">Rename and reorder activities to reinforce one throughline; remove or downsize items that don’t fit.</div>
+                          </div>
+                          <div className="rounded-lg border border-white/20 bg-white/10 p-3">
+                            <div className="text-xs uppercase tracking-wide text-white/80 mb-1">Make proof visible</div>
+                            <div className="text-white/95 text-sm">Publish a small artifact every 2–3 weeks (demo, write‑up, repo, testimonial) tied to a number.</div>
+                          </div>
+                          <div className="rounded-lg border border-white/20 bg-white/10 p-3">
+                            <div className="text-xs uppercase tracking-wide text-white/80 mb-1">Sequence</div>
+                            <div className="text-white/95 text-sm">Commit to one 60–90 day push in the weakest area; schedule weekly check‑ins and a public update.</div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="text-xs uppercase tracking-wide text-white/80 mb-1">30 / 60 / 90 plan</div>
+                          <ul className="text-sm text-white/95 space-y-1">
+                            <li className="flex items-start gap-2"><Target className="h-4 w-4 mt-0.5" /> Choose one focus lane and define a numeric goal.</li>
+                            <li className="flex items-start gap-2"><Lightbulb className="h-4 w-4 mt-0.5" /> Ship one public artifact; request feedback from a mentor.</li>
+                            <li className="flex items-start gap-2"><TrendingUp className="h-4 w-4 mt-0.5" /> Quantify impact and update your portfolio with outcomes.</li>
+                          </ul>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
           {/* Insights inside hero gradient */}
           <Collapsible open={isInsightsOpen} onOpenChange={setIsInsightsOpen}>
@@ -806,6 +1070,8 @@ const PortfolioScanner = () => {
 
           {/* Secondary metrics row removed to avoid repetition */}
         </div>
+        {/* Extra scroll room at end of header (not a snap target) */}
+        <div className="h-24 md:h-40 lg:h-56 pointer-events-none" aria-hidden="true" />
       </div>
 
       {/* Soft divider between header and journey */}

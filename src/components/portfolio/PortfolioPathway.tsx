@@ -302,10 +302,10 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
       <div className="relative z-10 max-w-6xl mx-auto px-4 py-12">
         {/* Header removed for a cleaner, cohesive layout */}
 
-        {/* Centered Pathway */}
-        <div className="relative flex flex-col items-center space-y-44">
+        {/* Centered Pathway with snap points */}
+        <div className="relative flex flex-col items-center">
           {pathwaySections.map((section, index) => (
-            <div key={section.id} className="relative">
+            <div key={section.id} className="relative snap-center snap-always min-h-[85vh] md:min-h-screen flex items-center justify-center">
               {/* Pathway Node */}
               <div className="relative z-10" ref={(el) => (nodeRefs.current[section.id] = el)}>
                 {/* Simple full-width banner behind the node */}
@@ -320,26 +320,27 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
                   />
                 </div>
                 <AnimatedContent
-                  distance={240}
+                  distance={90}
                   direction="vertical"
                   reverse={false}
-                  duration={2.0}
+                  duration={0.65}
                   ease="power3.out"
                   initialOpacity={0}
                   animateOpacity
-                  scale={1.02}
-                  threshold={0.24}
-                  enterThreshold={(section.id === 'academic-journey') ? 0.24 : ((section.id === 'support' || section.id === 'growth') ? 0.30 : 0.26)}
-                  leaveThreshold={(section.id === 'personal-info') ? 0.52 : ((section.id === 'support' || section.id === 'growth') ? 0.46 : 0.40)}
-                  delay={0.05 * index}
+                  snapOpacityAtCenter
+                  scale={1.01}
+                  threshold={0.06}
+                  enterThreshold={(section.id === 'academic-journey') ? 0.09 : ((section.id === 'support' || section.id === 'growth') ? 0.11 : 0.09)}
+                  leaveThreshold={(section.id === 'personal-info') ? 0.22 : ((section.id === 'support' || section.id === 'growth') ? 0.20 : 0.18)}
+                  delay={0}
                   reversible
                   leaveOpacity={0}
-                  leaveScale={0.96}
-                  enterBackDelay={0.12}
-                  enterBackDurationMultiplier={1.55}
+                  leaveScale={0.99}
+                  enterBackDelay={0}
+                  enterBackDurationMultiplier={1.0}
                   initialReveal={index === 0}
-                  endExtendPct={section.id === 'growth' ? 18 : (section.id === 'support' ? 12 : 0)}
-                  hideDuration={1.6}
+                  endExtendPct={(section.id === 'growth' ? 16 : (section.id === 'support' ? 14 : 12))}
+                  hideDuration={0.6}
                   onActiveChange={(active) => {
                     if (active) {
                       window.setTimeout(() => {

@@ -86,8 +86,7 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
           "relative w-[34rem] md:w-[40rem] p-12 rounded-xl border-2 transition-all duration-300 cursor-pointer overflow-visible",
           // Pastel glass background for contrast without murkiness
           "border-purple-400/40",
-          "bg-gradient-to-br from-purple-50/80 via-indigo-50/70 to-blue-50/80",
-          "backdrop-blur-xl",
+          "bg-gradient-to-br from-purple-50 via-indigo-50 to-blue-50", // fully opaque background
           config.clickable && "hover:shadow-lg hover:scale-[1.02]",
           !config.clickable && "opacity-60 cursor-not-allowed"
         )}
@@ -98,7 +97,7 @@ const PathwayNode = ({ section, onClick }: PathwayNodeProps) => {
       >
       {/* Banner is rendered outside this component to avoid tilt and ensure background layering */}
       {/* Color tint overlay for depth */}
-      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/12 via-blue-500/10 to-cyan-400/12" />
+      <div className="pointer-events-none absolute inset-0 rounded-xl bg-gradient-to-br from-purple-500/8 via-blue-500/8 to-cyan-400/8" />
       {/* Subtle vignette */}
       <div className="pointer-events-none absolute inset-0 rounded-xl" style={{ background: 'radial-gradient(120% 90% at 50% 40%, rgba(0,0,0,0) 55%, rgba(124,58,237,0.05) 100%)' }} />
       {/* Progress Ring */}
