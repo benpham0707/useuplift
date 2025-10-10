@@ -347,7 +347,7 @@ export default function PortfolioInsights() {
             High-level summary of your portfolio strengths and priority areas for focused improvement.
           </p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
             {/* Hero Card - 3 columns */}
             <div className="lg:col-span-3">
               <OverallStrengthHero
@@ -361,7 +361,7 @@ export default function PortfolioInsights() {
             </div>
 
             {/* Supporting Metrics - 2 columns, stacked */}
-            <div className="lg:col-span-2 space-y-4">
+            <div className="lg:col-span-2 space-y-3">
               <QuickMetricCard
                 title="Dimensions Excelling"
                 value={dimensionsExcellingCount}
