@@ -15,7 +15,7 @@ import ProjectManagement from "./pages/ProjectManagement";
 import ProjectDiscovery from "./pages/ProjectDiscovery";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
-import PortfolioInsights from "./pages/PortfolioInsights";
+import PortfolioInsightsNew from "./pages/PortfolioInsightsNew";
 import VerifyEmail from "./pages/VerifyEmail";
 import ResetPassword from "./pages/ResetPassword";
 import RequireVerified from "@/components/RequireVerified";
@@ -34,7 +34,7 @@ const App = () => (
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/portfolio-scanner" element={<RequireVerified><PortfolioScanner /></RequireVerified>} />
-            <Route path="/portfolio-insights" element={<RequireVerified><PortfolioInsights /></RequireVerified>} />
+            <Route path="/portfolio-insights" element={<RequireVerified><PortfolioInsightsNew /></RequireVerified>} />
             <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
             <Route path="/academic-planner" element={<AcademicPlanner />} />
             <Route path="/project-incubation" element={<ProjectIncubationHub />} />
