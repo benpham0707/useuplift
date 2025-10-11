@@ -8,6 +8,10 @@ interface AuthContextType {
   loading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signInWithGoogle: () => Promise<{ error: any }>;
+  sendMagicLink: (email: string) => Promise<{ error: any }>;
+  requestPasswordReset: (email: string) => Promise<{ error: any }>;
+  updatePassword: (newPassword: string) => Promise<{ error: any }>;
   signOut: () => Promise<{ error: any }>;
 }
 
@@ -56,6 +60,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password
     });
+    if (!error) {
+      // best-effort notify new signin
+      try {
+        const ua = navigator.userAgent;
+        await fetch(`${SUPABASE_URL}/functions/v1/notify-new-signin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}` },
+          body: JSON.stringify({ ua })
+        });
+      } catch (_) {}
+    }
+    return { error };
+  };
+
+  const signInWithGoogle = async () => {
+    const redirectTo = `${window.location.origin}/portfolio-scanner`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo }
+    });
+    return { error };
+  };
+
+  const sendMagicLink = async (email: string) => {
+    const emailRedirectTo = `${window.location.origin}/portfolio-scanner`;
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo }
+    });
+    return { error };
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    const redirectTo = `${window.location.origin}/reset-password`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    return { error };
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
     return { error };
   };
 
@@ -71,6 +115,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       loading,
       signUp,
       signIn,
+      signInWithGoogle,
+      sendMagicLink,
+      requestPasswordReset,
+      updatePassword,
       signOut
     }}>
       {children}
