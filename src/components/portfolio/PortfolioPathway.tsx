@@ -306,7 +306,6 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
         <div className="relative flex flex-col items-center">
           {pathwaySections.map((section, index) => (
             <div id={section.id} key={section.id} className="relative snap-center snap-always min-h-[85vh] md:min-h-screen flex items-center justify-center">
-              {/* Pathway Node */}
               <div className="relative z-10" ref={(el) => (nodeRefs.current[section.id] = el)}>
                 {/* Simple full-width banner behind the node */}
                 <div className="absolute left-1/2 -translate-x-1/2 top-1/2 -translate-y-1/2 w-screen z-0 pointer-events-none">

@@ -1,6 +1,10 @@
 import React from 'react';
 import { Card } from '@/components/ui/card';
+import ProfileCard from './ProfileCard';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import { Rocket, Target, Heart, Sparkles, AlertTriangle, ChevronDown, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +25,46 @@ interface HolisticSummary {
   narrativeTheme: KeyTakeaway;
   biggestDifferentiator: KeyTakeaway;
   criticalGap: KeyTakeaway;
+  overarchingInsight?: OverarchingInsight;
+}
+
+type EvidenceProps = { text: string; details: string[] };
+type RichSegment = string | EvidenceProps;
+
+const InlineEvidence: React.FC<EvidenceProps> = ({ text, details }) => (
+  <HoverCard>
+    <HoverCardTrigger asChild>
+      <span className="underline decoration-dotted underline-offset-4 cursor-help text-primary/90 hover:text-primary">
+        {text}
+      </span>
+    </HoverCardTrigger>
+    <HoverCardContent align="start" className="w-80">
+      <div className="text-sm font-semibold mb-1">Evidence</div>
+      <ul className="list-disc pl-5 space-y-1 text-sm leading-6">
+        {details.map((d, i) => (
+          <li key={i} className="text-foreground/90">{d}</li>
+        ))}
+      </ul>
+    </HoverCardContent>
+  </HoverCard>
+);
+
+const renderRich = (segments: RichSegment[]) =>
+  segments.map((seg, i) =>
+    typeof seg === 'string' ? <span key={i}>{seg}</span> : <InlineEvidence key={i} text={seg.text} details={seg.details} />
+  );
+
+interface OverarchingInsight {
+  verdict: { spike: RichSegment[]; spine: RichSegment[]; lift: RichSegment[] };
+  readinessInContext: RichSegment[];
+  storyCoherencePercent: number;
+  storyCoherenceLine: RichSegment[];
+  impactFootprint: RichSegment[];
+  recognitionMix: RichSegment[];
+  trajectoryDurability: RichSegment[];
+  contextContribution: RichSegment[];
+  committeeSoundBite: RichSegment[];
+  concludingNarrative: RichSegment[];
 }
 
 // IMPORTANT: Hard-coded mock data representing a holistic portfolio analysis
@@ -61,10 +105,87 @@ const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
     icon: AlertTriangle,
     colorClass: 'border-destructive',
   },
+  overarchingInsight: {
+    verdict: {
+      spike: [
+        'A distinctive spike in engineering‑for‑access with real adoption — your ',
+        { text: 'tutoring platform', details: ['118 weekly active students last month', 'MOUs with two partner schools', 'Tutor roster grew 6 → 19'] },
+        ' consistently serves local schools, and the ',
+        { text: 'adaptive controller kits', details: ['18 robotics members using kits', 'Open‑source repo: 42 stars, 9 forks'] },
+        ' lowered barriers for new participants.'
+      ],
+      spine: [
+        'Your spine is clear: using technology to democratize access — from ',
+        { text: 'Title I workshops', details: ['Free cycles for two Title I partners', 'Avg 24 students/session'] },
+        ' to mentoring first‑time coders via the ',
+        { text: 'library program', details: ['Monthly beginner cohorts since Jan 2024', 'Consistent waitlist demand'] },
+        '.'
+      ],
+      lift: [
+        'Biggest lift: convert effort into public outcomes. Instead of logging hours, surface a compact metrics layer — a single ',
+        { text: 'impact hub', details: ['One page consolidating beneficiaries, before/after, artifacts, testimonials'] },
+        ' that quantifies who benefited and how across programs.'
+      ]
+    },
+    readinessInContext: [
+      'Readiness is strong relative to availability: you maximized rigor and show an upward trend. With ',
+      { text: 'limited AP availability', details: ['School profile lists 6 AP vs district 12'] },
+      ' you still hit the ceiling; the transcript climbs from 10th grade, and dual‑enrolling in ',
+      { text: 'Multivariable', details: ['College Multivariable completed with A‑', 'Linear Algebra in progress'] },
+      ' validates preparation for upper‑division work.'
+    ],
+    storyCoherencePercent: 78,
+    storyCoherenceLine: [
+      'Coherence sits at 78%: 7 of 9 activities and your main essays reinforce the access theme. The personal statement’s focus on ',
+      { text: 'assistive tech for access', details: ['Draft PS references accessibility outcomes and user testing notes'] },
+      ' is echoed by recommenders who highlight your teaching‑and‑buildership pattern.'
+    ],
+    impactFootprint: [
+      'Impact concentrates in education access. The ',
+      { text: 'tutoring platform', details: ['118 weekly active students; two partner schools; retention improving 12 pts'] },
+      ' reduces friction for students and coordinators, while ',
+      { text: 'workshop series', details: ['Three cycles delivered; avg 24 students/session; pre/post quiz gains 18%'] },
+      ' expands reach beyond your school.'
+    ],
+    recognitionMix: [
+      'Credibility is supported by external reads: ',
+      { text: 'national finalist', details: ['Civic Tech Challenge – finalist (top 10/1,200)'] },
+      ', ',
+      { text: 'two state‑level awards', details: ['State CS Olympiad – 2nd place', 'State Service Innovation Award – winner'] },
+      ', and multiple school honors. This ladder validates both craft and contribution.'
+    ],
+    trajectoryDurability: [
+      'Trajectory points up and the work outlives you. You progressed from tutor to program ',
+      { text: 'director', details: ['Tutor → coordinator → director; scope expanded to two schools'] },
+      ', built written playbooks, and trained successors for two orgs. Durability is visible in maintained schedules and ',
+      { text: 'handoff docs', details: ['Shared drive: onboarding checklist, weekly runbook, escalation contacts'] },
+      ' that keep services running.'
+    ],
+    contextContribution: [
+      'Context reframes choices: despite ',
+      { text: 'limited AP availability', details: ['School offers 6 AP vs district 12'] },
+      ', you expanded rigor via college math and contributed to an ',
+      { text: 'open‑source repo', details: ['Regular issues/PRs across 6 months; 42 stars; 9 forks'] },
+      ', signaling initiative and community orientation.'
+    ],
+    committeeSoundBite: [
+      '“Admit as the ',
+      { text: 'civic‑tech builder', details: ['Budget PDF → dashboard prototype; partner quotes; public changelog'] },
+      ' who turns messy policy data into tools people actually use.”'
+    ],
+    concludingNarrative: [
+      'Taken together, your narrative is a builder‑teacher translating technical skill into access at scale. Lead with the ',
+      { text: 'tutoring platform', details: ['118 weekly active students; two schools; retention improving'] },
+      ' as living proof, braid in the research and outreach that sharpened the tools, and anchor credibility with the ',
+      { text: 'national finalist', details: ['Civic Tech Challenge finalist (top 10/1,200)'] },
+      ' read. Over the next 60–90 days, publish a monthly update with before/after metrics and a brief note from a beneficiary. With quantified outcomes and documented handoffs, your profile reads not as “busy” but as a systems builder whose work keeps running without you.'
+    ]
+  }
 };
 
 export const HolisticPortfolioHero: React.FC = () => {
   const summary = MOCK_HOLISTIC_SUMMARY;
+  const overall100 = Math.round(summary.overallScore * 10);
   const takeaways = [
     summary.coreIdentity,
     summary.competitivePosition,
@@ -86,78 +207,133 @@ export const HolisticPortfolioHero: React.FC = () => {
           </p>
         </div>
 
-        {/* Overall Score Circle */}
+        {/* Player Card replacing score circle */}
         <div className="flex justify-center">
-          <div className="relative">
-            <div className="w-48 h-48 md:w-56 md:h-56 rounded-full border-8 border-primary flex flex-col items-center justify-center bg-card shadow-xl">
-              <div className="text-6xl md:text-7xl font-bold text-foreground">
-                {summary.overallScore}
+          <ProfileCard
+            name={'Your Portfolio'}
+            title={`${summary.tierName} • ${summary.tierPercentile}`}
+            handle="portfolio"
+            status="Analyzed"
+            avatarUrl={undefined}
+            showUserInfo={false}
+            enableTilt={true}
+            enableMobileTilt={false}
+          >
+            <div className="pc-sides">
+              <div className="pc-side-col">
+                <div className="pc-side-line">
+                  <div className="pc-side-num">7.8</div>
+                  <div className="pc-side-label">Academic</div>
+                </div>
+                <div className="pc-side-line">
+                  <div className="pc-side-num">8.5</div>
+                  <div className="pc-side-label">Readiness</div>
+                </div>
               </div>
-              <div className="text-sm text-muted-foreground mt-1">
-                out of 10
+              <div className="pc-side-col">
+                <div className="pc-side-line">
+                  <div className="pc-side-num">8.5</div>
+                  <div className="pc-side-label">Leadership</div>
+                </div>
+                <div className="pc-side-line">
+                  <div className="pc-side-num">8.3</div>
+                  <div className="pc-side-label">Community</div>
+                </div>
               </div>
             </div>
-            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-max">
-              <div className="bg-primary text-primary-foreground px-6 py-2 rounded-full font-semibold text-lg shadow-lg">
-                {summary.tierName}
-              </div>
-              <div className="text-center text-sm text-muted-foreground mt-2">
-                {summary.tierPercentile}
-              </div>
+            <div className="pc-overall-plaque">
+              <div className="pc-overall-num">{overall100}</div>
+              <div className="pc-overall-label">Overall</div>
             </div>
-          </div>
+          </ProfileCard>
         </div>
 
-        {/* Profile Summary */}
+        {/* Overarching Portfolio Insight */}
         <div className="mt-16">
           <Card className="bg-card shadow-lg border-2">
-            <div className="p-8 md:p-10">
-              <h2 className="text-2xl font-bold text-foreground mb-4 text-center">
-                Your Candidate Profile
-              </h2>
-              <p className="text-lg text-foreground/90 leading-relaxed text-center max-w-4xl mx-auto">
-                {summary.profileSummary}
-              </p>
+            <div className="p-8 md:p-10 space-y-8">
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-bold text-foreground">Overarching Portfolio Insight</h2>
+                <p className="text-muted-foreground text-sm">A crisp, committee‑ready read on what stands out, what ties together, and the highest‑leverage lift.</p>
+              </div>
+
+              {/* Verdict Line */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-xl border bg-background p-4 h-full">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="secondary" className="px-2 py-0.5">Spike</Badge>
+                    <Rocket className="w-4 h-4 text-foreground/80" />
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{renderRich((summary.overarchingInsight as OverarchingInsight).verdict.spike)}</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4 h-full">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="outline" className="px-2 py-0.5">Spine</Badge>
+                    <Target className="w-4 h-4 text-foreground/80" />
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{renderRich((summary.overarchingInsight as OverarchingInsight).verdict.spine)}</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4 h-full">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Badge variant="destructive" className="px-2 py-0.5">Biggest lift</Badge>
+                    <AlertTriangle className="w-4 h-4" />
+                  </div>
+                  <p className="text-sm text-foreground/90 leading-relaxed">{renderRich((summary.overarchingInsight as OverarchingInsight).verdict.lift)}</p>
+                </div>
+              </div>
+
+              {/* Readiness in Context */}
+              <div className="rounded-xl border bg-background p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Readiness in context</div>
+                <p className="text-sm text-foreground/90">{renderRich((summary.overarchingInsight as OverarchingInsight).readinessInContext)}</p>
+              </div>
+
+              {/* Story Coherence */}
+              <div className="rounded-xl border bg-background p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground">Story coherence</div>
+                  <div className="text-sm font-medium text-foreground">{(summary.overarchingInsight as OverarchingInsight).storyCoherencePercent}%</div>
+                </div>
+                <Progress value={(summary.overarchingInsight as OverarchingInsight).storyCoherencePercent} />
+                <p className="text-sm text-foreground/90 mt-2">{renderRich((summary.overarchingInsight as OverarchingInsight).storyCoherenceLine)}</p>
+              </div>
+
+              {/* Fact Lines */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="rounded-xl border bg-background p-4">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Impact footprint</div>
+                  <p className="text-sm text-foreground/90">{renderRich((summary.overarchingInsight as OverarchingInsight).impactFootprint)}</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Recognition mix</div>
+                  <p className="text-sm text-foreground/90">{renderRich((summary.overarchingInsight as OverarchingInsight).recognitionMix)}</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Trajectory & durability</div>
+                  <p className="text-sm text-foreground/90">{renderRich((summary.overarchingInsight as OverarchingInsight).trajectoryDurability)}</p>
+                </div>
+                <div className="rounded-xl border bg-background p-4">
+                  <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Context & contribution</div>
+                  <p className="text-sm text-foreground/90">{renderRich((summary.overarchingInsight as OverarchingInsight).contextContribution)}</p>
+                </div>
+              </div>
+
+              {/* Committee Sound Bite */}
+              <div className="rounded-xl border bg-background p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-1">Committee sound bite</div>
+                <p className="text-sm text-foreground/90 italic">{renderRich((summary.overarchingInsight as OverarchingInsight).committeeSoundBite)}</p>
+              </div>
+
+              {/* How to Tell This Story */}
+              <div className="rounded-xl border bg-background p-5 md:p-6">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground mb-2">How to tell this story</div>
+                <p className="text-[15px] leading-7 text-foreground/90">{renderRich((summary.overarchingInsight as OverarchingInsight).concludingNarrative)}</p>
+              </div>
             </div>
           </Card>
         </div>
 
-        {/* Five Key Takeaways */}
-        <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-foreground text-center mb-6">
-            Five Key Takeaways
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {takeaways.map((takeaway, index) => {
-              const Icon = takeaway.icon;
-              return (
-                <Card
-                  key={index}
-                  className={cn(
-                    'bg-card shadow-md hover:shadow-lg transition-shadow border-l-4',
-                    takeaway.colorClass
-                  )}
-                >
-                  <div className="p-6 flex gap-4">
-                    <div className="flex-shrink-0">
-                      <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                        <Icon className="w-6 h-6 text-foreground" />
-                      </div>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <h3 className="text-base font-semibold text-foreground">
-                        {takeaway.label}
-                      </h3>
-                      <p className="text-sm text-muted-foreground leading-relaxed">
-                        {takeaway.description}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              );
-            })}
-          </div>
-        </div>
+        {/* Five Key Takeaways removed in restored insight layout */}
 
         {/* Scroll Indicator */}
         <div className="flex flex-col items-center gap-4 pt-8 pb-4">
