@@ -3,7 +3,6 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import ProfileCard from '@/components/portfolio/ProfileCard';
 import { Rocket, Target, AlertTriangle, ArrowRight } from 'lucide-react';
 import { HolisticSummary, renderRich } from '../portfolioInsightsData';
 
@@ -13,54 +12,12 @@ interface OverviewTabProps {
 }
 
 export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToTab }) => {
-  const overall100 = Math.round(summary.overallScore * 10);
   const insight = summary.overarchingInsight;
 
   if (!insight) return null;
 
   return (
     <div className="space-y-12 pb-12">
-      {/* Player Card */}
-      <div className="flex justify-center">
-        <ProfileCard
-          name={'Your Portfolio'}
-          title={`${summary.tierName} • ${summary.tierPercentile}`}
-          handle="portfolio"
-          status="Analyzed"
-          avatarUrl={undefined}
-          showUserInfo={false}
-          enableTilt={true}
-          enableMobileTilt={false}
-        >
-          <div className="pc-sides">
-            <div className="pc-side-col">
-              <div className="pc-side-line">
-                <div className="pc-side-num">7.8</div>
-                <div className="pc-side-label">Academic</div>
-              </div>
-              <div className="pc-side-line">
-                <div className="pc-side-num">8.5</div>
-                <div className="pc-side-label">Readiness</div>
-              </div>
-            </div>
-            <div className="pc-side-col">
-              <div className="pc-side-line">
-                <div className="pc-side-num">8.5</div>
-                <div className="pc-side-label">Leadership</div>
-              </div>
-              <div className="pc-side-line">
-                <div className="pc-side-num">8.3</div>
-                <div className="pc-side-label">Community</div>
-              </div>
-            </div>
-          </div>
-          <div className="pc-overall-plaque">
-            <div className="pc-overall-num">{overall100}</div>
-            <div className="pc-overall-label">Overall</div>
-          </div>
-        </ProfileCard>
-      </div>
-
       {/* Spine, Spike, Lift - Three Column Layout */}
       <div className="space-y-4">
         <div className="text-center space-y-2">

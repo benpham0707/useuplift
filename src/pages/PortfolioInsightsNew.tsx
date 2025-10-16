@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { OverviewTab } from '@/components/portfolio/tabs/OverviewTab';
 import { Badge } from '@/components/ui/badge';
 import { MOCK_HOLISTIC_SUMMARY } from '@/components/portfolio/portfolioInsightsData';
+import '@/components/portfolio/ProfileCard.css';
 import { 
   LayoutDashboard, 
   Target, 
@@ -80,6 +81,7 @@ const PortfolioInsightsNew: React.FC = () => {
   };
 
   const summary = MOCK_HOLISTIC_SUMMARY;
+  const overall100 = Math.round(summary.overallScore * 10);
 
   return (
     <main role="main" className="min-h-screen bg-gradient-to-b from-background via-accent/5 to-background">
@@ -99,6 +101,57 @@ const PortfolioInsightsNew: React.FC = () => {
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
             A comprehensive analysis of your application profile with actionable recommendations
           </p>
+        </div>
+
+        {/* Portfolio Card - Fixed at top */}
+        <div className="flex justify-center mb-12">
+          <div className="inline-block">
+            <div className="pc-wrapper">
+              <div className="pc-card">
+                <div className="pc-header">
+                  <div className="pc-avatar">
+                    <div className="pc-avatar-inner bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center text-white font-bold text-xl">
+                      P
+                    </div>
+                  </div>
+                  <div className="pc-user-info">
+                    <div className="pc-name">Your Portfolio</div>
+                    <div className="pc-title">{summary.tierName} • {summary.tierPercentile}</div>
+                    <div className="pc-handle">@portfolio</div>
+                  </div>
+                </div>
+                <div className="pc-body">
+                  <div className="pc-sides">
+                    <div className="pc-side-col">
+                      <div className="pc-side-line">
+                        <div className="pc-side-num">7.8</div>
+                        <div className="pc-side-label">Academic</div>
+                      </div>
+                      <div className="pc-side-line">
+                        <div className="pc-side-num">8.5</div>
+                        <div className="pc-side-label">Readiness</div>
+                      </div>
+                    </div>
+                    <div className="pc-side-col">
+                      <div className="pc-side-line">
+                        <div className="pc-side-num">8.5</div>
+                        <div className="pc-side-label">Leadership</div>
+                      </div>
+                      <div className="pc-side-line">
+                        <div className="pc-side-num">8.3</div>
+                        <div className="pc-side-label">Community</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pc-overall-plaque">
+                    <div className="pc-overall-num">{overall100}</div>
+                    <div className="pc-overall-label">Overall</div>
+                  </div>
+                </div>
+                <div className="pc-status-badge">Analyzed</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Tab Navigation */}
