@@ -104,21 +104,21 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
   overarchingInsight: {
     verdict: {
       spike: [
-        'A distinctive spike in engineering‑for‑access with real adoption — your ',
-        { text: 'tutoring platform', details: ['118 weekly active students last month', 'MOUs with two partner schools', 'Tutor roster grew 6 → 19'] },
+        'A distinctive spike in engineering-for-access with real adoption - your ',
+        { text: 'tutoring platform', details: ['118 weekly active students last month', 'MOUs with two partner schools', 'Tutor roster grew 6 to 19'] },
         ' consistently serves local schools, and the ',
-        { text: 'adaptive controller kits', details: ['18 robotics members using kits', 'Open‑source repo: 42 stars, 9 forks'] },
+        { text: 'adaptive controller kits', details: ['18 robotics members using kits', 'Open-source repo: 42 stars, 9 forks'] },
         ' lowered barriers for new participants.'
       ],
       spine: [
-        'Your spine is clear: using technology to democratize access — from ',
+        'Your spine is clear: using technology to democratize access - from ',
         { text: 'Title I workshops', details: ['Free cycles for two Title I partners', 'Avg 24 students/session'] },
-        ' to mentoring first‑time coders via the ',
+        ' to mentoring first-time coders via the ',
         { text: 'library program', details: ['Monthly beginner cohorts since Jan 2024', 'Consistent waitlist demand'] },
         '.'
       ],
       lift: [
-        'Biggest lift: convert effort into public outcomes. Instead of logging hours, surface a compact metrics layer — a single ',
+        'Biggest lift: convert effort into public outcomes. Instead of logging hours, surface a compact metrics layer - a single ',
         { text: 'impact hub', details: ['One page consolidating beneficiaries, before/after, artifacts, testimonials'] },
         ' that quantifies who benefited and how across programs.'
       ]
@@ -126,15 +126,15 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
     readinessInContext: [
       'Readiness is strong relative to availability: you maximized rigor and show an upward trend. With ',
       { text: 'limited AP availability', details: ['School profile lists 6 AP vs district 12'] },
-      ' you still hit the ceiling; the transcript climbs from 10th grade, and dual‑enrolling in ',
-      { text: 'Multivariable', details: ['College Multivariable completed with A‑', 'Linear Algebra in progress'] },
-      ' validates preparation for upper‑division work.'
+      ' you still hit the ceiling; the transcript climbs from 10th grade, and dual-enrolling in ',
+      { text: 'Multivariable', details: ['College Multivariable completed with A-', 'Linear Algebra in progress'] },
+      ' validates preparation for upper-division work.'
     ],
     storyCoherencePercent: 78,
     storyCoherenceLine: [
-      'Coherence sits at 78%: 7 of 9 activities and your main essays reinforce the access theme. The personal statement\'s focus on ',
+      'Coherence sits at 78%: 7 of 9 activities and your main essays reinforce the access theme. The personal statement focuses on ',
       { text: 'assistive tech for access', details: ['Draft PS references accessibility outcomes and user testing notes'] },
-      ' is echoed by recommenders who highlight your teaching‑and‑buildership pattern.'
+      ', which is echoed by recommenders who highlight your teaching-and-buildership pattern.'
     ],
     impactFootprint: [
       'Impact concentrates in education access. The ',
@@ -145,9 +145,9 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
     ],
     recognitionMix: [
       'Credibility is supported by external reads: ',
-      { text: 'national finalist', details: ['Civic Tech Challenge – finalist (top 10/1,200)'] },
+      { text: 'national finalist', details: ['Civic Tech Challenge - finalist (top 10/1,200)'] },
       ', ',
-      { text: 'two state‑level awards', details: ['State CS Olympiad – 2nd place', 'State Service Innovation Award – winner'] },
+      { text: 'two state-level awards', details: ['State CS Olympiad - 2nd place', 'State Service Innovation Award - winner'] },
       ', and multiple school honors. This ladder validates both craft and contribution.'
     ],
     trajectoryDurability: [
@@ -161,20 +161,20 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
       'Context reframes choices: despite ',
       { text: 'limited AP availability', details: ['School offers 6 AP vs district 12'] },
       ', you expanded rigor via college math and contributed to an ',
-      { text: 'open‑source repo', details: ['Regular issues/PRs across 6 months; 42 stars; 9 forks'] },
+      { text: 'open-source repo', details: ['Regular issues/PRs across 6 months; 42 stars; 9 forks'] },
       ', signaling initiative and community orientation.'
     ],
     committeeSoundBite: [
       '"Admit as the ',
-      { text: 'civic‑tech builder', details: ['Budget PDF → dashboard prototype; partner quotes; public changelog'] },
+      { text: 'civic-tech builder', details: ['Budget PDF to dashboard prototype; partner quotes; public changelog'] },
       ' who turns messy policy data into tools people actually use."'
     ],
     concludingNarrative: [
-      'Taken together, your narrative is a builder‑teacher translating technical skill into access at scale. Lead with the ',
+      'Taken together, your narrative is a builder-teacher translating technical skill into access at scale. Lead with the ',
       { text: 'tutoring platform', details: ['118 weekly active students; two schools; retention improving'] },
       ' as living proof, braid in the research and outreach that sharpened the tools, and anchor credibility with the ',
       { text: 'national finalist', details: ['Civic Tech Challenge finalist (top 10/1,200)'] },
-      ' read. Over the next 60–90 days, publish a monthly update with before/after metrics and a brief note from a beneficiary. With quantified outcomes and documented handoffs, your profile reads not as "busy" but as a systems builder whose work keeps running without you.'
+      ' read. Over the next 60-90 days, publish a monthly update with before/after metrics and a brief note from a beneficiary. With quantified outcomes and documented handoffs, your profile reads not as "busy" but as a systems builder whose work keeps running without you.'
     ]
   }
 };
