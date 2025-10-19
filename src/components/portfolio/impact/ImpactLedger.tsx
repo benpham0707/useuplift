@@ -32,9 +32,21 @@ export interface Initiative {
 
 interface ImpactLedgerProps {
   initiatives: Initiative[];
+  impactQuality?: {
+    overallAssessment: string;
+    dimensions: Array<{
+      id: string;
+      name: string;
+      score: number;
+      explanation?: string;
+      suggestion?: string;
+      improvements?: string[];
+      status?: string;
+    }>;
+  };
 }
 
-export const ImpactLedger: React.FC<ImpactLedgerProps> = ({ initiatives }) => {
+export const ImpactLedger: React.FC<ImpactLedgerProps> = ({ initiatives, impactQuality }) => {
   const [selectedInitiative, setSelectedInitiative] = useState<Initiative | null>(null);
 
   return (
@@ -53,6 +65,7 @@ export const ImpactLedger: React.FC<ImpactLedgerProps> = ({ initiatives }) => {
         initiative={selectedInitiative}
         isOpen={!!selectedInitiative}
         onClose={() => setSelectedInitiative(null)}
+        impactQuality={impactQuality}
       />
     </>
   );
