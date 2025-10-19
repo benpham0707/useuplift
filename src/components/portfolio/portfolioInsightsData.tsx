@@ -1,6 +1,15 @@
 import React from 'react';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import { LucideIcon, Rocket, Target, Heart, Sparkles, AlertTriangle } from 'lucide-react';
+import { KPI } from '@/components/portfolio/impact/KPIDashboard';
+import { CredibilitySource } from '@/components/portfolio/impact/CredibilityRollup';
+import { ImpactFrame } from '@/components/portfolio/impact/ImpactFramePicker';
+import { Artifact } from '@/components/portfolio/impact/ProofStrip';
+import { Initiative } from '@/components/portfolio/impact/ImpactLedger';
+import { RecognitionItem } from '@/components/portfolio/impact/RecognitionMap';
+import { TrajectoryPoint } from '@/components/portfolio/impact/TrajectoryView';
+import { DurabilityEvidence } from '@/components/portfolio/impact/DurabilityReplication';
+import { ContextData } from '@/components/portfolio/impact/ContextAttribution';
 
 // Types
 export interface KeyTakeaway {
@@ -89,6 +98,20 @@ export interface OverarchingInsight {
   committeeSoundBite: RichSegment[];
   impactData: ImpactData;
   recognitionData: RecognitionData;
+  // Extended data for comprehensive results board
+  kpis?: KPI[];
+  credibilityRollup?: {
+    overallScore: number;
+    breakdown: CredibilitySource[];
+    explanation: string;
+  };
+  impactFrames?: ImpactFrame[];
+  artifacts?: Artifact[];
+  initiatives?: Initiative[];
+  recognitions?: RecognitionItem[];
+  trajectory?: TrajectoryPoint[];
+  durabilityEvidence?: DurabilityEvidence[];
+  contextData?: ContextData;
 }
 
 export interface HolisticSummary {
@@ -537,7 +560,7 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         label: 'Catalyst & Systems Change',
         description: 'Emphasize how your work enabled others or changed institutional practices',
         narrative: [
-          'Your platform didn't just serve students—it ',
+          "Your platform didn't just serve students—it ",
           { text: 'reduced coordinator burden', evidence: 'Partner feedback: "Cuts admin time from 4hrs to 30min/week for session scheduling and tracking"' },
           ' and ',
           { text: 'enabled peer tutors', evidence: '19 student tutors recruited and trained across two schools, up from 6 initial tutors' },

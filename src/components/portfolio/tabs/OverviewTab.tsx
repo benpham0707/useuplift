@@ -113,10 +113,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
 
           <TabsContent value="impact" className="mt-8">
             {insight.impactData && insight.recognitionData && (
-              <ImpactTab
-                impactData={insight.impactData}
-                recognitionData={insight.recognitionData}
-              />
+              <ImpactTab overarchingInsight={insight} />
             )}
           </TabsContent>
 
