@@ -1,7 +1,9 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { FileText, Image, Video, BarChart, Quote, ExternalLink, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArtifactModal } from './ArtifactModal';
 import { cn } from '@/lib/utils';
 
 export interface Artifact {
@@ -28,6 +30,7 @@ const typeConfig = {
 
 export const ProofStrip: React.FC<ProofStripProps> = ({ artifacts }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [selectedArtifact, setSelectedArtifact] = useState<Artifact | null>(null);
 
   const scroll = (direction: 'left' | 'right') => {
     if (scrollRef.current) {
@@ -40,9 +43,7 @@ export const ProofStrip: React.FC<ProofStripProps> = ({ artifacts }) => {
   };
 
   return (
-    <div className="space-y-3">
-      <h3 className="text-lg font-bold text-foreground">Supporting Evidence</h3>
-      
+    <>
       <div className="relative">
         {/* Scroll Buttons */}
         <Button
@@ -73,51 +74,63 @@ export const ProofStrip: React.FC<ProofStripProps> = ({ artifacts }) => {
             const Icon = config.icon;
 
             return (
-              <Card
-                key={artifact.id}
-                className="flex-shrink-0 w-64 snap-start border-primary/20 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer"
-                onClick={() => artifact.link && window.open(artifact.link, '_blank')}
-              >
-                <CardContent className="p-4 space-y-3">
-                  {/* Type Icon */}
-                  <div className="flex items-center justify-between">
-                    <Icon className={cn("w-5 h-5", config.color)} />
-                    {artifact.link && (
-                      <ExternalLink className="w-3 h-3 text-muted-foreground" />
-                    )}
-                  </div>
+              <TooltipProvider key={artifact.id} delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Card
+                      className="flex-shrink-0 w-64 snap-start border-primary/20 hover:border-primary/40 hover:shadow-md transition-all cursor-pointer"
+                      onClick={() => setSelectedArtifact(artifact)}
+                    >
+                      <CardContent className="p-4 space-y-3">
+                        {/* Type Icon */}
+                        <div className="flex items-center justify-between">
+                          <Icon className={cn("w-5 h-5", config.color)} />
+                          {artifact.link && (
+                            <ExternalLink className="w-3 h-3 text-muted-foreground" />
+                          )}
+                        </div>
 
-                  {/* Thumbnail (if available) */}
-                  {artifact.thumbnail && (
-                    <div className="w-full h-32 bg-muted rounded-md overflow-hidden">
-                      <img
-                        src={artifact.thumbnail}
-                        alt={artifact.title}
-                        className="w-full h-full object-cover"
-                      />
+                        {/* Thumbnail (if available) */}
+                        {artifact.thumbnail && (
+                          <div className="w-full h-32 bg-muted rounded-md overflow-hidden">
+                            <img
+                              src={artifact.thumbnail}
+                              alt={artifact.title}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+
+                        {/* Title */}
+                        <h4 className="text-sm font-semibold text-foreground line-clamp-2">
+                          {artifact.title}
+                        </h4>
+
+                        {/* Date */}
+                        <div className="text-xs text-muted-foreground">
+                          {artifact.date}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">{artifact.title}</p>
+                      <p className="text-xs text-muted-foreground">{artifact.date}</p>
                     </div>
-                  )}
-
-                  {/* Title and Description */}
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-semibold text-foreground line-clamp-2">
-                      {artifact.title}
-                    </h4>
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                      {artifact.description}
-                    </p>
-                  </div>
-
-                  {/* Date */}
-                  <div className="text-xs text-muted-foreground">
-                    {artifact.date}
-                  </div>
-                </CardContent>
-              </Card>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             );
           })}
         </div>
       </div>
-    </div>
+
+      <ArtifactModal
+        artifact={selectedArtifact}
+        isOpen={!!selectedArtifact}
+        onClose={() => setSelectedArtifact(null)}
+      />
+    </>
   );
 };

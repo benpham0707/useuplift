@@ -1,6 +1,4 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
 import { ImpactSnapshot } from '@/components/portfolio/impact/ImpactSnapshot';
 import { KPIDashboard } from '@/components/portfolio/impact/KPIDashboard';
 import { ImpactFramePicker } from '@/components/portfolio/impact/ImpactFramePicker';
@@ -8,7 +6,7 @@ import { ProofStrip } from '@/components/portfolio/impact/ProofStrip';
 import { ImpactLedger } from '@/components/portfolio/impact/ImpactLedger';
 import { ImpactQualityCheck } from '@/components/portfolio/impact/ImpactQualityCheck';
 import { StorytellingGuidance } from '@/components/portfolio/impact/StorytellingGuidance';
-import { InsightSection } from '@/components/portfolio/InsightSection';
+import { ImpactDock } from '@/components/portfolio/impact/ImpactDock';
 import { OverarchingInsight } from '@/components/portfolio/portfolioInsightsData';
 
 interface ImpactTabProps {
@@ -17,146 +15,174 @@ interface ImpactTabProps {
 
 export const ImpactTab: React.FC<ImpactTabProps> = ({ overarchingInsight }) => {
   const insight = overarchingInsight as any;
-  const [expandAllSections, setExpandAllSections] = useState(false);
+  const [activeSection, setActiveSection] = useState('snapshot');
+  
+  // Refs for each section
+  const snapshotRef = useRef<HTMLDivElement>(null);
+  const framesRef = useRef<HTMLDivElement>(null);
+  const outcomesRef = useRef<HTMLDivElement>(null);
+  const initiativesRef = useRef<HTMLDivElement>(null);
+  const evidenceRef = useRef<HTMLDivElement>(null);
+  const qualityRef = useRef<HTMLDivElement>(null);
+  const guidanceRef = useRef<HTMLDivElement>(null);
 
-  // HARD-CODED DATA: These section states would be driven by user preferences in production
-  const [sectionStates, setSectionStates] = useState({
-    kpis: false,
-    initiatives: false,
-    quality: false,
-    guidance: false,
-  });
-
-  const toggleAllSections = () => {
-    const newState = !expandAllSections;
-    setExpandAllSections(newState);
-    setSectionStates({
-      kpis: newState,
-      initiatives: newState,
-      quality: newState,
-      guidance: newState,
-    });
+  const sectionRefs = {
+    snapshot: snapshotRef,
+    frames: framesRef,
+    outcomes: outcomesRef,
+    initiatives: initiativesRef,
+    evidence: evidenceRef,
+    quality: qualityRef,
+    guidance: guidanceRef,
   };
 
+  const handleNavigate = (sectionId: string) => {
+    const ref = sectionRefs[sectionId as keyof typeof sectionRefs];
+    if (ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setActiveSection(sectionId);
+    }
+  };
+
+  // Scroll spy to update active section
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + 200;
+      
+      for (const [id, ref] of Object.entries(sectionRefs)) {
+        if (ref.current) {
+          const { offsetTop, offsetHeight } = ref.current;
+          if (scrollPosition >= offsetTop && scrollPosition < offsetTop + offsetHeight) {
+            setActiveSection(id);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-12 pb-32">
       {/* Section 1: Impact Snapshot - Always Visible */}
-      {insight.snapshotSummary && insight.snapshotMetrics && (
-        <ImpactSnapshot 
-          summary={insight.snapshotSummary}
-          metrics={insight.snapshotMetrics}
-        />
-      )}
+      <div ref={snapshotRef} id="snapshot">
+        {insight.snapshotSummary && insight.snapshotMetrics && (
+          <ImpactSnapshot 
+            summary={insight.snapshotSummary}
+            metrics={insight.snapshotMetrics}
+          />
+        )}
+      </div>
 
-      {/* Section 2: Frame Your Story - Interactive Frame Picker */}
-      {insight.impactFrames && (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-              Frame Your Story
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Choose different lenses to view and present your impact. Each frame emphasizes different aspects of your work.
-            </p>
-          </div>
-          <ImpactFramePicker frames={insight.impactFrames} />
-        </div>
-      )}
-
-      {/* Expand/Collapse All Control */}
-      {(insight.kpis || insight.initiatives || insight.impactQuality || insight.storytellingGuidance) && (
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={toggleAllSections}
-            className="gap-2"
-          >
-            {expandAllSections ? (
-              <>
-                <ChevronUp className="w-4 h-4" />
-                Collapse All
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-4 h-4" />
-                Expand All
-              </>
-            )}
-          </Button>
-        </div>
-      )}
-
-      {/* Section 3: Key Outcomes - Expandable */}
-      {insight.kpis && (
-        <InsightSection
-          title="Key Outcomes"
-          count={insight.kpis.length}
-          defaultExpanded={sectionStates.kpis}
-          variant="high"
-        >
-          <KPIDashboard kpis={insight.kpis} />
-        </InsightSection>
-      )}
-
-      {/* Section 4: Initiative Breakdown - Expandable Accordion */}
-      {insight.initiatives && (
-        <InsightSection
-          title="Initiative Breakdown"
-          count={insight.initiatives.length}
-          defaultExpanded={sectionStates.initiatives}
-          variant="high"
-        >
+      {/* Section 2: Frame Your Story */}
+      <div ref={framesRef} id="frames">
+        {insight.impactFrames && (
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Detailed view of each initiative showing beneficiaries, outcomes, resources, and sustainability. Click any initiative to expand full details.
-            </p>
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                Frame Your Story
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Choose different lenses to view and present your impact. Each frame emphasizes different aspects of your work.
+              </p>
+            </div>
+            <ImpactFramePicker frames={insight.impactFrames} />
+          </div>
+        )}
+      </div>
+
+      {/* Section 3: Key Outcomes */}
+      <div ref={outcomesRef} id="outcomes">
+        {insight.kpis && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                Key Outcomes
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Critical metrics showing real-world impact. Hover for context, click for full details.
+              </p>
+            </div>
+            <KPIDashboard kpis={insight.kpis} />
+          </div>
+        )}
+      </div>
+
+      {/* Section 4: Initiative Breakdown */}
+      <div ref={initiativesRef} id="initiatives">
+        {insight.initiatives && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                Initiative Breakdown
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Detailed view of each initiative. Hover for preview, click for full details.
+              </p>
+            </div>
             <ImpactLedger initiatives={insight.initiatives} />
           </div>
-        </InsightSection>
-      )}
+        )}
+      </div>
 
-      {/* Section 5: Evidence Locker - Horizontal Scroll */}
-      {insight.artifacts && (
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
-              Evidence Locker
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              Supporting documentation, testimonials, media coverage, and data artifacts that validate your impact.
-            </p>
+      {/* Section 5: Evidence Locker */}
+      <div ref={evidenceRef} id="evidence">
+        {insight.artifacts && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                Evidence Locker
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Supporting documentation, testimonials, media coverage, and data artifacts. Click to view details.
+              </p>
+            </div>
+            <ProofStrip artifacts={insight.artifacts} />
           </div>
-          <ProofStrip artifacts={insight.artifacts} />
-        </div>
-      )}
+        )}
+      </div>
 
-      {/* Section 6: Impact Quality Check - Expandable Assessment */}
-      {insight.impactQuality && (
-        <InsightSection
-          title="Impact Quality Assessment"
-          count={insight.impactQuality.dimensions.length}
-          defaultExpanded={sectionStates.quality}
-          variant="medium"
-        >
-          <ImpactQualityCheck 
-            dimensions={insight.impactQuality.dimensions}
-            overallAssessment={insight.impactQuality.overallAssessment}
-          />
-        </InsightSection>
-      )}
+      {/* Section 6: Impact Quality Check */}
+      <div ref={qualityRef} id="quality">
+        {insight.impactQuality && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                Impact Quality Assessment
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Evaluation across key dimensions. Hover over radar chart for details.
+              </p>
+            </div>
+            <ImpactQualityCheck 
+              dimensions={insight.impactQuality.dimensions}
+              overallAssessment={insight.impactQuality.overallAssessment}
+            />
+          </div>
+        )}
+      </div>
 
-      {/* Section 7: Storytelling Guidance - Expandable Tips */}
-      {insight.storytellingGuidance && (
-        <InsightSection
-          title="Strategic Storytelling Guidance"
-          count={insight.storytellingGuidance.length}
-          defaultExpanded={sectionStates.guidance}
-          variant="medium"
-        >
-          <StorytellingGuidance insights={insight.storytellingGuidance} />
-        </InsightSection>
-      )}
+      {/* Section 7: Storytelling Guidance */}
+      <div ref={guidanceRef} id="guidance">
+        {insight.storytellingGuidance && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-bold text-foreground mb-2">
+                Strategic Storytelling Guidance
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Recommendations based on your impact data. Hover for preview, click to expand.
+              </p>
+            </div>
+            <StorytellingGuidance insights={insight.storytellingGuidance} />
+          </div>
+        )}
+      </div>
+
+      {/* Dock Navigation */}
+      <ImpactDock activeSection={activeSection} onNavigate={handleNavigate} />
     </div>
   );
 };
