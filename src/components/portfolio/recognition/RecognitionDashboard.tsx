@@ -1,18 +1,18 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Filter, ArrowUpDown } from 'lucide-react';
 import { RecognitionCard, RecognitionItem } from './RecognitionCard';
 
 interface RecognitionDashboardProps {
   recognitions: RecognitionItem[];
+  onViewRecognition: (recognition: RecognitionItem) => void;
 }
 
 type SortOption = 'portfolioLift' | 'impressiveness' | 'narrativeFit' | 'recency';
 type FilterTier = 'all' | 'national' | 'state' | 'regional' | 'school';
 type FilterUse = 'all' | 'flagship' | 'bridge' | 'support' | 'footnote' | 'archive';
 
-export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ recognitions }) => {
+export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ recognitions, onViewRecognition }) => {
   const [sortBy, setSortBy] = useState<SortOption>('portfolioLift');
   const [filterTier, setFilterTier] = useState<FilterTier>('all');
   const [filterUse, setFilterUse] = useState<FilterUse>('all');
@@ -44,13 +44,11 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
   return (
     <div className="space-y-6">
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3 p-4 rounded-lg border bg-muted/30">
+      <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/20">
         <div className="flex items-center gap-2">
-          <ArrowUpDown className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Sort by:</span>
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue />
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Sort by" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="portfolioLift">Portfolio Lift</SelectItem>
@@ -61,14 +59,10 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
           </Select>
         </div>
 
-        <div className="h-6 w-px bg-border" />
-
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          <span className="text-sm font-medium text-foreground">Tier:</span>
           <Select value={filterTier} onValueChange={(v) => setFilterTier(v as FilterTier)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="All Tiers" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Tiers</SelectItem>
@@ -81,10 +75,9 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">Use:</span>
           <Select value={filterUse} onValueChange={(v) => setFilterUse(v as FilterUse)}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue />
+            <SelectTrigger className="w-[130px]">
+              <SelectValue placeholder="All Uses" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Uses</SelectItem>
@@ -105,9 +98,9 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
               setFilterTier('all');
               setFilterUse('all');
             }}
-            className="ml-auto"
+            className="ml-auto text-xs"
           >
-            Clear Filters
+            Clear
           </Button>
         )}
       </div>
@@ -120,7 +113,11 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
       {/* Recognition Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {sortedRecognitions.map(recognition => (
-          <RecognitionCard key={recognition.id} recognition={recognition} />
+          <RecognitionCard 
+            key={recognition.id} 
+            recognition={recognition}
+            onViewAnalysis={() => onViewRecognition(recognition)}
+          />
         ))}
       </div>
 
