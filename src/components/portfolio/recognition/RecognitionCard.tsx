@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ExternalLink } from 'lucide-react';
+import { RecommendedUseLabel } from './RecommendedUseLabel';
+import { RecognitionScoreDisplay } from './RecognitionScoreDisplay';
 import { cn } from '@/lib/utils';
-import { UsageGuidance } from './UsageGuidancePanel';
 
 export interface RecognitionItem {
   id: string;
@@ -12,7 +12,7 @@ export interface RecognitionItem {
   issuer: string;
   date: string;
   tier: 'national' | 'state' | 'regional' | 'school';
-  type: 'award' | 'partnership' | 'media' | 'institutional' | 'peer';
+  type: 'award' | 'honor' | 'fellowship' | 'institutional';
   link?: string;
   selectivity?: {
     accepted: number;
@@ -43,7 +43,12 @@ export interface RecognitionItem {
     };
   };
   recommendedUse: 'flagship' | 'bridge' | 'support' | 'footnote' | 'archive';
-  usageGuidance: UsageGuidance;
+  usageGuidance: {
+    whereToUse: string[];
+    howToFrame: string[];
+    framingAngles: Array<{ angle: string; example: string }>;
+    strategicNote?: string;
+  };
 }
 
 interface RecognitionCardProps {
@@ -52,90 +57,120 @@ interface RecognitionCardProps {
 }
 
 const tierConfig = {
-  national: { label: 'National', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-500/10' },
-  state: { label: 'State', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-500/10' },
-  regional: { label: 'Regional', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-500/10' },
-  school: { label: 'School', color: 'text-muted-foreground', bg: 'bg-muted/50' }
-};
-
-const useConfig = {
-  flagship: { label: 'FLAGSHIP', icon: '⭐', gradient: 'from-amber-500 to-yellow-400' },
-  bridge: { label: 'BRIDGE', icon: '🌉', gradient: 'from-blue-500 to-cyan-400' },
-  support: { label: 'SUPPORT', icon: '📋', gradient: 'from-green-500 to-emerald-400' },
-  footnote: { label: 'FOOTNOTE', icon: '📝', gradient: 'from-gray-400 to-slate-400' },
-  archive: { label: 'ARCHIVE', icon: '📦', gradient: 'from-gray-300 to-gray-400' }
+  national: { label: 'National', className: 'text-amber-600 dark:text-amber-400' },
+  state: { label: 'State', className: 'text-blue-600 dark:text-blue-400' },
+  regional: { label: 'Regional', className: 'text-orange-600 dark:text-orange-400' },
+  school: { label: 'School', className: 'text-green-600 dark:text-green-400' }
 };
 
 export const RecognitionCard: React.FC<RecognitionCardProps> = ({ recognition, onViewAnalysis }) => {
-  const useStyle = useConfig[recognition.recommendedUse];
-  const { scores } = recognition;
-
-  const getScoreColor = (score: number) => {
-    if (score >= 9.0) return 'text-amber-600 dark:text-amber-400';
-    if (score >= 7.5) return 'text-green-600 dark:text-green-400';
-    if (score >= 6.0) return 'text-blue-600 dark:text-blue-400';
-    return 'text-muted-foreground';
-  };
-
-  const scoreColor = getScoreColor(scores.portfolioLift.overall);
+  const [whyItMattersExpanded, setWhyItMattersExpanded] = useState(false);
+  const tierInfo = tierConfig[recognition.tier];
 
   return (
-    <Card className="border hover:border-primary/40 transition-all">
-      <CardContent className="p-6 space-y-4">
+    <Card className="h-full flex flex-col hover:shadow-lg transition-shadow">
+      <CardContent className="p-6 flex-1 flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 space-y-1">
-            <h3 className="text-xl font-bold text-foreground leading-tight">
-              {recognition.name}
-            </h3>
-            <div className="text-sm text-muted-foreground">
-              {recognition.issuer} • {recognition.date}
+        <div className="mb-4">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <h3 className="text-lg font-bold leading-tight flex-1">{recognition.name}</h3>
+            {recognition.link && (
+              <a 
+                href={recognition.link} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-muted-foreground hover:text-primary transition-colors"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>{recognition.issuer}</span>
+            <span>•</span>
+            <span>{recognition.date}</span>
+            <span>•</span>
+            <span className={tierInfo.className}>{tierInfo.label}</span>
+          </div>
+        </div>
+
+        {/* Score Display */}
+        <div className="mb-4">
+          <RecognitionScoreDisplay
+            portfolioLift={recognition.scores.portfolioLift.overall}
+            impressiveness={recognition.scores.impressiveness}
+            narrativeFit={recognition.scores.narrativeFit}
+          />
+        </div>
+
+        {/* At a Glance */}
+        <div className="mb-4 p-3 rounded-lg border bg-muted/20">
+          <div className="text-xs font-semibold text-muted-foreground mb-2">At a Glance</div>
+          <div className="space-y-1.5 text-sm">
+            {recognition.selectivity && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Selectivity:</span>
+                <span className="font-medium">{recognition.selectivity.description}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Spine Match:</span>
+              <span className="font-medium">{recognition.scores.narrativeFit.spineAlignment}% alignment</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Recency:</span>
+              <span className="font-medium">{recognition.date}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Validates:</span>
+              <span className="font-medium text-right">{recognition.scores.narrativeFit.themeSupport.slice(0, 2).join(', ')}</span>
             </div>
           </div>
-          {recognition.link && (
-            <a
-              href={recognition.link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0"
-            >
-              <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-            </a>
-          )}
         </div>
 
-        {/* Portfolio Lift Score & Badge */}
-        <div className="flex items-center gap-4">
-          <div className="flex-1 text-center py-4 border rounded-lg bg-muted/30">
-            <div className="text-xs font-medium text-muted-foreground mb-1">
-              PORTFOLIO LIFT
-            </div>
-            <div className={cn('text-4xl font-bold', scoreColor)}>
-              {scores.portfolioLift.overall.toFixed(1)}
-              <span className="text-xl text-muted-foreground">/10</span>
-            </div>
-          </div>
-          <Badge className="text-xs px-3 py-1.5 bg-foreground text-background whitespace-nowrap">
-            {useStyle.icon} {useStyle.label}
-          </Badge>
+        {/* Why It Matters */}
+        <div className="mb-4 p-3 rounded-lg border bg-muted/10">
+          <div className="text-xs font-semibold text-muted-foreground mb-2">Why It Matters</div>
+          <p className="text-sm leading-relaxed">
+            {whyItMattersExpanded 
+              ? recognition.scores.narrativeFit.analysis 
+              : `${recognition.scores.narrativeFit.analysis.slice(0, 120)}...`}
+          </p>
+          <button
+            onClick={() => setWhyItMattersExpanded(!whyItMattersExpanded)}
+            className="text-xs text-primary hover:underline mt-2 flex items-center gap-1"
+          >
+            {whyItMattersExpanded ? (
+              <>Show less <ChevronUp className="h-3 w-3" /></>
+            ) : (
+              <>Read more <ChevronDown className="h-3 w-3" /></>
+            )}
+          </button>
         </div>
 
-        {/* Quick Facts - One Line */}
-        <div className="text-sm text-muted-foreground text-center">
-          {recognition.selectivity && (
-            <>{recognition.selectivity.description} • </>
-          )}
-          {scores.narrativeFit.spineAlignment}% spine match
+        {/* Recommended Use */}
+        <div className="mb-4">
+          <RecommendedUseLabel use={recognition.recommendedUse} className="mb-2" />
+          <ul className="space-y-1 text-xs text-muted-foreground">
+            {recognition.usageGuidance.whereToUse.slice(0, 3).map((use, idx) => (
+              <li key={idx} className="flex items-start gap-1.5">
+                <span className="text-primary mt-0.5">•</span>
+                <span>{use}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* View Analysis CTA */}
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={onViewAnalysis}
-        >
-          View Full Analysis →
-        </Button>
+        {/* View Full Analysis CTA */}
+        <div className="mt-auto pt-4">
+          <Button 
+            variant="outline" 
+            className="w-full"
+            onClick={onViewAnalysis}
+          >
+            View Full Analysis →
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

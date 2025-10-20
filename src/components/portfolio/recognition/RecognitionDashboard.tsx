@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from '@/components/ui/carousel';
 import { RecognitionCard, RecognitionItem } from './RecognitionCard';
 
 interface RecognitionDashboardProps {
@@ -34,7 +35,6 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
       case 'narrativeFit':
         return b.scores.narrativeFit.overall - a.scores.narrativeFit.overall;
       case 'recency':
-        // Parse dates and sort
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       default:
         return 0;
@@ -43,12 +43,16 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
 
   return (
     <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3 p-3 rounded-lg border bg-muted/20">
+      {/* Header and Controls */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold">All Recognitions ({sortedRecognitions.length})</h3>
+          <p className="text-sm text-muted-foreground">Browse 2 at a time with navigation arrows</p>
+        </div>
         <div className="flex items-center gap-2">
           <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Sort by" />
+            <SelectTrigger className="w-[150px]">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="portfolioLift">Portfolio Lift</SelectItem>
@@ -58,37 +62,36 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
             </SelectContent>
           </Select>
         </div>
+      </div>
 
-        <div className="flex items-center gap-2">
-          <Select value={filterTier} onValueChange={(v) => setFilterTier(v as FilterTier)}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="All Tiers" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Tiers</SelectItem>
-              <SelectItem value="national">National</SelectItem>
-              <SelectItem value="state">State</SelectItem>
-              <SelectItem value="regional">Regional</SelectItem>
-              <SelectItem value="school">School</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border bg-muted/20">
+        <Select value={filterTier} onValueChange={(v) => setFilterTier(v as FilterTier)}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Tiers</SelectItem>
+            <SelectItem value="national">National</SelectItem>
+            <SelectItem value="state">State</SelectItem>
+            <SelectItem value="regional">Regional</SelectItem>
+            <SelectItem value="school">School</SelectItem>
+          </SelectContent>
+        </Select>
 
-        <div className="flex items-center gap-2">
-          <Select value={filterUse} onValueChange={(v) => setFilterUse(v as FilterUse)}>
-            <SelectTrigger className="w-[130px]">
-              <SelectValue placeholder="All Uses" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Uses</SelectItem>
-              <SelectItem value="flagship">Flagship</SelectItem>
-              <SelectItem value="bridge">Bridge</SelectItem>
-              <SelectItem value="support">Support</SelectItem>
-              <SelectItem value="footnote">Footnote</SelectItem>
-              <SelectItem value="archive">Archive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Select value={filterUse} onValueChange={(v) => setFilterUse(v as FilterUse)}>
+          <SelectTrigger className="w-[120px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Uses</SelectItem>
+            <SelectItem value="flagship">Flagship</SelectItem>
+            <SelectItem value="bridge">Bridge</SelectItem>
+            <SelectItem value="support">Support</SelectItem>
+            <SelectItem value="footnote">Footnote</SelectItem>
+            <SelectItem value="archive">Archive</SelectItem>
+          </SelectContent>
+        </Select>
 
         {(filterTier !== 'all' || filterUse !== 'all') && (
           <Button
@@ -98,32 +101,37 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
               setFilterTier('all');
               setFilterUse('all');
             }}
-            className="ml-auto text-xs"
           >
-            Clear
+            Clear Filters
           </Button>
         )}
       </div>
 
-      {/* Results Count */}
-      <div className="text-sm text-muted-foreground">
-        Showing {sortedRecognitions.length} of {recognitions.length} recognitions
-      </div>
-
-      {/* Recognition Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {sortedRecognitions.map(recognition => (
-          <RecognitionCard 
-            key={recognition.id} 
-            recognition={recognition}
-            onViewAnalysis={() => onViewRecognition(recognition)}
-          />
-        ))}
-      </div>
-
-      {sortedRecognitions.length === 0 && (
-        <div className="text-center py-12 text-muted-foreground">
-          No recognitions match your filters
+      {/* Carousel */}
+      {sortedRecognitions.length > 0 ? (
+        <Carousel
+          opts={{
+            align: "start",
+            slidesToScroll: 1,
+          }}
+          className="w-full"
+        >
+          <CarouselContent className="-ml-4">
+            {sortedRecognitions.map((recognition) => (
+              <CarouselItem key={recognition.id} className="pl-4 md:basis-1/2 lg:basis-1/2">
+                <RecognitionCard 
+                  recognition={recognition}
+                  onViewAnalysis={() => onViewRecognition(recognition)}
+                />
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          <CarouselPrevious className="-left-12" />
+          <CarouselNext className="-right-12" />
+        </Carousel>
+      ) : (
+        <div className="text-center py-12 rounded-lg border bg-muted/20">
+          <p className="text-muted-foreground">No recognitions match your filters</p>
         </div>
       )}
     </div>
