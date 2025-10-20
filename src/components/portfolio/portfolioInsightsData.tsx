@@ -1148,6 +1148,173 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         mostRecentDate: 'May 2024',
         spineAlignmentPercent: 83,
         recencyScore: 'excellent' as const
+      },
+      competitivePositioning: {
+        selectivityBenchmark: {
+          theirAverage: 2.4,
+          ivyAdmitsAverage: 3.1,
+          top20Average: 5.2,
+          top50Average: 8.7,
+          percentile: 78,
+          interpretation: 'Your portfolio selectivity places you in the 78th percentile of Ivy+ admitted students. This means your recognition portfolio is more competitive than 78% of students who were accepted to Ivy League schools.'
+        },
+        tierDistribution: {
+          current: { national: 17, state: 33, school: 50 },
+          ivyTypical: { national: 35, state: 40, school: 25 },
+          top20Typical: { national: 25, state: 45, school: 30 },
+          analysis: 'Your portfolio is weighted toward school-level recognitions compared to typical Ivy+ admits. Adding 1-2 more national or state honors would bring you closer to the competitive benchmark.',
+          impactProjection: {
+            withOneMoreNational: { percentile: 85 },
+            withOneMoreState: { percentile: 81 }
+          }
+        },
+        competitiveDensity: {
+          stemCount: 4,
+          communityCount: 3,
+          leadershipCount: 2,
+          artsCount: 0,
+          diversificationScore: 7.2,
+          analysis: 'Your recognitions cluster around STEM and community impact, creating a clear and consistent narrative signal. This is ideal for STEM-focused applications. No diversification needed - maintain focus.'
+        }
+      },
+      qualityIndicators: {
+        issuerPrestige: [
+          {
+            recognition: 'Civic Tech Challenge Finalist',
+            issuerType: 'foundation' as const,
+            prestigeScore: 9.2,
+            contextTooltip: 'National foundation with rigorous selection process. Top 10 of 1,200 applicants nationwide demonstrates exceptional validation.'
+          },
+          {
+            recognition: 'State CS Olympiad - 2nd Place',
+            issuerType: 'state_agency' as const,
+            prestigeScore: 8.0,
+            contextTooltip: 'State Education Department administered competition with documented selection criteria and public rankings.'
+          },
+          {
+            recognition: 'State Service Innovation Award',
+            issuerType: 'governor' as const,
+            prestigeScore: 7.8,
+            contextTooltip: 'Governor\'s Office recognition for innovative community service. Statewide selection with limited awards.'
+          },
+          {
+            recognition: 'School Awards (3)',
+            issuerType: 'institution' as const,
+            prestigeScore: 5.5,
+            contextTooltip: 'Institutional awards demonstrate local recognition but have limited competitive differentiation at selective colleges.'
+          }
+        ],
+        averageIssuerPrestige: 7.6,
+        recencyDistribution: {
+          last6Months: 4,
+          months6to12: 2,
+          months12to24: 0,
+          older: 0,
+          recencyScore: 9.3,
+          analysis: 'Your recognition portfolio demonstrates current and ongoing achievement. 100% of your recognitions are from the past year, signaling sustained excellence.'
+        },
+        verification: {
+          verifiedCount: 3,
+          selfReportedCount: 3,
+          verificationRate: 50,
+          recommendation: 'Consider gathering verification for self-reported recognitions to strengthen credibility. Even informal documentation (emails, photos, certificates) adds legitimacy during application verification.'
+        }
+      },
+      gapAnalysisGrowth: {
+        criticalGaps: [
+          {
+            issue: 'Only 1 national-level recognition',
+            impact: 'Adding 1 more national honor would move you from 78th → 85th percentile of Ivy+ admits',
+            priority: 'HIGH' as const
+          },
+          {
+            issue: '50% of portfolio is school-level',
+            impact: 'School recognitions don\'t differentiate at selective colleges. Focus future efforts on state/national competitions.',
+            priority: 'MEDIUM' as const
+          }
+        ],
+        minorGaps: [
+          'No arts/humanities recognition (acceptable for STEM applicants - not a concern given your focus)',
+          'All recognitions from current year (excellent recency but lacks multi-year trajectory evidence)'
+        ],
+        diminishingReturns: [
+          {
+            category: 'School-level recognitions',
+            currentCount: 3,
+            recommendation: 'Adding more school awards won\'t increase competitive standing. Your time is better spent on state/national competitions.'
+          },
+          {
+            category: 'Community service validation',
+            currentCount: 2,
+            recommendation: 'You have sufficient recognitions validating community impact. Further recognitions in this area would be redundant.'
+          }
+        ],
+        growthTrajectory: {
+          timelineData: [
+            { quarter: 'Q1 2023', count: 1 },
+            { quarter: 'Q2 2023', count: 0 },
+            { quarter: 'Q3 2023', count: 0 },
+            { quarter: 'Q4 2023', count: 1 },
+            { quarter: 'Q1 2024', count: 2 },
+            { quarter: 'Q2 2024', count: 2 }
+          ],
+          trend: 'accelerating' as const,
+          analysis: 'Your recognition earning has accelerated in 2024, earning 4 honors in first half vs 2 in all of 2023. This upward trajectory signals increasing achievement.'
+        },
+        seniorYearStrategy: {
+          timeRemaining: '8 months until Regular Decision',
+          realisticTargets: [
+            '1-2 more recognitions achievable before apps',
+            'Focus on competitions with Fall 2024 deadlines',
+            'Prioritize national/state over additional school'
+          ],
+          strategicTiming: [
+            'September-October: Apply to competitions',
+            'November-December: Results announced, update apps',
+            'January: Update colleges with new honors'
+          ],
+          actionsTabCTA: 'See specific competition recommendations, deadlines, and application strategies in the Actions tab.'
+        }
+      },
+      strategicUsage: {
+        credibilityReferences: [
+          {
+            recognition: 'Civic Tech Challenge Finalist',
+            whenToReference: 'When discussing your community impact projects. Establishes that outside experts validated your work quality and mission alignment.',
+            exampleFraming: '...which earned recognition as a National Civic Tech Challenge Finalist, validating both the platform\'s technical execution and community need.'
+          },
+          {
+            recognition: 'State CS Olympiad - 2nd Place',
+            whenToReference: 'When discussing technical skills. Proves competitive coding ability without needing to explain your skill level.',
+            exampleFraming: 'My programming skills, validated through 2nd place at the State CS Olympiad, enabled me to...'
+          }
+        ],
+        expandOnInAdditionalInfo: [
+          {
+            recognition: 'Civic Tech Challenge Finalist',
+            whatToInclude: [
+              'Selectivity statistics (top 10 of 1,200)',
+              'Evaluation criteria judges used',
+              'What this recognition validates (technical + impact, not just one or the other)'
+            ]
+          },
+          {
+            recognition: 'Service Innovation Award',
+            whatToInclude: [
+              'State-level selection process',
+              'Why the Governor\'s Office recognized your work',
+              'What differentiated your submission from other applicants'
+            ]
+          }
+        ],
+        positioning: {
+          flagship: ['Civic Tech Challenge Finalist → Common App #1'],
+          bridge: [
+            'State CS Olympiad → Honors section',
+            'Service Innovation Award → Common App #3'
+          ],
+          support: ['3 school-level → Group in Activities #8-10']
+        }
       }
     },
     recognitionItems: [
