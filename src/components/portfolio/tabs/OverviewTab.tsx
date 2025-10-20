@@ -10,6 +10,7 @@ import { ChevronLeft, ChevronRight, CheckCircle, Circle, AlertTriangle } from 'l
 import { NavigationControls } from '../NavigationControls';
 import { ScoreIndicator } from '../ScoreIndicator';
 import { ImpactTab } from './ImpactTab';
+import { RecognitionTab } from '../recognition/RecognitionTab';
 
 interface OverviewTabProps {
   summary: HolisticSummary;
@@ -118,9 +119,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
           </TabsContent>
 
           <TabsContent value="recognition" className="mt-8">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Recognition Mix tab coming soon...</p>
-            </div>
+            {insight.recognitionOverview && insight.recognitionItems && (
+              <RecognitionTab 
+                overview={insight.recognitionOverview}
+                recognitions={insight.recognitionItems}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="trajectory" className="mt-8">

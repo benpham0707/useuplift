@@ -8,6 +8,8 @@ import { Initiative } from '@/components/portfolio/impact/ImpactLedger';
 import { SnapshotMetric } from '@/components/portfolio/impact/ImpactSnapshot';
 import { QualityDimension } from '@/components/portfolio/impact/ImpactQualityCheck';
 import { GuidanceInsight } from '@/components/portfolio/impact/StorytellingGuidance';
+import { RecognitionOverviewData } from '@/components/portfolio/recognition/RecognitionOverview';
+import { RecognitionItem } from '@/components/portfolio/recognition/RecognitionCard';
 
 // Types
 export interface KeyTakeaway {
@@ -96,6 +98,9 @@ export interface OverarchingInsight {
   committeeSoundBite: RichSegment[];
   impactData: ImpactData;
   recognitionData: RecognitionData;
+  // Recognition Tab Data
+  recognitionOverview?: RecognitionOverviewData;
+  recognitionItems?: RecognitionItem[];
   // Impact Tab - Redesigned for reflection and insights
   snapshotSummary?: string;
   snapshotMetrics?: SnapshotMetric[];
@@ -1129,6 +1134,348 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         { tier: 'Regional', description: 'Notable recognition within regional network', percentile: 'Top 15%', colorClass: 'from-orange-500 to-amber-400' },
         { tier: 'School', description: 'Honored by institution for exceptional contribution', percentile: 'Top 25%', colorClass: 'from-green-500 to-emerald-400' }
       ]
-    }
+    },
+    // Recognition Tab - Comprehensive prioritization data
+    recognitionOverview: {
+      portfolioLiftScore: 8.4,
+      assessmentLabel: 'Strong Validation',
+      oneLineSummary: 'Your recognition portfolio demonstrates exceptional competitive validation with national-level distinction and consistent state honors. Strong recency and clear alignment to your STEM + community impact narrative.',
+      mixAnalysis: {
+        nationalCount: 1,
+        stateCount: 2,
+        regionalCount: 0,
+        schoolCount: 3,
+        mostRecentDate: 'May 2024',
+        spineAlignmentPercent: 83,
+        recencyScore: 'excellent' as const
+      }
+    },
+    recognitionItems: [
+      // Hard coded recognition data with comprehensive scoring
+      {
+        id: 'civic-tech-finalist',
+        name: 'Civic Tech Challenge Finalist',
+        issuer: 'National Civic Tech Foundation',
+        date: 'March 2024',
+        tier: 'national' as const,
+        type: 'award' as const,
+        link: 'https://example.com/civic-tech',
+        selectivity: {
+          accepted: 10,
+          applicants: 1200,
+          acceptanceRate: 0.008,
+          description: 'Top 10 of 1,200 nationwide'
+        },
+        scores: {
+          impressiveness: {
+            overall: 9.2,
+            breakdown: {
+              selectivity: 9.8,
+              issuerPrestige: 8.5,
+              fieldScale: 9.0,
+              recency: 9.5
+            }
+          },
+          narrativeFit: {
+            overall: 9.8,
+            analysis: 'This recognition directly validates your technology + community impact narrative. The "civic tech" frame perfectly bridges your STEM skills and social impact work. Competitive distinction (top 10/1,200) proves both technical execution and mission alignment.',
+            spineAlignment: 95,
+            themeSupport: ['STEM Skills', 'Community Impact', 'Technology for Good']
+          },
+          portfolioLift: {
+            overall: 9.6,
+            reasoning: 'National-level competitive validation that establishes credibility and distinguishes from regional peers.',
+            strategicValue: [
+              'Establishes national-level credibility',
+              'Third-party validation of impact quality',
+              'Distinguishes you from regional peers',
+              'Competitive filter proves merit at scale'
+            ]
+          }
+        },
+        recommendedUse: 'flagship' as const,
+        usageGuidance: {
+          whereToUse: [
+            'Common App Activity #1 (lead credential)',
+            'Honors section (first entry)',
+            'Supplemental essays (credibility anchor)'
+          ],
+          howToFrame: [
+            'Lead with selectivity numbers upfront: "Top 10 of 1,200 nationwide"',
+            'Use to establish authority before describing details',
+            'Emphasize competitive validation of both tech and impact'
+          ],
+          framingAngles: [
+            { angle: 'Competitive Distinction', example: 'Nationally recognized among 1,200 civic tech projects' },
+            { angle: 'Technical Validation', example: 'Platform design and execution validated by national judges' },
+            { angle: 'Impact Credibility', example: 'Community impact verified through competitive evaluation' }
+          ]
+        }
+      },
+      {
+        id: 'state-service-innovation',
+        name: 'State Service Innovation Award',
+        issuer: "Governor's Office",
+        date: 'April 2024',
+        tier: 'state' as const,
+        type: 'institutional' as const,
+        selectivity: {
+          accepted: 25,
+          applicants: 450,
+          acceptanceRate: 0.056,
+          description: 'Top 25 of 450 state applicants'
+        },
+        scores: {
+          impressiveness: {
+            overall: 8.5,
+            breakdown: {
+              selectivity: 8.8,
+              issuerPrestige: 9.0,
+              fieldScale: 8.0,
+              recency: 8.5
+            }
+          },
+          narrativeFit: {
+            overall: 8.8,
+            analysis: 'Validates the "service innovation" angle of your work. The Governor\'s Office recognition adds institutional weight and shows your work resonates beyond tech circles into policy and civic leadership spaces.',
+            spineAlignment: 85,
+            themeSupport: ['Community Impact', 'Innovation', 'Leadership']
+          },
+          portfolioLift: {
+            overall: 8.7,
+            reasoning: 'High-prestige institutional validation that bridges technical and civic leadership.',
+            strategicValue: [
+              'Institutional credibility from state government',
+              'Validates community impact at policy level',
+              'Bridges tech skills with civic leadership'
+            ]
+          }
+        },
+        recommendedUse: 'flagship' as const,
+        usageGuidance: {
+          whereToUse: [
+            'Common App Activity #2 or Honors section',
+            'Essays discussing community impact',
+            'Leadership supplements'
+          ],
+          howToFrame: [
+            'Emphasize institutional validation: "Recognized by Governor\'s Office"',
+            'Use to validate community-facing work',
+            'Pair with civic tech finalist for composite narrative'
+          ],
+          framingAngles: [
+            { angle: 'Policy Recognition', example: 'Service innovation model recognized at state policy level' },
+            { angle: 'Institutional Trust', example: 'Governor\'s Office validated community impact approach' }
+          ]
+        }
+      },
+      {
+        id: 'state-cs-olympiad',
+        name: 'State CS Olympiad - 2nd Place',
+        issuer: 'State Education Department',
+        date: 'February 2024',
+        tier: 'state' as const,
+        type: 'award' as const,
+        selectivity: {
+          accepted: 3,
+          applicants: 180,
+          acceptanceRate: 0.017,
+          description: 'Top 3 of 180 state competitors'
+        },
+        scores: {
+          impressiveness: {
+            overall: 8.0,
+            breakdown: {
+              selectivity: 9.0,
+              issuerPrestige: 7.5,
+              fieldScale: 7.5,
+              recency: 8.0
+            }
+          },
+          narrativeFit: {
+            overall: 7.5,
+            analysis: 'Validates technical skills but is less central to your civic impact spine. It supports your technical credibility without directly connecting to the community service theme.',
+            spineAlignment: 70,
+            themeSupport: ['STEM Skills', 'Technical Competence']
+          },
+          portfolioLift: {
+            overall: 7.8,
+            reasoning: 'Strong technical credential that supports but does not lead your narrative.',
+            strategicValue: [
+              'Validates technical/CS competence',
+              'Competitive distinction in academic domain',
+              'Supports but doesn\'t define primary narrative'
+            ]
+          }
+        },
+        recommendedUse: 'bridge' as const,
+        usageGuidance: {
+          whereToUse: [
+            'Honors section (after flagship awards)',
+            'CS/STEM supplements as supporting evidence',
+            'Activity descriptions to show technical foundation'
+          ],
+          howToFrame: [
+            'Use as supporting credential, not lead',
+            'Frame as technical foundation for civic work',
+            'Mention briefly to establish CS credibility'
+          ],
+          framingAngles: [
+            { angle: 'Technical Foundation', example: 'CS skills validated through state competition placement' },
+            { angle: 'Academic Rigor', example: 'Top 3 finish demonstrates technical depth' }
+          ]
+        }
+      },
+      {
+        id: 'community-service-award',
+        name: 'Outstanding Community Service Award',
+        issuer: 'High School',
+        date: 'May 2024',
+        tier: 'school' as const,
+        type: 'institutional' as const,
+        scores: {
+          impressiveness: {
+            overall: 5.8,
+            breakdown: {
+              selectivity: 4.0,
+              issuerPrestige: 6.5,
+              fieldScale: 5.0,
+              recency: 8.0
+            }
+          },
+          narrativeFit: {
+            overall: 7.2,
+            analysis: 'This award validates your community impact theme but lacks the competitive distinction of your higher-tier recognitions. It is evidence of local appreciation but does not differentiate at the selective college level.',
+            spineAlignment: 75,
+            themeSupport: ['Community Impact', 'Service']
+          },
+          portfolioLift: {
+            overall: 6.3,
+            reasoning: 'Local validation that supports narrative but adds minimal competitive distinction.',
+            strategicValue: [
+              'Local validation of service commitment',
+              'Shows sustained institutional recognition',
+              'Supports but does not lead your narrative'
+            ]
+          }
+        },
+        recommendedUse: 'support' as const,
+        usageGuidance: {
+          whereToUse: [
+            'Honors section (after higher-tier awards)',
+            'As supporting evidence, not lead credential',
+            'Group with other school recognitions'
+          ],
+          howToFrame: [
+            'Don\'t lead with this—bury after competitive awards',
+            'Cluster with other school honors as group',
+            'Use primarily if it rounds out a theme'
+          ],
+          framingAngles: [
+            { angle: 'Local Impact', example: 'School community recognized sustained service commitment' }
+          ],
+          strategicNote: 'This recognition is valuable for demonstrating consistency but should not be emphasized over your national/state distinctions. List it, but don\'t feature it prominently.'
+        }
+      },
+      {
+        id: 'cs-department-award',
+        name: 'CS Department Award',
+        issuer: 'High School',
+        date: 'May 2024',
+        tier: 'school' as const,
+        type: 'institutional' as const,
+        scores: {
+          impressiveness: {
+            overall: 5.5,
+            breakdown: {
+              selectivity: 3.5,
+              issuerPrestige: 6.0,
+              fieldScale: 5.0,
+              recency: 8.0
+            }
+          },
+          narrativeFit: {
+            overall: 6.8,
+            analysis: 'Validates CS skills at school level but redundant with state CS Olympiad placement. Adds minimal new information beyond existing technical credentials.',
+            spineAlignment: 60,
+            themeSupport: ['STEM Skills']
+          },
+          portfolioLift: {
+            overall: 6.0,
+            reasoning: 'Redundant with higher-tier CS recognition; minimal strategic value.',
+            strategicValue: [
+              'Local CS recognition',
+              'Supports technical credibility at school level'
+            ]
+          }
+        },
+        recommendedUse: 'support' as const,
+        usageGuidance: {
+          whereToUse: [
+            'Honors section (grouped with school awards)',
+            'Only if space allows after competitive recognitions'
+          ],
+          howToFrame: [
+            'Group with other school honors',
+            'De-emphasize given redundancy with state CS award'
+          ],
+          framingAngles: [
+            { angle: 'Local Technical Recognition', example: 'Department-level CS excellence' }
+          ],
+          strategicNote: 'Consider omitting if space is limited, as state CS Olympiad placement is a stronger signal of the same skill.'
+        }
+      },
+      {
+        id: 'humanitarian-leadership',
+        name: 'Humanitarian Leadership Award',
+        issuer: 'High School',
+        date: 'May 2023',
+        tier: 'school' as const,
+        type: 'institutional' as const,
+        scores: {
+          impressiveness: {
+            overall: 5.2,
+            breakdown: {
+              selectivity: 3.5,
+              issuerPrestige: 6.0,
+              fieldScale: 5.0,
+              recency: 6.5
+            }
+          },
+          narrativeFit: {
+            overall: 7.5,
+            analysis: 'Thematically aligned with community impact narrative but dated (one year old) and school-level only. Shows early commitment but less impressive than recent state/national recognitions.',
+            spineAlignment: 80,
+            themeSupport: ['Community Impact', 'Leadership', 'Service']
+          },
+          portfolioLift: {
+            overall: 6.2,
+            reasoning: 'Shows early trajectory of impact work but less valuable than recent higher-tier awards.',
+            strategicValue: [
+              'Demonstrates sustained commitment (longitudinal)',
+              'Early recognition of leadership potential',
+              'Supports narrative of consistent service orientation'
+            ]
+          }
+        },
+        recommendedUse: 'support' as const,
+        usageGuidance: {
+          whereToUse: [
+            'Honors section (last entries)',
+            'Use to show longitudinal commitment if needed',
+            'Group with other early recognitions'
+          ],
+          howToFrame: [
+            'Frame as early indicator of sustained trajectory',
+            'De-emphasize date to avoid highlighting age',
+            'Use only if it helps show progression story'
+          ],
+          framingAngles: [
+            { angle: 'Early Trajectory', example: 'Leadership recognized early, sustained over time' }
+          ],
+          strategicNote: 'The one-year age reduces value. Only include if you need to demonstrate longitudinal commitment or if you have limited honors to list.'
+        }
+      }
+    ]
   }
 };

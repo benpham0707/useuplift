@@ -49,7 +49,7 @@ const PixelTransition: React.FC<PixelTransitionProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const pixelGridRef = useRef<HTMLDivElement | null>(null);
   const activeRef = useRef<HTMLDivElement | null>(null);
-  const delayedCallRef = useRef<gsap.core.DelayedCall | null>(null);
+  const delayedCallRef = useRef<any>(null);
 
   const [isActive, setIsActive] = useState(false);
 
