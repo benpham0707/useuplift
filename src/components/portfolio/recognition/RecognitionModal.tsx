@@ -10,10 +10,10 @@ import { RecognitionItem } from './RecognitionCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
-import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 
 interface RecognitionModalProps {
@@ -179,7 +179,9 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
     }
   };
 
-  const [draft, setDraft] = React.useState<string>(getStored()?.draft ?? '');
+  const defaultMockDraft = `${recognition.name}. I led a small team to build scheduling and onboarding for our program; as a result, attendance stabilized at 76% over 18 months. We served 118 students weekly across two schools. This recognition validates outcomes central to my public‑interest technology focus.`;
+  const [draft, setDraft] = React.useState<string>(getStored()?.draft ?? defaultMockDraft);
+  const draftRef = React.useRef<HTMLTextAreaElement | null>(null);
   React.useEffect(() => {
     try {
       const existing = getStored();
@@ -201,6 +203,57 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
     } catch {
       // ignore persistence errors
     }
+  };
+
+  // Apply helpers: insert at cursor or replace excerpt
+  const insertAtCursor = (text: string) => {
+    const el = draftRef.current;
+    if (!el) {
+      persistDraft((draft ? draft + (draft.endsWith(' ') ? '' : ' ') : '') + text);
+      return;
+    }
+    const start = el.selectionStart ?? draft.length;
+    const end = el.selectionEnd ?? draft.length;
+    const before = draft.slice(0, start);
+    const after = draft.slice(end);
+    const needsSpaceBefore = before && !/\s$/.test(before);
+    const needsSpaceAfter = after && !/^\s/.test(after);
+    const next = `${before}${needsSpaceBefore ? ' ' : ''}${text}${needsSpaceAfter ? ' ' : ''}${after}`;
+    persistDraft(next);
+    // Restore cursor just after inserted text
+    requestAnimationFrame(() => {
+      try {
+        const pos = (before.length + (needsSpaceBefore ? 1 : 0) + text.length + (needsSpaceAfter ? 1 : 0));
+        el.setSelectionRange(pos, pos);
+        el.focus();
+      } catch {}
+    });
+  };
+
+  const replaceExcerptOnce = (excerpt: string, replacement: string) => {
+    if (!excerpt || !draft) {
+      insertAtCursor(replacement);
+      return;
+    }
+    const idx = draft.indexOf(excerpt);
+    if (idx === -1) {
+      insertAtCursor(replacement);
+      return;
+    }
+    const before = draft.slice(0, idx);
+    const after = draft.slice(idx + excerpt.length);
+    const next = `${before}${replacement}${after}`;
+    persistDraft(next);
+    requestAnimationFrame(() => {
+      const el = draftRef.current;
+      if (!el) return;
+      try {
+        const start = before.length;
+        const end = start + replacement.length;
+        el.setSelectionRange(start, end);
+        el.focus();
+      } catch {}
+    });
   };
 
   // Strict Ivy-level rubric: 5 criteria, each 0-10 with weight; overall as weighted average
@@ -272,6 +325,13 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
     return 'text-muted-foreground';
   };
 
+  const labelForScore = (s: number) => {
+    if (s >= 9) return 'Excellent';
+    if (s >= 8) return 'Strong';
+    if (s >= 7) return 'Developing';
+    return 'Needs work';
+  };
+
   // Expandable rubric helpers
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
@@ -324,6 +384,23 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
   const splitSentences = (t: string) => (t || '').split(/(?<=[.!?])\s+/).filter(Boolean);
   const findSentence = (t: string, re: RegExp) => splitSentences(t).find(s => re.test(s));
   const cleanExcerpt = (s?: string) => (s ? s.trim() : '');
+  const excerptFallback = (text: string) => {
+    const sentences = splitSentences(text);
+    const first = sentences[0] || text;
+    return (first || '').slice(0, 220).trim();
+  };
+
+  // Heuristic tags that describe how a suggestion would change the draft
+  function inferChangeTags(text: string): string[] {
+    const tags: string[] = [];
+    if (/(intended|major|focus|spine|theme)/i.test(text)) tags.push('names academic focus');
+    if (/(Top\s*\d+\/|%|accepted|applicants)/i.test(text)) tags.push('adds selectivity metric');
+    if (/(\d|percent|students|hours|months|years)/.test(text)) tags.push('adds hard number');
+    if (/(I\s+(led|built|designed|researched|coordinated|founded))/i.test(text)) tags.push('clarifies agency');
+    if (/(which led to|as a result|resulted in|so that)/i.test(text)) tags.push('adds cause→effect');
+    if (text.length < 200) tags.push('tightens phrasing');
+    return Array.from(new Set(tags));
+  }
 
   function buildCriterionIssues(criterion: string, text: string, rec: RecognitionItem): CriterionIssue[] {
     const issues: CriterionIssue[] = [];
@@ -334,7 +411,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
       const themeRe = new RegExp(theme0.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i');
       const missingTheme = !themeRe.test(text);
       if (missingTheme) {
-        const ex = cleanExcerpt(findSentence(text, /\b(recognition|award|finalist|winner|honor|program)\b/i) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, /\b(recognition|award|finalist|winner|honor|program)\b/i) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'Theme not explicit',
           excerpt: ex,
@@ -347,7 +424,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
         });
       }
       if (!/(intended|major|focus|spine|theme)/i.test(text)) {
-        const ex = cleanExcerpt(findSentence(text, /\b(I|my)\b/i) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, /\b(I|my)\b/i) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'No academic focus named',
           excerpt: ex,
@@ -364,7 +441,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
     if (criterion.includes('Evidence')) {
       if (rec.selectivity && !/(top|accepted|applicants|acceptance|%)/i.test(text)) {
         const rate = pct(rec.selectivity.acceptanceRate);
-        const ex = cleanExcerpt(findSentence(text, new RegExp(rec.name.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, new RegExp(rec.name.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&'), 'i')) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'Selectivity missing',
           excerpt: ex,
@@ -377,7 +454,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
         });
       }
       if (!/(\d|percent|students|hours|months|years)/i.test(text)) {
-        const ex = cleanExcerpt(findSentence(text, /\b(I|we)\b/i) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, /\b(I|we)\b/i) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'No hard numbers',
           excerpt: ex,
@@ -393,7 +470,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
 
     if (criterion.includes('Role Clarity')) {
       if (!/(I\s+(led|built|designed|researched|coordinated|founded))/i.test(text)) {
-        const ex = cleanExcerpt(findSentence(text, /\b(we|the team|it)\b/i) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, /\b(we|the team|it)\b/i) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'Agency unclear',
           excerpt: ex,
@@ -409,7 +486,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
 
     if (criterion.includes('Causality')) {
       if (!/(resulted in|which led to|so that|therefore|as a result)/i.test(text)) {
-        const ex = cleanExcerpt(findSentence(text, /\b(I|my)\b/i) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, /\b(I|my)\b/i) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'Missing cause→effect',
           excerpt: ex,
@@ -422,7 +499,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
         });
       }
       if (!/(I learned|I realized|this taught me)/i.test(text)) {
-        const ex = cleanExcerpt(findSentence(text, /\b(I|my)\b/i) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, /\b(I|my)\b/i) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'No reflection',
           excerpt: ex,
@@ -440,7 +517,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
       const buzz = text.match(/\b(passionate|world[- ]class|life[- ]changing|dream|unparalleled)\b/gi) || [];
       if (buzz.length) {
         const word = buzz[0];
-        const ex = cleanExcerpt(findSentence(text, new RegExp(word, 'i')) || splitSentences(text)[0]);
+        const ex = cleanExcerpt(findSentence(text, new RegExp(word, 'i')) || splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'Buzzword without evidence',
           excerpt: ex,
@@ -453,7 +530,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
         });
       }
       if (text.length > 240) {
-        const ex = cleanExcerpt(splitSentences(text)[0]);
+        const ex = cleanExcerpt(splitSentences(text)[0]) || excerptFallback(text);
         issues.push({
           title: 'Too long for officer scan',
           excerpt: ex,
@@ -732,192 +809,318 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
 
             {/* Narrative Fit Tab */}
             <TabsContent value="narrative" className="space-y-6">
-              {/* Author Draft */}
-              <Card className="border bg-card/50">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <PencilLine className="h-4 w-4 text-primary" />
-                    <CardTitle className="text-lg">Your Narrative for This Recognition</CardTitle>
-                  </div>
-                  <CardDescription>Write a tight, officer-ready framing. Be specific, quantified, and role-forward.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Textarea
-                    value={draft}
-                    onChange={(e) => persistDraft(e.target.value)}
-                    placeholder="Example: National Civic Tech Challenge Finalist (Top 10/1,200). I led the platform design and school partnerships; as a result, 118 students received weekly support and retention improved 12 points. This recognition validates both technical execution and community impact central to my academic focus in CS + public interest."
-                    className="min-h-[140px]"
-                  />
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{draft.trim().length} characters</span>
-                    <span>Autosaved locally</span>
-                  </div>
-                </CardContent>
-              </Card>
+              <div className="grid lg:grid-cols-3 gap-6">
+                {/* Left column: draft + critiques + rubric cards */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Author Draft */}
+                  <Card className="border bg-card/50">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <PencilLine className="h-4 w-4 text-primary" />
+                        <CardTitle className="text-lg">Your Narrative for This Recognition</CardTitle>
+                      </div>
+                      <CardDescription>Write a tight, officer-ready framing. Be specific, quantified, and role-forward.</CardDescription>
+                    </CardHeader>
+                  <CardContent className="space-y-3">
+                      <Textarea
+                        value={draft}
+                        ref={draftRef}
+                        onChange={(e) => persistDraft(e.target.value)}
+                        placeholder="Example: National Civic Tech Challenge Finalist (Top 10/1,200). I led the platform design and school partnerships; as a result, 118 students received weekly support and retention improved 12 points. This recognition validates both technical execution and community impact central to my academic focus in CS + public interest."
+                        className="min-h-[140px]"
+                      />
+                    {(() => {
+                      const wordCount = (draft.trim().match(/\S+/g) || []).length;
+                      const min = 80; const max = 180; const idealLo = 90; const idealHi = 170;
+                      const pct = Math.max(0, Math.min(100, (wordCount / max) * 100));
+                      const status = wordCount < min ? 'Too short' : wordCount > max ? 'Too long' : 'On target';
+                      const statusClass = status === 'On target' ? 'text-success' : status === 'Too short' ? 'text-warning' : 'text-destructive';
+                      return (
+                        <div className="space-y-1">
+                          <Progress value={pct} className="h-2" />
+                          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                            <span>
+                              {wordCount} words • ideal {idealLo}–{idealHi}
+                            </span>
+                            <span className={statusClass}>{status}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
-              {/* Rubric Scores */}
-              <Card className="border bg-muted/20">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <ClipboardList className="h-4 w-4 text-primary" />
-                      <CardTitle className="text-lg">Ivy-Level Rubric</CardTitle>
+                    {/* Quick inserts */}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {(() => {
+                        const theme0 = (scores.narrativeFit.themeSupport || [])[0];
+                        const buttons: Array<{ label: string; text: string } | null> = [
+                          theme0 ? { label: 'Make theme explicit', text: `This recognition directly reinforces my ${theme0} narrative.` } : null,
+                          recognition.selectivity && typeof recognition.selectivity.accepted === 'number' && typeof recognition.selectivity.applicants === 'number'
+                            ? { label: 'Insert selectivity', text: `Top ${recognition.selectivity.accepted}/${recognition.selectivity.applicants} (${(recognition.selectivity.acceptanceRate * 100).toFixed(1)}%).` }
+                            : null,
+                          { label: 'Add agency', text: 'I led [process/initiative] and owned [decision].' },
+                          { label: 'Add cause→effect', text: '… which led to [quantified outcome].' },
+                          { label: 'Add reflection', text: 'This taught me to [principle] I now [decision rule].' }
+                        ];
+                        return buttons.filter(Boolean).map((b, i) => (
+                          <Button key={i} size="sm" className="h-7 px-2 text-xs" variant="outline" onClick={() => insertAtCursor((b as any).text)}>
+                            {(b as any).label}
+                          </Button>
+                        ));
+                      })()}
                     </div>
-                    <div className="text-right">
-                      <div className={`text-2xl font-extrabold ${colorForScore(weightedOverall)}`}>{weightedOverall}</div>
-                      <div className="text-[11px] text-muted-foreground">Overall</div>
+
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>{draft.trim().length} characters</span>
+                      <span>Autosaved locally</span>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Accordion type="single" collapsible className="rounded-lg divide-y border bg-card/50">
+                    </CardContent>
+                  </Card>
+
+                  {/* Officer critiques under draft for immediate action */}
+                  <Card className="border bg-card/50">
+                    <CardHeader className="pb-2">
+                      <div className="flex items-center gap-2">
+                        <TriangleAlert className="h-4 w-4 text-amber-600" />
+                        <CardTitle className="text-lg">Officer-Level Critiques</CardTitle>
+                      </div>
+                      <CardDescription>Strict read aligned to Ivy/Top-20 standards. Address these to strengthen your file.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      {(() => {
+                        const issues: string[] = [];
+                        if (!(draft && /\b(top\s?\d+|1,?200|%|accepted|applicants)\b/i.test(draft)) && recognition.selectivity) {
+                          issues.push('Missing selectivity context (e.g., Top X/Applicants or acceptance rate).');
+                        }
+                        if (!/(I\s+(led|built|designed|researched|coordinated|founded))/i.test(draft)) {
+                          issues.push('Unclear agency—add a first‑person action verb describing your role.');
+                        }
+                        if (!/(\d|percent|students|hours|months)/i.test(draft)) {
+                          issues.push('No quantification—add one concrete metric (beneficiaries, improvement, duration).');
+                        }
+                        if (!/(so that|which led to|resulted in|as a result)/i.test(draft)) {
+                          issues.push('Missing causality—add "which led to…" to connect action to outcome.');
+                        }
+                        if (draft.length > 240) {
+                          issues.push('Too long—tighten to ~80–180 words for officer skimmability.');
+                        }
+                        if (issues.length === 0) {
+                          return <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="h-4 w-4" /> Looks officer-ready. Minor tightening only.</div>;
+                        }
+                        return (
+                          <ul className="list-disc pl-5 space-y-1">
+                            {issues.map((i, idx) => (<li key={idx}>{i}</li>))}
+                          </ul>
+                        );
+                      })()}
+                    </CardContent>
+                  </Card>
+
+                  {/* Rubric rendered as clean per-criterion cards */}
+                  <div className="space-y-4">
                     {rubric.map((r, i) => {
                       const suggestions = buildCriterionSuggestions(r.criterion, draft, recognition);
                       const issues = buildCriterionIssues(r.criterion, draft, recognition);
+                      const criterionId = r.criterion.toLowerCase().replace(/[^a-z0-9]+/g, '-');
                       return (
-                        <AccordionItem key={i} value={`rubric-${i}`}>
-                          <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                            <div className="flex w-full items-center gap-3">
-                              <span className="text-sm font-semibold">{r.criterion}</span>
-                              <span className="ml-auto text-xs text-muted-foreground">Weight {Math.round(r.weight * 100)}%</span>
-                              <span className={`text-sm font-bold ${colorForScore(r.score)}`}>{r.score.toFixed(1)}/10</span>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="px-4 pb-4">
-                            <div className="space-y-3">
-                              <div className="text-xs text-muted-foreground">{r.description}</div>
-                              <Progress value={Math.min(100, (r.score / 10) * 100)} className="h-2" />
-                              <div className="text-sm space-y-3">
-                                <div className="flex items-center justify-between">
-                                  <div className="font-medium">What to improve</div>
-                                  {issues.length > 0 && (
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-7 w-7"
-                                        disabled={getIssueIndex(r.criterion, issues.length) === 0}
-                                        onClick={() => setIssueIndex(r.criterion, getIssueIndex(r.criterion, issues.length) - 1, issues.length)}
-                                      >
-                                        <ChevronLeft className="h-4 w-4" />
-                                      </Button>
-                                      <div className="text-xs text-muted-foreground min-w-[70px] text-center">
-                                        {issues.length ? `Issue ${getIssueIndex(r.criterion, issues.length) + 1} of ${issues.length}` : '—'}
-                                      </div>
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        className="h-7 w-7"
-                                        disabled={getIssueIndex(r.criterion, issues.length) >= issues.length - 1}
-                                        onClick={() => setIssueIndex(r.criterion, getIssueIndex(r.criterion, issues.length) + 1, issues.length)}
-                                      >
-                                        <ChevronRight className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  )}
+                        <Card id={criterionId} key={i} className="border bg-muted/20">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <ClipboardList className="h-4 w-4 text-primary" />
+                                  <CardTitle className="text-base md:text-lg">{r.criterion}</CardTitle>
                                 </div>
-
-                                {issues.length === 0 ? (
-                                  <div className="text-muted-foreground">No obvious gaps detected for this criterion.</div>
-                                ) : (
-                                  (() => {
-                                    const idx = getIssueIndex(r.criterion, issues.length);
-                                    const iss = issues[idx];
-                                    return (
-                                      <div className="space-y-2">
-                                        <div className="font-semibold">{iss.title}</div>
-                                        {iss.excerpt && (
-                                          <div className="text-sm border-l-2 pl-3 text-foreground/80">“{iss.excerpt}”</div>
-                                        )}
-                                        <div className="text-sm text-muted-foreground">{iss.reason}</div>
-
-                                        {(() => {
-                                          const key = `${r.criterion}-${idx}`;
-                                          const edits = iss.suggestions;
-                                          const eIdx = getEditIndex(key, edits.length);
-                                          const current = edits[eIdx];
-                                          return (
-                                            <div className="rounded-md bg-muted/20 p-2">
-                                              <div className="text-sm">{current.edit}</div>
-                                              <div className="text-xs text-muted-foreground mt-1">{current.rationale}</div>
-                                              <div className="mt-2 flex justify-end">
-                                                <Button
-                                                  size="sm"
-                                                  variant="ghost"
-                                                  onClick={() => setEditIndex(key, (eIdx + 1) % Math.max(1, edits.length), edits.length)}
-                                                >
-                                                  New suggestion
-                                                </Button>
-                                              </div>
-                                            </div>
-                                          );
-                                        })()}
-                                      </div>
-                                    );
-                                  })()
-                                )}
-
-                                {suggestions.length > 0 && (
-                                  <Accordion type="single" collapsible className="rounded-md border bg-card/50">
-                                    <AccordionItem value="tips">
-                                      <AccordionTrigger className="px-3 py-2 text-sm font-medium hover:no-underline">General tips</AccordionTrigger>
-                                      <AccordionContent className="px-3 pb-3">
-                                        <ul className="list-disc pl-5 space-y-1 text-sm">
-                                          {suggestions.map((s, idx) => (<li key={idx}>{s}</li>))}
-                                        </ul>
-                                      </AccordionContent>
-                                    </AccordionItem>
-                                  </Accordion>
+                                <div className="text-xs text-muted-foreground mt-1">{r.description}</div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <div className={`text-xl font-extrabold ${colorForScore(r.score)}`}>{r.score.toFixed(1)}</div>
+                                <div className="text-[11px] text-muted-foreground">{labelForScore(r.score)} • Weight {Math.round(r.weight * 100)}%</div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <Progress value={Math.max(0, Math.min(100, r.score * 10))} className="h-2" />
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium">What to improve</div>
+                                {issues.length > 0 && (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7"
+                                      disabled={getIssueIndex(r.criterion, issues.length) === 0}
+                                      onClick={() => setIssueIndex(r.criterion, getIssueIndex(r.criterion, issues.length) - 1, issues.length)}
+                                    >
+                                      <ChevronLeft className="h-4 w-4" />
+                                    </Button>
+                                    <div className="text-xs text-muted-foreground min-w-[70px] text-center">
+                                      {issues.length ? `Issue ${getIssueIndex(r.criterion, issues.length) + 1} of ${issues.length}` : '—'}
+                                    </div>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      className="h-7 w-7"
+                                      disabled={getIssueIndex(r.criterion, issues.length) >= issues.length - 1}
+                                      onClick={() => setIssueIndex(r.criterion, getIssueIndex(r.criterion, issues.length) + 1, issues.length)}
+                                    >
+                                      <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
-                              
+
+                              {issues.length === 0 ? (
+                                <div className="text-muted-foreground">No obvious gaps detected for this criterion.</div>
+                              ) : (
+                                (() => {
+                                  const idx = getIssueIndex(r.criterion, issues.length);
+                                  const iss = issues[idx];
+                                  const key = `${r.criterion}-${idx}`;
+                                  const edits = iss.suggestions;
+                                  const eIdx = getEditIndex(key, edits.length);
+                                  const current = edits[eIdx];
+                                  return (
+                                    <div className="space-y-2">
+                                      <div className="font-semibold">{iss.title}</div>
+                                      <div className="text-sm border-l-2 pl-3 text-foreground/80">“{iss.excerpt || excerptFallback(draft)}”</div>
+                                      <div className="text-sm text-muted-foreground">{iss.reason}</div>
+                                      <div className="rounded-md bg-muted/20 p-2">
+                                        <div className="text-sm">{current.edit}</div>
+                                        <div className="text-xs text-muted-foreground mt-1">{current.rationale}</div>
+                                        <div className="mt-2 text-xs text-muted-foreground">
+                                          <span className="font-medium mr-1">Change type:</span>
+                                          {inferChangeTags(current.edit).map((t, i2) => (
+                                            <span key={i2} className="inline-block mr-2 mb-1 px-2 py-0.5 rounded border bg-background">{t}</span>
+                                          ))}
+                                        </div>
+                                        <div className="mt-2 text-xs">
+                                          <div className="font-medium mb-1">Before → After</div>
+                                          <div className="p-2 rounded border bg-background">
+                                            <div className="text-foreground/80 mb-1"><span className="text-muted-foreground">Before:</span> {iss.excerpt || excerptFallback(draft)}</div>
+                                            <div className="text-foreground/90"><span className="text-muted-foreground">After:</span> {current.edit}</div>
+                                          </div>
+                                        </div>
+                                        <div className="mt-2 flex flex-wrap items-center gap-2 justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <Button size="sm" variant="secondary" onClick={() => insertAtCursor(current.edit)}>
+                                              Insert at cursor
+                                            </Button>
+                                            {iss.excerpt && (
+                                              <Button size="sm" variant="outline" onClick={() => replaceExcerptOnce(iss.excerpt, current.edit)}>
+                                                Replace quoted excerpt
+                                              </Button>
+                                            )}
+                                          </div>
+                                          <Button size="sm" variant="ghost" onClick={() => setEditIndex(key, (eIdx + 1) % Math.max(1, edits.length), edits.length)}>
+                                            New suggestion
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()
+                              )}
+
+                              {suggestions.length > 0 && (
+                                <div className="pt-2">
+                                  <div className="text-xs font-medium mb-1">General tips</div>
+                                  <ul className="list-disc pl-5 space-y-1 text-sm">
+                                    {suggestions.map((s, idx2) => (<li key={idx2}>{s}</li>))}
+                                  </ul>
+                                </div>
+                              )}
                             </div>
-                          </AccordionContent>
-                        </AccordionItem>
+                          </CardContent>
+                        </Card>
                       );
                     })}
-                  </Accordion>
-                </CardContent>
-              </Card>
-
-              {/* Actionable Critiques */}
-              <Card className="border bg-card/50">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <TriangleAlert className="h-4 w-4 text-amber-600" />
-                    <CardTitle className="text-lg">Officer-Level Critiques</CardTitle>
                   </div>
-                  <CardDescription>Strict read aligned to Ivy/Top-20 standards. Address these to strengthen your file.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2 text-sm">
-                  {(() => {
-                    const issues: string[] = [];
-                    if (!(draft && /\b(top\s?\d+|1,?200|%|accepted|applicants)\b/i.test(draft)) && recognition.selectivity) {
-                      issues.push('Missing selectivity context (e.g., Top X/Applicants or acceptance rate).');
-                    }
-                    if (!/(I\s+(led|built|designed|researched|coordinated|founded))/i.test(draft)) {
-                      issues.push('Unclear agency—add a first‑person action verb describing your role.');
-                    }
-                    if (!/(\d|percent|students|hours|months)/i.test(draft)) {
-                      issues.push('No quantification—add one concrete metric (beneficiaries, improvement, duration).');
-                    }
-                    if (!/(so that|which led to|resulted in|as a result)/i.test(draft)) {
-                      issues.push('Missing causality—add "which led to…" to connect action to outcome.');
-                    }
-                    if (draft.length > 240) {
-                      issues.push('Too long—tighten to ~80–180 words for officer skimmability.');
-                    }
-                    if (issues.length === 0) {
-                      return <div className="flex items-center gap-2 text-green-600"><CheckCircle2 className="h-4 w-4" /> Looks officer-ready. Minor tightening only.</div>;
-                    }
-                    return (
-                      <ul className="list-disc pl-5 space-y-1">
-                        {issues.map((i, idx) => (<li key={idx}>{i}</li>))}
-                      </ul>
-                    );
-                  })()}
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Right column: sticky summary and quick navigation */}
+                <div className="lg:col-span-1 space-y-4">
+                  <div className="lg:sticky top-4 space-y-4">
+                    <Card className="border">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Narrative Fit Summary</CardTitle>
+                        <CardDescription>Overall score and alignment snapshot</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className={`text-3xl font-extrabold ${colorForScore(weightedOverall)}`}>{weightedOverall}</div>
+                          <div className="flex-1 ml-4">
+                            <Progress value={Math.max(0, Math.min(100, weightedOverall * 10))} className="h-2" />
+                            <div className="text-[11px] text-muted-foreground mt-1">Overall rubric score</div>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Alignment</div>
+                            <div className="font-medium">{scores.narrativeFit.spineAlignment}%</div>
+                          </div>
+                          <div>
+                            <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Themes</div>
+                            <div className="font-medium">{(scores.narrativeFit.themeSupport || []).slice(0,2).join(', ') || '—'}</div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="border">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-base">Rubric Navigator</CardTitle>
+                        <CardDescription>Jump to a criterion</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {rubric.map((r, i) => {
+                          const id = r.criterion.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                const el = document.getElementById(id);
+                                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                              }}
+                              className="w-full text-left p-2 rounded border hover:bg-muted/50"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="text-sm font-medium truncate">{r.criterion}</div>
+                                <div className={`text-sm font-bold ${colorForScore(r.score)}`}>{r.score.toFixed(1)}</div>
+                              </div>
+                              <Progress value={Math.max(0, Math.min(100, r.score * 10))} className="h-1.5 mt-2" />
+                            </button>
+                          );
+                        })}
+                      </CardContent>
+                    </Card>
+
+                    {(() => {
+                      const withIssues = rubric
+                        .map((r) => ({ r, issues: buildCriterionIssues(r.criterion, draft, recognition) }))
+                        .find((x) => x.issues.length > 0);
+                      if (!withIssues) return null;
+                      const id = withIssues.r.criterion.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                      const topIssue = withIssues.issues[0];
+                      return (
+                        <Card className="border">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-base">Best next edit</CardTitle>
+                            <CardDescription className="line-clamp-2">{withIssues.r.criterion} — {topIssue.title}</CardDescription>
+                          </CardHeader>
+                          <CardContent className="space-y-2 text-sm">
+                            <div className="text-foreground/80">{topIssue.suggestions[0]?.edit}</div>
+                            <Button size="sm" onClick={() => {
+                              const el = document.getElementById(id);
+                              if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }}>Go to section</Button>
+                          </CardContent>
+                        </Card>
+                      );
+                    })()}
+                  </div>
+                </div>
+              </div>
             </TabsContent>
 
             {/* Strategic Value Tab (placeholder) */}
