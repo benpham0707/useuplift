@@ -47,7 +47,7 @@ export const CompetitivePositioningTab: React.FC<CompetitivePositioningTabProps>
     <div className="space-y-6">
       {/* Selectivity Benchmark Analysis */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-2">Selectivity Benchmark Analysis</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Selectivity Benchmark Analysis</h3>
         <div className="text-sm text-muted-foreground mb-4">
           Your Average Acceptance Rate: <span className="text-foreground font-semibold">{data.selectivityBenchmark.theirAverage}%</span>
         </div>
@@ -93,7 +93,7 @@ export const CompetitivePositioningTab: React.FC<CompetitivePositioningTabProps>
 
       {/* Tier Distribution Analysis */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Tier Distribution Analysis</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Tier Distribution Analysis</h3>
         
         <div className="mb-4">
           <div className="text-xs font-semibold text-muted-foreground mb-2">Current Mix</div>
@@ -133,7 +133,7 @@ export const CompetitivePositioningTab: React.FC<CompetitivePositioningTabProps>
 
       {/* Competitive Density Map */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Competitive Density Map</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Competitive Density Map</h3>
         <div className="text-sm text-muted-foreground mb-4">Your Recognition Distribution by Domain:</div>
         
         <div className="space-y-3 mb-4">

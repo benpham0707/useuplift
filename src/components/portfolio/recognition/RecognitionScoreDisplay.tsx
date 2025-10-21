@@ -2,6 +2,7 @@ import React from 'react';
 import { Info } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import GradientText from '@/components/ui/GradientText';
 
 interface ScoreBreakdown {
   overall: number;
@@ -40,14 +41,28 @@ export const RecognitionScoreDisplay: React.FC<RecognitionScoreDisplayProps> = (
   narrativeFit,
   className
 }) => {
+  const renderScore = (value: number, sizeClass: string = 'text-2xl') => {
+    if (value >= 9.0) {
+      return (
+        <GradientText
+          className={cn(sizeClass, 'font-extrabold metric-value')}
+          colors={['hsl(250 70% 60%)','hsl(185 80% 55%)','hsl(280 90% 65%)','hsl(250 70% 60%)']}
+          textOnly
+        >
+          {value.toFixed(1)}
+        </GradientText>
+      );
+    }
+    return (
+      <div className={cn(sizeClass, 'font-bold', getScoreColor(value))}>{value.toFixed(1)}</div>
+    );
+  };
   return (
     <div className={cn('space-y-3', className)}>
       {/* Portfolio Lift - Primary Score */}
       <div className="text-center pb-3 border-b">
         <div className="text-sm text-muted-foreground mb-1">Portfolio Lift</div>
-        <div className={cn('text-4xl font-bold', getScoreColor(portfolioLift))}>
-          {portfolioLift.toFixed(1)}
-        </div>
+        {renderScore(portfolioLift, 'text-4xl')}
         <div className="text-xs text-muted-foreground mt-1">
           {getScoreLabel(portfolioLift)}
         </div>
@@ -64,9 +79,7 @@ export const RecognitionScoreDisplay: React.FC<RecognitionScoreDisplayProps> = (
                   <span className="text-xs text-muted-foreground">Impressiveness</span>
                   <Info className="h-3 w-3 text-muted-foreground/60" />
                 </div>
-                <div className={cn('text-2xl font-bold', getScoreColor(impressiveness.overall))}>
-                  {impressiveness.overall.toFixed(1)}
-                </div>
+                {renderScore(impressiveness.overall, 'text-2xl')}
               </div>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
@@ -94,9 +107,7 @@ export const RecognitionScoreDisplay: React.FC<RecognitionScoreDisplayProps> = (
                   <span className="text-xs text-muted-foreground">Narrative Fit</span>
                   <Info className="h-3 w-3 text-muted-foreground/60" />
                 </div>
-                <div className={cn('text-2xl font-bold', getScoreColor(narrativeFit.overall))}>
-                  {narrativeFit.overall.toFixed(1)}
-                </div>
+                {renderScore(narrativeFit.overall, 'text-2xl')}
               </div>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">
@@ -115,9 +126,7 @@ export const RecognitionScoreDisplay: React.FC<RecognitionScoreDisplayProps> = (
                   <span className="text-xs text-muted-foreground">Strategic Value</span>
                   <Info className="h-3 w-3 text-muted-foreground/60" />
                 </div>
-                <div className={cn('text-2xl font-bold', getScoreColor(portfolioLift))}>
-                  {portfolioLift.toFixed(1)}
-                </div>
+                {renderScore(portfolioLift, 'text-2xl')}
               </div>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs">

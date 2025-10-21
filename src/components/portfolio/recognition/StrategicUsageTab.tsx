@@ -29,9 +29,9 @@ export const StrategicUsageTab: React.FC<StrategicUsageTabProps> = ({ data }) =>
     <div className="space-y-6">
       {/* Recognitions to Reference for Credibility */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+        <h3 className="mb-2 flex items-center gap-2">
           <Trophy className="h-5 w-5" />
-          Recognitions to Reference for Credibility
+          <span className="text-xl md:text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Recognitions to Reference for Credibility</span>
         </h3>
         <div className="text-sm text-muted-foreground mb-4">In Essays & Short Answers:</div>
         
@@ -59,9 +59,9 @@ export const StrategicUsageTab: React.FC<StrategicUsageTabProps> = ({ data }) =>
 
       {/* What to Expand On */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+        <h3 className="mb-2 flex items-center gap-2">
           <FileText className="h-5 w-5" />
-          What to Expand On
+          <span className="text-xl md:text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">What to Expand On</span>
         </h3>
         <div className="text-sm text-muted-foreground mb-4">In Additional Info Section:</div>
         
@@ -89,9 +89,9 @@ export const StrategicUsageTab: React.FC<StrategicUsageTabProps> = ({ data }) =>
 
       {/* Strategic Positioning by Recognition Type */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
+        <h3 className="mb-2 flex items-center gap-2">
           <Target className="h-5 w-5" />
-          Strategic Positioning by Recognition Type
+          <span className="text-xl md:text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Strategic Positioning by Recognition Type</span>
         </h3>
         <div className="text-sm text-muted-foreground mb-4">How to position each recognition in your application:</div>
         

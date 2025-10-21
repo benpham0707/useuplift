@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { RecommendedUseLabel } from './RecommendedUseLabel';
 import { RecognitionScoreDisplay } from './RecognitionScoreDisplay';
 import { cn } from '@/lib/utils';
 
@@ -73,7 +72,9 @@ export const RecognitionCard: React.FC<RecognitionCardProps> = ({ recognition, o
         {/* Header */}
         <div className="mb-4">
           <div className="flex items-start justify-between gap-2 mb-2">
-            <h3 className="text-lg font-bold leading-tight flex-1">{recognition.name}</h3>
+            <h3 className="text-lg font-extrabold leading-tight flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              {recognition.name}
+            </h3>
             {recognition.link && (
               <a 
                 href={recognition.link} 
@@ -148,18 +149,7 @@ export const RecognitionCard: React.FC<RecognitionCardProps> = ({ recognition, o
           </button>
         </div>
 
-        {/* Recommended Use */}
-        <div className="mb-4">
-          <RecommendedUseLabel use={recognition.recommendedUse} className="mb-2" />
-          <ul className="space-y-1 text-xs text-muted-foreground">
-            {recognition.usageGuidance.whereToUse.slice(0, 3).map((use, idx) => (
-              <li key={idx} className="flex items-start gap-1.5">
-                <span className="text-primary mt-0.5">•</span>
-                <span>{use}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        {/* Recommended Use removed for streamlined card UI */}
 
         {/* View Full Analysis CTA */}
         <div className="mt-auto pt-4">

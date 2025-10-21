@@ -58,7 +58,7 @@ export const GapAnalysisGrowthTab: React.FC<GapAnalysisGrowthTabProps> = ({ data
     <div className="space-y-6">
       {/* Portfolio Gaps */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Portfolio Gaps</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Portfolio Gaps</h3>
         
         <div className="space-y-3 mb-4">
           <div className="text-sm font-semibold text-muted-foreground mb-2">Critical Gaps (would significantly strengthen):</div>
@@ -96,7 +96,7 @@ export const GapAnalysisGrowthTab: React.FC<GapAnalysisGrowthTabProps> = ({ data
 
       {/* Diminishing Returns Analysis */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-2">Diminishing Returns Analysis</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-2 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Diminishing Returns Analysis</h3>
         <div className="text-sm text-muted-foreground mb-4">Where you have ENOUGH (don't pursue more):</div>
         
         <div className="space-y-3">
@@ -116,7 +116,7 @@ export const GapAnalysisGrowthTab: React.FC<GapAnalysisGrowthTabProps> = ({ data
 
       {/* Growth Trajectory */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Growth Trajectory</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Growth Trajectory</h3>
         <div className="text-sm text-muted-foreground mb-4">Recognition Earning Timeline:</div>
         
         <div className="space-y-2 mb-4">
@@ -142,7 +142,7 @@ export const GapAnalysisGrowthTab: React.FC<GapAnalysisGrowthTabProps> = ({ data
       {/* Senior Year Strategy (if applicable) */}
       {data.seniorYearStrategy && (
         <Card className="p-6">
-          <h3 className="text-lg font-semibold mb-4">Senior Year Strategy</h3>
+          <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Senior Year Strategy</h3>
           
           <div className="mb-4 p-3 rounded-lg border bg-muted/10">
             <div className="text-sm font-semibold mb-1">Time Remaining</div>

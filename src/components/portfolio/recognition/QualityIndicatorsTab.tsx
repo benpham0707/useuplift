@@ -51,7 +51,7 @@ export const QualityIndicatorsTab: React.FC<QualityIndicatorsTabProps> = ({ data
     <div className="space-y-6">
       {/* Issuer Prestige Analysis */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Issuer Prestige Analysis</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Issuer Prestige Analysis</h3>
         
         <div className="overflow-x-auto mb-4">
           <table className="w-full text-sm">
@@ -102,7 +102,7 @@ export const QualityIndicatorsTab: React.FC<QualityIndicatorsTabProps> = ({ data
 
       {/* Recency Distribution */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Recency Distribution</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Recency Distribution</h3>
         <div className="text-sm text-muted-foreground mb-4">Recognition Timeline</div>
         
         <div className="space-y-3 mb-4">
@@ -153,7 +153,7 @@ export const QualityIndicatorsTab: React.FC<QualityIndicatorsTabProps> = ({ data
 
       {/* Verification & Evidence */}
       <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Verification & Evidence</h3>
+        <h3 className="text-xl md:text-2xl font-extrabold mb-4 bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Verification & Evidence</h3>
         
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="p-4 rounded-lg border bg-muted/10">

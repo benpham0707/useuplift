@@ -1149,6 +1149,12 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         spineAlignmentPercent: 83,
         recencyScore: 'excellent' as const
       },
+      difficulty: {
+        overallScore: 9.1,
+        highestLabel: 'Top 10 of 1,200',
+        context: 'Civic Tech Challenge Finalist',
+        percentile: 99
+      },
       competitivePositioning: {
         selectivityBenchmark: {
           theirAverage: 2.4,
