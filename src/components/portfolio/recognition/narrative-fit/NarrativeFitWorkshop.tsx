@@ -1,130 +1,216 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { RecognitionItem } from '../RecognitionCard';
+import { DraftVersion, RubricDimension, WritingIssue } from './types';
+import { detectAllIssuesWithRubric, getMockDraft } from './issueDetector';
+import { calculateOverallScore } from './rubricScorer';
+import { HeroSection } from './HeroSection';
 import { DraftEditor } from './DraftEditor';
-import { IssueList } from './IssueList';
-import { WritingIssue } from './types';
-import { detectAllIssues, getMockDraft } from './issueDetector';
+import { OverallScoreCard } from './OverallScoreCard';
+import { RubricDimensionCard } from './RubricDimensionCard';
+import { WorkshopComplete } from './WorkshopComplete';
 
 interface NarrativeFitWorkshopProps {
   recognition: RecognitionItem;
 }
 
 export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ recognition }) => {
-  // Hard coded mock draft as placeholder
-  const [draft, setDraft] = useState(getMockDraft());
-  const [issues, setIssues] = useState<WritingIssue[]>([]);
+  const [draftVersions, setDraftVersions] = useState<DraftVersion[]>([
+    { id: 'v0', text: getMockDraft(), timestamp: Date.now() }
+  ]);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [dimensions, setDimensions] = useState<RubricDimension[]>([]);
+  const [overallScore, setOverallScore] = useState(0);
 
-  // Detect issues when draft changes (debounced)
+  const currentDraft = draftVersions[currentVersionIndex].text;
+
+  // Recalculate issues and scores when draft changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      const detectedIssues = detectAllIssues(draft, recognition);
-      setIssues(detectedIssues);
+      const newDimensions = detectAllIssuesWithRubric(currentDraft, recognition);
+      
+      // Preserve issue states (expanded, currentSuggestionIndex)
+      const updatedDimensions = newDimensions.map(newDim => {
+        const oldDim = dimensions.find(d => d.id === newDim.id);
+        if (!oldDim) return newDim;
+        
+        return {
+          ...newDim,
+          issues: newDim.issues.map(newIssue => {
+            const oldIssue = oldDim.issues.find(i => i.id === newIssue.id);
+            if (!oldIssue) return newIssue;
+            
+            return {
+              ...newIssue,
+              expanded: oldIssue.expanded,
+              currentSuggestionIndex: oldIssue.currentSuggestionIndex,
+              status: oldIssue.status
+            };
+          })
+        };
+      });
+      
+      setDimensions(updatedDimensions);
+      setOverallScore(calculateOverallScore(updatedDimensions));
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [draft, recognition]);
+  }, [currentDraft, recognition]);
 
-  // Calculate word count
-  const wordCount = draft.trim().split(/\s+/).filter(Boolean).length;
+  const wordCount = currentDraft.trim().split(/\s+/).filter(Boolean).length;
+
+  const handleDraftChange = useCallback((newDraft: string) => {
+    // If we're not at the latest version, discard future versions
+    const newVersions = draftVersions.slice(0, currentVersionIndex + 1);
+    const newVersion: DraftVersion = {
+      id: `v${newVersions.length}`,
+      text: newDraft,
+      timestamp: Date.now()
+    };
+    setDraftVersions([...newVersions, newVersion]);
+    setCurrentVersionIndex(newVersions.length);
+  }, [draftVersions, currentVersionIndex]);
+
+  const handleUndo = useCallback(() => {
+    if (currentVersionIndex > 0) {
+      setCurrentVersionIndex(currentVersionIndex - 1);
+    }
+  }, [currentVersionIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (currentVersionIndex < draftVersions.length - 1) {
+      setCurrentVersionIndex(currentVersionIndex + 1);
+    }
+  }, [currentVersionIndex, draftVersions.length]);
 
   const handleToggleIssue = useCallback((issueId: string) => {
-    setIssues(prev => prev.map(issue => 
-      issue.id === issueId 
-        ? { ...issue, expanded: !issue.expanded, status: issue.expanded ? issue.status : 'in_progress' }
-        : issue
-    ));
+    setDimensions(prev => prev.map(dim => ({
+      ...dim,
+      issues: dim.issues.map(issue =>
+        issue.id === issueId
+          ? {
+              ...issue,
+              expanded: !issue.expanded,
+              status: !issue.expanded && issue.status === 'not_fixed' ? 'in_progress' : issue.status
+            }
+          : issue
+      )
+    })));
   }, []);
 
-  const handleApplySuggestion = useCallback((issueId: string, suggestionText: string) => {
-    const issue = issues.find(i => i.id === issueId);
+  const handleApplySuggestion = useCallback((
+    issueId: string,
+    suggestionText: string,
+    type: 'replace' | 'insert_before' | 'insert_after'
+  ) => {
+    const dimension = dimensions.find(d => d.issues.some(i => i.id === issueId));
+    const issue = dimension?.issues.find(i => i.id === issueId);
     if (!issue) return;
 
-    // Replace the excerpt in the draft with the suggestion
-    const updatedDraft = draft.replace(issue.excerpt.replace(/"/g, ''), suggestionText);
-    setDraft(updatedDraft);
+    let updatedDraft = currentDraft;
+    const excerpt = issue.excerpt.replace(/"/g, '');
 
-    // Mark issue as fixed and collapse
-    setIssues(prev => prev.map(i => 
-      i.id === issueId 
-        ? { ...i, status: 'fixed', expanded: false }
-        : i
-    ));
-  }, [draft, issues]);
+    switch (type) {
+      case 'replace':
+        updatedDraft = currentDraft.replace(excerpt, suggestionText);
+        break;
+      case 'insert_before':
+        updatedDraft = suggestionText + ' ' + currentDraft;
+        break;
+      case 'insert_after':
+        updatedDraft = currentDraft + ' ' + suggestionText;
+        break;
+    }
 
-  const handleInsertSuggestion = useCallback((issueId: string, suggestionText: string) => {
-    // Insert at end of draft
-    setDraft(prev => prev + (prev.endsWith(' ') ? '' : ' ') + suggestionText);
+    // Create new version
+    const newVersions = draftVersions.slice(0, currentVersionIndex + 1);
+    const newVersion: DraftVersion = {
+      id: `v${newVersions.length}`,
+      text: updatedDraft,
+      timestamp: Date.now(),
+      appliedIssueId: issueId
+    };
+    setDraftVersions([...newVersions, newVersion]);
+    setCurrentVersionIndex(newVersions.length);
 
     // Mark issue as fixed
-    setIssues(prev => prev.map(i => 
-      i.id === issueId 
-        ? { ...i, status: 'fixed', expanded: false }
-        : i
-    ));
-  }, []);
+    setDimensions(prev => prev.map(dim => ({
+      ...dim,
+      issues: dim.issues.map(i =>
+        i.id === issueId
+          ? { ...i, status: 'fixed' as const, expanded: false }
+          : i
+      )
+    })));
+  }, [currentDraft, draftVersions, currentVersionIndex, dimensions]);
 
   const handleNextSuggestion = useCallback((issueId: string) => {
-    setIssues(prev => prev.map(issue => {
-      if (issue.id === issueId) {
-        const nextIndex = (issue.currentSuggestionIndex + 1) % issue.suggestions.length;
-        return { ...issue, currentSuggestionIndex: nextIndex };
-      }
-      return issue;
-    }));
+    setDimensions(prev => prev.map(dim => ({
+      ...dim,
+      issues: dim.issues.map(issue => {
+        if (issue.id === issueId) {
+          const nextIndex = (issue.currentSuggestionIndex + 1) % issue.suggestions.length;
+          return { ...issue, currentSuggestionIndex: nextIndex };
+        }
+        return issue;
+      })
+    })));
   }, []);
 
-  return (
-    <div className="relative min-h-screen">
-      {/* Hero Introduction */}
-      <div className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border-b p-8">
-        <div className="max-w-4xl mx-auto space-y-4">
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            ✍️ Narrative Fit Workshop
-          </h2>
-          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-6 border shadow-sm space-y-3">
-            <p className="font-semibold text-base">How to use this tool:</p>
-            <div className="grid gap-2 text-sm leading-relaxed">
-              <div className="flex gap-3">
-                <span className="font-bold text-primary">1️⃣</span>
-                <span>Review your draft in the editor below</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="font-bold text-primary">2️⃣</span>
-                <span>Click each issue card to see what's wrong</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="font-bold text-primary">3️⃣</span>
-                <span>Choose an edit suggestion and apply it</span>
-              </div>
-              <div className="flex gap-3">
-                <span className="font-bold text-primary">4️⃣</span>
-                <span>Watch your narrative quality improve in real-time</span>
-              </div>
-            </div>
-            <div className="pt-2 border-t mt-4">
-              <p className="text-sm text-muted-foreground">
-                <span className="font-semibold text-foreground">Goal:</span> Transform your recognition description into an officer-ready narrative that showcases selectivity, theme connection, and measurable impact.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+  const totalIssues = dimensions.reduce((sum, dim) => sum + dim.issues.length, 0);
+  const fixedIssues = dimensions.reduce((sum, dim) => 
+    sum + dim.issues.filter(i => i.status === 'fixed').length, 0
+  );
 
-      {/* Draft Editor - Sticky */}
-      <DraftEditor 
-        draft={draft}
-        onDraftChange={setDraft}
-        wordCount={wordCount}
-      />
+  const allFixed = fixedIssues === totalIssues && totalIssues > 0;
+  const isComplete = allFixed && overallScore >= 8.0;
+
+  const versionInfo = `Version ${currentVersionIndex + 1} of ${draftVersions.length}`;
+
+  return (
+    <div className="relative min-h-screen bg-background">
+      <HeroSection />
       
-      {/* Issues Section */}
-      <IssueList
-        issues={issues}
-        onToggleIssue={handleToggleIssue}
-        onApplySuggestion={handleApplySuggestion}
-        onInsertSuggestion={handleInsertSuggestion}
-        onNextSuggestion={handleNextSuggestion}
+      <DraftEditor
+        draft={currentDraft}
+        onDraftChange={handleDraftChange}
+        wordCount={wordCount}
+        canUndo={currentVersionIndex > 0}
+        canRedo={currentVersionIndex < draftVersions.length - 1}
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        versionInfo={versionInfo}
       />
+
+      <div className="max-w-5xl mx-auto p-8 space-y-8">
+        <OverallScoreCard
+          overallScore={overallScore}
+          fixedCount={fixedIssues}
+          totalCount={totalIssues}
+        />
+
+        {isComplete ? (
+          <WorkshopComplete draft={currentDraft} overallScore={overallScore} />
+        ) : (
+          <>
+            <div>
+              <h3 className="text-lg font-semibold text-muted-foreground uppercase tracking-wide text-xs mb-4">
+                Narrative Quality Rubric
+              </h3>
+              <div className="space-y-4">
+                {dimensions.map((dimension) => (
+                  <RubricDimensionCard
+                    key={dimension.id}
+                    dimension={dimension}
+                    onToggleIssue={handleToggleIssue}
+                    onApplySuggestion={handleApplySuggestion}
+                    onNextSuggestion={handleNextSuggestion}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
