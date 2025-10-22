@@ -9,13 +9,15 @@ interface IssueCardProps {
   onToggle: () => void;
   onApplySuggestion: (issueId: string, suggestionText: string, type: 'replace' | 'insert_before' | 'insert_after') => void;
   onNextSuggestion: (issueId: string) => void;
+  onPrevSuggestion: (issueId: string) => void;
 }
 
 export const IssueCard: React.FC<IssueCardProps> = ({
   issue,
   onToggle,
   onApplySuggestion,
-  onNextSuggestion
+  onNextSuggestion,
+  onPrevSuggestion
 }) => {
   const getStatusIcon = (status: WritingIssue['status']) => {
     switch (status) {
@@ -126,6 +128,7 @@ export const IssueCard: React.FC<IssueCardProps> = ({
               suggestions={issue.suggestions}
               currentIndex={issue.currentSuggestionIndex}
               onNext={() => onNextSuggestion(issue.id)}
+              onPrev={() => onPrevSuggestion(issue.id)}
               onApply={(text, type) => onApplySuggestion(issue.id, text, type)}
             />
           </div>

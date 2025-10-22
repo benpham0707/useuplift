@@ -9,6 +9,7 @@ interface RubricDimensionCardProps {
   onToggleIssue: (issueId: string) => void;
   onApplySuggestion: (issueId: string, suggestionText: string, type: 'replace' | 'insert_before' | 'insert_after') => void;
   onNextSuggestion: (issueId: string) => void;
+  onPrevSuggestion: (issueId: string) => void;
 }
 
 const statusConfig = {
@@ -54,7 +55,8 @@ export const RubricDimensionCard: React.FC<RubricDimensionCardProps> = ({
   dimension,
   onToggleIssue,
   onApplySuggestion,
-  onNextSuggestion
+  onNextSuggestion,
+  onPrevSuggestion
 }) => {
   const [isExpanded, setIsExpanded] = useState(dimension.status === 'critical' || dimension.status === 'needs_work');
   const config = statusConfig[dimension.status];
@@ -118,6 +120,7 @@ export const RubricDimensionCard: React.FC<RubricDimensionCardProps> = ({
                   onToggle={() => onToggleIssue(issue.id)}
                   onApplySuggestion={onApplySuggestion}
                   onNextSuggestion={onNextSuggestion}
+                  onPrevSuggestion={onPrevSuggestion}
                 />
               ))}
             </div>

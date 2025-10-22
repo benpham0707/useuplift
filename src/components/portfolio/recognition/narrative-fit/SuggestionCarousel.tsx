@@ -1,12 +1,14 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronRight, Wand2, MessageCircle } from 'lucide-react';
+import { Wand2 } from 'lucide-react';
 import { EditSuggestion } from './types';
+import { NavigationControls } from '../../NavigationControls';
 
 interface SuggestionCarouselProps {
   suggestions: EditSuggestion[];
   currentIndex: number;
   onNext: () => void;
+  onPrev: () => void;
   onApply: (suggestionText: string, type: 'replace' | 'insert_before' | 'insert_after') => void;
 }
 
@@ -14,6 +16,7 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
   suggestions,
   currentIndex,
   onNext,
+  onPrev,
   onApply
 }) => {
   const currentSuggestion = suggestions[currentIndex];
@@ -24,9 +27,12 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
         <span className="text-sm font-semibold text-primary">
           Suggested Fix
         </span>
-        <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground font-medium">
-          {currentIndex + 1} / {suggestions.length}
-        </span>
+        <NavigationControls
+          current={currentIndex}
+          total={suggestions.length}
+          onPrev={onPrev}
+          onNext={onNext}
+        />
       </div>
 
       <div className="p-4 rounded-lg bg-primary/5 border-l-4 border-primary">
@@ -52,16 +58,6 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
           <Wand2 className="w-4 h-4" />
           Apply This Edit
         </Button>
-        {currentIndex < suggestions.length - 1 && (
-          <Button
-            onClick={onNext}
-            variant="outline"
-            className="gap-2"
-          >
-            Next ({currentIndex + 2}/{suggestions.length})
-            <ChevronRight className="w-4 h-4" />
-          </Button>
-        )}
       </div>
     </div>
   );
