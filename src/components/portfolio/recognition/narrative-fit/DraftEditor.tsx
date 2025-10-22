@@ -25,7 +25,7 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({ draft, onDraftChange, 
   };
 
   return (
-    <div className="sticky top-0 z-50 bg-background/95 backdrop-blur-sm border-b shadow-md">
+    <div className="bg-background border-b shadow-sm">
       <div className="max-w-4xl mx-auto p-8 space-y-4">
         <div className="space-y-2">
           <div className="flex items-center justify-between">
