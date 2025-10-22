@@ -74,13 +74,50 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
   }, []);
 
   return (
-    <div className="space-y-0">
+    <div className="relative min-h-screen">
+      {/* Hero Introduction */}
+      <div className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border-b p-8">
+        <div className="max-w-4xl mx-auto space-y-4">
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            ✍️ Narrative Fit Workshop
+          </h2>
+          <div className="bg-background/80 backdrop-blur-sm rounded-lg p-6 border shadow-sm space-y-3">
+            <p className="font-semibold text-base">How to use this tool:</p>
+            <div className="grid gap-2 text-sm leading-relaxed">
+              <div className="flex gap-3">
+                <span className="font-bold text-primary">1️⃣</span>
+                <span>Review your draft in the editor below</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="font-bold text-primary">2️⃣</span>
+                <span>Click each issue card to see what's wrong</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="font-bold text-primary">3️⃣</span>
+                <span>Choose an edit suggestion and apply it</span>
+              </div>
+              <div className="flex gap-3">
+                <span className="font-bold text-primary">4️⃣</span>
+                <span>Watch your narrative quality improve in real-time</span>
+              </div>
+            </div>
+            <div className="pt-2 border-t mt-4">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-semibold text-foreground">Goal:</span> Transform your recognition description into an officer-ready narrative that showcases selectivity, theme connection, and measurable impact.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Draft Editor - Sticky */}
       <DraftEditor 
         draft={draft}
         onDraftChange={setDraft}
         wordCount={wordCount}
       />
       
+      {/* Issues Section */}
       <IssueList
         issues={issues}
         onToggleIssue={handleToggleIssue}
