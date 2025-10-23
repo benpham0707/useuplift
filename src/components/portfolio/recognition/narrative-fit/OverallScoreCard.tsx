@@ -36,7 +36,7 @@ export const OverallScoreCard: React.FC<OverallScoreCardProps> = ({
   };
 
   return (
-    <Card className="border-0 bg-transparent shadow-none">
+    <Card className="border bg-muted/20">
       <div className="p-6 md:p-7 space-y-5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 md:gap-4">

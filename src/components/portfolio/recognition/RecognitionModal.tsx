@@ -804,11 +804,10 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                 </AccordionItem>
               </Accordion>
 
-              <div className="text-xs text-muted-foreground">Note: Recency is no longer used in the impressiveness score.</div>
             </TabsContent>
 
             {/* Narrative Fit Tab */}
-            <TabsContent value="narrative" className="space-y-0">
+            <TabsContent value="narrative" className="space-y-6">
               <NarrativeFitWorkshop recognition={recognition} />
             </TabsContent>
 

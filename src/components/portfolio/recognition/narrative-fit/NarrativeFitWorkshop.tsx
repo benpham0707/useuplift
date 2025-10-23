@@ -229,9 +229,9 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
   const versionInfo = `Version ${currentVersionIndex + 1} of ${draftVersions.length}`;
 
   return (
-    <div className="relative min-h-screen bg-background">
+    <div className="space-y-6">
       <HeroSection overallScore={overallScore} fixedCount={fixedIssues} totalCount={totalIssues} embedScoreCard />
-      
+
       <DraftEditor
         draft={draft}
         onDraftChange={handleDraftChange}
@@ -245,7 +245,7 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
         onManualSave={handleManualSave}
       />
 
-      <div className="max-w-5xl mx-auto p-5 space-y-4">
+      <div className="space-y-4">
 
         {isComplete ? (
           <WorkshopComplete draft={draft} overallScore={overallScore} />

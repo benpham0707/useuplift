@@ -22,28 +22,26 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ overallScore, fixedCou
   };
 
   return (
-    <div className="bg-gradient-to-br from-primary/5 via-background to-accent/5 border-b">
-      <div className="max-w-5xl mx-auto pt-8 pb-4 px-5 space-y-4">
-        {embedScoreCard && overallScore !== undefined ? (
-          <OverallScoreCard
-            overallScore={overallScore}
-            fixedCount={fixedCount || 0}
-            totalCount={totalCount || 0}
-            howToExpanded={isExpanded}
-            onToggleHowTo={() => setIsExpanded(!isExpanded)}
-          />
-        ) : (
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-medium">
-              <PenTool className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <GradientText className="text-3xl font-bold">
-              Narrative Fit Workshop
-            </GradientText>
+    <div className="space-y-0">
+      {embedScoreCard && overallScore !== undefined ? (
+        <OverallScoreCard
+          overallScore={overallScore}
+          fixedCount={fixedCount || 0}
+          totalCount={totalCount || 0}
+          howToExpanded={isExpanded}
+          onToggleHowTo={() => setIsExpanded(!isExpanded)}
+        />
+      ) : (
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-medium">
+            <PenTool className="w-6 h-6 text-primary-foreground" />
           </div>
-        )}
-        {/* How-to panel is now rendered inside OverallScoreCard to ensure tight spacing below the link */}
-      </div>
+          <GradientText className="text-3xl font-bold">
+            Narrative Fit Workshop
+          </GradientText>
+        </div>
+      )}
+      {/* How-to panel is rendered inside OverallScoreCard to ensure tight spacing below the link */}
     </div>
   );
 };
