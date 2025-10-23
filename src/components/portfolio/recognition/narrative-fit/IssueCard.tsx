@@ -77,33 +77,33 @@ export const IssueCard: React.FC<IssueCardProps> = ({
 
   return (
     <Card className="border-2 border-primary/30">
-      <div className="p-4 space-y-4">
-        <div className="flex items-start justify-between gap-3">
+      <div className="px-4 pb-4">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="w-full -mx-4 px-4 py-4 mb-3 flex items-start justify-between gap-3 text-left cursor-pointer hover:bg-accent/40 rounded-t-xl transition-colors"
+          aria-label="Collapse issue"
+        >
           <div className="flex items-start gap-2 flex-1">
             <StatusIcon className={`w-5 h-5 ${
               issue.status === 'not_fixed' ? 'text-red-500' : 'text-yellow-500'
             } ${issue.status === 'in_progress' ? 'animate-spin' : ''} flex-shrink-0 mt-0.5`} />
             <h4 className="text-base font-bold text-primary">{issue.title}</h4>
           </div>
-          <button 
-            onClick={onToggle}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ChevronUp className="w-4 h-4" />
-          </button>
-        </div>
+          <ChevronUp className="w-4 h-4 text-muted-foreground" />
+        </button>
 
         <div className="space-y-3">
           <div>
             <p className="text-xs font-semibold text-muted-foreground mb-1">
               From Your Draft
             </p>
-            <div className="relative rounded-md bg-primary/5 p-4">
-              <span className="absolute -top-3 -left-1 text-5xl leading-none text-primary select-none">“</span>
-              <p className="text-sm italic text-foreground/80 px-6">
+            <div className="relative rounded-md bg-primary/5 py-4 pr-7 pl-7">
+              <span className="absolute top-2 left-1 text-2xl leading-none text-primary select-none pointer-events-none">“</span>
+              <p className="text-sm italic text-foreground/80 pr-2">
                 {issue.excerpt.replace(/"/g, '')}
               </p>
-              <span className="absolute -top-3 -right-1 text-5xl leading-none text-primary select-none">”</span>
+              <span className="absolute top-2 right-1 text-2xl leading-none text-primary select-none pointer-events-none">”</span>
             </div>
           </div>
 

@@ -5,7 +5,6 @@ import { ImpactFramePicker } from '@/components/portfolio/impact/ImpactFramePick
 import { ProofStrip } from '@/components/portfolio/impact/ProofStrip';
 import { ImpactLedger } from '@/components/portfolio/impact/ImpactLedger';
 import { ImpactQualityCheck } from '@/components/portfolio/impact/ImpactQualityCheck';
-import { StorytellingGuidance } from '@/components/portfolio/impact/StorytellingGuidance';
 import { ImpactDock } from '@/components/portfolio/impact/ImpactDock';
 import { OverarchingInsight } from '@/components/portfolio/portfolioInsightsData';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,7 +25,7 @@ export const ImpactTab: React.FC<ImpactTabProps> = ({ overarchingInsight }) => {
   const initiativesRef = useRef<HTMLDivElement>(null);
   const evidenceRef = useRef<HTMLDivElement>(null);
   const qualityRef = useRef<HTMLDivElement>(null);
-  const guidanceRef = useRef<HTMLDivElement>(null);
+  
 
   const sectionRefs = {
     snapshot: snapshotRef,
@@ -35,7 +34,6 @@ export const ImpactTab: React.FC<ImpactTabProps> = ({ overarchingInsight }) => {
     initiatives: initiativesRef,
     evidence: evidenceRef,
     quality: qualityRef,
-    guidance: guidanceRef,
   };
 
   const handleNavigate = (sectionId: string) => {
@@ -191,27 +189,7 @@ export const ImpactTab: React.FC<ImpactTabProps> = ({ overarchingInsight }) => {
         )}
       </div>
 
-      {/* Section 7: Storytelling Guidance */}
-      <div ref={guidanceRef} id="guidance">
-        {insight.storytellingGuidance && (
-          <Card className="shadow-sm hover:shadow-md transition-shadow border-0">
-            <CardContent className="p-7 md:p-8 space-y-5">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Lightbulb className="w-6 h-6 text-primary" />
-                  <h3 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                    Strategic Storytelling Guidance
-                  </h3>
-                </div>
-                <p className="text-sm md:text-base text-muted-foreground mt-2">
-                  Recommendations based on your impact data. Hover for preview, click to expand.
-                </p>
-              </div>
-              <StorytellingGuidance insights={insight.storytellingGuidance} />
-            </CardContent>
-          </Card>
-        )}
-      </div>
+      
 
       {/* Dock Navigation */}
       <ImpactDock activeSection={activeSection} onNavigate={handleNavigate} />

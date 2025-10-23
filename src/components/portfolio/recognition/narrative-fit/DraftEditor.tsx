@@ -13,6 +13,8 @@ interface DraftEditorProps {
   onUndo: () => void;
   onRedo: () => void;
   versionInfo: string;
+  isDirty: boolean;
+  onManualSave: () => void;
 }
 
 export const DraftEditor: React.FC<DraftEditorProps> = ({ 
@@ -23,25 +25,14 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({
   canRedo,
   onUndo,
   onRedo,
-  versionInfo
+  versionInfo,
+  isDirty,
+  onManualSave
 }) => {
-  const targetMin = 90;
-  const targetMax = 170;
-  const progress = Math.min((wordCount / targetMax) * 100, 100);
   
-  const getProgressColor = () => {
-    if (wordCount < targetMin) return 'bg-warning';
-    if (wordCount > targetMax) return 'bg-destructive';
-    return 'bg-success';
-  };
-
-  const insertText = (text: string) => {
-    onDraftChange(draft + (draft.endsWith(' ') ? '' : ' ') + text);
-  };
-
   return (
     <div className="bg-gradient-to-br from-background via-primary/5 to-background border-b">
-      <div className="max-w-4xl mx-auto p-5 space-y-3">
+      <div className="max-w-5xl mx-auto p-5 space-y-3">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -56,30 +47,39 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({
                   <span className="text-xs text-muted-foreground">
                     {versionInfo}
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onUndo}
-                    disabled={!canUndo}
-                    className="h-7 w-7 p-0"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onRedo}
-                    disabled={!canRedo}
-                    className="h-7 w-7 p-0"
-                  >
-                    <Redo2 className="w-3.5 h-3.5" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onUndo}
+                      disabled={!canUndo}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Undo2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onRedo}
+                      disabled={!canRedo}
+                      className="h-7 w-7 p-0"
+                    >
+                      <Redo2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </>
               )}
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Save className="w-3 h-3" />
-                Autosaved
-              </div>
+              {isDirty ? (
+                <Button size="sm" onClick={onManualSave} className="h-7 px-2">
+                  <Save className="w-3 h-3 mr-1" />
+                  Save
+                </Button>
+              ) : (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <Save className="w-3 h-3" />
+                  Autosaved
+                </div>
+              )}
             </div>
           </div>
           <Textarea
@@ -118,44 +118,6 @@ export const DraftEditor: React.FC<DraftEditorProps> = ({
               }`}
               style={{ width: `${Math.min((wordCount / 170) * 100, 100)}%` }}
             />
-          </div>
-        </div>
-
-        <div className="pt-3 border-t">
-          <p className="text-xs text-muted-foreground mb-2">Quick Insert:</p>
-          <div className="flex gap-2 overflow-x-auto">
-            <Button
-              onClick={() => insertText('This directly reinforces my [theme name] narrative. ')}
-              variant="outline"
-              size="sm"
-              className="text-xs whitespace-nowrap"
-            >
-              Theme Connection
-            </Button>
-            <Button
-              onClick={() => insertText('(Top X of Y applicants) ')}
-              variant="outline"
-              size="sm"
-              className="text-xs whitespace-nowrap"
-            >
-              Selectivity
-            </Button>
-            <Button
-              onClick={() => insertText('which resulted in ')}
-              variant="outline"
-              size="sm"
-              className="text-xs whitespace-nowrap"
-            >
-              Cause & Effect
-            </Button>
-            <Button
-              onClick={() => insertText('This experience taught me ')}
-              variant="outline"
-              size="sm"
-              className="text-xs whitespace-nowrap"
-            >
-              Reflection
-            </Button>
           </div>
         </div>
       </div>

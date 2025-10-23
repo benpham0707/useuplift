@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Dock from '@/components/Dock';
-import { Target, Frame, BarChart3, FolderOpen, Lock, CheckSquare, Lightbulb } from 'lucide-react';
+import { Target, Frame, BarChart3, FolderOpen, Lock, CheckSquare } from 'lucide-react';
 
 interface ImpactDockProps {
   activeSection: string;
@@ -24,7 +24,6 @@ export const ImpactDock: React.FC<ImpactDockProps> = ({ activeSection, onNavigat
     { Icon: FolderOpen, label: 'Initiatives', id: 'initiatives' },
     { Icon: Lock, label: 'Evidence', id: 'evidence' },
     { Icon: CheckSquare, label: 'Quality', id: 'quality' },
-    { Icon: Lightbulb, label: 'Guidance', id: 'guidance' },
   ];
 
   return (

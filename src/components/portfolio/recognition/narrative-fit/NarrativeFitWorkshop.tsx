@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RecognitionItem } from '../RecognitionCard';
 import { DraftVersion, RubricDimension, WritingIssue } from './types';
 import { detectAllIssuesWithRubric, getMockDraft } from './issueDetector';
@@ -21,13 +21,44 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
   const [dimensions, setDimensions] = useState<RubricDimension[]>([]);
   const [overallScore, setOverallScore] = useState(0);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(null);
+  // Live draft being edited in the textarea (decoupled from saved versions)
+  const [draft, setDraft] = useState<string>(draftVersions[currentVersionIndex].text);
+  const [isDirty, setIsDirty] = useState<boolean>(false);
+  const draftRef = useRef<string>(draft);
+  useEffect(() => { draftRef.current = draft; }, [draft]);
+  // Keep live draft in sync when undo/redo changes the selected version
+  useEffect(() => {
+    setDraft(draftVersions[currentVersionIndex].text);
+  }, [currentVersionIndex, draftVersions]);
 
-  const currentDraft = draftVersions[currentVersionIndex].text;
+  // Throttled autosave timer (at most one save every 30 seconds after edits start)
+  const autosaveTimerRef = useRef<number | null>(null);
+  const clearAutosaveTimer = () => {
+    if (autosaveTimerRef.current !== null) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+  };
 
-  // Recalculate issues and scores when draft changes
+  const saveDraftVersion = useCallback((text: string, appliedIssueId?: string) => {
+    // Avoid duplicate versions with identical text
+    const last = draftVersions[draftVersions.length - 1];
+    if (last && last.text === text) return;
+    const newVersions = draftVersions.slice(0, currentVersionIndex + 1);
+    const newVersion: DraftVersion = {
+      id: `v${newVersions.length}`,
+      text,
+      timestamp: Date.now(),
+      ...(appliedIssueId ? { appliedIssueId } : {})
+    };
+    setDraftVersions([...newVersions, newVersion]);
+    setCurrentVersionIndex(newVersions.length);
+  }, [draftVersions, currentVersionIndex]);
+
+  // Recalculate issues and scores when live draft changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      const newDimensions = detectAllIssuesWithRubric(currentDraft, recognition);
+      const newDimensions = detectAllIssuesWithRubric(draft, recognition);
       
       // Preserve issue states (expanded, currentSuggestionIndex)
       const updatedDimensions = newDimensions.map(newDim => {
@@ -51,31 +82,37 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
       });
       
       setDimensions(updatedDimensions);
-      // If nothing selected yet, choose first dimension needing work; else keep current if still present
+      // Keep prior expansion if still valid; otherwise start with all collapsed
       setExpandedDimensionId(prev => {
         if (prev && updatedDimensions.some(d => d.id === prev)) return prev;
-        const firstNeedingWork = updatedDimensions.find(d => d.status === 'critical' || d.status === 'needs_work');
-        return firstNeedingWork ? firstNeedingWork.id : updatedDimensions[0]?.id ?? null;
+        return null;
       });
       setOverallScore(calculateOverallScore(updatedDimensions));
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [currentDraft, recognition]);
+  }, [draft, recognition]);
 
-  const wordCount = currentDraft.trim().split(/\s+/).filter(Boolean).length;
+  const wordCount = draft.trim().split(/\s+/).filter(Boolean).length;
 
   const handleDraftChange = useCallback((newDraft: string) => {
-    // If we're not at the latest version, discard future versions
-    const newVersions = draftVersions.slice(0, currentVersionIndex + 1);
-    const newVersion: DraftVersion = {
-      id: `v${newVersions.length}`,
-      text: newDraft,
-      timestamp: Date.now()
-    };
-    setDraftVersions([...newVersions, newVersion]);
-    setCurrentVersionIndex(newVersions.length);
-  }, [draftVersions, currentVersionIndex]);
+    setDraft(newDraft);
+    if (!isDirty) setIsDirty(true);
+    // Start a 30s autosave window if not already scheduled
+    if (autosaveTimerRef.current === null) {
+      autosaveTimerRef.current = window.setTimeout(() => {
+        autosaveTimerRef.current = null;
+        saveDraftVersion(draftRef.current);
+        setIsDirty(false);
+      }, 30_000);
+    }
+  }, [saveDraftVersion, isDirty]);
+
+  const handleManualSave = useCallback(() => {
+    clearAutosaveTimer();
+    saveDraftVersion(draftRef.current);
+    setIsDirty(false);
+  }, [saveDraftVersion]);
 
   const handleUndo = useCallback(() => {
     if (currentVersionIndex > 0) {
@@ -120,31 +157,25 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
     const issue = dimension?.issues.find(i => i.id === issueId);
     if (!issue) return;
 
-    let updatedDraft = currentDraft;
+    let updatedDraft = draft;
     const excerpt = issue.excerpt.replace(/"/g, '');
 
     switch (type) {
       case 'replace':
-        updatedDraft = currentDraft.replace(excerpt, suggestionText);
+        updatedDraft = draft.replace(excerpt, suggestionText);
         break;
       case 'insert_before':
-        updatedDraft = suggestionText + ' ' + currentDraft;
+        updatedDraft = suggestionText + ' ' + draft;
         break;
       case 'insert_after':
-        updatedDraft = currentDraft + ' ' + suggestionText;
+        updatedDraft = draft + ' ' + suggestionText;
         break;
     }
 
-    // Create new version
-    const newVersions = draftVersions.slice(0, currentVersionIndex + 1);
-    const newVersion: DraftVersion = {
-      id: `v${newVersions.length}`,
-      text: updatedDraft,
-      timestamp: Date.now(),
-      appliedIssueId: issueId
-    };
-    setDraftVersions([...newVersions, newVersion]);
-    setCurrentVersionIndex(newVersions.length);
+    // Update live draft and immediately save a version for an explicit action
+    setDraft(updatedDraft);
+    clearAutosaveTimer();
+    saveDraftVersion(updatedDraft, issueId);
 
     // Mark issue as fixed
     setDimensions(prev => prev.map(dim => ({
@@ -155,7 +186,7 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
           : i
       )
     })));
-  }, [currentDraft, draftVersions, currentVersionIndex, dimensions]);
+  }, [draft, dimensions, saveDraftVersion]);
 
   const handleNextSuggestion = useCallback((issueId: string) => {
     setDimensions(prev => prev.map(dim => ({
@@ -199,10 +230,10 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
 
   return (
     <div className="relative min-h-screen bg-background">
-      <HeroSection />
+      <HeroSection overallScore={overallScore} fixedCount={fixedIssues} totalCount={totalIssues} embedScoreCard />
       
       <DraftEditor
-        draft={currentDraft}
+        draft={draft}
         onDraftChange={handleDraftChange}
         wordCount={wordCount}
         canUndo={currentVersionIndex > 0}
@@ -210,20 +241,17 @@ export const NarrativeFitWorkshop: React.FC<NarrativeFitWorkshopProps> = ({ reco
         onUndo={handleUndo}
         onRedo={handleRedo}
         versionInfo={versionInfo}
+        isDirty={isDirty}
+        onManualSave={handleManualSave}
       />
 
       <div className="max-w-5xl mx-auto p-5 space-y-4">
-        <OverallScoreCard
-          overallScore={overallScore}
-          fixedCount={fixedIssues}
-          totalCount={totalIssues}
-        />
 
         {isComplete ? (
-          <WorkshopComplete draft={currentDraft} overallScore={overallScore} />
+          <WorkshopComplete draft={draft} overallScore={overallScore} />
         ) : (
           <>
-            <div>
+            <div id="narrative-rubric">
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Narrative Quality Rubric
               </h3>

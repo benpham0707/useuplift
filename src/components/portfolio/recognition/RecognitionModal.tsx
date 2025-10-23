@@ -591,10 +591,9 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
 
         <div className="space-y-8 pt-4">
           <Tabs defaultValue="impressiveness" className="w-full space-y-6">
-            <TabsList className="grid w-full grid-cols-3 bg-card/80 backdrop-blur border rounded-lg overflow-hidden">
-              <TabsTrigger value="impressiveness" className="data-[state=active]:bg-foreground data-[state=active]:text-background rounded-none">Impressiveness</TabsTrigger>
-              <TabsTrigger value="narrative" className="data-[state=active]:bg-foreground data-[state=active]:text-background rounded-none">Narrative Fit</TabsTrigger>
-              <TabsTrigger value="strategic" className="data-[state=active]:bg-foreground data-[state=active]:text-background rounded-none">Strategic Value</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 gap-1 bg-muted/50 backdrop-blur border rounded-xl p-1">
+              <TabsTrigger value="impressiveness" className="rounded-lg transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Impressiveness</TabsTrigger>
+              <TabsTrigger value="narrative" className="rounded-lg transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Narrative Fit</TabsTrigger>
             </TabsList>
 
             {/* Impressiveness Tab */}
@@ -663,7 +662,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
               </Card>
 
               {/* Specifics (stacked, single-open accordion) */}
-              <Accordion type="single" collapsible defaultValue="selectivity" className="rounded-xl border bg-card divide-y">
+              <Accordion type="single" collapsible className="rounded-xl border bg-card divide-y">
                 <AccordionItem value="selectivity">
                   <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
                     <div className="flex w-full items-center gap-3">
@@ -813,13 +812,6 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
               <NarrativeFitWorkshop recognition={recognition} />
             </TabsContent>
 
-            {/* Strategic Value Tab (placeholder) */}
-            <TabsContent value="strategic" className="space-y-4">
-              <div className="p-6 rounded-xl border bg-muted/20">
-                <div className="text-xs font-medium text-muted-foreground mb-1">Coming soon</div>
-                <p className="text-sm text-muted-foreground">We’ll break down how this recognition strengthens your overall application strategy.</p>
-              </div>
-            </TabsContent>
           </Tabs>
         </div>
       </DialogContent>
