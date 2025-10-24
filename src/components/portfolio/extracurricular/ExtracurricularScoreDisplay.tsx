@@ -118,9 +118,22 @@ export const ExtracurricularScoreDisplay: React.FC<ScoreDisplayProps> = ({ score
               <div className="space-y-1">
                 <p className="font-semibold text-sm mb-2">Impact quality metrics</p>
                 <div className="text-xs space-y-1">
-                  <div>Tangibility: {scores.impact.tangibility.toFixed(1)}/10</div>
-                  <div>Scope: {scores.impact.scope.toFixed(1)}/10</div>
-                  <div>Sustainability: {scores.impact.sustainability.toFixed(1)}/10</div>
+                  {scores.impact.tangibility !== undefined && (
+                    <div>Tangibility: {scores.impact.tangibility.toFixed(1)}/10</div>
+                  )}
+                  {scores.impact.scope !== undefined && (
+                    <div>Scope: {scores.impact.scope.toFixed(1)}/10</div>
+                  )}
+                  {scores.impact.sustainability !== undefined && (
+                    <div>Sustainability: {scores.impact.sustainability.toFixed(1)}/10</div>
+                  )}
+                  {scores.impact.metrics && scores.impact.metrics.length > 0 && (
+                    <div className="pt-1 border-t border-border mt-1">
+                      {scores.impact.metrics.slice(0, 2).map((metric, idx) => (
+                        <div key={idx}>{metric.label}: {metric.value}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </TooltipContent>
