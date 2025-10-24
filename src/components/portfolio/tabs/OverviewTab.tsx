@@ -11,6 +11,7 @@ import { NavigationControls } from '../NavigationControls';
 import { ScoreIndicator } from '../ScoreIndicator';
 import { ImpactTab } from './ImpactTab';
 import { RecognitionTab } from '../recognition/RecognitionTab';
+import { ExtracurricularTab } from '../extracurricular/ExtracurricularTab';
 
 interface OverviewTabProps {
   summary: HolisticSummary;
@@ -140,9 +141,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
           </TabsContent>
 
           <TabsContent value="evidence" className="mt-8">
-            <div className="text-center py-12">
-              <p className="text-muted-foreground">Extracurricular tab coming soon...</p>
-            </div>
+            {insight.extracurricularOverview && insight.extracurricularItems && (
+              <ExtracurricularTab 
+                overview={insight.extracurricularOverview}
+                activities={insight.extracurricularItems}
+              />
+            )}
           </TabsContent>
 
           <TabsContent value="recommendations" className="mt-8">
