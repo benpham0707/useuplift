@@ -20,6 +20,8 @@ interface ScoreDisplayProps {
       totalHours: number;
       consistencyScore?: number;
       roleGrowth?: string[];
+      hoursPerWeek: number;
+      weeksPerYear: number;
     };
     impact: {
       overall: number;

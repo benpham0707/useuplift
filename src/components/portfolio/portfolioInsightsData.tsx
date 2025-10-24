@@ -1768,6 +1768,10 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         weeksPerYear: 40,
         category: 'leadership' as const,
         description: 'Led 15-member cabinet representing 2,000+ students. Secured $50K budget increase for student programs. Implemented digital feedback system reaching 85% student participation.',
+        dateRange: { start: 'September 2021', end: 'June 2024' },
+        roleEvolution: { current: 'President' },
+        impactMetrics: { tangibilityLevel: 'Highly Quantified' },
+        skillsDeveloped: { technical: ['Digital platform management', 'Budget systems', 'Data analysis'] },
         scores: {
           portfolioContribution: {
             overall: 9.2,
@@ -1782,7 +1786,9 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
             overall: 9.5,
             totalHours: 1440,
             consistencyScore: 9.8,
-            roleGrowth: ['Member (2021)', 'Secretary (2022)', 'Vice President (2023)', 'President (2024)']
+            roleGrowth: ['Member (2021)', 'Secretary (2022)', 'Vice President (2023)', 'President (2024)'],
+            hoursPerWeek: 12,
+            weeksPerYear: 40
           },
           impact: {
             overall: 8.8,
@@ -1797,6 +1803,11 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         },
         recommendedUse: 'centerpiece' as const,
         applicationGuidance: {
+          whyItMatters: 'This student government presidency exemplifies authentic institutional leadership with measurable outcomes. The four-year progression from member to president demonstrates sustained commitment and earned trust, while the $50K budget increase and 85% feedback participation rate provide concrete evidence of negotiation skills and digital innovation.',
+          descriptionAnalysis: {
+            strengths: ['Clear leadership trajectory over 4 years', 'Quantified budget impact ($50K)', 'Innovation (digital feedback system)', 'High student engagement (85%)'],
+            improvements: ['Consider adding specific example of a program funded by budget increase', 'Could mention specific challenges overcome']
+          },
           essayFit: [
             {
               promptType: 'Leadership challenge',
@@ -1839,6 +1850,10 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         weeksPerYear: 50,
         category: 'service' as const,
         description: 'Built full-stack web platform connecting volunteer tutors with students. Serves 118 weekly active students across 2 partner schools. Led team of 6 developers and 19 tutors.',
+        dateRange: { start: 'January 2022', end: 'Present' },
+        roleEvolution: { current: 'Founder & Lead Developer' },
+        impactMetrics: { tangibilityLevel: 'Highly Quantified' },
+        skillsDeveloped: { technical: ['Full-stack development', 'Product management', 'Database design', 'API development'] },
         scores: {
           portfolioContribution: {
             overall: 9.5,
@@ -1853,7 +1868,9 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
             overall: 9.2,
             totalHours: 1875,
             consistencyScore: 9.5,
-            roleGrowth: ['Solo Developer (2022)', 'Team Lead (2023)', 'Program Director (2024)']
+            roleGrowth: ['Solo Developer (2022)', 'Team Lead (2023)', 'Program Director (2024)'],
+            hoursPerWeek: 15,
+            weeksPerYear: 50
           },
           impact: {
             overall: 9.8,
@@ -1869,6 +1886,11 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         },
         recommendedUse: 'centerpiece' as const,
         applicationGuidance: {
+          whyItMatters: 'This self-founded tutoring platform represents exceptional initiative, technical skill, and social entrepreneurship. The formal school partnerships (MOUs) provide rare institutional validation for a high school project, while serving 118 weekly students demonstrates sustained, scalable impact. The evolution from solo developer to program director shows natural leadership development.',
+          descriptionAnalysis: {
+            strengths: ['Self-initiated enterprise', 'Institutional partnerships (MOUs)', 'Measurable sustained impact (118 weekly users)', 'Team leadership (6 developers, 19 tutors)', 'Clear retention improvement (+12pts)'],
+            improvements: ['Perfect as-is. Clear role, concrete metrics, scalable impact.']
+          },
           essayFit: [
             {
               promptType: 'Problem you solved',
@@ -1917,6 +1939,10 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         weeksPerYear: 45,
         category: 'academic' as const,
         description: 'Manage operations for 35-member team. Designed adaptive controller kits lowering barriers for new members. Led outreach to 3 middle schools, introducing 150+ students to robotics.',
+        dateRange: { start: 'September 2021', end: 'Present' },
+        roleEvolution: { current: 'Vice President' },
+        impactMetrics: { tangibilityLevel: 'Quantified' },
+        skillsDeveloped: { technical: ['Robotics engineering', 'CAD design', 'Embedded systems', 'Team management'] },
         scores: {
           portfolioContribution: {
             overall: 8.5,
@@ -1931,7 +1957,9 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
             overall: 8.8,
             totalHours: 1350,
             consistencyScore: 9.0,
-            roleGrowth: ['Member (2021)', 'Build Team Lead (2022)', 'Vice President (2023-24)']
+            roleGrowth: ['Member (2021)', 'Build Team Lead (2022)', 'Vice President (2023-24)'],
+            hoursPerWeek: 10,
+            weeksPerYear: 45
           },
           impact: {
             overall: 8.2,
@@ -1946,6 +1974,11 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
         },
         recommendedUse: 'supporting' as const,
         applicationGuidance: {
+          whyItMatters: 'This robotics leadership combines technical operations management with innovation (adaptive kits) and community outreach. The progression from member to Vice President demonstrates genuine technical skill and leadership development, while the middle school outreach (150+ students) shows commitment to STEM pipeline development and accessibility.',
+          descriptionAnalysis: {
+            strengths: ['Operational leadership (35-member team)', 'Innovation in accessibility (adaptive kits)', 'Community outreach (3 schools, 150+ students)', 'Clear role progression'],
+            improvements: ['Could clarify what "adaptive" means - be more specific', 'Add brief explanation: "one-handed controller kits for students with limited dexterity"']
+          },
           essayFit: [
             {
               promptType: 'Collaboration',
