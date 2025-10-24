@@ -90,17 +90,17 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
               <Award className="w-4 h-4" />
               <span className="hidden sm:inline">Recognition</span>
             </TabsTrigger>
-            <TabsTrigger value="trajectory" className="flex items-center gap-2 data-[state=active]:bg-background">
-              <TrendingUp className="w-4 h-4" />
-              <span className="hidden sm:inline">Trajectory</span>
+            <TabsTrigger value="evidence" className="flex items-center gap-2 data-[state=active]:bg-background">
+              <FileText className="w-4 h-4" />
+              <span className="hidden sm:inline">Extracurricular</span>
             </TabsTrigger>
             <TabsTrigger value="coherence" className="flex items-center gap-2 data-[state=active]:bg-background">
               <MapPin className="w-4 h-4" />
               <span className="hidden sm:inline">Coherence</span>
             </TabsTrigger>
-            <TabsTrigger value="evidence" className="flex items-center gap-2 data-[state=active]:bg-background">
-              <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">Evidence</span>
+            <TabsTrigger value="trajectory" className="flex items-center gap-2 data-[state=active]:bg-background">
+              <TrendingUp className="w-4 h-4" />
+              <span className="hidden sm:inline">Trajectory</span>
             </TabsTrigger>
             <TabsTrigger value="recommendations" className="flex items-center gap-2 data-[state=active]:bg-background">
               <Lightbulb className="w-4 h-4" />
@@ -141,7 +141,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
 
           <TabsContent value="evidence" className="mt-8">
             <div className="text-center py-12">
-              <p className="text-muted-foreground">Evidence & Analysis tab coming soon...</p>
+              <p className="text-muted-foreground">Extracurricular tab coming soon...</p>
             </div>
           </TabsContent>
 
