@@ -1,79 +1,113 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ExtracurricularItem, ExtracurricularCard } from './ExtracurricularCard';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel';
 
 interface ExtracurricularDashboardProps {
   activities: ExtracurricularItem[];
 }
 
+type SortOption = 'contribution' | 'hours' | 'impact';
+type FilterCategory = 'all' | 'leadership' | 'service' | 'research' | 'athletics' | 'arts' | 'academic' | 'work';
+type FilterUse = 'all' | 'centerpiece' | 'supporting' | 'breadth' | 'optional';
+
 export const ExtracurricularDashboard: React.FC<ExtracurricularDashboardProps> = ({ activities }) => {
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [useFilter, setUseFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('contribution');
-  const [currentPage, setCurrentPage] = useState(0);
+  const [sortBy, setSortBy] = useState<SortOption>('contribution');
+  const [filterCategory, setFilterCategory] = useState<FilterCategory>('all');
+  const [filterUse, setFilterUse] = useState<FilterUse>('all');
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [perPage, setPerPage] = useState(2);
+  const [canPrev, setCanPrev] = useState(false);
+  const [canNext, setCanNext] = useState(false);
 
-  const cardsPerPage = 2;
+  // Apply filters
+  const filteredActivities = activities.filter(act => {
+    if (filterCategory !== 'all' && act.category !== filterCategory) return false;
+    if (filterUse !== 'all' && act.recommendedUse !== filterUse) return false;
+    return true;
+  });
 
-  // Filter and sort activities
-  const filteredAndSorted = useMemo(() => {
-    let result = [...activities];
-
-    // Apply filters
-    if (categoryFilter !== 'all') {
-      result = result.filter(a => a.category === categoryFilter);
+  // Apply sorting
+  const sortedActivities = [...filteredActivities].sort((a, b) => {
+    switch (sortBy) {
+      case 'contribution':
+        return b.scores.portfolioContribution.overall - a.scores.portfolioContribution.overall;
+      case 'hours':
+        return b.scores.commitment.totalHours - a.scores.commitment.totalHours;
+      case 'impact':
+        return b.scores.impact.overall - a.scores.impact.overall;
+      default:
+        return 0;
     }
-    if (useFilter !== 'all') {
-      result = result.filter(a => a.recommendedUse === useFilter);
-    }
+  });
 
-    // Apply sorting
-    if (sortBy === 'contribution') {
-      result.sort((a, b) => b.scores.portfolioContribution.overall - a.scores.portfolioContribution.overall);
-    } else if (sortBy === 'hours') {
-      result.sort((a, b) => b.scores.commitment.totalHours - a.scores.commitment.totalHours);
-    } else if (sortBy === 'impact') {
-      result.sort((a, b) => b.scores.impact.overall - a.scores.impact.overall);
-    }
+  // Determine items per page based on viewport
+  useEffect(() => {
+    const computePerPage = () => setPerPage(window.innerWidth < 768 ? 1 : 2);
+    computePerPage();
+    window.addEventListener('resize', computePerPage);
+    return () => window.removeEventListener('resize', computePerPage);
+  }, []);
 
-    return result;
-  }, [activities, categoryFilter, useFilter, sortBy]);
+  // Keep slide/page indicator in sync
+  useEffect(() => {
+    const computeTotals = () => {
+      setTotalPages(Math.max(1, Math.ceil(sortedActivities.length / perPage)));
+      if (carouselApi) {
+        const idx = carouselApi.selectedScrollSnap?.() ?? 0;
+        setCurrentPage(Math.floor(idx / perPage) + 1);
+        setCanPrev(carouselApi.canScrollPrev());
+        setCanNext(carouselApi.canScrollNext());
+      } else {
+        setCurrentPage(1);
+        setCanPrev(false);
+        setCanNext(sortedActivities.length > perPage);
+      }
+    };
+    computeTotals();
+  }, [carouselApi, sortedActivities.length, perPage]);
 
-  const totalPages = Math.ceil(filteredAndSorted.length / cardsPerPage);
-  const currentActivities = filteredAndSorted.slice(
-    currentPage * cardsPerPage,
-    (currentPage + 1) * cardsPerPage
-  );
-
-  const handlePrevPage = () => {
-    setCurrentPage(prev => Math.max(0, prev - 1));
-  };
-
-  const handleNextPage = () => {
-    setCurrentPage(prev => Math.min(totalPages - 1, prev + 1));
-  };
-
-  // Reset page when filters change
-  React.useEffect(() => {
-    setCurrentPage(0);
-  }, [categoryFilter, useFilter, sortBy]);
+  // Update current page on carousel selection events
+  useEffect(() => {
+    if (!carouselApi) return;
+    const updatePage = () => {
+      const idx = carouselApi.selectedScrollSnap?.() ?? 0;
+      setCurrentPage(Math.floor(idx / perPage) + 1);
+      setCanPrev(carouselApi.canScrollPrev());
+      setCanNext(carouselApi.canScrollNext());
+    };
+    carouselApi.on('select', updatePage);
+    carouselApi.on('reInit', updatePage);
+    updatePage();
+    return () => {
+      carouselApi.off('select', updatePage);
+      carouselApi.off('reInit', updatePage);
+    };
+  }, [carouselApi, perPage]);
 
   return (
-    <div className="space-y-4">
-      {/* Header with filters and navigation */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h2 className="text-2xl font-bold text-foreground">
-          All Activities Dashboard ({filteredAndSorted.length})
-        </h2>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            All Activities Dashboard ({sortedActivities.length})
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            Review your complete activity portfolio with strategic insights
+          </p>
+        </div>
       </div>
 
-      {/* Filters and Navigation Bar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 p-4 bg-muted/30 rounded-lg border">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder="Category" />
+      {/* Filters + Centered Navigation */}
+      <div className="relative flex flex-wrap items-center gap-2 p-3 rounded-lg border bg-muted/20">
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={filterCategory} onValueChange={(v) => setFilterCategory(v as FilterCategory)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Categories</SelectItem>
@@ -87,9 +121,9 @@ export const ExtracurricularDashboard: React.FC<ExtracurricularDashboardProps> =
             </SelectContent>
           </Select>
 
-          <Select value={useFilter} onValueChange={setUseFilter}>
-            <SelectTrigger className="w-[140px] h-9">
-              <SelectValue placeholder="Use" />
+          <Select value={filterUse} onValueChange={(v) => setFilterUse(v as FilterUse)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
@@ -100,56 +134,69 @@ export const ExtracurricularDashboard: React.FC<ExtracurricularDashboardProps> =
             </SelectContent>
           </Select>
 
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="w-[160px] h-9">
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="contribution">Portfolio Contribution</SelectItem>
-              <SelectItem value="hours">Commitment Hours</SelectItem>
-              <SelectItem value="impact">Impact Score</SelectItem>
-            </SelectContent>
-          </Select>
+          {(filterCategory !== 'all' || filterUse !== 'all') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFilterCategory('all');
+                setFilterUse('all');
+              }}
+            >
+              Clear Filters
+            </Button>
+          )}
         </div>
 
-        {/* Centered Navigation */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrevPage}
-              disabled={currentPage === 0}
-              className="h-9"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <span className="text-sm text-muted-foreground whitespace-nowrap px-2">
-              Slide {currentPage + 1} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleNextPage}
-              disabled={currentPage === totalPages - 1}
-              className="h-9"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+        {/* Centered nav group */}
+        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center gap-2 z-10">
+          <Button
+            size="icon"
+            className="h-8 w-8"
+            disabled={!canPrev}
+            onClick={() => carouselApi?.scrollPrev()}
+          >
+            <span className="sr-only">Previous slide</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M15 18l-6-6 6-6"/></svg>
+          </Button>
+          <div className="text-xs font-medium text-foreground min-w-[92px] text-center">
+            Slide {currentPage} of {totalPages}
           </div>
-        )}
+          <Button
+            size="icon"
+            className="h-8 w-8"
+            disabled={!canNext}
+            onClick={() => carouselApi?.scrollNext()}
+          >
+            <span className="sr-only">Next slide</span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="h-4 w-4"><path d="M9 6l6 6-6 6"/></svg>
+          </Button>
+        </div>
       </div>
 
-      {/* Cards Grid */}
-      {currentActivities.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {currentActivities.map(activity => (
-            <ExtracurricularCard key={activity.id} activity={activity} />
-          ))}
+      {/* Carousel */}
+      {sortedActivities.length > 0 ? (
+        <div className="relative">
+          <Carousel
+            opts={{
+              align: "start",
+              slidesToScroll: perPage,
+            }}
+            className="w-full"
+            setApi={setCarouselApi}
+          >
+            <CarouselContent className="-ml-4">
+              {sortedActivities.map((activity) => (
+                <CarouselItem key={activity.id} className="pl-4 md:basis-1/2 lg:basis-1/2">
+                  <ExtracurricularCard activity={activity} />
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
         </div>
       ) : (
-        <div className="text-center py-12 text-muted-foreground">
-          No activities match your filters
+        <div className="text-center py-12 rounded-lg border bg-muted/20">
+          <p className="text-muted-foreground">No activities match your filters</p>
         </div>
       )}
     </div>
