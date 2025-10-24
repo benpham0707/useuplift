@@ -5,7 +5,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ExternalLink, Gauge, Building2, Info, PencilLine, ClipboardList, CheckCircle2, TriangleAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Gauge, Building2, Info, PencilLine, ClipboardList, CheckCircle2, TriangleAlert, ChevronLeft, ChevronRight, Award } from 'lucide-react';
 import { RecognitionItem } from './RecognitionCard';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { NarrativeFitWorkshop } from './narrative-fit/NarrativeFitWorkshop';
+import GradientText from '@/components/ui/GradientText';
 
 interface RecognitionModalProps {
   recognition: RecognitionItem | null;
@@ -333,6 +334,37 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
     return 'Needs work';
   };
 
+  // Map recognition tier to an approximate impressiveness score for color coding
+  const scoreForTier = (tier: RecognitionItem['tier']): number => {
+    switch (tier) {
+      case 'national':
+        return 9.2; // exceptional
+      case 'state':
+        return 8.0; // strong
+      case 'regional':
+        return 7.4; // developing/solid
+      case 'school':
+      default:
+        return 6.4; // modest
+    }
+  };
+
+  // Render metric text with gradient when score is very high
+  const renderMetricText = (score: number, content: React.ReactNode, className = '') => {
+    if (score >= 9) {
+      return (
+        <GradientText
+          className={`${className}`}
+          colors={["hsl(250 70% 60%)","hsl(185 80% 55%)","hsl(280 90% 65%)","hsl(250 70% 60%)"]}
+          textOnly
+        >
+          {content}
+        </GradientText>
+      );
+    }
+    return <span className={`${colorForScore(score)} ${className}`}>{content}</span>;
+  };
+
   // Expandable rubric helpers
   const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
@@ -576,16 +608,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                 {recognition.issuer} • {recognition.date}
               </div>
             </div>
-            {recognition.link && (
-              <a
-                href={recognition.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="shrink-0"
-              >
-                <ExternalLink className="w-5 h-5 text-primary hover:text-primary/80" />
-              </a>
-            )}
+            {/* External link removed per design: keep header clean; close (X) handles exit */}
           </div>
         </DialogHeader>
 
@@ -602,14 +625,30 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
               <Card className="border bg-muted/20">
                 <CardHeader className="pb-2">
                   <div className="flex items-start justify-between gap-6">
-                    <div>
-                      <CardTitle className="text-lg md:text-xl bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center">
+                        <Award className="w-6 h-6 text-primary-foreground" />
+                      </div>
+                      <GradientText
+                        className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+                        colors={["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#a855f7"]}
+                      >
                         Impressiveness Overview
-                      </CardTitle>
+                      </GradientText>
                     </div>
                     <div className="text-right">
                       <div className="flex items-baseline justify-end gap-1">
-                        <span className={`${scoreColor} text-4xl font-extrabold`}>{scores.impressiveness.overall.toFixed(1)}</span>
+                        {scores.impressiveness.overall >= 9.0 ? (
+                          <GradientText
+                            className="text-4xl font-extrabold metric-value"
+                            colors={["hsl(250 70% 60%)","hsl(185 80% 55%)","hsl(280 90% 65%)","hsl(250 70% 60%)"]}
+                            textOnly
+                          >
+                            {scores.impressiveness.overall.toFixed(1)}
+                          </GradientText>
+                        ) : (
+                          <span className={`${scoreColor} text-4xl font-extrabold`}>{scores.impressiveness.overall.toFixed(1)}</span>
+                        )}
                         <span className="text-muted-foreground font-medium">/10</span>
                       </div>
                       {(() => { const tier = getTierSummary(scores.impressiveness.overall); return (
@@ -621,28 +660,28 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                 <CardContent>
                   <div className="space-y-4">
                     <div>
-                      <h4 className="text-sm font-semibold mb-1">Comparative position</h4>
+                      <h4 className="text-sm font-semibold mb-1 text-primary">Comparative position</h4>
                       <p className="text-sm text-foreground/80 leading-relaxed">
                         {buildComparativeText()}
                       </p>
                       <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                         <div>
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Estimated percentile</div>
-                          <div className="font-medium">{getPercentileBand(scores.impressiveness.overall)}</div>
+                          <div className="font-medium">{renderMetricText(scores.impressiveness.overall, getPercentileBand(scores.impressiveness.overall))}</div>
                         </div>
                         <div>
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Recognition tier</div>
-                          <div className="font-medium">{recognition.tier.charAt(0).toUpperCase() + recognition.tier.slice(1)}</div>
+                          <div className="font-medium">{renderMetricText(scoreForTier(recognition.tier), recognition.tier.charAt(0).toUpperCase() + recognition.tier.slice(1))}</div>
                         </div>
                         <div>
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Issuer prestige</div>
-                          <div className="font-medium">{scores.impressiveness.breakdown.issuerPrestige.toFixed(1)}/10</div>
+                          <div className="font-medium">{renderMetricText(scores.impressiveness.breakdown.issuerPrestige, `${scores.impressiveness.breakdown.issuerPrestige.toFixed(1)}/10`)}</div>
                         </div>
                       </div>
                     </div>
                     <div className="border-t" />
                     <div>
-                      <h4 className="text-sm font-semibold mb-1">Positioning verdict</h4>
+                      <h4 className="text-sm font-semibold mb-1 text-primary">Positioning verdict</h4>
                       {(() => { const v = getPositionVerdict(); return (
                         <p className="text-sm text-foreground/80 leading-relaxed"><span className="font-medium">{v.label}.</span> This is due to {v.rationale}.</p>
                       ); })()}
@@ -650,7 +689,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                     </div>
                     <div className="border-t" />
                     <div>
-                      <h4 className="text-sm font-semibold mb-1">Implications for the admissions officer</h4>
+                      <h4 className="text-sm font-semibold mb-1 text-primary">Implications for the admissions officer</h4>
                       <div className="space-y-2">
                         <p className="text-sm text-foreground/80 leading-relaxed">
                           {buildOfficerImplication()}
@@ -667,7 +706,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                   <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
                     <div className="flex w-full items-center gap-3">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Gauge className="h-3.5 w-3.5" /></span>
-                      <span className="text-sm font-semibold">Selectivity</span>
+                      <span className="text-sm font-semibold text-primary">Selectivity</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -680,28 +719,28 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <span className="ml-auto text-xs font-semibold text-foreground/70">{scores.impressiveness.breakdown.selectivity.toFixed(1)}/10</span>
+                      <span className="ml-auto text-xs font-semibold">{renderMetricText(scores.impressiveness.breakdown.selectivity, `${scores.impressiveness.breakdown.selectivity.toFixed(1)}/10`)}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4">
                     <div className="space-y-3 text-sm text-foreground/80">
-                      <h4 className="text-base font-semibold">Selectivity details</h4>
+                      <h4 className="text-base font-semibold text-primary">Selectivity details</h4>
                       {recognition.selectivity ? (
                         <>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <div>
                               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Acceptance rate</div>
-                              <div className="font-medium">{(recognition.selectivity.acceptanceRate * 100).toFixed(1)}%</div>
+                              <div className="font-medium">{renderMetricText(scores.impressiveness.breakdown.selectivity, `${(recognition.selectivity.acceptanceRate * 100).toFixed(1)}%`)}</div>
                             </div>
                             {(typeof recognition.selectivity.accepted === 'number' && typeof recognition.selectivity.applicants === 'number') && (
                               <div>
                                 <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Applicants</div>
-                                <div className="font-medium">{recognition.selectivity.accepted.toLocaleString()} / {recognition.selectivity.applicants.toLocaleString()}</div>
+                                <div className="font-medium">{renderMetricText(scores.impressiveness.breakdown.selectivity, `${recognition.selectivity.accepted.toLocaleString()} / ${recognition.selectivity.applicants.toLocaleString()}`)}</div>
                               </div>
                             )}
                             <div>
                               <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Recognition tier</div>
-                              <div className="font-medium">{recognition.tier.charAt(0).toUpperCase() + recognition.tier.slice(1)}</div>
+                              <div className="font-medium">{renderMetricText(scoreForTier(recognition.tier), recognition.tier.charAt(0).toUpperCase() + recognition.tier.slice(1))}</div>
                             </div>
                           </div>
                           <div className="text-foreground/70">{recognition.selectivity.description}</div>
@@ -709,9 +748,9 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                           {(typeof recognition.selectivity.accepted === 'number' && typeof recognition.selectivity.applicants === 'number') && (
                             <></>
                           )}
-                          <h5 className="text-sm font-semibold">Why this scored as it did</h5>
+                          <h5 className="text-sm font-semibold text-primary">Why this scored as it did</h5>
                           <div className="text-foreground/80">{buildSelectivityInsight()}</div>
-                          <h5 className="text-sm font-semibold mt-2">How this strengthens the profile</h5>
+                          <h5 className="text-sm font-semibold mt-2 text-primary">How this strengthens the profile</h5>
                           <div className="text-foreground/80">Competitive selection communicates readiness to excel under external standards, increasing confidence in projected academic performance.</div>
                         </>
                       ) : (
@@ -725,7 +764,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                   <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
                     <div className="flex w-full items-center gap-3">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Building2 className="h-3.5 w-3.5" /></span>
-                      <span className="text-sm font-semibold">Issuer Prestige</span>
+                      <span className="text-sm font-semibold text-primary">Issuer Prestige</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -738,12 +777,12 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <span className="ml-auto text-xs font-semibold text-foreground/70">{scores.impressiveness.breakdown.issuerPrestige.toFixed(1)}/10</span>
+                      <span className="ml-auto text-xs font-semibold">{renderMetricText(scores.impressiveness.breakdown.issuerPrestige, `${scores.impressiveness.breakdown.issuerPrestige.toFixed(1)}/10`)}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4">
                     <div className="space-y-3 text-sm text-foreground/80">
-                      <h4 className="text-base font-semibold">Issuer prestige details</h4>
+                      <h4 className="text-base font-semibold text-primary">Issuer prestige details</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Issuing organization</div>
@@ -751,12 +790,12 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                         </div>
                         <div>
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Prestige score</div>
-                          <div className="font-medium">{scores.impressiveness.breakdown.issuerPrestige.toFixed(1)}/10</div>
+                          <div className="font-medium">{renderMetricText(scores.impressiveness.breakdown.issuerPrestige, `${scores.impressiveness.breakdown.issuerPrestige.toFixed(1)}/10`)}</div>
                         </div>
                       </div>
-                      <h5 className="text-sm font-semibold">Why this scored as it did</h5>
+                      <h5 className="text-sm font-semibold text-primary">Why this scored as it did</h5>
                       <div className="text-foreground/80">{buildPrestigeInsight()}</div>
-                      <h5 className="text-sm font-semibold mt-2">How this strengthens the profile</h5>
+                      <h5 className="text-sm font-semibold mt-2 text-primary">How this strengthens the profile</h5>
                       <div className="text-foreground/80">Prestigious issuers act as third-party validators; this compresses doubt in committee and allows scarce space to focus on outcomes rather than justification.</div>
                     </div>
                   </AccordionContent>
@@ -766,7 +805,7 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                   <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
                     <div className="flex w-full items-center gap-3">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Info className="h-3.5 w-3.5" /></span>
-                      <span className="text-sm font-semibold">Relevance</span>
+                      <span className="text-sm font-semibold text-primary">Relevance</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -779,25 +818,25 @@ export const RecognitionModal: React.FC<RecognitionModalProps> = ({
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
-                      <span className="ml-auto text-xs font-semibold text-foreground/70">{scores.narrativeFit.spineAlignment}% aligned</span>
+                      <span className="ml-auto text-xs font-semibold">{renderMetricText(scores.narrativeFit.spineAlignment / 10, `${scores.narrativeFit.spineAlignment}% aligned`)}</span>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent className="px-4">
                     <div className="space-y-3 text-sm text-foreground/80">
-                      <h4 className="text-base font-semibold">Relevance details</h4>
+                      <h4 className="text-base font-semibold text-primary">Relevance details</h4>
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div>
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Alignment</div>
-                          <div className="font-medium">{scores.narrativeFit.spineAlignment}%</div>
+                          <div className="font-medium">{renderMetricText(scores.narrativeFit.spineAlignment / 10, `${scores.narrativeFit.spineAlignment}%`)}</div>
                         </div>
                         <div className="sm:col-span-2">
                           <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Narrative themes</div>
                           <div className="font-medium">{(scores.narrativeFit.themeSupport || []).slice(0,2).join(', ') || '—'}</div>
                         </div>
                       </div>
-                      <h5 className="text-sm font-semibold">Why this scored as it did</h5>
+                      <h5 className="text-sm font-semibold text-primary">Why this scored as it did</h5>
                       <div className="text-foreground/80">{buildRelevanceInsight()}</div>
-                      <h5 className="text-sm font-semibold mt-2">How this strengthens the profile</h5>
+                      <h5 className="text-sm font-semibold mt-2 text-primary">How this strengthens the profile</h5>
                       <div className="text-foreground/80">High relevance reduces cognitive load for the admissions officer, making the case for fit and progression more immediate across the application.</div>
                     </div>
                   </AccordionContent>

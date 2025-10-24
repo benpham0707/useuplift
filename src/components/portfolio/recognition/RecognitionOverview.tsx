@@ -180,15 +180,15 @@ export const RecognitionOverview: React.FC<RecognitionOverviewProps> = ({ data }
         {/* Collapsed View - Premium at-a-glance card */}
         {!expanded && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="flex items-center justify-between mb-6 gap-2 md:gap-3">
+              <h2 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">
                 Recognition Portfolio Analysis
               </h2>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setExpanded(true)}
-                className="text-sm"
+                className="text-[11px] md:text-xs h-7 px-2.5 md:h-8 md:px-3 ml-1 md:ml-2"
               >
                 View Full Analysis <ChevronDown className="ml-1 h-4 w-4" />
               </Button>
@@ -297,15 +297,15 @@ export const RecognitionOverview: React.FC<RecognitionOverviewProps> = ({ data }
         {/* Expanded View - New Deep Insights Tabs */}
         {expanded && (
           <div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <div className="flex items-center justify-between mb-6 gap-2 md:gap-3">
+              <h2 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent whitespace-nowrap">
                 Recognition Portfolio Analysis
               </h2>
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => setExpanded(false)}
-                className="text-sm"
+                className="text-[11px] md:text-xs h-7 px-2.5 md:h-8 md:px-3 ml-1 md:ml-2"
               >
                 Collapse <ChevronUp className="ml-1 h-4 w-4" />
               </Button>

@@ -68,8 +68,8 @@ export const RecognitionScoreDisplay: React.FC<RecognitionScoreDisplayProps> = (
         </div>
       </div>
 
-      {/* Tri-Score Display */}
-      <div className="grid grid-cols-3 gap-3">
+      {/* Dual-Score Display (Strategic Value removed) */}
+      <div className="grid grid-cols-2 gap-3">
         {/* Impressiveness */}
         <TooltipProvider>
           <Tooltip>
@@ -113,25 +113,6 @@ export const RecognitionScoreDisplay: React.FC<RecognitionScoreDisplayProps> = (
             <TooltipContent className="max-w-xs">
               <p className="font-semibold text-sm">How well does this align with your narrative spine?</p>
               <p className="text-xs mt-1">Higher scores indicate direct validation of your core themes and story.</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
-        {/* Strategic Value (Portfolio Lift displayed differently) */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="text-center cursor-help">
-                <div className="flex items-center justify-center gap-1 mb-1">
-                  <span className="text-xs text-muted-foreground">Strategic Value</span>
-                  <Info className="h-3 w-3 text-muted-foreground/60" />
-                </div>
-                {renderScore(portfolioLift, 'text-2xl')}
-              </div>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              <p className="font-semibold text-sm">How much does this strengthen your overall portfolio?</p>
-              <p className="text-xs mt-1">Combines impressiveness and narrative fit to determine strategic priority.</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

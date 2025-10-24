@@ -53,9 +53,19 @@ export const OverallScoreCard: React.FC<OverallScoreCardProps> = ({
             </div>
           </div>
           <div className="flex items-baseline gap-1.5">
-            <span className={`text-3xl md:text-4xl font-bold ${getScoreColor(overallScore)}`}>
-              {overallScore.toFixed(1)}
-            </span>
+            {overallScore >= 9.0 ? (
+              <GradientText
+                className="text-3xl md:text-4xl font-extrabold metric-value"
+                colors={["hsl(250 70% 60%)","hsl(185 80% 55%)","hsl(280 90% 65%)","hsl(250 70% 60%)"]}
+                textOnly
+              >
+                {overallScore.toFixed(1)}
+              </GradientText>
+            ) : (
+              <span className={`text-3xl md:text-4xl font-bold ${getScoreColor(overallScore)}`}>
+                {overallScore.toFixed(1)}
+              </span>
+            )}
             <span className="text-2xl font-semibold text-muted-foreground">/10</span>
           </div>
         </div>

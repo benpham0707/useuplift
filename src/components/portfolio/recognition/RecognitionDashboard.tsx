@@ -98,23 +98,13 @@ export const RecognitionDashboard: React.FC<RecognitionDashboardProps> = ({ reco
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
-            All Recognitions ({sortedRecognitions.length})
+            All Recognitions Dashboard ({sortedRecognitions.length})
           </h3>
-          <p className="text-sm text-muted-foreground">Sort and filter to prioritize which recognitions to feature in your applications</p>
+          <p className="text-sm text-muted-foreground">
+            Spot your best achievements — open any card for score breakdowns and a rewrite workshop
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
-            <SelectTrigger className="w-[150px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="portfolioLift">Portfolio Lift</SelectItem>
-              <SelectItem value="impressiveness">Impressiveness</SelectItem>
-              <SelectItem value="narrativeFit">Narrative Fit</SelectItem>
-              <SelectItem value="recency">Recency</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Sort dropdown removed per product update */}
       </div>
 
       {/* Filters + Centered Navigation */}
