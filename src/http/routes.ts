@@ -75,6 +75,14 @@ r.post("/analyze-entry", async (req, res) => {
       // Cap at maxScore based on length
       base = Math.min(base, maxScore);
 
+      // Calculate heuristic scores for all 11 rubric dimensions
+      const hasNumbers = text.match(/\d+/g)?.length || 0;
+      const hasLeadership = text.match(/\b(led|founded|created|organized|initiated|coordinated|managed)\b/i);
+      const hasCommunity = text.match(/\b(we|team|group|community|others|together|collaborative)\b/i);
+      const hasImpact = text.match(/\b(changed|improved|increased|helped|taught|built|achieved)\b/i);
+      const hasOwnership = text.match(/\b(I|my)\b/g)?.length || 0;
+      const hasStakes = text.match(/\b(challenge|problem|struggled|difficult|failed|overcome)\b/i);
+
       const report = {
         id: entryObj.id || undefined,
         rubric_version: '1.0.0',
@@ -82,9 +90,72 @@ r.post("/analyze-entry", async (req, res) => {
         narrative_quality_index: Math.round(base * 10),
         reader_impression_label: base >= 7 ? 'solid_needs_polish' : base >= 4 ? 'needs_work' : 'weak',
         categories: [
-          { name: 'voice_integrity', score_0_to_10: +(base).toFixed(1), evidence_snippets: [text.slice(0, 80)], evaluator_notes: 'Heuristic: Resume-style; needs authentic voice and sensory details.' },
-          { name: 'specificity_evidence', score_0_to_10: +(Math.max(1, base - 0.5)).toFixed(1), evidence_snippets: [], evaluator_notes: 'Heuristic: Needs concrete metrics (who/when/how much).' },
-          { name: 'reflection_meaning', score_0_to_10: +(Math.max(0, base - 1)).toFixed(1), evidence_snippets: [], evaluator_notes: 'Heuristic: Needs deeper reflection with transferable insights.' },
+          {
+            name: 'voice_integrity',
+            score_0_to_10: +(base).toFixed(1),
+            evidence_snippets: [text.slice(0, 80)],
+            evaluator_notes: 'Heuristic: Resume-style; needs authentic voice and sensory details.'
+          },
+          {
+            name: 'specificity_evidence',
+            score_0_to_10: +(Math.max(1, base - 0.5 + (hasNumbers > 2 ? 1 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: hasNumbers > 0 ? 'Heuristic: Has some metrics, but needs more specific evidence.' : 'Heuristic: Needs concrete metrics (who/when/how much).'
+          },
+          {
+            name: 'transformative_impact',
+            score_0_to_10: +(Math.max(1, base - 0.5 + (hasImpact ? 1 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: hasImpact ? 'Heuristic: Shows some impact, but needs before/after contrast.' : 'Heuristic: Needs clear transformative impact on self or community.'
+          },
+          {
+            name: 'role_clarity_ownership',
+            score_0_to_10: +(Math.max(1, base - 0.3 + (hasOwnership > 3 ? 0.5 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: 'Heuristic: Needs clearer role definition and personal ownership markers.'
+          },
+          {
+            name: 'narrative_arc_stakes',
+            score_0_to_10: +(Math.max(1, base - 1 + (hasStakes ? 1.5 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: hasStakes ? 'Heuristic: Has some stakes/challenges, but needs narrative arc.' : 'Heuristic: Needs challenge/stakes and narrative progression.'
+          },
+          {
+            name: 'initiative_leadership',
+            score_0_to_10: +(Math.max(1, base - 0.5 + (hasLeadership ? 1 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: hasLeadership ? 'Heuristic: Shows some initiative, but needs specific leadership moments.' : 'Heuristic: Needs clear initiative and leadership examples.'
+          },
+          {
+            name: 'community_collaboration',
+            score_0_to_10: +(Math.max(1, base - 0.5 + (hasCommunity ? 0.5 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: hasCommunity ? 'Heuristic: Mentions collaboration, but needs depth on relationships.' : 'Heuristic: Needs community/collaborative elements.'
+          },
+          {
+            name: 'reflection_meaning',
+            score_0_to_10: +(Math.max(0, base - 1 + (hasReflection ? 1 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: hasReflection ? 'Heuristic: Has basic reflection, but needs transferable insights.' : 'Heuristic: Needs deeper reflection with transferable insights.'
+          },
+          {
+            name: 'craft_language_quality',
+            score_0_to_10: +(Math.max(1, base - 0.5 + (hasDialogue ? 1 : 0) + (wc > 150 ? 0.5 : 0))).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: 'Heuristic: Needs varied sentence structure and vivid language.'
+          },
+          {
+            name: 'fit_trajectory',
+            score_0_to_10: +(Math.max(1, base - 0.5)).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: 'Heuristic: Needs connection to academic/career trajectory.'
+          },
+          {
+            name: 'time_investment_consistency',
+            score_0_to_10: +(Math.max(1, base - 0.3)).toFixed(1),
+            evidence_snippets: [],
+            evaluator_notes: 'Heuristic: Needs time commitment details and consistency indicators.'
+          },
         ],
         weights: {
           voice_integrity: 0.10,
