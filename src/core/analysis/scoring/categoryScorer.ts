@@ -62,12 +62,19 @@ Score the following categories for a student's experience description. For each 
 2. 1-3 direct quotes from the text that justify your score
 3. A brief (1-2 sentence) evaluator note explaining the score
 
-**Scoring Philosophy:**
-- Be honest and rigorous
+**Scoring Philosophy - READ THIS CAREFULLY:**
+- Be BRUTALLY strict - this determines college admissions outcomes
+- **Scores must be EARNED, not given** - start from 0 and only increase for strong evidence
+- **Resume bullets with no story = 1-2 per category** (not 4-6!)
+- **Facts + numbers but no emotion/reflection = 2-3 per category**
+- **Decent storytelling with some depth = 5-6 per category**
+- **Exceptional narrative + vulnerability = 7-8 per category**
+- **Near-perfect literary craft = 9-10 per category** (reserved for top 1% of HYPSM essays)
+- anchor_5 represents SOLID/ACCEPTABLE work - most essays are BELOW this
+- anchor_0 is template/no-content - anything factual should still score 1-3 if it lacks story
 - Never invent facts or quotes not in the text
-- Use the provided anchors (0, 5, 10) to calibrate your scoring
 - Evidence-based: always quote exact phrases to justify scores
-- Context-aware: consider what's plausible for a high school student
+- CRITICAL: 80+ NQI = admitted to Stanford/MIT. 70-80 = UCLA/Berkeley. 50-70 = mid-tier UCs. Below 50 = needs major work.
 
 **Categories to Score:**
 
@@ -103,19 +110,32 @@ Return a JSON object with this structure:
   ]
 }
 
-**Important:**
+**CRITICAL SCORING CALIBRATION:**
 - All quotes must be exact, verbatim excerpts from the student's text
-- Scores should use the full 0-10 range; don't cluster around 5-7
-- Confidence is 0-1, reflecting how certain you are of the score (based on evidence quality)`;
+- **DEFAULT to scores of 1-3 for most categories** - only increase if there's strong evidence
+- Voice Integrity: Resume language = 1-2. Some personality = 3-4. Authentic voice = 5-6. Exceptional voice = 7-10.
+- Narrative Arc: No story = 0-1. Some structure = 3-4. Good arc = 5-6. Masterful arc = 8-10.
+- Reflection: None = 0. Surface = 1-2. Some depth = 4-5. Profound = 7-10.
+- **If a category is missing entirely (no reflection, no story, no emotion), score it 0-1, not 4-6**
+- **LENGTH PENALTIES:** <100 words = cap all scores at 4/10. <50 words = cap at 2/10. <25 words = cap at 1/10.
+- Confidence is 0-1, reflecting how certain you are of the score (based on evidence quality)
+- Remember: An NQI of 80+ means this student gets into Stanford. An NQI of 35 means they need to completely rewrite.`;
 }
 
 /**
  * Build user prompt with entry and extracted features
  */
 function buildScoringUserPrompt(entry: ExperienceEntry, features: ExtractedFeatures, authenticity: AuthenticityAnalysis): string {
+  const wordCount = entry.description_original.trim().split(/\s+/).filter(Boolean).length;
+  const charCount = entry.description_original.length;
+
   return `**Student's Experience Description:**
 
 "${entry.description_original}"
+
+**LENGTH:** ${wordCount} words, ${charCount} characters
+${wordCount < 100 ? '⚠️ WARNING: Essay is very short (<100 words) - apply LENGTH PENALTIES!' : ''}
+${wordCount < 50 ? '⚠️ CRITICAL: Essay is extremely short (<50 words) - maximum score 2/10 per category!' : ''}
 
 **AUTHENTICITY ANALYSIS (CRITICAL FOR VOICE SCORING):**
 

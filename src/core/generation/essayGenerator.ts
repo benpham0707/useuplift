@@ -16,6 +16,7 @@ import { analyzeElitePatterns } from '../analysis/features/elitePatternDetector'
 import { analyzeLiterarySophistication } from '../analysis/features/literarySophisticationDetector';
 import { ExperienceEntry } from '../types/experience';
 import { generateNarrativeAngles, selectBestAngle, type NarrativeAngle } from './narrativeAngleGenerator';
+import { validateAndRankAngles, selectBestValidatedAngle, type AngleQualityScore } from './angleQualityValidator';
 
 // ============================================================================
 // TYPES
@@ -351,50 +352,79 @@ Generate essay now. Return ONLY the essay text, no commentary or preamble.`;
 // ============================================================================
 
 /**
- * Smart angle selection based on Session 18 findings:
- * - Prioritize 7/10 originality (moderate risk)
- * - Favor grounded over abstract angles
- * - Optimize for authenticity potential
+ * Multi-stage angle selection with comprehensive quality validation
+ *
+ * Process:
+ * 1. Generate 10+ angles
+ * 2. Validate each with quality metrics (grounding, bridge, authenticity, implementability)
+ * 3. Filter out "avoid" recommendations
+ * 4. Rank remaining by overall quality
+ * 5. Select best with detailed reporting
  */
-function selectOptimalAngle(angles: NarrativeAngle[], profile: GenerationProfile): NarrativeAngle {
-  // Filter for moderate risk angles (7/10 originality performed best in Session 18)
-  const moderateAngles = angles.filter(
-    a => a.originality >= 6 && a.originality <= 8 && a.riskLevel === 'moderate'
-  );
+export function selectOptimalAngle(angles: NarrativeAngle[], profile: GenerationProfile): NarrativeAngle {
+  console.log(`\n${'='.repeat(80)}`);
+  console.log(`📊 MULTI-STAGE ANGLE VALIDATION (${angles.length} candidates)`);
+  console.log(`${'='.repeat(80)}\n`);
 
-  // If we have moderate angles, pick the best one
-  if (moderateAngles.length > 0) {
-    // Sort by: grounded keywords presence (higher = better)
-    const scored = moderateAngles.map(angle => {
-      let score = angle.originality;
+  // Stage 1: Validate all angles
+  console.log(`Stage 1: Validating angle quality...`);
+  const validated = validateAndRankAngles(angles, profile);
 
-      // Boost if uses concrete/grounded language (vision, system, guide, etc.)
-      const groundedKeywords = ['vision', 'system', 'guide', 'conversation', 'page', 'mechanical'];
-      const abstractKeywords = ['oracle', 'reverence', 'spiritual', 'prophecy', 'sacred'];
+  // Stage 2: Filter by recommendation
+  const excellent = validated.filter(v => v.recommendation === 'excellent');
+  const good = validated.filter(v => v.recommendation === 'good');
+  const acceptable = validated.filter(v => v.recommendation === 'acceptable');
+  const risky = validated.filter(v => v.recommendation === 'risky');
+  const avoid = validated.filter(v => v.recommendation === 'avoid');
 
-      const titleLower = angle.title.toLowerCase();
-      const hookLower = angle.hook.toLowerCase();
+  console.log(`\nStage 2: Quality Distribution:`);
+  console.log(`  • Excellent: ${excellent.length}`);
+  console.log(`  • Good: ${good.length}`);
+  console.log(`  • Acceptable: ${acceptable.length}`);
+  console.log(`  • Risky: ${risky.length}`);
+  console.log(`  • Avoid: ${avoid.length}\n`);
 
-      groundedKeywords.forEach(kw => {
-        if (titleLower.includes(kw) || hookLower.includes(kw)) score += 2;
-      });
+  // Stage 3: Select best usable angle
+  const usable = [...excellent, ...good, ...acceptable];
 
-      abstractKeywords.forEach(kw => {
-        if (titleLower.includes(kw) || hookLower.includes(kw)) score -= 3;
-      });
-
-      // Boost if connects to something tangible
-      if (angle.unusualConnection && angle.unusualConnection.includes('system')) score += 1;
-
-      return { angle, score };
-    });
-
-    scored.sort((a, b) => b.score - a.score);
-    return scored[0].angle;
+  if (usable.length === 0) {
+    console.warn(`⚠️  WARNING: All angles flagged as risky/avoid. Using least-bad option.\n`);
+    return validated[0].angle;
   }
 
-  // Fallback: use the standard selection
-  return selectBestAngle(angles, profile);
+  const selected = usable[0];
+
+  // Stage 4: Report selection
+  console.log(`Stage 3: Selected Angle`);
+  console.log(`${'─'.repeat(80)}`);
+  console.log(`Title: "${selected.angle.title}"`);
+  console.log(`Originality: ${selected.angle.originality}/10 | Risk: ${selected.angle.riskLevel}`);
+  console.log(`\n🎯 Quality Scores:`);
+  console.log(`  • Overall Quality: ${selected.overallQuality}/100`);
+  console.log(`  • Grounding: ${selected.groundingScore}/100`);
+  console.log(`  • Bridge (Tech-Human): ${selected.bridgeScore}/100`);
+  console.log(`  • Authenticity Potential: ${selected.authenticityPotential}/100`);
+  console.log(`  • Implementability: ${selected.implementabilityScore}/100`);
+  console.log(`\n✅ Recommendation: ${selected.recommendation.toUpperCase()} (confidence: ${Math.round(selected.confidence * 100)}%)`);
+
+  if (selected.strengths.length > 0) {
+    console.log(`\n💪 Strengths:`);
+    selected.strengths.forEach(s => console.log(`  • ${s}`));
+  }
+
+  if (selected.warnings.length > 0) {
+    console.log(`\n⚠️  Warnings:`);
+    selected.warnings.forEach(w => console.log(`  • ${w}`));
+  }
+
+  if (selected.redFlags.length > 0) {
+    console.log(`\n🚨 Red Flags:`);
+    selected.redFlags.forEach(f => console.log(`  • ${f}`));
+  }
+
+  console.log(`\n${'='.repeat(80)}\n`);
+
+  return selected.angle;
 }
 
 export async function generateEssay(

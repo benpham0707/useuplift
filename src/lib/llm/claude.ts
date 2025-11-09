@@ -15,9 +15,10 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 // Initialize Anthropic client
-const apiKey = process.env.ANTHROPIC_API_KEY;
+// Prioritize ANTHROPIC_API_KEY (has credits) over CLAUDE_CODE_KEY (no credits)
+const apiKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_CODE_KEY;
 if (!apiKey) {
-  throw new Error('ANTHROPIC_API_KEY not found in environment variables. Please check your .env file.');
+  throw new Error('CLAUDE_CODE_KEY or ANTHROPIC_API_KEY not found in environment variables. Please check your .env file.');
 }
 
 const client = new Anthropic({

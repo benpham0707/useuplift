@@ -6,15 +6,12 @@
  */
 
 import { callClaudeWithRetry } from '../../lib/llm/claude';
-import { GenerationProfile, GenerationResult, buildGenerationPrompt } from './essayGenerator';
+import { GenerationProfile, GenerationResult, buildGenerationPrompt, selectOptimalAngle } from './essayGenerator';
 import { analyzeAuthenticity } from '../analysis/features/authenticityDetector';
 import { analyzeElitePatterns } from '../analysis/features/elitePatternDetector';
 import { analyzeLiterarySophistication } from '../analysis/features/literarySophisticationDetector';
 import { buildIntelligentPrompt, identifyEmphasis } from './intelligentPrompting';
 import { generateNarrativeAngles, type NarrativeAngle } from './narrativeAngleGenerator';
-
-// Import smart angle selection from essayGenerator
-import type { selectOptimalAngle } from './essayGenerator';
 
 // ============================================================================
 // LEARNING SYSTEM
@@ -311,6 +308,31 @@ export async function generateWithIterativeImprovement(
   console.log(`Target Score: ${targetScore}/100, Max Iterations: ${maxIterations}`);
   console.log(`${'█'.repeat(80)}\n`);
 
+  // Generate narrative angle if requested (Session 18 optimization)
+  let narrativeAngle = profile.narrativeAngle;
+
+  if (profile.generateAngle && !narrativeAngle) {
+    console.log(`🎨 GENERATING NARRATIVE ANGLES...\n`);
+
+    const angles = await generateNarrativeAngles({
+      profile,
+      numAngles: 10,
+      prioritize: 'originality',
+    });
+
+    console.log(`✓ Generated ${angles.length} unique angles`);
+
+    // Use smart selection (prioritize moderate risk + grounded)
+    narrativeAngle = selectOptimalAngle(angles, profile);
+
+    console.log(`\n🎯 SELECTED ANGLE: "${narrativeAngle.title}"`);
+    console.log(`   Originality: ${narrativeAngle.originality}/10 | Risk: ${narrativeAngle.riskLevel}`);
+    console.log(`   Hook: "${narrativeAngle.hook}"`);
+    console.log(`   Connection: ${narrativeAngle.unusualConnection}\n`);
+  } else if (narrativeAngle) {
+    console.log(`🎯 USING PROVIDED ANGLE: "${narrativeAngle.title}"\n`);
+  }
+
   const techniques = profile.literaryTechniques.length > 0
     ? profile.literaryTechniques
     : ['extendedMetaphor', 'dualScene', 'inMediasRes'];
@@ -327,7 +349,7 @@ export async function generateWithIterativeImprovement(
   console.log(`${'▓'.repeat(80)}\n`);
 
   // Use intelligent prompting from the start (no previous essay for iteration 1)
-  const initialPrompt = buildIntelligentPrompt(profile, techniques, null, 1);
+  const initialPrompt = buildIntelligentPrompt(profile, techniques, null, 1, narrativeAngle);
   console.log(`Generating initial essay with intelligent prompting...`);
 
   const initialResponse = await callClaudeWithRetry<{ essay: string }>(
@@ -344,7 +366,7 @@ export async function generateWithIterativeImprovement(
   console.log(`✓ Generated ${currentEssay.length} characters\n`);
 
   // Analyze initial
-  const initialResult = await analyzeEssay(currentEssay, profile, techniques, 1);
+  const initialResult = await analyzeEssay(currentEssay, profile, techniques, 1, narrativeAngle);
   iterationHistory.push(initialResult);
   bestScore = initialResult.combinedScore;
 
@@ -386,7 +408,8 @@ export async function generateWithIterativeImprovement(
       profile,
       techniques,
       bestEssay,
-      iteration
+      iteration,
+      narrativeAngle
     );
 
     console.log(`Generating improved essay (~${Math.round(intelligentPrompt.length / 4)} tokens)...`);
@@ -404,7 +427,7 @@ export async function generateWithIterativeImprovement(
     console.log(`✓ Generated ${currentEssay.length} characters\n`);
 
     // Analyze improved version
-    const improvedResult = await analyzeEssay(currentEssay, profile, techniques, iteration);
+    const improvedResult = await analyzeEssay(currentEssay, profile, techniques, iteration, narrativeAngle);
     iterationHistory.push(improvedResult);
 
     // Update best if this is better
@@ -486,7 +509,8 @@ async function analyzeEssay(
   essay: string,
   profile: GenerationProfile,
   techniques: string[],
-  iteration: number
+  iteration: number,
+  narrativeAngle?: NarrativeAngle
 ): Promise<GenerationResult> {
   const authenticity = analyzeAuthenticity(essay);
   const elitePatterns = analyzeElitePatterns(essay);
@@ -509,5 +533,6 @@ async function analyzeEssay(
     iteration,
     techniquesUsed: techniques,
     warningFlags: authenticity.voice_type === 'essay' || authenticity.voice_type === 'robotic' ? ['essay_voice'] : [],
+    narrativeAngle, // Include the angle used
   };
 }

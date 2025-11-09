@@ -21,7 +21,7 @@ import {
 import { extractFeatures, validateFeatures } from './features/extractor';
 import { analyzeAuthenticity, AuthenticityAnalysis } from './features/authenticityDetector';
 import { scoreAllCategories, scoreSingleCategory, validateCategoryScores } from './scoring/categoryScorer';
-import { calculateNQI, getReaderImpressionLabel, RUBRIC_WEIGHTS, RUBRIC_VERSION, RUBRIC_CATEGORIES_DEFINITIONS } from '../rubrics/v1.0.0';
+import { calculateNQI, getReaderImpressionLabel, RUBRIC_WEIGHTS, RUBRIC_VERSION, RUBRIC_CATEGORIES_DEFINITIONS, getWeightsForCategory } from '../rubrics/v1.0.0';
 import { v4 as uuidv4 } from 'uuid';
 
 // ============================================================================
@@ -32,6 +32,7 @@ export interface AnalysisResult {
   report: AnalysisReport;
   features: ExtractedFeatures;
   authenticity: AuthenticityAnalysis;
+  coaching?: import('./coaching').CoachingOutput;  // Optional: included unless skip_coaching = true
   performance: {
     stage1_ms: number; // Feature extraction
     stage2_ms: number; // Category scoring
@@ -39,6 +40,61 @@ export interface AnalysisResult {
     stage4_ms: number; // NQI & flags
     total_ms: number;
   };
+}
+
+// ============================================================================
+// QUIET EXCELLENCE BONUS
+// ============================================================================
+
+/**
+ * Calculate "Quiet Excellence" bonus for essays that demonstrate profound simplicity
+ *
+ * Requirements (ALL must be met):
+ * - Exceptional authenticity (7.5+)
+ * - Strong voice (9.0+)
+ * - Good reflection (7.5+)
+ * - Sustained time investment (8.0+)
+ *
+ * Bonus: +1 to +3 points maximum (doesn't artificially inflate weak essays)
+ */
+function calculateQuietExcellenceBonus(
+  scores: Record<string, number>,
+  authenticity: AuthenticityAnalysis
+): number {
+  // Only apply if essay demonstrates strong fundamentals
+  const voice = scores.voice_integrity;
+  const reflection = scores.reflection_meaning;
+  const time = scores.time_investment_consistency;
+  const authScore = authenticity.authenticity_score;
+
+  if (voice === undefined || reflection === undefined || time === undefined) {
+    return 0;
+  }
+
+  // Must have exceptional voice and authenticity
+  if (voice < 9.0) return 0;
+  if (authScore < 7.5) return 0;
+
+  // Must have good reflection (shows depth)
+  if (reflection < 7.5) return 0;
+
+  // Must show sustained commitment
+  if (time < 8.0) return 0;
+
+  // Calculate how many excellence markers are present
+  let excellenceMarkers = 0;
+  if (voice >= 9.5) excellenceMarkers++;
+  if (authScore >= 8.0) excellenceMarkers++;
+  if (reflection >= 8.5) excellenceMarkers++;
+  if (time >= 9.0) excellenceMarkers++;
+
+  // Conservative bonus: 1-3 points based on excellence markers
+  // This helps "quiet" narratives without inflating scores artificially
+  if (excellenceMarkers >= 4) return 3;  // All markers exceptional
+  if (excellenceMarkers >= 3) return 2;  // Most markers exceptional
+  if (excellenceMarkers >= 2) return 1;  // Some markers exceptional
+
+  return 0;
 }
 
 // ============================================================================
@@ -345,21 +401,25 @@ export async function analyzeEntry(
   console.log('Applying authenticity-based adjustments...');
 
   // Calculate adjustment based on authenticity score
+  // Calibrated for extracurricular context (more forgiving than personal statement essays)
   let voiceIntegrityAdjustment = 0;
   let adjustmentReason = '';
 
   if (authenticity.authenticity_score >= 8) {
-    voiceIntegrityAdjustment = +2;
-    adjustmentReason = 'Highly authentic conversational voice (+2 boost)';
-  } else if (authenticity.authenticity_score >= 6) {
+    voiceIntegrityAdjustment = +1.5;
+    adjustmentReason = 'Highly authentic conversational voice (+1.5 boost)';
+  } else if (authenticity.authenticity_score >= 6.5) {
+    voiceIntegrityAdjustment = +0.5;
+    adjustmentReason = 'Good authentic voice (+0.5 boost)';
+  } else if (authenticity.authenticity_score >= 5) {
     voiceIntegrityAdjustment = 0;
-    adjustmentReason = 'Moderately authentic (no adjustment)';
-  } else if (authenticity.authenticity_score >= 4) {
-    voiceIntegrityAdjustment = -1;
-    adjustmentReason = 'Somewhat manufactured (-1 penalty)';
+    adjustmentReason = 'Acceptable voice (no adjustment)';
+  } else if (authenticity.authenticity_score >= 3) {
+    voiceIntegrityAdjustment = -0.5;
+    adjustmentReason = 'Somewhat manufactured (-0.5 penalty)';
   } else {
-    voiceIntegrityAdjustment = -3;
-    adjustmentReason = 'CRITICAL: Robotic/essay voice (-3 major penalty)';
+    voiceIntegrityAdjustment = -2;
+    adjustmentReason = 'CRITICAL: Robotic/essay voice (-2 major penalty)';
   }
 
   if (voiceIntegrityAdjustment !== 0) {
@@ -376,9 +436,22 @@ export async function analyzeEntry(
     }
   }
 
-  // Calculate NQI with adjusted scores
-  const nqi = calculateNQI(scoresMap);
+  // Calculate NQI with adjusted scores and adaptive weights based on activity category
+  const adaptiveWeights = getWeightsForCategory(entry.category);
+  let nqi = calculateNQI(scoresMap, adaptiveWeights);
+
+  // Apply "Quiet Excellence" bonus if warranted
+  // This recognizes essays that demonstrate profound simplicity and sustained authenticity
+  // without traditional dramatic arcs, but ONLY if other fundamentals are strong
+  const quietExcellenceBonus = calculateQuietExcellenceBonus(scoresMap, authenticity);
+  if (quietExcellenceBonus > 0) {
+    const originalNqi = nqi;
+    nqi = Math.min(100, nqi + quietExcellenceBonus);
+    console.log(`  - Quiet Excellence bonus: +${quietExcellenceBonus} (${originalNqi} → ${nqi}) - sustained authenticity with strong fundamentals`);
+  }
+
   const readerLabel = getReaderImpressionLabel(nqi);
+  console.log(`  - Using adaptive weights for category: ${entry.category}`);
 
   // Generate flags
   const flags = generateFlags(scoresMap, features, authenticity);
@@ -418,6 +491,17 @@ export async function analyzeEntry(
     analysis_depth: options.depth,
   };
 
+  // ==========================================================================
+  // GENERATE COACHING (unless skip_coaching = true)
+  // ==========================================================================
+
+  let coaching;
+  if (!options.skip_coaching) {
+    const { generateCoaching } = await import('./coaching');
+    coaching = generateCoaching(entry, report, authenticity, features);
+    console.log(`✓ Coaching generated: ${coaching.overall.total_issues} issues detected\n`);
+  }
+
   console.log(`${'='.repeat(80)}`);
   console.log(`ANALYSIS COMPLETE`);
   console.log(`Total time: ${performanceTracking.total_ms}ms`);
@@ -427,6 +511,7 @@ export async function analyzeEntry(
     report,
     features,
     authenticity,
+    coaching,
     performance: performanceTracking,
   };
 }

@@ -9,6 +9,7 @@
  */
 
 import type { GenerationProfile } from './essayGenerator';
+import type { NarrativeAngle } from './narrativeAngleGenerator';
 import { analyzeAuthenticity } from '../analysis/features/authenticityDetector';
 import { analyzeElitePatterns } from '../analysis/features/elitePatternDetector';
 import { analyzeLiterarySophistication } from '../analysis/features/literarySophisticationDetector';
@@ -269,10 +270,80 @@ export function buildIntelligentPrompt(
   profile: GenerationProfile,
   techniques: string[],
   previousEssay: string | null,
-  iteration: number
+  iteration: number,
+  angle?: NarrativeAngle
 ): string {
   // Determine emphasis (only if we have previous essay to analyze)
   const emphasis = previousEssay ? identifyEmphasis(previousEssay) : { category: 'none', reason: '', enhancement: '' };
+
+  // Build narrative angle guidance if provided (Session 18 integration)
+  const angleGuidance = angle ? `
+
+${'='.repeat(80)}
+🎯 NARRATIVE ANGLE (Your Unique Perspective - Session 18 Optimization)
+${'='.repeat(80)}
+
+**Central Perspective**: "${angle.title}"
+**Opening Hook**: ${angle.hook}
+**Throughline**: ${angle.throughline}
+
+**What Makes This Unique**:
+- Unusual Connection: ${angle.unusualConnection}
+- Philosophical Depth: ${angle.philosophicalDepth}
+- Universal Insight: ${angle.universalInsight}
+
+**CRITICAL IMPLEMENTATION REQUIREMENTS**:
+1. Use the hook as inspiration for your opening (adapt to your authentic voice)
+2. Maintain the throughline perspective THROUGHOUT the essay
+3. Connect your specific experience to the universal insight
+4. Keep it GROUNDED - philosophy must emerge from concrete moments
+5. Target authenticity score 9+ (stay genuine, angle enhances but doesn't replace)
+
+⚠️ **Balance**: This angle ENHANCES your story. Ground philosophical depth in SPECIFIC moments (dialogue, sensory details, vulnerability).
+
+` : '';
+
+  // Special first iteration guidance (ensures strong foundation)
+  const firstIterationBoost = iteration === 1 && !previousEssay ? `
+${'='.repeat(80)}
+⚡ FIRST ITERATION: BUILD STRONG FOUNDATION
+${'='.repeat(80)}
+
+THIS IS YOUR FIRST DRAFT. Make it count! A strong first iteration (60-65/100) is easier to refine than a weak one (45-55/100).
+
+🎯 MANDATORY FIRST-DRAFT REQUIREMENTS (to hit 60+/100):
+
+1. **STRUCTURAL INNOVATION** (Add immediately - worth 5-8 points):
+   ✅ Start with: "Flashback to three days before [event]..." OR
+   ✅ Use section markers: "**Scene One:**" and "**Scene Two:**"
+   → This scores 5-8 points automatically if done right
+
+2. **VULNERABILITY** (Critical - worth 10 points):
+   ✅ Physical symptoms: "hands trembled", "stomach churned", "voice cracked"
+   ✅ Named emotions: "I was terrified", "felt dumbstruck"
+   ✅ Admit limits: "I had no clue", "seemed impossible"
+   → Include ALL THREE types for full credit
+
+3. **IMPACTFUL DIALOGUE** (Critical - worth 10 points):
+   ✅ 2-3 exchanges minimum
+   ✅ Must reveal character/relationship, not just info
+   ✅ Include subtext (what's NOT said matters)
+   → Example: "Can you help?" reveals more than "The servo is broken"
+
+4. **CONCRETE METRICS** (Easy points - worth 5-10 points):
+   ✅ Specific numbers: "23-page guide", "18 teams", "2,847 lines of code"
+   ✅ Before/after transformation: "5 isolated teams → 17 collaborators"
+   → Just add numbers to your existing story
+
+5. **UNIVERSAL INSIGHT** (Hardest but highest value - worth 20 points):
+   ✅ Must apply beyond your activity to ALL human systems
+   ✅ Test: "Is this true about LIFE or just robotics?"
+   ✅ Example: "Complex systems fail from connection errors, not technical flaws"
+   → Think bigger than your activity
+
+⚠️ **CRITICAL**: Don't try to be perfect, but DO include ALL 5 requirements above. Each one adds 5-20 points to your score. Missing any one hurts badly.
+
+` : '';
 
   // Base prompt structure (always comprehensive)
   const basePrompt = `You are an elite college admissions essay coach generating iteration ${iteration}.
@@ -289,7 +360,8 @@ ${previousEssay}
 
 YOUR TASK: Rewrite the essay maintaining its core story and strengths, but addressing the critical focus above.
 ` : 'YOUR TASK: Generate a compelling personal narrative essay.'}
-
+${firstIterationBoost}
+${angleGuidance}
 STUDENT PROFILE:
 - Activity: ${profile.activityType} - ${profile.role}
 - Duration: ${profile.duration} (${profile.hoursPerWeek} hrs/week)

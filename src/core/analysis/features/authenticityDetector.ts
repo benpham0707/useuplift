@@ -15,13 +15,6 @@
  * Phrases that signal manufactured-for-admissions content
  */
 const MANUFACTURED_PHRASES = [
-  // Forced literary devices
-  'smelled like',
-  'tasted like',
-  'felt like silk',
-  'echoed through',
-  'hung in the air',
-
   // Formulaic reflection starters
   'i used to think',
   'i once believed',
@@ -56,6 +49,23 @@ const MANUFACTURED_PHRASES = [
   'in addition',
   'consequently',
   'thus',
+];
+
+/**
+ * Abstract/forced sensory language (BAD)
+ * vs. Concrete sensory details (GOOD - don't flag these)
+ */
+const ABSTRACT_SENSORY_PHRASES = [
+  'smelled like ambition',
+  'smelled like success',
+  'smelled like possibility',
+  'tasted like victory',
+  'tasted like triumph',
+  'felt like silk',
+  'felt like electricity',
+  'felt like magic',
+  'echoed through',
+  'hung in the air',
 ];
 
 /**
@@ -153,6 +163,11 @@ export function analyzeAuthenticity(text: string): AuthenticityAnalysis {
     lowerText.includes(phrase)
   );
 
+  // Check for abstract/forced sensory language (separate from concrete sensory details)
+  const abstractSensoryFound = ABSTRACT_SENSORY_PHRASES.filter(phrase =>
+    lowerText.includes(phrase)
+  );
+
   const forcedArcFound = FORCED_ARC_PATTERNS.filter(pattern =>
     pattern.test(text)
   ).map(p => p.toString());
@@ -183,7 +198,8 @@ export function analyzeAuthenticity(text: string): AuthenticityAnalysis {
   if (forcedArcFound.length >= 2) {
     redFlags.push('forced_narrative_arc');
   }
-  if (lowerText.includes('smelled like') || lowerText.includes('tasted like')) {
+  // Only flag abstract/metaphorical sensory language, not concrete details
+  if (abstractSensoryFound.length >= 1) {
     redFlags.push('trying_too_hard_sensory');
   }
   if (/i used to think.*but.*learned/i.test(text)) {
@@ -236,17 +252,18 @@ export function analyzeAuthenticity(text: string): AuthenticityAnalysis {
   }
 
   // Calculate authenticity score (0-10)
-  let authenticityScore = 5;  // Start neutral
+  let authenticityScore = 6;  // Start slightly above neutral (less harsh)
 
   // Boost for authentic markers
   authenticityScore += Math.min(3, authenticFound.length * 0.5);
   authenticityScore += Math.min(2, realSpecificsFound.length * 0.3);
-  authenticityScore += greenFlags.length * 0.5;
+  authenticityScore += greenFlags.length * 0.4;
 
-  // Penalize for manufactured markers
-  authenticityScore -= Math.min(4, manufacturedFound.length * 0.4);
-  authenticityScore -= forcedArcFound.length * 0.8;
-  authenticityScore -= redFlags.length * 0.6;
+  // Penalize for manufactured markers (reduced penalties)
+  authenticityScore -= Math.min(3, manufacturedFound.length * 0.3);  // Reduced from 0.4
+  authenticityScore -= forcedArcFound.length * 0.6;  // Reduced from 0.8
+  authenticityScore -= abstractSensoryFound.length * 0.5;  // Only penalize abstract sensory
+  authenticityScore -= redFlags.length * 0.4;  // Reduced from 0.6
 
   // Clamp to 0-10
   authenticityScore = Math.max(0, Math.min(10, authenticityScore));
@@ -254,7 +271,7 @@ export function analyzeAuthenticity(text: string): AuthenticityAnalysis {
 
   return {
     authenticity_score: authenticityScore,
-    manufactured_signals: [...manufacturedFound, ...forcedArcFound.map(p => `Pattern: ${p}`)],
+    manufactured_signals: [...manufacturedFound, ...abstractSensoryFound, ...forcedArcFound.map(p => `Pattern: ${p}`)],
     authentic_signals: [...authenticFound.map(p => `Pattern: ${p}`), ...realSpecificsFound.map(p => `Real specific: ${p}`)],
     voice_type: voiceType,
     red_flags: redFlags,

@@ -113,16 +113,77 @@ PHILOSOPHY:
 4. Find the philosophical depth - what does this reveal about human nature or the world?
 5. The hook should make readers think "Wait, WHAT?" in a good way
 
+🎯 CRITICAL SUCCESS PATTERN (Session 18 Findings):
+- GROUNDED > ABSTRACT: Use concrete technical terms (build, debug, code, system, vision) rather than mystical/abstract terms (oracle, sacred, cosmic, ethereal)
+- BRIDGE TECHNICAL + HUMAN: Connect technical work to human insight (e.g., "debugging the social operating system")
+- TARGET 7/10 ORIGINALITY: Moderate risk is optimal (not too safe, not too abstract)
+- AUTHENTICITY MATTERS MOST: Students must be able to tell this story genuinely
+
 ANGLE QUALITY LEVELS:
 
 ❌ GENERIC (Avoid): "I learned teamwork through robotics"
 ⚠️  DECENT (Predictable): "I discovered leadership when our robot failed"
 ✅ GOOD (Interesting): "I learned to debug humans, not just code"
-🌟 EXCELLENT (Memorable): "Every bug is an oracle, teaching me to ask better questions"
-🚀 EXTRAORDINARY (Never-been-done): "In the silence between compile and crash, I found my philosophy"
+🌟 EXCELLENT (Memorable - TARGET THIS): "Vision Systems and Blind Faith" - concrete technical term + human insight
+🚀 EXTRAORDINARY (Too abstract - AVOID): "The Decimal Point Oracle" - mystical metaphor without grounding
+
+⚠️ PROVEN FAILURES TO AVOID:
+- Mystical/spiritual language: oracle, prophecy, reverence, sacred, cosmic
+- Abstract geography: cartography, territories, undiscovered lands, invisible realms
+- Abstract curatorial: curator, conspiracy, alchemy, mythology
+- Overly poetic: ephemeral, ethereal, luminous, crystalline, sublime
+
+✅ PROVEN SUCCESS PATTERNS (from Harvard/Stanford/MIT/Yale admitted students):
+
+**Archetype 1 - The Awakening (7/10 orig):**
+- Pattern: Observing someone/something → Personal realization → Changed trajectory
+- Example: "Watching physicist work sparked my own physics awakening"
+- Key: External catalyst + emotional progression + concrete transformation
+
+**Archetype 2 - The Visceral Truth (7-8/10 orig):**
+- Pattern: Shocking sensory experience → Deeper understanding → Philosophical insight
+- Example: "Gangrene surgery showed me the moral weight doctors carry"
+- Key: Vivid sensory details + vulnerability + mature perspective
+
+**Archetype 3 - The Systems Thinker (8/10 orig):**
+- Pattern: Multiple experiences → Single unifying principle → Broader application
+- Example: "Nonprofit work + research lab both taught me: small changes = immense impacts"
+- Key: Intellectual synthesis + pattern recognition + maturity
+
+**Archetype 4 - Vulnerability as Strength (7-8/10 orig):**
+- Pattern: Personal struggle → Creative response → Helping others
+- Example: "Domestic chaos → Writing as escape → Platform to help others"
+- Key: Transforms adversity into agency + shows impact + demonstrates growth
+
+**Archetype 5 - Failure → Growth (7/10 orig - SAFEST, MOST ACCESSIBLE):**
+- Pattern: Dramatic failure → External support → Overcoming deeper fear
+- Example: "Failed painting → Friend's encouragement → Conquering self-doubt, not technique"
+- Key: Vulnerability + human connection + concrete skill development
+
+**Archetype 6 - Technical → Human Bridge (7/10 orig - BEST FOR STEM):**
+- Pattern: Technical work reveals human insight
+- Examples:
+  * "Debugging code taught me to debug relationships"
+  * "Flow cytometry taught me patience and precision apply beyond the lab"
+  * "Robot vision system showed me I'd been blind to team dynamics"
+- Key: Concrete technical term/process → Human quality/understanding
+
+**CRITICAL REQUIREMENTS:**
+1. START with specific visualizable moment (not abstract concept)
+2. INCLUDE sensory detail potential ("smell of burnt circuits", "silence of failed code")
+3. SHOW external catalyst (person, shocking event, observation - not pure introspection)
+4. BRIDGE concrete experience → universal insight clearly
+5. TARGET 7/10 originality (memorable but authentic)
+6. USE grounded verbs (build, debug, create, fix) NOT abstract nouns (curator, oracle, conspiracy)
 
 YOUR TASK:
-Generate angles that are EXCELLENT or EXTRAORDINARY. Make admissions officers pause and think.`;
+Generate angles following these PROVEN ARCHETYPES from successful essays. Each angle must:
+- Start with a CONCRETE, SENSORY moment
+- Have an EXTERNAL catalyst (not just internal reflection)
+- Bridge SPECIFIC experience → UNIVERSAL insight
+- Target 7/10 originality (the sweet spot for authenticity + memorability)
+- Use GROUNDED language that students can authentically tell`;
+
 
 // ============================================================================
 // PROMPT BUILDER
@@ -160,8 +221,10 @@ REQUIREMENTS:
 1. Each angle must be COMPLETELY DIFFERENT from the others
 2. Avoid clichés: "passion", "journey", "adversity", "leadership", "teamwork"
 3. Find unexpected connections (e.g., robotics → philosophy, not robotics → engineering)
-4. ${prioritize === 'originality' ? 'Prioritize MAXIMUM originality - be bold!' : prioritize === 'safety' ? 'Balance originality with accessibility' : 'Maximize philosophical depth'}
+4. ${prioritize === 'originality' ? 'Target 7/10 originality with GROUNDED language (not 9/10 abstract)' : prioritize === 'safety' ? 'Target 6-7/10 originality with maximum grounding' : 'Maximize philosophical depth BUT keep it grounded in concrete terms'}
 5. The hook must be gripping - make me want to read more
+6. CRITICAL: Use CONCRETE technical verbs (build, debug, fix, create, design) NOT abstract nouns (curator, oracle, conspiracy, cartography)
+7. BRIDGE technical + human domains explicitly (e.g., "debugging social systems", "engineering empathy")
 
 Return a JSON array where each angle is an object with these EXACT fields:
 {

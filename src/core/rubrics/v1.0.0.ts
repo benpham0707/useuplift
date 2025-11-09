@@ -19,6 +19,7 @@ import { RubricCategory } from '../types/experience';
 
 export const RUBRIC_VERSION = 'v1.0.0';
 
+// Default weights (balanced for leadership/service activities)
 export const RUBRIC_WEIGHTS: Record<RubricCategory, number> = {
   voice_integrity: 0.10,
   specificity_evidence: 0.09,
@@ -37,6 +38,71 @@ export const RUBRIC_WEIGHTS: Record<RubricCategory, number> = {
 const totalWeight = Object.values(RUBRIC_WEIGHTS).reduce((sum, w) => sum + w, 0);
 if (Math.abs(totalWeight - 1.0) > 0.001) {
   throw new Error(`Rubric weights must sum to 1.0, got ${totalWeight}`);
+}
+
+// ============================================================================
+// ADAPTIVE WEIGHTS BY ACTIVITY TYPE
+// ============================================================================
+
+/**
+ * Adaptive weighting based on activity category
+ * Different activities emphasize different strengths
+ */
+export const ADAPTIVE_WEIGHTS: Record<string, Partial<Record<RubricCategory, number>>> = {
+  // Leadership/Service: Default weights (no override)
+  leadership: {},
+  service: {},
+
+  // Work (part-time jobs): Lower leadership/fit expectations, higher voice/reflection
+  work: {
+    initiative_leadership: 0.06,     // Down from 0.10
+    fit_trajectory: 0.04,             // Down from 0.07
+    voice_integrity: 0.13,            // Up from 0.10
+    reflection_meaning: 0.15,         // Up from 0.12
+    community_collaboration: 0.10,    // Up from 0.08 (customer/coworker connections)
+  },
+
+  // Arts/Personal pursuits: Lower leadership, higher craft/meaning
+  arts: {
+    initiative_leadership: 0.05,      // Down from 0.10
+    role_clarity_ownership: 0.05,     // Down from 0.08
+    craft_language_quality: 0.10,     // Up from 0.07
+    reflection_meaning: 0.15,         // Up from 0.12
+    fit_trajectory: 0.09,             // Up from 0.07 (artistic trajectory matters)
+  },
+
+  // Research/Academic: Higher evidence, lower community
+  research: {
+    specificity_evidence: 0.12,       // Up from 0.09
+    community_collaboration: 0.05,    // Down from 0.08
+    initiative_leadership: 0.12,      // Up from 0.10 (intellectual initiative)
+  },
+
+  // Athletics: Lower reflection, higher time/community
+  athletics: {
+    reflection_meaning: 0.08,         // Down from 0.12
+    time_investment_consistency: 0.11, // Up from 0.07
+    community_collaboration: 0.11,    // Up from 0.08
+  },
+};
+
+/**
+ * Get appropriate weights for an activity category
+ */
+export function getWeightsForCategory(category: string): Record<RubricCategory, number> {
+  const baseWeights = { ...RUBRIC_WEIGHTS };
+  const overrides = ADAPTIVE_WEIGHTS[category] || {};
+
+  // Apply overrides
+  const adjusted = { ...baseWeights, ...overrides };
+
+  // Verify still sums to 1.0
+  const sum = Object.values(adjusted).reduce((s, w) => s + w, 0);
+  if (Math.abs(sum - 1.0) > 0.001) {
+    console.warn(`Adaptive weights for category "${category}" sum to ${sum}, not 1.0`);
+  }
+
+  return adjusted as Record<RubricCategory, number>;
 }
 
 // ============================================================================
@@ -468,18 +534,22 @@ const DISPLAY_NAME_TO_KEY: Record<string, RubricCategory> = Object.entries(RUBRI
 /**
  * Calculate Narrative Quality Index (0-100) from category scores
  */
-export function calculateNQI(categoryScores: Record<string, number>): number {
+export function calculateNQI(
+  categoryScores: Record<string, number>,
+  customWeights?: Record<RubricCategory, number>
+): number {
+  const weights = customWeights || RUBRIC_WEIGHTS;
   let weightedSum = 0;
 
   for (const [category, score] of Object.entries(categoryScores)) {
     // Try to find weight by key first, then by display name
-    let weight = RUBRIC_WEIGHTS[category as RubricCategory];
+    let weight = weights[category as RubricCategory];
 
     if (weight === undefined) {
       // Try mapping from display name
       const categoryKey = DISPLAY_NAME_TO_KEY[category];
       if (categoryKey) {
-        weight = RUBRIC_WEIGHTS[categoryKey];
+        weight = weights[categoryKey];
       }
     }
 

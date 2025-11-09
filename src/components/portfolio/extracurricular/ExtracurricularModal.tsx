@@ -5,15 +5,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
-import { Gauge, Layers, Target, Sparkles, Info, CheckCircle2 } from 'lucide-react';
-import GradientText from '@/components/ui/GradientText';
+import { Gauge, Building2, Info, Award } from 'lucide-react';
 import { ExtracurricularItem } from './ExtracurricularCard';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ExtracurricularWorkshopNew as ExtracurricularWorkshop } from './workshop/ExtracurricularWorkshopNew';
+import { ExperienceEntry } from '@/core/types/experience';
+import GradientText from '@/components/ui/GradientText';
 
 interface ExtracurricularModalProps {
   activity: ExtracurricularItem | null;
@@ -28,273 +28,414 @@ const getScoreColor = (score: number) => {
   return 'text-muted-foreground';
 };
 
-export const ExtracurricularModal: React.FC<ExtracurricularModalProps> = ({ activity, open, onOpenChange }) => {
-  const [draft, setDraft] = React.useState<string>('');
+/**
+ * Convert ExtracurricularItem to ExperienceEntry format for workshop
+ */
+function convertToExperienceEntry(activity: ExtracurricularItem): ExperienceEntry {
+  const description =
+    activity.applicationGuidance?.whyItMatters ||
+    activity.description ||
+    `${activity.role} at ${activity.organization}. ${activity.scores.commitment.hoursPerWeek} hours/week for ${activity.scores.commitment.weeksPerYear} weeks/year.`;
 
-  React.useEffect(() => {
-    if (!activity) return;
-    // Seed draft from existing guidance if available
-    const seed = activity.applicationGuidance?.whyItMatters || '';
-    setDraft(seed);
-  }, [activity]);
+  return {
+    id: activity.id,
+    user_id: 'current-user',
+    title: activity.name,
+    organization: activity.organization || '',
+    role: activity.role || '',
+    category: activity.category as any,
+    description_original: description,
+    hours_per_week: activity.scores.commitment.hoursPerWeek,
+    weeks_per_year: activity.scores.commitment.weeksPerYear,
+    start_date: activity.dateRange?.start || '',
+    end_date: activity.dateRange?.end || 'Present',
+    time_span: `${activity.dateRange?.start || ''} - ${activity.dateRange?.end || 'Present'}`,
+    version: 1,
+  };
+}
+
+export const ExtracurricularModal: React.FC<ExtracurricularModalProps> = ({
+  activity,
+  open,
+  onOpenChange
+}) => {
+  const handleSave = (updatedEntry: ExperienceEntry) => {
+    // Update activity with new description
+    // In production, this would call an API to persist changes
+    console.log('Saving updated description:', updatedEntry.description_original);
+  };
 
   if (!activity) return null;
 
-  const contribution = activity.scores.portfolioContribution;
-  const contributionOverall = Number(contribution.overall?.toFixed(1));
+  const { scores } = activity;
+  const scoreColor = getScoreColor(scores.portfolioContribution.overall);
 
-  const colorForScore = (s: number) => getScoreColor(s);
-
-  // Simple rubric for activity narrative fit using available fields
-  type RubricItem = {
-    title: string;
-    description: string;
-    weight: number;
-    score: number;
-    suggestions: string[];
+  const buildContributionOverview = () => {
+    const parts: string[] = [];
+    parts.push(`This activity earns an overall portfolio contribution score of ${scores.portfolioContribution.overall.toFixed(1)}/10.`);
+    parts.push(`Commitment depth is rated ${scores.portfolioContribution.breakdown.commitmentDepth.toFixed(1)}/10 and leadership trajectory is ${scores.portfolioContribution.breakdown.leadershipTrajectory.toFixed(1)}/10.`);
+    return parts.join(' ');
   };
 
-  const computeNarrativeRubric = (text: string): RubricItem[] => {
-    const length = text.trim().length;
-    const hasNumbers = /(\d|%)/.test(text) || (activity.scores.commitment.totalHours > 0);
-    const mentionsRole = /(I\s+(led|founded|organized|built|researched)|as (captain|president|director|founder))/i.test(text) || !!activity.role;
-    const hasCausality = /(which led to|resulted in|enabling|therefore|as a result)/i.test(text);
-    const hasReflection = /(I learned|taught me|I realized|I discovered)/i.test(text);
-    const lengthScore = length >= 80 && length <= 240 ? 8.5 : 6.5;
-
-    const items: RubricItem[] = [
-      {
-        title: 'Portfolio/Thematic Fit',
-        description: 'Connects activity to your academic spine and application themes.',
-        weight: 0.28,
-        score: Math.min(10, Math.max(5.5, 6.5 + (contribution.breakdown.narrativeAlignment / 10))),
-        suggestions: [
-          'Name your academic focus or theme explicitly (e.g., "public-interest technology").',
-          'State how this activity advances that spine in one clause.'
-        ]
-      },
-      {
-        title: 'Evidence & Specificity',
-        description: 'Uses numbers and concrete outcomes (hours, beneficiaries, metrics).',
-        weight: 0.22,
-        score: hasNumbers ? 8.5 : 5.5,
-        suggestions: [
-          `Add hours and duration (e.g., ${activity.scores.commitment.hoursPerWeek}h/wk · ${activity.scores.commitment.weeksPerYear}w/yr).`,
-          ...(activity.impactMetrics?.tangibilityLevel ? [`Mention impact tangibility: ${activity.impactMetrics.tangibilityLevel}.`] : []),
-          ...(activity.scores.impact.metrics?.[0]?.label ? [`Include one metric: ${activity.scores.impact.metrics[0].label} → ${activity.scores.impact.metrics[0].value}.`] : [])
-        ]
-      },
-      {
-        title: 'Role Clarity & Agency',
-        description: 'Crisp statement of your role and decisions you owned.',
-        weight: 0.18,
-        score: mentionsRole ? 8.0 : 5.5,
-        suggestions: [
-          'Lead with a first-person action verb: "I led", "I built", "I designed".',
-          'State one decision you made or process you owned.'
-        ]
-      },
-      {
-        title: 'Causality & Reflection',
-        description: 'Links actions to outcomes and includes one learning insight.',
-        weight: 0.18,
-        score: (hasCausality ? 8 : 6.5) + (hasReflection ? 1 : 0),
-        suggestions: [
-          'Add a cause→effect connector: "which led to" or "resulted in".',
-          'Close with one sentence on what you learned.'
-        ]
-      },
-      {
-        title: 'Tone & Economy',
-        description: 'Avoids buzzwords; concise and specific (~80–200 words).',
-        weight: 0.14,
-        score: lengthScore,
-        suggestions: [
-          'Remove adjectives like "impactful"; replace with one precise number.',
-          'Trim to essentials; prefer one metric over two generic claims.'
-        ]
-      }
-    ];
-    return items.map(i => ({ ...i, score: Math.max(0, Math.min(10, Number(i.score.toFixed(1)))) }));
+  const getTierSummary = (overall: number) => {
+    if (overall >= 9) return { label: 'Exceptional', context: 'top few percent of high school extracurriculars' };
+    if (overall >= 8) return { label: 'Top-tier', context: 'well above most activities listed by applicants' };
+    if (overall >= 7) return { label: 'Strong', context: 'notable and above average among peers' };
+    return { label: 'Moderate', context: 'competitive but common in selective applicant pools' };
   };
 
-  const rubric = computeNarrativeRubric(draft || '');
-  const weightedOverall = Math.max(0, Math.min(10, Number((rubric.reduce((acc, r) => acc + r.score * r.weight, 0) / rubric.reduce((a, r) => a + r.weight, 0)).toFixed(1))));
+  const getPercentileBand = (overall: number) => {
+    if (overall >= 9.5) return '≈ top 1-2%';
+    if (overall >= 9) return '≈ top 3-5%';
+    if (overall >= 8.5) return '≈ top 6-10%';
+    if (overall >= 8) return '≈ top 11-15%';
+    if (overall >= 7.5) return '≈ top 20-25%';
+    if (overall >= 7) return '≈ top 30%';
+    return '≈ top 50%';
+  };
+
+  const buildComparativeText = () => {
+    const { overall, breakdown } = scores.portfolioContribution;
+    const tier = getTierSummary(overall);
+    const pieces: string[] = [];
+    pieces.push(`${tier.label} relative standing — ${tier.context}.`);
+
+    const commitmentLevel = breakdown.commitmentDepth >= 9 ? 'exceptional' : breakdown.commitmentDepth >= 8 ? 'strong' : breakdown.commitmentDepth >= 7 ? 'credible' : 'emerging';
+    pieces.push(`Commitment depth is ${commitmentLevel} (${breakdown.commitmentDepth.toFixed(1)}/10), and leadership trajectory indicates ${(breakdown.leadershipTrajectory >= 8 ? 'significant growth and responsibility' : breakdown.leadershipTrajectory >= 7 ? 'notable development' : 'steady participation')} (${breakdown.leadershipTrajectory.toFixed(1)}/10).`);
+    return pieces.join(' ');
+  };
+
+  const buildOfficerImplication = () => {
+    const overall = scores.portfolioContribution.overall;
+    const tier = getTierSummary(overall).label.toLowerCase();
+    const commitment = scores.portfolioContribution.breakdown.commitmentDepth;
+    const leadership = scores.portfolioContribution.breakdown.leadershipTrajectory;
+
+    const commitmentRead = commitment >= 9 ? 'deep, sustained commitment' : commitment >= 8 ? 'strong commitment' : commitment >= 7 ? 'credible involvement' : 'moderate engagement';
+    const leadershipRead = leadership >= 9 ? 'exceptional growth trajectory' : leadership >= 8 ? 'notable leadership development' : leadership >= 7 ? 'steady progression' : 'consistent participation';
+
+    const leadTreatment = overall >= 9 ? 'centerpiece activity' : overall >= 8 ? 'primary supporting activity' : overall >= 7 ? 'supporting activity' : 'context activity';
+
+    const s1 = `Reads as a ${tier} activity and will be handled as a ${leadTreatment} in file.`;
+    const s2 = `With ${commitmentRead} and ${leadershipRead}, this demonstrates sustained engagement rather than surface-level participation.`;
+    const s3 = overall >= 9
+      ? 'Frames the applicant as deeply invested with tangible outcomes; reviewers expect brief evidence of impact rather than lengthy justification.'
+      : overall >= 8
+      ? 'Frames the applicant as committed and growing; reviewers will look for concise evidence of progression and outcomes.'
+      : overall >= 7
+      ? 'Frames the applicant as credibly involved; reviewers will weight sustained engagement and specific contributions.'
+      : 'Adds breadth but is unlikely to differentiate; reviewers will look for concrete impact or leadership pairing to elevate significance.';
+
+    return `${s1} ${s2} ${s3}`;
+  };
+
+  const getPositionVerdict = () => {
+    const overall = scores.portfolioContribution.overall;
+    const narrative = scores.portfolioContribution.breakdown.narrativeAlignment;
+    if (overall >= 9 && narrative >= 8) {
+      return { label: 'Flagship candidate', level: 'flagship', rationale: 'very high contribution paired with strong relevance to the academic narrative' };
+    }
+    if (overall >= 8 && narrative >= 7) {
+      return { label: 'Primary supporting (bridge)', level: 'bridge', rationale: 'strong sustained engagement with good thematic fit' };
+    }
+    if (overall >= 7 && narrative >= 6) {
+      return { label: 'Supporting activity', level: 'support', rationale: 'credible involvement that adds context but does not define the narrative' };
+    }
+    if (narrative < 5) {
+      return { label: 'Low relevance (footnote)', level: 'footnote', rationale: 'impact is difficult to connect to intended major or story' };
+    }
+    return { label: 'Context activity', level: 'context', rationale: 'helpful breadth but unlikely to influence a committee decision by itself' };
+  };
+
+  const buildUpgradeAdvice = () => {
+    const { breakdown } = scores.portfolioContribution;
+    const suggestions: string[] = [];
+    if (breakdown.narrativeAlignment < 7) {
+      suggestions.push('Increase relevance: tie outcomes directly to intended major (e.g., project application, research continuation, or domain-specific contribution).');
+    }
+    if (breakdown.leadershipTrajectory < 8) {
+      suggestions.push('Pursue expanded leadership responsibility or initiate a new dimension within the activity.');
+    }
+    if (breakdown.impactScale < 8) {
+      suggestions.push('Document broader reach or measurable outcomes to signal scalable impact beyond individual participation.');
+    }
+    return suggestions.length ? suggestions.join(' ') : 'Maintain trajectory and document outcomes; current positioning is already strong.';
+  };
+
+  const buildCommitmentInsight = () => {
+    const c = scores.portfolioContribution.breakdown.commitmentDepth;
+    const hours = scores.commitment.totalHours;
+    return `Scored ${c.toFixed(1)}/10 based on ${hours.toLocaleString()} total hours. This indicates sustained, deep investment rather than superficial participation, elevating credibility.`;
+  };
+
+  const buildLeadershipInsight = () => {
+    const l = scores.portfolioContribution.breakdown.leadershipTrajectory;
+    const band = l >= 9 ? 'exceptional growth' : l >= 8 ? 'strong progression' : l >= 7 ? 'steady development' : 'consistent involvement';
+    return `Scored ${l.toFixed(1)}/10 given ${band}. Activities demonstrating clear advancement in responsibility carry higher weight in committee review.`;
+  };
+
+  const buildRelevanceInsight = () => {
+    const align = scores.portfolioContribution.breakdown.narrativeAlignment;
+    return `Alignment score of ${align.toFixed(1)}/10. This makes it ${align >= 8 ? 'very easy' : align >= 7 ? 'straightforward' : align >= 6 ? 'moderately clear' : 'challenging'} for an admissions officer to connect the activity to the academic narrative and intended major.`;
+  };
+
+  // Render metric text with gradient when score is very high
+  const renderMetricText = (score: number, content: React.ReactNode, className = '') => {
+    if (score >= 9) {
+      return (
+        <GradientText
+          className={`${className}`}
+          colors={["hsl(250 70% 60%)","hsl(185 80% 55%)","hsl(280 90% 65%)","hsl(250 70% 60%)"]}
+          textOnly
+        >
+          {content}
+        </GradientText>
+      );
+    }
+    return <span className={`${getScoreColor(score)} ${className}`}>{content}</span>;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl p-0 overflow-hidden">
-        <DialogHeader className="px-6 pt-6">
-          <DialogTitle className="flex items-center gap-2">
-            <Gauge className="w-5 h-5 text-primary" />
-            <span>{activity.name}</span>
-            <Badge variant="secondary" className="ml-2">{activity.category}</Badge>
-          </DialogTitle>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <DialogTitle className="text-3xl font-extrabold leading-tight bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+                {activity.name}
+              </DialogTitle>
+              <div className="text-base text-muted-foreground">
+                {activity.organization} • {activity.role}
+              </div>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="px-6 pb-6">
-          <Tabs defaultValue="contribution">
-            <TabsList className="grid grid-cols-2 w-full">
-              <TabsTrigger value="contribution" className="flex items-center gap-2">
-                <Layers className="w-4 h-4" /> Contribution
-              </TabsTrigger>
-              <TabsTrigger value="narrative" className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" /> Narrative Workshop
-              </TabsTrigger>
+        <div className="space-y-8 pt-4">
+          <Tabs defaultValue="contribution" className="w-full space-y-6">
+            <TabsList className="grid w-full grid-cols-2 gap-1 bg-muted/50 backdrop-blur border rounded-xl p-1">
+              <TabsTrigger value="contribution" className="rounded-lg transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Portfolio Contribution</TabsTrigger>
+              <TabsTrigger value="narrative" className="rounded-lg transition-colors data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Narrative Workshop</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="contribution" className="mt-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm text-muted-foreground">Portfolio Contribution</CardTitle>
-                    <CardDescription>Overall weight in application</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {contributionOverall >= 9.0 ? (
-                      <GradientText className="text-4xl font-extrabold" colors={["hsl(250 70% 60%)","hsl(185 80% 55%)","hsl(280 90% 65%)","hsl(250 70% 60%)"]} textOnly>
-                        {contributionOverall}/10
-                      </GradientText>
-                    ) : (
-                      <div className={`text-4xl font-bold ${colorForScore(contributionOverall)}`}>{contributionOverall}/10</div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm text-muted-foreground">Commitment</CardTitle>
-                    <CardDescription>Hours and durability</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-xl font-semibold">{activity.scores.commitment.totalHours} hours</div>
-                    <div className="text-sm text-muted-foreground">{activity.scores.commitment.hoursPerWeek}h/wk · {activity.scores.commitment.weeksPerYear}w/yr</div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm text-muted-foreground">Impact</CardTitle>
-                    <CardDescription>Quantified outcomes</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className={`text-2xl font-bold ${colorForScore(activity.scores.impact.overall)}`}>{activity.scores.impact.overall.toFixed(1)}/10</div>
-                    {activity.scores.impact.metrics?.length ? (
-                      <div className="mt-2 text-sm text-muted-foreground">
-                        {activity.scores.impact.metrics.slice(0, 2).map((m, i) => (
-                          <div key={i} className="flex items-center gap-2"><Target className="w-3.5 h-3.5 text-primary" /> {m.label}: <span className="font-medium">{m.value}</span></div>
-                        ))}
+            {/* Portfolio Contribution Tab */}
+            <TabsContent value="contribution" className="space-y-6">
+              {/* Overview */}
+              <Card className="border bg-muted/20">
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between gap-6">
+                    <div className="flex items-center gap-3 md:gap-4">
+                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center">
+                        <Award className="w-6 h-6 text-primary-foreground" />
                       </div>
-                    ) : null}
-                  </CardContent>
-                </Card>
-              </div>
+                      <GradientText
+                        className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+                        colors={["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#a855f7"]}
+                      >
+                        Portfolio Contribution Overview
+                      </GradientText>
+                    </div>
+                    <div className="text-right">
+                      <div className="flex items-baseline justify-end gap-1">
+                        {scores.portfolioContribution.overall >= 9.0 ? (
+                          <GradientText
+                            className="text-4xl font-extrabold metric-value"
+                            colors={["hsl(250 70% 60%)","hsl(185 80% 55%)","hsl(280 90% 65%)","hsl(250 70% 60%)"]}
+                            textOnly
+                          >
+                            {scores.portfolioContribution.overall.toFixed(1)}
+                          </GradientText>
+                        ) : (
+                          <span className={`${scoreColor} text-4xl font-extrabold`}>{scores.portfolioContribution.overall.toFixed(1)}</span>
+                        )}
+                        <span className="text-muted-foreground font-medium">/10</span>
+                      </div>
+                      {(() => { const tier = getTierSummary(scores.portfolioContribution.overall); return (
+                        <div className="text-xs text-muted-foreground">{tier.label} • {getPercentileBand(scores.portfolioContribution.overall)}</div>
+                      ); })()}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold mb-1 text-primary">Comparative position</h4>
+                      <p className="text-sm text-foreground/80 leading-relaxed">
+                        {buildComparativeText()}
+                      </p>
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Estimated percentile</div>
+                          <div className="font-medium">{renderMetricText(scores.portfolioContribution.overall, getPercentileBand(scores.portfolioContribution.overall))}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Recommended use</div>
+                          <div className="font-medium capitalize">{activity.recommendedUse}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Commitment depth</div>
+                          <div className="font-medium">{renderMetricText(scores.portfolioContribution.breakdown.commitmentDepth, `${scores.portfolioContribution.breakdown.commitmentDepth.toFixed(1)}/10`)}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="border-t" />
+                    <div>
+                      <h4 className="text-sm font-semibold mb-1 text-primary">Positioning verdict</h4>
+                      {(() => { const v = getPositionVerdict(); return (
+                        <p className="text-sm text-foreground/80 leading-relaxed"><span className="font-medium">{v.label}.</span> This is due to {v.rationale}.</p>
+                      ); })()}
+                      <div className="mt-2 text-sm text-muted-foreground">Upgrade path: {buildUpgradeAdvice()}</div>
+                    </div>
+                    <div className="border-t" />
+                    <div>
+                      <h4 className="text-sm font-semibold mb-1 text-primary">Implications for the admissions officer</h4>
+                      <div className="space-y-2">
+                        <p className="text-sm text-foreground/80 leading-relaxed">
+                          {buildOfficerImplication()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="breakdown">
-                  <AccordionTrigger className="px-4">
-                    <div className="flex items-center gap-2"><Info className="w-4 h-4 text-primary" /> Contribution Breakdown</div>
+              {/* Specifics (stacked, single-open accordion) */}
+              <Accordion type="single" collapsible className="rounded-xl border bg-card divide-y">
+                <AccordionItem value="commitment">
+                  <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
+                    <div className="flex w-full items-center gap-3">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Gauge className="h-3.5 w-3.5" /></span>
+                      <span className="text-sm font-semibold text-primary">Commitment Depth</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground">
+                              <Info className="h-3.5 w-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="max-w-xs text-sm">Total hours and consistency of engagement; higher indicates sustained, deep investment.</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <span className="ml-auto text-xs font-semibold">{renderMetricText(scores.portfolioContribution.breakdown.commitmentDepth, `${scores.portfolioContribution.breakdown.commitmentDepth.toFixed(1)}/10`)}</span>
+                    </div>
                   </AccordionTrigger>
-                  <AccordionContent>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4">
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Commitment Depth</CardTitle>
-                          <CardDescription>Longevity and intensity</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className={`text-xl font-semibold ${colorForScore(contribution.breakdown.commitmentDepth)}`}>{contribution.breakdown.commitmentDepth.toFixed(1)}/10</div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Leadership Trajectory</CardTitle>
-                          <CardDescription>Role growth over time</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className={`text-xl font-semibold ${colorForScore(contribution.breakdown.leadershipTrajectory)}`}>{contribution.breakdown.leadershipTrajectory.toFixed(1)}/10</div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Impact Scale</CardTitle>
-                          <CardDescription>Scope of outcomes</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className={`text-xl font-semibold ${colorForScore(contribution.breakdown.impactScale)}`}>{contribution.breakdown.impactScale.toFixed(1)}/10</div>
-                        </CardContent>
-                      </Card>
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm">Narrative Alignment</CardTitle>
-                          <CardDescription>Reinforces your spine</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className={`text-xl font-semibold ${colorForScore(contribution.breakdown.narrativeAlignment)}`}>{contribution.breakdown.narrativeAlignment.toFixed(1)}/10</div>
-                        </CardContent>
-                      </Card>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-3 text-sm text-foreground/80">
+                      <h4 className="text-base font-semibold text-primary">Commitment details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Total hours</div>
+                          <div className="font-medium">{renderMetricText(scores.portfolioContribution.breakdown.commitmentDepth, `${scores.commitment.totalHours.toLocaleString()} hrs`)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Hours/week</div>
+                          <div className="font-medium">{renderMetricText(scores.portfolioContribution.breakdown.commitmentDepth, `${scores.commitment.hoursPerWeek}/week`)}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Consistency</div>
+                          <div className="font-medium">{renderMetricText(scores.commitment.consistencyScore, `${scores.commitment.consistencyScore.toFixed(1)}/10`)}</div>
+                        </div>
+                      </div>
+                      <h5 className="text-sm font-semibold text-primary">Why this scored as it did</h5>
+                      <div className="text-foreground/80">{buildCommitmentInsight()}</div>
+                      <h5 className="text-sm font-semibold mt-2 text-primary">How this strengthens the profile</h5>
+                      <div className="text-foreground/80">Deep commitment demonstrates genuine interest rather than résumé padding; this increases credibility and signals capacity for sustained academic work.</div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="leadership">
+                  <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
+                    <div className="flex w-full items-center gap-3">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Building2 className="h-3.5 w-3.5" /></span>
+                      <span className="text-sm font-semibold text-primary">Leadership Trajectory</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground">
+                              <Info className="h-3.5 w-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="max-w-xs text-sm">Growth in responsibility and role progression over time.</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <span className="ml-auto text-xs font-semibold">{renderMetricText(scores.portfolioContribution.breakdown.leadershipTrajectory, `${scores.portfolioContribution.breakdown.leadershipTrajectory.toFixed(1)}/10`)}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-3 text-sm text-foreground/80">
+                      <h4 className="text-base font-semibold text-primary">Leadership details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Current role</div>
+                          <div className="font-medium">{activity.role}</div>
+                        </div>
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Trajectory score</div>
+                          <div className="font-medium">{renderMetricText(scores.portfolioContribution.breakdown.leadershipTrajectory, `${scores.portfolioContribution.breakdown.leadershipTrajectory.toFixed(1)}/10`)}</div>
+                        </div>
+                      </div>
+                      <h5 className="text-sm font-semibold text-primary">Why this scored as it did</h5>
+                      <div className="text-foreground/80">{buildLeadershipInsight()}</div>
+                      <h5 className="text-sm font-semibold mt-2 text-primary">How this strengthens the profile</h5>
+                      <div className="text-foreground/80">Leadership progression demonstrates initiative and capacity for greater responsibility; this signals readiness for college-level independence and project ownership.</div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+
+                <AccordionItem value="relevance">
+                  <AccordionTrigger className="px-4 data-[state=open]:bg-primary/5">
+                    <div className="flex w-full items-center gap-3">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary"><Info className="h-3.5 w-3.5" /></span>
+                      <span className="text-sm font-semibold text-primary">Narrative Alignment</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="text-muted-foreground">
+                              <Info className="h-3.5 w-3.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <div className="max-w-xs text-sm">Closeness to intended major and narrative; higher means easier connection to the applicant's academic story.</div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <span className="ml-auto text-xs font-semibold">{renderMetricText(scores.portfolioContribution.breakdown.narrativeAlignment, `${scores.portfolioContribution.breakdown.narrativeAlignment.toFixed(1)}/10`)}</span>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-4">
+                    <div className="space-y-3 text-sm text-foreground/80">
+                      <h4 className="text-base font-semibold text-primary">Narrative alignment details</h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Alignment score</div>
+                          <div className="font-medium">{renderMetricText(scores.portfolioContribution.breakdown.narrativeAlignment, `${scores.portfolioContribution.breakdown.narrativeAlignment.toFixed(1)}/10`)}</div>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <div className="text-[11px] uppercase tracking-wide text-muted-foreground">Category</div>
+                          <div className="font-medium capitalize">{activity.category}</div>
+                        </div>
+                      </div>
+                      <h5 className="text-sm font-semibold text-primary">Why this scored as it did</h5>
+                      <div className="text-foreground/80">{buildRelevanceInsight()}</div>
+                      <h5 className="text-sm font-semibold mt-2 text-primary">How this strengthens the profile</h5>
+                      <div className="text-foreground/80">High relevance reduces cognitive load for the admissions officer, making the case for fit and progression more immediate across the application.</div>
                     </div>
                   </AccordionContent>
                 </AccordionItem>
               </Accordion>
+
             </TabsContent>
 
-            <TabsContent value="narrative" className="mt-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  <Card className="shadow-sm border-0">
-                    <CardHeader>
-                      <CardTitle>Narrative Draft</CardTitle>
-                      <CardDescription>Write a concise, evidence-based description</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <Textarea
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        placeholder="Describe your activity with metrics, role, and outcomes..."
-                        className="min-h-[220px]"
-                      />
-                      <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                        <div>
-                          Word count: {draft.trim().split(/\s+/).filter(Boolean).length}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <CheckCircle2 className={`w-4 h-4 ${weightedOverall >= 8 ? 'text-green-600' : 'text-muted-foreground'}`} />
-                          <span>Rubric score: {weightedOverall.toFixed(1)}/10</span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                <div className="lg:col-span-1 space-y-4">
-                  {rubric.map((r, idx) => (
-                    <Card key={idx} className="shadow-sm border-0">
-                      <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-sm">{r.title}</CardTitle>
-                          <div className={`text-sm font-semibold ${colorForScore(r.score)}`}>{r.score.toFixed(1)}/10</div>
-                        </div>
-                        <CardDescription>{r.description}</CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                          {r.suggestions.map((s, i) => (
-                            <li key={i}>{s}</li>
-                          ))}
-                        </ul>
-                        <div className="mt-3">
-                          <Button size="sm" variant="secondary" onClick={() => {
-                            const withTip = draft ? `${draft} ${r.suggestions[0]}` : r.suggestions[0];
-                            setDraft(withTip);
-                          }}>Apply tip</Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </div>
+            {/* Narrative Workshop Tab */}
+            <TabsContent value="narrative" className="space-y-6">
+              <ExtracurricularWorkshop activity={activity} />
             </TabsContent>
+
           </Tabs>
         </div>
       </DialogContent>
@@ -303,10 +444,3 @@ export const ExtracurricularModal: React.FC<ExtracurricularModalProps> = ({ acti
 };
 
 export default ExtracurricularModal;
-
-
-
-
-
-
-

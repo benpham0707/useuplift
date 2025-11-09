@@ -1,0 +1,362 @@
+API server listening on :8789
+
+================================================================================
+ANALYZING ENTRY: Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (2ms)
+  - Word count: 26
+  - Active verbs: 2, Passive: 0
+  - Numbers found: 4
+  - Reflection quality: none
+  - Authenticity score: 6.5/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry test-frontend...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+Validation warnings: Reflection & Meaning: missing evidence snippets (may be acceptable for very weak entries)
+✓ Stage 2 complete (7863ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 2 → 2.5 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: service
+✓ Stage 4 complete (1ms)
+  - NQI: 14.7/100
+  - Label: generic_unclear
+  - Flags: 10
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 11240ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Test Activity
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (2ms)
+  - Word count: 3
+  - Active verbs: 0, Passive: 0
+  - Numbers found: 0
+  - Reflection quality: none
+  - Authenticity score: 6/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry test-1...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+✓ Stage 2 complete (6412ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Using adaptive weights for category: service
+✓ Stage 4 complete (0ms)
+  - NQI: 1.2/100
+  - Label: generic_unclear
+  - Flags: 11
+
+✓ Coaching generated: 5 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 9482ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Community Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (0ms)
+  - Word count: 26
+  - Active verbs: 2, Passive: 0
+  - Numbers found: 4
+  - Reflection quality: none
+  - Authenticity score: 6.5/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry tutoring-platform...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+Validation warnings: Reflection & Meaning: missing evidence snippets (may be acceptable for very weak entries)
+✓ Stage 2 complete (9643ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 2 → 2.5 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: academic
+✓ Stage 4 complete (0ms)
+  - NQI: 15.4/100
+  - Label: generic_unclear
+  - Flags: 10
+
+✓ Coaching generated: 4 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 12930ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Community Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (1ms)
+  - Word count: 26
+  - Active verbs: 2, Passive: 0
+  - Numbers found: 4
+  - Reflection quality: none
+  - Authenticity score: 6.5/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry tutoring-platform...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+Validation warnings: Reflection & Meaning: missing evidence snippets (may be acceptable for very weak entries)
+✓ Stage 2 complete (8401ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 2 → 2.5 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: academic
+✓ Stage 4 complete (1ms)
+  - NQI: 14.7/100
+  - Label: generic_unclear
+  - Flags: 10
+
+✓ Coaching generated: 4 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 12012ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Community Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (0ms)
+  - Word count: 26
+  - Active verbs: 2, Passive: 0
+  - Numbers found: 4
+  - Reflection quality: none
+  - Authenticity score: 6.5/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry tutoring-platform...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+Validation warnings: Reflection & Meaning: missing evidence snippets (may be acceptable for very weak entries)
+✓ Stage 2 complete (7991ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 2 → 2.5 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: academic
+✓ Stage 4 complete (0ms)
+  - NQI: 15.3/100
+  - Label: generic_unclear
+  - Flags: 10
+
+✓ Coaching generated: 4 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 11087ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Community Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (3ms)
+  - Word count: 116
+  - Active verbs: 1, Passive: 0
+  - Numbers found: 1
+  - Reflection quality: moderate
+  - Authenticity score: 6.8/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry tutoring-platform...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+✓ Stage 2 complete (9318ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 7.2 → 7.7 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: academic
+✓ Stage 4 complete (0ms)
+  - NQI: 63.7/100
+  - Label: patchy_narrative
+  - Flags: 3
+
+✓ Coaching generated: 2 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 13623ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Community Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (2ms)
+  - Word count: 116
+  - Active verbs: 1, Passive: 0
+  - Numbers found: 1
+  - Reflection quality: moderate
+  - Authenticity score: 6.8/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry tutoring-platform...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+✓ Stage 2 complete (10921ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 7.2 → 7.7 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: academic
+✓ Stage 4 complete (1ms)
+  - NQI: 63.5/100
+  - Label: patchy_narrative
+  - Flags: 3
+
+✓ Coaching generated: 2 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 15171ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: Community Tutoring Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (0ms)
+  - Word count: 26
+  - Active verbs: 2, Passive: 0
+  - Numbers found: 4
+  - Reflection quality: none
+  - Authenticity score: 6.5/10 (conversational)
+  - Red flags: 0, Green flags: 0
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry tutoring-platform...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+Validation warnings: Reflection & Meaning: missing evidence snippets (may be acceptable for very weak entries)
+✓ Stage 2 complete (8340ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 2 → 2.5 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: academic
+✓ Stage 4 complete (0ms)
+  - NQI: 15.7/100
+  - Label: generic_unclear
+  - Flags: 10
+
+✓ Coaching generated: 4 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 11696ms
+================================================================================
+
+
+================================================================================
+ANALYZING ENTRY: TutorConnect Platform
+================================================================================
+
+Stage 1: Feature Extraction + Authenticity Detection...
+✓ Stage 1 complete (1ms)
+  - Word count: 133
+  - Active verbs: 0, Passive: 0
+  - Numbers found: 4
+  - Reflection quality: moderate
+  - Authenticity score: 7.2/10 (conversational)
+  - Red flags: 0, Green flags: 1
+
+Stage 2: Parallel Category Scoring (3 batches)...
+Scoring all categories for entry test-versioning-12345...
+Missing category scores: voice_integrity, specificity_evidence, transformative_impact, role_clarity_ownership, narrative_arc_stakes, initiative_leadership, community_collaboration, reflection_meaning, craft_language_quality, fit_trajectory, time_investment_consistency
+Scored 11 categories successfully
+✓ Stage 2 complete (16268ms)
+  - Scored 11 categories in 3 parallel batches
+
+Running deep reflection analysis (initial score < 6)...
+
+Stage 4: NQI Calculation & Diagnostics...
+Applying authenticity-based adjustments...
+  - Voice Integrity: 7.2 → 7.7 (+0.5)
+  - Reason: Good authentic voice (+0.5 boost)
+  - Using adaptive weights for category: service
+✓ Stage 4 complete (1ms)
+  - NQI: 64/100
+  - Label: patchy_narrative
+  - Flags: 3
+
+✓ Coaching generated: 3 issues detected
+
+================================================================================
+ANALYSIS COMPLETE
+Total time: 20792ms
+================================================================================
+
