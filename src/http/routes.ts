@@ -301,13 +301,16 @@ r.post("/analyze-entry", async (req, res) => {
       });
     } catch (llmErr: any) {
       const msg = String(llmErr?.message || llmErr || '');
-      const isCreditIssue =
+      const isApiIssue =
         msg.includes('credit balance') ||
         msg.includes('insufficient') ||
         msg.includes('invalid_request_error') ||
-        msg.includes('Claude API error: 400');
+        msg.includes('authentication_error') ||
+        msg.includes('invalid x-api-key') ||
+        msg.includes('Claude API error: 400') ||
+        msg.includes('Claude API error: 401');
 
-      if (isCreditIssue) {
+      if (isApiIssue) {
         // STRICT HEURISTIC FALLBACK on credit error - matches our brutal scoring philosophy
         const text: string = String(entryObj.description_original || '');
         const wc = text.trim().split(/\s+/).filter(Boolean).length;
