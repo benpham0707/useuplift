@@ -115,9 +115,9 @@ export async function callClaude<T = any>(
       ...(systemMessages.length > 0 && { system: systemMessages as any }),
     };
 
-    // Make API call with timeout (10 seconds)
+    // Make API call with timeout (5 seconds to enable fast fallback when API key has no credits)
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Claude API call timed out after 10 seconds')), 10000)
+      setTimeout(() => reject(new Error('Claude API call timed out after 5 seconds')), 5000)
     );
     const response = await Promise.race([
       client.messages.create(requestParams),

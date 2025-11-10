@@ -307,6 +307,8 @@ r.post("/analyze-entry", async (req, res) => {
         msg.includes('invalid_request_error') ||
         msg.includes('authentication_error') ||
         msg.includes('invalid x-api-key') ||
+        msg.includes('timed out') ||
+        msg.includes('timeout') ||
         msg.includes('Claude API error: 400') ||
         msg.includes('Claude API error: 401');
 
