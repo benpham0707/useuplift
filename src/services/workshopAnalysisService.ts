@@ -109,12 +109,25 @@ export async function analyzeExtracurricularEntry(
 
   try {
     // Fast fail if backend is not reachable to avoid long UI hangs
-    try {
-      const healthRes = await fetch('/api/v1/health', { signal: AbortSignal.timeout(3000) });
-      if (!healthRes.ok) {
-        throw new Error('Health check failed');
+    // Try multiple health check paths with increased timeout
+    let healthCheckPassed = false;
+    const healthPaths = ['/api/v1/health', '/api/health'];
+
+    for (const path of healthPaths) {
+      try {
+        console.log(`[Health Check] Trying ${path}...`);
+        const healthRes = await fetch(path, { signal: AbortSignal.timeout(10000) });
+        if (healthRes.ok) {
+          console.log(`[Health Check] ✅ Success via ${path}`);
+          healthCheckPassed = true;
+          break;
+        }
+      } catch (err) {
+        console.log(`[Health Check] ❌ Failed via ${path}:`, err);
       }
-    } catch {
+    }
+
+    if (!healthCheckPassed) {
       throw new Error(
         'Analysis server not reachable. Start it with "npm run server" or use "npm run dev:full".'
       );
