@@ -18,8 +18,17 @@ r.patch("/experiences/:id", requireAuth, Exp.update);
 r.get("/analytics/portfolio-strength", requireAuth, computePortfolioStrength);
 r.post("/analytics/reconcile", requireAuth, reconcilePortfolioStrength);
 
-// Extracurricular analysis (dev/prototype endpoint - no auth for now)
-// Support both /analyze-entry (frontend) and /analyze/extracurricular (legacy)
+// ============================================================================
+// Extracurricular Analysis Endpoint
+// ============================================================================
+// IMPORTANT: This endpoint has 3 fallback paths that ALL must return 11 rubric dimensions:
+//   1. Quick depth (intentional - saves API credits)
+//   2. No API key (emergency fallback)
+//   3. API error/timeout (catches auth errors, credit issues, timeouts)
+//
+// PROPER FIX: Add credits to ANTHROPIC_API_KEY to use sophisticated 19-iteration system.
+// Current issue: API key has no credits, so system uses heuristic fallback.
+// ============================================================================
 r.post("/analyze-entry", async (req, res) => {
   try {
     // Frontend sends: {description, activity, depth, skip_coaching}
@@ -46,7 +55,11 @@ r.post("/analyze-entry", async (req, res) => {
       skip_coaching: skip_coaching || false,
     };
 
-    // If caller requests quick depth, always use heuristic (no paid credits)
+    // ============================================================================
+    // FALLBACK PATH #1: Quick Depth (Intentional - saves API credits)
+    // ============================================================================
+    // CRITICAL: This MUST return all 11 rubric dimensions to match the full system.
+    // If you modify this, verify all 11 categories are present or frontend will break.
     if ((analysisOptions.depth || 'standard') === 'quick') {
       // STRICT HEURISTIC FALLBACK - matches our brutal scoring philosophy
       const text: string = String(entryObj.description_original || '');
@@ -246,7 +259,11 @@ r.post("/analyze-entry", async (req, res) => {
       return res.json({ success: true, result: { report, authenticity, coaching, performance: { total_ms: 1200 } }, engine: 'heuristic_quick' });
     }
 
-    // Early env check for Anthropic key. Only ANTHROPIC_API_KEY is considered.
+    // ============================================================================
+    // FALLBACK PATH #2: No API Key (Emergency fallback)
+    // ============================================================================
+    // CRITICAL: This MUST return all 11 rubric dimensions to match the full system.
+    // If you modify this, verify all 11 categories are present or frontend will break.
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       // No key: still return heuristic to avoid breaking UI
@@ -440,6 +457,11 @@ r.post("/analyze-entry", async (req, res) => {
         engine: 'sophisticated_19_iteration_system'
       });
     } catch (llmErr: any) {
+      // ============================================================================
+      // FALLBACK PATH #3: API Error/Timeout (Catches auth errors, credit issues, timeouts)
+      // ============================================================================
+      // CRITICAL: This MUST return all 11 rubric dimensions to match the full system.
+      // If you modify this, verify all 11 categories are present or frontend will break.
       const msg = String(llmErr?.message || llmErr || '');
       const isApiIssue =
         msg.includes('credit balance') ||
