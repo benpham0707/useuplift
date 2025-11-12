@@ -28,6 +28,12 @@ import {
   Target,
   CheckCircle2,
   Clock,
+  Lightbulb,
+  BookOpen,
+  Brain,
+  Sparkles,
+  Zap,
+  ArrowRight,
 } from 'lucide-react';
 
 // Backend integration
@@ -35,6 +41,11 @@ import { type AnalysisResult } from './backendTypes';
 import { analyzeExtracurricularEntry } from '@/services/workshopAnalysisService';
 import { transformAnalysisToCoaching } from './teachingTransformer';
 import type { TeachingCoachingOutput, TeachingIssue } from './teachingTypes';
+import {
+  type ReflectionPromptSet,
+  generateReflectionPromptsWithCache,
+} from '@/services/workshop/reflectionPrompts';
+import WorkshopChatV3 from './components/WorkshopChatV3';
 
 interface ExtracurricularWorkshopUnifiedProps {
   activity: ExtracurricularItem;
@@ -64,6 +75,13 @@ export const ExtracurricularWorkshopUnified: React.FC<ExtracurricularWorkshopUni
   const [needsReanalysis, setNeedsReanalysis] = useState(false);
 
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  // Teaching system state
+  const [reflectionPromptsMap, setReflectionPromptsMap] = useState<Map<string, ReflectionPromptSet>>(new Map());
+  const [loadingPromptsFor, setLoadingPromptsFor] = useState<Set<string>>(new Set());
+  const [reflectionAnswers, setReflectionAnswers] = useState<Record<string, Record<string, string>>>({});
+  const [showReflectionFor, setShowReflectionFor] = useState<Set<string>>(new Set());
+  const [selectedFixStrategies, setSelectedFixStrategies] = useState<Record<string, number>>({});
 
   const reanalysisTimerRef = useRef<number | null>(null);
   const initialScoreRef = useRef<number>(0);
@@ -195,6 +213,74 @@ export const ExtracurricularWorkshopUnified: React.FC<ExtracurricularWorkshopUni
     });
   };
 
+  // Load reflection prompts for a teaching issue
+  const loadReflectionPrompts = async (issueId: string, teachingIssue: any) => {
+    if (reflectionPromptsMap.has(issueId) || loadingPromptsFor.has(issueId)) {
+      return; // Already loaded or loading
+    }
+
+    setLoadingPromptsFor(prev => new Set([...prev, issueId]));
+
+    try {
+      // Convert teachingIssue to DetectedIssue format for the generator
+      const detectedIssue = {
+        id: issueId,
+        category: teachingIssue.category || '',
+        severity: teachingIssue.severity || 'important',
+        title: teachingIssue.problem?.title || '',
+        from_draft: teachingIssue.problem?.from_draft || '',
+        problem: teachingIssue.problem?.explanation || '',
+        why_matters: teachingIssue.principle?.why_officers_care || '',
+        suggested_fixes: [],
+      };
+
+      const prompts = await generateReflectionPromptsWithCache(
+        detectedIssue as any,
+        activity as any,
+        {
+          tone: 'mentor',
+          depth: teachingIssue.severity === 'critical' ? 'deep' : 'surface',
+        }
+      );
+
+      setReflectionPromptsMap(prev => new Map(prev).set(issueId, prompts));
+    } catch (error) {
+      console.error('[Workshop] Failed to load reflection prompts:', error);
+    } finally {
+      setLoadingPromptsFor(prev => {
+        const next = new Set(prev);
+        next.delete(issueId);
+        return next;
+      });
+    }
+  };
+
+  const handleReflectionAnswerChange = (issueId: string, promptId: string, answer: string) => {
+    setReflectionAnswers(prev => ({
+      ...prev,
+      [issueId]: {
+        ...(prev[issueId] || {}),
+        [promptId]: answer,
+      },
+    }));
+  };
+
+  const toggleReflectionSection = (issueId: string, teachingIssue: any) => {
+    const isCurrentlyShown = showReflectionFor.has(issueId);
+
+    setShowReflectionFor(prev => {
+      const next = new Set(prev);
+      if (isCurrentlyShown) {
+        next.delete(issueId);
+      } else {
+        next.add(issueId);
+        // Auto-load prompts when expanding
+        loadReflectionPrompts(issueId, teachingIssue);
+      }
+      return next;
+    });
+  };
+
   // Computed values
   const currentScore = analysisResult?.analysis.narrative_quality_index || 0;
   const initialScore = initialScoreRef.current;
@@ -287,19 +373,21 @@ export const ExtracurricularWorkshopUnified: React.FC<ExtracurricularWorkshopUni
   }
 
   return (
-    <div className="space-y-6">
-      {/* Error banner */}
-      {analysisError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription className="flex items-center justify-between">
-            <span>{analysisError}</span>
-            <Button variant="outline" size="sm" onClick={() => setAnalysisError(null)}>
-              Dismiss
-            </Button>
-          </AlertDescription>
-        </Alert>
-      )}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Main Workshop Content - 2/3 width on large screens */}
+      <div className="lg:col-span-2 space-y-6">
+        {/* Error banner */}
+        {analysisError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{analysisError}</span>
+              <Button variant="outline" size="sm" onClick={() => setAnalysisError(null)}>
+                Dismiss
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
       {/* 1. HERO SECTION - Score + Progress */}
       <Card className={`border-2 ${nqiConfig.bg} border-${nqiConfig.color.split('-')[1]}-300`}>
@@ -584,40 +672,250 @@ export const ExtracurricularWorkshopUnified: React.FC<ExtracurricularWorkshopUni
                     </div>
                   )}
 
-                  {/* Teaching Issue (if exists) */}
-                  {teachingIssue && (
-                    <div className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20">
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h5 className="font-bold text-sm text-foreground mb-1">
-                            📚 Learning Opportunity
-                          </h5>
-                          <p className="text-xs text-muted-foreground">
-                            {teachingIssue.principle.name}
-                          </p>
+                  {/* Teaching Issue (if exists) - ENHANCED WITH FULL TEACHING FRAMEWORK */}
+                  {teachingIssue && (() => {
+                    const issueId = `${category.category}-${teachingIssue.principle?.name || 'issue'}`;
+                    const prompts = reflectionPromptsMap.get(issueId);
+                    const isLoadingPrompts = loadingPromptsFor.has(issueId);
+                    const showReflection = showReflectionFor.has(issueId);
+                    const issueAnswers = reflectionAnswers[issueId] || {};
+                    const selectedFixIdx = selectedFixStrategies[issueId] || 0;
+
+                    const severityConfig = (() => {
+                      const sev = teachingIssue.severity;
+                      if (sev === 'critical') return {
+                        icon: AlertCircle,
+                        color: 'text-red-600',
+                        bg: 'bg-red-50',
+                        border: 'border-red-200',
+                        label: 'Critical',
+                      };
+                      if (sev === 'major') return {
+                        icon: Zap,
+                        color: 'text-orange-600',
+                        bg: 'bg-orange-50',
+                        border: 'border-orange-200',
+                        label: 'Important',
+                      };
+                      return {
+                        icon: Lightbulb,
+                        color: 'text-blue-600',
+                        bg: 'bg-blue-50',
+                        border: 'border-blue-200',
+                        label: 'Helpful',
+                      };
+                    })();
+
+                    const SevIcon = severityConfig.icon;
+
+                    return (
+                      <div className={`p-5 rounded-lg ${severityConfig.bg} border-2 ${severityConfig.border} space-y-4 animate-in slide-in-from-bottom-2 duration-300`}>
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-3 flex-1">
+                            <div className={`p-2 rounded-lg ${severityConfig.bg} border ${severityConfig.border}`}>
+                              <SevIcon className={`w-5 h-5 ${severityConfig.color}`} />
+                            </div>
+                            <div className="flex-1">
+                              <h5 className="font-bold text-base text-foreground mb-1">
+                                {teachingIssue.problem?.title || teachingIssue.principle?.name}
+                              </h5>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={teachingIssue.severity === 'critical' ? 'destructive' : 'default'} className="text-xs">
+                                  {severityConfig.label}
+                                </Badge>
+                                <span className="text-xs text-muted-foreground">
+                                  {teachingIssue.problem?.impact_on_score}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          {teachingIssue.status === 'completed' && (
+                            <CheckCircle2 className="w-5 h-5 text-green-600 animate-in zoom-in-75 duration-300" />
+                          )}
                         </div>
-                        <Badge
-                          variant={
-                            teachingIssue.severity === 'critical'
-                              ? 'destructive'
-                              : teachingIssue.severity === 'major'
-                              ? 'default'
-                              : 'secondary'
-                          }
-                        >
-                          {teachingIssue.severity}
-                        </Badge>
+
+                        {/* FROM YOUR DRAFT */}
+                        {teachingIssue.problem?.from_draft && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <BookOpen className="w-4 h-4 text-muted-foreground" />
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                                From Your Draft
+                              </p>
+                            </div>
+                            <div className="p-3 rounded-md bg-white/60 border border-border">
+                              <p className="text-sm text-foreground/80 italic leading-relaxed">
+                                "{teachingIssue.problem.from_draft}"
+                              </p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* THE PROBLEM */}
+                        {teachingIssue.problem?.explanation && (
+                          <div className="space-y-2">
+                            <p className="text-sm text-foreground leading-relaxed">
+                              {teachingIssue.problem.explanation}
+                            </p>
+                            {teachingIssue.principle?.why_officers_care && (
+                              <div className="p-3 rounded-md bg-primary/10 border border-primary/30">
+                                <p className="text-xs font-semibold text-primary mb-1">
+                                  💡 Why Admissions Officers Care
+                                </p>
+                                <p className="text-sm text-foreground/90 leading-relaxed">
+                                  {teachingIssue.principle.why_officers_care}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* TEACHING EXAMPLE */}
+                        {teachingIssue.examples && teachingIssue.examples.length > 0 && teachingIssue.examples[0] && (
+                          <div className="space-y-3 animate-in slide-in-from-left-2 duration-500">
+                            <div className="flex items-center gap-2">
+                              <Sparkles className="w-4 h-4 text-primary" />
+                              <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                                Teaching Example: Weak → Strong
+                              </p>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-3">
+                              <div className="p-3 rounded-lg bg-red-50 border border-red-200">
+                                <p className="text-xs font-semibold text-red-700 mb-2">❌ Weak</p>
+                                <p className="text-sm text-foreground/80 italic">
+                                  "{teachingIssue.examples[0].before?.text}"
+                                </p>
+                              </div>
+                              <div className="p-3 rounded-lg bg-green-50 border border-green-200">
+                                <p className="text-xs font-semibold text-green-700 mb-2">✅ Strong</p>
+                                <p className="text-sm text-foreground/80 font-medium">
+                                  "{teachingIssue.examples[0].after?.text}"
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* REFLECTION PROMPTS SECTION */}
+                        <div className="space-y-3 pt-2 border-t-2 border-dashed border-border">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Brain className="w-4 h-4 text-primary" />
+                              <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+                                Guided Reflection
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant={showReflection ? "outline" : "default"}
+                              onClick={() => toggleReflectionSection(issueId, teachingIssue)}
+                              className="text-xs"
+                            >
+                              {showReflection ? 'Hide' : 'Start Reflection'}
+                              <ArrowRight className="w-3 h-3 ml-1" />
+                            </Button>
+                          </div>
+
+                          {showReflection && (
+                            <div className="space-y-4 animate-in slide-in-from-bottom-3 duration-500">
+                              {isLoadingPrompts && (
+                                <div className="flex items-center gap-3 p-4 rounded-lg bg-primary/5">
+                                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                                  <div>
+                                    <p className="text-sm font-semibold text-foreground">
+                                      Crafting personalized questions...
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Analyzing your specific activity to generate thoughtful prompts
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+
+                              {prompts && (
+                                <div className="space-y-4">
+                                  <div className="p-3 rounded-md bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200">
+                                    <p className="text-xs text-blue-900 leading-relaxed">
+                                      💭 <strong>These questions are tailored to your specific activity.</strong> Take time to reflect deeply.
+                                    </p>
+                                  </div>
+
+                                  {prompts.prompts.map((prompt, idx) => (
+                                    <div key={prompt.id} className="space-y-2 animate-in slide-in-from-bottom-2 duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+                                      <div className="flex items-start gap-2">
+                                        <Badge variant="outline" className="mt-1">Q{idx + 1}</Badge>
+                                        <div className="flex-1">
+                                          <p className="text-sm font-semibold text-foreground leading-relaxed mb-1">
+                                            {prompt.question}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground italic">
+                                            {prompt.purpose}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <Textarea
+                                        value={issueAnswers[prompt.id] || ''}
+                                        onChange={(e) => handleReflectionAnswerChange(issueId, prompt.id, e.target.value)}
+                                        placeholder={prompt.placeholderExample || 'Your answer...'}
+                                        className="min-h-[80px] text-sm"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-foreground/80 mb-2">
-                        {teachingIssue.problem.impact_on_score}
-                      </p>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
             </Card>
           );
         })}
+      </div>
+      </div>
+
+      {/* AI Chat Assistant - 1/3 width on large screens, sticky */}
+      <div className="lg:col-span-1">
+        <div className="sticky top-6" style={{ height: 'calc(100vh - 6rem)' }}>
+          <WorkshopChatV3
+            activity={activity}
+            currentDraft={currentDraft}
+            analysisResult={analysisResult}
+            teachingCoaching={teachingCoaching}
+            currentScore={currentScore}
+            initialScore={initialScoreRef.current}
+            hasUnsavedChanges={hasUnsavedChanges}
+            needsReanalysis={needsReanalysis}
+            reflectionPromptsMap={reflectionPromptsMap}
+            reflectionAnswers={reflectionAnswers}
+            onToggleCategory={(categoryKey) => {
+              setExpandedCategories((prev) => {
+                const next = new Set(prev);
+                if (next.has(categoryKey)) {
+                  next.delete(categoryKey);
+                } else {
+                  next.add(categoryKey);
+                }
+                return next;
+              });
+            }}
+            onLoadReflectionPrompts={async (issueId) => {
+              const issue = teachingCoaching?.teaching_issues.find((i) => i.id === issueId);
+              if (issue) {
+                await loadReflectionPrompts(issue, issueId);
+              }
+            }}
+            onTriggerReanalysis={() => {
+              if (currentDraft !== draftVersions[currentVersionIndex].text) {
+                performAnalysis(currentDraft);
+              }
+            }}
+          />
+        </div>
       </div>
     </div>
   );

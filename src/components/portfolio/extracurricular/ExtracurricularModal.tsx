@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ExtracurricularWorkshopNew as ExtracurricularWorkshop } from './workshop/ExtracurricularWorkshopNew';
+import { ExtracurricularWorkshopFinal as ExtracurricularWorkshop } from './workshop/ExtracurricularWorkshopFinal';
 import { ExperienceEntry } from '@/core/types/experience';
 import GradientText from '@/components/ui/GradientText';
 

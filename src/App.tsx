@@ -19,6 +19,8 @@ import PortfolioInsightsNew from "./pages/PortfolioInsightsNew";
 import VerifyEmail from "./pages/VerifyEmail";
 import ResetPassword from "./pages/ResetPassword";
 import RequireVerified from "@/components/RequireVerified";
+import TestTeachingUnit from "./pages/TestTeachingUnit";
+import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +47,8 @@ const App = () => (
             <Route path="/project-incubation/projects" element={<ProjectManagement />} />
             <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
+            <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

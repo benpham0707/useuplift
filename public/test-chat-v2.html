@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat V2 Real Analysis Testing</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-case {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .scenario {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .question {
+            color: #2563eb;
+            font-weight: 600;
+            margin: 15px 0 10px 0;
+        }
+        .response {
+            background: #eff6ff;
+            border-left: 4px solid #3b82f6;
+            padding: 15px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        .analysis {
+            background: #fef3c7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .check-item {
+            margin: 8px 0;
+        }
+        .check-item input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        h1 {
+            color: #1e293b;
+            border-bottom: 3px solid #3b82f6;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #334155;
+            margin-top: 0;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+        .status.weak { background: #fecaca; color: #991b1b; }
+        .status.developing { background: #fde68a; color: #92400e; }
+        .status.strong { background: #bbf7d0; color: #166534; }
+        .quote {
+            font-style: italic;
+            color: #64748b;
+            border-left: 3px solid #cbd5e1;
+            padding-left: 12px;
+            margin: 10px 0;
+        }
+        .improvements {
+            background: #dcfce7;
+            padding: 15px;
+            border-radius: 6px;
+            margin-top: 15px;
+        }
+        .improvements h3 {
+            margin-top: 0;
+            color: #166534;
+        }
+        .improvement-item {
+            margin: 8px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+        .run-test {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .run-test:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <h1>📊 Chat V2 Real Analysis Testing</h1>
+    <p>Testing the rebuilt chat system that provides actual analysis instead of templates.</p>
+
+    <button class="run-test" onclick="runAllTests()">Run All Tests</button>
+
+    <div id="test-results"></div>
+
+    <script type="module">
+        // Import the chat service (this will work when run through Vite dev server)
+        import { sendChatMessage } from '../src/services/workshop/chatService.ts';
+        import { buildWorkshopChatContext } from '../src/services/workshop/chatContext.ts';
+
+        // Test scenarios
+        const testScenarios = [
+            {
+                name: "Very Weak Narrative (15/100) - Score Question",
+                activity: { name: 'Debate Team', role: 'Member', category: 'Community Service' },
+                draft: 'I was on the debate team. We practiced every week and went to tournaments. I learned a lot about public speaking and making arguments. We won some competitions.',
+                score: 15,
+                question: "Why is my score so low?",
+                topIssue: {
+                    title: 'Add Deep Personal Reflection',
+                    severity: 'critical',
+                    problem: 'lacks reflection on meaning',
+                    fromDraft: 'I learned a lot about public speaking...'
+                },
+                expectedQualities: [
+                    'Quotes actual draft text',
+                    'Identifies specific writing problems',
+                    'Provides concrete rewrite example',
+                    'Explains WHY it\'s weak (not just "needs depth")',
+                    'Gives specific next steps',
+                    'No generic follow-up questions'
+                ]
+            },
+            {
+                name: "Basic Narrative (45/100) - Priority Question",
+                activity: { name: 'Community Garden', role: 'Founder', category: 'Community Service' },
+                draft: 'I organized volunteers and managed the garden. We planted vegetables and flowers. The community was happy. It taught me leadership skills.',
+                score: 45,
+                question: "What should I focus on first?",
+                topIssue: {
+                    title: 'Show Personal Transformation',
+                    severity: 'high',
+                    problem: 'tells what you did, not who you became',
+                    fromDraft: 'I organized volunteers and managed the garden'
+                },
+                expectedQualities: [
+                    'Quotes specific sentence from draft',
+                    'Explains concrete problem (passive voice, vague language, etc)',
+                    'Shows before/after example',
+                    'ONE priority (not list of options)',
+                    'Direct answer (not asking more questions)'
+                ]
+            },
+            {
+                name: "Good Narrative (72/100) - Improvement Question",
+                activity: { name: 'Robotics Team', role: 'Lead Engineer', category: 'STEM' },
+                draft: 'When our robot failed at regionals, I spent three nights redesigning the gripper mechanism. I tried pneumatics, then servos, finally settling on a custom gear system. Each failure taught me that engineering isn\'t about perfect designs - it\'s about rapid iteration.',
+                score: 72,
+                question: "How can I push this to the next level?",
+                topIssue: {
+                    title: 'Strengthen Emotional Maturity',
+                    severity: 'medium',
+                    problem: 'shows problem-solving but limited self-reflection',
+                    fromDraft: 'Each failure taught me that engineering isn\'t about perfect designs'
+                },
+                expectedQualities: [
+                    'Acknowledges what\'s strong',
+                    'Identifies specific missing element',
+                    'Shows what "next level" looks like with example',
+                    'Concrete task to complete',
+                    'No vague "think about" suggestions'
+                ]
+            }
+        ];
+
+        // Make functions globally available
+        window.runAllTests = async function() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<p>Running tests...</p>';
+
+            let html = '';
+
+            for (let i = 0; i < testScenarios.length; i++) {
+                const scenario = testScenarios[i];
+                html += await generateTestHTML(scenario, i + 1);
+            }
+
+            resultsDiv.innerHTML = html;
+        };
+
+        async function generateTestHTML(scenario, testNumber) {
+            // Build context
+            const context = buildWorkshopChatContext(
+                scenario.activity,
+                scenario.draft,
+                {
+                    overallScore: scenario.score,
+                    categories: [
+                        { name: 'reflection_meaning', score: 2.5, maxScore: 10 },
+                        { name: 'specificity_evidence', score: 3.0, maxScore: 10 }
+                    ]
+                },
+                {
+                    topIssues: [scenario.topIssue],
+                    quickWins: [],
+                    strategicGuidance: []
+                }
+            );
+
+            // Get response
+            let response;
+            try {
+                const result = await sendChatMessage({
+                    userMessage: scenario.question,
+                    context
+                });
+                response = result.message.content;
+            } catch (error) {
+                response = `Error: ${error.message}`;
+            }
+
+            // Determine status badge
+            let statusClass = 'weak';
+            if (scenario.score >= 60) statusClass = 'strong';
+            else if (scenario.score >= 40) statusClass = 'developing';
+
+            // Generate HTML
+            let html = `
+                <div class="test-case">
+                    <h2>Test ${testNumber}: ${scenario.name} <span class="status ${statusClass}">${scenario.score}/100</span></h2>
+
+                    <div class="scenario">
+                        <strong>Activity:</strong> ${scenario.activity.name} (${scenario.activity.role})<br>
+                        <strong>Draft Excerpt:</strong>
+                        <div class="quote">${scenario.draft}</div>
+                        <strong>Top Issue:</strong> ${scenario.topIssue.title} (${scenario.topIssue.severity})
+                    </div>
+
+                    <div class="question">Student asks: "${scenario.question}"</div>
+
+                    <div class="response">${response}</div>
+
+                    <div class="analysis">
+                        <strong>✅ Check for these qualities:</strong><br>
+            `;
+
+            scenario.expectedQualities.forEach((quality, idx) => {
+                html += `
+                    <div class="check-item">
+                        <input type="checkbox" id="test${testNumber}_q${idx}">
+                        <label for="test${testNumber}_q${idx}">${quality}</label>
+                    </div>
+                `;
+            });
+
+            html += `
+                    </div>
+
+                    <div class="improvements">
+                        <h3>🎯 Key Improvements from V1 to V2</h3>
+                        <div class="improvement-item">
+                            <strong>V1:</strong> "working on <strong>deepen intellectual analysis</strong>. The challenge is: good insight, could go deeper intellectually"
+                        </div>
+                        <div class="improvement-item">
+                            <strong>V2:</strong> Should quote actual draft, explain specific problem, show concrete rewrite
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            return html;
+        }
+
+        // Auto-run tests on load
+        window.addEventListener('load', () => {
+            setTimeout(runAllTests, 500);
+        });
+    </script>
+</body>
+</html>

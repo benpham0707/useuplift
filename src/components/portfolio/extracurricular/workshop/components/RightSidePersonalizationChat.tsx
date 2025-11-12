@@ -1,7 +1,7 @@
 // RightSidePersonalizationChat.tsx
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { MessageCircle, Send, RefreshCw } from 'lucide-react';
@@ -15,6 +15,8 @@ export default function RightSidePersonalizationChat() {
     }
   ]);
   const [userInput, setUserInput] = useState('');
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [stackHeight, setStackHeight] = useState<number>(44);
 
   const handleSendMessage = () => {
     if (userInput.trim()) {
@@ -30,6 +32,42 @@ export default function RightSidePersonalizationChat() {
       setUserInput('');
     }
   };
+
+  // Auto-resize the textarea from 1 → up to 4 lines, then scroll
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    const MIN_ROWS = 1;
+    const MAX_ROWS = 4;
+    // Reset to min rows to correctly measure scrollHeight
+    el.rows = MIN_ROWS;
+    el.style.height = 'auto';
+    const computed = window.getComputedStyle(el);
+    const lineHeight = parseFloat(computed.lineHeight || '20');
+    const paddingTop = parseFloat(computed.paddingTop || '0');
+    const paddingBottom = parseFloat(computed.paddingBottom || '0');
+    const borderTop = parseFloat(computed.borderTopWidth || '0');
+    const borderBottom = parseFloat(computed.borderBottomWidth || '0');
+    const maxHeight = lineHeight * MAX_ROWS + paddingTop + paddingBottom + borderTop + borderBottom;
+    const newHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${newHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    setStackHeight(el.getBoundingClientRect().height);
+  }, [userInput]);
+
+  // Recalculate on window resize
+  useEffect(() => {
+    const handler = () => {
+      const el = inputRef.current;
+      if (!el) return;
+      setStackHeight(el.getBoundingClientRect().height);
+    };
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+
+  const gapPx = 8; // gap-2
+  const buttonSize = Math.max(28, Math.floor((stackHeight - gapPx) / 2));
 
   return (
     <div className="w-full h-full flex flex-col border-2 border-purple-300 dark:border-purple-700 rounded-lg bg-card">
@@ -67,31 +105,29 @@ export default function RightSidePersonalizationChat() {
       </ScrollArea>
 
       {/* Chat Input */}
-      <div className="p-4 border-t flex-shrink-0">
+      <div className="p-3 border-t flex-shrink-0">
         <div className="flex gap-2 items-end">
-          <div className="flex-1">
-            <textarea
-              value={userInput}
-              onChange={(e) => setUserInput(e.target.value)}
-              placeholder="Ask me anything about your essay..."
-              onKeyPress={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage();
-                }
-              }}
-              className="w-full min-h-[80px] max-h-[120px] p-3 text-sm rounded-md border border-input bg-background resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              rows={3}
-            />
-            <p className="text-xs text-muted-foreground mt-1.5">
-              Press Enter to send, Shift+Enter for new line
-            </p>
-          </div>
-          <div className="flex flex-col gap-2">
+          <Textarea
+            ref={inputRef}
+            value={userInput}
+            onChange={(e) => setUserInput(e.target.value)}
+            placeholder="Ask me anything about your essay..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage();
+              }
+            }}
+            className="flex-1 resize-none text-sm leading-5 overflow-y-hidden"
+            rows={1}
+          />
+          <div className="flex flex-col gap-2" style={{ height: stackHeight }}>
             <Button
               onClick={handleSendMessage}
               disabled={!userInput.trim()}
-              className="bg-purple-600 hover:bg-purple-700 h-10 w-10 p-0"
+              className="bg-purple-600 hover:bg-purple-700 p-0"
+              aria-label="Send message"
+              style={{ height: buttonSize, width: buttonSize }}
             >
               <Send className="h-4 w-4" />
             </Button>
@@ -100,10 +136,12 @@ export default function RightSidePersonalizationChat() {
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-10 w-10 p-0"
+                    className="p-0"
                     onClick={() =>
                       console.log('Regenerating task based on chat discussion...')
                     }
+                    aria-label="Regenerate based on chat"
+                    style={{ height: buttonSize, width: buttonSize }}
                   >
                     <RefreshCw className="h-4 w-4" />
                   </Button>
@@ -117,6 +155,9 @@ export default function RightSidePersonalizationChat() {
             </TooltipProvider>
           </div>
         </div>
+        <p className="text-[11px] text-muted-foreground mt-1">
+          Press Enter to send, Shift+Enter for new line
+        </p>
       </div>
     </div>
   );

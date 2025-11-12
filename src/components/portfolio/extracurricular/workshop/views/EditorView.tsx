@@ -28,7 +28,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import type { TeachingIssue } from '../teachingTypes';
-import RightSidePersonalizationChat from '../components/RightSidePersonalizationChat';
 
 interface EditorViewProps {
   currentDraft: string;
@@ -89,9 +88,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const scoreChange = scoreDiff > 0 ? 'improved' : scoreDiff < 0 ? 'decreased' : 'unchanged';
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 h-full">
-      {/* Editor Panel - Narrower to give more room to chat */}
-      <div className="lg:col-span-3 space-y-4">
+    <div className="space-y-4">
         {/* Editor Header */}
         <Card className="border-2 border-primary">
           <div className="p-4">
@@ -210,14 +207,6 @@ export const EditorView: React.FC<EditorViewProps> = ({
             </div>
           </div>
         </Card>
-      </div>
-
-      {/* Chat Interface - Wider for better usability */}
-      <div className="lg:col-span-2">
-        <div className="sticky top-4 h-[600px]">
-          <RightSidePersonalizationChat />
-        </div>
-      </div>
     </div>
   );
 };
