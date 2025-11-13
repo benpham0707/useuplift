@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import ProfileCard from '@/components/portfolio/ProfileCard';
+import { InteractivePortfolioCard } from '@/components/portfolio/interactive/InteractivePortfolioCard';
 import { Rocket, Target, TrendingUp, LayoutDashboard, Award, MapPin, FileText, Lightbulb, Sparkles } from 'lucide-react';
 import { HolisticSummary, renderRich } from '../portfolioInsightsData';
 import { ChevronLeft, ChevronRight, CheckCircle, Circle, AlertTriangle } from 'lucide-react';
@@ -28,52 +28,28 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
 
   return (
     <div className="space-y-8">
-      {/* Player Card */}
-      <div className="flex justify-center">
-        <ProfileCard
-          name={'Your Portfolio'}
-          title={`${summary.tierName} • ${summary.tierPercentile}`}
-          handle="portfolio"
-          status="Analyzed"
-          avatarUrl={undefined}
-          showUserInfo={false}
-          enableTilt={true}
-          enableMobileTilt={false}
-        >
-          <div className="pc-sides">
-            <div className="pc-side-col">
-              <div className="pc-side-line">
-                <div className="pc-side-num">7.8</div>
-                <div className="pc-side-label">Academic</div>
-              </div>
-              <div className="pc-side-line">
-                <div className="pc-side-num">8.5</div>
-                <div className="pc-side-label">Readiness</div>
-              </div>
-            </div>
-            <div className="pc-side-col">
-              <div className="pc-side-line">
-                <div className="pc-side-num">8.5</div>
-                <div className="pc-side-label">Leadership</div>
-              </div>
-              <div className="pc-side-line">
-                <div className="pc-side-num">8.3</div>
-                <div className="pc-side-label">Community</div>
-              </div>
-            </div>
-          </div>
-          <div className="pc-overall-plaque">
-            <div className="pc-overall-num">{overall100}</div>
-            <div className="pc-overall-label">Overall</div>
-          </div>
-        </ProfileCard>
-      </div>
-
-      {/* Section Header */}
-      <div className="text-center space-y-2">
-        <h2 className="text-4xl md:text-5xl font-extrabold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">Your Portfolio Verdict</h2>
-        <p className="text-muted-foreground text-lg md:text-xl">The backbone of your narrative, your strengths to amplify, and critical improvements needed</p>
-      </div>
+      {/* Interactive Portfolio Card */}
+      <InteractivePortfolioCard
+        overallScore={overall100}
+        tierName={summary.tierName}
+        percentile={summary.tierPercentile}
+        metrics={{
+          academic: 7.8,
+          leadership: 8.5,
+          readiness: 8.5,
+          community: 8.3,
+          extracurricular: 9.1,
+          courseRigor: 7.5,
+        }}
+        achievements={summary.achievements || []}
+        schoolComparisons={summary.schoolComparisons || []}
+        tierProgress={{
+          currentTier: summary.tierName,
+          nextTier: 'Platinum Achiever',
+          progress: 75,
+          pointsNeeded: 8,
+        }}
+      />
 
       {/* Tab Navigation */}
       {onTabChange && (

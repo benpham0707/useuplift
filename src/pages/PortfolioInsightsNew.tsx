@@ -88,7 +88,7 @@ const PortfolioInsightsNew: React.FC = () => {
   return (
     <main role="main" className="min-h-screen bg-gradient-to-b from-background via-accent/5 to-background">
       <div className="max-w-7xl mx-auto px-4 py-8 md:py-12">
-        {/* Page Header */}
+        {/* Unified Header */}
         <div className="text-center space-y-3 mb-8">
           <div className="inline-flex items-center gap-2 bg-primary/10 text-primary px-4 py-2 rounded-full">
             <Badge variant="default" className="text-xs">
@@ -98,10 +98,10 @@ const PortfolioInsightsNew: React.FC = () => {
             <span className="text-sm font-medium">{summary.tierPercentile}</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground">
-            Portfolio Insights
+            Your Portfolio
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-            A comprehensive analysis of your application profile with actionable recommendations
+            Your application profile analyzed, scored, and compared
           </p>
         </div>
 

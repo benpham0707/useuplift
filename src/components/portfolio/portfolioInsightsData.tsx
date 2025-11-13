@@ -120,11 +120,28 @@ export interface OverarchingInsight {
   storytellingGuidance?: GuidanceInsight[];
 }
 
+// Achievement interface for gamification
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  unlocked: boolean;
+}
+
+// School comparison interface
+export interface SchoolComparison {
+  tier: string;
+  avgScore: number;
+  difference: number;
+}
+
 export interface HolisticSummary {
   overallScore: number;
   tierName: string;
   tierPercentile: string;
   profileSummary: string;
+  achievements?: Achievement[];
+  schoolComparisons?: SchoolComparison[];
   coreIdentity: KeyTakeaway;
   competitivePosition: KeyTakeaway;
   narrativeTheme: KeyTakeaway;
@@ -165,6 +182,21 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
   tierName: 'Diamond Achiever',
   tierPercentile: 'Top 15%',
   profileSummary: 'You present as a community-focused STEM leader with demonstrated technical expertise, sustained volunteer commitment, and emerging research capabilities. Your portfolio shows cross-domain versatility, positioning you competitively for Top 20 schools with reach potential for Top 10.',
+  achievements: [
+    { id: 'stem_excellence', name: 'STEM Excellence', description: 'Outstanding performance in STEM courses', unlocked: true },
+    { id: 'leadership_award', name: 'Leadership Impact', description: 'Founded and led successful student organization', unlocked: true },
+    { id: 'community_champion', name: 'Community Champion', description: 'Completed 200+ service hours', unlocked: true },
+    { id: 'national_recognition', name: 'National Recognition', description: 'Earned national-level awards', unlocked: true },
+    { id: 'perfect_attendance', name: 'Perfect Attendance', description: 'Never missed a deadline', unlocked: false },
+    { id: 'research_pioneer', name: 'Research Pioneer', description: 'Published research paper', unlocked: false },
+    { id: 'test_master', name: 'Test Master', description: 'Scored in 99th percentile', unlocked: false },
+    { id: 'multi_talented', name: 'Multi-Talented', description: 'Excelled in diverse fields', unlocked: true },
+  ],
+  schoolComparisons: [
+    { tier: 'Elite Schools (Top 10)', avgScore: 8.9, difference: -0.7 },
+    { tier: 'Target Schools (Top 25)', avgScore: 8.0, difference: 0.2 },
+    { tier: 'Safety Schools (Top 50)', avgScore: 7.0, difference: 1.2 },
+  ],
   coreIdentity: {
     label: 'STEM Leader & Community Catalyst',
     description: 'You consistently combine technical projects with community service, showing you can lead in both contexts.',
