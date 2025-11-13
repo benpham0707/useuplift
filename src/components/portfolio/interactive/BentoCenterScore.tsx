@@ -1,10 +1,18 @@
 import React from 'react';
 
+import { BookOpen, TrendingUp, Users, Award } from 'lucide-react';
+
 interface BentoCenterScoreProps {
   score: number;
   tierName: string;
   percentile: string;
   onClick?: () => void;
+  quickStats: {
+    gpa: number;
+    sat: number;
+    hours: number;
+    awards: number;
+  };
 }
 
 export const BentoCenterScore: React.FC<BentoCenterScoreProps> = ({
@@ -12,6 +20,7 @@ export const BentoCenterScore: React.FC<BentoCenterScoreProps> = ({
   tierName,
   percentile,
   onClick,
+  quickStats,
 }) => {
   return (
     <div className="relative h-full">
@@ -62,9 +71,29 @@ export const BentoCenterScore: React.FC<BentoCenterScoreProps> = ({
             </div>
           </div>
 
+          {/* Quick Stats Pills */}
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <div className="depth-layer-1 px-4 py-2 rounded-full bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200/50 flex items-center gap-2">
+              <BookOpen className="w-4 h-4 text-green-600" />
+              <span className="text-sm font-bold text-green-700">GPA {quickStats.gpa}</span>
+            </div>
+            <div className="depth-layer-1 px-4 py-2 rounded-full bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-200/50 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-blue-600" />
+              <span className="text-sm font-bold text-blue-700">SAT {quickStats.sat}</span>
+            </div>
+            <div className="depth-layer-1 px-4 py-2 rounded-full bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200/50 flex items-center gap-2">
+              <Users className="w-4 h-4 text-orange-600" />
+              <span className="text-sm font-bold text-orange-700">{quickStats.hours}+ Hours</span>
+            </div>
+            <div className="depth-layer-1 px-4 py-2 rounded-full bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200/50 flex items-center gap-2">
+              <Award className="w-4 h-4 text-purple-600" />
+              <span className="text-sm font-bold text-purple-700">{quickStats.awards} Awards</span>
+            </div>
+          </div>
+
           {/* Hint */}
           <div className="mt-6 flex items-center gap-2 text-xs text-muted-foreground/60 opacity-0 group-hover/center:opacity-100 transition-opacity duration-500">
-            <div className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             <span>Click to explore detailed insights</span>
             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
           </div>
