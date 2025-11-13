@@ -601,33 +601,55 @@ All colors MUST be HSL.
 }
 
 /* ============================================
-   BENTO MAZE GRID SYSTEM
+   INSIGHTS DASHBOARD LAYOUT - Clean & Intuitive
    ============================================ */
 
-.bento-maze-grid {
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  grid-template-rows: repeat(5, minmax(100px, auto));
-  gap: 1rem;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, 
-    hsl(250 30% 98%), 
-    hsl(185 30% 98%), 
-    hsl(250 30% 97%)
-  );
-  border-radius: 1.5rem;
+.insights-dashboard-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
 }
 
-.area-quick-stats { grid-area: 1 / 1 / 3 / 3; }
-.area-academic { grid-area: 2 / 3 / 3 / 5; }
-.area-center-score { grid-area: 1 / 5 / 3 / 8; }
-.area-leadership { grid-area: 1 / 8 / 2 / 10; }
-.area-extracurricular { grid-area: 2 / 8 / 3 / 9; }
-.area-readiness { grid-area: 2 / 9 / 3 / 11; }
-.area-course-rigor { grid-area: 3 / 1 / 4 / 5; }
-.area-progress-bar { grid-area: 4 / 1 / 5 / 11; }
-.area-achievements { grid-area: 5 / 1 / 6 / 5; }
-.area-comparison { grid-area: 5 / 5 / 6 / 11; }
+.insights-hero-section {
+  margin-bottom: 3rem;
+}
+
+.insights-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+@media (max-width: 1024px) {
+  .insights-metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .insights-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.insights-context-section {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+.insights-bottom-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .insights-bottom-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* ============================================
    DEPTH LAYER SYSTEM
@@ -713,6 +735,10 @@ All colors MUST be HSL.
   to { transform: rotate(0deg); opacity: 0.2; }
 }
 
+.animate-ring-orbit {
+  animation: ring-orbit-slow 10s linear infinite;
+}
+
 .animate-ring-orbit-slow {
   animation: ring-orbit-slow 15s linear infinite;
 }
@@ -742,45 +768,4 @@ All colors MUST be HSL.
 
 .bg-gradient-radial {
   background: radial-gradient(circle, var(--tw-gradient-stops));
-}
-
-/* Responsive breakpoints */
-@media (max-width: 1024px) {
-  .bento-maze-grid {
-    grid-template-columns: repeat(6, 1fr);
-    grid-template-rows: repeat(7, auto);
-  }
-  
-  .area-quick-stats { grid-area: 1 / 1 / 3 / 3; }
-  .area-center-score { grid-area: 1 / 3 / 3 / 7; }
-  .area-academic { grid-area: 3 / 1 / 4 / 4; }
-  .area-leadership { grid-area: 3 / 4 / 4 / 7; }
-  .area-extracurricular { grid-area: 4 / 1 / 5 / 4; }
-  .area-readiness { grid-area: 4 / 4 / 5 / 7; }
-  .area-course-rigor { grid-area: 5 / 1 / 6 / 7; }
-  .area-progress-bar { grid-area: 6 / 1 / 7 / 7; }
-  .area-achievements { grid-area: 7 / 1 / 8 / 4; }
-  .area-comparison { grid-area: 7 / 4 / 8 / 7; }
-}
-
-@media (max-width: 768px) {
-  .bento-maze-grid {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto;
-    gap: 0.75rem;
-    padding: 1rem;
-  }
-  
-  .area-quick-stats,
-  .area-center-score,
-  .area-academic,
-  .area-leadership,
-  .area-extracurricular,
-  .area-readiness,
-  .area-course-rigor,
-  .area-progress-bar,
-  .area-achievements,
-  .area-comparison {
-    grid-area: auto !important;
-  }
 }

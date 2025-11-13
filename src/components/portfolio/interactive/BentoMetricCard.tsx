@@ -79,34 +79,42 @@ export const BentoMetricCard: React.FC<BentoMetricCardProps> = ({
     >
       {/* Icon badge */}
       <div className="flex items-center gap-3 mb-4">
-        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-depth-2 group-hover/metric:shadow-depth-3 group-hover/metric:scale-110 transition-all duration-300`}>
-          <Icon className="w-6 h-6 text-white" />
+        <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-depth-2 group-hover/metric:shadow-depth-3 group-hover/metric:scale-110 transition-all duration-300`}>
+          <Icon className="w-7 h-7 text-white" />
         </div>
-        <div>
-          <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+        <div className="flex-1">
+          <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold mb-1">
             {title}
           </div>
-          <div className={`text-2xl font-black bg-gradient-to-r ${config.textGradient} bg-clip-text text-transparent`}>
+          <div className={`text-3xl font-black bg-gradient-to-r ${config.textGradient} bg-clip-text text-transparent`}>
             {score.toFixed(1)}
           </div>
         </div>
       </div>
 
       {/* Progress bar */}
-      <div className="relative h-3 bg-gradient-to-r from-muted/50 to-muted/30 rounded-full overflow-hidden shadow-inner">
+      <div className="relative h-4 bg-gradient-to-r from-muted/50 to-muted/30 rounded-full overflow-hidden shadow-inner mb-4">
         <div
           className={`absolute inset-0 bg-gradient-to-r ${config.progress} rounded-full transition-all duration-1000 shadow-depth-1`}
           style={{ width: `${percentage}%` }}
         />
         <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-transparent rounded-full blur-sm" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-xs font-bold text-white/90 drop-shadow-md">{percentage}%</span>
+        </div>
       </div>
 
       {/* Description */}
       {description && (
-        <div className="mt-4 text-xs text-muted-foreground/80 leading-relaxed">
+        <div className="text-sm text-foreground/80 leading-relaxed font-medium">
           {description}
         </div>
       )}
+
+      {/* Click hint */}
+      <div className="mt-4 text-xs text-muted-foreground/60 opacity-0 group-hover/metric:opacity-100 transition-opacity duration-300">
+        Click for detailed insights →
+      </div>
 
       {/* Hover glow */}
       <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${config.hoverGlow} opacity-0 group-hover/metric:opacity-100 transition-opacity duration-500 pointer-events-none`} />
