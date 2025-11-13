@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { InteractivePortfolioCard } from '@/components/portfolio/interactive/InteractivePortfolioCard';
+import { InteractivePortfolioCardBento } from '@/components/portfolio/interactive/InteractivePortfolioCardBento';
 import { Rocket, Target, TrendingUp, LayoutDashboard, Award, MapPin, FileText, Lightbulb, Sparkles } from 'lucide-react';
 import { HolisticSummary, renderRich } from '../portfolioInsightsData';
 import { ChevronLeft, ChevronRight, CheckCircle, Circle, AlertTriangle } from 'lucide-react';
@@ -28,8 +28,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
 
   return (
     <div className="space-y-8">
-      {/* Interactive Portfolio Card */}
-      <InteractivePortfolioCard
+      {/* Interactive Portfolio Card - Bento Layout */}
+      <InteractivePortfolioCardBento
         overallScore={overall100}
         tierName={summary.tierName}
         percentile={summary.tierPercentile}
@@ -47,7 +47,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ summary, onNavigateToT
           currentTier: summary.tierName,
           nextTier: 'Platinum Achiever',
           progress: 75,
-          pointsNeeded: 8,
+          pointsNeeded: 3.2,
         }}
       />
 

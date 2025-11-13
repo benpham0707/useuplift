@@ -599,3 +599,188 @@ All colors MUST be HSL.
     display: none;
   }
 }
+
+/* ============================================
+   BENTO MAZE GRID SYSTEM
+   ============================================ */
+
+.bento-maze-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  grid-template-rows: repeat(5, minmax(100px, auto));
+  gap: 1rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, 
+    hsl(250 30% 98%), 
+    hsl(185 30% 98%), 
+    hsl(250 30% 97%)
+  );
+  border-radius: 1.5rem;
+}
+
+.area-quick-stats { grid-area: 1 / 1 / 3 / 3; }
+.area-academic { grid-area: 2 / 3 / 3 / 5; }
+.area-center-score { grid-area: 1 / 5 / 3 / 8; }
+.area-leadership { grid-area: 1 / 8 / 2 / 10; }
+.area-extracurricular { grid-area: 2 / 8 / 3 / 9; }
+.area-readiness { grid-area: 2 / 9 / 3 / 11; }
+.area-course-rigor { grid-area: 3 / 1 / 4 / 5; }
+.area-progress-bar { grid-area: 4 / 1 / 5 / 11; }
+.area-achievements { grid-area: 5 / 1 / 6 / 5; }
+.area-comparison { grid-area: 5 / 5 / 6 / 11; }
+
+/* ============================================
+   DEPTH LAYER SYSTEM
+   Multi-level shadow system for realistic depth
+   ============================================ */
+
+.depth-layer-1 {
+  box-shadow: 
+    0 1px 2px -1px rgba(0, 0, 0, 0.08),
+    0 2px 4px -2px rgba(0, 0, 0, 0.06);
+}
+
+.depth-layer-2 {
+  box-shadow: 
+    0 2px 4px -2px rgba(0, 0, 0, 0.1),
+    0 4px 8px -4px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+.depth-layer-3 {
+  box-shadow: 
+    0 4px 8px -4px rgba(0, 0, 0, 0.12),
+    0 8px 16px -8px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(0, 0, 0, 0.03);
+}
+
+.depth-layer-4 {
+  box-shadow: 
+    0 8px 16px -8px rgba(0, 0, 0, 0.14),
+    0 16px 32px -16px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+.shadow-depth-1 {
+  box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1), 0 4px 8px -2px rgba(0, 0, 0, 0.08);
+}
+
+.shadow-depth-2 {
+  box-shadow: 0 4px 8px -2px rgba(0, 0, 0, 0.12), 0 8px 16px -4px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-depth-3 {
+  box-shadow: 0 8px 16px -4px rgba(0, 0, 0, 0.14), 0 16px 32px -8px rgba(0, 0, 0, 0.12);
+}
+
+.shadow-depth-4 {
+  box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.16), 0 24px 48px -12px rgba(0, 0, 0, 0.14);
+}
+
+/* ============================================
+   REFINED ANIMATIONS
+   ============================================ */
+
+@keyframes ambient-pulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+.animate-ambient-pulse {
+  animation: ambient-pulse 6s ease-in-out infinite;
+}
+
+.animate-ambient-pulse-slow {
+  animation: ambient-pulse 10s ease-in-out infinite;
+}
+
+@keyframes ring-orbit-slow {
+  from { transform: rotate(0deg); opacity: 0.3; }
+  50% { opacity: 0.6; }
+  to { transform: rotate(360deg); opacity: 0.3; }
+}
+
+@keyframes ring-orbit-reverse-slow {
+  from { transform: rotate(360deg); opacity: 0.2; }
+  50% { opacity: 0.5; }
+  to { transform: rotate(0deg); opacity: 0.2; }
+}
+
+.animate-ring-orbit-slow {
+  animation: ring-orbit-slow 15s linear infinite;
+}
+
+.animate-ring-orbit-reverse-slow {
+  animation: ring-orbit-reverse-slow 20s linear infinite;
+}
+
+@keyframes border-flow {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-border-flow {
+  animation: border-flow 4s ease infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0%; }
+  100% { background-position: 200% 0%; }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s linear infinite;
+}
+
+.bg-gradient-radial {
+  background: radial-gradient(circle, var(--tw-gradient-stops));
+}
+
+/* Responsive breakpoints */
+@media (max-width: 1024px) {
+  .bento-maze-grid {
+    grid-template-columns: repeat(6, 1fr);
+    grid-template-rows: repeat(7, auto);
+  }
+  
+  .area-quick-stats { grid-area: 1 / 1 / 3 / 3; }
+  .area-center-score { grid-area: 1 / 3 / 3 / 7; }
+  .area-academic { grid-area: 3 / 1 / 4 / 4; }
+  .area-leadership { grid-area: 3 / 4 / 4 / 7; }
+  .area-extracurricular { grid-area: 4 / 1 / 5 / 4; }
+  .area-readiness { grid-area: 4 / 4 / 5 / 7; }
+  .area-course-rigor { grid-area: 5 / 1 / 6 / 7; }
+  .area-progress-bar { grid-area: 6 / 1 / 7 / 7; }
+  .area-achievements { grid-area: 7 / 1 / 8 / 4; }
+  .area-comparison { grid-area: 7 / 4 / 8 / 7; }
+}
+
+@media (max-width: 768px) {
+  .bento-maze-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+    gap: 0.75rem;
+    padding: 1rem;
+  }
+  
+  .area-quick-stats,
+  .area-center-score,
+  .area-academic,
+  .area-leadership,
+  .area-extracurricular,
+  .area-readiness,
+  .area-course-rigor,
+  .area-progress-bar,
+  .area-achievements,
+  .area-comparison {
+    grid-area: auto !important;
+  }
+}

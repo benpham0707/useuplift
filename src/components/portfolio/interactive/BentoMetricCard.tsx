@@ -1,0 +1,115 @@
+import React from 'react';
+import { BookOpen, Users, Target, TrendingUp, Award, Sparkles } from 'lucide-react';
+import { LucideIcon } from 'lucide-react';
+
+interface BentoMetricCardProps {
+  title: string;
+  score: number;
+  color: 'blue' | 'purple' | 'cyan' | 'green' | 'indigo' | 'orange';
+  description?: string;
+  onClick?: () => void;
+}
+
+const colorConfig = {
+  blue: {
+    gradient: 'from-blue-500 to-indigo-500',
+    bgGradient: 'from-blue-50 to-indigo-50',
+    textGradient: 'from-blue-600 to-indigo-600',
+    progress: 'from-blue-500 to-indigo-500',
+    hoverGlow: 'from-blue-500/0 via-indigo-500/0 to-blue-500/5',
+    icon: BookOpen,
+  },
+  purple: {
+    gradient: 'from-purple-500 to-pink-500',
+    bgGradient: 'from-purple-50 to-pink-50',
+    textGradient: 'from-purple-600 to-pink-600',
+    progress: 'from-purple-500 to-pink-500',
+    hoverGlow: 'from-purple-500/0 via-pink-500/0 to-purple-500/5',
+    icon: Target,
+  },
+  cyan: {
+    gradient: 'from-cyan-500 to-blue-500',
+    bgGradient: 'from-cyan-50 to-blue-50',
+    textGradient: 'from-cyan-600 to-blue-600',
+    progress: 'from-cyan-500 to-blue-500',
+    hoverGlow: 'from-cyan-500/0 via-blue-500/0 to-cyan-500/5',
+    icon: Sparkles,
+  },
+  green: {
+    gradient: 'from-green-500 to-emerald-500',
+    bgGradient: 'from-green-50 to-emerald-50',
+    textGradient: 'from-green-600 to-emerald-600',
+    progress: 'from-green-500 to-emerald-500',
+    hoverGlow: 'from-green-500/0 via-emerald-500/0 to-green-500/5',
+    icon: TrendingUp,
+  },
+  indigo: {
+    gradient: 'from-indigo-500 to-violet-500',
+    bgGradient: 'from-indigo-50 to-violet-50',
+    textGradient: 'from-indigo-600 to-violet-600',
+    progress: 'from-indigo-500 to-violet-500',
+    hoverGlow: 'from-indigo-500/0 via-violet-500/0 to-indigo-500/5',
+    icon: Award,
+  },
+  orange: {
+    gradient: 'from-orange-500 to-amber-500',
+    bgGradient: 'from-orange-50 to-amber-50',
+    textGradient: 'from-orange-600 to-amber-600',
+    progress: 'from-orange-500 to-amber-500',
+    hoverGlow: 'from-orange-500/0 via-amber-500/0 to-orange-500/5',
+    icon: Users,
+  },
+};
+
+export const BentoMetricCard: React.FC<BentoMetricCardProps> = ({
+  title,
+  score,
+  color,
+  description,
+  onClick,
+}) => {
+  const config = colorConfig[color];
+  const Icon = config.icon;
+  const percentage = Math.round((score / 10) * 100);
+
+  return (
+    <div
+      className="depth-layer-3 holo-surface rounded-2xl p-6 h-full bg-gradient-to-br from-white/95 to-white/85 hover:scale-[1.02] hover:shadow-depth-4 transition-all duration-500 cursor-pointer group/metric relative overflow-hidden"
+      onClick={onClick}
+    >
+      {/* Icon badge */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-depth-2 group-hover/metric:shadow-depth-3 group-hover/metric:scale-110 transition-all duration-300`}>
+          <Icon className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <div className="text-xs uppercase tracking-wider text-muted-foreground font-bold">
+            {title}
+          </div>
+          <div className={`text-2xl font-black bg-gradient-to-r ${config.textGradient} bg-clip-text text-transparent`}>
+            {score.toFixed(1)}
+          </div>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="relative h-3 bg-gradient-to-r from-muted/50 to-muted/30 rounded-full overflow-hidden shadow-inner">
+        <div
+          className={`absolute inset-0 bg-gradient-to-r ${config.progress} rounded-full transition-all duration-1000 shadow-depth-1`}
+          style={{ width: `${percentage}%` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-white/40 to-transparent rounded-full blur-sm" />
+      </div>
+
+      {/* Description */}
+      {description && (
+        <div className="mt-4 text-xs text-muted-foreground/80 leading-relaxed">
+          {description}
+        </div>
+      )}
+
+      {/* Hover glow */}
+      <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${config.hoverGlow} opacity-0 group-hover/metric:opacity-100 transition-opacity duration-500 pointer-events-none`} />
+    </div>
+  );
+};
