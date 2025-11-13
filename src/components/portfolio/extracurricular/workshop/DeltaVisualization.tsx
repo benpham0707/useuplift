@@ -26,7 +26,7 @@ import {
   Target,
   CheckCircle2,
   AlertCircle,
-  Party,
+  PartyPopper,
   Zap,
 } from 'lucide-react';
 
@@ -58,7 +58,7 @@ export const DeltaVisualization: React.FC<DeltaVisualizationProps> = ({
     if (overallDelta >= 20) {
       return {
         level: 'amazing',
-        icon: Party,
+        icon: PartyPopper,
         color: 'text-purple-600',
         bg: 'bg-gradient-to-r from-purple-50 to-pink-50',
         border: 'border-purple-300',

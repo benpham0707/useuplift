@@ -30,6 +30,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 export interface AnalysisResult {
   report: AnalysisReport;
+  analysis?: AnalysisReport; // Alias for backwards compatibility
   features: ExtractedFeatures;
   authenticity: AuthenticityAnalysis;
   coaching?: import('./coaching').CoachingOutput;  // Optional: included unless skip_coaching = true

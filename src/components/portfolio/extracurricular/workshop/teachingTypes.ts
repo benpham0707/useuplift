@@ -21,6 +21,17 @@ export interface TeachingIssue {
   rubric_category: RubricCategory; // For matching with UI categories
   severity: 'critical' | 'major' | 'minor';
 
+  // Backwards compatibility - flat properties
+  title?: string;
+  context?: string;
+  teaching_points?: string[];
+  why_it_matters?: string;
+  short_label?: string;
+  one_line_why?: string;
+  problem_explanation?: string;
+  teaching_example?: any;
+  fix_strategies?: string[];
+
   // Problem identification
   problem: {
     title: string; // e.g., "Missing Quantified Impact"

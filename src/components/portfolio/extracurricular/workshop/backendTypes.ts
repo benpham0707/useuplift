@@ -32,11 +32,17 @@ export type RubricCategory =
 
 export interface RubricCategoryScore {
   name: string; // Display name or key
+  category?: string; // Backwards compatibility
   score_0_to_10: number;
+  score?: number; // Backwards compatibility
+  maxScore?: number; // Backwards compatibility
   weight: number;
   evaluator_notes: string;
+  comments?: string; // Backwards compatibility
+  evidence?: string[]; // Backwards compatibility
   strengths: string[];
   weaknesses: string[];
+  suggestions?: string[]; // Backwards compatibility
 }
 
 // ============================================================================
@@ -240,6 +246,7 @@ export interface CoachingOutput {
 
 export interface AnalysisResult {
   report: AnalysisReport;
+  analysis?: AnalysisReport; // Alias for backwards compatibility
   features: ExtractedFeatures;
   authenticity: AuthenticityAnalysis;
   coaching?: CoachingOutput;
