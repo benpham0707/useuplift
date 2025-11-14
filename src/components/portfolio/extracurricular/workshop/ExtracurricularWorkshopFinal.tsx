@@ -808,10 +808,10 @@ export const ExtracurricularWorkshopFinal: React.FC<ExtracurricularWorkshopProps
         </div>
       </Card>
 
-      {/* 2-COLUMN LAYOUT: Editor+Rubric (2/3) | Chat (1/3) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* 2-COLUMN LAYOUT: Editor+Rubric (3/5) | Chat (2/5) */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* LEFT COLUMN: Editor and Rubric */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-3 space-y-6">
           {/* Warning banner if changes need re-analysis */}
           {needsReanalysis && !isAnalyzing && (
         <Alert>
@@ -846,7 +846,7 @@ export const ExtracurricularWorkshopFinal: React.FC<ExtracurricularWorkshopProps
         </div>
 
         {/* RIGHT COLUMN: Chat (matches editor + textarea height) */}
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-2">
           <ContextualWorkshopChat
             activity={activity}
             currentDraft={currentDraft}

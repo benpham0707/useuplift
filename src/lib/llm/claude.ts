@@ -12,10 +12,14 @@ import Anthropic from '@anthropic-ai/sdk';
 
 // Single-key policy: only use ANTHROPIC_API_KEY (paid/subscription credits).
 // CLAUDE_CODE_KEY is no longer considered.
-// In Vite, environment variables are accessed via import.meta.env, not process.env
-const PAID_KEY = import.meta.env.VITE_ANTHROPIC_API_KEY || '';
+// Check if we're in browser (Vite) or Node.js environment
+const isBrowser = typeof import.meta !== 'undefined' && import.meta.env;
+const PAID_KEY = isBrowser
+  ? import.meta.env.VITE_ANTHROPIC_API_KEY
+  : process.env.ANTHROPIC_API_KEY;
+
 if (!PAID_KEY) {
-  throw new Error('VITE_ANTHROPIC_API_KEY not found in environment variables. Please add it to your .env file.');
+  throw new Error('ANTHROPIC_API_KEY not found in environment variables. Please add it to your .env file.');
 }
 let client = new Anthropic({
   apiKey: PAID_KEY,
@@ -96,9 +100,9 @@ export async function callClaude<T = any>(
       ...(systemParam ? { system: systemParam } : {}),
     };
 
-    // Make API call with timeout (30 seconds for chat, 3 seconds for analysis)
+    // Make API call with timeout (30 seconds for chat, 60 seconds for analysis)
     console.log('[Claude API] Starting API call...');
-    const timeoutMs = maxTokens <= 2000 ? 30000 : 3000; // Chat needs more time
+    const timeoutMs = maxTokens >= 2000 ? 30000 : 60000; // Chat needs 30s, analysis needs 60s
     let timeoutId: NodeJS.Timeout;
 
     const timeoutPromise = new Promise<never>((_, reject) => {

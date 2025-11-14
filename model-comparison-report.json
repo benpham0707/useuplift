@@ -1,0 +1,13 @@
+{
+  "testDate": "2025-11-14T01:24:55.371Z",
+  "results": [],
+  "summary": {
+    "claude": {
+      "avgWeightedScore": 0,
+      "avgDuration": 0,
+      "avgTokens": 0,
+      "avgCost": 0
+    },
+    "gpt5": null
+  }
+}
