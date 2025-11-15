@@ -769,3 +769,74 @@ All colors MUST be HSL.
 .bg-gradient-radial {
   background: radial-gradient(circle, var(--tw-gradient-stops));
 }
+
+/* Angular Shape System */
+.shape-profile {
+  clip-path: polygon(0 0, 100% 2%, 100% 98%, 0 100%);
+}
+
+.shape-competitive {
+  clip-path: polygon(0 2%, 100% 0, 100% 100%, 0 98%);
+}
+
+.shape-attribution {
+  clip-path: polygon(2% 0, 100% 0, 98% 100%, 0 100%);
+}
+
+.shape-next-steps {
+  clip-path: polygon(0 0, 100% 0, 95% 100%, 5% 100%);
+}
+
+.shape-progress {
+  clip-path: polygon(2% 0, 98% 0, 100% 100%, 0 100%);
+}
+
+/* Angular Border System */
+.angular-border {
+  position: relative;
+}
+
+.angular-border::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  clip-path: inherit;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.angular-border:hover::before {
+  opacity: 0.8;
+}
+
+/* Portfolio Dashboard Layout */
+.insights-dashboard-container {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.profile-story-section {
+  grid-column: span 12;
+}
+
+.insights-two-column-section {
+  grid-column: span 12;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1rem;
+}
+
+.insights-two-column-section-alt {
+  grid-column: span 12;
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 1rem;
+}
+
+.insights-achievements-section {
+  grid-column: span 12;
+}

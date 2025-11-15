@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
-import { BentoCenterScore } from './BentoCenterScore';
 import { BentoMetricCard } from './BentoMetricCard';
 import { BentoAchievements } from './BentoAchievements';
-import { BentoProgressBar } from './BentoProgressBar';
 import { Achievement } from '../portfolioInsightsData';
 import { motion, AnimatePresence } from 'motion/react';
+import { ExpandableWrapper } from './ExpandableWrapper';
+import { ProfileStoryComponent } from './ProfileStoryComponent';
+import { CompetitiveStandingComponent } from './CompetitiveStandingComponent';
+import { AttributionBreakdownComponent } from './AttributionBreakdownComponent';
+import { NextStepsComponent } from './NextStepsComponent';
+import { ProgressTrackingComponent } from './ProgressTrackingComponent';
+import {
+  MOCK_PROFILE_STORY,
+  MOCK_COMPETITIVE_STANDING,
+  MOCK_ATTRIBUTION,
+  MOCK_NEXT_STEPS,
+  MOCK_PROGRESS_TRACKING,
+} from './mockPortfolioData';
+import { cn } from '@/lib/utils';
 
 interface InteractivePortfolioCardBentoProps {
   overallScore: number;
@@ -37,13 +49,10 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
   tierProgress,
 }) => {
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
+  const [expandedComponent, setExpandedComponent] = useState<string | null>(null);
 
-  // Hard-coded quick stats values for display
-  const quickStats = {
-    gpa: 3.95,
-    sat: 1520,
-    hours: 450,
-    awards: 12,
+  const handleComponentToggle = (componentId: string) => {
+    setExpandedComponent(expandedComponent === componentId ? null : componentId);
   };
 
   return (
@@ -71,15 +80,21 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
                 <div className="space-y-6 text-left">
                   <div className="depth-layer-2 rounded-2xl p-6 bg-gradient-to-br from-primary/5 to-cyan-500/5">
                     <h3 className="font-bold text-lg mb-2">Score Breakdown</h3>
-                    <p className="text-muted-foreground">How your score is calculated and what factors contribute to it.</p>
+                    <p className="text-muted-foreground">
+                      How your score is calculated and what factors contribute to it.
+                    </p>
                   </div>
                   <div className="depth-layer-2 rounded-2xl p-6 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
                     <h3 className="font-bold text-lg mb-2">Contributing Factors</h3>
-                    <p className="text-muted-foreground">Key activities and achievements that influence this metric.</p>
+                    <p className="text-muted-foreground">
+                      Key activities and achievements that influence this metric.
+                    </p>
                   </div>
                   <div className="depth-layer-2 rounded-2xl p-6 bg-gradient-to-br from-green-500/5 to-emerald-500/5">
                     <h3 className="font-bold text-lg mb-2">Recommendations</h3>
-                    <p className="text-muted-foreground">Specific actions you can take to improve your score.</p>
+                    <p className="text-muted-foreground">
+                      Specific actions you can take to improve your score.
+                    </p>
                   </div>
                 </div>
                 <button
@@ -93,19 +108,31 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
           </motion.div>
         ) : (
           <div className="insights-dashboard-container">
-            {/* Hero Section - Large Center Score */}
-            <div className="insights-hero-section">
-              <BentoCenterScore
-                score={overallScore}
-                tierName={tierName}
-                percentile={percentile}
-                onClick={() => setExpandedMetric('Overall Score')}
-                quickStats={quickStats}
-              />
+            {/* Profile Story Component */}
+            <div className={cn(
+              'profile-story-section transition-all duration-300',
+              expandedComponent && expandedComponent !== 'profile-story' && 'opacity-40 blur-sm pointer-events-none'
+            )}>
+              <ExpandableWrapper
+                id="profile-story"
+                isExpanded={expandedComponent === 'profile-story'}
+                onToggle={() => handleComponentToggle('profile-story')}
+                shapeClass="shape-profile angular-border"
+                expandedHeight="85vh"
+                collapsedContent={
+                  <ProfileStoryComponent data={MOCK_PROFILE_STORY} isExpanded={false} />
+                }
+                className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300"
+              >
+                <ProfileStoryComponent data={MOCK_PROFILE_STORY} isExpanded={true} />
+              </ExpandableWrapper>
             </div>
 
-            {/* Metrics Grid - 3 Columns */}
-            <div className="insights-metrics-grid">
+            {/* Metrics Grid - Keep Existing */}
+            <div className={cn(
+              'insights-metrics-grid transition-all duration-300',
+              expandedComponent && 'opacity-40 blur-sm pointer-events-none'
+            )}>
               <BentoMetricCard
                 title="Academic"
                 score={metrics.academic}
@@ -150,37 +177,92 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
               />
             </div>
 
-            {/* Context Section */}
-            <div className="insights-context-section">
-              {/* Progress Bar */}
-              <BentoProgressBar tierProgress={tierProgress} />
-
-              {/* Bottom Grid */}
-              <div className="insights-bottom-grid">
-                {/* Achievements */}
-                <BentoAchievements achievements={achievements} />
-
-                {/* Comparison Table */}
-                <div className="depth-layer-3 holo-surface rounded-2xl p-6 h-full bg-gradient-to-br from-white/95 to-white/85 hover:shadow-depth-4 transition-all duration-500">
-                  <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-6">
-                    vs Admitted Students
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200/50">
-                      <span className="font-semibold">Elite Schools</span>
-                      <span className="text-lg font-bold text-orange-600">-0.7 ⚠</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200/50">
-                      <span className="font-semibold">Target Schools</span>
-                      <span className="text-lg font-bold text-green-600">+0.2 ✓</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200/50">
-                      <span className="font-semibold">Safety Schools</span>
-                      <span className="text-lg font-bold text-green-600">+1.0 ✓✓</span>
-                    </div>
-                  </div>
-                </div>
+            {/* Competitive Standing and Attribution */}
+            <div className="insights-two-column-section">
+              <div className={cn(
+                'transition-all duration-300',
+                expandedComponent && expandedComponent !== 'competitive' && 'opacity-40 blur-sm pointer-events-none'
+              )}>
+                <ExpandableWrapper
+                  id="competitive"
+                  isExpanded={expandedComponent === 'competitive'}
+                  onToggle={() => handleComponentToggle('competitive')}
+                  shapeClass="shape-competitive angular-border"
+                  expandedHeight="80vh"
+                  collapsedContent={
+                    <CompetitiveStandingComponent data={MOCK_COMPETITIVE_STANDING} isExpanded={false} />
+                  }
+                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
+                >
+                  <CompetitiveStandingComponent data={MOCK_COMPETITIVE_STANDING} isExpanded={true} />
+                </ExpandableWrapper>
               </div>
+
+              <div className={cn(
+                'transition-all duration-300',
+                expandedComponent && expandedComponent !== 'attribution' && 'opacity-40 blur-sm pointer-events-none'
+              )}>
+                <ExpandableWrapper
+                  id="attribution"
+                  isExpanded={expandedComponent === 'attribution'}
+                  onToggle={() => handleComponentToggle('attribution')}
+                  shapeClass="shape-attribution angular-border"
+                  expandedHeight="75vh"
+                  collapsedContent={
+                    <AttributionBreakdownComponent data={MOCK_ATTRIBUTION} isExpanded={false} />
+                  }
+                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
+                >
+                  <AttributionBreakdownComponent data={MOCK_ATTRIBUTION} isExpanded={true} />
+                </ExpandableWrapper>
+              </div>
+            </div>
+
+            {/* Next Steps and Progress */}
+            <div className="insights-two-column-section-alt">
+              <div className={cn(
+                'transition-all duration-300',
+                expandedComponent && expandedComponent !== 'next-steps' && 'opacity-40 blur-sm pointer-events-none'
+              )}>
+                <ExpandableWrapper
+                  id="next-steps"
+                  isExpanded={expandedComponent === 'next-steps'}
+                  onToggle={() => handleComponentToggle('next-steps')}
+                  shapeClass="shape-next-steps angular-border"
+                  expandedHeight="80vh"
+                  collapsedContent={<NextStepsComponent data={MOCK_NEXT_STEPS} isExpanded={false} />}
+                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
+                >
+                  <NextStepsComponent data={MOCK_NEXT_STEPS} isExpanded={true} />
+                </ExpandableWrapper>
+              </div>
+
+              <div className={cn(
+                'transition-all duration-300',
+                expandedComponent && expandedComponent !== 'progress' && 'opacity-40 blur-sm pointer-events-none'
+              )}>
+                <ExpandableWrapper
+                  id="progress"
+                  isExpanded={expandedComponent === 'progress'}
+                  onToggle={() => handleComponentToggle('progress')}
+                  shapeClass="shape-progress angular-border"
+                  expandedHeight="70vh"
+                  collapsedContent={
+                    <ProgressTrackingComponent data={MOCK_PROGRESS_TRACKING} isExpanded={false} />
+                  }
+                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
+                >
+                  <ProgressTrackingComponent data={MOCK_PROGRESS_TRACKING} isExpanded={true} />
+                </ExpandableWrapper>
+              </div>
+            </div>
+
+            {/* Achievements Grid - Keep Existing */}
+            <div className={cn(
+              'insights-achievements-section transition-all duration-300',
+              expandedComponent && 'opacity-40 blur-sm pointer-events-none'
+            )}>
+              <BentoAchievements achievements={achievements} />
             </div>
           </div>
         )}
