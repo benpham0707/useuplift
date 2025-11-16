@@ -40,7 +40,7 @@ export interface UnifiedLLMResponse<T = any> {
 // ============================================================================
 
 // Check if we're in browser (Vite) or Node.js environment
-const isBrowser = typeof import.meta !== 'undefined' && import.meta.env;
+const isBrowser = typeof import.meta !== 'undefined' && !!import.meta.env;
 
 // Get API keys
 const ANTHROPIC_KEY = isBrowser
@@ -310,5 +310,4 @@ export async function compareModels<T = any>(
 // EXPORTS
 // ============================================================================
 
-export { callUnifiedLLM, compareModels };
-export type { LLMProvider, UnifiedLLMOptions, UnifiedLLMResponse };
+// All exports are already declared above with the function/type definitions
