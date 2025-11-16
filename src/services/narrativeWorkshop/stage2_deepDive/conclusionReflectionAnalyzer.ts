@@ -237,7 +237,7 @@ export async function analyzeConclusionReflection(
       analysis = response.content as ConclusionReflectionAnalysis;
     }
 
-    analysis.tokensUsed = response.usage?.total_tokens || 0;
+    analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
     console.log(`     ✓ Conclusion/reflection analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);

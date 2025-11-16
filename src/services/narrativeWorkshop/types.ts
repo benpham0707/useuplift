@@ -224,6 +224,10 @@ export interface CharacterDevelopmentAnalysis {
   // Protagonist clarity
   protagonistClarity: number;              // 0-10
   agencyLevel: number;                     // 0-10, active vs passive
+  voiceDistinctiveness: number;            // 0-10
+  growthDemonstrated: number;              // 0-10
+  emotionDescriptionType: 'shown' | 'told' | 'mixed';
+  agencyType: 'active' | 'passive' | 'mixed';
 
   // Interiority
   interiorityPresent: boolean;
@@ -267,15 +271,21 @@ export interface StakesTensionAnalysis {
   tensionPresent: boolean;
   tensionLevel: number;                    // 0-10
   tensionSources: string[];
+  tensionPacing: number;                   // 0-10
 
   // Stakes clarity
   stakesEstablished: boolean;
   stakesType: 'personal' | 'relational' | 'academic' | 'community' | 'unclear';
   stakesHeight: number;                    // 0-10, how high are stakes?
+  stakesSpecificity: number;               // 0-10
+  stakesEstablishedByPercent: number;      // % of essay where stakes clear
 
   // Conflict markers
   conflictMarkers: string[];               // "but", "however", "failed", etc.
   conflictDensity: number;                 // Markers per 100 words
+  conflictType: 'internal' | 'external' | 'both' | 'unclear';
+  conflictClarity: number;                 // 0-10
+  conflictComplexity: number;              // 0-10
 
   // Suspense & engagement
   suspenseBuilding: number;                // 0-10
@@ -285,6 +295,7 @@ export interface StakesTensionAnalysis {
   resolutionPresent: boolean;
   resolutionSatisfying: boolean;
   resolutionDescription: string | null;
+  resolutionQuality: number;               // 0-10
 
   improvementSuggestions: string[];
   tokensUsed: number;
@@ -315,6 +326,7 @@ export interface GrammarAnalysis {
   shortSentences: number;                  // <= 8 words
   longSentences: number;                   // >= 20 words
   sentenceVarietyScore: number;            // 0-10
+  sentenceMetrics: Array<{ length: number; text: string; }>;
 
   // Verb analysis
   activeVoiceCount: number;
@@ -350,6 +362,7 @@ export interface GrammarAnalysis {
   // Deterministic flags
   redFlags: string[];
   greenFlags: string[];
+  overallGrammarScore: number;             // 0-10
 }
 
 export interface WritingStyleAnalysis {
@@ -362,6 +375,7 @@ export interface WritingStyleAnalysis {
   // Rhythm & flow
   rhythmQuality: number;                   // 0-10
   flowAnalysis: string;
+  overallStyleScore: number;               // 0-10
   jarringTransitions: string[];
   smoothTransitions: string[];
 
@@ -390,14 +404,10 @@ export interface WritingStyleAnalysis {
 }
 
 export interface GrammarStyleAnalysis {
-  grammar: GrammarAnalysis;
-  style: WritingStyleAnalysis;
-
-  // Combined assessment
-  overallCraftScore: number;               // 0-10
-  topStrengths: string[];
-  topWeaknesses: string[];
-  improvementPriorities: string[];
+  grammarAnalysis: GrammarAnalysis;
+  styleAnalysis: WritingStyleAnalysis;
+  totalTokensUsed: number;
+  analysisCompletedAt: string;
 }
 
 // ============================================================================
@@ -604,7 +614,8 @@ export interface SpecificInsights {
 
 export interface NarrativeWorkshopAnalysis {
   // Input
-  input: NarrativeEssayInput;
+  essayInput: NarrativeEssayInput;
+  essayType: string;
 
   // Analysis stages
   stage1_holisticUnderstanding: HolisticUnderstanding;
@@ -614,22 +625,25 @@ export interface NarrativeWorkshopAnalysis {
   stage5_specificInsights: SpecificInsights;
 
   // Overall metadata
-  analysisId: string;
-  analyzedAt: string;
-  totalTokensUsed: number;
-  performanceMetrics: {
-    stage1Ms: number;
-    stage2Ms: number;
-    stage3Ms: number;
-    stage4Ms: number;
-    stage5Ms: number;
-    totalMs: number;
+  analysisMetadata: {
+    analyzedAt: string;
+    totalDurationMs: number;
+    totalTokensUsed: number;
+    stageTimings: {
+      stage1: number;
+      stage2: number;
+      stage3: number;
+      stage4: number;
+      stage5: number;
+    };
+    systemVersion: string;
   };
 
   // Quick access
   overallScore: number;                    // 0-100
-  topPriorities: string[];                 // Top 3-5 things to fix
-  quickSummary: string;                    // One-sentence diagnosis
+  impressionLabel: string;
+  topPriorities: SentenceLevelInsight[];   // Top 3-5 things to fix
+  quickSummary?: string;                   // One-sentence diagnosis
 }
 
 // ============================================================================
@@ -691,29 +705,4 @@ export interface NarrativePattern {
 // EXPORT
 // ============================================================================
 
-export type {
-  // Main types
-  NarrativeEssayInput,
-  NarrativeWorkshopAnalysis,
-  NarrativeWorkshopOptions,
-
-  // Stage outputs
-  HolisticUnderstanding,
-  DeepDiveAnalyses,
-  GrammarStyleAnalysis,
-  SynthesizedInsights,
-  SpecificInsights,
-
-  // Component types
-  OpeningAnalysis,
-  BodyDevelopmentAnalysis,
-  ClimaxTurningPointAnalysis,
-  ConclusionReflectionAnalysis,
-  CharacterDevelopmentAnalysis,
-  StakesTensionAnalysis,
-  GrammarAnalysis,
-  WritingStyleAnalysis,
-  SentenceLevelInsight,
-  GeneralInsight,
-  NarrativePattern,
-};
+// All types are already exported with their definitions above

@@ -381,7 +381,7 @@ export async function synthesizeInsights(
       synthesis = response.content as SynthesizedInsights;
     }
 
-    synthesis.tokensUsed = response.usage?.total_tokens || 0;
+    synthesis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
     synthesis.synthesizedAt = new Date().toISOString();
 
     const duration = Date.now() - startTime;

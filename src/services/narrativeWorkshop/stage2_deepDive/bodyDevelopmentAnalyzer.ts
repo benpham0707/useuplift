@@ -207,7 +207,7 @@ export async function analyzeBodyDevelopment(
       analysis = response.content as BodyDevelopmentAnalysis;
     }
 
-    analysis.tokensUsed = response.usage?.total_tokens || 0;
+    analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
     console.log(`     ✓ Body development analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);

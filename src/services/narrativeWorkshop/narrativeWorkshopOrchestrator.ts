@@ -57,9 +57,10 @@ export async function analyzeNarrativeWorkshop(
   const pipelineStartTime = Date.now();
 
   // Infer essay type if not provided
-  const essayType = input.essayType || inferEssayType(input.essayText, input.promptText);
+  const wordCount = input.essayText.split(/\s+/).length;
+  const essayType = input.essayType || inferEssayType(input.promptText, wordCount, input.essayText);
   console.log(`📝 Essay Type: ${essayType}`);
-  console.log(`📊 Word Count: ${input.essayText.split(/\s+/).length} words\n`);
+  console.log(`📊 Word Count: ${wordCount} words\n`);
 
   try {
     // ========================================================================

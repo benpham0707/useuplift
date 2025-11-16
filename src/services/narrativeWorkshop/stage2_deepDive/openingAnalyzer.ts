@@ -184,7 +184,7 @@ export async function analyzeOpening(
       analysis = response.content as OpeningAnalysis;
     }
 
-    analysis.tokensUsed = response.usage?.total_tokens || 0;
+    analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
     console.log(`     ✓ Opening analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);

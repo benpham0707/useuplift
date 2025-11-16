@@ -31,7 +31,7 @@
  */
 
 import { callClaudeWithRetry } from '@/lib/llm/claude';
-import { StyleAnalysis, NarrativeEssayInput } from '../types';
+import { WritingStyleAnalysis, NarrativeEssayInput } from '../types';
 
 // ============================================================================
 // SYSTEM PROMPT
@@ -235,7 +235,7 @@ Return ONLY valid JSON, no markdown, no explanation.`;
 export async function analyzeStyle(
   input: NarrativeEssayInput,
   essayType: string
-): Promise<StyleAnalysis> {
+): Promise<WritingStyleAnalysis> {
   console.log('  → Stage 3.2: Writing Style Analysis (LLM)');
   const startTime = Date.now();
 
@@ -252,17 +252,17 @@ export async function analyzeStyle(
       }
     );
 
-    let analysis: StyleAnalysis;
+    let analysis: WritingStyleAnalysis;
 
     if (typeof response.content === 'string') {
       const jsonMatch = response.content.match(/\{[\s\S]*\}/);
       if (!jsonMatch) throw new Error('No JSON found in style analysis response');
       analysis = JSON.parse(jsonMatch[0]);
     } else {
-      analysis = response.content as StyleAnalysis;
+      analysis = response.content as WritingStyleAnalysis;
     }
 
-    analysis.tokensUsed = response.usage?.total_tokens || 0;
+    analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
     console.log(`     ✓ Style analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);

@@ -208,7 +208,7 @@ export async function analyzeClimaxTurningPoint(
       analysis = response.content as ClimaxTurningPointAnalysis;
     }
 
-    analysis.tokensUsed = response.usage?.total_tokens || 0;
+    analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
     console.log(`     ✓ Climax/turning point analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
