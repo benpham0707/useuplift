@@ -1,22 +1,14 @@
 import React, { useState } from 'react';
 import { BentoMetricCard } from './BentoMetricCard';
 import { BentoAchievements } from './BentoAchievements';
+import { ScoreOrbitalHero } from './ScoreOrbitalHero';
+import { CompetitiveSpectrumCard } from './CompetitiveSpectrumCard';
+import { TopContributorsCard } from './TopContributorsCard';
+import { QuickStatsGrid } from './QuickStatsGrid';
+import { PriorityActionsCard } from './PriorityActionsCard';
+import { TierProgressCard } from './TierProgressCard';
 import { Achievement } from '../portfolioInsightsData';
 import { motion, AnimatePresence } from 'motion/react';
-import { ExpandableWrapper } from './ExpandableWrapper';
-import { ProfileStoryComponent } from './ProfileStoryComponent';
-import { CompetitiveStandingComponent } from './CompetitiveStandingComponent';
-import { AttributionBreakdownComponent } from './AttributionBreakdownComponent';
-import { NextStepsComponent } from './NextStepsComponent';
-import { ProgressTrackingComponent } from './ProgressTrackingComponent';
-import {
-  MOCK_PROFILE_STORY,
-  MOCK_COMPETITIVE_STANDING,
-  MOCK_ATTRIBUTION,
-  MOCK_NEXT_STEPS,
-  MOCK_PROGRESS_TRACKING,
-} from './mockPortfolioData';
-import { cn } from '@/lib/utils';
 
 interface InteractivePortfolioCardBentoProps {
   overallScore: number;
@@ -40,6 +32,50 @@ interface InteractivePortfolioCardBentoProps {
   };
 }
 
+// Hard-coded mock data for new components
+const MOCK_TOP_CONTRIBUTORS = [
+  { name: 'Leadership Impact', dimension: 'Leadership', score: 18, color: 'purple', icon: 'Users' as const },
+  { name: 'Community Service', dimension: 'Service', score: 14, color: 'green', icon: 'Heart' as const },
+  { name: 'Award Recognition', dimension: 'Awards', score: 12, color: 'amber', icon: 'Award' as const },
+];
+
+const MOCK_QUICK_STATS = {
+  activities: 12,
+  hours: 450,
+  impactReach: '2.5K',
+  recognitions: 8,
+};
+
+const MOCK_PRIORITY_ACTIONS = [
+  {
+    title: 'Start Research Project',
+    dimension: 'Academic Differentiation',
+    priority: 'high' as const,
+    impact: 0.5,
+    effort: 'high' as const,
+  },
+  {
+    title: 'Enter National Competition',
+    dimension: 'Recognition & Awards',
+    priority: 'medium' as const,
+    impact: 0.4,
+    effort: 'medium' as const,
+  },
+  {
+    title: 'Apply for National Programs',
+    dimension: 'Recognition',
+    priority: 'low' as const,
+    impact: 0.3,
+    effort: 'low' as const,
+  },
+];
+
+const MOCK_SCHOOL_TIERS = [
+  { name: 'UC Berkeley', score: 7.8, type: 'safety' as const, color: 'green' },
+  { name: 'Northwestern', score: 8.2, type: 'target' as const, color: 'amber' },
+  { name: 'MIT', score: 8.9, type: 'reach' as const, color: 'red' },
+];
+
 export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBentoProps> = ({
   overallScore,
   tierName,
@@ -49,16 +85,33 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
   tierProgress,
 }) => {
   const [expandedMetric, setExpandedMetric] = useState<string | null>(null);
-  const [expandedComponent, setExpandedComponent] = useState<string | null>(null);
 
-  const handleComponentToggle = (componentId: string) => {
-    setExpandedComponent(expandedComponent === componentId ? null : componentId);
+  const metricCards = [
+    { title: 'Academic', score: metrics.academic, color: 'blue' as const },
+    { title: 'Leadership', score: metrics.leadership, color: 'purple' as const },
+    { title: 'Readiness', score: metrics.readiness, color: 'cyan' as const },
+    { title: 'Extracurricular', score: metrics.extracurricular, color: 'green' as const },
+    { title: 'Course Rigor', score: metrics.courseRigor, color: 'indigo' as const },
+    { title: 'Community', score: metrics.community, color: 'orange' as const },
+  ];
+
+  // Prepare tier progress data with milestones
+  const tierProgressData = {
+    ...tierProgress,
+    milestonesCompleted: 2,
+    milestonesTotal: 6,
+    milestones: [
+      { text: 'Complete 6 AP courses with 5s', completed: true },
+      { text: 'Reach 400+ service hours', completed: true },
+      { text: 'Start research project or major competition', completed: false },
+    ],
   };
 
   return (
     <div className="relative">
+      {/* Modal for Expanded Metric */}
       <AnimatePresence>
-        {expandedMetric ? (
+        {expandedMetric && (
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -99,174 +152,70 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
                 </div>
                 <button
                   onClick={() => setExpandedMetric(null)}
-                  className="mt-8 px-8 py-3 bg-gradient-to-r from-primary to-cyan-500 text-white rounded-xl hover:shadow-depth-3 transition-all duration-300 font-bold"
+                  className="mt-8 px-6 py-3 bg-primary text-primary-foreground rounded-xl font-medium hover:scale-105 transition-transform"
                 >
                   Close
                 </button>
               </div>
             </motion.div>
           </motion.div>
-        ) : (
-          <div className="insights-dashboard-container">
-            {/* Profile Story Component */}
-            <div className={cn(
-              'profile-story-section transition-all duration-300',
-              expandedComponent && expandedComponent !== 'profile-story' && 'opacity-40 blur-sm pointer-events-none'
-            )}>
-              <ExpandableWrapper
-                id="profile-story"
-                isExpanded={expandedComponent === 'profile-story'}
-                onToggle={() => handleComponentToggle('profile-story')}
-                shapeClass="shape-profile angular-border"
-                expandedHeight="85vh"
-                collapsedContent={
-                  <ProfileStoryComponent data={MOCK_PROFILE_STORY} isExpanded={false} />
-                }
-                className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300"
-              >
-                <ProfileStoryComponent data={MOCK_PROFILE_STORY} isExpanded={true} />
-              </ExpandableWrapper>
-            </div>
-
-            {/* Metrics Grid - Keep Existing */}
-            <div className={cn(
-              'insights-metrics-grid transition-all duration-300',
-              expandedComponent && 'opacity-40 blur-sm pointer-events-none'
-            )}>
-              <BentoMetricCard
-                title="Academic"
-                score={metrics.academic}
-                color="blue"
-                description="Strong foundation with room for strategic enhancement"
-                onClick={() => setExpandedMetric('Academic')}
-              />
-              <BentoMetricCard
-                title="Leadership"
-                score={metrics.leadership}
-                color="purple"
-                description="Exceptional leadership demonstrated across activities"
-                onClick={() => setExpandedMetric('Leadership')}
-              />
-              <BentoMetricCard
-                title="Readiness"
-                score={metrics.readiness}
-                color="green"
-                description="Well-prepared for college-level challenges"
-                onClick={() => setExpandedMetric('Readiness')}
-              />
-              <BentoMetricCard
-                title="Extracurricular"
-                score={metrics.extracurricular}
-                color="cyan"
-                description="Impressive breadth and depth of involvement"
-                onClick={() => setExpandedMetric('Extracurricular')}
-              />
-              <BentoMetricCard
-                title="Course Rigor"
-                score={metrics.courseRigor}
-                color="indigo"
-                description="Strong • 6 APs completed"
-                onClick={() => setExpandedMetric('Course Rigor')}
-              />
-              <BentoMetricCard
-                title="Community"
-                score={metrics.community}
-                color="orange"
-                description="Meaningful service and community leadership"
-                onClick={() => setExpandedMetric('Community')}
-              />
-            </div>
-
-            {/* Competitive Standing and Attribution */}
-            <div className="insights-two-column-section">
-              <div className={cn(
-                'transition-all duration-300',
-                expandedComponent && expandedComponent !== 'competitive' && 'opacity-40 blur-sm pointer-events-none'
-              )}>
-                <ExpandableWrapper
-                  id="competitive"
-                  isExpanded={expandedComponent === 'competitive'}
-                  onToggle={() => handleComponentToggle('competitive')}
-                  shapeClass="shape-competitive angular-border"
-                  expandedHeight="80vh"
-                  collapsedContent={
-                    <CompetitiveStandingComponent data={MOCK_COMPETITIVE_STANDING} isExpanded={false} />
-                  }
-                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
-                >
-                  <CompetitiveStandingComponent data={MOCK_COMPETITIVE_STANDING} isExpanded={true} />
-                </ExpandableWrapper>
-              </div>
-
-              <div className={cn(
-                'transition-all duration-300',
-                expandedComponent && expandedComponent !== 'attribution' && 'opacity-40 blur-sm pointer-events-none'
-              )}>
-                <ExpandableWrapper
-                  id="attribution"
-                  isExpanded={expandedComponent === 'attribution'}
-                  onToggle={() => handleComponentToggle('attribution')}
-                  shapeClass="shape-attribution angular-border"
-                  expandedHeight="75vh"
-                  collapsedContent={
-                    <AttributionBreakdownComponent data={MOCK_ATTRIBUTION} isExpanded={false} />
-                  }
-                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
-                >
-                  <AttributionBreakdownComponent data={MOCK_ATTRIBUTION} isExpanded={true} />
-                </ExpandableWrapper>
-              </div>
-            </div>
-
-            {/* Next Steps and Progress */}
-            <div className="insights-two-column-section-alt">
-              <div className={cn(
-                'transition-all duration-300',
-                expandedComponent && expandedComponent !== 'next-steps' && 'opacity-40 blur-sm pointer-events-none'
-              )}>
-                <ExpandableWrapper
-                  id="next-steps"
-                  isExpanded={expandedComponent === 'next-steps'}
-                  onToggle={() => handleComponentToggle('next-steps')}
-                  shapeClass="shape-next-steps angular-border"
-                  expandedHeight="80vh"
-                  collapsedContent={<NextStepsComponent data={MOCK_NEXT_STEPS} isExpanded={false} />}
-                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
-                >
-                  <NextStepsComponent data={MOCK_NEXT_STEPS} isExpanded={true} />
-                </ExpandableWrapper>
-              </div>
-
-              <div className={cn(
-                'transition-all duration-300',
-                expandedComponent && expandedComponent !== 'progress' && 'opacity-40 blur-sm pointer-events-none'
-              )}>
-                <ExpandableWrapper
-                  id="progress"
-                  isExpanded={expandedComponent === 'progress'}
-                  onToggle={() => handleComponentToggle('progress')}
-                  shapeClass="shape-progress angular-border"
-                  expandedHeight="70vh"
-                  collapsedContent={
-                    <ProgressTrackingComponent data={MOCK_PROGRESS_TRACKING} isExpanded={false} />
-                  }
-                  className="depth-layer-3 bg-gradient-to-br from-background to-muted/20 hover:shadow-depth-3 transition-all duration-300 h-full"
-                >
-                  <ProgressTrackingComponent data={MOCK_PROGRESS_TRACKING} isExpanded={true} />
-                </ExpandableWrapper>
-              </div>
-            </div>
-
-            {/* Achievements Grid - Keep Existing */}
-            <div className={cn(
-              'insights-achievements-section transition-all duration-300',
-              expandedComponent && 'opacity-40 blur-sm pointer-events-none'
-            )}>
-              <BentoAchievements achievements={achievements} />
-            </div>
-          </div>
         )}
       </AnimatePresence>
+
+      {/* Main Dashboard Layout */}
+      <div className="space-y-6 w-full">
+        {/* 1. Hero Score Orbital */}
+        <div className="flex justify-center">
+          <ScoreOrbitalHero 
+            score={overallScore} 
+            tier={tierName} 
+            percentile={percentile} 
+          />
+        </div>
+
+        {/* 2. Competitive Context */}
+        <CompetitiveSpectrumCard
+          userScore={8.2}
+          userPercentile={percentile}
+          schoolTiers={MOCK_SCHOOL_TIERS}
+        />
+
+        {/* 3. Insights Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          <div className="lg:col-span-3">
+            <TopContributorsCard contributors={MOCK_TOP_CONTRIBUTORS} />
+          </div>
+          <div className="lg:col-span-2">
+            <QuickStatsGrid stats={MOCK_QUICK_STATS} />
+          </div>
+        </div>
+
+        {/* 4. Metrics Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {metricCards.map((metric) => (
+            <BentoMetricCard
+              key={metric.title}
+              title={metric.title}
+              score={metric.score}
+              color={metric.color}
+              onClick={() => setExpandedMetric(metric.title)}
+            />
+          ))}
+        </div>
+
+        {/* 5. Action & Progress Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <PriorityActionsCard actions={MOCK_PRIORITY_ACTIONS} />
+          <TierProgressCard progress={tierProgressData} />
+        </div>
+
+        {/* 6. Achievements */}
+        <div className="flex justify-center">
+          <div className="w-full max-w-md">
+            <BentoAchievements achievements={achievements} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

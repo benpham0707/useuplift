@@ -149,11 +149,19 @@ export const InteractivePortfolioCard: React.FC<InteractivePortfolioCardProps> =
               />
               <div className="flex items-center">
                 <TierProgressCard
-                  currentTier={tierProgress.currentTier}
-                  nextTier={tierProgress.nextTier}
-                  progress={tierProgress.progress}
-                  pointsNeeded={tierProgress.pointsNeeded}
-                  className="h-full"
+                  progress={{
+                    currentTier: tierProgress.currentTier,
+                    nextTier: tierProgress.nextTier,
+                    progress: tierProgress.progress,
+                    pointsNeeded: tierProgress.pointsNeeded,
+                    milestonesCompleted: 2,
+                    milestonesTotal: 6,
+                    milestones: [
+                      { text: 'Complete 6 AP courses with 5s', completed: true },
+                      { text: 'Reach 400+ service hours', completed: true },
+                      { text: 'Start research project', completed: false },
+                    ],
+                  }}
                 />
               </div>
             </div>
@@ -213,10 +221,19 @@ export const InteractivePortfolioCard: React.FC<InteractivePortfolioCardProps> =
 
               <div className="col-span-2">
                 <TierProgressCard
-                  currentTier={tierProgress.currentTier}
-                  nextTier={tierProgress.nextTier}
-                  progress={tierProgress.progress}
-                  pointsNeeded={tierProgress.pointsNeeded}
+                  progress={{
+                    currentTier: tierProgress.currentTier,
+                    nextTier: tierProgress.nextTier,
+                    progress: tierProgress.progress,
+                    pointsNeeded: tierProgress.pointsNeeded,
+                    milestonesCompleted: 2,
+                    milestonesTotal: 6,
+                    milestones: [
+                      { text: 'Complete 6 AP courses with 5s', completed: true },
+                      { text: 'Reach 400+ service hours', completed: true },
+                      { text: 'Start research project', completed: false },
+                    ],
+                  }}
                 />
               </div>
 
@@ -273,10 +290,19 @@ export const InteractivePortfolioCard: React.FC<InteractivePortfolioCardProps> =
               </div>
 
               <TierProgressCard
-                currentTier={tierProgress.currentTier}
-                nextTier={tierProgress.nextTier}
-                progress={tierProgress.progress}
-                pointsNeeded={tierProgress.pointsNeeded}
+                progress={{
+                  currentTier: tierProgress.currentTier,
+                  nextTier: tierProgress.nextTier,
+                  progress: tierProgress.progress,
+                  pointsNeeded: tierProgress.pointsNeeded,
+                  milestonesCompleted: 2,
+                  milestonesTotal: 6,
+                  milestones: [
+                    { text: 'Complete 6 AP courses with 5s', completed: true },
+                    { text: 'Reach 400+ service hours', completed: true },
+                    { text: 'Start research project', completed: false },
+                  ],
+                }}
               />
               
               <AchievementTracker achievements={achievements} />
