@@ -36,7 +36,7 @@ import type {
   RubricCategoryScore,
 } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 
-import type { TeachingIssue, TeachingExample } from './teachingExamples';
+import type { TeachingExample } from './teachingExamples';
 import { TEACHING_EXAMPLES } from './teachingExamples';
 import {
   PATTERN_GROUPS,
@@ -414,14 +414,12 @@ function convertTeachingToComparative(
   }
 
   return {
-    text: teaching.text,
+    text: type === 'weak' ? teaching.weakExample : teaching.strongExample,
     score: type === 'weak' ? 3 : 9,
     annotations: [
       {
-        highlight: type === 'weak' ? teaching.problem || 'Weak execution' : teaching.principle || 'Strong technique',
-        explanation: type === 'weak'
-          ? teaching.problem || 'This approach weakens the narrative'
-          : teaching.principle || 'This technique strengthens impact',
+        highlight: (teaching.diffHighlights && teaching.diffHighlights[0]) || (type === 'weak' ? 'Weak execution' : 'Strong technique'),
+        explanation: teaching.explanation,
         category: type === 'weak' ? 'weakness' : 'strength',
       },
     ],
