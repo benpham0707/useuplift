@@ -38,16 +38,16 @@ export const TierProgressCard: React.FC<TierProgressCardProps> = ({ progress }) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1, duration: 0.5 }}
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-200/60 hover:border-purple-400/80 shadow-lg shadow-purple-100/50 hover:shadow-xl hover:shadow-purple-200/60 hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-400/40 shadow-lg shadow-purple-400/40 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3 md:gap-4">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-400/50">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#a855f7] to-[#07c6ff] flex items-center justify-center shadow-lg">
                 <Trophy className="w-6 h-6 text-white" />
               </div>
               <GradientText
                 className="text-base md:text-lg font-extrabold uppercase tracking-wide"
-                colors={["#a855f7", "#06b6d4", "#8b5cf6", "#a855f7"]}
+                colors={["#a855f7", "#c137ff", "#07c6ff", "#a855f7"]}
               >
                 PROGRESS TO {progress.nextTier.toUpperCase()}
               </GradientText>

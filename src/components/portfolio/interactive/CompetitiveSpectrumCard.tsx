@@ -32,15 +32,15 @@ export const CompetitiveSpectrumCard: React.FC<CompetitiveSpectrumCardProps> = (
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2, duration: 0.5 }}
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-200/60 hover:border-purple-400/80 shadow-lg shadow-purple-100/50 hover:shadow-xl hover:shadow-purple-200/60 hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-[#07c6ff]/40 shadow-lg shadow-cyan-400/30 hover:border-[#07c6ff]/60 hover:shadow-xl hover:shadow-cyan-500/40 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center gap-3 md:gap-4 mb-6">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-400/50">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#07c6ff] to-[#c137ff] flex items-center justify-center shadow-lg">
               <MapPin className="w-6 h-6 text-white" />
             </div>
             <GradientText
               className="text-base md:text-lg font-extrabold uppercase tracking-wide"
-              colors={["#8b5cf6", "#3b82f6", "#06b6d4", "#8b5cf6"]}
+              colors={["#07c6ff", "#00ffaa", "#8b5cf6", "#c137ff"]}
             >
               WHERE YOU STAND
             </GradientText>

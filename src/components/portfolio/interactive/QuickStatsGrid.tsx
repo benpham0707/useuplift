@@ -87,15 +87,15 @@ export const QuickStatsGrid: React.FC<QuickStatsGridProps> = ({ stats }) => {
       transition={{ delay: 0.4, duration: 0.5 }}
       className="h-full"
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-cyan-200/60 hover:border-cyan-400/80 shadow-lg shadow-cyan-100/50 hover:shadow-xl hover:shadow-cyan-200/60 hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-[#00ffaa]/40 shadow-lg shadow-cyan-300/30 hover:border-[#00ffaa]/60 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center gap-3 md:gap-4 mb-4">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 via-teal-500 to-green-500 flex items-center justify-center shadow-lg shadow-cyan-400/50">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00ffaa] to-[#07c6ff] flex items-center justify-center shadow-lg">
               <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <GradientText
               className="text-base md:text-lg font-extrabold uppercase tracking-wide"
-              colors={["#06b6d4", "#10b981", "#14b8a6", "#06b6d4"]}
+              colors={["#07c6ff", "#00c1ff", "#00ffaa", "#07c6ff"]}
             >
               AT A GLANCE
             </GradientText>

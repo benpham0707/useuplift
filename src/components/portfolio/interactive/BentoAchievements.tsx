@@ -63,16 +63,16 @@ export const BentoAchievements: React.FC<BentoAchievementsProps> = ({ achievemen
   ];
 
   return (
-    <div className="rounded-2xl p-5 h-full bg-white/80 backdrop-blur-md border-2 border-amber-200/60 hover:border-amber-400/80 shadow-lg shadow-amber-100/50 hover:shadow-xl hover:shadow-amber-200/60 hover:-translate-y-1 transition-all duration-300">
+    <div className="rounded-2xl p-5 h-full bg-white/80 backdrop-blur-md border-2 border-cyan-400/40 shadow-lg shadow-cyan-300/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
       {/* Header */}
       <div className="flex items-center gap-3 md:gap-4 mb-4">
-        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-400/50">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00ffaa] to-[#c137ff] flex items-center justify-center shadow-lg">
           <Award className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1 flex items-center justify-between">
           <GradientText
             className="text-base md:text-lg font-extrabold uppercase tracking-wide"
-            colors={["#eab308", "#f59e0b", "#fbbf24", "#eab308"]}
+            colors={["#00ffaa", "#07c6ff", "#8b5cf6", "#c137ff"]}
           >
             ACHIEVEMENTS
           </GradientText>
