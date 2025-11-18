@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Radial gradient utility */
+@layer utilities {
+  .bg-gradient-radial {
+    background-image: radial-gradient(circle at center, var(--tw-gradient-stops));
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 20px rgba(147, 51, 234, 0.6),
+                 0 0 40px rgba(147, 51, 234, 0.4);
+  }
+  
+  .box-glow {
+    box-shadow: 0 0 20px rgba(147, 51, 234, 0.3),
+                0 0 40px rgba(147, 51, 234, 0.2),
+                0 0 60px rgba(147, 51, 234, 0.1);
+  }
+}
+
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
