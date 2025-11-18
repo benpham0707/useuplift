@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { motion } from 'motion/react';
-import { TrendingUp, CheckCircle, Circle } from 'lucide-react';
+import { TrendingUp, CheckCircle, Circle, Trophy } from 'lucide-react';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
+import GradientText from '@/components/ui/GradientText';
 
 interface TierProgressCardProps {
   progress: {
@@ -37,14 +38,19 @@ export const TierProgressCard: React.FC<TierProgressCardProps> = ({ progress }) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1, duration: 0.5 }}
     >
-      <Card className="h-full depth-layer-3 hover:depth-layer-4 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-200/60 hover:border-purple-400/80 shadow-lg shadow-purple-100/50 hover:shadow-xl hover:shadow-purple-200/60 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-primary" />
-              <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-                Progress to {progress.nextTier}
-              </h3>
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-indigo-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-400/50">
+                <Trophy className="w-6 h-6 text-white" />
+              </div>
+              <GradientText
+                className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+                colors={["#a855f7", "#06b6d4", "#8b5cf6", "#a855f7"]}
+              >
+                PROGRESS TO {progress.nextTier.toUpperCase()}
+              </GradientText>
             </div>
             <motion.div
               initial={{ opacity: 0, scale: 0 }}
@@ -58,10 +64,13 @@ export const TierProgressCard: React.FC<TierProgressCardProps> = ({ progress }) 
 
           {/* Progress Bar */}
           <div className="relative mb-6">
-            <Progress 
-              value={animatedProgress} 
-              className="h-3"
-            />
+            <div className="relative h-4 bg-muted rounded-full overflow-hidden border-2 border-white/40 shadow-inner shadow-slate-200/50">
+              <Progress 
+                value={animatedProgress} 
+                className="h-full"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse" />
+            </div>
           </div>
 
           {/* Stats Grid */}

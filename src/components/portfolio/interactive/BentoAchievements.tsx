@@ -1,6 +1,7 @@
 import React from 'react';
-import { Trophy, Star, Target, Sparkles, Lock } from 'lucide-react';
+import { Trophy, Star, Target, Sparkles, Lock, Award } from 'lucide-react';
 import { Achievement } from '../portfolioInsightsData';
+import GradientText from '@/components/ui/GradientText';
 
 interface BentoAchievementsProps {
   achievements: Achievement[];
@@ -62,17 +63,22 @@ export const BentoAchievements: React.FC<BentoAchievementsProps> = ({ achievemen
   ];
 
   return (
-    <div className="depth-layer-3 holo-surface rounded-2xl p-5 h-full bg-gradient-to-br from-white/95 to-white/85">
+    <div className="rounded-2xl p-5 h-full bg-white/80 backdrop-blur-md border-2 border-amber-200/60 hover:border-amber-400/80 shadow-lg shadow-amber-100/50 hover:shadow-xl hover:shadow-amber-200/60 hover:-translate-y-1 transition-all duration-300">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-4 h-4 text-amber-500" />
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-            Achievements
-          </h3>
+      <div className="flex items-center gap-3 md:gap-4 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 via-amber-500 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-400/50">
+          <Award className="w-6 h-6 text-white" />
         </div>
-        <div className="text-xs font-bold text-primary">
-          {unlockedCount}/{totalCount}
+        <div className="flex-1 flex items-center justify-between">
+          <GradientText
+            className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+            colors={["#eab308", "#f59e0b", "#fbbf24", "#eab308"]}
+          >
+            ACHIEVEMENTS
+          </GradientText>
+          <div className="text-xs font-bold text-primary">
+            {unlockedCount}/{totalCount}
+          </div>
         </div>
       </div>
 

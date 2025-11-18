@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { motion } from 'motion/react';
-import { Trophy, Clock, Target, Award } from 'lucide-react';
+import { Trophy, Clock, Target, Award, BarChart3 } from 'lucide-react';
+import GradientText from '@/components/ui/GradientText';
 
 interface QuickStatsGridProps {
   stats: {
@@ -51,7 +52,7 @@ const StatCard: React.FC<{
       whileHover={{ scale: 1.05 }}
       className="group cursor-pointer"
     >
-      <Card className="h-full depth-layer-2 hover:depth-layer-3 transition-all duration-300 overflow-hidden">
+      <Card className="h-full bg-white/70 backdrop-blur-sm border-2 border-white/50 hover:border-cyan-400/60 shadow-lg shadow-cyan-100/50 hover:shadow-xl hover:shadow-cyan-200/60 transition-all duration-300 overflow-hidden">
         <CardContent className="p-4 relative">
           {/* Background gradient */}
           <div className={`absolute inset-0 bg-gradient-to-br from-${color}-500/5 to-${color}-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -86,12 +87,18 @@ export const QuickStatsGrid: React.FC<QuickStatsGridProps> = ({ stats }) => {
       transition={{ delay: 0.4, duration: 0.5 }}
       className="h-full"
     >
-      <Card className="h-full depth-layer-3 hover:depth-layer-4 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-cyan-200/60 hover:border-cyan-400/80 shadow-lg shadow-cyan-100/50 hover:shadow-xl hover:shadow-cyan-200/60 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
-          <div className="mb-4">
-            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              At a Glance
-            </h3>
+          <div className="flex items-center gap-3 md:gap-4 mb-4">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 via-teal-500 to-green-500 flex items-center justify-center shadow-lg shadow-cyan-400/50">
+              <BarChart3 className="w-6 h-6 text-white" />
+            </div>
+            <GradientText
+              className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+              colors={["#06b6d4", "#10b981", "#14b8a6", "#06b6d4"]}
+            >
+              AT A GLANCE
+            </GradientText>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

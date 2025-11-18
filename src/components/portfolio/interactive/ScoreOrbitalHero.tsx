@@ -37,37 +37,52 @@ export const ScoreOrbitalHero: React.FC<ScoreOrbitalHeroProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6 }}
-      className="relative w-full max-w-md mx-auto"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.8, ease: "easeOut" }}
+      className="relative w-full h-[400px] flex items-center justify-center bg-white/70 backdrop-blur-xl rounded-3xl overflow-hidden border-2 border-white/50 shadow-[0_20px_60px_-15px_rgba(147,51,234,0.3)] hover:shadow-[0_25px_70px_-15px_rgba(147,51,234,0.4)] hover:-translate-y-1 transition-all duration-300"
+      style={{ willChange: 'opacity, transform' }}
     >
       {/* Multi-layer pulsing glow effects */}
       <motion.div
-        animate={{ 
-          opacity: [0.3, 0.6, 0.3],
-          scale: [1, 1.2, 1]
+        animate={{
+          scale: [1, 1.2, 1],
+          opacity: [0.4, 0.6, 0.4],
         }}
-        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute inset-0 rounded-full bg-primary/30 blur-3xl -z-20"
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        className="absolute w-72 h-72 rounded-full bg-gradient-radial from-purple-500/50 via-purple-400/30 to-transparent blur-3xl"
         style={{ willChange: 'opacity, transform' }}
       />
       <motion.div
-        animate={{ 
-          opacity: [0.2, 0.5, 0.2],
-          scale: [1.2, 1, 1.2]
+        animate={{
+          scale: [1, 1.3, 1],
+          opacity: [0.3, 0.5, 0.3],
         }}
-        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-        className="absolute inset-0 rounded-full bg-secondary/20 blur-3xl -z-20"
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 0.5
+        }}
+        className="absolute w-96 h-96 rounded-full bg-gradient-radial from-cyan-400/40 via-blue-400/25 to-transparent blur-3xl"
         style={{ willChange: 'opacity, transform' }}
       />
       <motion.div
-        animate={{ 
-          opacity: [0.1, 0.3, 0.1],
-          scale: [1, 1.3, 1]
+        animate={{
+          scale: [1, 1.4, 1],
+          opacity: [0.25, 0.4, 0.25],
         }}
-        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-        className="absolute inset-0 rounded-full bg-accent/20 blur-3xl -z-20"
+        transition={{
+          duration: 6,
+          repeat: Infinity,
+          ease: "easeInOut",
+          delay: 1
+        }}
+        className="absolute w-[500px] h-[500px] rounded-full bg-gradient-radial from-pink-400/35 via-rose-400/20 to-transparent blur-3xl"
         style={{ willChange: 'opacity, transform' }}
       />
       
@@ -77,30 +92,30 @@ export const ScoreOrbitalHero: React.FC<ScoreOrbitalHeroProps> = ({
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-0 rounded-full border-2 border-primary/60 shadow-[0_0_15px_rgba(147,51,234,0.5)]"
+          className="absolute inset-0 rounded-full border-2 border-purple-400/60 shadow-lg shadow-purple-400/40"
           style={{ willChange: 'transform' }}
         >
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-primary shadow-[0_0_20px_rgba(147,51,234,0.8)]" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.8)]" />
         </motion.div>
 
         {/* Middle Ring - Enhanced glow */}
         <motion.div
           animate={{ rotate: -360 }}
           transition={{ duration: 15, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-8 rounded-full border-2 border-secondary/60 shadow-[0_0_15px_rgba(6,182,212,0.5)]"
+          className="absolute inset-8 rounded-full border-2 border-cyan-400/55 shadow-lg shadow-cyan-400/40"
           style={{ willChange: 'transform' }}
         >
-          <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-secondary shadow-[0_0_20px_rgba(6,182,212,0.8)]" />
+          <div className="absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_15px_rgba(34,211,238,0.8)]" />
         </motion.div>
 
         {/* Inner Ring - Enhanced glow */}
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-          className="absolute inset-16 rounded-full border-2 border-accent/60 shadow-[0_0_15px_rgba(192,38,211,0.5)]"
+          className="absolute inset-16 rounded-full border-2 border-pink-400/50 shadow-lg shadow-pink-400/40"
           style={{ willChange: 'transform' }}
         >
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 rounded-full bg-accent shadow-[0_0_20px_rgba(192,38,211,0.8)]" />
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 w-2 h-2 rounded-full bg-pink-400 shadow-[0_0_15px_rgba(236,72,153,0.8)]" />
         </motion.div>
 
         {/* Floating particles */}
@@ -126,47 +141,33 @@ export const ScoreOrbitalHero: React.FC<ScoreOrbitalHeroProps> = ({
           />
         ))}
 
-        {/* Center Score Circle - Dark glass with intense glow */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="relative">
-            <div className="w-32 h-32 rounded-full bg-slate-900/90 backdrop-blur-md border-2 border-primary/50 shadow-[0_0_40px_rgba(147,51,234,0.4)] flex flex-col items-center justify-center">
-              <div 
-                className="text-6xl font-bold bg-gradient-to-r from-white via-primary to-secondary bg-clip-text text-transparent"
-                style={{ textShadow: '0 0 30px rgba(147, 51, 234, 0.8)' }}
-              >
-                {animatedScore}
-              </div>
-              <div className="text-xs text-white/80 uppercase tracking-wider mt-1">
-                Overall
-              </div>
-            </div>
-            {/* Additional center glow */}
-            <motion.div
-              animate={{ opacity: [0.5, 1, 0.5], scale: [1, 1.1, 1] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="absolute inset-0 rounded-full bg-primary/30 blur-xl -z-10"
-              style={{ willChange: 'opacity, transform' }}
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Tier Badge & Percentile - Dark mode styling */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
-        className="flex items-center justify-center gap-3 mt-4"
-      >
-        <Badge 
-          variant="default" 
-          className="px-4 py-1.5 text-sm font-medium bg-slate-800/80 backdrop-blur-sm border-2 border-primary/40 text-white shadow-[0_0_20px_rgba(147,51,234,0.3)] hover:scale-105 transition-transform"
+        {/* Central score display */}
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+          className="absolute inset-0 flex flex-col items-center justify-center"
         >
-          {tier}
-        </Badge>
-        <span className="text-sm font-medium text-white/60">•</span>
-        <span className="text-sm font-medium text-white font-semibold">{percentile}</span>
-      </motion.div>
+          <div className="relative mb-4">
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="absolute inset-0 bg-gradient-to-r from-purple-400 via-cyan-400 to-pink-400 blur-2xl opacity-60"
+            />
+            <div className="relative text-8xl font-black bg-gradient-to-r from-purple-600 via-cyan-600 to-pink-600 bg-clip-text text-transparent drop-shadow-[0_0_30px_rgba(168,85,247,0.9)]" style={{ textShadow: '0 0 40px rgba(168,85,247,0.7), 0 0 60px rgba(34,211,238,0.5)' }}>
+              {animatedScore}
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="default" className="px-4 py-1.5 text-sm font-bold bg-primary text-primary-foreground border-0 shadow-lg shadow-primary/30">
+              {tier}
+            </Badge>
+            <span className="text-base font-semibold text-foreground">
+              {percentile}
+            </span>
+          </div>
+        </motion.div>
+      </div>
     </motion.div>
   );
 };

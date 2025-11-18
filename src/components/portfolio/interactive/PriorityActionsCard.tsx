@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { motion } from 'motion/react';
 import { Lightbulb, Flame, Zap, CheckCircle } from 'lucide-react';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
+import GradientText from '@/components/ui/GradientText';
 
 interface PriorityAction {
   title: string;
@@ -51,13 +52,18 @@ export const PriorityActionsCard: React.FC<PriorityActionsCardProps> = ({ action
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1, duration: 0.5 }}
     >
-      <Card className="h-full depth-layer-3 hover:depth-layer-4 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-amber-200/60 hover:border-amber-400/80 shadow-lg shadow-amber-100/50 hover:shadow-xl hover:shadow-amber-200/60 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Lightbulb className="h-5 w-5 text-primary" />
-            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Your Next Steps
-            </h3>
+          <div className="flex items-center gap-3 md:gap-4 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 via-orange-500 to-yellow-500 flex items-center justify-center shadow-lg shadow-amber-400/50">
+              <Lightbulb className="w-6 h-6 text-white" />
+            </div>
+            <GradientText
+              className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+              colors={["#f59e0b", "#f97316", "#fb923c", "#f59e0b"]}
+            >
+              YOUR NEXT STEPS
+            </GradientText>
           </div>
 
           <div className="space-y-3">
@@ -73,7 +79,11 @@ export const PriorityActionsCard: React.FC<PriorityActionsCardProps> = ({ action
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 1.2 + idx * 0.1, duration: 0.4 }}
-                      className={`relative p-4 rounded-xl border ${config.bg} ${config.border} ${config.accentBorder} cursor-pointer group hover:scale-[1.02] transition-all duration-300`}
+                      className={`relative p-4 rounded-xl bg-white/60 backdrop-blur-sm border-l-4 ${config.accentBorder} border border-white/40 shadow-md ${
+                        action.priority === 'high' ? 'shadow-red-100/50 hover:shadow-red-200/60' :
+                        action.priority === 'medium' ? 'shadow-amber-100/50 hover:shadow-amber-200/60' :
+                        'shadow-green-100/50 hover:shadow-green-200/60'
+                      } cursor-pointer group hover:scale-[1.01] hover:shadow-lg transition-all duration-300`}
                     >
                       {isPulse && (
                         <motion.div

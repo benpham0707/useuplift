@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { motion } from 'motion/react';
-import { Users, Heart, Award, Sparkles } from 'lucide-react';
+import { Users, Heart, Award, Sparkles, TrendingUp } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
+import GradientText from '@/components/ui/GradientText';
 
 interface Contributor {
   name: string;
@@ -35,13 +36,18 @@ export const TopContributorsCard: React.FC<TopContributorsCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.5 }}
     >
-      <Card className="h-full depth-layer-3 hover:depth-layer-4 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-pink-200/60 hover:border-pink-400/80 shadow-lg shadow-pink-100/50 hover:shadow-xl hover:shadow-pink-200/60 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              What's Driving Your Score
-            </h3>
+          <div className="flex items-center gap-3 md:gap-4 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-pink-500 to-rose-500 flex items-center justify-center shadow-lg shadow-pink-400/50">
+              <TrendingUp className="w-6 h-6 text-white" />
+            </div>
+            <GradientText
+              className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+              colors={["#a855f7", "#ec4899", "#f472b6", "#a855f7"]}
+            >
+              WHAT'S DRIVING YOUR SCORE
+            </GradientText>
           </div>
 
           <div className="space-y-4">
@@ -56,7 +62,7 @@ export const TopContributorsCard: React.FC<TopContributorsCardProps> = ({
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.6 + idx * 0.1, duration: 0.4 }}
-                      className="p-4 rounded-xl bg-gradient-to-br from-background to-muted/30 border border-border hover:border-primary/50 transition-all duration-300 cursor-pointer group hover:scale-[1.02]"
+                      className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/40 hover:border-primary/50 shadow-md shadow-slate-200/50 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 cursor-pointer group hover:scale-[1.02]"
                     >
                       <div className="flex items-center gap-4">
                         <motion.div

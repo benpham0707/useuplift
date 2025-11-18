@@ -74,7 +74,14 @@ export const BentoMetricCard: React.FC<BentoMetricCardProps> = ({
 
   return (
     <div
-      className="depth-layer-3 holo-surface rounded-2xl p-6 h-full bg-gradient-to-br from-white/95 to-white/85 hover:scale-[1.02] hover:shadow-depth-4 transition-all duration-500 cursor-pointer group/metric relative overflow-hidden"
+      className={`rounded-2xl p-6 h-full bg-white/80 backdrop-blur-md border-2 border-white/50 hover:border-${color}-400/70 shadow-lg hover:scale-[1.02] hover:shadow-xl hover:-translate-y-1 transition-all duration-500 cursor-pointer group/metric relative overflow-hidden ${
+        color === 'blue' ? 'shadow-blue-100/50 hover:shadow-blue-200/60' :
+        color === 'purple' ? 'shadow-purple-100/50 hover:shadow-purple-200/60' :
+        color === 'cyan' ? 'shadow-cyan-100/50 hover:shadow-cyan-200/60' :
+        color === 'green' ? 'shadow-green-100/50 hover:shadow-green-200/60' :
+        color === 'indigo' ? 'shadow-indigo-100/50 hover:shadow-indigo-200/60' :
+        'shadow-orange-100/50 hover:shadow-orange-200/60'
+      }`}
       onClick={onClick}
     >
       {/* Icon badge */}

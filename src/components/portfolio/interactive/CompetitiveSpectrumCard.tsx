@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { motion } from 'motion/react';
 import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
 import { MapPin } from 'lucide-react';
+import GradientText from '@/components/ui/GradientText';
 
 interface CompetitiveSpectrumCardProps {
   userScore: number;
@@ -31,19 +32,24 @@ export const CompetitiveSpectrumCard: React.FC<CompetitiveSpectrumCardProps> = (
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.2, duration: 0.5 }}
     >
-      <Card className="depth-layer-3 hover:depth-layer-4 transition-all duration-300">
+      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-200/60 hover:border-purple-400/80 shadow-lg shadow-purple-100/50 hover:shadow-xl hover:shadow-purple-200/60 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-6">
-            <MapPin className="h-5 w-5 text-primary" />
-            <h3 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">
-              Where You Stand
-            </h3>
+          <div className="flex items-center gap-3 md:gap-4 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-400/50">
+              <MapPin className="w-6 h-6 text-white" />
+            </div>
+            <GradientText
+              className="text-base md:text-lg font-extrabold uppercase tracking-wide"
+              colors={["#8b5cf6", "#3b82f6", "#06b6d4", "#8b5cf6"]}
+            >
+              WHERE YOU STAND
+            </GradientText>
           </div>
 
           {/* Spectrum Bar */}
           <div className="relative h-20 mb-8">
             {/* Background Gradient Bar */}
-            <div className="absolute inset-x-0 top-8 h-3 bg-gradient-to-r from-green-500 via-amber-400 to-red-500 rounded-full" />
+            <div className="absolute inset-x-0 top-8 h-3 bg-gradient-to-r from-green-500 via-amber-400 to-red-500 rounded-full border border-white/30" />
             
             {/* School Markers */}
             {schoolTiers.map((school, idx) => {
