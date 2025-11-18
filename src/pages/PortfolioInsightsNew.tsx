@@ -89,68 +89,81 @@ const PortfolioInsightsNew: React.FC = () => {
   return (
     <main role="main" className="relative min-h-screen overflow-hidden">
       {/* Animated Background Layers - Vibrant Cyan/Purple Theme */}
-      <div className="fixed inset-0 -z-10">
-        {/* Base light gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-cyan-50/80 via-purple-50/80 to-violet-50/80" />
-        
-        {/* Animated radial gradient 1 - Purple to Cyan */}
+      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-purple-100 via-cyan-100 to-violet-100">
+        {/* Animated radial gradient 1 - Purple to Cyan (Large, top-left) */}
         <motion.div
           animate={{
-            x: [0, 100, 0],
-            y: [0, -100, 0],
+            x: [0, 120, 0],
+            y: [0, -80, 0],
           }}
           transition={{
             duration: 20,
             repeat: Infinity,
             ease: "linear"
           }}
-          className="absolute -top-1/2 -left-1/4 w-full h-full bg-gradient-radial from-[#c137ff]/40 via-[#8b5cf6]/35 to-[#07c6ff]/40 blur-[100px]"
+          className="absolute -top-1/3 -left-1/3 w-[120%] h-[120%] bg-gradient-radial from-purple-400/60 via-violet-400/50 to-transparent blur-[80px]"
           style={{ willChange: 'transform' }}
         />
         
-        {/* Animated radial gradient 2 - Cyan to Teal */}
+        {/* Animated radial gradient 2 - Cyan/Teal (Large, bottom-right) */}
         <motion.div
           animate={{
-            opacity: [0.3, 0.5, 0.3],
-            scale: [1, 1.1, 1],
-          }}
-          transition={{
-            duration: 15,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-          className="absolute -bottom-1/2 -right-1/4 w-full h-full bg-gradient-radial from-[#00ffaa]/35 via-[#00c1ff]/30 to-[#07c6ff]/35 blur-[100px]"
-          style={{ willChange: 'opacity, transform' }}
-        />
-        
-        {/* Animated radial gradient 3 - Purple accent */}
-        <motion.div
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 80, 0],
-            rotate: [0, 180, 360],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "linear"
-          }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-gradient-radial from-[#c137ff]/25 via-[#a855f7]/20 to-[#8b5cf6]/25 blur-[100px]"
-          style={{ willChange: 'transform' }}
-        />
-        
-        {/* Large cloudy layer */}
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.4, 0.6, 0.4],
+            x: [0, -100, 0],
+            y: [0, 60, 0],
+            opacity: [0.5, 0.7, 0.5],
           }}
           transition={{
             duration: 18,
             repeat: Infinity,
             ease: "easeInOut"
           }}
-          className="absolute inset-0 bg-gradient-radial from-[#07c6ff]/40 via-[#c137ff]/30 to-transparent blur-[120px]"
+          className="absolute -bottom-1/3 -right-1/3 w-[120%] h-[120%] bg-gradient-radial from-cyan-400/60 via-teal-400/50 to-transparent blur-[80px]"
+          style={{ willChange: 'opacity, transform' }}
+        />
+        
+        {/* Animated radial gradient 3 - Pink/Purple accent (center) */}
+        <motion.div
+          animate={{
+            scale: [1, 1.3, 1],
+            opacity: [0.4, 0.65, 0.4],
+          }}
+          transition={{
+            duration: 16,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[100%] h-[100%] bg-gradient-radial from-pink-400/50 via-purple-400/40 to-transparent blur-[100px]"
+          style={{ willChange: 'opacity, transform' }}
+        />
+        
+        {/* Animated radial gradient 4 - Bright cyan accent (rotating) */}
+        <motion.div
+          animate={{
+            x: [-50, 50, -50],
+            y: [50, -50, 50],
+            rotate: [0, 360],
+          }}
+          transition={{
+            duration: 25,
+            repeat: Infinity,
+            ease: "linear"
+          }}
+          className="absolute top-1/2 right-1/4 w-[80%] h-[80%] bg-gradient-radial from-cyan-500/45 via-blue-400/35 to-transparent blur-[90px]"
+          style={{ willChange: 'transform' }}
+        />
+        
+        {/* Large cloudy overlay */}
+        <motion.div
+          animate={{
+            scale: [1, 1.15, 1],
+            opacity: [0.5, 0.7, 0.5],
+          }}
+          transition={{
+            duration: 22,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+          className="absolute inset-0 bg-gradient-radial from-violet-300/40 via-purple-300/30 to-transparent blur-[120px]"
           style={{ willChange: 'opacity, transform' }}
         />
       </div>
