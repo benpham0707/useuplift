@@ -81,7 +81,7 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
       icon: BookOpen,
       value: `${metrics.apScores.total} APs`,
       subValue: `Avg: ${metrics.apScores.average.toFixed(1)} • ${metrics.apScores.fives} 5s`,
-      label: 'AP Scores'
+      label: 'AP/IB Scores'
     },
     {
       id: 'classRank',
@@ -89,34 +89,6 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
       value: `Top ${metrics.classRank.percentage}%`,
       subValue: `${metrics.classRank.rank} / ${metrics.classRank.outOf}`,
       label: 'Class Rank'
-    },
-    {
-      id: 'activities',
-      icon: Trophy,
-      value: `${metrics.activities}`,
-      subValue: 'Extracurriculars',
-      label: 'Activities'
-    },
-    {
-      id: 'hours',
-      icon: Clock,
-      value: `${metrics.hours}`,
-      subValue: 'Total commitment',
-      label: 'Hours'
-    },
-    {
-      id: 'impactReach',
-      icon: Target,
-      value: metrics.impactReach,
-      subValue: 'People impacted',
-      label: 'Impact Reach'
-    },
-    {
-      id: 'awards',
-      icon: Award,
-      value: `${metrics.awards}`,
-      subValue: 'Recognitions',
-      label: 'Awards'
     }
   ];
 
@@ -131,7 +103,7 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="bg-white/95 backdrop-blur-xl rounded-2xl border border-border/50 shadow-lg overflow-hidden"
+      className="bg-white/98 backdrop-blur-xl rounded-2xl border-2 border-border shadow-xl overflow-hidden"
     >
       <div className="grid grid-cols-1 lg:grid-cols-[35%_65%] gap-6 p-6">
         {/* Left Side - Overall Score */}
@@ -227,7 +199,7 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: index * 0.05 }}
-                      className="bg-white/90 backdrop-blur-sm rounded-xl border border-border/30 p-4 hover:border-cyan-400/60 hover:shadow-xl hover:shadow-cyan-400/20 hover:scale-105 transition-all duration-300 cursor-pointer group"
+                      className="bg-white/95 backdrop-blur-sm rounded-xl border-2 border-border/50 p-4 hover:border-cyan-400/60 hover:shadow-xl hover:shadow-cyan-400/20 hover:scale-105 transition-all duration-300 cursor-pointer group"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
