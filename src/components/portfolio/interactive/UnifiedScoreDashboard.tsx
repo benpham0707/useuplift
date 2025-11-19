@@ -166,99 +166,31 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
             }}
           />
 
-          {/* Orbital Rings - Complex Planetary System */}
-          <div className="relative" style={{ perspective: '1000px' }}>
-            {/* Ring 1 - Horizontal orbit */}
-            <motion.div
-              className="absolute rounded-full border-2"
-              style={{
-                width: '170px',
-                height: '170px',
-                left: '-15px',
-                top: '-15px',
-                borderColor: 'rgba(6,182,212,0.4)',
-                transformStyle: 'preserve-3d',
-              }}
-              animate={{
-                rotateZ: 360,
-                opacity: [0.3, 0.7, 0.3],
-              }}
-              transition={{
-                rotateZ: { duration: 20, repeat: Infinity, ease: "linear" },
-                opacity: { duration: 3, repeat: Infinity, ease: "easeInOut" }
-              }}
-            />
-
-            {/* Ring 2 - Tilted orbit (45deg) */}
-            <motion.div
-              className="absolute rounded-full border-2"
-              style={{
-                width: '200px',
-                height: '200px',
-                left: '-30px',
-                top: '-30px',
-                borderColor: 'rgba(147,51,234,0.4)',
-                transformStyle: 'preserve-3d',
-                transform: 'rotateX(60deg) rotateY(30deg)',
-              }}
-              animate={{
-                rotateZ: -360,
-                opacity: [0.4, 0.8, 0.4],
-              }}
-              transition={{
-                rotateZ: { duration: 25, repeat: Infinity, ease: "linear" },
-                opacity: { duration: 4, repeat: Infinity, ease: "easeInOut" }
-              }}
-            />
-
-            {/* Ring 3 - Vertical orbit */}
-            <motion.div
-              className="absolute rounded-full border-2"
-              style={{
-                width: '230px',
-                height: '230px',
-                left: '-45px',
-                top: '-45px',
-                borderColor: 'rgba(139,92,246,0.4)',
-                transformStyle: 'preserve-3d',
-                transform: 'rotateY(75deg) rotateX(15deg)',
-              }}
-              animate={{
-                rotateZ: 360,
-                opacity: [0.3, 0.6, 0.3],
-              }}
-              transition={{
-                rotateZ: { duration: 30, repeat: Infinity, ease: "linear" },
-                opacity: { duration: 5, repeat: Infinity, ease: "easeInOut" }
-              }}
-            />
-
-            {/* Orbital particles */}
-            {[0, 120, 240].map((angle, idx) => (
+          {/* Orbital Rings */}
+          <div className="relative">
+            {[1, 2, 3].map((ring) => (
               <motion.div
-                key={`particle-${idx}`}
-                className="absolute w-2 h-2 rounded-full"
+                key={ring}
+                className="absolute rounded-full"
                 style={{
-                  background: idx === 0 ? 'rgba(6,182,212,0.8)' : 
-                             idx === 1 ? 'rgba(147,51,234,0.8)' : 
-                             'rgba(139,92,246,0.8)',
-                  left: '50%',
-                  top: '50%',
-                  marginLeft: '-4px',
-                  marginTop: '-4px',
-                  transformOrigin: '4px 4px',
+                  width: `${140 + ring * 30}px`,
+                  height: `${140 + ring * 30}px`,
+                  left: `${-15 * ring}px`,
+                  top: `${-15 * ring}px`,
+                  border: '2px solid',
+                  borderColor: 
+                    ring === 1 ? 'rgba(6,182,212,0.3)' :   // cyan
+                    ring === 2 ? 'rgba(147,51,234,0.3)' :  // purple
+                    'rgba(139,92,246,0.3)',                // violet
                 }}
                 animate={{
-                  rotate: 360,
-                  x: Math.cos((angle * Math.PI) / 180) * 85,
-                  y: Math.sin((angle * Math.PI) / 180) * 85,
-                  scale: [1, 1.5, 1],
-                  opacity: [0.6, 1, 0.6],
+                  rotate: ring % 2 === 0 ? 360 : -360,
+                  opacity: [0.3, 0.6, 0.3],
                 }}
                 transition={{
-                  rotate: { duration: 15 + idx * 3, repeat: Infinity, ease: "linear" },
-                  scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
-                  opacity: { duration: 2, repeat: Infinity, ease: "easeInOut" }
+                  duration: 15 + ring * 5,
+                  repeat: Infinity,
+                  ease: "linear"
                 }}
               />
             ))}
