@@ -89,7 +89,7 @@ const PortfolioInsightsNew: React.FC = () => {
   return (
     <main role="main" className="relative min-h-screen overflow-hidden">
       {/* Animated Background Layers - Vibrant Cyan/Purple Theme */}
-      <div className="fixed inset-0 -z-10 bg-gradient-to-br from-purple-100 via-cyan-100 to-violet-100">
+      <div className="fixed inset-0 -z-10 bg-gradient-to-r from-cyan-300 via-blue-300 to-purple-300">
         {/* Animated radial gradient 1 - Purple to Cyan (Large, top-left) */}
         <motion.div
           animate={{
