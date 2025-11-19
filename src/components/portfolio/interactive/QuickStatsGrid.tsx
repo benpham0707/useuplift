@@ -52,7 +52,7 @@ const StatCard: React.FC<{
       whileHover={{ scale: 1.05 }}
       className="group cursor-pointer"
     >
-      <Card className="h-full bg-white/70 backdrop-blur-sm border-2 border-white/50 hover:border-cyan-400/60 shadow-lg shadow-cyan-100/50 hover:shadow-xl hover:shadow-cyan-200/60 transition-all duration-300 overflow-hidden">
+      <Card className="h-full bg-white/90 backdrop-blur-sm border-2 border-white/50 hover:border-cyan-400/60 shadow-lg shadow-cyan-100/50 hover:shadow-xl hover:shadow-cyan-200/60 transition-all duration-300 overflow-hidden">
         <CardContent className="p-4 relative">
           {/* Background gradient */}
           <div className={`absolute inset-0 bg-gradient-to-br from-${color}-500/5 to-${color}-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
@@ -87,7 +87,7 @@ export const QuickStatsGrid: React.FC<QuickStatsGridProps> = ({ stats }) => {
       transition={{ delay: 0.4, duration: 0.5 }}
       className="h-full"
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-[#00ffaa]/40 shadow-lg shadow-cyan-300/30 hover:border-[#00ffaa]/60 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/95 backdrop-blur-md border-2 border-[#00ffaa]/40 shadow-lg shadow-cyan-300/30 hover:border-[#00ffaa]/60 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center gap-3 md:gap-4 mb-4">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00ffaa] to-[#07c6ff] flex items-center justify-center shadow-lg">

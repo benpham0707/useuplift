@@ -36,7 +36,7 @@ export const TopContributorsCard: React.FC<TopContributorsCardProps> = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.4, duration: 0.5 }}
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-[#c137ff]/40 shadow-lg shadow-purple-400/30 hover:border-[#c137ff]/60 hover:shadow-xl hover:shadow-purple-500/40 hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/95 backdrop-blur-md border-2 border-[#c137ff]/40 shadow-lg shadow-purple-400/30 hover:border-[#c137ff]/60 hover:shadow-xl hover:shadow-purple-500/40 hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center gap-3 md:gap-4 mb-6">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#c137ff] to-[#07c6ff] flex items-center justify-center shadow-lg">
@@ -62,7 +62,7 @@ export const TopContributorsCard: React.FC<TopContributorsCardProps> = ({
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.6 + idx * 0.1, duration: 0.4 }}
-                      className="p-4 rounded-xl bg-white/60 backdrop-blur-sm border border-white/40 hover:border-primary/50 shadow-md shadow-slate-200/50 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 cursor-pointer group hover:scale-[1.02]"
+                      className="p-4 rounded-xl bg-white/90 backdrop-blur-sm border border-white/40 hover:border-primary/50 shadow-md shadow-slate-200/50 hover:shadow-lg hover:shadow-primary/20 transition-all duration-300 cursor-pointer group hover:scale-[1.02]"
                     >
                       <div className="flex items-center gap-4">
                         <motion.div

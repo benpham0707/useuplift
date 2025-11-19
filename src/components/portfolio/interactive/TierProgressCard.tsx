@@ -38,7 +38,7 @@ export const TierProgressCard: React.FC<TierProgressCardProps> = ({ progress }) 
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1, duration: 0.5 }}
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-400/40 shadow-lg shadow-purple-400/40 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/95 backdrop-blur-md border-2 border-purple-400/40 shadow-lg shadow-purple-400/40 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3 md:gap-4">

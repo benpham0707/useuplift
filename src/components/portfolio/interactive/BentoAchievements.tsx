@@ -63,7 +63,7 @@ export const BentoAchievements: React.FC<BentoAchievementsProps> = ({ achievemen
   ];
 
   return (
-    <div className="rounded-2xl p-5 h-full bg-white/80 backdrop-blur-md border-2 border-cyan-400/40 shadow-lg shadow-cyan-300/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+    <div className="rounded-2xl p-5 h-full bg-white/95 backdrop-blur-md border-2 border-cyan-400/40 shadow-lg shadow-cyan-300/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
       {/* Header */}
       <div className="flex items-center gap-3 md:gap-4 mb-4">
         <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00ffaa] to-[#c137ff] flex items-center justify-center shadow-lg">

@@ -40,7 +40,7 @@ export const ScoreOrbitalHero: React.FC<ScoreOrbitalHeroProps> = ({
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
-      className="relative w-full h-[400px] flex items-center justify-center bg-white/70 backdrop-blur-xl rounded-3xl overflow-hidden border-2 border-white/50 shadow-[0_20px_60px_-15px_rgba(147,51,234,0.3)] hover:shadow-[0_25px_70px_-15px_rgba(147,51,234,0.4)] hover:-translate-y-1 transition-all duration-300"
+      className="relative w-full h-[400px] flex items-center justify-center bg-white/95 backdrop-blur-xl rounded-3xl overflow-hidden border-2 border-white/50 shadow-[0_20px_60px_-15px_rgba(147,51,234,0.3)] hover:shadow-[0_25px_70px_-15px_rgba(147,51,234,0.4)] hover:-translate-y-1 transition-all duration-300"
       style={{ willChange: 'opacity, transform' }}
     >
       {/* Multi-layer pulsing glow effects */}

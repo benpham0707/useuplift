@@ -52,7 +52,7 @@ export const PriorityActionsCard: React.FC<PriorityActionsCardProps> = ({ action
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 1, duration: 0.5 }}
     >
-      <Card className="h-full bg-white/80 backdrop-blur-md border-2 border-purple-400/40 shadow-lg shadow-purple-300/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+      <Card className="h-full bg-white/95 backdrop-blur-md border-2 border-purple-400/40 shadow-lg shadow-purple-300/30 hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
         <CardContent className="p-6">
           <div className="flex items-center gap-3 md:gap-4 mb-6">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#a855f7] to-[#07c6ff] flex items-center justify-center shadow-lg">
@@ -79,7 +79,7 @@ export const PriorityActionsCard: React.FC<PriorityActionsCardProps> = ({ action
                       initial={{ opacity: 0, x: -20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 1.2 + idx * 0.1, duration: 0.4 }}
-                      className={`relative p-4 rounded-xl bg-white/60 backdrop-blur-sm border-l-4 ${
+                      className={`relative p-4 rounded-xl bg-white/90 backdrop-blur-sm border-l-4 ${
                         action.priority === 'high' ? 'border-[#c137ff]' :
                         action.priority === 'medium' ? 'border-[#a855f7]' :
                         'border-[#00ffaa]'
