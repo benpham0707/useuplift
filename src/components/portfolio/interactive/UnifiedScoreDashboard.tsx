@@ -186,7 +186,7 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
         </div>
 
         {/* Right Side - Metrics Grid */}
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-4 pr-4">
           <TooltipProvider>
             {metricCards.map((metric, index) => {
               const Icon = metric.icon;
@@ -199,23 +199,37 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: index * 0.05 }}
-                      className="bg-white/95 backdrop-blur-sm rounded-xl border-2 border-border/50 p-4 hover:border-cyan-400/60 hover:shadow-xl hover:shadow-cyan-400/20 hover:scale-105 transition-all duration-300 cursor-pointer group"
+                      className="relative bg-gradient-to-br from-white via-white to-cyan-50/30 backdrop-blur-sm rounded-2xl border-2 border-border/50 p-5 hover:border-cyan-400/70 hover:shadow-2xl hover:shadow-cyan-400/25 hover:scale-[1.02] transition-all duration-300 cursor-pointer group overflow-hidden"
                     >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-2xl font-bold text-foreground mb-0.5">
-                            {metric.value}
+                      {/* Subtle gradient overlay on hover */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/0 via-purple-400/0 to-cyan-400/0 group-hover:from-cyan-400/5 group-hover:via-purple-400/5 group-hover:to-cyan-400/5 transition-all duration-300 rounded-2xl" />
+                      
+                      <div className="relative flex flex-col gap-4">
+                        {/* Icon Section */}
+                        <div className="flex items-center justify-between">
+                          <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-400/15 via-purple-400/10 to-cyan-400/15 group-hover:from-cyan-400/25 group-hover:via-purple-400/20 group-hover:to-cyan-400/25 transition-all duration-300 shadow-sm">
+                            <Icon className="h-6 w-6 text-cyan-600 group-hover:text-cyan-700 transition-colors" />
                           </div>
-                          <div className="text-[10px] text-muted-foreground mb-1 leading-tight">
-                            {metric.subValue}
-                          </div>
-                          <div className="text-xs font-medium text-foreground/80">
+                          <div className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
                             {metric.label}
                           </div>
                         </div>
-                        <div className="flex-shrink-0">
-                          <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-400/10 to-purple-400/10 group-hover:from-cyan-400/20 group-hover:to-purple-400/20 transition-colors">
-                            <Icon className="h-5 w-5 text-cyan-500" />
+
+                        {/* Value Section */}
+                        <div className="space-y-1">
+                          <div className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+                            {metric.value}
+                          </div>
+                          <div className="text-sm text-muted-foreground/80 font-medium">
+                            {metric.subValue}
+                          </div>
+                        </div>
+
+                        {/* Hover indicator */}
+                        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                          <div className="text-xs text-cyan-600 font-medium flex items-center gap-1">
+                            <span>View details</span>
+                            <span className="text-[10px]">→</span>
                           </div>
                         </div>
                       </div>
