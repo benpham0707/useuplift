@@ -152,53 +152,119 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
       <div className="grid grid-cols-1 lg:grid-cols-[40%_60%] gap-8 p-8">
         {/* Left Side - Overall Score */}
         <div className="flex flex-col items-center justify-center space-y-6 relative">
-          {/* Pulsing background glow */}
+          {/* Pulsing background glow - Audio response */}
           <motion.div
             className="absolute inset-0 bg-gradient-to-br from-cyan-300/20 via-purple-300/20 to-cyan-300/20 rounded-2xl blur-3xl"
             animate={{
-              opacity: [0.4, 0.7, 0.4],
-              scale: [1, 1.08, 1],
+              opacity: [0.3, 0.8, 0.3],
+              scale: [1, 1.12, 1],
             }}
             transition={{
-              duration: 4,
+              duration: 2.5,
               repeat: Infinity,
               ease: "easeInOut"
             }}
           />
 
-          {/* Orbital Rings */}
+          {/* Audio Waveform Rings */}
           <div className="relative">
-            {[1, 2, 3].map((ring) => (
-              <motion.div
-                key={ring}
-                className="absolute rounded-full"
-                style={{
-                  width: `${140 + ring * 30}px`,
-                  height: `${140 + ring * 30}px`,
-                  left: `${-15 * ring}px`,
-                  top: `${-15 * ring}px`,
-                  border: '2px solid',
-                  borderColor: 
-                    ring === 1 ? 'rgba(6,182,212,0.3)' :   // cyan
-                    ring === 2 ? 'rgba(147,51,234,0.3)' :  // purple
-                    'rgba(139,92,246,0.3)',                // violet
-                }}
-                animate={{
-                  rotate: ring % 2 === 0 ? 360 : -360,
-                  opacity: [0.3, 0.6, 0.3],
-                }}
-                transition={{
-                  duration: 15 + ring * 5,
-                  repeat: Infinity,
-                  ease: "linear"
-                }}
-              />
-            ))}
+            {/* Ring 3 - Treble (Outermost) - Fast, high frequency */}
+            <div className="absolute" style={{ width: '170px', height: '170px', left: '-15px', top: '-15px' }}>
+              {[...Array(32)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute origin-bottom"
+                  style={{
+                    width: '2px',
+                    height: '15px',
+                    background: 'rgba(139,92,246,0.4)',
+                    borderRadius: '1px',
+                    left: '50%',
+                    top: '50%',
+                    transformOrigin: 'center 85px',
+                    transform: `rotate(${i * 11.25}deg) translateY(-85px)`,
+                  }}
+                  animate={{
+                    scaleY: [1, 2.5, 1],
+                    opacity: [0.3, 0.8, 0.3],
+                  }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    delay: (i * 0.03) % 0.8,
+                    ease: "easeInOut"
+                  }}
+                />
+              ))}
+            </div>
 
-            {/* Score Circle */}
+            {/* Ring 2 - Mid (Middle) - Medium speed */}
+            <div className="absolute" style={{ width: '135px', height: '135px', left: '2.5px', top: '2.5px' }}>
+              {[...Array(24)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute origin-bottom"
+                  style={{
+                    width: '3px',
+                    height: '18px',
+                    background: 'rgba(147,51,234,0.5)',
+                    borderRadius: '2px',
+                    left: '50%',
+                    top: '50%',
+                    transformOrigin: 'center 67.5px',
+                    transform: `rotate(${i * 15}deg) translateY(-67.5px)`,
+                  }}
+                  animate={{
+                    scaleY: [1, 2.2, 1],
+                    opacity: [0.3, 0.9, 0.3],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    delay: i * 0.05,
+                    ease: "easeInOut"
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Ring 1 - Bass (Innermost) - Slow, heavy pulses */}
+            <div className="absolute" style={{ width: '100px', height: '100px', left: '20px', top: '20px' }}>
+              {[...Array(24)].map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute origin-bottom"
+                  style={{
+                    width: '4px',
+                    height: '20px',
+                    background: 'rgba(6,182,212,0.6)',
+                    borderRadius: '2px',
+                    left: '50%',
+                    top: '50%',
+                    transformOrigin: 'center 50px',
+                    transform: `rotate(${i * 15}deg) translateY(-50px)`,
+                  }}
+                  animate={{
+                    scaleY: [1, 1.8, 1],
+                    opacity: [0.4, 1, 0.4],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Infinity,
+                    delay: (i % 3) * 0.15,
+                    ease: "easeInOut"
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Score Circle - Spins once, then stops */}
             <motion.div
               className="relative z-10 w-[140px] h-[140px] rounded-full bg-gradient-to-br from-cyan-400 via-purple-500 to-violet-500 p-[3px]"
+              initial={{ rotate: -180, scale: 0 }}
               animate={{
+                rotate: 0,
+                scale: 1,
                 boxShadow: [
                   '0 0 50px rgba(6,182,212,0.5)',
                   '0 0 70px rgba(147,51,234,0.6)',
@@ -206,12 +272,32 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                 ],
               }}
               transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut"
+                rotate: { duration: 1.2, ease: "easeOut" },
+                scale: { duration: 0.8, ease: "backOut" },
+                boxShadow: {
+                  duration: 4,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }
               }}
             >
-              <div className="w-full h-full rounded-full bg-white shadow-inner flex items-center justify-center">
+              {/* Center glow ring - pulses with the beat */}
+              <motion.div
+                className="absolute inset-4 rounded-full"
+                style={{
+                  background: 'radial-gradient(circle, rgba(147,51,234,0.2) 0%, transparent 70%)',
+                }}
+                animate={{
+                  scale: [1, 1.15, 1],
+                  opacity: [0.5, 1, 0.5],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              />
+              <div className="w-full h-full rounded-full bg-white shadow-inner flex items-center justify-center relative z-10">
                 <div className="flex flex-col items-center">
                   <motion.div
                     className="text-6xl font-bold bg-gradient-to-r from-cyan-500 via-purple-500 to-violet-600 bg-clip-text text-transparent"
