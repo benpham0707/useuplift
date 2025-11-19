@@ -103,7 +103,7 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6 }}
-      className="bg-white/98 backdrop-blur-xl rounded-2xl border-2 border-border shadow-xl overflow-hidden"
+      className="bg-background/60 backdrop-blur-sm rounded-2xl border border-border/50 shadow-lg overflow-hidden"
     >
       <div className="grid grid-cols-1 lg:grid-cols-[35%_65%] gap-6 p-6">
         {/* Left Side - Overall Score */}
@@ -186,7 +186,7 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
         </div>
 
         {/* Right Side - Metrics Grid */}
-        <div className="grid grid-cols-2 gap-4 pr-4">
+        <div className="grid grid-cols-2 gap-3 pr-3">
           <TooltipProvider>
             {metricCards.map((metric, index) => {
               const Icon = metric.icon;
@@ -199,38 +199,27 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.4, delay: index * 0.05 }}
-                      className="relative bg-gradient-to-br from-white via-white to-cyan-50/30 backdrop-blur-sm rounded-2xl border-2 border-border/50 p-5 hover:border-cyan-400/70 hover:shadow-2xl hover:shadow-cyan-400/25 hover:scale-[1.02] transition-all duration-300 cursor-pointer group overflow-hidden"
+                      className="bg-card border border-border rounded-xl p-3 hover:border-cyan-400/60 hover:shadow-lg hover:shadow-cyan-400/20 hover:scale-[1.02] transition-all duration-300 cursor-pointer group"
                     >
-                      {/* Subtle gradient overlay on hover */}
-                      <div className="absolute inset-0 bg-gradient-to-br from-cyan-400/0 via-purple-400/0 to-cyan-400/0 group-hover:from-cyan-400/5 group-hover:via-purple-400/5 group-hover:to-cyan-400/5 transition-all duration-300 rounded-2xl" />
-                      
-                      <div className="relative flex flex-col gap-4">
-                        {/* Icon Section */}
-                        <div className="flex items-center justify-between">
-                          <div className="p-3 rounded-xl bg-gradient-to-br from-cyan-400/15 via-purple-400/10 to-cyan-400/15 group-hover:from-cyan-400/25 group-hover:via-purple-400/20 group-hover:to-cyan-400/25 transition-all duration-300 shadow-sm">
-                            <Icon className="h-6 w-6 text-cyan-600 group-hover:text-cyan-700 transition-colors" />
-                          </div>
-                          <div className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                            {metric.label}
-                          </div>
+                      <div className="flex flex-col gap-2">
+                        {/* Label */}
+                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          {metric.label}
                         </div>
 
-                        {/* Value Section */}
-                        <div className="space-y-1">
-                          <div className="text-3xl font-bold bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">
+                        {/* Value and Icon */}
+                        <div className="flex items-center justify-between">
+                          <div className="text-2xl font-bold text-foreground">
                             {metric.value}
                           </div>
-                          <div className="text-sm text-muted-foreground/80 font-medium">
-                            {metric.subValue}
+                          <div className="p-2 rounded-lg bg-gradient-to-br from-cyan-400/10 to-purple-400/10 group-hover:from-cyan-400/20 group-hover:to-purple-400/20 transition-colors">
+                            <Icon className="h-4 w-4 text-cyan-600" />
                           </div>
                         </div>
 
-                        {/* Hover indicator */}
-                        <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                          <div className="text-xs text-cyan-600 font-medium flex items-center gap-1">
-                            <span>View details</span>
-                            <span className="text-[10px]">→</span>
-                          </div>
+                        {/* Subvalue */}
+                        <div className="text-xs text-muted-foreground">
+                          {metric.subValue}
                         </div>
                       </div>
                     </motion.div>
