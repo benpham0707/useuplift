@@ -166,66 +166,135 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
             }}
           />
 
-          {/* Audio Waveform Rings - Concentric circles that pulsate like music */}
+          {/* Audio Waveform Bars - Individual bars arranged in circles */}
           <div className="absolute inset-0 flex items-center justify-center">
-            {/* Ring 4 - Treble (Outermost) - Fast, high frequency */}
-            <motion.div
-              className="absolute w-[220px] h-[220px] rounded-full border-2 border-violet-400/40"
-              animate={{
-                scale: [1, 1.08, 0.98, 1.05, 1],
-                opacity: [0.4, 0.7, 0.5, 0.8, 0.4],
-              }}
-              transition={{
-                duration: 0.8,
-                repeat: Infinity,
-                ease: "easeInOut"
-              }}
-            />
-            
-            {/* Ring 3 - High-Mid - Fast-medium */}
-            <motion.div
-              className="absolute w-[190px] h-[190px] rounded-full border-2 border-purple-400/50"
-              animate={{
-                scale: [1, 0.95, 1.1, 0.97, 1],
-                opacity: [0.5, 0.8, 0.6, 0.9, 0.5],
-              }}
-              transition={{
-                duration: 1.2,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.1
-              }}
-            />
+            {/* Ring 4 - Treble (Outermost) - 70 bars at 155px radius */}
+            <div className="absolute w-[310px] h-[310px]">
+              {[...Array(70)].map((_, i) => {
+                const angle = (i / 70) * 360;
+                return (
+                  <motion.div
+                    key={`r4-${i}`}
+                    className="absolute left-1/2 top-1/2"
+                    style={{
+                      width: '3px',
+                      height: '20px',
+                      background: 'linear-gradient(to top, rgba(139,92,246,0.6), rgba(167,139,250,0.3))',
+                      borderRadius: '1.5px',
+                      transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-155px)`,
+                      transformOrigin: 'center 155px',
+                      filter: 'blur(0.5px)',
+                      boxShadow: '0 0 8px rgba(139,92,246,0.6)',
+                    }}
+                    animate={{
+                      scaleY: [1, 2.5, 1.2, 2, 1],
+                    }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      delay: (i * 0.01) % 0.5,
+                      ease: "easeInOut"
+                    }}
+                  />
+                );
+              })}
+            </div>
 
-            {/* Ring 2 - Mid (Middle) - Medium speed */}
-            <motion.div
-              className="absolute w-[170px] h-[170px] rounded-full border-[3px] border-purple-500/60"
-              animate={{
-                scale: [1, 1.12, 0.94, 1.08, 1],
-                opacity: [0.6, 0.9, 0.7, 1, 0.6],
-              }}
-              transition={{
-                duration: 1.5,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.2
-              }}
-            />
+            {/* Ring 3 - Mid-High - 60 bars at 130px radius */}
+            <div className="absolute w-[260px] h-[260px]">
+              {[...Array(60)].map((_, i) => {
+                const angle = (i / 60) * 360;
+                return (
+                  <motion.div
+                    key={`r3-${i}`}
+                    className="absolute left-1/2 top-1/2"
+                    style={{
+                      width: '3px',
+                      height: '20px',
+                      background: 'linear-gradient(to top, rgba(147,51,234,0.7), rgba(192,132,252,0.4))',
+                      borderRadius: '1.5px',
+                      transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-130px)`,
+                      transformOrigin: 'center 130px',
+                      filter: 'blur(0.5px)',
+                      boxShadow: '0 0 8px rgba(147,51,234,0.6)',
+                    }}
+                    animate={{
+                      scaleY: [1, 3, 1.5, 2.5, 1],
+                    }}
+                    transition={{
+                      duration: 0.9,
+                      repeat: Infinity,
+                      delay: i * 0.015,
+                      ease: "easeInOut"
+                    }}
+                  />
+                );
+              })}
+            </div>
 
-            {/* Ring 1 - Bass (Innermost) - Slow, heavy pulses */}
-            <motion.div
-              className="absolute w-[155px] h-[155px] rounded-full border-[3px] border-cyan-400/70"
-              animate={{
-                scale: [1, 1.15, 0.92, 1.1, 1],
-                opacity: [0.7, 1, 0.8, 0.95, 0.7],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: "easeInOut",
-                delay: 0.3
-              }}
-            />
+            {/* Ring 2 - Mid-Low - 50 bars at 105px radius */}
+            <div className="absolute w-[210px] h-[210px]">
+              {[...Array(50)].map((_, i) => {
+                const angle = (i / 50) * 360;
+                return (
+                  <motion.div
+                    key={`r2-${i}`}
+                    className="absolute left-1/2 top-1/2"
+                    style={{
+                      width: '3.5px',
+                      height: '22px',
+                      background: 'linear-gradient(to top, rgba(59,130,246,0.8), rgba(147,197,253,0.4))',
+                      borderRadius: '1.75px',
+                      transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-105px)`,
+                      transformOrigin: 'center 105px',
+                      filter: 'blur(0.5px)',
+                      boxShadow: '0 0 8px rgba(59,130,246,0.6)',
+                    }}
+                    animate={{
+                      scaleY: [1, 2.8, 1.2, 2.3, 1],
+                    }}
+                    transition={{
+                      duration: 1.2,
+                      repeat: Infinity,
+                      delay: (i * 0.024) % 1,
+                      ease: "easeInOut"
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Ring 1 - Bass (Innermost) - 40 bars at 80px radius */}
+            <div className="absolute w-[160px] h-[160px]">
+              {[...Array(40)].map((_, i) => {
+                const angle = (i / 40) * 360;
+                return (
+                  <motion.div
+                    key={`r1-${i}`}
+                    className="absolute left-1/2 top-1/2"
+                    style={{
+                      width: '4px',
+                      height: '25px',
+                      background: 'linear-gradient(to top, rgba(6,182,212,0.9), rgba(103,232,249,0.5))',
+                      borderRadius: '2px',
+                      transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-80px)`,
+                      transformOrigin: 'center 80px',
+                      filter: 'blur(0.5px)',
+                      boxShadow: '0 0 8px rgba(6,182,212,0.7)',
+                    }}
+                    animate={{
+                      scaleY: [1, 2.2, 1.5, 2.5, 1],
+                    }}
+                    transition={{
+                      duration: 1.8,
+                      repeat: Infinity,
+                      delay: Math.floor(i / 4) * 0.15,
+                      ease: "easeInOut"
+                    }}
+                  />
+                );
+              })}
+            </div>
 
             {/* Score Circle - Spins once, then stops */}
             <motion.div
