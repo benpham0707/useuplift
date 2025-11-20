@@ -169,11 +169,11 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
           {/* Audio Waveform Rings */}
           <div className="relative">
             {/* Ring 3 - Treble (Outermost) - Fast, high frequency */}
-            <div className="absolute" style={{ width: '170px', height: '170px', left: '-15px', top: '-15px' }}>
+            <div className="absolute inset-0 flex items-center justify-center">
               {[...Array(32)].map((_, i) => (
                 <motion.div
                   key={i}
-                  className="absolute origin-bottom"
+                  className="absolute"
                   style={{
                     width: '2px',
                     height: '15px',
@@ -181,8 +181,8 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                     borderRadius: '1px',
                     left: '50%',
                     top: '50%',
-                    transformOrigin: 'center 85px',
-                    transform: `rotate(${i * 11.25}deg) translateY(-85px)`,
+                    transformOrigin: 'bottom center',
+                    transform: `translateX(-50%) translateY(-85px) rotate(${i * 11.25}deg)`,
                   }}
                   animate={{
                     scaleY: [1, 2.5, 1],
@@ -199,11 +199,11 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
             </div>
 
             {/* Ring 2 - Mid (Middle) - Medium speed */}
-            <div className="absolute" style={{ width: '135px', height: '135px', left: '2.5px', top: '2.5px' }}>
+            <div className="absolute inset-0 flex items-center justify-center">
               {[...Array(24)].map((_, i) => (
                 <motion.div
                   key={i}
-                  className="absolute origin-bottom"
+                  className="absolute"
                   style={{
                     width: '3px',
                     height: '18px',
@@ -211,8 +211,8 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                     borderRadius: '2px',
                     left: '50%',
                     top: '50%',
-                    transformOrigin: 'center 67.5px',
-                    transform: `rotate(${i * 15}deg) translateY(-67.5px)`,
+                    transformOrigin: 'bottom center',
+                    transform: `translateX(-50%) translateY(-67.5px) rotate(${i * 15}deg)`,
                   }}
                   animate={{
                     scaleY: [1, 2.2, 1],
@@ -229,11 +229,11 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
             </div>
 
             {/* Ring 1 - Bass (Innermost) - Slow, heavy pulses */}
-            <div className="absolute" style={{ width: '100px', height: '100px', left: '20px', top: '20px' }}>
+            <div className="absolute inset-0 flex items-center justify-center">
               {[...Array(24)].map((_, i) => (
                 <motion.div
                   key={i}
-                  className="absolute origin-bottom"
+                  className="absolute"
                   style={{
                     width: '4px',
                     height: '20px',
@@ -241,8 +241,8 @@ export const UnifiedScoreDashboard: React.FC<UnifiedScoreDashboardProps> = ({
                     borderRadius: '2px',
                     left: '50%',
                     top: '50%',
-                    transformOrigin: 'center 50px',
-                    transform: `rotate(${i * 15}deg) translateY(-50px)`,
+                    transformOrigin: 'bottom center',
+                    transform: `translateX(-50%) translateY(-50px) rotate(${i * 15}deg)`,
                   }}
                   animate={{
                     scaleY: [1, 1.8, 1],
