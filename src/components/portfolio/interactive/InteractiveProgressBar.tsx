@@ -1,12 +1,13 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Award, Heart, Users, BookOpen } from 'lucide-react';
+import { motion } from "motion/react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import { Trophy, Award, Medal, Star } from "lucide-react";
 
 interface Milestone {
   title: string;
   impact: number;
   icon: string;
+  competitiveContext?: string[];
+  profileImpact?: string;
 }
 
 interface HistoryPoint {
@@ -20,108 +21,123 @@ interface InteractiveProgressBarProps {
   currentScore: number;
 }
 
-const iconMap: Record<string, React.ComponentType<any>> = {
-  Award,
-  Heart,
-  Users,
-  BookOpen,
+// Icon mapping - hardcoded data values for demonstration
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  trophy: Trophy,
+  award: Award,
+  medal: Medal,
+  star: Star,
 };
 
-export const InteractiveProgressBar: React.FC<InteractiveProgressBarProps> = ({
-  history,
-  currentScore,
-}) => {
-  const startScore = history[0].score;
+export function InteractiveProgressBar({ history, currentScore }: InteractiveProgressBarProps) {
+  const startScore = history[0]?.score || 70;
   const endScore = currentScore;
-  const scoreRange = 100 - 70; // Display range 70-100
 
-  // Calculate position for each milestone
+  // Helper function to calculate position (70-100 scale)
   const getMilestonePosition = (score: number) => {
-    return ((score - 70) / scoreRange) * 100;
+    return ((score - 70) / 30) * 100;
   };
 
   return (
-    <div className="w-full py-4">
+    <div className="space-y-3">
       {/* Labels */}
-      <div className="flex justify-between mb-2 text-sm">
-        <span className="text-muted-foreground">3 months ago: {startScore}</span>
-        <span className="font-semibold text-foreground">Today: {endScore}</span>
+      <div className="flex justify-between text-xs text-muted-foreground">
+        <span>3 months ago: {startScore}</span>
+        <span>Today: {endScore}</span>
       </div>
 
       {/* Progress Bar Container */}
-      <div className="relative h-16 w-full">
-        {/* Background bar with gradient */}
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-muted via-muted to-muted overflow-hidden">
-          {/* Score scale markers */}
-          <div className="absolute inset-0 flex items-center justify-between px-4">
-            {[70, 75, 80, 85, 90, 95, 100].map((score) => (
-              <div key={score} className="text-xs text-muted-foreground/40 font-mono">
-                {score}
-              </div>
-            ))}
-          </div>
+      <div className="relative h-[60px] bg-muted/30 rounded-full overflow-visible">
+        {/* Background Scale Markers */}
+        <div className="absolute inset-0 flex justify-between items-center px-4 text-[10px] text-muted-foreground/40">
+          {[75, 80, 85, 90, 95].map((mark) => (
+            <div key={mark} className="relative">
+              <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-[1px] h-3 bg-muted-foreground/20" />
+              <div className="absolute top-2 left-1/2 -translate-x-1/2">{mark}</div>
+            </div>
+          ))}
         </div>
 
-        {/* Filled progress gradient */}
+        {/* Gradient Progress Fill */}
         <motion.div
-          initial={{ width: 0 }}
+          className="absolute left-0 top-0 h-full rounded-full"
+          style={{
+            background: "linear-gradient(90deg, hsl(var(--primary)), hsl(var(--secondary)), hsl(var(--accent)))",
+            boxShadow: "0 0 20px hsl(var(--primary) / 0.3)",
+          }}
+          initial={{ width: "0%" }}
           animate={{ width: `${getMilestonePosition(currentScore)}%` }}
-          transition={{ duration: 1.5, ease: 'easeOut' }}
-          className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary via-secondary to-accent"
-          style={{ boxShadow: '0 0 20px hsl(var(--primary) / 0.5)' }}
+          transition={{ duration: 1.5, ease: "easeOut" }}
         />
 
-        {/* Milestone markers */}
-        {history.map((point, index) => {
-          const position = getMilestonePosition(point.score);
-          const milestone = point.milestones[0]; // Get first milestone for this point
-          if (!milestone) return null;
+        {/* Milestone Markers */}
+        {history.map((point, index) => 
+          point.milestones.map((milestone, mIndex) => {
+            const IconComponent = iconMap[milestone.icon] || Star;
+            const position = getMilestonePosition(point.score);
 
-          const IconComponent = iconMap[milestone.icon] || Award;
+            return (
+              <HoverCard key={`${index}-${mIndex}`} openDelay={200}>
+                <HoverCardTrigger asChild>
+                  <motion.div
+                    className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10"
+                    style={{ left: `${position}%` }}
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.5 + index * 0.2, duration: 0.3 }}
+                  >
+                    <div className="relative">
+                      {/* Outer glow ring */}
+                      <div className="absolute inset-0 w-12 h-12 -translate-x-[calc(50%-6px)] -translate-y-[calc(50%-6px)] bg-primary/20 rounded-full blur-sm" />
+                      
+                      {/* Icon container */}
+                      <div className="relative w-12 h-12 bg-background border-2 border-primary rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform">
+                        <IconComponent className="w-5 h-5 text-primary" />
+                      </div>
+                    </div>
+                  </motion.div>
+                </HoverCardTrigger>
+                <HoverCardContent className="w-80" side="top">
+                  <div className="space-y-3">
+                    {/* Header */}
+                    <div>
+                      <div className="font-semibold text-base">{milestone.title}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {point.date} • +{milestone.impact} points
+                      </div>
+                    </div>
 
-          return (
-            <HoverCard key={index} openDelay={0} closeDelay={100}>
-              <HoverCardTrigger asChild>
-                <motion.div
-                  initial={{ scale: 0, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.3 + index * 0.2, type: 'spring', stiffness: 200 }}
-                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10"
-                  style={{ left: `${position}%` }}
-                >
-                  <div className="relative">
-                    {/* Milestone dot */}
-                    <div className="w-8 h-8 rounded-full bg-background border-2 border-primary flex items-center justify-center shadow-lg">
-                      <IconComponent className="w-4 h-4 text-primary" />
-                    </div>
-                    {/* Pulse animation */}
-                    <motion.div
-                      animate={{ scale: [1, 1.4, 1], opacity: [0.5, 0, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity, delay: index * 0.3 }}
-                      className="absolute inset-0 rounded-full bg-primary"
-                    />
+                    {/* Competitive Context */}
+                    {milestone.competitiveContext && (
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold text-primary">Competitive Context:</div>
+                        <ul className="text-xs text-muted-foreground space-y-1">
+                          {milestone.competitiveContext.map((context, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="text-primary mt-0.5">•</span>
+                              <span>{context}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* Profile Impact */}
+                    {milestone.profileImpact && (
+                      <div className="space-y-1.5">
+                        <div className="text-xs font-semibold text-secondary">Impact on Your Profile:</div>
+                        <div className="text-xs text-muted-foreground leading-relaxed">
+                          {milestone.profileImpact}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </motion.div>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-64" side="top">
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2">
-                    <IconComponent className="w-5 h-5 text-primary mt-0.5" />
-                    <div className="flex-1">
-                      <h4 className="font-semibold text-sm leading-tight">{milestone.title}</h4>
-                      <p className="text-xs text-muted-foreground mt-1">{point.date}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <span className="text-xs text-muted-foreground">Impact</span>
-                    <span className="text-lg font-bold text-green-600">+{milestone.impact} pts</span>
-                  </div>
-                </div>
-              </HoverCardContent>
-            </HoverCard>
-          );
-        })}
+                </HoverCardContent>
+              </HoverCard>
+            );
+          })
+        )}
       </div>
     </div>
   );
-};
+}
