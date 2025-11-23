@@ -8,7 +8,7 @@ if (!process.env.STRIPE_SECRET_KEY) {
 }
 
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-11-20.acacia', // Use the latest API version or match what's installed
+  apiVersion: '2025-11-17.clover', // Use the latest API version
 });
 
 // Constants for Price IDs - these should be replaced with actual Price IDs from your Stripe Dashboard
