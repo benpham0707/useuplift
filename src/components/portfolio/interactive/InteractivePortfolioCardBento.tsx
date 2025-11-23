@@ -189,14 +189,14 @@ const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
       date: 'Sep 2024',
       score: 78,
       milestones: [
-        { title: 'Completed service project', impact: 5, icon: 'Heart' },
+        { title: 'National Merit Semifinalist', impact: 5, icon: 'Award' },
       ],
     },
     {
       date: 'Oct 2024',
       score: 82,
       milestones: [
-        { title: 'Won regional competition', impact: 4, icon: 'Award' },
+        { title: 'Launched community service initiative', impact: 4, icon: 'Heart' },
       ],
     },
     {
@@ -216,6 +216,26 @@ const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
   
   competitiveStanding: {
     yourScore: 85,
+    local: {
+      region: 'California',
+      percentile: 'Top 8%',
+      yourScore: 85,
+      avgScore: 78,
+      spectrum: { min: 65, max: 95, position: 85 },
+      schoolContext: "You're above average for most in-state schools",
+      strongFor: ['UC Berkeley', 'UCLA', 'USC'],
+      competitiveFor: ['Stanford'],
+    },
+    national: {
+      region: 'United States',
+      percentile: 'Top 15%',
+      yourScore: 85,
+      avgScore: 80,
+      spectrum: { min: 60, max: 100, position: 85 },
+      schoolContext: 'Competitive range for selective private universities',
+      competitiveFor: ['Northwestern', 'Duke', 'Brown'],
+      reachingFor: ['MIT', 'Harvard', 'Stanford'],
+    },
     spectrum: {
       min: 70,
       max: 100,
@@ -264,38 +284,6 @@ const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
       },
     },
   },
-  
-  nextMilestones: [
-    {
-      title: 'Complete AP Scholar Award application',
-      status: 'completed',
-      estimatedImpact: 2,
-    },
-    {
-      title: 'Lead team research project',
-      status: 'in-progress',
-      estimatedImpact: 3,
-      deadline: 'Jan 2025',
-    },
-    {
-      title: 'Enter national competition',
-      status: 'upcoming',
-      estimatedImpact: 4,
-      deadline: 'Feb 2025',
-    },
-    {
-      title: 'Launch community initiative',
-      status: 'upcoming',
-      estimatedImpact: 3,
-      deadline: 'Feb 2025',
-    },
-    {
-      title: 'Complete advanced coursework',
-      status: 'in-progress',
-      estimatedImpact: 2,
-      deadline: 'Mar 2025',
-    },
-  ],
 };
 
 export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBentoProps> = ({

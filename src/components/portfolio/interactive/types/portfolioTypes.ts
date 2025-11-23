@@ -151,6 +151,28 @@ export interface PortfolioProgressData {
   
   competitiveStanding: {
     yourScore: number;
+    local: {
+      region: string;
+      percentile: string;
+      yourScore: number;
+      avgScore: number;
+      spectrum: { min: number; max: number; position: number };
+      schoolContext: string;
+      strongFor?: string[];
+      competitiveFor?: string[];
+      reachingFor?: string[];
+    };
+    national: {
+      region: string;
+      percentile: string;
+      yourScore: number;
+      avgScore: number;
+      spectrum: { min: number; max: number; position: number };
+      schoolContext: string;
+      strongFor?: string[];
+      competitiveFor?: string[];
+      reachingFor?: string[];
+    };
     spectrum: {
       min: number;
       max: number;
@@ -165,7 +187,7 @@ export interface PortfolioProgressData {
     };
   };
   
-  nextMilestones: Array<{
+  nextMilestones?: Array<{
     title: string;
     status: 'completed' | 'in-progress' | 'upcoming';
     estimatedImpact: number;
