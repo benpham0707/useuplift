@@ -1,227 +1,237 @@
-import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { motion } from 'motion/react';
-import { TrendingUp, Trophy, Target } from 'lucide-react';
-import { PortfolioProgressData } from './types/portfolioTypes';
-import { ProgressTimeline } from './ProgressTimeline';
-import { CompetitiveSpectrum } from './CompetitiveSpectrum';
-import { SchoolTierCard } from './SchoolTierCard';
-import GradientText from '@/components/ui/GradientText';
+import { useState } from "react";
+import { motion } from "motion/react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { TrendingUp, Target, ChevronDown } from "lucide-react";
+import { PortfolioProgressData } from "./types/portfolioTypes";
+import { ProgressTimeline } from "./ProgressTimeline";
+import { CompetitiveSpectrum } from "./CompetitiveSpectrum";
+import { SchoolTierCard } from "./SchoolTierCard";
 
 interface PortfolioProgressStandingProps {
   data: PortfolioProgressData;
 }
 
-export const PortfolioProgressStanding: React.FC<PortfolioProgressStandingProps> = ({ data }) => {
+export function PortfolioProgressStanding({ data }: PortfolioProgressStandingProps) {
+  const { current, history, projection, competitiveStanding, nextMilestones } = data;
+  
+  // Collapsed state management - only first section open by default
+  const [openSections, setOpenSections] = useState({
+    timeline: true,
+    standing: false,
+    tiers: false,
+    milestones: false,
+  });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const completedMilestones = nextMilestones.filter(m => m.status === 'completed').length;
+  const totalMilestones = nextMilestones.length;
+  const milestoneProgress = (completedMilestones / totalMilestones) * 100;
+  const growthPoints = history[history.length - 1].score - history[0].score;
+
   return (
-    <div className="space-y-8 w-full">
-      {/* Hero Stats Section */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <Card className="bg-gradient-to-br from-primary/10 via-secondary/5 to-background backdrop-blur-sm border-2 border-primary/20 shadow-xl">
-          <CardContent className="p-8">
-            <div className="text-center mb-6">
-              <GradientText 
-                className="text-xs font-bold uppercase tracking-wider mb-2"
-                colors={["#a855f7", "#07c6ff"]}
-              >
-                Portfolio Progress & Standing
-              </GradientText>
-              <h2 className="text-5xl md:text-6xl font-extrabold bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                {data.current.score}
-              </h2>
-              <Badge 
-                variant="default" 
-                className="mt-3 text-sm px-4 py-1.5 bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
-              >
-                {data.current.tier}
-              </Badge>
+    <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5">
+      <CardContent className="p-6">
+        {/* Always Visible Header */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+          className="text-center pb-6 mb-6 border-b"
+        >
+          {/* Large Score Display */}
+          <div className="text-7xl font-bold bg-gradient-to-br from-primary to-primary/60 bg-clip-text text-transparent mb-2">
+            {current.score}
+          </div>
+          
+          {/* Tier Badge */}
+          <Badge variant="secondary" className="text-base px-4 py-1.5 mb-4">
+            {current.tier}
+          </Badge>
+
+          {/* Compact 3-stat Grid */}
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            <div>
+              <div className="text-lg font-semibold">{current.score}/100</div>
+              <div className="text-xs text-muted-foreground">Score</div>
             </div>
-
-            {/* Key Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="text-center p-4 rounded-xl bg-background/50 border border-border"
-              >
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                  Current Score
-                </div>
-                <div className="text-3xl font-bold text-foreground">
-                  {data.current.score}/100
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-center p-4 rounded-xl bg-background/50 border border-border"
-              >
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
-                  Percentile
-                </div>
-                <div className="text-3xl font-bold text-primary">
-                  {data.current.percentile}
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="text-center p-4 rounded-xl bg-background/50 border border-border"
-              >
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1 flex items-center justify-center gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  Growth
-                </div>
-                <div className="text-3xl font-bold text-success">
-                  {data.history.length > 1 
-                    ? `+${(data.current.score - data.history[0].score).toFixed(1)}`
-                    : '+0.0'}
-                </div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  vs {data.history[0]?.date || 'baseline'}
-                </div>
-              </motion.div>
+            <div>
+              <div className="text-lg font-semibold">{current.percentile}</div>
+              <div className="text-xs text-muted-foreground">Percentile</div>
             </div>
-          </CardContent>
-        </Card>
-      </motion.div>
-
-      {/* Progress Timeline Section */}
-      <Card className="bg-background/95 backdrop-blur-sm border-2 border-border shadow-lg">
-        <CardContent className="p-6 md:p-8">
-          <ProgressTimeline 
-            history={data.history}
-            projection={data.projection}
-            currentScore={data.current.score}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Competitive Standing Spectrum */}
-      <Card className="bg-background/95 backdrop-blur-sm border-2 border-border shadow-lg">
-        <CardContent className="p-6 md:p-8">
-          <CompetitiveSpectrum 
-            yourScore={data.competitiveStanding.yourScore}
-            spectrum={data.competitiveStanding.spectrum}
-          />
-        </CardContent>
-      </Card>
-
-      {/* School Tier Cards */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <Trophy className="w-5 h-5 text-primary" />
-          <h3 className="text-xl font-bold text-foreground">School Tier Analysis</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <SchoolTierCard tier={data.competitiveStanding.tiers.safety} index={0} />
-          <SchoolTierCard tier={data.competitiveStanding.tiers.target} index={1} />
-          <SchoolTierCard tier={data.competitiveStanding.tiers.reach} index={2} />
-        </div>
-      </div>
-
-      {/* Next Milestones Section */}
-      <Card className="bg-gradient-to-br from-accent/10 to-background backdrop-blur-sm border-2 border-accent/20 shadow-lg">
-        <CardContent className="p-6 md:p-8">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-accent to-primary flex items-center justify-center shadow-lg">
-                <Target className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <GradientText
-                  className="text-lg font-bold uppercase tracking-wide"
-                  colors={["#a855f7", "#07c6ff"]}
-                >
-                  Next Milestones
-                </GradientText>
-                <p className="text-xs text-muted-foreground">Path to {data.projection.targetScore}</p>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-xs text-muted-foreground">Target by</div>
-              <div className="text-sm font-bold text-foreground">{data.projection.targetDate}</div>
+            <div>
+              <div className="text-lg font-semibold text-green-600">+{growthPoints}</div>
+              <div className="text-xs text-muted-foreground">Growth</div>
             </div>
           </div>
+        </motion.div>
 
-          {/* Progress Bar */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-              <span>Progress</span>
-              <span>
-                {data.nextMilestones.filter(m => m.status === 'completed').length}/{data.nextMilestones.length} completed
-              </span>
-            </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ 
-                  width: `${(data.nextMilestones.filter(m => m.status === 'completed').length / data.nextMilestones.length) * 100}%` 
-                }}
-                transition={{ delay: 0.5, duration: 1 }}
-                className="h-full bg-gradient-to-r from-success to-primary"
+        {/* Collapsible Sections */}
+        <div className="space-y-2">
+          {/* Section 1: Progress Timeline */}
+          <Collapsible open={openSections.timeline} onOpenChange={() => toggleSection('timeline')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50 rounded-lg transition-colors border-b">
+              <div className="flex items-center gap-3">
+                <TrendingUp className="w-5 h-5 text-primary" />
+                <div className="text-left">
+                  <div className="font-semibold">Progress Timeline</div>
+                  <div className="text-sm text-muted-foreground">
+                    View your progress over time • +{growthPoints} pts in 3 months
+                  </div>
+                </div>
+              </div>
+              <ChevronDown 
+                className={`w-5 h-5 text-muted-foreground transition-transform ${
+                  openSections.timeline ? 'rotate-180' : ''
+                }`} 
               />
-            </div>
-          </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-5 pb-5 pt-4">
+              <ProgressTimeline 
+                history={history}
+                projection={projection}
+                currentScore={current.score}
+              />
+            </CollapsibleContent>
+          </Collapsible>
 
-          {/* Milestone List */}
-          <div className="space-y-3">
-            {data.nextMilestones.slice(0, 4).map((milestone, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 + idx * 0.1 }}
-                className="flex items-start gap-3 p-3 rounded-lg bg-background/50 border border-border hover:border-primary/30 transition-colors"
-              >
-                <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                  milestone.status === 'completed' 
-                    ? 'bg-success text-white' 
-                    : milestone.status === 'in-progress'
-                    ? 'bg-amber-500 text-white'
-                    : 'bg-muted text-muted-foreground'
-                }`}>
-                  {milestone.status === 'completed' ? '✓' : idx + 1}
-                </div>
-                <div className="flex-1">
-                  <div className={`font-medium text-sm ${
-                    milestone.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'
-                  }`}>
-                    {milestone.title}
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="text-xs text-green-600 font-semibold">
-                      +{milestone.estimatedImpact} pts
-                    </span>
-                    {milestone.deadline && (
-                      <span className="text-xs text-muted-foreground">
-                        • Due: {milestone.deadline}
-                      </span>
-                    )}
+          {/* Section 2: Competitive Standing */}
+          <Collapsible open={openSections.standing} onOpenChange={() => toggleSection('standing')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50 rounded-lg transition-colors border-b">
+              <div className="flex items-center gap-3">
+                <Target className="w-5 h-5 text-primary" />
+                <div className="text-left">
+                  <div className="font-semibold">Competitive Standing</div>
+                  <div className="text-sm text-muted-foreground">
+                    You're in the competitive range • {current.percentile}
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </div>
+              </div>
+              <ChevronDown 
+                className={`w-5 h-5 text-muted-foreground transition-transform ${
+                  openSections.standing ? 'rotate-180' : ''
+                }`} 
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-5 pb-5 pt-4">
+              <CompetitiveSpectrum 
+                yourScore={competitiveStanding.yourScore}
+                spectrum={competitiveStanding.spectrum}
+              />
+            </CollapsibleContent>
+          </Collapsible>
 
-          {data.nextMilestones.length > 4 && (
-            <button className="w-full mt-4 text-primary text-sm font-medium hover:text-primary/80 transition-colors flex items-center justify-center gap-1 group">
-              View all {data.nextMilestones.length} milestones
-              <span className="group-hover:translate-x-1 transition-transform">→</span>
-            </button>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+          {/* Section 3: School Tier Analysis */}
+          <Collapsible open={openSections.tiers} onOpenChange={() => toggleSection('tiers')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50 rounded-lg transition-colors border-b">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                <div className="text-left">
+                  <div className="font-semibold">School Tier Analysis</div>
+                  <div className="text-sm text-muted-foreground">
+                    View admission probability by tier • 3 tiers analyzed
+                  </div>
+                </div>
+              </div>
+              <ChevronDown 
+                className={`w-5 h-5 text-muted-foreground transition-transform ${
+                  openSections.tiers ? 'rotate-180' : ''
+                }`} 
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-5 pb-5 pt-4">
+              <div className="space-y-3">
+                <SchoolTierCard tier={competitiveStanding.tiers.safety} index={0} />
+                <SchoolTierCard tier={competitiveStanding.tiers.target} index={1} />
+                <SchoolTierCard tier={competitiveStanding.tiers.reach} index={2} />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+
+          {/* Section 4: Next Milestones */}
+          <Collapsible open={openSections.milestones} onOpenChange={() => toggleSection('milestones')}>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-4 hover:bg-muted/50 rounded-lg transition-colors">
+              <div className="flex items-center gap-3">
+                <Target className="w-5 h-5 text-primary" />
+                <div className="text-left">
+                  <div className="font-semibold">Next Milestones</div>
+                  <div className="text-sm text-muted-foreground">
+                    {completedMilestones} of {totalMilestones} milestones completed • +{nextMilestones.reduce((sum, m) => sum + m.estimatedImpact, 0)} pts possible
+                  </div>
+                </div>
+              </div>
+              <ChevronDown 
+                className={`w-5 h-5 text-muted-foreground transition-transform ${
+                  openSections.milestones ? 'rotate-180' : ''
+                }`} 
+              />
+            </CollapsibleTrigger>
+            <CollapsibleContent className="px-5 pb-5 pt-4 space-y-4">
+              {/* Progress Bar */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    {completedMilestones} of {totalMilestones} completed
+                  </span>
+                  <span className="font-medium">
+                    {Math.round(milestoneProgress)}%
+                  </span>
+                </div>
+                <Progress value={milestoneProgress} className="h-2" />
+              </div>
+
+              {/* Milestone List */}
+              <div className="space-y-2">
+                {nextMilestones.slice(0, 4).map((milestone, index) => {
+                  const statusConfig = {
+                    completed: { icon: "✅", color: "text-green-600", bg: "bg-green-50 dark:bg-green-950/30" },
+                    "in-progress": { icon: "🔄", color: "text-blue-600", bg: "bg-blue-50 dark:bg-blue-950/30" },
+                    upcoming: { icon: "⏳", color: "text-muted-foreground", bg: "bg-muted/50" },
+                  };
+                  const config = statusConfig[milestone.status];
+
+                  return (
+                    <div
+                      key={index}
+                      className={`flex items-start gap-3 p-3 rounded-lg ${config.bg}`}
+                    >
+                      <span className="text-lg">{config.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm">{milestone.title}</div>
+                        <div className="flex items-center gap-3 mt-1 text-xs">
+                          <span className={`font-semibold ${config.color}`}>
+                            +{milestone.estimatedImpact} pts
+                          </span>
+                          {milestone.deadline && (
+                            <span className="text-muted-foreground">
+                              Due: {new Date(milestone.deadline).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* View All Button */}
+              {totalMilestones > 4 && (
+                <Button variant="outline" className="w-full" size="sm">
+                  View All {totalMilestones} Milestones
+                </Button>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        </div>
+      </CardContent>
+    </Card>
   );
-};
+}
