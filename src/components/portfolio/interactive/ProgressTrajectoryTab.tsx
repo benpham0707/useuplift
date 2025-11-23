@@ -1,9 +1,7 @@
-import { useState } from "react";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
-import { TrendingUp, Calendar, ChevronDown } from "lucide-react";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart, ReferenceDot } from "recharts";
+import { TrendingUp, Calendar, Award } from "lucide-react";
 
 interface HistoryPoint {
   date: string;
@@ -38,8 +36,6 @@ interface ProgressTrajectoryTabProps {
 }
 
 export function ProgressTrajectoryTab({ history, trajectory, projection }: ProgressTrajectoryTabProps) {
-  const [isMilestonesOpen, setIsMilestonesOpen] = useState(false);
-  
   // Safety checks
   if (!trajectory || !trajectory.growthAnalysis) {
     console.error('Invalid trajectory data:', trajectory);
@@ -54,6 +50,8 @@ export function ProgressTrajectoryTab({ history, trajectory, projection }: Progr
   const chartData = history.map(point => ({
     date: point.date,
     score: point.score,
+    hasMilestone: point.milestones.length > 0,
+    milestones: point.milestones,
   }));
 
   // Add projection point
@@ -63,18 +61,48 @@ export function ProgressTrajectoryTab({ history, trajectory, projection }: Progr
       date: projection.targetDate,
       score: projection.targetScore,
       isProjection: true,
+      hasMilestone: false,
+      milestones: [],
     }
   ];
 
+  // Custom tooltip to show milestones
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-card border rounded-lg p-3 shadow-lg">
+          <p className="font-semibold text-sm">{data.date}</p>
+          <p className="text-primary font-bold text-lg">Score: {data.score}</p>
+          {data.milestones && data.milestones.length > 0 && (
+            <div className="mt-2 pt-2 border-t space-y-1">
+              {data.milestones.map((milestone: any, idx: number) => (
+                <div key={idx} className="text-xs">
+                  <p className="font-medium">{milestone.title}</p>
+                  <p className="text-success">+{milestone.impact} pts</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {data.isProjection && (
+            <p className="text-xs text-muted-foreground mt-1">Projected</p>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
     <div className="space-y-6">
-      {/* Timeline Chart */}
-      <Card className="p-6 bg-gradient-to-br from-primary/5 to-secondary/5">
-        <div className="flex items-center gap-2 mb-4">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <h3 className="font-semibold text-lg">Score Progression</h3>
+      {/* Section 1: Your Growth Story */}
+      <Card className="p-8 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+        <div className="flex items-center gap-2 mb-6">
+          <TrendingUp className="w-6 h-6 text-primary" />
+          <h3 className="font-bold text-2xl">Your Growth Story</h3>
         </div>
         
+        {/* Timeline Chart with Milestones */}
         <ResponsiveContainer width="100%" height={300}>
           <AreaChart data={projectionData}>
             <defs>
@@ -83,7 +111,7 @@ export function ProgressTrajectoryTab({ history, trajectory, projection }: Progr
                 <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
             <XAxis 
               dataKey="date" 
               stroke="hsl(var(--muted-foreground))"
@@ -94,128 +122,107 @@ export function ProgressTrajectoryTab({ history, trajectory, projection }: Progr
               stroke="hsl(var(--muted-foreground))"
               style={{ fontSize: '12px' }}
             />
-            <Tooltip 
-              contentStyle={{
-                backgroundColor: 'hsl(var(--card))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: '8px',
-              }}
-            />
+            <Tooltip content={<CustomTooltip />} />
             <Area
               type="monotone"
               dataKey="score"
               stroke="hsl(var(--primary))"
               strokeWidth={3}
               fill="url(#scoreGradient)"
+              dot={(props: any) => {
+                const { cx, cy, payload } = props;
+                if (payload.hasMilestone) {
+                  return (
+                    <g>
+                      <circle cx={cx} cy={cy} r={6} fill="hsl(var(--success))" stroke="hsl(var(--background))" strokeWidth={2} />
+                      <Award className="w-3 h-3" x={cx - 6} y={cy - 6} fill="hsl(var(--background))" />
+                    </g>
+                  );
+                }
+                if (payload.isProjection) {
+                  return (
+                    <circle cx={cx} cy={cy} r={5} fill="hsl(var(--secondary))" stroke="hsl(var(--background))" strokeWidth={2} strokeDasharray="4 4" />
+                  );
+                }
+                return <circle cx={cx} cy={cy} r={4} fill="hsl(var(--primary))" stroke="hsl(var(--background))" strokeWidth={2} />;
+              }}
             />
           </AreaChart>
         </ResponsiveContainer>
-      </Card>
 
-      {/* Milestone Breakdown - Collapsible */}
-      <Card className="p-4">
-        <Collapsible open={isMilestonesOpen} onOpenChange={setIsMilestonesOpen}>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Key Milestones</h3>
-              <CollapsibleTrigger asChild>
-                <button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-                  {isMilestonesOpen ? "Hide details" : "View impact analysis"}
-                  <ChevronDown className={`w-4 h-4 transition-transform ${isMilestonesOpen ? "rotate-180" : ""}`} />
-                </button>
-              </CollapsibleTrigger>
-            </div>
-            
-            {/* Condensed Summary */}
-            <div className="space-y-1 text-sm">
-              {history.slice(0, 3).map((point, index) => (
-                point.milestones.map((milestone, mIndex) => (
-                  <div key={`${index}-${mIndex}`} className="flex items-center gap-2 text-muted-foreground">
-                    <span className="text-primary">•</span>
-                    <span>{point.date}: {milestone.title}</span>
-                    <span className="text-success font-medium">(+{milestone.impact})</span>
-                  </div>
-                ))
-              ))}
-            </div>
+        {/* Divider */}
+        <div className="my-6 border-t border-border" />
 
-            <CollapsibleContent className="pt-3">
-              <div className="space-y-3">
-                {history.map((point, index) => (
-                  <div key={index}>
-                    {point.milestones.map((milestone, mIndex) => (
-                      <motion.div
-                        key={`${index}-${mIndex}`}
-                        initial={{ opacity: 0, x: -20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        className="flex items-center justify-between py-3 border-b last:border-b-0"
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium">{milestone.title}</div>
-                          <div className="text-sm text-muted-foreground">{point.date}</div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-sm font-semibold text-success">+{milestone.impact} pts</div>
-                          </div>
-                          <div className="text-right min-w-[60px]">
-                            <div className="text-lg font-bold">{point.score}</div>
-                            <div className="text-xs text-muted-foreground">New Score</div>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </CollapsibleContent>
+        {/* Growth Analysis */}
+        <div>
+          <h4 className="font-semibold text-lg mb-3 flex items-center gap-2">
+            <span className="text-primary">What This Means</span>
+          </h4>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {trajectory.growthAnalysis}
+          </p>
+        </div>
+
+        {/* Milestone Legend */}
+        <div className="mt-6 pt-4 border-t flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-success rounded-full" />
+            <span>Milestone Achievement</span>
           </div>
-        </Collapsible>
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 bg-secondary rounded-full border-2 border-dashed" />
+            <span>Projected Target</span>
+          </div>
+        </div>
       </Card>
 
-      {/* Growth Analysis */}
-      <Card className="p-6 bg-gradient-to-br from-accent/5 to-accent/10">
-        <h3 className="font-semibold text-lg mb-4">Growth Analysis</h3>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {trajectory.growthAnalysis}
-        </p>
-      </Card>
-
-      {/* Projection Box */}
-      <Card className="p-6 bg-gradient-to-br from-secondary/5 to-secondary/10">
+      {/* Section 2: What's Next */}
+      <Card className="p-8 bg-gradient-to-br from-secondary/10 via-secondary/5 to-transparent">
         <div className="flex items-center gap-2 mb-4">
-          <Calendar className="w-5 h-5 text-secondary" />
-          <h3 className="font-semibold text-lg">Future Projections</h3>
+          <Calendar className="w-6 h-6 text-secondary" />
+          <h3 className="font-bold text-2xl">What's Next: Your Growth Targets</h3>
         </div>
         
+        <p className="text-sm text-muted-foreground mb-6">
+          With 6 months remaining, here's your path forward:
+        </p>
+        
         <div className="space-y-4">
-          <div className="text-sm font-medium mb-3">
-            With 6 months until applications, realistic targets include:
-          </div>
-          
           {trajectory.scenarios.map((scenario, index) => (
             <motion.div
               key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="flex items-start gap-3 p-4 bg-background/50 rounded-lg border"
+              className="flex items-start gap-4 p-5 bg-background/60 rounded-lg border-2 border-border/50 hover:border-secondary/50 transition-colors"
             >
-              <div className="flex-shrink-0 w-8 h-8 bg-secondary/10 rounded-full flex items-center justify-center text-sm font-bold text-secondary">
-                +{scenario.points}
+              <div className="flex-shrink-0 w-12 h-12 bg-secondary/20 rounded-full flex items-center justify-center">
+                <div className="text-lg font-bold text-secondary">+{scenario.points}</div>
               </div>
               <div className="flex-1">
-                <div className="font-medium text-sm mb-1">
+                <div className="font-semibold text-base mb-1">
                   {scenario.title} → {scenario.newPercentile}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className="text-sm text-muted-foreground leading-relaxed">
                   {scenario.requirements}
                 </div>
               </div>
             </motion.div>
           ))}
         </div>
+
+        {/* Recommendation */}
+        {trajectory.scenarios.length > 0 && (
+          <div className="mt-6 p-4 bg-accent/10 rounded-lg border border-accent/20">
+            <p className="text-sm">
+              <span className="font-semibold text-accent">Our Recommendation:</span>{" "}
+              <span className="text-muted-foreground">
+                Focus on {trajectory.scenarios[0].title.toLowerCase()} as it provides the strongest 
+                return on investment given your current profile and timeline.
+              </span>
+            </p>
+          </div>
+        )}
       </Card>
     </div>
   );
