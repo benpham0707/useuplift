@@ -2,10 +2,8 @@ import React, { useState } from 'react';
 import { BentoMetricCard } from './BentoMetricCard';
 import { BentoAchievements } from './BentoAchievements';
 import { UnifiedScoreDashboard } from './UnifiedScoreDashboard';
-import { CompetitiveSpectrumCard } from './CompetitiveSpectrumCard';
-import { TopContributorsCard } from './TopContributorsCard';
-import { PriorityActionsCard } from './PriorityActionsCard';
-import { TierProgressCard } from './TierProgressCard';
+import { PortfolioProgressStanding } from './PortfolioProgressStanding';
+import { PortfolioProgressData } from './types/portfolioTypes';
 import { Achievement } from '../portfolioInsightsData';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -169,11 +167,136 @@ const MOCK_PRIORITY_ACTIONS = [
   },
 ];
 
-const MOCK_SCHOOL_TIERS = [
-  { name: 'UC Berkeley', score: 7.8, type: 'safety' as const, color: 'green' },
-  { name: 'Northwestern', score: 8.2, type: 'target' as const, color: 'amber' },
-  { name: 'MIT', score: 8.9, type: 'reach' as const, color: 'red' },
-];
+// Hard-coded mock data for the unified Portfolio Progress & Standing component
+// This represents the user's progress over time, competitive standing, and school tier analysis
+const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
+  current: {
+    score: 85,
+    tier: 'Platinum Achiever',
+    percentile: 'Top 15%',
+    lastUpdated: '2024-11-23',
+  },
+  
+  history: [
+    {
+      date: 'Aug 2024',
+      score: 73,
+      milestones: [
+        { title: 'Started leadership role', impact: 3, icon: 'Users' },
+      ],
+    },
+    {
+      date: 'Sep 2024',
+      score: 78,
+      milestones: [
+        { title: 'Completed service project', impact: 5, icon: 'Heart' },
+      ],
+    },
+    {
+      date: 'Oct 2024',
+      score: 82,
+      milestones: [
+        { title: 'Won regional competition', impact: 4, icon: 'Award' },
+      ],
+    },
+    {
+      date: 'Nov 2024',
+      score: 85,
+      milestones: [
+        { title: 'Published research paper', impact: 3, icon: 'BookOpen' },
+      ],
+    },
+  ],
+  
+  projection: {
+    targetScore: 92,
+    targetDate: 'Mar 2025',
+    confidence: 'high',
+  },
+  
+  competitiveStanding: {
+    yourScore: 85,
+    spectrum: {
+      min: 70,
+      max: 100,
+      safetyRange: [70, 80],
+      targetRange: [80, 90],
+      reachRange: [90, 100],
+    },
+    tiers: {
+      safety: {
+        name: 'Safety Tier',
+        schools: ['UC Berkeley', 'UCLA', 'USC', 'UC San Diego'],
+        avgAdmitScore: 78,
+        yourScore: 85,
+        gap: 7,
+        admissionProbability: { min: 70, max: 85 },
+        status: 'strong',
+      },
+      target: {
+        name: 'Target Tier',
+        schools: ['Northwestern', 'Duke', 'Brown', 'Cornell'],
+        avgAdmitScore: 88,
+        yourScore: 85,
+        gap: -3,
+        admissionProbability: { min: 35, max: 55 },
+        status: 'competitive',
+        actions: [
+          'Start independent research project (+3-4 pts)',
+          'Win national competition or award (+2-3 pts)',
+          'Launch significant community initiative (+2-3 pts)',
+        ],
+      },
+      reach: {
+        name: 'Reach Tier',
+        schools: ['MIT', 'Stanford', 'Harvard', 'Princeton'],
+        avgAdmitScore: 95,
+        yourScore: 85,
+        gap: -10,
+        admissionProbability: { min: 15, max: 25 },
+        status: 'challenging',
+        actions: [
+          'Achieve international recognition (+5-6 pts)',
+          'Develop transformative project with major impact (+4-5 pts)',
+          'Secure prestigious fellowship or grant (+3-4 pts)',
+          'Publish in top-tier journal (+3-4 pts)',
+        ],
+      },
+    },
+  },
+  
+  nextMilestones: [
+    {
+      title: 'Complete AP Scholar Award application',
+      status: 'completed',
+      estimatedImpact: 2,
+    },
+    {
+      title: 'Lead team research project',
+      status: 'in-progress',
+      estimatedImpact: 3,
+      deadline: 'Jan 2025',
+    },
+    {
+      title: 'Enter national competition',
+      status: 'upcoming',
+      estimatedImpact: 4,
+      deadline: 'Feb 2025',
+    },
+    {
+      title: 'Launch community initiative',
+      status: 'upcoming',
+      estimatedImpact: 3,
+      deadline: 'Feb 2025',
+    },
+    {
+      title: 'Complete advanced coursework',
+      status: 'in-progress',
+      estimatedImpact: 2,
+      deadline: 'Mar 2025',
+    },
+  ],
+};
 
 export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBentoProps> = ({
   overallScore,
@@ -272,12 +395,8 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
           competitiveAnalysis={COMPETITIVE_ANALYSIS}
         />
 
-        {/* 2. Competitive Context */}
-        <CompetitiveSpectrumCard
-          userScore={8.2}
-          userPercentile={percentile}
-          schoolTiers={MOCK_SCHOOL_TIERS}
-        />
+        {/* 2. Portfolio Progress & Standing (Combined) */}
+        <PortfolioProgressStanding data={MOCK_PORTFOLIO_PROGRESS_DATA} />
 
         {/* 3. Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -292,10 +411,7 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
           ))}
         </div>
 
-        {/* 5. Tier Progress */}
-        <TierProgressCard progress={tierProgressData} />
-
-        {/* 6. Achievements */}
+        {/* 4. Achievements */}
         <div className="flex justify-center">
           <div className="w-full max-w-md">
             <BentoAchievements achievements={achievements} />
