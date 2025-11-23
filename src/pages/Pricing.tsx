@@ -24,13 +24,13 @@ const Pricing = () => {
     const loadProfile = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('credits, subscription_status')
+        .select('id')
         .eq('user_id', user.id)
         .single();
       
       if (data) {
-        setCredits(data.credits);
-        setSubscriptionStatus(data.subscription_status);
+        setCredits(0);
+        setSubscriptionStatus(null);
       }
     };
 
@@ -92,13 +92,13 @@ const Pricing = () => {
                       // Refresh credits
                      supabase
                     .from('profiles')
-                    .select('credits, subscription_status')
+                    .select('id')
                     .eq('user_id', user.id)
                     .single()
                     .then(({ data }) => {
                         if (data) {
-                            setCredits(data.credits);
-                            setSubscriptionStatus(data.subscription_status);
+                            setCredits(0);
+                            setSubscriptionStatus(null);
                         }
                     });
                     // Clean URL
@@ -111,14 +111,14 @@ const Pricing = () => {
          // Fallback if no session_id but success=true (shouldn't happen with our backend link but safe to keep)
         if (user) {
              supabase
-            .from('profiles')
-            .select('credits, subscription_status')
+             .from('profiles')
+            .select('id')
             .eq('user_id', user.id)
             .single()
             .then(({ data }) => {
                 if (data) {
-                    setCredits(data.credits);
-                    setSubscriptionStatus(data.subscription_status);
+                    setCredits(0);
+                    setSubscriptionStatus(null);
                 }
             });
         }

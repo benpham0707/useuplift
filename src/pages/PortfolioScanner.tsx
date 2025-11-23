@@ -513,11 +513,9 @@ const PortfolioScanner = () => {
           .from('profiles')
           .insert({
             user_id: user.id,
-            user_context: 'high_school_11th',
-            has_completed_assessment: false,
-            credits: 0 // Initialize with 0 credits
+            user_context: 'high_school_11th'
           })
-          .select('id, has_completed_assessment, credits')
+          .select('id')
           .single();
         if (insertError) {
           // eslint-disable-next-line no-console
@@ -525,11 +523,11 @@ const PortfolioScanner = () => {
           setInitializing(false);
           return;
         }
-        setHasCompletedOnboarding(Boolean(created?.has_completed_assessment));
-        setCredits(created?.credits || 0);
+        setHasCompletedOnboarding(false);
+        setCredits(0);
       } else {
-        setHasCompletedOnboarding(Boolean(data.has_completed_assessment));
-        setCredits(data.credits || 0);
+        setHasCompletedOnboarding(false);
+        setCredits(0);
       }
       setInitializing(false);
     };

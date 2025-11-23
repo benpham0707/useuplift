@@ -14,7 +14,24 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
-const PLANS = {
+type SubscriptionPlan = {
+  name: string;
+  amount: number;
+  currency: string;
+  credits: number;
+  interval: 'month' | 'year';
+};
+
+type AddonPlan = {
+  name: string;
+  amount: number;
+  currency: string;
+  credits: number;
+};
+
+type Plan = SubscriptionPlan | AddonPlan;
+
+const PLANS: Record<string, Plan> = {
   subscription: {
     name: 'Monthly Subscription',
     amount: 2000, // $20.00
@@ -79,6 +96,8 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
         .eq('user_id', userId);
     }
 
+    const isSubscription = 'interval' in plan;
+    
     const sessionConfig: any = {
       customer: customerId,
       payment_method_types: ['card'],
@@ -91,12 +110,12 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
               name: plan.name,
             },
             unit_amount: plan.amount,
-            ...(plan.interval ? { recurring: { interval: plan.interval as any } } : {}),
+            ...(isSubscription ? { recurring: { interval: (plan as SubscriptionPlan).interval } } : {}),
           },
           quantity: 1,
         },
       ],
-      mode: plan.interval ? 'subscription' : 'payment',
+      mode: isSubscription ? 'subscription' : 'payment',
       success_url: successUrl || `${req.headers.origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl || `${req.headers.origin}/billing/cancel`,
       metadata: {
