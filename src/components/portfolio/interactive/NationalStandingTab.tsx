@@ -1,8 +1,17 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Globe, Target, Lightbulb, School } from "lucide-react";
+import { Globe, Target, Lightbulb, School, ChevronDown } from "lucide-react";
 import { CompetitiveSpectrum } from "./CompetitiveSpectrum";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface NationalStandingData {
   region: string;
@@ -51,6 +60,11 @@ interface NationalStandingTabProps {
 }
 
 export function NationalStandingTab({ data, tiers, yourScore }: NationalStandingTabProps) {
+  const [selectedSchool, setSelectedSchool] = useState(data.schoolComparisons[0]?.school || "");
+  const [isTierDetailsOpen, setIsTierDetailsOpen] = useState(false);
+  
+  const selectedComparison = data.schoolComparisons.find(c => c.school === selectedSchool) || data.schoolComparisons[0];
+
   return (
     <div className="space-y-6">
       {/* Header Section */}
@@ -73,15 +87,15 @@ export function NationalStandingTab({ data, tiers, yourScore }: NationalStanding
         </div>
       </Card>
 
-      {/* Spectrum Visualization */}
-      <Card className="p-6">
-        <h4 className="font-semibold mb-4">National Score Distribution</h4>
+      {/* Inline Spectrum */}
+      <Card className="p-4">
         <CompetitiveSpectrum
           min={data.spectrum.min}
           max={data.spectrum.max}
           yourScore={yourScore}
           avgScore={data.avgScore}
           percentile={data.percentile}
+          variant="inline"
         />
       </Card>
 
@@ -96,104 +110,142 @@ export function NationalStandingTab({ data, tiers, yourScore }: NationalStanding
         </p>
       </Card>
 
-      {/* School Comparisons */}
+      {/* School Comparison Selector */}
       <Card className="p-6">
         <div className="flex items-center gap-2 mb-4">
           <School className="w-5 h-5 text-secondary" />
-          <h4 className="font-semibold">Comparison to Top Schools</h4>
+          <h4 className="font-semibold">Compare Your Profile To:</h4>
         </div>
         
-        <div className="space-y-4">
-          {data.schoolComparisons.map((comparison, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
-              className="p-4 border rounded-lg space-y-2"
-            >
-              <div className="flex items-start justify-between">
-                <div className="font-medium">{comparison.school}</div>
-                <Badge 
-                  variant={comparison.gap > 0 ? "default" : comparison.gap >= -3 ? "secondary" : "outline"}
-                  className={
-                    comparison.gap > 0 
-                      ? "bg-success" 
-                      : comparison.gap >= -3 
-                      ? "bg-warning text-warning-foreground" 
-                      : "bg-destructive text-destructive-foreground"
-                  }
-                >
-                  {comparison.gap > 0 ? `+${comparison.gap}` : comparison.gap} pts
-                </Badge>
+        <Select value={selectedSchool} onValueChange={setSelectedSchool}>
+          <SelectTrigger className="w-full mb-4">
+            <SelectValue placeholder="Select a school" />
+          </SelectTrigger>
+          <SelectContent>
+            {data.schoolComparisons.map((comparison) => (
+              <SelectItem key={comparison.school} value={comparison.school}>
+                {comparison.school}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {selectedComparison && (
+          <motion.div
+            key={selectedSchool}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 border rounded-lg space-y-3"
+          >
+            <div className="flex items-start justify-between">
+              <div className="font-medium text-lg">{selectedComparison.school}</div>
+              <Badge 
+                variant={selectedComparison.gap > 0 ? "default" : selectedComparison.gap >= -3 ? "secondary" : "outline"}
+                className={
+                  selectedComparison.gap > 0 
+                    ? "bg-success" 
+                    : selectedComparison.gap >= -3 
+                    ? "bg-warning text-warning-foreground" 
+                    : "bg-destructive text-destructive-foreground"
+                }
+              >
+                {selectedComparison.gap > 0 ? `+${selectedComparison.gap}` : selectedComparison.gap} pts
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-muted-foreground text-xs">Average Admit Score</div>
+                <div className="font-semibold text-lg">{selectedComparison.avgScore}</div>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground text-xs">Average Admit Score</div>
-                  <div className="font-semibold">{comparison.avgScore}</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground text-xs">Your Score</div>
-                  <div className="font-semibold">{yourScore}</div>
-                </div>
+              <div>
+                <div className="text-muted-foreground text-xs">Your Score</div>
+                <div className="font-semibold text-lg">{yourScore}</div>
               </div>
-              
-              <div className="text-sm text-muted-foreground pt-2 border-t">
-                <span className="font-medium text-foreground">Assessment:</span> {comparison.assessment}
-              </div>
-            </motion.div>
-          ))}
-        </div>
+            </div>
+            
+            <div className="text-sm text-muted-foreground pt-3 border-t leading-relaxed">
+              <span className="font-medium text-foreground">Assessment:</span> {selectedComparison.assessment}
+            </div>
+          </motion.div>
+        )}
       </Card>
 
-      {/* School Tier Summary */}
-      <Card className="p-6 bg-muted/30">
-        <h4 className="font-semibold mb-4">National School Tiers</h4>
-        
-        <div className="grid md:grid-cols-3 gap-4">
-          {/* Safety */}
-          <div className="p-4 bg-success/10 rounded-lg border border-success/20">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold text-success">Safety</div>
-              <div className="text-2xl">✅</div>
+      {/* Condensed School Tier Summary */}
+      <Card className="p-4 bg-muted/30">
+        <Collapsible open={isTierDetailsOpen} onOpenChange={setIsTierDetailsOpen}>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h4 className="font-semibold">National School Tiers</h4>
+              <CollapsibleTrigger asChild>
+                <button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  {isTierDetailsOpen ? "Hide details" : "View breakdown"}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isTierDetailsOpen ? "rotate-180" : ""}`} />
+                </button>
+              </CollapsibleTrigger>
             </div>
-            <div className="text-sm text-muted-foreground mb-2">
-              {tiers.safety.schools.join(", ")}
+            
+            <div className="text-sm space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-success font-medium">Safety:</span>
+                <span className="text-muted-foreground">{tiers.safety.schools.length} schools (✅ Strong positioning)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-warning font-medium">Target:</span>
+                <span className="text-muted-foreground">{tiers.target.schools.length} schools (⚠️ {Math.abs(tiers.target.gap)}pt gap)</span>
+                <span className="text-muted-foreground">•</span>
+                <span className="text-destructive font-medium">Reach:</span>
+                <span className="text-muted-foreground">{tiers.reach.schools.length} schools</span>
+              </div>
             </div>
-            <div className="text-xs font-medium text-success">
-              {tiers.safety.admissionProbability.min}-{tiers.safety.admissionProbability.max}% admit probability
-            </div>
-          </div>
 
-          {/* Target */}
-          <div className="p-4 bg-warning/10 rounded-lg border border-warning/20">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold text-warning">Target</div>
-              <div className="text-2xl">⚠️</div>
-            </div>
-            <div className="text-sm text-muted-foreground mb-2">
-              {tiers.target.schools.join(", ")}
-            </div>
-            <div className="text-xs font-medium text-warning">
-              {tiers.target.admissionProbability.min}-{tiers.target.admissionProbability.max}% admit probability
-            </div>
-          </div>
+            <CollapsibleContent className="pt-4">
+              <div className="grid md:grid-cols-3 gap-4">
+                {/* Safety */}
+                <div className="p-4 bg-success/10 rounded-lg border border-success/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-success">Safety</div>
+                    <div className="text-2xl">✅</div>
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {tiers.safety.schools.join(", ")}
+                  </div>
+                  <div className="text-xs font-medium text-success">
+                    {tiers.safety.admissionProbability.min}-{tiers.safety.admissionProbability.max}% admit probability
+                  </div>
+                </div>
 
-          {/* Reach */}
-          <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-semibold text-destructive">Reach</div>
-              <div className="text-2xl">🎯</div>
-            </div>
-            <div className="text-sm text-muted-foreground mb-2">
-              {tiers.reach.schools.join(", ")}
-            </div>
-            <div className="text-xs font-medium text-destructive">
-              {tiers.reach.admissionProbability.min}-{tiers.reach.admissionProbability.max}% admit probability
-            </div>
+                {/* Target */}
+                <div className="p-4 bg-warning/10 rounded-lg border border-warning/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-warning">Target</div>
+                    <div className="text-2xl">⚠️</div>
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {tiers.target.schools.join(", ")}
+                  </div>
+                  <div className="text-xs font-medium text-warning">
+                    {tiers.target.admissionProbability.min}-{tiers.target.admissionProbability.max}% admit probability
+                  </div>
+                </div>
+
+                {/* Reach */}
+                <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-destructive">Reach</div>
+                    <div className="text-2xl">🎯</div>
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-2">
+                    {tiers.reach.schools.join(", ")}
+                  </div>
+                  <div className="text-xs font-medium text-destructive">
+                    {tiers.reach.admissionProbability.min}-{tiers.reach.admissionProbability.max}% admit probability
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
           </div>
-        </div>
+        </Collapsible>
       </Card>
 
       {/* Gap Analysis */}

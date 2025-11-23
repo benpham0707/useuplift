@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Card } from "@/components/ui/card";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
-import { TrendingUp, Calendar } from "lucide-react";
+import { TrendingUp, Calendar, ChevronDown } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface HistoryPoint {
   date: string;
@@ -36,6 +38,8 @@ interface ProgressTrajectoryTabProps {
 }
 
 export function ProgressTrajectoryTab({ history, trajectory, projection }: ProgressTrajectoryTabProps) {
+  const [isMilestonesOpen, setIsMilestonesOpen] = useState(false);
+  
   // Safety checks
   if (!trajectory || !trajectory.growthAnalysis) {
     console.error('Invalid trajectory data:', trajectory);
@@ -108,38 +112,66 @@ export function ProgressTrajectoryTab({ history, trajectory, projection }: Progr
         </ResponsiveContainer>
       </Card>
 
-      {/* Milestone Breakdown */}
-      <Card className="p-6">
-        <h3 className="font-semibold text-lg mb-4">Milestone Breakdown</h3>
-        <div className="space-y-3">
-          {history.map((point, index) => (
-            <div key={index}>
-              {point.milestones.map((milestone, mIndex) => (
-                <motion.div
-                  key={`${index}-${mIndex}`}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  className="flex items-center justify-between py-3 border-b last:border-b-0"
-                >
-                  <div className="flex-1">
-                    <div className="font-medium">{milestone.title}</div>
-                    <div className="text-sm text-muted-foreground">{point.date}</div>
+      {/* Milestone Breakdown - Collapsible */}
+      <Card className="p-4">
+        <Collapsible open={isMilestonesOpen} onOpenChange={setIsMilestonesOpen}>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Key Milestones</h3>
+              <CollapsibleTrigger asChild>
+                <button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+                  {isMilestonesOpen ? "Hide details" : "View impact analysis"}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isMilestonesOpen ? "rotate-180" : ""}`} />
+                </button>
+              </CollapsibleTrigger>
+            </div>
+            
+            {/* Condensed Summary */}
+            <div className="space-y-1 text-sm">
+              {history.slice(0, 3).map((point, index) => (
+                point.milestones.map((milestone, mIndex) => (
+                  <div key={`${index}-${mIndex}`} className="flex items-center gap-2 text-muted-foreground">
+                    <span className="text-primary">•</span>
+                    <span>{point.date}: {milestone.title}</span>
+                    <span className="text-success font-medium">(+{milestone.impact})</span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="text-sm font-semibold text-success">+{milestone.impact} pts</div>
-                    </div>
-                    <div className="text-right min-w-[60px]">
-                      <div className="text-lg font-bold">{point.score}</div>
-                      <div className="text-xs text-muted-foreground">New Score</div>
-                    </div>
-                  </div>
-                </motion.div>
+                ))
               ))}
             </div>
-          ))}
-        </div>
+
+            <CollapsibleContent className="pt-3">
+              <div className="space-y-3">
+                {history.map((point, index) => (
+                  <div key={index}>
+                    {point.milestones.map((milestone, mIndex) => (
+                      <motion.div
+                        key={`${index}-${mIndex}`}
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="flex items-center justify-between py-3 border-b last:border-b-0"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium">{milestone.title}</div>
+                          <div className="text-sm text-muted-foreground">{point.date}</div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <div className="text-sm font-semibold text-success">+{milestone.impact} pts</div>
+                          </div>
+                          <div className="text-right min-w-[60px]">
+                            <div className="text-lg font-bold">{point.score}</div>
+                            <div className="text-xs text-muted-foreground">New Score</div>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
       </Card>
 
       {/* Growth Analysis */}

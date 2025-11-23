@@ -6,9 +6,10 @@ interface CompetitiveSpectrumProps {
   yourScore: number;
   avgScore: number;
   percentile: string;
+  variant?: "default" | "inline";
 }
 
-export function CompetitiveSpectrum({ min, max, yourScore, avgScore, percentile }: CompetitiveSpectrumProps) {
+export function CompetitiveSpectrum({ min, max, yourScore, avgScore, percentile, variant = "default" }: CompetitiveSpectrumProps) {
   // Calculate positions as percentages
   const getPosition = (score: number) => {
     return ((score - min) / (max - min)) * 100;
@@ -25,6 +26,47 @@ export function CompetitiveSpectrum({ min, max, yourScore, avgScore, percentile 
     { label: "90th", position: 90, score: min + (max - min) * 0.9 },
   ];
 
+  // Inline variant - compact version
+  if (variant === "inline") {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span className="font-medium">Your Position: {percentile} ({yourScore} vs avg {avgScore})</span>
+        </div>
+        <div className="relative h-8 rounded-lg overflow-hidden">
+          <div 
+            className="absolute inset-0"
+            style={{
+              background: "linear-gradient(90deg, hsl(var(--destructive) / 0.2), hsl(var(--warning) / 0.2) 33%, hsl(var(--primary) / 0.2) 66%, hsl(var(--success) / 0.2))"
+            }}
+          />
+          
+          {/* Average Marker */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-2 h-2 bg-muted-foreground rounded-full border border-background"
+            style={{ left: `${avgPosition}%` }}
+          />
+          
+          {/* Your Position Marker */}
+          <motion.div
+            className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+            style={{ left: `${yourPosition}%` }}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, type: "spring" }}
+          >
+            <div className="w-3 h-3 bg-primary rounded-full border-2 border-background" />
+          </motion.div>
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>↑ You</span>
+          <span>State Avg ↓</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Default variant - full version
   return (
     <div className="space-y-4">
       {/* Spectrum Bar */}
