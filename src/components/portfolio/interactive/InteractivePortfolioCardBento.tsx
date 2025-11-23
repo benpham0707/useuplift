@@ -279,10 +279,7 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
           schoolTiers={MOCK_SCHOOL_TIERS}
         />
 
-        {/* 3. Top Contributors Card */}
-        <TopContributorsCard contributors={MOCK_TOP_CONTRIBUTORS} />
-
-        {/* 4. Metrics Grid */}
+        {/* 3. Metrics Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {metricCards.map((metric) => (
             <BentoMetricCard
@@ -295,11 +292,8 @@ export const InteractivePortfolioCardBento: React.FC<InteractivePortfolioCardBen
           ))}
         </div>
 
-        {/* 5. Action & Progress Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <PriorityActionsCard actions={MOCK_PRIORITY_ACTIONS} />
-          <TierProgressCard progress={tierProgressData} />
-        </div>
+        {/* 5. Tier Progress */}
+        <TierProgressCard progress={tierProgressData} />
 
         {/* 6. Achievements */}
         <div className="flex justify-center">
