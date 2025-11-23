@@ -124,3 +124,62 @@ export interface ProgressTrackingData {
     resources: string[];
   }>;
 }
+
+export interface PortfolioProgressData {
+  current: {
+    score: number;
+    tier: string;
+    percentile: string;
+    lastUpdated: string;
+  };
+  
+  history: Array<{
+    date: string;
+    score: number;
+    milestones: Array<{
+      title: string;
+      impact: number;
+      icon: string;
+    }>;
+  }>;
+  
+  projection: {
+    targetScore: number;
+    targetDate: string;
+    confidence: 'low' | 'medium' | 'high';
+  };
+  
+  competitiveStanding: {
+    yourScore: number;
+    spectrum: {
+      min: number;
+      max: number;
+      safetyRange: [number, number];
+      targetRange: [number, number];
+      reachRange: [number, number];
+    };
+    tiers: {
+      safety: SchoolTierData;
+      target: SchoolTierData;
+      reach: SchoolTierData;
+    };
+  };
+  
+  nextMilestones: Array<{
+    title: string;
+    status: 'completed' | 'in-progress' | 'upcoming';
+    estimatedImpact: number;
+    deadline?: string;
+  }>;
+}
+
+export interface SchoolTierData {
+  name: string;
+  schools: string[];
+  avgAdmitScore: number;
+  yourScore: number;
+  gap: number;
+  admissionProbability: { min: number; max: number };
+  status: 'strong' | 'competitive' | 'challenging';
+  actions?: string[];
+}
