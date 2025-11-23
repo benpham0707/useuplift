@@ -1,138 +1,101 @@
-import React from 'react';
-import { motion } from 'motion/react';
-import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
-import { Badge } from '@/components/ui/badge';
-import { Target } from 'lucide-react';
+import { motion } from "motion/react";
 
 interface CompetitiveSpectrumProps {
+  min: number;
+  max: number;
   yourScore: number;
-  spectrum: {
-    min: number;
-    max: number;
-    safetyRange: [number, number];
-    targetRange: [number, number];
-    reachRange: [number, number];
-  };
+  avgScore: number;
+  percentile: string;
 }
 
-export const CompetitiveSpectrum: React.FC<CompetitiveSpectrumProps> = ({ 
-  yourScore, 
-  spectrum 
-}) => {
-  // Calculate position percentage
+export function CompetitiveSpectrum({ min, max, yourScore, avgScore, percentile }: CompetitiveSpectrumProps) {
+  // Calculate positions as percentages
   const getPosition = (score: number) => {
-    return ((score - spectrum.min) / (spectrum.max - spectrum.min)) * 100;
+    return ((score - min) / (max - min)) * 100;
   };
 
   const yourPosition = getPosition(yourScore);
-  const safetyStart = getPosition(spectrum.safetyRange[0]);
-  const safetyEnd = getPosition(spectrum.safetyRange[1]);
-  const targetStart = getPosition(spectrum.targetRange[0]);
-  const targetEnd = getPosition(spectrum.targetRange[1]);
-  const reachStart = getPosition(spectrum.reachRange[0]);
-  const reachEnd = getPosition(spectrum.reachRange[1]);
+  const avgPosition = getPosition(avgScore);
 
-  // Determine which zone the user is in
-  const getZoneStatus = () => {
-    if (yourScore >= spectrum.reachRange[0]) return 'reach';
-    if (yourScore >= spectrum.targetRange[0]) return 'target';
-    return 'safety';
-  };
-
-  const zoneStatus = getZoneStatus();
+  // Quartile positions - hardcoded placeholder values
+  const quartiles = [
+    { label: "25th", position: 25, score: min + (max - min) * 0.25 },
+    { label: "50th", position: 50, score: min + (max - min) * 0.5 },
+    { label: "75th", position: 75, score: min + (max - min) * 0.75 },
+    { label: "90th", position: 90, score: min + (max - min) * 0.9 },
+  ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5, delay: 0.2 }}
-      className="w-full space-y-4"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold text-foreground">Competitive Standing</h3>
-        <Badge variant={zoneStatus === 'reach' ? 'default' : zoneStatus === 'target' ? 'secondary' : 'outline'}>
-          {zoneStatus === 'reach' ? 'Reach Zone' : zoneStatus === 'target' ? 'Target Zone' : 'Safety Zone'}
-        </Badge>
-      </div>
-
+    <div className="space-y-4">
       {/* Spectrum Bar */}
-      <div className="relative h-16 w-full">
-        {/* Background gradient bar */}
-        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-green-500/30 via-amber-500/30 to-red-500/30 border-2 border-border" />
-        
-        {/* Zone markers */}
+      <div className="relative h-16 rounded-lg overflow-hidden">
+        {/* Gradient Background */}
         <div 
-          className="absolute top-0 bottom-0 bg-green-500/20 border-l-2 border-r-2 border-green-500/40"
-          style={{ left: `${safetyStart}%`, width: `${safetyEnd - safetyStart}%` }}
-        />
-        <div 
-          className="absolute top-0 bottom-0 bg-amber-500/20 border-l-2 border-r-2 border-amber-500/40"
-          style={{ left: `${targetStart}%`, width: `${targetEnd - targetStart}%` }}
-        />
-        <div 
-          className="absolute top-0 bottom-0 bg-red-500/20 border-l-2 border-r-2 border-red-500/40"
-          style={{ left: `${reachStart}%`, width: `${reachEnd - reachStart}%` }}
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(90deg, hsl(var(--destructive) / 0.2), hsl(var(--warning) / 0.2) 33%, hsl(var(--primary) / 0.2) 66%, hsl(var(--success) / 0.2))"
+          }}
         />
 
-        {/* Your position indicator */}
-        <HoverCard>
-          <HoverCardTrigger asChild>
-            <motion.div
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.5, type: 'spring', stiffness: 200 }}
-              className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 cursor-pointer z-10"
-              style={{ left: `${yourPosition}%` }}
-            >
-              <div className="relative">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg ring-4 ring-background">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <motion.div
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="absolute inset-0 rounded-full bg-primary/30"
-                />
-              </div>
-            </motion.div>
-          </HoverCardTrigger>
-          <HoverCardContent className="w-64">
-            <div className="space-y-2">
-              <h4 className="font-bold text-sm">Your Position</h4>
-              <div className="text-2xl font-bold text-primary">{yourScore}</div>
-              <p className="text-xs text-muted-foreground">
-                You are in the <span className="font-semibold capitalize">{zoneStatus}</span> zone for competitive admissions.
-              </p>
+        {/* Quartile Markers */}
+        {quartiles.map((q, index) => (
+          <div
+            key={index}
+            className="absolute top-0 bottom-0 w-[1px] bg-border"
+            style={{ left: `${q.position}%` }}
+          >
+            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground whitespace-nowrap">
+              {q.label}
             </div>
-          </HoverCardContent>
-        </HoverCard>
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground">
+              {Math.round(q.score)}
+            </div>
+          </div>
+        ))}
+
+        {/* Average Marker */}
+        <motion.div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+          style={{ left: `${avgPosition}%` }}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.3 }}
+        >
+          <div className="w-3 h-3 bg-muted-foreground rounded-full border-2 border-background" />
+          <div className="absolute top-6 left-1/2 -translate-x-1/2 text-xs text-muted-foreground whitespace-nowrap">
+            Avg: {avgScore}
+          </div>
+        </motion.div>
+
+        {/* Your Position Marker */}
+        <motion.div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 z-10"
+          style={{ left: `${yourPosition}%` }}
+          initial={{ opacity: 0, scale: 0 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5, type: "spring" }}
+        >
+          <div className="relative">
+            {/* Glow effect */}
+            <div className="absolute inset-0 w-5 h-5 -translate-x-[calc(50%-10px)] -translate-y-[calc(50%-10px)] bg-primary/30 rounded-full blur-md animate-pulse" />
+            
+            {/* Marker */}
+            <div className="relative w-5 h-5 bg-primary rounded-full border-4 border-background shadow-lg" />
+            
+            {/* Label */}
+            <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap shadow-lg">
+              You: {yourScore}
+              <div className="text-[10px] font-normal opacity-90">{percentile}</div>
+            </div>
+          </div>
+        </motion.div>
       </div>
 
-      {/* Legend */}
-      <div className="grid grid-cols-3 gap-3 text-xs">
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-green-500/10">
-          <div className="w-3 h-3 rounded-full bg-green-500" />
-          <div>
-            <div className="font-semibold text-foreground">Safety</div>
-            <div className="text-muted-foreground">{spectrum.safetyRange[0]}-{spectrum.safetyRange[1]}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-amber-500/10">
-          <div className="w-3 h-3 rounded-full bg-amber-500" />
-          <div>
-            <div className="font-semibold text-foreground">Target</div>
-            <div className="text-muted-foreground">{spectrum.targetRange[0]}-{spectrum.targetRange[1]}</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 p-2 rounded-lg bg-red-500/10">
-          <div className="w-3 h-3 rounded-full bg-red-500" />
-          <div>
-            <div className="font-semibold text-foreground">Reach</div>
-            <div className="text-muted-foreground">{spectrum.reachRange[0]}-{spectrum.reachRange[1]}</div>
-          </div>
-        </div>
+      {/* Scale Labels */}
+      <div className="flex justify-between text-xs text-muted-foreground pt-8">
+        <span>{min}</span>
+        <span>{max}</span>
       </div>
-    </motion.div>
+    </div>
   );
-};
+}

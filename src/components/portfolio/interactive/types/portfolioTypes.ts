@@ -140,8 +140,20 @@ export interface PortfolioProgressData {
       title: string;
       impact: number;
       icon: string;
+      competitiveContext?: string[];
+      profileImpact?: string;
     }>;
   }>;
+  
+  trajectory: {
+    growthAnalysis: string;
+    scenarios: Array<{
+      title: string;
+      newPercentile: string;
+      requirements: string;
+      points: number;
+    }>;
+  };
   
   projection: {
     targetScore: number;
@@ -156,22 +168,41 @@ export interface PortfolioProgressData {
       percentile: string;
       yourScore: number;
       avgScore: number;
+      totalStudents: number;
       spectrum: { min: number; max: number; position: number };
-      schoolContext: string;
-      strongFor?: string[];
-      competitiveFor?: string[];
-      reachingFor?: string[];
+      strengths: string;
+      schoolComparisons: Array<{
+        school: string;
+        avgScore: number;
+        gap: number;
+        assessment: string;
+      }>;
+      actionableInsight: string;
     };
     national: {
       region: string;
       percentile: string;
       yourScore: number;
       avgScore: number;
+      totalStudents: number;
       spectrum: { min: number; max: number; position: number };
-      schoolContext: string;
-      strongFor?: string[];
-      competitiveFor?: string[];
-      reachingFor?: string[];
+      strengths: string;
+      schoolComparisons: Array<{
+        school: string;
+        avgScore: number;
+        gap: number;
+        assessment: string;
+      }>;
+      gapAnalysis: {
+        targetPercentile: number;
+        pointsNeeded: number;
+        scenarios: Array<{
+          description: string;
+          points: number;
+        }>;
+        timeline: string;
+      };
+      strategicRecommendations: string;
     };
     spectrum: {
       min: number;

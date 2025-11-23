@@ -177,33 +177,78 @@ const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
     lastUpdated: '2024-11-23',
   },
   
+  // Hard-coded milestone history data showing the user's progress over time
   history: [
     {
       date: 'Aug 2024',
       score: 73,
       milestones: [
-        { title: 'Started leadership role', impact: 3, icon: 'Users' },
+        { 
+          title: 'Started leadership role', 
+          impact: 3, 
+          icon: 'award',
+          competitiveContext: [
+            'Leadership roles demonstrate initiative',
+            'Shows ability to influence and organize peers',
+            'Valued by selective universities as indicator of future campus contribution',
+          ],
+          profileImpact: 'Added leadership dimension to your profile, moving you from 70th → 73rd percentile',
+        },
       ],
     },
     {
       date: 'Sep 2024',
       score: 78,
       milestones: [
-        { title: 'National Merit Semifinalist', impact: 5, icon: 'Award' },
+        { 
+          title: 'National Merit Semifinalist', 
+          impact: 5, 
+          icon: 'trophy',
+          competitiveContext: [
+            'Top 1% of 1.5M PSAT test-takers nationally',
+            'Signals strong academic foundation to admissions',
+            'Valued by all Top 50 schools',
+            'Opens $2,500+ in merit scholarship opportunities',
+            'Particularly impactful for STEM programs',
+          ],
+          profileImpact: 'Moved you from 73rd → 78th percentile nationally. Major credibility boost for academic excellence.',
+        },
       ],
     },
     {
       date: 'Oct 2024',
       score: 82,
       milestones: [
-        { title: 'Launched community service initiative', impact: 4, icon: 'Heart' },
+        { 
+          title: 'Launched community service initiative', 
+          impact: 4, 
+          icon: 'star',
+          competitiveContext: [
+            'Demonstrates leadership and social impact',
+            'Shows ability to identify problems and create solutions',
+            'Valued for demonstrating civic engagement',
+            'Indicates potential for campus community contribution',
+          ],
+          profileImpact: 'Advanced you from 78th → 82nd percentile. Strengthened your leadership narrative.',
+        },
       ],
     },
     {
       date: 'Nov 2024',
       score: 85,
       milestones: [
-        { title: 'Published research paper', impact: 3, icon: 'BookOpen' },
+        { 
+          title: 'Published research paper', 
+          impact: 3, 
+          icon: 'medal',
+          competitiveContext: [
+            'Publication demonstrates scholarly research capability',
+            'Shows intellectual curiosity beyond classroom',
+            'Valued by research universities',
+            'Indicates readiness for college-level research',
+          ],
+          profileImpact: 'Brought you to 85th percentile. Added research depth to your STEM profile.',
+        },
       ],
     },
   ],
@@ -214,6 +259,25 @@ const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
     confidence: 'high',
   },
   
+  // Hard-coded data values representing user's competitive standing analysis
+  trajectory: {
+    growthAnalysis: "Your portfolio has accelerated over the past 3 months with two major national-level achievements. The National Merit Semifinalist recognition was particularly impactful (+5 points) because it signals consistent academic excellence over time—admissions officers know this represents years of preparation, not a one-time performance. Your community service initiative launch (+4 points) reinforces your leadership profile and demonstrates ability to create lasting impact. This upward trajectory suggests strong momentum heading into college applications.",
+    scenarios: [
+      {
+        title: "1 National recognition",
+        newPercentile: "92nd percentile",
+        requirements: "target: national science competition or prestigious summer program",
+        points: 6,
+      },
+      {
+        title: "2 State honors",
+        newPercentile: "89th percentile",
+        requirements: "target: state debate championship + research publication",
+        points: 4,
+      },
+    ],
+  },
+  
   competitiveStanding: {
     yourScore: 85,
     local: {
@@ -221,20 +285,79 @@ const MOCK_PORTFOLIO_PROGRESS_DATA: PortfolioProgressData = {
       percentile: 'Top 8%',
       yourScore: 85,
       avgScore: 78,
+      totalStudents: 450000,
       spectrum: { min: 65, max: 95, position: 85 },
-      schoolContext: "You're above average for most in-state schools",
-      strongFor: ['UC Berkeley', 'UCLA', 'USC'],
-      competitiveFor: ['Stanford'],
+      strengths: "You're significantly above the state average (85 vs 78). Your National Merit status is particularly rare in California (only 2,000 students) and gives you an edge for UC Berkeley, UCLA, and USC admissions.",
+      schoolComparisons: [
+        {
+          school: 'UC Berkeley',
+          avgScore: 87,
+          gap: -2,
+          assessment: 'Competitive range, strong chance with solid essays'
+        },
+        {
+          school: 'UCLA',
+          avgScore: 84,
+          gap: 1,
+          assessment: 'Above average, excellent positioning'
+        },
+        {
+          school: 'USC',
+          avgScore: 82,
+          gap: 3,
+          assessment: 'Strong candidate, likely admit with good essays'
+        },
+      ],
+      actionableInsight: "Your profile is strong for most UC schools. To move from 'competitive' to 'likely' for UC Berkeley, consider adding one more STEM-focused state or national recognition. California's competitive environment means demonstrating distinction beyond grades is critical.",
     },
     national: {
       region: 'United States',
       percentile: 'Top 15%',
       yourScore: 85,
       avgScore: 80,
+      totalStudents: 3700000,
       spectrum: { min: 60, max: 100, position: 85 },
-      schoolContext: 'Competitive range for selective private universities',
-      competitiveFor: ['Northwestern', 'Duke', 'Brown'],
-      reachingFor: ['MIT', 'Harvard', 'Stanford'],
+      strengths: "Your National Merit Semifinalist status (top 1% of test-takers) and published research position you in the competitive range for selective private universities. You demonstrate both academic excellence and specialized achievement.",
+      schoolComparisons: [
+        {
+          school: 'Northwestern',
+          avgScore: 88,
+          gap: -3,
+          assessment: 'Competitive but not guaranteed. Strong essays + interview critical.'
+        },
+        {
+          school: 'Duke',
+          avgScore: 89,
+          gap: -4,
+          assessment: 'Reach range. Need to differentiate in essays or add achievement.'
+        },
+        {
+          school: 'MIT',
+          avgScore: 94,
+          gap: -9,
+          assessment: 'Significant gap. Would need multiple national STEM honors to close.'
+        },
+      ],
+      gapAnalysis: {
+        targetPercentile: 10,
+        pointsNeeded: 5,
+        scenarios: [
+          {
+            description: "1 additional national-level recognition in STEM (+8-10 pts), OR",
+            points: 9,
+          },
+          {
+            description: "2 state-level recognitions in different domains (+4-5 pts each), OR",
+            points: 9,
+          },
+          {
+            description: "1 publication in peer-reviewed journal + 1 national competition finalist (+6 pts + 4 pts)",
+            points: 10,
+          },
+        ],
+        timeline: "6 months remaining suggests focusing on 1-2 strategic targets rather than spreading thin.",
+      },
+      strategicRecommendations: "Given your STEM profile and National Merit status, prioritize national STEM competitions (Regeneron STS, ISEF) or research publication. These have highest ROI for your profile and align with your narrative thread.\n\nYour current positioning makes you competitive for schools like Northwestern and Duke, but you need 1-2 more significant achievements to move into the 'likely' category for these schools. Focus on depth over breadth—one major national recognition is more valuable than multiple local awards.",
     },
     spectrum: {
       min: 70,
