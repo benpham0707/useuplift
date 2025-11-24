@@ -21,12 +21,14 @@ function getClient() {
     
     // Only initialize in backend/edge function context
     if (isBrowser) {
-        throw new Error('Anthropic API calls must be made from backend/edge functions, not directly from the browser. Please create an edge function to handle AI requests.');
+        console.warn('[Claude API] Skipping initialization in browser context - use edge functions instead');
+        return null;
     }
     
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-        throw new Error('ANTHROPIC_API_KEY not found in environment variables. Please add it as a secret.');
+        console.warn('[Claude API] ANTHROPIC_API_KEY not found - use edge functions for AI operations');
+        return null;
     }
     
     console.log(`[Claude API] Initializing client with API key: ${apiKey.substring(0, 20)}...${apiKey.substring(apiKey.length - 4)}`);
@@ -52,6 +54,10 @@ export async function callClaude(userPrompt, options = {}) {
     const { model = DEFAULT_MODEL, temperature = 0.7, maxTokens = DEFAULT_MAX_TOKENS, systemPrompt, useJsonMode = false, cacheSystemPrompt = false, } = options;
     try {
         const anthropicClient = getClient(); // Get client lazily
+        
+        if (!anthropicClient) {
+            throw new Error('Claude API calls must be made from backend/edge functions. Use the workshop-analysis edge function instead.');
+        }
         
         // Build system prompt (SDK accepts a plain string)
         const systemParam = systemPrompt ? String(systemPrompt) : undefined;

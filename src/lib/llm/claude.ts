@@ -16,13 +16,18 @@ import Anthropic from '@anthropic-ai/sdk';
 const isBrowser = typeof import.meta !== 'undefined' && import.meta.env;
 
 // Function to get API key - allows for runtime updates
-function getApiKey(): string {
-  const key = isBrowser
-    ? import.meta.env.VITE_ANTHROPIC_API_KEY
-    : process.env.ANTHROPIC_API_KEY;
+function getApiKey(): string | null {
+  // Don't throw in browser context - just return null
+  if (isBrowser) {
+    console.warn('[Claude API] Skipping initialization in browser - use edge functions');
+    return null;
+  }
+
+  const key = process.env.ANTHROPIC_API_KEY;
 
   if (!key) {
-    throw new Error('ANTHROPIC_API_KEY not found in environment variables. Please add it to your .env file.');
+    console.warn('[Claude API] ANTHROPIC_API_KEY not found - use edge functions for AI operations');
+    return null;
   }
 
   console.log(`[Claude API] Using API key: ${key.substring(0, 20)}...${key.substring(key.length - 4)}`);
@@ -32,13 +37,19 @@ function getApiKey(): string {
 // Singleton client instance
 let clientInstance: Anthropic | null = null;
 
-function getClient(): Anthropic {
+function getClient(): Anthropic | null {
   if (clientInstance) return clientInstance;
 
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.warn('[Claude API] Cannot create client - no API key available');
+    return null;
+  }
+
   clientInstance = new Anthropic({
-  apiKey: getApiKey(),
-  dangerouslyAllowBrowser: true // Required for client-side usage
-});
+    apiKey: apiKey,
+    dangerouslyAllowBrowser: false // Never allow browser usage
+  });
 
   return clientInstance;
 }
@@ -117,6 +128,12 @@ export async function callClaude<T = any>(
       ...(systemParam ? { system: systemParam } : {}),
     };
 
+    // Get client
+    const client = getClient();
+    if (!client) {
+      throw new Error('Claude API not available in browser context. Use edge functions for AI operations.');
+    }
+
     // Make API call with timeout (30 seconds for chat, 120 seconds for deep analysis)
     console.log('[Claude API] Starting API call...');
     const timeoutMs = maxTokens >= 3000 ? 120000 : maxTokens >= 2000 ? 90000 : 45000; // Increased for reliability
@@ -129,7 +146,6 @@ export async function callClaude<T = any>(
       }, timeoutMs);
     });
 
-    const client = getClient();
     const response = await Promise.race([
       client.messages.create(requestParams).then(res => {
         console.log('[Claude API] Call completed successfully');
