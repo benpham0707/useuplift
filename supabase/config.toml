@@ -2,3 +2,6 @@ project_id = "zclaplpkuvxkrdwsgrul"
 
 [functions.analyze-portfolio]
 verify_jwt = false
+
+[functions.workshop-analysis]
+verify_jwt = false
