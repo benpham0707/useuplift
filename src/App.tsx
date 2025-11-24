@@ -22,6 +22,7 @@ import RequireVerified from "@/components/RequireVerified";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 import WorkshopDemo from "./pages/WorkshopDemo";
+import PIQNarrativeWorkshop from "./pages/PIQNarrativeWorkshop";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +52,7 @@ const App = () => (
             <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
             <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
             <Route path="/workshop-demo" element={<WorkshopDemo />} />
+            <Route path="/piq-workshop" element={<RequireVerified><PIQNarrativeWorkshop /></RequireVerified>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
