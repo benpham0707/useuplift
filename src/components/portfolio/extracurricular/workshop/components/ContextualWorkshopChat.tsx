@@ -340,8 +340,8 @@ export default function ContextualWorkshopChat({
     <div className="w-full flex flex-col border-2 border-purple-300 dark:border-purple-700 rounded-lg bg-card" style={{ height: '600px' }}>
       {/* Header */}
       <div className="p-4 border-b flex-shrink-0">
-        <h3 className="font-semibold flex items-center gap-2">
-          <MessageCircle className="h-4 w-4 text-purple-600" />
+        <h3 className="text-xl font-semibold flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-purple-600" />
           AI Essay Coach
         </h3>
         <p className="text-xs text-muted-foreground mt-1">

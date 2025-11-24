@@ -98,9 +98,9 @@ export const EditorView: React.FC<EditorViewProps> = ({
           <div className="p-4">
             <div className="flex items-center justify-between gap-3 mb-3">
               <div className="flex items-center gap-2">
-                <FileEdit className="w-5 h-5 text-primary" />
+                <FileEdit className="w-6 h-6 text-primary" />
                 <GradientText
-                  className="text-lg font-bold"
+                  className="text-xl font-bold"
                   colors={["#3b82f6", "#8b5cf6", "#3b82f6"]}
                 >
                   Essay Editor
