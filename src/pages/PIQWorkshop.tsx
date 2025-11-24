@@ -694,21 +694,6 @@ export default function PIQWorkshop() {
                   <span className="font-semibold">{fixedIssues}/{totalIssues} ({Math.round(progressPercent)}%)</span>
                 </div>
                 <Progress value={progressPercent} className="h-2" />
-                <div className="flex items-center gap-1.5 justify-end mt-2">
-                  <Button
-                    onClick={handleRequestReanalysis}
-                    disabled={!needsReanalysis || isAnalyzing}
-                    variant={needsReanalysis ? "default" : "secondary"}
-                    size="sm"
-                    className="h-7 text-xs"
-                  >
-                    {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCcw className="w-3 h-3 mr-1" />}
-                    {needsReanalysis ? 'Re-analyze' : 'Updated'}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)} className="h-7 text-xs">
-                    <History className="w-3 h-3 mr-1" /> History
-                  </Button>
-                </div>
               </div>
 
               {/* Compact Category Quick Links */}
@@ -860,7 +845,7 @@ export default function PIQWorkshop() {
           <div className="space-y-6">
             {/* Editor */}
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
-              <EditorView
+            <EditorView
                 currentDraft={currentDraft}
                 onDraftChange={handleDraftChange}
                 onSave={handleSave}
@@ -874,6 +859,7 @@ export default function PIQWorkshop() {
                 canRedo={currentVersionIndex < draftVersions.length - 1}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
+                onShowHistory={() => setShowVersionHistory(true)}
               />
             </Card>
 
