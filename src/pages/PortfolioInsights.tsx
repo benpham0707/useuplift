@@ -309,9 +309,12 @@ export default function PortfolioInsights() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
+    <div className="min-h-screen bg-background">
+      {/* Hero Gradient Background with Fade */}
+      <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none" />
+      
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border shadow-sm">
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-border shadow-sm relative">
         <div className="max-w-7xl mx-auto px-6 py-5 md:py-6 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="lg" onClick={() => navigate('/portfolio-scanner')}>
@@ -334,7 +337,7 @@ export default function PortfolioInsights() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-12 space-y-16">
+      <div className="max-w-7xl mx-auto px-6 py-12 space-y-16 relative z-10">
         {/* Section 1: Portfolio Overview - Differentiators & Impact */}
         <section className="animate-fade-in">
           <PortfolioOverview />
