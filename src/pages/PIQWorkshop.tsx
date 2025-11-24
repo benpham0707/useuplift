@@ -258,6 +258,9 @@ export default function PIQWorkshop() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(null);
   const initialScoreRef = useRef<number>(73);
+  
+  // Extract active issues from dimensions
+  const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
 
   // ============================================================================
   // MOCK ANALYSIS (Simulated delay, no API call)
@@ -529,15 +532,19 @@ export default function PIQWorkshop() {
             {/* Editor */}
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
               <EditorView
-                draft={currentDraft}
+                currentDraft={currentDraft}
                 onDraftChange={handleDraftChange}
                 onSave={handleSave}
+                activeIssues={[]}
+                currentScore={currentScore}
+                initialScore={initialScore}
+                isAnalyzing={isAnalyzing}
+                onRequestReanalysis={handleRequestReanalysis}
+                versionHistory={draftVersions}
                 canUndo={currentVersionIndex > 0}
                 canRedo={currentVersionIndex < draftVersions.length - 1}
                 onUndo={handleUndo}
                 onRedo={handleRedo}
-                needsReanalysis={needsReanalysis}
-                isAnalyzing={isAnalyzing}
               />
             </Card>
 
@@ -572,13 +579,17 @@ export default function PIQWorkshop() {
           <div className="xl:col-span-1">
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg sticky top-24">
               <ContextualWorkshopChat
-                studentDraft={currentDraft}
+                activity={MOCK_PIQ as any}
+                currentDraft={currentDraft}
                 analysisResult={null}
-                teachingIssues={[]}
-                onApplySuggestion={(text) => {
-                  setCurrentDraft(text);
-                  setNeedsReanalysis(true);
-                }}
+                teachingCoaching={null}
+                currentScore={currentScore}
+                initialScore={initialScore}
+                hasUnsavedChanges={needsReanalysis}
+                needsReanalysis={needsReanalysis}
+                reflectionPromptsMap={new Map()}
+                reflectionAnswers={{}}
+                onTriggerReanalysis={handleRequestReanalysis}
               />
             </Card>
           </div>
