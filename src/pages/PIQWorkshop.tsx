@@ -1,236 +1,605 @@
-import { useState } from 'react';
+// @ts-nocheck
+/**
+ * PIQ Narrative Workshop - Pure Frontend Demo
+ * 
+ * 100% frontend implementation with mock data - NO backend calls.
+ * Cloned UI/UX from ExtracurricularWorkshopFinal.tsx
+ */
+
+import React, { useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
-import { ArrowLeft, Sparkles, FileText } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { PIQWorkshopIntegrated } from '@/components/portfolio/piq/workshop/PIQWorkshopIntegrated';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History } from 'lucide-react';
+
+// UI Components (NO backend imports)
+import { EditorView } from '@/components/portfolio/extracurricular/workshop/views/EditorView';
+import { RubricDimensionCard } from '@/components/portfolio/extracurricular/workshop/RubricDimensionCard';
+import type { RubricDimension, WritingIssue, EditSuggestion } from '@/components/portfolio/extracurricular/workshop/types';
+import ContextualWorkshopChat from '@/components/portfolio/extracurricular/workshop/components/ContextualWorkshopChat';
+import { VersionHistory } from '@/components/portfolio/extracurricular/workshop/VersionHistory';
+
+// ============================================================================
+// MOCK DATA - Hardcoded for demonstration
+// ============================================================================
+
+// HARDCODED DATA: Sample PIQ response
+const MOCK_PIQ = {
+  id: "piq-1",
+  piqNumber: 1,
+  prompt: "Describe an example of your leadership experience in which you have positively influenced others, helped resolve disputes or contributed to group efforts over time.",
+  description: "During my junior year, I founded the Environmental Action Club at my school with just three members. Initially, our beach cleanups attracted only a handful of students, but I knew we needed to think bigger. I spent weeks researching plastic pollution data and crafting a proposal for the administration. The breakthrough came when I presented to the school board, armed with statistics showing our campus generated over 2,000 plastic bottles weekly. My voice shook, but I pushed through. The board approved funding for water refill stations across all buildings. Within one semester, we reduced single-use plastic waste by 47% and grew our club to 45 active members. More importantly, I learned that leadership isn't about having all the answers—it's about channeling collective passion into measurable change that outlasts your involvement.",
+  wordCount: 142,
+  category: "leadership"
+};
+
+// HARDCODED DATA: Mock analysis with realistic scores (73/100 NQI)
+const MOCK_DIMENSIONS: RubricDimension[] = [
+  {
+    id: 'voice_integrity',
+    name: 'Voice Integrity',
+    score: 7.5,
+    maxScore: 10,
+    status: 'good',
+    weight: 15,
+    overview: 'Authentic voice with genuine nervousness shown. Good use of first-person narrative. Could deepen emotional vulnerability.',
+    issues: [
+      {
+        id: 'issue-voice-1',
+        dimensionId: 'voice_integrity',
+        title: 'Limited Vulnerability - Missing Emotional Depth',
+        excerpt: 'My voice shook, but I pushed through.',
+        analysis: 'You mention nervousness but don\'t let readers feel it. Elite essays show physical symptoms and internal conflict.',
+        impact: 'Costing you 5-8 points in Voice Integrity. Officers read thousands of essays—physical details make yours memorable.',
+        suggestions: [
+          {
+            text: 'My palms left wet marks on the presentation slides. I could feel my pulse in my throat as I faced the board members, their skeptical expressions making my carefully rehearsed pitch feel suddenly hollow.',
+            rationale: 'Notice the specific physical details: wet palms, pulse in throat. Creates tension readers can feel.',
+            type: 'replace'
+          },
+          {
+            text: 'When I stood to present, my hands trembled so badly I had to grip the podium. The board\'s silence felt like judgment, and every statistic I\'d memorized scattered like leaves in my mind.',
+            rationale: 'Shows physical manifestation of anxiety AND its mental impact. Vulnerability signals authenticity.',
+            type: 'replace'
+          }
+        ],
+        status: 'not_fixed',
+        currentSuggestionIndex: 0,
+        expanded: false
+      }
+    ]
+  },
+  {
+    id: 'specificity_evidence',
+    name: 'Specificity & Evidence',
+    score: 8.2,
+    maxScore: 10,
+    status: 'good',
+    weight: 20,
+    overview: 'Strong quantified impact with specific metrics: 2,000 bottles, 47% reduction, 45 members. Excellent use of concrete data.',
+    issues: []
+  },
+  {
+    id: 'transformative_impact',
+    name: 'Transformative Impact',
+    score: 6.5,
+    maxScore: 10,
+    status: 'needs_work',
+    weight: 15,
+    overview: 'Shows growth but transformation is stated rather than shown. Need before/after contrast.',
+    issues: [
+      {
+        id: 'issue-transform-1',
+        dimensionId: 'transformative_impact',
+        title: 'Transformation Stated, Not Shown',
+        excerpt: 'I learned that leadership isn\'t about having all the answers',
+        analysis: 'This is a cliché conclusion. Elite essays show transformation through specific before/after contrasts with concrete examples.',
+        impact: 'Costing you 6-10 points in Transformative Impact—the highest-weighted category.',
+        suggestions: [
+          {
+            text: 'Before: I used to plan every club meeting down to the minute, cutting off members when they diverged from my agenda. After: Now I listen when Mia suggests a campus art installation, even though it wasn\'t in my original plan—and it becomes our most successful campaign.',
+            rationale: 'Specific before behavior with concrete action. Clear after behavior showing different approach. Outcome validates the change.',
+            type: 'replace'
+          },
+          {
+            text: 'My first meeting agenda had every second scheduled. When Emma raised her hand to suggest partnering with local businesses, I dismissed it—"That\'s not what we\'re here for." Six months later, I found myself cold-calling restaurants for donations, using Emma\'s exact idea. The difference? Now I asked: "What else should I consider?"',
+            rationale: 'Shows specific controlling behavior, admits mistake, demonstrates changed approach through action and dialogue.',
+            type: 'replace'
+          }
+        ],
+        status: 'not_fixed',
+        currentSuggestionIndex: 0,
+        expanded: false
+      }
+    ]
+  },
+  {
+    id: 'role_clarity',
+    name: 'Role Clarity & Ownership',
+    score: 7.8,
+    maxScore: 10,
+    status: 'good',
+    weight: 10,
+    overview: 'Clear founder/president role. Good ownership of specific actions: research, proposal, presentation.',
+    issues: []
+  },
+  {
+    id: 'narrative_arc',
+    name: 'Narrative Arc & Stakes',
+    score: 6.0,
+    maxScore: 10,
+    status: 'needs_work',
+    weight: 12,
+    overview: 'Basic chronology present but stakes could be higher. Missing turning point drama.',
+    issues: [
+      {
+        id: 'issue-arc-1',
+        dimensionId: 'narrative_arc',
+        title: 'Missing Dialogue & Scene Details',
+        excerpt: 'The breakthrough came when I presented to the school board',
+        analysis: 'You tell us about the presentation but don\'t show it. Elite essays use dialogue and scene details to create dramatic tension.',
+        impact: 'Missing opportunity to show leadership under pressure.',
+        suggestions: [
+          {
+            text: '"These numbers represent real environmental harm," I said, my voice steadier now as I pointed to the chart. Board member Johnson leaned forward: "And you\'re confident students will actually use these stations?" I met his eyes. "Sir, forty-five students signed up after our last cleanup. They\'re waiting for us to make this easy."',
+            rationale: 'Dialogue makes the scene real. Shows you handling objections. Demonstrates confidence growth.',
+            type: 'insert_after'
+          }
+        ],
+        status: 'not_fixed',
+        currentSuggestionIndex: 0,
+        expanded: false
+      }
+    ]
+  },
+  {
+    id: 'initiative_leadership',
+    name: 'Initiative & Leadership',
+    score: 8.0,
+    maxScore: 10,
+    status: 'good',
+    weight: 12,
+    overview: 'Strong initiative shown: founding club, research, proposal, presentation. Clear leader actions.',
+    issues: []
+  },
+  {
+    id: 'community_collaboration',
+    name: 'Community & Collaboration',
+    score: 7.2,
+    maxScore: 10,
+    status: 'good',
+    weight: 8,
+    overview: 'Shows group growth (3 to 45 members) but individual members remain unnamed. Could add more human connection.',
+    issues: []
+  },
+  {
+    id: 'reflection_meaning',
+    name: 'Reflection & Meaning',
+    score: 6.8,
+    maxScore: 10,
+    status: 'needs_work',
+    weight: 10,
+    overview: 'Generic reflection about leadership. Needs personal insight rooted in specific moments.',
+    issues: [
+      {
+        id: 'issue-reflect-1',
+        dimensionId: 'reflection_meaning',
+        title: 'Generic Reflection - Lacks Personal Insight',
+        excerpt: 'leadership isn\'t about having all the answers—it\'s about channeling collective passion',
+        analysis: 'This could apply to anyone. Elite essays connect insight to specific moments that reveal personal values.',
+        impact: 'Reflection is 10% of your score. Generic insights don\'t distinguish you.',
+        suggestions: [
+          {
+            text: 'Standing in the cafeteria three months later, I watched students line up at the refill station we fought for, and realized: the 47% reduction mattered less than seeing Sarah—a freshman who joined after our first beach cleanup—now leading her own recycling initiative. Real leadership means building systems that don\'t need you.',
+            rationale: 'Ties insight to specific image. Names a person. Reveals value: sustainability of impact over personal glory.',
+            type: 'replace'
+          }
+        ],
+        status: 'not_fixed',
+        currentSuggestionIndex: 0,
+        expanded: false
+      }
+    ]
+  },
+  {
+    id: 'craft_language',
+    name: 'Craft & Language Quality',
+    score: 7.5,
+    maxScore: 10,
+    status: 'good',
+    weight: 8,
+    overview: 'Clear writing with good flow. Effective use of statistics. Some sentences could be more dynamic.',
+    issues: []
+  },
+  {
+    id: 'fit_trajectory',
+    name: 'Fit & Trajectory',
+    score: 7.0,
+    maxScore: 10,
+    status: 'good',
+    weight: 8,
+    overview: 'Shows environmental interest and leadership potential. Could connect more explicitly to future goals.',
+    issues: []
+  },
+  {
+    id: 'time_investment',
+    name: 'Time Investment',
+    score: 8.5,
+    maxScore: 10,
+    status: 'excellent',
+    weight: 7,
+    overview: 'Clear sustained involvement: junior year, research period, one semester of results. Good longitudinal commitment.',
+    issues: []
+  }
+];
+
+interface DraftVersion {
+  text: string;
+  timestamp: number;
+  score: number;
+}
 
 export default function PIQWorkshop() {
-  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
-  const [essayText, setEssayText] = useState('');
-  const [showWorkshop, setShowWorkshop] = useState(false);
+  const navigate = useNavigate();
 
-  const UC_PIQ_PROMPTS = [
-    {
-      id: 'piq1',
-      number: 1,
-      title: 'Leadership Experience',
-      prompt: 'Describe an example of your leadership experience in which you have positively influenced others, helped resolve disputes or contributed to group efforts over time.',
-      placeholder: 'Share a specific leadership moment where you made a real impact...'
-    },
-    {
-      id: 'piq2',
-      number: 2,
-      title: 'Creative Side',
-      prompt: 'Every person has a creative side, and it can be expressed in many ways: problem solving, original and innovative thinking, and artistically, to name a few. Describe how you express your creative side.',
-      placeholder: 'Describe a time when you expressed your creativity...'
-    },
-    {
-      id: 'piq3',
-      number: 3,
-      title: 'Greatest Talent or Skill',
-      prompt: 'What would you say is your greatest talent or skill? How have you developed and demonstrated that talent over time?',
-      placeholder: 'What skill defines you, and how have you honed it?...'
-    },
-    {
-      id: 'piq4',
-      number: 4,
-      title: 'Educational Opportunity or Barrier',
-      prompt: 'Describe how you have taken advantage of a significant educational opportunity or worked to overcome an educational barrier you have faced.',
-      placeholder: 'Share how you seized an opportunity or overcame a challenge...'
-    },
-    {
-      id: 'piq5',
-      number: 5,
-      title: 'Significant Challenge',
-      prompt: 'Describe the most significant challenge you have faced and the steps you have taken to overcome this challenge. How has this challenge affected your academic achievement?',
-      placeholder: 'What challenge tested you most, and how did you grow?...'
-    },
-    {
-      id: 'piq6',
-      number: 6,
-      title: 'Inspiring Academic Subject',
-      prompt: 'Think about an academic subject that inspires you. Describe how you have furthered this interest inside and/or outside of the classroom.',
-      placeholder: 'What subject fascinates you, and how have you explored it?...'
-    },
-    {
-      id: 'piq7',
-      number: 7,
-      title: 'Community Contribution',
-      prompt: 'What have you done to make your school or your community a better place?',
-      placeholder: 'Describe a specific way you improved your community...'
-    },
-    {
-      id: 'piq8',
-      number: 8,
-      title: 'What Sets You Apart',
-      prompt: 'Beyond what has already been shared in your application, what do you believe makes you a strong candidate for admissions to the University of California?',
-      placeholder: 'What unique perspective or experience do you bring?...'
-    }
-  ];
+  // ============================================================================
+  // STATE
+  // ============================================================================
 
-  const handleStartAnalysis = () => {
-    if (essayText.trim().length > 0) {
-      setShowWorkshop(true);
+  const [currentDraft, setCurrentDraft] = useState(MOCK_PIQ.description);
+  const [draftVersions, setDraftVersions] = useState<DraftVersion[]>([
+    { text: MOCK_PIQ.description, timestamp: Date.now(), score: 73 }
+  ]);
+  const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
+  const [dimensions, setDimensions] = useState<RubricDimension[]>(MOCK_DIMENSIONS);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [needsReanalysis, setNeedsReanalysis] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState(false);
+  const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(null);
+  const initialScoreRef = useRef<number>(73);
+
+  // ============================================================================
+  // MOCK ANALYSIS (Simulated delay, no API call)
+  // ============================================================================
+
+  const performMockAnalysis = useCallback(async () => {
+    setIsAnalyzing(true);
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API delay
+    setIsAnalyzing(false);
+    setNeedsReanalysis(false);
+    // In real app would update scores - for demo, keep same
+  }, []);
+
+  // ============================================================================
+  // HANDLERS (Same as ExtracurricularWorkshopFinal)
+  // ============================================================================
+
+  const handleDraftChange = useCallback((newDraft: string) => {
+    setCurrentDraft(newDraft);
+    setNeedsReanalysis(true);
+  }, []);
+
+  const handleSave = useCallback(() => {
+    const newVersion: DraftVersion = {
+      text: currentDraft,
+      timestamp: Date.now(),
+      score: 73 // Mock score
+    };
+    const newVersions = draftVersions.slice(0, currentVersionIndex + 1);
+    newVersions.push(newVersion);
+    setDraftVersions(newVersions);
+    setCurrentVersionIndex(newVersions.length - 1);
+    
+    if (needsReanalysis) {
+      performMockAnalysis();
     }
+  }, [currentDraft, draftVersions, currentVersionIndex, needsReanalysis, performMockAnalysis]);
+
+  const handleUndo = useCallback(() => {
+    if (currentVersionIndex > 0) {
+      const newIndex = currentVersionIndex - 1;
+      setCurrentVersionIndex(newIndex);
+      setCurrentDraft(draftVersions[newIndex].text);
+      setNeedsReanalysis(false);
+    }
+  }, [currentVersionIndex, draftVersions]);
+
+  const handleRedo = useCallback(() => {
+    if (currentVersionIndex < draftVersions.length - 1) {
+      const newIndex = currentVersionIndex + 1;
+      setCurrentVersionIndex(newIndex);
+      setCurrentDraft(draftVersions[newIndex].text);
+      setNeedsReanalysis(false);
+    }
+  }, [currentVersionIndex, draftVersions]);
+
+  const handleRequestReanalysis = useCallback(() => {
+    performMockAnalysis();
+  }, [performMockAnalysis]);
+
+  const toggleDimensionExpand = useCallback((dimensionId: string) => {
+    setExpandedDimensionId(prev => prev === dimensionId ? null : dimensionId);
+  }, []);
+
+  const handleToggleIssue = useCallback((issueId: string) => {
+    setDimensions(prev => prev.map(dim => {
+      const containsIssue = dim.issues.some(i => i.id === issueId);
+      if (!containsIssue) return dim;
+
+      return {
+        ...dim,
+        issues: dim.issues.map(i => {
+          if (i.id === issueId) {
+            const willExpand = !i.expanded;
+            return {
+              ...i,
+              expanded: willExpand,
+              status: willExpand && i.status === 'not_fixed' ? 'in_progress' : i.status
+            };
+          }
+          return { ...i, expanded: false };
+        })
+      };
+    }));
+  }, []);
+
+  const handleApplySuggestion = useCallback((issueId: string) => {
+    const dimension = dimensions.find(d => d.issues.some(i => i.id === issueId));
+    if (!dimension) return;
+
+    const issue = dimension.issues.find(i => i.id === issueId);
+    if (!issue || !issue.suggestions[issue.currentSuggestionIndex]) return;
+
+    const suggestion = issue.suggestions[issue.currentSuggestionIndex];
+    let newDraft = currentDraft;
+
+    if (suggestion.type === 'replace' && issue.excerpt) {
+      newDraft = currentDraft.replace(issue.excerpt, suggestion.text);
+    } else if (suggestion.type === 'insert_after' && issue.excerpt) {
+      const idx = currentDraft.indexOf(issue.excerpt);
+      if (idx !== -1) {
+        newDraft = currentDraft.slice(0, idx + issue.excerpt.length) + ' ' + suggestion.text + currentDraft.slice(idx + issue.excerpt.length);
+      }
+    } else if (suggestion.type === 'insert_before' && issue.excerpt) {
+      const idx = currentDraft.indexOf(issue.excerpt);
+      if (idx !== -1) {
+        newDraft = currentDraft.slice(0, idx) + suggestion.text + ' ' + currentDraft.slice(idx);
+      }
+    }
+
+    setCurrentDraft(newDraft);
+    setNeedsReanalysis(true);
+    setDimensions(prev => prev.map(d => ({
+      ...d,
+      issues: d.issues.map(i => i.id === issueId ? { ...i, status: 'fixed' } : i)
+    })));
+  }, [dimensions, currentDraft]);
+
+  const handleNextSuggestion = useCallback((issueId: string) => {
+    setDimensions(prev => prev.map(dim => ({
+      ...dim,
+      issues: dim.issues.map(i => {
+        if (i.id === issueId && i.currentSuggestionIndex < i.suggestions.length - 1) {
+          return { ...i, currentSuggestionIndex: i.currentSuggestionIndex + 1 };
+        }
+        return i;
+      })
+    })));
+  }, []);
+
+  const handlePrevSuggestion = useCallback((issueId: string) => {
+    setDimensions(prev => prev.map(dim => ({
+      ...dim,
+      issues: dim.issues.map(i => {
+        if (i.id === issueId && i.currentSuggestionIndex > 0) {
+          return { ...i, currentSuggestionIndex: i.currentSuggestionIndex - 1 };
+        }
+        return i;
+      })
+    })));
+  }, []);
+
+  const handleRestoreVersion = useCallback((versionDescription: string) => {
+    setCurrentDraft(versionDescription);
+    setShowVersionHistory(false);
+    setNeedsReanalysis(true);
+  }, []);
+
+  // ============================================================================
+  // COMPUTED
+  // ============================================================================
+
+  const currentScore = 73;
+  const initialScore = initialScoreRef.current;
+  const totalIssues = dimensions.reduce((sum, d) => sum + d.issues.length, 0);
+  const fixedIssues = dimensions.reduce((sum, d) => sum + d.issues.filter(i => i.status === 'fixed').length, 0);
+  const criticalIssues = dimensions.filter(d => d.status === 'critical').length;
+  const needsWorkIssues = dimensions.filter(d => d.status === 'needs_work').length;
+
+  const getNQIConfig = () => {
+    const nqi = currentScore;
+    if (nqi >= 85) return { label: 'Outstanding', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-950/30', border: 'border-green-300 dark:border-green-800' };
+    if (nqi >= 70) return { label: 'Solid, Needs Polish', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-950/30', border: 'border-blue-300 dark:border-blue-800' };
+    if (nqi >= 55) return { label: 'Needs Significant Work', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-950/30', border: 'border-amber-300 dark:border-amber-800' };
+    return { label: 'Critical Issues', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-950/30', border: 'border-red-300 dark:border-red-800' };
   };
 
-  const handleBack = () => {
-    setShowWorkshop(false);
-  };
+  const nqiConfig = getNQIConfig();
+  const scoreDelta = currentScore - initialScore;
 
-  // If workshop is active, show the integrated workshop component
-  if (showWorkshop && selectedPrompt) {
-    const prompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPrompt);
-    return (
-      <div className="min-h-screen bg-background">
-        <PIQWorkshopIntegrated
-          initialText={essayText}
-          promptTitle={prompt?.title || ''}
-          promptText={prompt?.prompt || ''}
-          onBack={handleBack}
-        />
-      </div>
-    );
-  }
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
-  // Prompt selection or essay input screen
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-purple-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      {/* Header */}
-      <div className="sticky top-0 z-50 backdrop-blur-lg bg-white/80 dark:bg-slate-950/80 border-b border-slate-200 dark:border-slate-800">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Link to="/" className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-primary transition-colors">
-              <ArrowLeft className="w-4 h-4" />
-              <span className="font-medium">Back to Home</span>
-            </Link>
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-primary" />
-              <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
-                PIQ Narrative Workshop
-              </h1>
+    <div className="min-h-screen bg-background">
+      {/* Gradient background */}
+      <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
+
+      {/* Sticky header */}
+      <div className="sticky top-0 z-50 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+          <div className="text-center">
+            <h1 className="text-xl font-bold text-primary">PIQ Narrative Workshop</h1>
+            <p className="text-xs text-muted-foreground">PIQ #{MOCK_PIQ.piqNumber} · {MOCK_PIQ.category}</p>
+          </div>
+          <div className="w-24" />
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 space-y-12">
+        {/* Hero section */}
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row gap-6 items-start">
+            {/* Score card */}
+            <Card className="flex-1 p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <div className="text-sm text-muted-foreground mb-1">Narrative Quality Index</div>
+                  <div className="flex items-baseline gap-3">
+                    <div className="text-5xl font-bold text-primary">{currentScore}</div>
+                    <div className="text-lg text-muted-foreground">/100</div>
+                  </div>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-xs font-medium ${nqiConfig.bg} ${nqiConfig.color} border ${nqiConfig.border}`}>
+                  {nqiConfig.label}
+                </div>
+              </div>
+
+              {scoreDelta !== 0 && (
+                <div className={`flex items-center gap-2 text-sm ${scoreDelta > 0 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                  {scoreDelta > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                  <span>{scoreDelta > 0 ? '+' : ''}{scoreDelta} from initial</span>
+                </div>
+              )}
+
+              <div className="mt-6 grid grid-cols-3 gap-4 pt-4 border-t">
+                <div>
+                  <div className="text-2xl font-bold text-primary">{fixedIssues}/{totalIssues}</div>
+                  <div className="text-xs text-muted-foreground">Issues Fixed</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">{needsWorkIssues}</div>
+                  <div className="text-xs text-muted-foreground">Needs Work</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-600 dark:text-red-400">{criticalIssues}</div>
+                  <div className="text-xs text-muted-foreground">Critical</div>
+                </div>
+              </div>
+            </Card>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-3">
+              <Button 
+                onClick={handleRequestReanalysis}
+                disabled={!needsReanalysis || isAnalyzing}
+                className="gap-2"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCcw className="w-4 h-4" />
+                    {needsReanalysis ? 'Re-analyze Draft' : 'Up to date'}
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => setShowVersionHistory(true)} className="gap-2">
+                <History className="w-4 h-4" />
+                View History
+              </Button>
             </div>
+          </div>
+        </div>
+
+        {/* Main workshop area */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+          {/* Left column: Editor + Rubric */}
+          <div className="xl:col-span-2 space-y-8">
+            {/* Editor */}
+            <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
+              <EditorView
+                draft={currentDraft}
+                onDraftChange={handleDraftChange}
+                onSave={handleSave}
+                canUndo={currentVersionIndex > 0}
+                canRedo={currentVersionIndex < draftVersions.length - 1}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                needsReanalysis={needsReanalysis}
+                isAnalyzing={isAnalyzing}
+              />
+            </Card>
+
+            {/* Rubric dimensions */}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-primary">11-Dimension Analysis</h2>
+                <Badge variant="outline" className="gap-2">
+                  <Target className="w-3 h-3" />
+                  {dimensions.length} Categories
+                </Badge>
+              </div>
+
+              <div className="space-y-4">
+                {dimensions.map((dimension) => (
+                  <RubricDimensionCard
+                    key={dimension.id}
+                    dimension={dimension}
+                    isExpanded={expandedDimensionId === dimension.id}
+                    onToggleExpand={() => toggleDimensionExpand(dimension.id)}
+                    onToggleIssue={handleToggleIssue}
+                    onApplySuggestion={handleApplySuggestion}
+                    onNextSuggestion={handleNextSuggestion}
+                    onPrevSuggestion={handlePrevSuggestion}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right column: Chat */}
+          <div className="xl:col-span-1">
+            <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg sticky top-24">
+              <ContextualWorkshopChat
+                studentDraft={currentDraft}
+                analysisResult={null}
+                teachingIssues={[]}
+                onApplySuggestion={(text) => {
+                  setCurrentDraft(text);
+                  setNeedsReanalysis(true);
+                }}
+              />
+            </Card>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {!selectedPrompt ? (
-          // Prompt Selection Screen
-          <div className="space-y-8">
-            <div className="text-center space-y-4">
-              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium">
-                <FileText className="w-4 h-4" />
-                UC Personal Insight Questions
-              </div>
-              <h2 className="text-4xl font-bold tracking-tight">
-                Choose Your PIQ Prompt
-              </h2>
-              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-                Select which Personal Insight Question you're working on. Our AI will provide tailored analysis
-                and coaching specifically for that prompt's requirements.
-              </p>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              {UC_PIQ_PROMPTS.map((piq) => (
-                <Card
-                  key={piq.id}
-                  className="p-6 cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 group"
-                  onClick={() => setSelectedPrompt(piq.id)}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
-                      <span className="text-xl font-bold">{piq.number}</span>
-                    </div>
-                    <div className="flex-1 space-y-2">
-                      <h3 className="font-bold text-lg group-hover:text-primary transition-colors">
-                        {piq.title}
-                      </h3>
-                      <p className="text-sm text-muted-foreground line-clamp-3">
-                        {piq.prompt}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        ) : (
-          // Essay Input Screen
-          <div className="space-y-8">
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setSelectedPrompt(null);
-                  setEssayText('');
-                }}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Change Prompt
-              </Button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-lg font-bold text-primary">
-                      {UC_PIQ_PROMPTS.find(p => p.id === selectedPrompt)?.number}
-                    </span>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-xl">
-                      {UC_PIQ_PROMPTS.find(p => p.id === selectedPrompt)?.title}
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      350 words maximum
-                    </p>
-                  </div>
-                </div>
-                <Card className="p-4 bg-slate-50 dark:bg-slate-900/50">
-                  <p className="text-sm leading-relaxed text-foreground/80">
-                    {UC_PIQ_PROMPTS.find(p => p.id === selectedPrompt)?.prompt}
-                  </p>
-                </Card>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Your Essay</label>
-                <Textarea
-                  value={essayText}
-                  onChange={(e) => setEssayText(e.target.value)}
-                  placeholder={UC_PIQ_PROMPTS.find(p => p.id === selectedPrompt)?.placeholder}
-                  className="min-h-[400px] font-mono text-sm leading-relaxed"
-                />
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>
-                    {essayText.trim().split(/\s+/).filter(Boolean).length} words
-                  </span>
-                  <span className={essayText.trim().split(/\s+/).filter(Boolean).length > 350 ? 'text-red-500 font-medium' : ''}>
-                    {350 - essayText.trim().split(/\s+/).filter(Boolean).length} words remaining
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                onClick={handleStartAnalysis}
-                disabled={essayText.trim().length === 0}
-                className="w-full gap-2 text-lg py-6"
-                size="lg"
-              >
-                <Sparkles className="w-5 h-5" />
-                Analyze My PIQ Essay
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      {/* Version history modal */}
+      {showVersionHistory && (
+        <VersionHistory
+          versions={draftVersions.map((v, idx) => ({
+            id: `v${idx}`,
+            description: v.text,
+            timestamp: v.timestamp,
+            score: v.score,
+            categories: []
+          }))}
+          currentVersionId={`v${currentVersionIndex}`}
+          onRestore={handleRestoreVersion}
+          onClose={() => setShowVersionHistory(false)}
+        />
+      )}
     </div>
   );
 }
