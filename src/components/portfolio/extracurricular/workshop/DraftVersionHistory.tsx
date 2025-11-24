@@ -50,10 +50,10 @@ export function DraftVersionHistory({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="max-w-5xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <Card className="max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Simple Header */}
         <div className="p-6 pb-4 border-b flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Version History</h2>
+          <h2 className="text-xl font-semibold whitespace-nowrap">Version History</h2>
           <Button 
             variant="ghost" 
             size="icon"
@@ -66,33 +66,21 @@ export function DraftVersionHistory({
 
         {/* Grid of Version Cards */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {versions.map((version) => {
               const isCurrent = version.id === currentVersionId;
 
               return (
                 <Card
                   key={version.id}
-                  className={`relative p-4 transition-all hover:shadow-md ${
+                  className={`relative p-4 transition-all hover:shadow-md flex items-center gap-6 ${
                     isCurrent 
                       ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
                       : 'hover:border-primary/50'
                   }`}
                 >
-                  {/* Restore Button */}
-                  {!isCurrent && (
-                    <Button
-                      onClick={() => onRestore(version.description)}
-                      size="icon"
-                      variant="ghost"
-                      className="absolute top-2 right-2 h-8 w-8 hover:bg-muted"
-                    >
-                      <RotateCcw className="w-4 h-4" />
-                    </Button>
-                  )}
-
                   {/* Score */}
-                  <div className="text-center mb-3 mt-2">
+                  <div className="flex-shrink-0 text-center min-w-[80px]">
                     <div className="text-4xl font-bold text-foreground">
                       {version.score}
                     </div>
@@ -100,27 +88,40 @@ export function DraftVersionHistory({
                   </div>
 
                   {/* Date */}
-                  <div className="text-center text-sm text-muted-foreground mb-2">
-                    {new Date(version.timestamp).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </div>
-                  <div className="text-center text-xs text-muted-foreground">
-                    {new Date(version.timestamp).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit'
-                    })}
+                  <div className="flex-1">
+                    <div className="text-sm text-muted-foreground">
+                      {new Date(version.timestamp).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(version.timestamp).toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit'
+                      })}
+                    </div>
                   </div>
 
                   {/* Current Badge */}
                   {isCurrent && (
-                    <div className="flex justify-center mt-3">
-                      <Badge variant="default" className="text-xs">
-                        Current
-                      </Badge>
-                    </div>
+                    <Badge variant="default" className="text-xs">
+                      Current
+                    </Badge>
+                  )}
+
+                  {/* Restore Button */}
+                  {!isCurrent && (
+                    <Button
+                      onClick={() => onRestore(version.description)}
+                      size="sm"
+                      variant="ghost"
+                      className="gap-2 hover:bg-muted"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      Restore
+                    </Button>
                   )}
                 </Card>
               );
