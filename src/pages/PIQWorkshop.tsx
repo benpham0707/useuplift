@@ -442,7 +442,7 @@ export default function PIQWorkshop() {
 
       {/* Sticky header */}
       <div className="sticky top-0 z-50 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -456,7 +456,7 @@ export default function PIQWorkshop() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 max-w-7xl mx-auto px-6 py-12 space-y-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 py-12 space-y-6">
         {/* Hero section */}
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row gap-6 items-start">
@@ -526,9 +526,9 @@ export default function PIQWorkshop() {
         </div>
 
         {/* Main workshop area */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left column: Editor + Rubric */}
-          <div className="xl:col-span-2 space-y-8">
+          <div className="lg:col-span-3 space-y-6">
             {/* Editor */}
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
               <EditorView
@@ -576,7 +576,7 @@ export default function PIQWorkshop() {
           </div>
 
           {/* Right column: Chat */}
-          <div className="xl:col-span-1">
+          <div className="lg:col-span-2">
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg sticky top-24">
               <ContextualWorkshopChat
                 activity={MOCK_PIQ as any}
