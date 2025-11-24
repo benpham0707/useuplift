@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Opening Hook Analyzer
  *

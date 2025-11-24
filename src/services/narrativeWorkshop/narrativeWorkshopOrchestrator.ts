@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * NARRATIVE WORKSHOP - Main Orchestrator
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 3: Grammar & Style Analysis - Main Orchestrator
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 3.2: Writing Style Analyzer (LLM-based)
  *

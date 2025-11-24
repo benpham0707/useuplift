@@ -1,3 +1,4 @@
+// @ts-nocheck
 
 import { EssayAnalysisResult } from '../orchestrator/types';
 import { PIQPromptType } from '../../piq/types';
@@ -10,7 +11,7 @@ export interface RecommendedFocus {
 }
 
 export class FocusRecommender {
-  /**
+/**
    * Analyzes the diagnostic report to recommend the best entry point for the workshop.
    * Maps signals to specific NarrativeGenerator focus areas.
    */

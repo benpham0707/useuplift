@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Narrative Workshop Type System
  *

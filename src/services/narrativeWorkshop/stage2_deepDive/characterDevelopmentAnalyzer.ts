@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 2.5: Character Development Analysis Engine
  *

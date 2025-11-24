@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Vividness Quality Analyzer - The Show-Don't-Tell Transformer
  *

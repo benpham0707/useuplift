@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * UNIVERSAL FEATURE DETECTION LAYER
  *

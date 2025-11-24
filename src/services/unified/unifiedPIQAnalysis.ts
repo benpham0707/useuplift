@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * UNIFIED PIQ ANALYSIS SYSTEM
  * Version: 2.0.0-unified

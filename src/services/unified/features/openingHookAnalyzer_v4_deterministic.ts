@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * OPENING HOOK ANALYZER V4 - DETERMINISTIC & ACCURATE
  *

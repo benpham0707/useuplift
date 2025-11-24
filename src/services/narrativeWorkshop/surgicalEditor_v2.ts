@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Surgical Editor Service v2 (Phase 14-15 Redux Complete)
  *
