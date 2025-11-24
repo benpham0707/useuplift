@@ -43,6 +43,7 @@ interface EditorViewProps {
   onRedo?: () => void;
   canUndo?: boolean;
   canRedo?: boolean;
+  onShowHistory?: () => void;
 }
 
 export const EditorView: React.FC<EditorViewProps> = ({
@@ -59,6 +60,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   onRedo,
   canUndo = false,
   canRedo = false,
+  onShowHistory,
 }) => {
   const [localDraft, setLocalDraft] = useState(currentDraft);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -123,6 +125,16 @@ export const EditorView: React.FC<EditorViewProps> = ({
                 >
                   <RotateCw className="w-4 h-4" />
                 </Button>
+                {onShowHistory && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onShowHistory}
+                    title="Version History"
+                  >
+                    <Clock className="w-4 h-4" />
+                  </Button>
+                )}
                 <Button
                   variant="default"
                   size="sm"
