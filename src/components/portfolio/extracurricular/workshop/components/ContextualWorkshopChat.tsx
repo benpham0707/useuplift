@@ -12,6 +12,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import GradientText from '@/components/ui/GradientText';
 import {
   Tooltip,
   TooltipContent,
@@ -340,11 +341,16 @@ export default function ContextualWorkshopChat({
     <div className="w-full flex flex-col border-2 border-purple-300 dark:border-purple-700 rounded-lg bg-card" style={{ height: '600px' }}>
       {/* Header */}
       <div className="p-4 border-b flex-shrink-0">
-        <h3 className="text-xl font-semibold flex items-center gap-2">
-          <MessageCircle className="h-5 w-5 text-purple-600" />
-          AI Essay Coach
-        </h3>
-        <p className="text-xs text-muted-foreground mt-1">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="w-5 h-5 text-purple-600" />
+          <GradientText
+            className="text-lg font-semibold"
+            colors={["#8b5cf6", "#a78bfa", "#8b5cf6"]}
+          >
+            AI Essay Coach
+          </GradientText>
+        </div>
+        <p className="text-sm text-muted-foreground mt-1">
           Ask me anything about your {activity.name} narrative
         </p>
       </div>
