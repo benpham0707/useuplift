@@ -26,7 +26,7 @@ export const InsightSection: React.FC<InsightSectionProps> = ({
 
   return (
     <div className={cn(
-      'border-2 rounded-lg overflow-hidden transition-all duration-300',
+      'border-2 rounded-lg overflow-hidden transition-all duration-300 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 backdrop-blur-xl shadow-lg',
       borderColor
     )}>
       {/* Header */}

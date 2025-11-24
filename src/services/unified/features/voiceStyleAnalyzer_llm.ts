@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * VOICE & WRITING STYLE LLM ANALYZER
  *

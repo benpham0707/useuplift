@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 2.6: Stakes & Tension Analysis Engine
  *

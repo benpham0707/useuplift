@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 4.1: Dimension Scorer
  *

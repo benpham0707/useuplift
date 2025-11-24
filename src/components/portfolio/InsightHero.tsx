@@ -25,7 +25,7 @@ export const InsightHero: React.FC<InsightHeroProps> = ({
   bgClass,
 }) => {
   return (
-    <Card className="border-2 border-destructive/30 shadow-xl overflow-hidden">
+    <Card className="border-2 border-destructive/30 shadow-xl overflow-hidden bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 backdrop-blur-xl">
       <CardContent className="p-10 md:p-14 text-center space-y-8">
         {/* Icon */}
         <div className="flex justify-center">

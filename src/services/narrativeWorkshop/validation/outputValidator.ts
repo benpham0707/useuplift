@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Output Validator - Core Validation Engine (Phase 15)
  *

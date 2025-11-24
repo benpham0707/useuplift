@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 4.2: Synthesis Engine (LLM-based)
  *

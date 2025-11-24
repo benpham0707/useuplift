@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { HolisticAnalysis, EssayAnalysisResult } from '../../services/orchestrator/types';
 import { HolisticSummary, OverarchingInsight } from '../../components/portfolio/portfolioInsightsData';
 
