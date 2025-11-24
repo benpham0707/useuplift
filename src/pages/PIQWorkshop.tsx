@@ -619,116 +619,148 @@ export default function PIQWorkshop() {
                 <Progress value={progressPercent} className="h-2" />
               </div>
 
-              {/* Dimension Performance Grid */}
-              <div className="mb-4">
-                <h3 className="text-sm font-bold text-foreground mb-3 uppercase tracking-wider">
-                  Dimension Performance
-                </h3>
-                
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Strong Dimensions */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <CheckCircle className="w-4 h-4 text-emerald-600" />
-                      <span className="text-xs font-semibold text-emerald-600 uppercase">
-                        Strong ({goodDimensions.length})
-                      </span>
+              {/* Interactive Category Boxes */}
+              <div className="space-y-3">
+                {/* Critical Box */}
+                {criticalDimensions.length > 0 && (
+                  <div className="bg-gradient-to-br from-red-50 to-red-100/80 dark:from-red-950/30 dark:to-red-950/20 border-2 border-red-300 dark:border-red-800 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <XCircle className="w-5 h-5 text-red-600" />
+                        <h3 className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">
+                          Critical Issues ({criticalDimensions.length})
+                        </h3>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      {goodDimensions.slice(0, showAllStrong ? undefined : 3).map(dim => (
+                    <div className="space-y-2">
+                      {criticalDimensions.map(dim => (
                         <button
                           key={dim.id}
                           onClick={() => scrollToDimension(dim.id)}
-                          className="w-full text-left px-2.5 py-1.5 rounded bg-emerald-50 dark:bg-emerald-950/20 hover:bg-emerald-100 dark:hover:bg-emerald-950/40 transition-colors border border-emerald-200/50 dark:border-emerald-800/50"
+                          className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-red-950/40 hover:bg-white dark:hover:bg-red-950/60 transition-all border border-red-200 dark:border-red-800/50 shadow-sm hover:shadow group"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-foreground truncate">{dim.name}</span>
-                            <span className="text-xs font-bold text-emerald-600 ml-2">{dim.score}/{dim.maxScore}</span>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                                {dim.name}
+                              </div>
+                              {dim.issues[0] && (
+                                <div className="text-xs text-muted-foreground line-clamp-2">
+                                  {dim.issues[0].problem}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                                {dim.score}/{dim.maxScore}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium">
+                                {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
                           </div>
                         </button>
                       ))}
-                      {goodDimensions.length > 3 && (
-                        <button
-                          onClick={() => setShowAllStrong(!showAllStrong)}
-                          className="text-xs text-primary hover:underline"
-                        >
-                          {showAllStrong ? 'Show less' : `Show ${goodDimensions.length - 3} more →`}
-                        </button>
-                      )}
-                      {goodDimensions.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic">None yet</p>
-                      )}
                     </div>
                   </div>
-                  
-                  {/* Needs Work Dimensions */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <AlertTriangle className="w-4 h-4 text-amber-600" />
-                      <span className="text-xs font-semibold text-amber-600 uppercase">
-                        Needs Work ({needsWorkDimensions.length})
-                      </span>
+                )}
+
+                {/* Needs Work Box */}
+                {needsWorkDimensions.length > 0 && (
+                  <div className="bg-gradient-to-br from-amber-50 to-amber-100/80 dark:from-amber-950/30 dark:to-amber-950/20 border-2 border-amber-300 dark:border-amber-800 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                          Needs Work ({needsWorkDimensions.length})
+                        </h3>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {needsWorkDimensions.slice(0, showAllNeedsWork ? undefined : 3).map(dim => (
                         <button
                           key={dim.id}
                           onClick={() => scrollToDimension(dim.id)}
-                          className="w-full text-left px-2.5 py-1.5 rounded bg-amber-50 dark:bg-amber-950/20 hover:bg-amber-100 dark:hover:bg-amber-950/40 transition-colors border border-amber-200/50 dark:border-amber-800/50"
+                          className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-amber-950/40 hover:bg-white dark:hover:bg-amber-950/60 transition-all border border-amber-200 dark:border-amber-800/50 shadow-sm hover:shadow group"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-foreground truncate">{dim.name}</span>
-                            <span className="text-xs font-bold text-amber-600 ml-2">{dim.score}/{dim.maxScore}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                {dim.name}
+                              </div>
+                              {dim.issues[0] && (
+                                <div className="text-xs text-muted-foreground line-clamp-2">
+                                  {dim.issues[0].problem}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                                {dim.score}/{dim.maxScore}
+                              </span>
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">
+                                {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
                           </div>
                         </button>
                       ))}
                       {needsWorkDimensions.length > 3 && (
                         <button
                           onClick={() => setShowAllNeedsWork(!showAllNeedsWork)}
-                          className="text-xs text-primary hover:underline"
+                          className="w-full text-xs text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 font-medium py-2 hover:underline"
                         >
-                          {showAllNeedsWork ? 'Show less' : `Show ${needsWorkDimensions.length - 3} more →`}
+                          {showAllNeedsWork ? '↑ Show less' : `↓ Show ${needsWorkDimensions.length - 3} more`}
                         </button>
-                      )}
-                      {needsWorkDimensions.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic">None</p>
                       )}
                     </div>
                   </div>
-                  
-                  {/* Critical Dimensions */}
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <XCircle className="w-4 h-4 text-red-600" />
-                      <span className="text-xs font-semibold text-red-600 uppercase">
-                        Critical ({criticalDimensions.length})
-                      </span>
+                )}
+
+                {/* Strong Box */}
+                {goodDimensions.length > 0 && (
+                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/80 dark:from-emerald-950/30 dark:to-emerald-950/20 border-2 border-emerald-300 dark:border-emerald-800 rounded-xl p-4 shadow-sm">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle className="w-5 h-5 text-emerald-600" />
+                        <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
+                          Strong Areas ({goodDimensions.length})
+                        </h3>
+                      </div>
                     </div>
-                    <div className="space-y-1.5">
-                      {criticalDimensions.map(dim => (
+                    <div className="space-y-2">
+                      {goodDimensions.slice(0, showAllStrong ? undefined : 3).map(dim => (
                         <button
                           key={dim.id}
                           onClick={() => scrollToDimension(dim.id)}
-                          className="w-full text-left px-2.5 py-1.5 rounded bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 transition-colors border border-red-200/50 dark:border-red-800/50"
+                          className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-emerald-950/40 hover:bg-white dark:hover:bg-emerald-950/60 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow group"
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-medium text-foreground truncate">{dim.name}</span>
-                            <span className="text-xs font-bold text-red-600 ml-2">{dim.score}/{dim.maxScore}</span>
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                            {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                {dim.name}
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Performing well
+                              </div>
+                            </div>
+                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                              {dim.score}/{dim.maxScore}
+                            </span>
                           </div>
                         </button>
                       ))}
-                      {criticalDimensions.length === 0 && (
-                        <p className="text-xs text-muted-foreground italic">None</p>
+                      {goodDimensions.length > 3 && (
+                        <button
+                          onClick={() => setShowAllStrong(!showAllStrong)}
+                          className="w-full text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-medium py-2 hover:underline"
+                        >
+                          {showAllStrong ? '↑ Show less' : `↓ Show ${goodDimensions.length - 3} more`}
+                        </button>
                       )}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Actionable Insights */}
