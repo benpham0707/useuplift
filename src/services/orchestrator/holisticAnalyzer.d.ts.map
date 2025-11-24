@@ -1,0 +1,1 @@
+{"version":3,"file":"holisticAnalyzer.d.ts","sourceRoot":"","sources":["holisticAnalyzer.ts"],"names":[],"mappings":"AAAA;;;;;;;;;GASG;AAGH,OAAO,EAAE,cAAc,EAAE,mBAAmB,EAAE,gBAAgB,EAAE,MAAM,SAAS,CAAC;AAEhF,qBAAa,gBAAgB;WAEd,OAAO,CAClB,SAAS,EAAE,MAAM,EACjB,OAAO,EAAE,cAAc,EACvB,aAAa,EAAE,mBAAmB,GACjC,OAAO,CAAC,gBAAgB,CAAC;CA8H7B"}

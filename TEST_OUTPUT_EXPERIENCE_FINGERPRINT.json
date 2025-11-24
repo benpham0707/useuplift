@@ -1,0 +1,140 @@
+{
+  "timestamp": "2025-11-23T16:30:58.751Z",
+  "results": {
+    "essays": [
+      {
+        "name": "UNIQUE_ESSAY (Village solar charger)",
+        "fingerprint": {
+          "hasUnusualCircumstance": true,
+          "hasUnexpectedEmotion": true,
+          "hasContraryInsight": true,
+          "hasSensoryAnchor": true,
+          "hasUniqueRelationship": false,
+          "hasCulturalSpecificity": true,
+          "antiPatternFlags": {
+            "followsTypicalArc": false,
+            "hasGenericInsight": false,
+            "hasManufacturedBeat": false,
+            "hasCrowdPleaser": false,
+            "warnings": []
+          },
+          "qualityAnchorsCount": 4,
+          "confidenceScore": 50
+        }
+      },
+      {
+        "name": "GENERIC_ESSAY (Robotics club)",
+        "fingerprint": {
+          "hasUnusualCircumstance": false,
+          "hasUnexpectedEmotion": false,
+          "hasContraryInsight": false,
+          "hasSensoryAnchor": false,
+          "hasUniqueRelationship": false,
+          "hasCulturalSpecificity": false,
+          "antiPatternFlags": {
+            "followsTypicalArc": false,
+            "hasGenericInsight": false,
+            "hasManufacturedBeat": false,
+            "hasCrowdPleaser": false,
+            "warnings": []
+          },
+          "qualityAnchorsCount": 0,
+          "confidenceScore": 50
+        }
+      },
+      {
+        "name": "CULTURALLY_SPECIFIC_ESSAY (Nail salon)",
+        "fingerprint": {
+          "hasUnusualCircumstance": true,
+          "hasUnexpectedEmotion": true,
+          "hasContraryInsight": true,
+          "hasSensoryAnchor": true,
+          "hasUniqueRelationship": false,
+          "hasCulturalSpecificity": true,
+          "antiPatternFlags": {
+            "followsTypicalArc": false,
+            "hasGenericInsight": false,
+            "hasManufacturedBeat": false,
+            "hasCrowdPleaser": false,
+            "warnings": []
+          },
+          "qualityAnchorsCount": 3,
+          "confidenceScore": 50
+        }
+      }
+    ],
+    "comparisons": [
+      {
+        "test": "Generic vs Unique flag count",
+        "genericFlagCount": 0,
+        "uniqueFlagCount": 0,
+        "passed": false
+      }
+    ],
+    "antiPatternAnalysis": [],
+    "divergenceQuality": [
+      {
+        "essay": "UNIQUE_ESSAY (Village solar charger)",
+        "constraintLength": 1223,
+        "hasMustInclude": true,
+        "hasMustAvoid": true,
+        "hasUniqueAngle": true,
+        "hasAntiConvergence": false,
+        "isSubstantial": true
+      },
+      {
+        "essay": "GENERIC_ESSAY (Robotics club)",
+        "constraintLength": 296,
+        "hasMustInclude": false,
+        "hasMustAvoid": true,
+        "hasUniqueAngle": false,
+        "hasAntiConvergence": false,
+        "isSubstantial": true
+      },
+      {
+        "essay": "CULTURALLY_SPECIFIC_ESSAY (Nail salon)",
+        "constraintLength": 991,
+        "hasMustInclude": true,
+        "hasMustAvoid": true,
+        "hasUniqueAngle": true,
+        "hasAntiConvergence": false,
+        "isSubstantial": true
+      }
+    ]
+  },
+  "criteriaResults": [
+    {
+      "name": "Unique essay detected unique elements (3+ found)",
+      "passed": true
+    },
+    {
+      "name": "Generic essay flagged for typical arc",
+      "passed": false
+    },
+    {
+      "name": "Generic essay flagged for generic insight",
+      "passed": false
+    },
+    {
+      "name": "Cultural essay detected cultural specificity",
+      "passed": true
+    },
+    {
+      "name": "All essays have divergence requirements",
+      "passed": true
+    },
+    {
+      "name": "Unique essay has higher confidence than generic",
+      "passed": false
+    },
+    {
+      "name": "Divergence constraints are substantive (>200 chars)",
+      "passed": true
+    }
+  ],
+  "summary": {
+    "allCriteriaPassed": false,
+    "passedCount": 4,
+    "totalCount": 7
+  }
+}

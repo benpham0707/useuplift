@@ -14,7 +14,7 @@
 /**
  * Phrases that signal manufactured-for-admissions content
  */
-const MANUFACTURED_PHRASES = [
+export const MANUFACTURED_PHRASES = [
   // Formulaic reflection starters
   'i used to think',
   'i once believed',
@@ -55,7 +55,7 @@ const MANUFACTURED_PHRASES = [
  * Abstract/forced sensory language (BAD)
  * vs. Concrete sensory details (GOOD - don't flag these)
  */
-const ABSTRACT_SENSORY_PHRASES = [
+export const ABSTRACT_SENSORY_PHRASES = [
   'smelled like ambition',
   'smelled like success',
   'smelled like possibility',
@@ -71,7 +71,7 @@ const ABSTRACT_SENSORY_PHRASES = [
 /**
  * Patterns that indicate forced narrative arc
  */
-const FORCED_ARC_PATTERNS = [
+export const FORCED_ARC_PATTERNS = [
   /but then.*realized/i,
   /until.*moment.*understood/i,
   /suddenly.*dawned on me/i,

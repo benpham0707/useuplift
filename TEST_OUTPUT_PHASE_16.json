@@ -1,0 +1,239 @@
+{
+  "difficultyData": [
+    {
+      "score": 30,
+      "difficulty": 1,
+      "tier": "foundation",
+      "tierDescription": "Building foundational writing skills"
+    },
+    {
+      "score": 40,
+      "difficulty": 1.5,
+      "tier": "foundation",
+      "tierDescription": "Building foundational writing skills"
+    },
+    {
+      "score": 50,
+      "difficulty": 2.4,
+      "tier": "developing",
+      "tierDescription": "Developing voice and specificity"
+    },
+    {
+      "score": 60,
+      "difficulty": 4.1,
+      "tier": "developing",
+      "tierDescription": "Developing voice and specificity"
+    },
+    {
+      "score": 70,
+      "difficulty": 6.3,
+      "tier": "competent",
+      "tierDescription": "Solid writing - competitive at good schools"
+    },
+    {
+      "score": 80,
+      "difficulty": 8.4,
+      "tier": "strong",
+      "tierDescription": "UC Berkeley/UCLA level - elite public school quality"
+    },
+    {
+      "score": 85,
+      "difficulty": 9.3,
+      "tier": "strong",
+      "tierDescription": "UC Berkeley/UCLA level - elite public school quality"
+    },
+    {
+      "score": 90,
+      "difficulty": 10.1,
+      "tier": "exceptional",
+      "tierDescription": "Stanford/MIT/Harvard level - elite private school quality"
+    },
+    {
+      "score": 95,
+      "difficulty": 10.6,
+      "tier": "masterful",
+      "tierDescription": "Best of the best - would stand out even at elite schools"
+    },
+    {
+      "score": 98,
+      "difficulty": 10.9,
+      "tier": "masterful",
+      "tierDescription": "Best of the best - would stand out even at elite schools"
+    }
+  ],
+  "progressData": [
+    {
+      "label": "Foundation → Developing (+20 raw)",
+      "previousScore": 30,
+      "currentScore": 50,
+      "rawGain": 20,
+      "effortGain": 34,
+      "percentileGain": 12
+    },
+    {
+      "label": "Developing → Competent (+10 raw)",
+      "previousScore": 60,
+      "currentScore": 70,
+      "rawGain": 10,
+      "effortGain": 52,
+      "percentileGain": 10
+    },
+    {
+      "label": "Strong tier (+5 raw)",
+      "previousScore": 80,
+      "currentScore": 85,
+      "rawGain": 5,
+      "effortGain": 44.3,
+      "percentileGain": 10
+    },
+    {
+      "label": "Exceptional tier (+2 raw)",
+      "previousScore": 90,
+      "currentScore": 92,
+      "rawGain": 2,
+      "effortGain": 20.4,
+      "percentileGain": 4
+    }
+  ],
+  "tierValidationData": [
+    {
+      "scenario": "Foundation Tier - Developing Writer",
+      "essayScore": 35,
+      "tier": "foundation",
+      "suggestionScore": 72,
+      "minThreshold": 55,
+      "maxThreshold": 65,
+      "tierViolations": 1,
+      "adaptiveScore": {
+        "rawScore": 72,
+        "effortAdjustedScore": 72,
+        "difficultyMultiplier": 6.7,
+        "difficultyTier": "competent",
+        "nextMilestone": {
+          "score": 75,
+          "name": "Solid Essay",
+          "description": "This would be competitive at good state schools",
+          "reward": "Ready for refinement",
+          "icon": "✍️"
+        },
+        "distanceToNextMilestone": 3,
+        "encouragement": "At this level, small changes create big impact. You're doing sophisticated work.",
+        "tierDescription": "Solid writing - competitive at good schools"
+      }
+    },
+    {
+      "scenario": "Developing Tier - Improving Writer",
+      "essayScore": 60,
+      "tier": "developing",
+      "suggestionScore": 72,
+      "minThreshold": 65,
+      "maxThreshold": 78,
+      "tierViolations": 0,
+      "adaptiveScore": {
+        "rawScore": 72,
+        "effortAdjustedScore": 72,
+        "difficultyMultiplier": 6.7,
+        "difficultyTier": "competent",
+        "nextMilestone": {
+          "score": 75,
+          "name": "Solid Essay",
+          "description": "This would be competitive at good state schools",
+          "reward": "Ready for refinement",
+          "icon": "✍️"
+        },
+        "distanceToNextMilestone": 3,
+        "encouragement": "Competent work. Now we're polishing this into something impressive.",
+        "tierDescription": "Solid writing - competitive at good schools"
+      }
+    },
+    {
+      "scenario": "Competent Tier - Solid Writer",
+      "essayScore": 75,
+      "tier": "competent",
+      "suggestionScore": 65,
+      "minThreshold": 75,
+      "maxThreshold": 88,
+      "tierViolations": 1,
+      "adaptiveScore": {
+        "rawScore": 65,
+        "effortAdjustedScore": 65,
+        "difficultyMultiplier": 5.1,
+        "difficultyTier": "developing",
+        "nextMilestone": {
+          "score": 75,
+          "name": "Solid Essay",
+          "description": "This would be competitive at good state schools",
+          "reward": "Ready for refinement",
+          "icon": "✍️"
+        },
+        "distanceToNextMilestone": 10,
+        "encouragement": "You're in the growth zone. Each revision sharpens your instincts.",
+        "tierDescription": "Developing voice and specificity"
+      }
+    },
+    {
+      "scenario": "Strong Tier - Advanced Writer",
+      "essayScore": 85,
+      "tier": "strong",
+      "suggestionScore": 65,
+      "minThreshold": 85,
+      "maxThreshold": 95,
+      "tierViolations": 2,
+      "adaptiveScore": {
+        "rawScore": 65,
+        "effortAdjustedScore": 65,
+        "difficultyMultiplier": 5.1,
+        "difficultyTier": "developing",
+        "nextMilestone": {
+          "score": 75,
+          "name": "Solid Essay",
+          "description": "This would be competitive at good state schools",
+          "reward": "Ready for refinement",
+          "icon": "✍️"
+        },
+        "distanceToNextMilestone": 10,
+        "encouragement": "You're in the growth zone. Each revision sharpens your instincts.",
+        "tierDescription": "Developing voice and specificity"
+      }
+    }
+  ],
+  "refinementData": [
+    {
+      "scenario": "Mid-tier refinement test",
+      "essayScore": 70,
+      "initialScore": 72,
+      "finalScore": 72,
+      "improvement": 0,
+      "passesExecuted": 1,
+      "stoppedReason": "diminishing_returns",
+      "success": false
+    }
+  ],
+  "criteriaResults": [
+    {
+      "name": "Difficulty curve is progressive",
+      "passed": true
+    },
+    {
+      "name": "Foundation tier has easier thresholds",
+      "passed": true
+    },
+    {
+      "name": "Effort-adjusted scores recognize difficulty",
+      "passed": true
+    },
+    {
+      "name": "Multi-pass refinement improves quality",
+      "passed": false
+    },
+    {
+      "name": "Refinement respects tier maximum",
+      "passed": true
+    }
+  ],
+  "summary": {
+    "allCriteriaPassed": false,
+    "totalTests": 5,
+    "passedTests": 4
+  }
+}

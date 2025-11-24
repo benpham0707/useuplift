@@ -1,0 +1,399 @@
+{
+  "analysisId": "f3e7315e-4b43-4248-a81d-58cb28ff19d2",
+  "overallScore": 62.3,
+  "voiceFingerprint": {
+    "tone": "Contemplative and grounded, with quiet wisdom beyond their years",
+    "cadence": "Deliberate pacing with short, impactful statements punctuating longer reflective passages",
+    "vocabulary": "Simple yet evocative, rich with natural imagery and sensory details",
+    "markers": [
+      "Uses present tense for immediacy ('The soil breathes')",
+      "Employs metaphorical thinking naturally",
+      "Creates vivid sensory details ('dark and rich and heavy')",
+      "Uses short, declarative sentences for emphasis ('I was afraid. I didn't know what to do.')",
+      "Connects abstract concepts to concrete imagery",
+      "Self-aware about metaphor use ('It's a metaphor, I know')",
+      "Repeats key phrases for emphasis ('carry buckets')",
+      "Uses nature as emotional landscape"
+    ]
+  },
+  "workshopItems": [
+    {
+      "id": "ac9c1515-e2ab-484b-addf-c57a8266489f",
+      "rubric_category": "intellectual_vitality_curiosity",
+      "severity": "critical",
+      "quote": "My grandfather always said that patience is a color, and in his garden, it was the green of slow-climbing vines.",
+      "problem": "This section scored 2/10 in intellectual_vitality_curiosity.",
+      "why_it_matters": "The essay shows minimal intellectual engagement. The color metaphor for patience is poetic but not deeply explored. The writer acknowledges the bucket metaphor but doesn't demonstrate genuine intellectual curiosity about resilience, drought, or the deeper connections between nature and human behavior. No evidence of self-propelled inquiry or connecting ideas to lived reality in a meaningful way.",
+      "suggestions": [
+        {
+          "text": "My grandfather always said that patience is a color, and in his garden, it was the green of slow-climbing vines. But I wanted to know why. Why green, when waiting feels gray? Why vines, when roots do the real work?",
+          "rationale": "Preserves the original color metaphor while adding genuine intellectual curiosity through direct questioning. The follow-up questions demonstrate the kind of self-propelled inquiry that shows intellectual vitality—the student isn't just accepting the metaphor but actively interrogating it.",
+          "type": "polished_original"
+        },
+        {
+          "text": "My grandfather always said that patience is a color. In his garden, it was the green of slow-climbing vines. I watch them now. They don't rush. They don't apologize for their pace. Each tendril reaches, finds purchase, holds.",
+          "rationale": "Amplifies the voice through present tense immediacy and short, declarative sentences. The repetitive structure ('They don't... They don't...') and concrete imagery ('Each tendril reaches, finds purchase, holds') intensifies the contemplative, grounded tone while showing rather than telling about patience.",
+          "type": "voice_amplifier"
+        },
+        {
+          "text": "My grandfather always said that patience is a color, and in his garden, it was the green of slow-climbing vines. But that morning, one vine had yellowed overnight. If I didn't water it within hours, three months of growth would shrivel to nothing.",
+          "rationale": "Uses the Micro Stakes strategy by focusing on a single yellowing vine with an immediate time pressure. This tiny, concrete consequence (losing three months of growth in hours) illustrates the larger themes of persistence and resilience while creating intellectual engagement through the urgency of decision-making.",
+          "type": "divergent_strategy"
+        }
+      ]
+    },
+    {
+      "id": "3cec411e-4d19-4f43-aef3-3e63c36cb9c3",
+      "rubric_category": "intellectual_vitality_curiosity",
+      "severity": "critical",
+      "quote": "It's a metaphor, I know, but it feels real to me.",
+      "problem": "This section scored 2/10 in intellectual_vitality_curiosity.",
+      "why_it_matters": "The essay shows minimal intellectual engagement. The color metaphor for patience is poetic but not deeply explored. The writer acknowledges the bucket metaphor but doesn't demonstrate genuine intellectual curiosity about resilience, drought, or the deeper connections between nature and human behavior. No evidence of self-propelled inquiry or connecting ideas to lived reality in a meaningful way.",
+      "suggestions": [
+        {
+          "text": "It's a metaphor, I know, but when I trace the bucket's worn handle with my thumb, I feel the weight of every drought my grandfather outlasted.",
+          "rationale": "This preserves the student's self-aware acknowledgment of metaphor while adding a specific sensory detail (tracing the handle) that grounds the abstract concept in physical reality. The addition of 'every drought my grandfather outlasted' deepens the intellectual connection between personal resilience and generational wisdom, showing curiosity about how persistence accumulates over time.",
+          "type": "polished_original"
+        },
+        {
+          "text": "It's a metaphor, I know. But my hands remember the bucket's weight. The soil remembers the water you give it.",
+          "rationale": "This amplifies the student's voice markers by using present tense ('hands remember'), creating vivid sensory details (bucket's weight), and employing their signature short declarative sentences for emphasis. The repetition of 'remember' creates a rhythmic connection between human memory and nature's memory, deepening the contemplative tone while maintaining their grounded wisdom.",
+          "type": "voice_amplifier"
+        },
+        {
+          "text": "I pick up my calculus textbook the same way grandfather lifted those buckets—slow, deliberate, like the weight might teach me something if I pay attention.",
+          "rationale": "Using the action beat strategy, this shows the physical movement of picking up the textbook with intentional parallel to the grandfather's bucket-lifting. This action reveals the emotional connection between academic challenges and learned resilience, demonstrating intellectual curiosity about how physical gestures can embody deeper truths about persistence and learning.",
+          "type": "divergent_strategy"
+        }
+      ]
+    },
+    {
+      "id": "5bfe17e4-45a5-4e17-a718-5d4147762bd7",
+      "rubric_category": "context_constraints_disclosure",
+      "severity": "critical",
+      "quote": "I spent my summers there",
+      "problem": "This section scored 2/10 in context_constraints_disclosure.",
+      "why_it_matters": "Very minimal context provided. We know the writer has access to summers at grandfather's garden, takes calculus, and participates in debate team, but no constraints, work hours, caregiving responsibilities, or resource limitations are disclosed. The essay assumes access to enriching summer experiences without acknowledging this privilege.",
+      "suggestions": [
+        {
+          "text": "I spent my summers there because my parents worked double shifts at the factory, lost in the humidity and the buzzing of cicadas, watching him work with hands that looked like tree bark.",
+          "rationale": "This maintains the exact sensory details and contemplative tone while subtly revealing economic constraints. The phrase 'because my parents worked double shifts' provides context without disrupting the poetic flow or natural imagery that defines this voice.",
+          "type": "polished_original"
+        },
+        {
+          "text": "I spent my summers there—no choice, really, with parents pulling overtime—lost in the humidity. The cicadas buzz. I watch him work with hands like tree bark.",
+          "rationale": "This amplifies the voice's signature short, declarative sentences and present tense immediacy while acknowledging privilege. The dash and fragmented structure mirror the contemplative, grounded tone, and 'no choice, really' carries the quiet wisdom that defines this student's perspective.",
+          "type": "voice_amplifier"
+        },
+        {
+          "text": "Other kids went to camps with names like 'Discovery' and 'Adventure.' I spent my summers there, lost in the humidity and the buzzing of cicadas, watching him work with hands that looked like tree bark.",
+          "rationale": "The contrast frame juxtaposes privileged summer experiences against the narrator's reality, immediately establishing different economic circumstances. This creates tension while preserving the contemplative voice and rich sensory details, showing rather than telling about class differences.",
+          "type": "divergent_strategy"
+        }
+      ]
+    },
+    {
+      "id": "253c3d32-0dca-4989-8043-ecd29ce66c48",
+      "rubric_category": "context_constraints_disclosure",
+      "severity": "critical",
+      "quote": "When calculus feels like a drought",
+      "problem": "This section scored 2/10 in context_constraints_disclosure.",
+      "why_it_matters": "Very minimal context provided. We know the writer has access to summers at grandfather's garden, takes calculus, and participates in debate team, but no constraints, work hours, caregiving responsibilities, or resource limitations are disclosed. The essay assumes access to enriching summer experiences without acknowledging this privilege.",
+      "suggestions": [
+        {
+          "text": "When calculus feels like a drought—when the problems stretch endlessly and I can't afford a tutor like my classmates—I just carry buckets.",
+          "rationale": "This preserves the original metaphor while subtly acknowledging economic constraints. The addition of 'can't afford a tutor like my classmates' provides the missing context about resource limitations without breaking the contemplative flow. It maintains the student's grounded tone while addressing the privilege gap.",
+          "type": "polished_original"
+        },
+        {
+          "text": "When calculus bleeds red ink across my page—when every wrong answer costs me sleep I can't spare—I carry buckets. The numbers don't care about my constraints.",
+          "rationale": "This amplifies the student's sensory detail voice ('bleeds red ink') and present-tense immediacy while revealing time constraints through 'sleep I can't spare.' The short declarative 'The numbers don't care about my constraints' mirrors their style of impactful statements while acknowledging systemic barriers that affect their learning experience.",
+          "type": "voice_amplifier"
+        },
+        {
+          "text": "When calculus feels like a drought, I reach for my grandfather's old bucket—dented from years of carrying water we couldn't afford to waste.",
+          "rationale": "Using Object Symbolism, the physical bucket becomes the focal point that naturally reveals economic constraints ('water we couldn't afford to waste'). This strategy transforms a simple metaphor into a tangible inheritance that carries both emotional weight and socioeconomic context, solving the disclosure issue through concrete imagery rather than direct statement.",
+          "type": "divergent_strategy"
+        }
+      ]
+    },
+    {
+      "id": "3268cdaf-e4b5-4607-ada5-e680106585c6",
+      "rubric_category": "context_constraints_disclosure",
+      "severity": "critical",
+      "quote": "When the debate team loses",
+      "problem": "This section scored 2/10 in context_constraints_disclosure.",
+      "why_it_matters": "Very minimal context provided. We know the writer has access to summers at grandfather's garden, takes calculus, and participates in debate team, but no constraints, work hours, caregiving responsibilities, or resource limitations are disclosed. The essay assumes access to enriching summer experiences without acknowledging this privilege.",
+      "suggestions": [
+        {
+          "text": "When the debate team loses and I'm riding the bus home with nothing but silence between teammates, I carry buckets.",
+          "rationale": "This preserves the original 'debate team loses' concept while adding contextual details that ground the experience. The bus ride home and silence between teammates provides specific imagery that shows the aftermath of loss without being overly dramatic. It maintains the bucket metaphor while giving readers a clearer picture of the student's actual circumstances.",
+          "type": "polished_original"
+        },
+        {
+          "text": "When the debate team loses, the fluorescent lights buzz overhead. I sit there. The room empties. I carry buckets.",
+          "rationale": "This amplifies the student's signature voice markers: present tense immediacy, short declarative sentences for emphasis, and sensory details that create atmosphere. The fluorescent lights buzzing creates a vivid sensory anchor while the fragmented sentence structure ('I sit there. The room empties.') mirrors their natural cadence. It transforms a simple loss into a moment of quiet contemplation that feels authentically theirs.",
+          "type": "voice_amplifier"
+        },
+        {
+          "text": "When the debate team loses and the metallic taste of disappointment fills my mouth, I carry buckets.",
+          "rationale": "Using the Sensory Anchor strategy, this grounds the abstract concept of losing through the specific physical sensation of metallic taste - something many people experience during stress or disappointment. This creates an immediate, visceral connection that makes the moment feel real and relatable while maintaining the bucket metaphor. The sensory detail transforms a potentially privileged activity (debate team) into a universal human experience of disappointment.",
+          "type": "divergent_strategy"
+        }
+      ]
+    }
+  ],
+  "rubricResult": {
+    "rubric_version": "v1.0.1",
+    "dimension_scores": [
+      {
+        "dimension_name": "opening_power_scene_entry",
+        "raw_score": 8.5,
+        "final_score": 8.5,
+        "weighted_score": 0.8500000000000001,
+        "evidence": {
+          "quotes": [
+            "The soil breathes. I can feel it under my fingernails, dark and rich and heavy with the promise of August tomatoes.",
+            "My grandfather always said that patience is a color, and in his garden, it was the green of slow-climbing vines."
+          ],
+          "justification": "Opens with immediate sensory immersion - we feel the soil, see the garden, hear the grandfather's voice. The concrete details (fingernails, August tomatoes, cicadas) drop us directly into a specific place and time. The metaphor of 'patience is a color' is provocative and original.",
+          "anchors_met": [
+            10
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "narrative_arc_stakes_turn",
+        "raw_score": 7,
+        "final_score": 7,
+        "weighted_score": 0.84,
+        "evidence": {
+          "quotes": [
+            "I remember the day the drought came. The sky turned a pale, sick white. The leaves curled up like burning paper. I was afraid. I didn't know what to do.",
+            "My grandfather didn't say anything. He just carried buckets. Back and forth. From the creek to the garden."
+          ],
+          "justification": "Clear tension with the drought threatening the garden. The stakes are both external (saving the plants) and internal (learning how to respond to crisis). The turn comes through the grandfather's quiet action rather than words. However, the resolution feels somewhat predictable and the connection to current applications is more told than shown.",
+          "anchors_met": [
+            5,
+            10
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "character_interiority_vulnerability",
+        "raw_score": 6.5,
+        "final_score": 6.5,
+        "weighted_score": 0.78,
+        "evidence": {
+          "quotes": [
+            "I was afraid. I didn't know what to do. I just watched the green fade to brown.",
+            "When calculus feels like a drought, I just carry buckets. When the debate team loses, I carry buckets."
+          ],
+          "justification": "Shows vulnerability through admission of fear and helplessness during the drought. The narrator admits to not knowing what to do and just watching passively. However, the introspection is relatively brief and the current applications feel more surface-level than deeply explored.",
+          "anchors_met": [
+            5
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "show_dont_tell_craft",
+        "raw_score": 8,
+        "final_score": 8,
+        "weighted_score": 0.8,
+        "evidence": {
+          "quotes": [
+            "The sky turned a pale, sick white. The leaves curled up like burning paper.",
+            "He just carried buckets. Back and forth. From the creek to the garden.",
+            "I can feel it under my fingernails, dark and rich and heavy with the promise of August tomatoes."
+          ],
+          "justification": "Strong sensory details throughout - we see the sick white sky, feel the soil under fingernails, hear the cicadas. The repetitive action of carrying buckets is shown through concrete imagery. The metaphorical language works effectively. Some telling in the final paragraph but overall maintains concrete imagery.",
+          "anchors_met": [
+            10
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "reflection_meaning_making",
+        "raw_score": 4,
+        "final_score": 4,
+        "weighted_score": 0.48,
+        "evidence": {
+          "quotes": [
+            "I think that's when I learned about resilience. It's not a big loud thing. It's just carrying buckets.",
+            "When calculus feels like a drought, I just carry buckets. When the debate team loses, I carry buckets.",
+            "The soil remembers the water you give it."
+          ],
+          "justification": "The essay attempts to reframe resilience as quiet persistence rather than dramatic action, which shows some insight. However, the reflection feels somewhat surface-level and doesn't fully escape cliché territory. The 'carrying buckets' metaphor is developed but the connection to broader life lessons remains fairly obvious. The final line about soil remembering water hints at deeper meaning but isn't fully explored.",
+          "anchors_met": [
+            3,
+            4
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "intellectual_vitality_curiosity",
+        "raw_score": 2,
+        "final_score": 2,
+        "weighted_score": 0.16,
+        "evidence": {
+          "quotes": [
+            "My grandfather always said that patience is a color, and in his garden, it was the green of slow-climbing vines.",
+            "It's a metaphor, I know, but it feels real to me."
+          ],
+          "justification": "The essay shows minimal intellectual engagement. The color metaphor for patience is poetic but not deeply explored. The writer acknowledges the bucket metaphor but doesn't demonstrate genuine intellectual curiosity about resilience, drought, or the deeper connections between nature and human behavior. No evidence of self-propelled inquiry or connecting ideas to lived reality in a meaningful way.",
+          "anchors_met": [
+            1,
+            2
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "originality_specificity_voice",
+        "raw_score": 6.5,
+        "final_score": 6.5,
+        "weighted_score": 0.52,
+        "evidence": {
+          "quotes": [
+            "The soil breathes. I can feel it under my fingernails, dark and rich and heavy with the promise of August tomatoes.",
+            "My grandfather always said that patience is a color, and in his garden, it was the green of slow-climbing vines.",
+            "hands that looked like tree bark",
+            "The sky turned a pale, sick white. The leaves curled up like burning paper."
+          ],
+          "justification": "The essay demonstrates strong sensory writing and distinctive imagery that feels authentic. The opening line is particularly striking, and phrases like 'hands that looked like tree bark' and 'pale, sick white' sky show original observation. The voice feels genuine rather than manufactured for college admissions. However, some elements like the bucket metaphor become slightly repetitive and the overall concept, while well-executed, isn't entirely unconventional.",
+          "anchors_met": [
+            6,
+            7
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "structure_pacing_coherence",
+        "raw_score": 5.5,
+        "final_score": 5.5,
+        "weighted_score": 0.32999999999999996,
+        "evidence": {
+          "quotes": [
+            "I spent my summers there, lost in the humidity and the buzzing of cicadas, watching him work",
+            "I remember the day the drought came.",
+            "I think that's when I learned about resilience.",
+            "I try to bring that to my schoolwork now."
+          ],
+          "justification": "The essay follows a clear chronological structure from setting to crisis to lesson to application. Transitions are mostly smooth, moving logically from the garden setting to the drought event to the reflection. However, the final paragraph feels somewhat rushed in connecting the metaphor to current life, and the pacing could be more balanced - the reflection section is quite brief compared to the descriptive opening.",
+          "anchors_met": [
+            5,
+            6
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "word_economy_craft",
+        "raw_score": 7.5,
+        "final_score": 7.5,
+        "weighted_score": 0.44999999999999996,
+        "evidence": {
+          "quotes": [
+            "The soil breathes.",
+            "patience is a color, and in his garden, it was the green of slow-climbing vines",
+            "hands that looked like tree bark",
+            "The sky turned a pale, sick white. The leaves curled up like burning paper.",
+            "The soil remembers the water you give it."
+          ],
+          "justification": "Strong opening with active verbs and concrete imagery. Metaphors are fresh and specific ('patience is a color,' 'hands that looked like tree bark'). Sentence variety creates good rhythm - short punchy sentences mixed with longer descriptive ones. Some filler exists ('It's a metaphor, I know') but overall the prose is energetic and memorable.",
+          "anchors_met": [
+            7.5
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "context_constraints_disclosure",
+        "raw_score": 2,
+        "final_score": 2,
+        "weighted_score": 0.16,
+        "evidence": {
+          "quotes": [
+            "I spent my summers there",
+            "When calculus feels like a drought",
+            "When the debate team loses"
+          ],
+          "justification": "Very minimal context provided. We know the writer has access to summers at grandfather's garden, takes calculus, and participates in debate team, but no constraints, work hours, caregiving responsibilities, or resource limitations are disclosed. The essay assumes access to enriching summer experiences without acknowledging this privilege.",
+          "anchors_met": [
+            2
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "school_program_fit",
+        "raw_score": 0,
+        "final_score": 0,
+        "weighted_score": 0,
+        "evidence": {
+          "quotes": [],
+          "justification": "Not applicable - this is not a 'Why us' essay but rather a personal development essay about resilience.",
+          "anchors_met": []
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      },
+      {
+        "dimension_name": "ethical_awareness_humility",
+        "raw_score": 6,
+        "final_score": 6,
+        "weighted_score": 0.36,
+        "evidence": {
+          "quotes": [
+            "My grandfather always said that patience is a color",
+            "I think that's when I learned about resilience",
+            "watching him work with hands that looked like tree bark",
+            "My grandfather didn't say anything. He just carried buckets."
+          ],
+          "justification": "Good credit given to grandfather as the source of wisdom and modeling of resilience. The writer positions themselves as a learner rather than a hero. However, there's no examination of privilege (access to enriching summers, educational opportunities) or deeper reflection on limitations. The tone is humble but lacks the deeper ethical awareness of privilege examination.",
+          "anchors_met": [
+            6
+          ]
+        },
+        "rules_applied": [],
+        "modified_by_rules": false
+      }
+    ],
+    "essay_quality_index": 62.3,
+    "impression_label": "readable_but_generic",
+    "flags": [],
+    "prioritized_levers": [
+      "Improve Reflection & Meaning-Making (current: 4/10, weight: 12%)",
+      "Improve Intellectual Vitality & Curiosity (current: 2/10, weight: 8%)",
+      "Improve Context & Constraints Disclosure (current: 2/10, weight: 8%)",
+      "Improve School/Program Fit (current: 0/10, weight: 6%)",
+      "Improve Character Interiority & Vulnerability (current: 6.5/10, weight: 12%)"
+    ],
+    "assessment": "EQI: 62.3/100 — Coherent but lacks the specificity, vulnerability, or narrative arc of elite essays."
+  },
+  "performanceMetrics": {
+    "totalMs": 40661,
+    "stages": {
+      "holistic_voice": 15061,
+      "rubric_scoring": 14882,
+      "locators": 2,
+      "surgical_editor": 10716
+    }
+  }
+}

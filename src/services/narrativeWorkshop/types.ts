@@ -224,10 +224,6 @@ export interface CharacterDevelopmentAnalysis {
   // Protagonist clarity
   protagonistClarity: number;              // 0-10
   agencyLevel: number;                     // 0-10, active vs passive
-  voiceDistinctiveness: number;            // 0-10
-  growthDemonstrated: number;              // 0-10
-  emotionDescriptionType: 'shown' | 'told' | 'mixed';
-  agencyType: 'active' | 'passive' | 'mixed';
 
   // Interiority
   interiorityPresent: boolean;
@@ -271,21 +267,15 @@ export interface StakesTensionAnalysis {
   tensionPresent: boolean;
   tensionLevel: number;                    // 0-10
   tensionSources: string[];
-  tensionPacing: number;                   // 0-10
 
   // Stakes clarity
   stakesEstablished: boolean;
   stakesType: 'personal' | 'relational' | 'academic' | 'community' | 'unclear';
   stakesHeight: number;                    // 0-10, how high are stakes?
-  stakesSpecificity: number;               // 0-10
-  stakesEstablishedByPercent: number;      // % of essay where stakes clear
 
   // Conflict markers
   conflictMarkers: string[];               // "but", "however", "failed", etc.
   conflictDensity: number;                 // Markers per 100 words
-  conflictType: 'internal' | 'external' | 'both' | 'unclear';
-  conflictClarity: number;                 // 0-10
-  conflictComplexity: number;              // 0-10
 
   // Suspense & engagement
   suspenseBuilding: number;                // 0-10
@@ -295,7 +285,6 @@ export interface StakesTensionAnalysis {
   resolutionPresent: boolean;
   resolutionSatisfying: boolean;
   resolutionDescription: string | null;
-  resolutionQuality: number;               // 0-10
 
   improvementSuggestions: string[];
   tokensUsed: number;
@@ -319,54 +308,37 @@ export interface DeepDiveAnalyses {
 // ============================================================================
 
 export interface GrammarAnalysis {
-  // Grouped sentence-level metrics
-  sentenceMetrics: {
-    totalSentences: number;
-    averageLength: number;
-    shortSentences: number;                // 5-10 words
-    mediumSentences: number;               // 11-20 words
-    longSentences: number;                 // 21+ words
-    varietyScore: number;                  // 0-10
-    longestSentence: number;
-    shortestSentence: number;
-  };
+  // Sentence-level metrics (deterministic)
+  sentenceCount: number;
+  averageSentenceLength: number;
+  sentenceLengthVariance: number;
+  shortSentences: number;                  // <= 8 words
+  longSentences: number;                   // >= 20 words
+  sentenceVarietyScore: number;            // 0-10
 
-  // Grouped verb analysis
-  verbAnalysis: {
-    activeVoiceCount: number;
-    passiveVoiceCount: number;
-    passivePercentage: number;
-    weakVerbs: string[];                   // "was", "had", "got", etc.
-    strongVerbs: string[];                 // Action verbs
-  };
+  // Verb analysis
+  activeVoiceCount: number;
+  passiveVoiceCount: number;
+  passiveVoiceRatio: number;
+  weakVerbs: string[];                     // "was", "had", "got", etc.
+  strongVerbs: string[];                   // Action verbs
 
-  // Grouped word choice
-  wordChoice: {
-    totalWords: number;
-    uniqueWords: number;
-    lexicalDiversity: number;              // 0-1
-    clichePhrases: string[];
-    averageWordLength: number;
-    overusedWords: Array<{
-      word: string;
-      count: number;
-    }>;
-  };
+  // Word choice
+  totalWords: number;
+  uniqueWords: number;
+  lexicalDiversity: number;                // 0-1
+  clichePhrases: string[];
+  overusedWords: Array<{
+    word: string;
+    count: number;
+  }>;
 
-  // Grouped punctuation
-  punctuation: {
-    dashUsage: number;
-    semicolonUsage: number;
-    colonUsage: number;
-    fragmentCount: number;
-    effectiveness: number;                 // 0-10
-  };
-
-  // Paragraph metrics
-  paragraphMetrics: {
-    totalParagraphs: number;
-    averageSentencesPerParagraph: number;
-  };
+  // Punctuation
+  dashUsage: number;
+  semicolonUsage: number;
+  colonUsage: number;
+  fragmentCount: number;
+  punctuationEffectiveness: number;        // 0-10 (LLM-determined)
 
   // Common issues
   grammaticalErrors: Array<{
@@ -378,8 +350,6 @@ export interface GrammarAnalysis {
   // Deterministic flags
   redFlags: string[];
   greenFlags: string[];
-  overallGrammarScore: number;             // 0-10
-  analysisCompletedAt: string;
 }
 
 export interface WritingStyleAnalysis {
@@ -392,7 +362,6 @@ export interface WritingStyleAnalysis {
   // Rhythm & flow
   rhythmQuality: number;                   // 0-10
   flowAnalysis: string;
-  overallStyleScore: number;               // 0-10
   jarringTransitions: string[];
   smoothTransitions: string[];
 
@@ -411,8 +380,6 @@ export interface WritingStyleAnalysis {
   // Originality markers
   originalPhrases: string[];               // Fresh, unique expressions
   genericPhrases: string[];                // Overused college essay language
-  originalityScore: number;                // 0-10
-  voiceDistinctiveness: number;            // 0-10
 
   // Comparative positioning
   styleComparison: string;                 // How style compares to strong essays
@@ -423,10 +390,14 @@ export interface WritingStyleAnalysis {
 }
 
 export interface GrammarStyleAnalysis {
-  grammarAnalysis: GrammarAnalysis;
-  styleAnalysis: WritingStyleAnalysis;
-  totalTokensUsed: number;
-  analysisCompletedAt: string;
+  grammar: GrammarAnalysis;
+  style: WritingStyleAnalysis;
+
+  // Combined assessment
+  overallCraftScore: number;               // 0-10
+  topStrengths: string[];
+  topWeaknesses: string[];
+  improvementPriorities: string[];
 }
 
 // ============================================================================
@@ -628,13 +599,42 @@ export interface SpecificInsights {
 }
 
 // ============================================================================
+// PHASE 8: VOICE FINGERPRINT & WORKSHOP ITEMS
+// ============================================================================
+
+export interface VoiceFingerprint {
+  tone: string; // "Earnest, self-deprecating"
+  cadence: string; // "Short, punchy sentences"
+  vocabulary: string; // "Simple, conversational"
+  markers: string[]; // ["Uses dashes often", "Starts sentences with And"]
+  sampleSentences?: string[]; // NEW: Authentic samples from the essay for style transfer
+}
+
+export interface WorkshopItem {
+  id: string;
+  rubric_category: string; // "Selectivity"
+  severity: 'critical' | 'warning' | 'optimization';
+  quote: string; // "I worked hard"
+  
+  // Contextual Education
+  problem: string; // "Lacks metrics."
+  why_it_matters: string; // "Credibility signal."
+  
+  // The Fixes
+  suggestions: Array<{
+    text: string; // "I sent 500 emails."
+    rationale: string; // "Adds quantification."
+    type: 'polished_original' | 'voice_amplifier' | 'divergent_strategy' | 'metric' | 'sensory' | 'clarity'; // Expanded for 2+1 Strategy
+  }>;
+}
+
+// ============================================================================
 // COMPLETE NARRATIVE WORKSHOP ANALYSIS
 // ============================================================================
 
 export interface NarrativeWorkshopAnalysis {
   // Input
-  essayInput: NarrativeEssayInput;
-  essayType: string;
+  input: NarrativeEssayInput;
 
   // Analysis stages
   stage1_holisticUnderstanding: HolisticUnderstanding;
@@ -643,26 +643,27 @@ export interface NarrativeWorkshopAnalysis {
   stage4_synthesizedInsights: SynthesizedInsights;
   stage5_specificInsights: SpecificInsights;
 
+  // Phase 8 additions
+  voiceFingerprint?: VoiceFingerprint;
+  workshopItems?: WorkshopItem[];
+
   // Overall metadata
-  analysisMetadata: {
-    analyzedAt: string;
-    totalDurationMs: number;
-    totalTokensUsed: number;
-    stageTimings: {
-      stage1: number;
-      stage2: number;
-      stage3: number;
-      stage4: number;
-      stage5: number;
-    };
-    systemVersion: string;
+  analysisId: string;
+  analyzedAt: string;
+  totalTokensUsed: number;
+  performanceMetrics: {
+    stage1Ms: number;
+    stage2Ms: number;
+    stage3Ms: number;
+    stage4Ms: number;
+    stage5Ms: number;
+    totalMs: number;
   };
 
   // Quick access
   overallScore: number;                    // 0-100
-  impressionLabel: string;
-  topPriorities: SentenceLevelInsight[];   // Top 3-5 things to fix
-  quickSummary?: string;                   // One-sentence diagnosis
+  topPriorities: string[];                 // Top 3-5 things to fix
+  quickSummary: string;                    // One-sentence diagnosis
 }
 
 // ============================================================================
@@ -676,6 +677,8 @@ export interface NarrativeWorkshopOptions {
   includeStage3?: boolean;                 // Default true
   includeStage4?: boolean;                 // Default true
   includeStage5?: boolean;                 // Default true
+  includeVoiceFingerprint?: boolean;       // Default false (Phase 8)
+  includeWorkshopItems?: boolean;          // Default false (Phase 8)
 
   // LLM configuration
   temperature?: number;                    // Default varies by stage
@@ -724,4 +727,29 @@ export interface NarrativePattern {
 // EXPORT
 // ============================================================================
 
-// All types are already exported with their definitions above
+export type {
+  // Main types
+  NarrativeEssayInput,
+  NarrativeWorkshopAnalysis,
+  NarrativeWorkshopOptions,
+
+  // Stage outputs
+  HolisticUnderstanding,
+  DeepDiveAnalyses,
+  GrammarStyleAnalysis,
+  SynthesizedInsights,
+  SpecificInsights,
+
+  // Component types
+  OpeningAnalysis,
+  BodyDevelopmentAnalysis,
+  ClimaxTurningPointAnalysis,
+  ConclusionReflectionAnalysis,
+  CharacterDevelopmentAnalysis,
+  StakesTensionAnalysis,
+  GrammarAnalysis,
+  WritingStyleAnalysis,
+  SentenceLevelInsight,
+  GeneralInsight,
+  NarrativePattern,
+};

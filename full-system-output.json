@@ -1,0 +1,66 @@
+{
+  "timestamp": "2025-11-21T13:43:41.634Z",
+  "essay_excerpt": "Only when I stare at a mirror can I see the other half of the world behind me. Such is reflection, a...",
+  "SECTION_1_DIAGNOSTICS": {
+    "description": "This is what Engine A 'sees' in your essay.",
+    "data": {
+      "metadata": {
+        "promptType": "piq3_talent",
+        "wordCount": 350
+      },
+      "voice": {
+        "score": 6,
+        "quality_level": "philosophical_abstract",
+        "weaknesses": [
+          "Over-reliance on abstract concepts",
+          "Telling not showing",
+          "Passive voice"
+        ]
+      },
+      "opening_hook": {
+        "score": 6.5,
+        "hook_type": "philosophical_statement",
+        "feedback": "Too generic."
+      },
+      "narrative_arc": {
+        "climax_quality": "summary"
+      },
+      "holistic_context": {
+        "narrative_quality": {
+          "recurring_motifs": [
+            "Antique wooden mirror",
+            "Sticky notes"
+          ]
+        }
+      }
+    }
+  },
+  "SECTION_2_RECOMMENDATIONS": {
+    "description": "This is what the Auto-Focus Helper suggests you do.",
+    "actions": [
+      {
+        "focusArea": "hook",
+        "reason": "Opening Hook score is low (6.5/10).",
+        "strategy": "Replace generic opening with 'In Medias Res' scene or Paradox.",
+        "priority": 1
+      },
+      {
+        "focusArea": "pivot_moment",
+        "reason": "Climax is identified as 'summary'.",
+        "strategy": "Convert summary of success into a specific scene of struggle and realization.",
+        "priority": 2
+      }
+    ]
+  },
+  "SECTION_3_GENERATION_PROMPTS": {
+    "description": "This is exactly what we send to the 'Writing Coach' (LLM) to get the result.",
+    "example_1_hook_fix": {
+      "mode": "Cinematographer",
+      "instruction": "\n**Original Text:**\n\"Only when I stare at a mirror can I see the other half of the world behind me. Such is reflection, a skill I use daily to contemplate behind what's visible only at first glance. From the time I reflec\"\n\n**Diagnostic Context (What to Fix):**\n- Current Voice Level: philosophical_abstract\n- Key Weaknesses: Over-reliance on abstract concepts, Telling not showing, Passive voice\n\n- Strategic Direction: Elevate to Tier 5\n\n\n      **Global Narrative Context (The Stitcher):**\n      \n      - **Recurring Motifs:** You MUST subtly weave in at least one of these motifs: [Antique wooden mirror].\n      \n      \n\n\n\n**Your Task:**\nWrite 3 alternative Opening Hooks (Tier 5). They must be under 40 words. Focus on \"In Medias Res\" or \"Paradox.\"\n(Mode: cinematographer)\n\n\n**Mandatory \"Vividness Checklist\" (You MUST include these):**\n1. One specific SENSORY detail (Smell, Sound, or Texture). *Tip: Go for \"gritty\" details (sticky floor, humming light) over \"pleasant\" ones.*\n2. One specific MICRO-MOMENT (a split-second action, e.g., \"my hand froze on the doorknob\").\n3. One line of DIALOGUE or INTERNAL MONOLOGUE that reveals character.\n4. **Thematic Connection:** Ensure your imagery isn't just \"decoration.\" If the theme is \"patience,\" describe the slow drip of a faucet. If it's \"chaos,\" describe the cacophony of a busy kitchen.\n\n\n**Constraints:**\n- Keep the word count similar to the original (unless it's a hook).\n- Do NOT use the phrase \"In conclusion\" or \"In summary.\"\n- Output ONLY the generated text options. Separate options with \"---\" if multiple.\n"
+    },
+    "example_2_climax_fix": {
+      "mode": "Journalist",
+      "instruction": "\n**Original Text:**\n\"Seeing my once successful start-up clothing brand fail absolved my self confident bravado...\"\n\n**Diagnostic Context (What to Fix):**\n- Current Voice Level: philosophical_abstract\n- Key Weaknesses: Over-reliance on abstract concepts, Telling not showing, Passive voice\n\n- Strategic Direction: Focus on the silence of the unsold inventory.\n\n\n\n\n\n**Your Task:**\nRewrite the \"Pivot Moment\" (the climax/change). Make it a scene, not a summary. Dialogue and action are required.\n(Mode: journalist)\n\n\n**Mandatory \"Vividness Checklist\" (You MUST include these):**\n1. One specific SENSORY detail (Smell, Sound, or Texture). *Tip: Go for \"gritty\" details (sticky floor, humming light) over \"pleasant\" ones.*\n2. One specific MICRO-MOMENT (a split-second action, e.g., \"my hand froze on the doorknob\").\n3. One line of DIALOGUE or INTERNAL MONOLOGUE that reveals character.\n4. **Thematic Connection:** Ensure your imagery isn't just \"decoration.\" If the theme is \"patience,\" describe the slow drip of a faucet. If it's \"chaos,\" describe the cacophony of a busy kitchen.\n\n\n**Constraints:**\n- Keep the word count similar to the original (unless it's a hook).\n- Do NOT use the phrase \"In conclusion\" or \"In summary.\"\n- Output ONLY the generated text options. Separate options with \"---\" if multiple.\n"
+    }
+  }
+}

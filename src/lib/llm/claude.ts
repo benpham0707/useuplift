@@ -14,24 +14,33 @@ import Anthropic from '@anthropic-ai/sdk';
 // CLAUDE_CODE_KEY is no longer considered.
 // Check if we're in browser (Vite) or Node.js environment
 const isBrowser = typeof import.meta !== 'undefined' && import.meta.env;
-const PAID_KEY = isBrowser
-  ? import.meta.env.VITE_ANTHROPIC_API_KEY
-  : process.env.ANTHROPIC_API_KEY;
 
-// Don't throw immediately - let the app load and check when actually calling Claude
-let client: Anthropic | null = null;
+// Function to get API key - allows for runtime updates
+function getApiKey(): string {
+  const key = isBrowser
+    ? import.meta.env.VITE_ANTHROPIC_API_KEY
+    : process.env.ANTHROPIC_API_KEY;
+
+  if (!key) {
+    throw new Error('ANTHROPIC_API_KEY not found in environment variables. Please add it to your .env file.');
+  }
+
+  console.log(`[Claude API] Using API key: ${key.substring(0, 20)}...${key.substring(key.length - 4)}`);
+  return key;
+}
+
+// Singleton client instance
+let clientInstance: Anthropic | null = null;
 
 function getClient(): Anthropic {
-  if (!PAID_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not found. Please add VITE_ANTHROPIC_API_KEY to your environment or enable Lovable Cloud for AI features.');
-  }
-  if (!client) {
-    client = new Anthropic({
-      apiKey: PAID_KEY,
-      dangerouslyAllowBrowser: true // Required for client-side usage
-    });
-  }
-  return client;
+  if (clientInstance) return clientInstance;
+
+  clientInstance = new Anthropic({
+  apiKey: getApiKey(),
+  dangerouslyAllowBrowser: true // Required for client-side usage
+});
+
+  return clientInstance;
 }
 
 // ============================================================================
@@ -108,9 +117,9 @@ export async function callClaude<T = any>(
       ...(systemParam ? { system: systemParam } : {}),
     };
 
-    // Make API call with timeout (30 seconds for chat, 60 seconds for analysis)
+    // Make API call with timeout (30 seconds for chat, 120 seconds for deep analysis)
     console.log('[Claude API] Starting API call...');
-    const timeoutMs = maxTokens >= 2000 ? 30000 : 60000; // Chat needs 30s, analysis needs 60s
+    const timeoutMs = maxTokens >= 3000 ? 120000 : maxTokens >= 2000 ? 90000 : 45000; // Increased for reliability
     let timeoutId: NodeJS.Timeout;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -120,9 +129,9 @@ export async function callClaude<T = any>(
       }, timeoutMs);
     });
 
-    const claudeClient = getClient();
+    const client = getClient();
     const response = await Promise.race([
-      claudeClient.messages.create(requestParams).then(res => {
+      client.messages.create(requestParams).then(res => {
         console.log('[Claude API] Call completed successfully');
         clearTimeout(timeoutId);
         return res;
@@ -138,13 +147,26 @@ export async function callClaude<T = any>(
       if (useJsonMode) {
         // Parse JSON from response
         try {
-          // Try to extract JSON from markdown code blocks if present
-          const jsonMatch = textContent.match(/```json\s*([\s\S]*?)\s*```/) ||
-                           textContent.match(/```\s*([\s\S]*?)\s*```/);
-          const jsonString = jsonMatch ? jsonMatch[1] : textContent;
+          let jsonString = textContent.trim();
+          
+          // 1. Try extracting from code blocks
+          const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+          if (jsonMatch) {
+            jsonString = jsonMatch[1].trim();
+          } else {
+            // 2. Fallback: Find first '{' and last '}'
+            const firstBrace = jsonString.indexOf('{');
+            const lastBrace = jsonString.lastIndexOf('}');
+            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+            }
+          }
+
           content = JSON.parse(jsonString);
         } catch (parseError) {
-          throw new Error(`Failed to parse JSON response: ${textContent.substring(0, 200)}...`);
+          console.error('[Claude API] JSON Parse Error:', parseError);
+          console.error('[Claude API] Failed Content Snippet:', textContent.substring(0, 500));
+          throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
       } else {
         content = textContent;

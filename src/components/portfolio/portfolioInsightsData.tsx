@@ -37,6 +37,7 @@ export interface StoryTellingOption {
   narrative: RichSegment[];
   score: number;
   reasoning: string;
+  tags?: string[]; // Added for dynamic traits
 }
 
 export interface ImpactData {
@@ -88,6 +89,7 @@ export interface OverarchingInsight {
     spine: VerdictOption[];
     spike: VerdictOption[];
     lift: VerdictOption[];
+    blind_spots?: VerdictOption[];
   };
   storyTellingOptions: StoryTellingOption[];
   readinessInContext: RichSegment[];
@@ -335,6 +337,28 @@ export const MOCK_HOLISTIC_SUMMARY: HolisticSummary = {
           ],
           score: 7.5,
           reasoning: 'Would strengthen well-roundedness, but lower priority than recognition - your tech leadership is already strong'
+        }
+      ],
+      blind_spots: [
+        {
+          id: 'narrow-focus',
+          text: [
+            'Unintended Signal: Your profile might signal a ',
+            { text: 'lack of intellectual curiosity', details: ['No humanities/arts electives', 'Essays focus purely on utility/building'] },
+            ' outside of engineering. Admissions officers at liberal arts colleges want to see how you engage with ideas, not just tools.'
+          ],
+          score: 8.5,
+          reasoning: 'Common pitfall for strong STEM applicants - risk of seeming one-dimensional.'
+        },
+        {
+          id: 'savior-complex',
+          text: [
+            'Risk: Your narrative on "democratizing access" could read as a ',
+            { text: 'savior complex', details: ['Language emphasizes "giving" to "underprivileged"'] },
+            ' if not careful. Frame it as partnership and learning from the community, not just bestowing technology upon them.'
+          ],
+          score: 7.8,
+          reasoning: 'Nuance in tone is critical for service narratives to avoid clichés.'
         }
       ]
     },

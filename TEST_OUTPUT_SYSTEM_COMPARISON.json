@@ -1,0 +1,225 @@
+{
+  "essay": "LEGO_ESSAY",
+  "targetPassage": "I was always captivated by puzzles throughout my life. I loved the moment after spending hours trying to put together a 1000-piece jigsaw just to finally place in the last piece.",
+  "oldSystem": {
+    "suggestions": [
+      {
+        "text": "Puzzles have captivated me since childhood; the satisfaction of sliding that final piece into a 1000-piece jigsaw after hours of methodical searching mirrors the same quiet triumph I've discovered in solving complex problems today.",
+        "rationale": "Maintains the original structure while adding present perfect tense, metaphorical connection to current problem-solving, and eliminates passive construction. Preserves the reflective tone with semicolon usage.",
+        "type": "polished_original"
+      },
+      {
+        "text": "The cardboard edges of puzzle pieces have worn smooth under my fingertips over the years; I've learned that the most rewarding moment isn't finding the corner pieces first, but placing that final fragment—watching a fragmented image become whole after 847 pieces have found their home.",
+        "rationale": "Amplifies voice through sensory details (smooth cardboard, fingertips), specific number variation, and present perfect tense. The semicolon connects past tactile experience with learned wisdom.",
+        "type": "voice_amplifier"
+      },
+      {
+        "text": "While others rush to frame their completed 1000-piece puzzles, I've always lingered over that final piece; holding it suspended above its destined space, savoring the last seconds before order conquers chaos—a ritual that has taught me patience extends far beyond my bedroom floor.",
+        "rationale": "Takes a divergent approach by focusing on the pause before completion rather than the completion itself. Uses contrast and metaphorical extension to broader life lessons.",
+        "type": "divergent_strategy"
+      }
+    ],
+    "evaluations": [
+      {
+        "scores": {
+          "authenticity": 4,
+          "specificity": 3,
+          "originality": 2,
+          "craft": 6,
+          "voicePreservation": 3
+        },
+        "totalScore": 18,
+        "strengths": [
+          "Improved sentence structure and flow",
+          "Better use of semicolon creates sophisticated rhythm",
+          "Attempts to connect past experience to present abilities"
+        ],
+        "weaknesses": [
+          "Loses the genuine, conversational tone of the original",
+          "Uses overly polished language that doesn't sound like a teenager ('methodical searching,' 'quiet triumph')",
+          "Puzzle metaphor is extremely common in college essays",
+          "Vague connection to 'complex problems today' - what problems specifically?",
+          "Removes the specific, relatable detail about 'spending hours' that made the original feel real",
+          "Sounds like it came from an essay writing guide"
+        ],
+        "wouldStandOut": false
+      },
+      {
+        "scores": {
+          "authenticity": 4,
+          "specificity": 6,
+          "originality": 5,
+          "craft": 8,
+          "voicePreservation": 3
+        },
+        "totalScore": 26,
+        "strengths": [
+          "Strong sensory detail with 'cardboard edges worn smooth under fingertips'",
+          "Excellent craft - sophisticated sentence structure and flow",
+          "Specific number (847 pieces) adds concrete detail",
+          "Nice metaphorical language about fragments becoming whole"
+        ],
+        "weaknesses": [
+          "Voice completely transformed from simple/direct to overly literary",
+          "Sounds like it was written by a creative writing teacher, not a teenager",
+          "Uses classic essay techniques ('I've learned that...') that feel manufactured",
+          "Puzzle metaphor is extremely common in college essays",
+          "Lost the genuine enthusiasm of the original"
+        ],
+        "wouldStandOut": false
+      },
+      {
+        "scores": {
+          "authenticity": 4,
+          "specificity": 5,
+          "originality": 6,
+          "craft": 7,
+          "voicePreservation": 3
+        },
+        "totalScore": 25,
+        "strengths": [
+          "Strong metaphorical language ('order conquers chaos')",
+          "Vivid imagery of holding the final piece suspended",
+          "Good sentence structure and flow",
+          "Attempts to find deeper meaning in a simple activity"
+        ],
+        "weaknesses": [
+          "Voice shift is dramatic - original was simple/direct, revision is overly literary",
+          "Language feels forced and unnatural for a teenager ('destined space,' 'conquers chaos')",
+          "The philosophical tone doesn't match the casual original voice",
+          "Still relies on a common essay trope (finding life lessons in hobbies)",
+          "The contrast setup ('While others...') feels manufactured"
+        ],
+        "wouldStandOut": false
+      }
+    ],
+    "avgScore": 23
+  },
+  "newSystem": {
+    "suggestions": [
+      {
+        "text": "I've always been drawn to the particular satisfaction of puzzles; there's something about wrestling with 1000 scattered pieces for hours, then feeling that final piece click into place—the moment when chaos suddenly becomes a complete picture.",
+        "rationale": "Uses semicolon to connect thoughts as per voice markers, adds specific sensory detail ('click'), and maintains the reflective tone while making the experience more vivid.",
+        "type": "polished_original",
+        "fingerprint_connection": "Builds on the specific number detail (1000 pieces) and the contrast between struggle and resolution that appears to be part of their thinking pattern."
+      },
+      {
+        "text": "Puzzles have held this quiet power over me since childhood; I'd spread 1000 pieces across our dining table, methodically sorting edges from centers, and hours later—sometimes days—I'd hold that final piece, knowing exactly where it belonged before I even placed it.",
+        "rationale": "Amplifies the reflective voice with 'quiet power' and adds concrete spatial details that feel personally experienced rather than generic.",
+        "type": "voice_amplifier",
+        "fingerprint_connection": "The methodical approach and specific setting details suggest someone who actually does puzzles regularly, making this feel authentically lived rather than conceptual."
+      },
+      {
+        "text": "Most people talk about puzzle satisfaction, but for me it was never about that final piece—it was about the hour before, when I'd have maybe thirty pieces left and could suddenly see how everything connected; the satisfaction had already happened.",
+        "rationale": "Subverts the expected 'final piece' narrative by locating the real satisfaction earlier in the process, creating a more sophisticated and personal insight.",
+        "type": "divergent_strategy",
+        "fingerprint_connection": "This challenges the typical puzzle metaphor while maintaining the specific numerical thinking (thirty pieces) and creates a more nuanced understanding of their actual experience."
+      }
+    ],
+    "evaluations": [
+      {
+        "scores": {
+          "authenticity": 6,
+          "specificity": 5,
+          "originality": 4,
+          "craft": 7,
+          "voicePreservation": 7
+        },
+        "totalScore": 29,
+        "strengths": [
+          "Maintains the student's original voice and perspective",
+          "Improved sentence flow and rhythm with better punctuation",
+          "The metaphor of 'chaos becoming a complete picture' adds depth",
+          "More sophisticated vocabulary while staying accessible",
+          "Preserves the specific detail of 1000-piece puzzles"
+        ],
+        "weaknesses": [
+          "Still relies on a very common essay opening (childhood hobby/interest)",
+          "The puzzle metaphor is overused in college essays",
+          "Lacks truly distinctive details that separate this from thousands of other puzzle essays",
+          "Doesn't reveal much about the student's character or growth",
+          "The improvement is mostly stylistic rather than substantive"
+        ],
+        "wouldStandOut": false
+      },
+      {
+        "scores": {
+          "authenticity": 8,
+          "specificity": 7,
+          "originality": 6,
+          "craft": 8,
+          "voicePreservation": 7
+        },
+        "totalScore": 36,
+        "strengths": [
+          "Natural, conversational tone that feels genuinely written by a teenager",
+          "Specific sensory details (spreading pieces, sorting edges from centers)",
+          "Strong craft with effective use of semicolon and em-dash",
+          "Maintains the student's original enthusiasm while elevating the language",
+          "The phrase 'quiet power' feels authentic and introspective"
+        ],
+        "weaknesses": [
+          "Still follows a fairly predictable puzzle metaphor pattern common in essays",
+          "The 'knowing where it belonged' ending veers slightly toward cliché",
+          "Could push further into what makes THIS student's relationship with puzzles unique",
+          "Doesn't fully escape the common 'hobby taught me life lessons' essay template"
+        ],
+        "wouldStandOut": false
+      },
+      {
+        "scores": {
+          "authenticity": 8,
+          "specificity": 7,
+          "originality": 9,
+          "craft": 8,
+          "voicePreservation": 6
+        },
+        "totalScore": 38,
+        "strengths": [
+          "Completely subverts the expected 'final piece satisfaction' cliche with genuine insight",
+          "The specific detail of 'thirty pieces left' feels real and lived-in",
+          "Sophisticated sentence structure that flows naturally",
+          "Shows genuine self-awareness about how their experience differs from others",
+          "The phrase 'the satisfaction had already happened' is memorable and philosophically interesting"
+        ],
+        "weaknesses": [
+          "Voice shifts from simple/direct in original to more sophisticated—may not fully preserve student's natural tone",
+          "Could be seen as slightly pretentious compared to the straightforward original",
+          "The insight, while good, might feel a bit manufactured upon close reading",
+          "Loses some of the earnest enthusiasm present in the original"
+        ],
+        "wouldStandOut": true
+      }
+    ],
+    "avgScore": 34.333333333333336
+  },
+  "fingerprint": {
+    "unusualCircumstance": "Building first computer and learning programming entirely self-directed, then creating a website that actually gained 500+ users while still in high school - suggests unusual level of independent technical achievement",
+    "unexpectedEmotion": null,
+    "contraryInsight": null,
+    "specificSensoryAnchor": "The specific satisfaction comparison between placing the last piece of a 1000-piece jigsaw and solving a complex bug - this exact parallel suggests deep personal familiarity with both experiences",
+    "uniqueRelationship": null,
+    "culturalSpecificity": "Garage as the 'pathetic environment' where childhood imagination was stored - suggests specific family/home dynamic where creative materials get relegated to storage spaces",
+    "antiPatternFlags": {
+      "followsTypicalArc": false,
+      "hasGenericInsight": false,
+      "hasManufacturedBeat": false,
+      "hasCrowdPleaser": false,
+      "warnings": []
+    },
+    "divergenceRequirements": {
+      "mustInclude": [],
+      "mustAvoid": [],
+      "uniqueAngle": "",
+      "authenticTension": ""
+    },
+    "qualityAnchors": [
+      "I realized the connection to my childhood—I was playing with Legos again.",
+      "My garage still holds those old Lego sets, but now I've found a new way to build—one that has real-world impact.",
+      "Each error message was just another puzzle piece to place."
+    ],
+    "confidenceScore": 50,
+    "extractedAt": "2025-11-23T16:53:40.861Z"
+  },
+  "winner": "NEW SYSTEM"
+}

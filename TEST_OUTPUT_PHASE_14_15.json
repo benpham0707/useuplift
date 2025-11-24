@@ -1,0 +1,177 @@
+{
+  "results": [
+    {
+      "locator": "I was always captivated by puzzles throughout my l",
+      "workshopItem": {
+        "id": "432649f1-4aa6-4f19-9918-da5b8cfb1e73",
+        "rubric_category": "opening_power_scene_entry",
+        "severity": "critical",
+        "quote": "I was always captivated by puzzles throughout my life.",
+        "problem": "Abstract opening with generic emotion",
+        "why_it_matters": "Combines passive construction ('I was captivated') with clichéd metaphor ('puzzles') and abstract timeframe ('throughout my life') that tells rather than shows the narrator's engagement.",
+        "suggestions": [
+          {
+            "text": "Every puzzle box that arrived at our house became my personal challenge to decode.",
+            "rationale": "By transforming passive reception ('was captivated') into active engagement ('became my personal challenge'), we position the narrator as the agent driving the story. This shift from telling about lifelong interest to showing immediate action creates stronger reader connection.",
+            "type": "polished_original",
+            "score_impact": "Eliminates passive voice and abstract timeframe while maintaining the puzzle theme through concrete imagery."
+          },
+          {
+            "text": "The harder the puzzle, the more my eight-year-old brain buzzed with the need to crack whatever code the designers had hidden inside those cardboard boxes.",
+            "rationale": "By amplifying the voice markers of specific age references and creative analogies ('crack whatever code'), we intensify the earnest, youthful enthusiasm while adding the slightly awkward but endearing construction that matches this writer's authentic student voice.",
+            "type": "voice_amplifier",
+            "score_impact": "Strengthens voice consistency and adds the technical metaphor ('code') that connects to the programming theme."
+          },
+          {
+            "text": "If I couldn't solve the 1000-piece jigsaw by bedtime, I'd lose my weekend Lego privileges—a consequence that made every missing piece feel like a tiny emergency.",
+            "rationale": "By introducing immediate, specific stakes (losing Lego privileges) tied to a concrete deadline (bedtime), we transform abstract interest into urgent micro-tension. This zooms in on the tiny consequence that illustrates larger passion without stating it directly.",
+            "type": "divergent_strategy",
+            "score_impact": "Creates narrative tension and shows dedication through consequences rather than declaring interest, while connecting to the Lego theme."
+          }
+        ]
+      }
+    },
+    {
+      "locator": "As I matured, I lost interest in toys, eventually ",
+      "workshopItem": {
+        "id": "50ee9728-cff7-43d7-8cbd-cb01aeea3b76",
+        "rubric_category": "narrative_arc_stakes_turn",
+        "severity": "critical",
+        "quote": "As I matured, I lost interest in toys, eventually stashing my whole realm of imagination and inventiveness in the pathetic environment of my garage.",
+        "problem": "Uses AI cliché \"realm\" and passive language",
+        "why_it_matters": "The phrase 'whole realm of imagination and inventiveness' uses abstract concepts instead of specific toys or activities. 'Pathetic environment' is editorial judgment rather than sensory detail that would let readers experience the garage.",
+        "suggestions": [
+          {
+            "text": "As I matured, I lost interest in toys, eventually stuffing my Lego sets, K'NEX wheels, and half-built robot kits into cardboard boxes that gathered dust between my father's paint cans and forgotten Christmas decorations.",
+            "rationale": "By replacing 'realm of imagination' with specific toys (Lego sets, K'NEX wheels, robot kits) and 'pathetic environment' with concrete garage details (paint cans, Christmas decorations), we create a visual scene readers can picture. This transforms abstract concepts into tangible objects that carry emotional weight.",
+            "type": "polished_original",
+            "score_impact": "Eliminates abstract language weakness while maintaining the melancholy tone through specific, relatable imagery"
+          },
+          {
+            "text": "As I matured, I lost interest in toys, eventually shoving my Lego sets, K'NEX pieces, and half-built robots into dusty cardboard boxes that lined my garage shelves.",
+            "rationale": "By replacing abstract concepts with specific objects (Lego sets, K'NEX pieces, robots) and concrete actions (shoving into dusty boxes), we create tangible images readers can visualize. This transforms vague concepts into sensory experiences.",
+            "type": "polished_original",
+            "score_impact": "Eliminates abstract language weakness by providing concrete, visual details"
+          },
+          {
+            "text": "As I grew older, my childhood fascination with building blocks faded, and I crammed my collection of Legos, circuit boards, and puzzle pieces into forgotten corners of our cluttered garage.",
+            "rationale": "By using the student's natural voice patterns (specific age references, technical terms like 'circuit boards') and flowing sentence structure, we amplify their authentic tone while maintaining their characteristic blend of technical precision and youthful reflection.",
+            "type": "voice_amplifier",
+            "score_impact": "Strengthens voice consistency and eliminates abstract language through specific technical details"
+          }
+        ]
+      }
+    },
+    {
+      "locator": "Throughout the whole process of creating this webs",
+      "workshopItem": {
+        "id": "184c3aaf-bb6c-46d3-abde-b97e18f556c8",
+        "rubric_category": "show_dont_tell_craft",
+        "severity": "warning",
+        "quote": "Throughout the whole process of creating this website, I encountered many incidences of syntax errors and code malfunctions.",
+        "problem": "Summary language, no specific moment",
+        "why_it_matters": "The phrase 'encountered many incidences of syntax errors and code malfunctions' treats coding problems like abstract statistical events rather than lived moments of frustration, discovery, or breakthrough.",
+        "suggestions": [
+          {
+            "text": "Throughout the whole process of creating this website, my screen filled with angry red error messages that made no sense—'unexpected token on line 47,' 'null reference exception'—each one sending me back to hunt through hundreds of lines of code for a missing semicolon or misplaced bracket.",
+            "rationale": "By replacing abstract 'incidences' with specific error messages and physical actions (hunting through code), we transform clinical reporting into visceral experience. Readers feel the frustration through concrete details like 'angry red' and 'hundreds of lines,' making the coding struggle tangible rather than statistical.",
+            "type": "polished_original",
+            "score_impact": "Eliminates telling language and creates sensory experience that readers can feel"
+          },
+          {
+            "text": "Throughout the whole process of creating this website, I stared at broken code until my eyes burned—lines that worked perfectly yesterday now throwing cryptic errors, forcing me to retrace every semicolon, every bracket, every variable name like a detective hunting for the one misplaced character that crashed my entire digital creation.",
+            "rationale": "By amplifying the reflective voice with extended metaphor (detective hunting) and physical sensations (burning eyes), we deepen the earnest, thoughtful tone. The flowing sentence structure with multiple clauses mirrors the audio samples while intensifying the emotional stakes of the coding experience.",
+            "type": "voice_amplifier",
+            "score_impact": "Strengthens voice authenticity and creates deeper emotional resonance"
+          },
+          {
+            "text": "Throughout the whole process of creating this website, I thought each error message was the computer rejecting my ideas—now I realize those cryptic warnings were actually the machine trying to teach me its language, one broken line at a time.",
+            "rationale": "By applying retroactive realization, we show past misunderstanding (computer rejecting ideas) versus current wisdom (machine teaching language). This technique reveals character growth while maintaining the Lego-building metaphor—both involve learning systematic construction through trial and error.",
+            "type": "divergent_strategy",
+            "score_impact": "Adds narrative depth and character development while advancing the central theme"
+          }
+        ]
+      }
+    },
+    {
+      "locator": "Although I had not possessed the best knowledge of",
+      "workshopItem": {
+        "id": "5221c6c3-231c-4e76-8ec8-46ab9e360433",
+        "rubric_category": "character_interiority_vulnerability",
+        "severity": "warning",
+        "quote": "Although I had not possessed the best knowledge of HTML yet",
+        "problem": "Awkward passive construction",
+        "why_it_matters": "The phrase 'had not possessed the best knowledge' creates a clunky, overly formal tone that distances the reader from the narrator's experience. The past perfect tense combined with 'possessed' makes a simple concept (lacking HTML skills) sound pretentious and removes agency from the learning process.",
+        "suggestions": [
+          {
+            "text": "Even though HTML still confused me",
+            "rationale": "By replacing the formal 'had not possessed the best knowledge' with direct confession 'HTML still confused me', we create authentic vulnerability that matches the voice's earnest awkwardness. This transforms distant formality into relatable student honesty.",
+            "type": "polished_original",
+            "score_impact": "Eliminates passive construction while maintaining the narrator's honest admission of skill gaps"
+          },
+          {
+            "text": "My HTML skills remained somewhere between beginner and completely hopeless",
+            "rationale": "By amplifying the voice's endearing awkwardness through self-deprecating humor ('between beginner and completely hopeless'), we dial up the authentic student perspective. This matches the voice's tendency toward creative analogies and honest self-assessment.",
+            "type": "voice_amplifier",
+            "score_impact": "Strengthens voice authenticity through characteristic self-aware humor and specific skill positioning"
+          },
+          {
+            "text": "'You're missing a closing bracket'—the error message that haunted my freshman year",
+            "rationale": "By opening with dialogue from an error message, we immediately place readers inside the coding struggle. This hook strategy transforms abstract skill admission into concrete programming reality that launches the narrative tension.",
+            "type": "divergent_strategy",
+            "score_impact": "Creates immediate engagement through specific technical dialogue while establishing the learning challenge"
+          }
+        ]
+      }
+    }
+  ],
+  "metrics": {
+    "rationale": {
+      "averageLength": 36.666666666666664,
+      "minLength": 32,
+      "maxLength": 44,
+      "hasEducationalKeywords": 12,
+      "usesIChanged": 0,
+      "usesVagueLanguage": 0
+    },
+    "suggestions": {
+      "containsBannedTerms": 0,
+      "containsPassiveVoice": 0,
+      "containsGenericDetermination": 0,
+      "averageQualityScore": 0
+    },
+    "retries": {
+      "totalAttempts": 0,
+      "successfulFirstTry": 0,
+      "requiredRetry": 0,
+      "failedAllAttempts": 0
+    }
+  },
+  "criteriaResults": [
+    {
+      "criteria": "Average rationale length >= 30 words",
+      "passed": true,
+      "value": "36.7 words"
+    },
+    {
+      "criteria": "Educational rationales >= 80%",
+      "passed": true,
+      "value": "100%"
+    },
+    {
+      "criteria": "No \"I changed\" language",
+      "passed": true,
+      "value": "0/12"
+    },
+    {
+      "criteria": "No banned terms in suggestions",
+      "passed": true,
+      "value": "0/12"
+    },
+    {
+      "criteria": "Minimal passive voice (<20%)",
+      "passed": true,
+      "value": "0%"
+    }
+  ]
+}

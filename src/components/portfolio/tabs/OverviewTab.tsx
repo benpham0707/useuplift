@@ -141,6 +141,7 @@ const OverviewContent: React.FC<{ insight: any; onNavigateToTab?: (tab: string) 
   const [spineIndex, setSpineIndex] = React.useState(0);
   const [spikeIndex, setSpikeIndex] = React.useState(0);
   const [liftIndex, setLiftIndex] = React.useState(0);
+  const [blindSpotIndex, setBlindSpotIndex] = React.useState(0);
   const [storyIndex, setStoryIndex] = React.useState(0);
 
   const { verdictOptions, storyTellingOptions } = insight;
@@ -148,6 +149,7 @@ const OverviewContent: React.FC<{ insight: any; onNavigateToTab?: (tab: string) 
   // Auto-select highest-scored options on mount
   React.useEffect(() => {
     const findHighestIndex = (options: any[]) => {
+      if (!options || options.length === 0) return 0;
       return options.reduce((maxIdx, curr, idx, arr) => 
         curr.score > arr[maxIdx].score ? idx : maxIdx, 0
       );
@@ -156,12 +158,14 @@ const OverviewContent: React.FC<{ insight: any; onNavigateToTab?: (tab: string) 
     setSpineIndex(findHighestIndex(verdictOptions.spine));
     setSpikeIndex(findHighestIndex(verdictOptions.spike));
     setLiftIndex(findHighestIndex(verdictOptions.lift));
+    setBlindSpotIndex(findHighestIndex(verdictOptions.blind_spots || []));
     setStoryIndex(findHighestIndex(storyTellingOptions));
   }, [verdictOptions, storyTellingOptions]);
 
   const currentSpine = verdictOptions.spine[spineIndex];
   const currentSpike = verdictOptions.spike[spikeIndex];
   const currentLift = verdictOptions.lift[liftIndex];
+  const currentBlindSpot = verdictOptions.blind_spots?.[blindSpotIndex];
   const currentStory = storyTellingOptions[storyIndex];
 
   // Map strategic positioning → characteristic trait tags
@@ -174,9 +178,14 @@ const OverviewContent: React.FC<{ insight: any; onNavigateToTab?: (tab: string) 
     };
     return mapping[positioning] || ['Proactive', 'Entrepreneur', 'Impact-Oriented'];
   }, []);
-  const traitTags = getTraitsForPositioning(currentStory.positioning);
+  
+  // Use tags from API if available, else fallback to static mapping
+  const traitTags = currentStory?.tags && currentStory.tags.length > 0 
+    ? currentStory.tags 
+    : getTraitsForPositioning(currentStory.positioning);
 
   const isHighestScore = (options: any[], index: number) => {
+    if (!options || options.length === 0) return false;
     return options[index].score === Math.max(...options.map(o => o.score));
   };
 
@@ -297,6 +306,45 @@ const OverviewContent: React.FC<{ insight: any; onNavigateToTab?: (tab: string) 
           </div>
         </Card>
       </div>
+
+      {/* BLIND SPOTS - Full width (Unintended Signals) */}
+      {currentBlindSpot && verdictOptions.blind_spots && (
+        <Card className="relative overflow-hidden shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-amber-500/60 border-y-0 border-r-0 bg-gradient-to-r from-amber-50/50 to-transparent">
+          <div className="p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <h3 className="text-xl md:text-2xl font-extrabold text-amber-700">Unintended Signals</h3>
+                </div>
+                <p className="text-sm text-amber-600/80">Potential blind spots in your narrative</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <ScoreIndicator 
+                  score={currentBlindSpot.score}
+                  isRecommended={isHighestScore(verdictOptions.blind_spots, blindSpotIndex)}
+                />
+                <NavigationControls
+                  current={blindSpotIndex}
+                  total={verdictOptions.blind_spots.length}
+                  onPrev={() => setBlindSpotIndex(prev => Math.max(0, prev - 1))}
+                  onNext={() => setBlindSpotIndex(prev => Math.min(verdictOptions.blind_spots!.length - 1, prev + 1))}
+                />
+              </div>
+            </div>
+            
+            <p className="text-lg leading-relaxed text-foreground/90">
+              {renderRich(currentBlindSpot.text)}
+            </p>
+
+            {currentBlindSpot.reasoning && (
+              <p className="text-sm text-muted-foreground pt-2 border-t border-amber-200/30">
+                {currentBlindSpot.reasoning}
+              </p>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* Story Coherence */}
       <Card className="shadow-sm border-0">

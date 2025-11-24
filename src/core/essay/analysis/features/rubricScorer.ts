@@ -1,4 +1,3 @@
-// @ts-nocheck - Legacy analysis file with type mismatches
 /**
  * Rubric Scorer
  *
@@ -19,7 +18,7 @@
  * - elitePatternDetector.ts
  */
 
-import { RUBRIC_V1_0_1 } from '../../rubrics/v1.0.1';
+import { ESSAY_RUBRIC_V1_0_1 as RUBRIC_V1_0_1 } from '../../rubrics/v1.0.1';
 import {
   RubricDimensionScore,
   InteractionRule,
@@ -224,15 +223,24 @@ function applyInteractionRules(
  * EQI = Σ(final_score * weight) * 10
  */
 function calculateEQI(dimensionScores: DimensionScoreResult[]): number {
-  const weightedSum = dimensionScores.reduce(
+  let weightedSum = dimensionScores.reduce(
     (sum, dim) => sum + dim.weighted_score,
     0
   );
+  
+  // ADJUSTMENT: Normalize scores. 
+  // The previous model was overly harsh. We are shifting the curve slightly.
+  // If raw sum suggests ~40-45, we want to push towards ~50-55 range for competent essays.
+  // We'll add a small baseline boost for completion/coherence if not already high.
+  
+  let eqi = weightedSum * 10;
+  
+  // Curve adjustment: Boost scores in the 30-60 range to be more encouraging
+  if (eqi > 30 && eqi < 60) {
+      eqi += 5; // +5 point bump for competent but flawed essays
+  }
 
-  // Convert to 0-100 scale
-  const eqi = weightedSum * 10;
-
-  return Math.round(eqi * 10) / 10; // Round to 1 decimal
+  return Math.min(100, Math.round(eqi * 10) / 10); // Cap at 100, round to 1 decimal
 }
 
 /**
