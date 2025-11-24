@@ -8,8 +8,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
-import { Check, Home, HelpCircle, Zap, Sparkles, GraduationCap, BookOpen } from 'lucide-react';
+import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
+import Navigation from '@/components/Navigation';
 
 const Pricing = () => {
   const { user, loading } = useAuth();
@@ -22,15 +23,12 @@ const Pricing = () => {
 
   useEffect(() => {
     if (loading) return;
-    if (!user) {
-      // Allow viewing pricing without auth, but redirect on checkout
-    }
-
+    
     const loadProfile = async () => {
       if (!user) return;
       
       // Cast result to any to handle 'credits' column
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('id, credits, subscription_status')
         .eq('user_id', user.id)
@@ -101,6 +99,8 @@ const Pricing = () => {
             if (data) {
                 setCredits(data.credits ?? 0);
                 setSubscriptionStatus(data.subscription_status);
+                // Notify other components (like Navigation) that credits have changed
+                window.dispatchEvent(new CustomEvent('credits:updated'));
             }
         });
         // Clean URL
@@ -113,26 +113,10 @@ const Pricing = () => {
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-8 font-sans">
-      <nav className="flex items-center justify-between mb-12 max-w-7xl mx-auto">
-        <Button variant="ghost" onClick={() => navigate('/')} className="flex items-center gap-2">
-          <Home className="h-4 w-4" />
-          Back to Dashboard
-        </Button>
-        {user && (
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-primary/20 bg-primary/5 text-foreground whitespace-nowrap">
-                    <GradientZap className="h-5 w-5 flex-shrink-0" />
-                    <span className="font-medium">{credits ?? 0} Credits</span>
-                </div>
-            </div>
-        )}
-        {!user && (
-            <Button onClick={() => navigate('/auth')}>Log in</Button>
-        )}
-      </nav>
-
-      <div className="max-w-7xl mx-auto space-y-16 pb-20">
+    <div className="min-h-screen bg-background font-sans">
+      <Navigation />
+      
+      <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20 space-y-16">
         <div className="text-center space-y-6">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             Invest in Your Future

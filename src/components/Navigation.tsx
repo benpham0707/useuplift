@@ -1,13 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, User, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import GradientZap from '@/components/ui/GradientZap';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
+  const [credits, setCredits] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const loadCredits = async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('credits')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      if (data) {
+        setCredits(data.credits ?? 0);
+      }
+    };
+
+    loadCredits();
+
+    // Listen for credit updates from other components (e.g., Pricing page)
+    const handleCreditUpdate = () => loadCredits();
+    window.addEventListener('credits:updated', handleCreditUpdate);
+    
+    return () => {
+      window.removeEventListener('credits:updated', handleCreditUpdate);
+    };
+  }, [user]);
 
   const handleNavigation = (path: string) => {
     if (!user) {
@@ -46,9 +75,12 @@ const Navigation = () => {
             >
               PIQ Workshop
             </button>
-            <a href="#pricing" className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium">
+            <button 
+              onClick={() => navigate('/pricing')}
+              className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
+            >
               Pricing
-            </a>
+            </button>
             <div className="text-muted-foreground cursor-not-allowed px-3 py-2 rounded-lg text-sm font-medium relative opacity-80">
               For Schools
               <span className="absolute -top-1 -right-3 px-1.5 py-0.5 bg-primary text-primary-foreground text-[10px] font-bold rounded-full transform scale-90">
@@ -63,6 +95,15 @@ const Navigation = () => {
               <div className="w-20 h-9" />
             ) : user ? (
               <div className="flex items-center space-x-2">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate('/pricing')}
+                  className="flex items-center gap-2 border-primary/20 hover:bg-primary/10 text-foreground mr-2"
+                >
+                  <GradientZap className="h-4 w-4" />
+                  <span>{credits ?? 0} Credits</span>
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -124,9 +165,12 @@ const Navigation = () => {
             >
               PIQ Workshop
             </button>
-            <a href="#pricing" className="block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium">
+            <button
+              onClick={() => { navigate('/pricing'); setIsMenuOpen(false); }}
+              className="w-full text-left block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
+            >
               Pricing
-            </a>
+            </button>
             <div className="block px-3 py-2 text-muted-foreground cursor-not-allowed rounded-lg text-sm font-medium">
               For Schools <span className="ml-2 text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">SOON</span>
             </div>
@@ -135,6 +179,13 @@ const Navigation = () => {
                 <div className="w-full h-9" />
               ) : user ? (
                 <div className="space-y-2">
+                  <div className="flex items-center justify-between px-3 py-2 mb-2 bg-primary/5 rounded-lg border border-primary/10">
+                     <div className="flex items-center gap-2">
+                        <GradientZap className="h-4 w-4" />
+                        <span className="text-sm font-medium text-foreground">{credits ?? 0} Credits</span>
+                     </div>
+                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { navigate('/pricing'); setIsMenuOpen(false); }}>Top Up</Button>
+                  </div>
                   <Button variant="ghost" className="w-full justify-start" asChild>
                     <Link to="/portfolio-scanner">Dashboard</Link>
                   </Button>
