@@ -463,36 +463,120 @@ export default function PIQWorkshop() {
   const [showAllStrong, setShowAllStrong] = React.useState(false);
   const [showAllNeedsWork, setShowAllNeedsWork] = React.useState(false);
 
-  // Generate overview paragraph
-  const getOverviewParagraph = (dims: RubricDimension[], score: number): string => {
+  // Generate detailed overview analysis with multiple key points
+  interface DetailedOverview {
+    currentStanding: string;
+    strengths: Array<{ name: string; score: string; insight: string }>;
+    priorityAreas: string;
+    strategicRoadmap: string;
+    patternAnalysis?: string;
+    nextSteps: string;
+    potentialGain: number;
+  }
+
+  const getDetailedOverview = (dims: RubricDimension[], score: number): DetailedOverview => {
     const critical = dims.filter(d => d.status === 'critical');
     const needsWork = dims.filter(d => d.status === 'needs_work');
-    const good = dims.filter(d => d.status === 'good');
+    const good = dims.filter(d => d.status === 'good').sort((a, b) => b.score - a.score);
     
-    let overview = `Your narrative scores ${score}/100, placing it in the ${
-      score >= 85 ? 'elite tier' : score >= 70 ? 'competitive range' : 'developing stage'
-    }. `;
+    // Current Standing Analysis
+    const tier = score >= 85 ? 'elite tier' : score >= 70 ? 'competitive range' : score >= 55 ? 'developing stage' : 'needs significant work';
+    const tierContext = score >= 85 
+      ? 'Your essay demonstrates exceptional narrative quality that stands out in admissions review.'
+      : score >= 70 
+      ? 'Your essay shows solid fundamentals but needs polish to reach the elite tier that commands admissions attention.'
+      : score >= 55
+      ? 'Your essay has a foundation to build on but requires significant revision to reach competitive quality.'
+      : 'Your essay needs substantial work across multiple dimensions to meet baseline admissions standards.';
     
+    const currentStanding = `Your narrative scores ${score}/100, placing it in the ${tier}. ${tierContext}`;
+    
+    // Strengths Analysis - Top 2-3 dimensions
+    const strengths = good.slice(0, 3).map(dim => ({
+      name: dim.name,
+      score: `${dim.score}/${dim.maxScore}`,
+      insight: dim.overview
+    }));
+    
+    // Priority Areas - Focus on critical first, then needs work
+    let priorityAreas = '';
     if (critical.length > 0) {
-      overview += `${critical.length} critical ${critical.length === 1 ? 'dimension requires' : 'dimensions require'} immediate attention to meet baseline standards. `;
-    }
-    
-    if (needsWork.length > 0) {
-      overview += `${needsWork.length} ${needsWork.length === 1 ? 'area needs' : 'areas need'} strengthening to reach competitive quality. `;
-    }
-    
-    if (good.length > 0) {
-      overview += `${good.length} ${good.length === 1 ? 'dimension is' : 'dimensions are'} performing well and demonstrate strong narrative foundations. `;
-    }
-    
-    const totalIssues = dims.reduce((sum, d) => sum + d.issues.length, 0);
-    if (totalIssues > 0) {
-      overview += `Focus on resolving the ${totalIssues} flagged ${totalIssues === 1 ? 'issue' : 'issues'} to improve your overall score.`;
+      const criticalNames = critical.map(d => d.name).join(', ');
+      const firstCriticalIssue = critical[0].issues[0];
+      priorityAreas = `Critical priority: ${criticalNames} ${critical.length === 1 ? 'requires' : 'require'} immediate attention. ${firstCriticalIssue ? firstCriticalIssue.title + '.' : 'Address flagged issues to meet baseline standards.'}`;
+    } else if (needsWork.length > 0) {
+      const needsWorkNames = needsWork.map(d => d.name).join(', ');
+      const weakestDim = [...needsWork].sort((a, b) => a.score - b.score)[0];
+      priorityAreas = `To reach ${score >= 70 ? 'excellence' : 'competitive quality'}, focus on: ${needsWorkNames}. Start with ${weakestDim.name} (${weakestDim.score}/${weakestDim.maxScore})`;
+      if (weakestDim.issues[0]) {
+        priorityAreas += ` - ${weakestDim.issues[0].title}`;
+      }
+      priorityAreas += '.';
     } else {
-      overview += `Your essay demonstrates consistent quality across all dimensions.`;
+      priorityAreas = 'Your essay demonstrates strong quality across all dimensions. Focus on the detailed feedback to reach excellence.';
     }
     
-    return overview;
+    // Calculate Potential Gain
+    const currentIssueCount = dims.reduce((sum, d) => sum + d.issues.length, 0);
+    const weightedPotential = [...critical, ...needsWork].reduce((sum, dim) => {
+      const maxGain = dim.maxScore - dim.score;
+      return sum + (maxGain * (dim.weight / 100));
+    }, 0);
+    const potentialGain = Math.round(weightedPotential * 0.7); // Realistic 70% of theoretical max
+    
+    // Strategic Roadmap
+    let strategicRoadmap = '';
+    if (critical.length > 0) {
+      strategicRoadmap = `Start by addressing all ${critical.length} critical ${critical.length === 1 ? 'dimension' : 'dimensions'} - these are foundational gaps that limit your entire narrative. Then move to the ${needsWork.length} areas needing refinement. Expect 3-4 revision cycles to reach competitive quality.`;
+    } else if (needsWork.length > 0) {
+      const sortedByWeight = [...needsWork].sort((a, b) => b.weight - a.weight);
+      strategicRoadmap = `Focus on ${sortedByWeight[0].name} first - it carries the highest weight (${sortedByWeight[0].weight}%) and offers the fastest score improvement. Then address ${sortedByWeight.slice(1).map(d => d.name).join(', ')}. With focused revision, you could reach ${score + potentialGain}+ within 2-3 editing cycles.`;
+    } else {
+      strategicRoadmap = 'Your essay is performing well across all dimensions. Polish the detailed feedback points to maximize impact. Consider deepening emotional resonance and specificity even in strong areas.';
+    }
+    
+    // Pattern Analysis - Detect recurring issues
+    const allIssues = dims.flatMap(d => d.issues);
+    let patternAnalysis: string | undefined = undefined;
+    
+    if (allIssues.length >= 3) {
+      // Check for common themes in issue titles
+      const titleWords = allIssues.flatMap(i => i.title.toLowerCase().split(/\s+/));
+      const wordFrequency: Record<string, number> = {};
+      titleWords.forEach(word => {
+        if (word.length > 5 && !['missing', 'lacking', 'needs', 'limited'].includes(word)) {
+          wordFrequency[word] = (wordFrequency[word] || 0) + 1;
+        }
+      });
+      
+      const frequentWords = Object.entries(wordFrequency)
+        .filter(([_, count]) => count >= 2)
+        .sort((a, b) => b[1] - a[1]);
+      
+      if (frequentWords.length > 0) {
+        const [commonWord, count] = frequentWords[0];
+        patternAnalysis = `Pattern detected: Multiple dimensions (${count}+) show issues related to "${commonWord}". This suggests a systematic area for improvement across your narrative.`;
+      } else if (allIssues.filter(i => i.title.toLowerCase().includes('specific')).length >= 2) {
+        patternAnalysis = 'Pattern detected: Several dimensions need more concrete specificity. Move from general statements to precise details, names, numbers, and sensory descriptions.';
+      } else if (allIssues.filter(i => i.title.toLowerCase().includes('emotion') || i.title.toLowerCase().includes('vulnerability')).length >= 2) {
+        patternAnalysis = 'Pattern detected: Multiple areas need deeper emotional engagement. Show internal reactions, vulnerabilities, and authentic feelings rather than just describing events.';
+      }
+    }
+    
+    // Next Steps
+    const nextSteps = currentIssueCount > 0
+      ? `Start with the ${critical.length > 0 ? 'Critical Issues' : 'Needs Work'} sections below. Click on any dimension card to see detailed feedback and apply AI-suggested revisions. Save frequently and re-analyze to track your progress.`
+      : 'Your essay is in excellent shape. Review the detailed dimension feedback to refine further, and consider the AI chat for personalized coaching on taking it from great to unforgettable.';
+    
+    return {
+      currentStanding,
+      strengths,
+      priorityAreas,
+      strategicRoadmap,
+      patternAnalysis,
+      nextSteps,
+      potentialGain
+    };
   };
 
   // Get actionable insights from actual dimension data
@@ -582,18 +666,18 @@ export default function PIQWorkshop() {
               {/* Header with Score & Actions */}
               <div className="flex items-start justify-between mb-4 pb-4 border-b">
                 {/* Left: Title + Icon */}
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center">
-                    <PenTool className="w-5 h-5 text-primary-foreground" />
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-lg bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg">
+                    <PenTool className="w-7 h-7 text-primary-foreground" />
                   </div>
                   <div>
                     <GradientText
-                      className="text-base font-extrabold uppercase tracking-wide"
+                      className="text-2xl font-extrabold uppercase tracking-wide"
                       colors={["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#a855f7"]}
                     >
                       Narrative Quality Index
                     </GradientText>
-                    <p className="text-xs text-muted-foreground">{dimensions.length}-dimension analysis</p>
+                    <p className="text-sm text-muted-foreground font-medium">{dimensions.length}-dimension analysis</p>
                   </div>
                 </div>
                 
@@ -808,12 +892,111 @@ export default function PIQWorkshop() {
                 </div>
               </div>
 
-              {/* Overview Section */}
-              <div className="pt-4 border-t mt-4">
-                <h3 className="text-sm font-bold text-foreground mb-2 uppercase tracking-wider">Overview</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  {getOverviewParagraph(dimensions, currentScore)}
-                </p>
+              {/* Comprehensive Overview Section */}
+              <div className="pt-6 mt-6 border-t">
+                {(() => {
+                  const overview = getDetailedOverview(dimensions, currentScore);
+                  return (
+                    <div className="space-y-4">
+                      {/* Header */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30 flex items-center justify-center">
+                          <Info className="w-5 h-5 text-primary" />
+                        </div>
+                        <h3 className="text-xl font-bold text-foreground">Essay Analysis Overview</h3>
+                      </div>
+
+                      {/* Current Standing */}
+                      <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg p-4 border border-primary/10">
+                        <div className="flex items-start gap-2">
+                          <Target className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                          <div>
+                            <h4 className="font-semibold text-foreground mb-1">Current Standing</h4>
+                            <p className="text-sm leading-relaxed text-muted-foreground">
+                              {overview.currentStanding}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Strengths */}
+                      {overview.strengths.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <CheckCircle className="w-4 h-4 text-emerald-600" />
+                            <h4 className="font-semibold text-foreground">Your Strengths</h4>
+                          </div>
+                          <ul className="space-y-2 ml-6">
+                            {overview.strengths.map((strength, idx) => (
+                              <li key={idx} className="text-sm text-muted-foreground">
+                                <span className="font-medium text-foreground">{strength.name}</span> ({strength.score}) - {strength.insight}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {/* Priority Areas */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-600" />
+                          <h4 className="font-semibold text-foreground">Priority Areas for Improvement</h4>
+                        </div>
+                        <p className="text-sm leading-relaxed text-muted-foreground ml-6">
+                          {overview.priorityAreas}
+                          {overview.potentialGain > 0 && (
+                            <span className="inline-block ml-2 px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
+                              Potential: +{overview.potentialGain} points
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Strategic Roadmap */}
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <TrendingUp className="w-4 h-4 text-blue-600" />
+                          <h4 className="font-semibold text-foreground">Strategic Roadmap</h4>
+                        </div>
+                        <p className="text-sm leading-relaxed text-muted-foreground ml-6">
+                          {overview.strategicRoadmap}
+                        </p>
+                      </div>
+
+                      {/* Pattern Analysis (if detected) */}
+                      {overview.patternAnalysis && (
+                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900 rounded-lg p-3">
+                          <div className="flex items-start gap-2">
+                            <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                              <span className="text-xs font-bold text-amber-700 dark:text-amber-400">!</span>
+                            </div>
+                            <div>
+                              <h4 className="font-semibold text-amber-800 dark:text-amber-300 text-sm mb-1">Pattern Detected</h4>
+                              <p className="text-sm text-amber-700 dark:text-amber-400">
+                                {overview.patternAnalysis}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Next Steps */}
+                      <div className="bg-gradient-to-r from-primary/10 to-accent/10 rounded-lg p-4 border border-primary/20">
+                        <div className="flex items-start gap-2">
+                          <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span className="text-xs font-bold text-primary">→</span>
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-foreground mb-1">Next Steps</h4>
+                            <p className="text-sm leading-relaxed text-muted-foreground">
+                              {overview.nextSteps}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </Card>
           </div>
