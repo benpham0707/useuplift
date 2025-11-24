@@ -428,6 +428,13 @@ export default function PIQWorkshop() {
     return { label: 'Critical Issues', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-950/30', border: 'border-red-300 dark:border-red-800' };
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return 'text-emerald-600 dark:text-emerald-400';
+    if (score >= 70) return 'text-blue-600 dark:text-blue-400';
+    if (score >= 55) return 'text-amber-600 dark:text-amber-400';
+    return 'text-red-600 dark:text-red-400';
+  };
+
   const nqiConfig = getNQIConfig();
   const scoreDelta = currentScore - initialScore;
 
@@ -466,7 +473,7 @@ export default function PIQWorkshop() {
                 <div>
                   <div className="text-sm text-muted-foreground mb-1">Narrative Quality Index</div>
                   <div className="flex items-baseline gap-3">
-                    <div className="text-5xl font-bold text-primary">{currentScore}</div>
+                    <div className={`text-5xl font-bold ${getScoreColor(currentScore)}`}>{currentScore}</div>
                     <div className="text-lg text-muted-foreground">/100</div>
                   </div>
                 </div>
@@ -496,32 +503,36 @@ export default function PIQWorkshop() {
                   <div className="text-xs text-muted-foreground">Critical</div>
                 </div>
               </div>
-            </Card>
 
-            {/* Action buttons */}
-            <div className="flex flex-col gap-3">
-              <Button 
-                onClick={handleRequestReanalysis}
-                disabled={!needsReanalysis || isAnalyzing}
-                className="gap-2"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCcw className="w-4 h-4" />
-                    {needsReanalysis ? 'Re-analyze Draft' : 'Up to date'}
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" onClick={() => setShowVersionHistory(true)} className="gap-2">
-                <History className="w-4 h-4" />
-                View History
-              </Button>
-            </div>
+              {/* Action buttons footer */}
+              <div className="flex gap-3 mt-6 pt-4 border-t">
+                <Button 
+                  onClick={handleRequestReanalysis}
+                  disabled={!needsReanalysis || isAnalyzing}
+                  className="flex-1 gap-2"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCcw className="w-4 h-4" />
+                      {needsReanalysis ? 'Re-analyze Draft' : 'Up to date'}
+                    </>
+                  )}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowVersionHistory(true)} 
+                  className="flex-1 gap-2"
+                >
+                  <History className="w-4 h-4" />
+                  View History
+                </Button>
+              </div>
+            </Card>
           </div>
         </div>
 
