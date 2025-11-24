@@ -48,7 +48,7 @@ export function PortfolioProgressStanding({ data }: PortfolioProgressStandingPro
   }
 
   return (
-    <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5 overflow-hidden">
+    <Card className="bg-background/70 backdrop-blur-xl border-2 shadow-lg overflow-hidden">
       <CardContent className="p-6">
         {/* Collapsed View */}
         <div className="space-y-6">
