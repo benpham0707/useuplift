@@ -426,7 +426,7 @@ export default function PIQWorkshop() {
   const getNQIConfig = () => {
     const nqi = currentScore;
     if (nqi >= 85) return { label: 'Outstanding', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-950/30', border: 'border-green-300 dark:border-green-800' };
-    if (nqi >= 70) return { label: 'Solid, Needs Polish', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-950/30', border: 'border-blue-300 dark:border-blue-800' };
+    if (nqi >= 70) return { label: 'Competitive', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-950/30', border: 'border-blue-300 dark:border-blue-800' };
     if (nqi >= 55) return { label: 'Needs Significant Work', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-950/30', border: 'border-amber-300 dark:border-amber-800' };
     return { label: 'Critical Issues', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-950/30', border: 'border-red-300 dark:border-red-800' };
   };
@@ -684,21 +684,6 @@ export default function PIQWorkshop() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 justify-end mt-2">
-                    <Button
-                      onClick={handleRequestReanalysis}
-                      disabled={!needsReanalysis || isAnalyzing}
-                      variant={needsReanalysis ? "default" : "secondary"}
-                      size="sm"
-                      className="h-7 text-xs"
-                    >
-                      {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCcw className="w-3 h-3 mr-1" />}
-                      {needsReanalysis ? 'Re-analyze' : 'Updated'}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)} className="h-7 text-xs">
-                      <History className="w-3 h-3 mr-1" /> History
-                    </Button>
-                  </div>
                 </div>
               </div>
 
@@ -709,6 +694,21 @@ export default function PIQWorkshop() {
                   <span className="font-semibold">{fixedIssues}/{totalIssues} ({Math.round(progressPercent)}%)</span>
                 </div>
                 <Progress value={progressPercent} className="h-2" />
+                <div className="flex items-center gap-1.5 justify-end mt-2">
+                  <Button
+                    onClick={handleRequestReanalysis}
+                    disabled={!needsReanalysis || isAnalyzing}
+                    variant={needsReanalysis ? "default" : "secondary"}
+                    size="sm"
+                    className="h-7 text-xs"
+                  >
+                    {isAnalyzing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <RefreshCcw className="w-3 h-3 mr-1" />}
+                    {needsReanalysis ? 'Re-analyze' : 'Updated'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowVersionHistory(true)} className="h-7 text-xs">
+                    <History className="w-3 h-3 mr-1" /> History
+                  </Button>
+                </div>
               </div>
 
               {/* Compact Category Quick Links */}
