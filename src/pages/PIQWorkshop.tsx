@@ -842,10 +842,10 @@ export default function PIQWorkshop() {
                     </div>
                     <div>
                       <h3 className="text-base font-semibold text-primary/70">Essay Overview</h3>
-                      <p className="text-xs text-primary/50">Analysis summary</p>
+                      <p className="text-xs text-muted-foreground">Analysis summary</p>
                     </div>
                   </div>
-                  <p className="text-sm leading-relaxed text-primary/60">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
                     {getDetailedOverview(dimensions, currentScore)}
                   </p>
                 </div>
