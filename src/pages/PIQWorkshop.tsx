@@ -688,7 +688,7 @@ export default function PIQWorkshop() {
               </div>
 
               {/* Progress Bar */}
-              <div className="mb-4 pb-4 border-b">
+              <div className="mb-4 pb-4">
                 <div className="flex items-center justify-between text-sm mb-2">
                   <span className="text-muted-foreground font-medium">Issues Resolved</span>
                   <span className="font-semibold">{fixedIssues}/{totalIssues} ({Math.round(progressPercent)}%)</span>
