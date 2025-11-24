@@ -53,61 +53,6 @@ export function PortfolioProgressStanding({ data }: PortfolioProgressStandingPro
         {/* Collapsed View */}
         <div className="space-y-6">
           {/* Visual Gauge */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6 }}
-            className="text-center"
-          >
-            {/* Circular Progress Ring */}
-            <div className="relative inline-flex items-center justify-center w-48 h-48 mb-4">
-              {/* Background ring */}
-              <svg className="absolute inset-0 w-full h-full -rotate-90">
-                <circle
-                  cx="96"
-                  cy="96"
-                  r="88"
-                  stroke="hsl(var(--muted))"
-                  strokeWidth="8"
-                  fill="none"
-                />
-                {/* Progress ring with gradient */}
-                <defs>
-                  <linearGradient id="progress-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="hsl(var(--primary))" />
-                    <stop offset="50%" stopColor="hsl(var(--secondary))" />
-                    <stop offset="100%" stopColor="hsl(var(--accent))" />
-                  </linearGradient>
-                </defs>
-                <motion.circle
-                  cx="96"
-                  cy="96"
-                  r="88"
-                  stroke="url(#progress-gradient)"
-                  strokeWidth="8"
-                  fill="none"
-                  strokeLinecap="round"
-                  initial={{ strokeDasharray: "0 552.9" }}
-                  animate={{ strokeDasharray: `${(current.score / 100) * 552.9} 552.9` }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
-                  style={{ filter: "drop-shadow(0 0 8px hsl(var(--primary) / 0.4))" }}
-                />
-              </svg>
-
-              {/* Score in center */}
-              <div className="relative z-10">
-                <div className="text-6xl font-extrabold bg-gradient-to-br from-primary via-secondary to-accent bg-clip-text text-transparent">
-                  {current.score}
-                </div>
-                <div className="text-sm text-muted-foreground mt-1">Portfolio Score</div>
-              </div>
-            </div>
-
-            {/* Tier Badge */}
-            <Badge variant="secondary" className="text-base px-4 py-1.5">
-              {current.tier}
-            </Badge>
-          </motion.div>
 
           {/* Interactive Progress Bar */}
           <InteractiveProgressBar 
