@@ -1,42 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Menu, X, User, LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import GradientZap from '@/components/ui/GradientZap';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
-  const [credits, setCredits] = useState<number | null>(null);
-
-  useEffect(() => {
-    if (!user) return;
-    
-    const loadCredits = async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('credits')
-        .eq('user_id', user.id)
-        .maybeSingle();
-      
-      if (data) {
-        setCredits(data.credits ?? 0);
-      }
-    };
-
-    loadCredits();
-
-    // Listen for credit updates from other components (e.g., Pricing page)
-    const handleCreditUpdate = () => loadCredits();
-    window.addEventListener('credits:updated', handleCreditUpdate);
-    
-    return () => {
-      window.removeEventListener('credits:updated', handleCreditUpdate);
-    };
-  }, [user]);
 
   const handleNavigation = (path: string) => {
     if (!user) {
@@ -95,15 +66,6 @@ const Navigation = () => {
               <div className="w-20 h-9" />
             ) : user ? (
               <div className="flex items-center space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => navigate('/pricing')}
-                  className="flex items-center gap-2 border-primary/20 hover:bg-primary/10 text-foreground mr-2"
-                >
-                  <GradientZap className="h-4 w-4" />
-                  <span>{credits ?? 0} Credits</span>
-                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -179,13 +141,6 @@ const Navigation = () => {
                 <div className="w-full h-9" />
               ) : user ? (
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between px-3 py-2 mb-2 bg-primary/5 rounded-lg border border-primary/10">
-                     <div className="flex items-center gap-2">
-                        <GradientZap className="h-4 w-4" />
-                        <span className="text-sm font-medium text-foreground">{credits ?? 0} Credits</span>
-                     </div>
-                     <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { navigate('/pricing'); setIsMenuOpen(false); }}>Top Up</Button>
-                  </div>
                   <Button variant="ghost" className="w-full justify-start" asChild>
                     <Link to="/portfolio-scanner">Dashboard</Link>
                   </Button>
