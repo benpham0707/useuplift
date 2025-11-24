@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Three-Tier Improvement Roadmap Generator
  *

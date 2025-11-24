@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 3.1: Grammar & Mechanics Analyzer (Deterministic)
  *

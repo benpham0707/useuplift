@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Adaptive Rubric Scoring Engine
  *

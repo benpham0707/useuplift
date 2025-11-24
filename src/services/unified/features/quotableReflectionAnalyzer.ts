@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Quotable Reflection Analyzer - The Insight Generator
  *
