@@ -819,7 +819,7 @@ export default function PIQWorkshop() {
               </div>
 
               {/* Essay Overview Section */}
-              <div className="mt-6 pt-4">
+              <div className="mt-3 pt-3">
                 <div className="bg-background/50 rounded-lg p-4 border border-border/50">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
