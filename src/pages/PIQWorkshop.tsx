@@ -833,19 +833,19 @@ export default function PIQWorkshop() {
                 </TooltipProvider>
               </div>
 
-              {/* Prominent Essay Overview Section */}
-              <div className="mt-6 pt-6 border-t-2 border-primary/20">
-                <div className="bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5 rounded-xl p-6 border-2 border-primary/20 shadow-sm">
-                  <div className="flex items-center gap-3 mb-5">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg">
-                      <Info className="w-6 h-6 text-primary-foreground" />
+              {/* Essay Overview Section */}
+              <div className="mt-6 pt-4">
+                <div className="bg-background/50 rounded-lg p-4 border border-border/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                      <Info className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
-                      <h3 className="text-2xl font-bold text-foreground">Essay Analysis Overview</h3>
-                      <p className="text-sm text-muted-foreground">Comprehensive quality assessment</p>
+                      <h3 className="text-base font-semibold text-foreground">Essay Overview</h3>
+                      <p className="text-xs text-muted-foreground">Analysis summary</p>
                     </div>
                   </div>
-                  <p className="text-lg leading-relaxed text-foreground font-medium">
+                  <p className="text-sm leading-relaxed text-muted-foreground">
                     {getDetailedOverview(dimensions, currentScore)}
                   </p>
                 </div>
