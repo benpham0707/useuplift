@@ -434,7 +434,7 @@ export default function PIQWorkshop() {
   const getScoreColor = (score: number) => {
     if (score >= 90) return { gradient: true, colors: ['hsl(250 70% 60%)', 'hsl(185 80% 55%)', 'hsl(280 90% 65%)', 'hsl(250 70% 60%)'] };
     if (score >= 85) return { gradient: false, className: 'text-emerald-600 dark:text-emerald-400' };
-    if (score >= 70) return { gradient: false, className: 'text-blue-600 dark:text-blue-400' };
+    if (score >= 70) return { gradient: true, colors: ['hsl(217 91% 60%)', 'hsl(262 83% 58%)', 'hsl(217 91% 65%)', 'hsl(262 83% 58%)'] };
     if (score >= 55) return { gradient: false, className: 'text-amber-600 dark:text-amber-400' };
     return { gradient: false, className: 'text-red-600 dark:text-red-400' };
   };
