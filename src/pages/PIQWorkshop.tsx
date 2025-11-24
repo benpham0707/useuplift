@@ -463,6 +463,38 @@ export default function PIQWorkshop() {
   const [showAllStrong, setShowAllStrong] = React.useState(false);
   const [showAllNeedsWork, setShowAllNeedsWork] = React.useState(false);
 
+  // Generate overview paragraph
+  const getOverviewParagraph = (dims: RubricDimension[], score: number): string => {
+    const critical = dims.filter(d => d.status === 'critical');
+    const needsWork = dims.filter(d => d.status === 'needs_work');
+    const good = dims.filter(d => d.status === 'good');
+    
+    let overview = `Your narrative scores ${score}/100, placing it in the ${
+      score >= 85 ? 'elite tier' : score >= 70 ? 'competitive range' : 'developing stage'
+    }. `;
+    
+    if (critical.length > 0) {
+      overview += `${critical.length} critical ${critical.length === 1 ? 'dimension requires' : 'dimensions require'} immediate attention to meet baseline standards. `;
+    }
+    
+    if (needsWork.length > 0) {
+      overview += `${needsWork.length} ${needsWork.length === 1 ? 'area needs' : 'areas need'} strengthening to reach competitive quality. `;
+    }
+    
+    if (good.length > 0) {
+      overview += `${good.length} ${good.length === 1 ? 'dimension is' : 'dimensions are'} performing well and demonstrate strong narrative foundations. `;
+    }
+    
+    const totalIssues = dims.reduce((sum, d) => sum + d.issues.length, 0);
+    if (totalIssues > 0) {
+      overview += `Focus on resolving the ${totalIssues} flagged ${totalIssues === 1 ? 'issue' : 'issues'} to improve your overall score.`;
+    } else {
+      overview += `Your essay demonstrates consistent quality across all dimensions.`;
+    }
+    
+    return overview;
+  };
+
   // Get actionable insights from actual dimension data
   const getActionableInsights = (dimensions: RubricDimension[], score: number): string => {
     // Find strongest dimension
@@ -633,35 +665,39 @@ export default function PIQWorkshop() {
                       </div>
                     </div>
                     {criticalDimensions.length > 0 ? (
-                      <div className="space-y-2">
-                        {criticalDimensions.map(dim => (
-                          <button
-                            key={dim.id}
-                            onClick={() => scrollToDimension(dim.id)}
-                            className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-red-950/40 hover:bg-white dark:hover:bg-red-950/60 transition-all border border-red-200 dark:border-red-800/50 shadow-sm hover:shadow group"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                                  {dim.name}
-                                </div>
-                                {dim.issues[0] && (
-                                  <div className="text-xs text-muted-foreground line-clamp-2">
-                                    {dim.issues[0].problem}
+                      <div className="flex flex-wrap gap-2">
+                        <TooltipProvider>
+                          {criticalDimensions.map(dim => (
+                            <Tooltip key={dim.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => scrollToDimension(dim.id)}
+                                  className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-red-950/40 hover:bg-white dark:hover:bg-red-950/60 transition-all border border-red-200 dark:border-red-800/50 shadow-sm hover:shadow group"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                                      {dim.name}
+                                    </span>
+                                    <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                                      {dim.score}/{dim.maxScore}
+                                    </span>
                                   </div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-xs font-bold text-red-600 dark:text-red-400">
-                                  {dim.score}/{dim.maxScore}
-                                </span>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium">
-                                  {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-xs">{dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''} found:</p>
+                                  {dim.issues.slice(0, 2).map((issue, idx) => (
+                                    <p key={idx} className="text-xs text-muted-foreground">• {issue.problem}</p>
+                                  ))}
+                                  {dim.issues.length > 2 && (
+                                    <p className="text-xs text-muted-foreground italic">+{dim.issues.length - 2} more...</p>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                        </TooltipProvider>
                       </div>
                     ) : (
                       <div className="text-center py-4">
@@ -683,43 +719,39 @@ export default function PIQWorkshop() {
                       </div>
                     </div>
                     {needsWorkDimensions.length > 0 ? (
-                      <div className="space-y-2">
-                        {needsWorkDimensions.slice(0, showAllNeedsWork ? undefined : 3).map(dim => (
-                          <button
-                            key={dim.id}
-                            onClick={() => scrollToDimension(dim.id)}
-                            className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-amber-950/40 hover:bg-white dark:hover:bg-amber-950/60 transition-all border border-amber-200 dark:border-amber-800/50 shadow-sm hover:shadow group"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                                  {dim.name}
-                                </div>
-                                {dim.issues[0] && (
-                                  <div className="text-xs text-muted-foreground line-clamp-2">
-                                    {dim.issues[0].problem}
+                      <div className="flex flex-wrap gap-2">
+                        <TooltipProvider>
+                          {needsWorkDimensions.map(dim => (
+                            <Tooltip key={dim.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => scrollToDimension(dim.id)}
+                                  className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-amber-950/40 hover:bg-white dark:hover:bg-amber-950/60 transition-all border border-amber-200 dark:border-amber-800/50 shadow-sm hover:shadow group"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                      {dim.name}
+                                    </span>
+                                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                                      {dim.score}/{dim.maxScore}
+                                    </span>
                                   </div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                  {dim.score}/{dim.maxScore}
-                                </span>
-                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">
-                                  {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                        {needsWorkDimensions.length > 3 && (
-                          <button
-                            onClick={() => setShowAllNeedsWork(!showAllNeedsWork)}
-                            className="w-full text-xs text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 font-medium py-2 hover:underline"
-                          >
-                            {showAllNeedsWork ? '↑ Show less' : `↓ Show ${needsWorkDimensions.length - 3} more`}
-                          </button>
-                        )}
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-xs">{dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''} found:</p>
+                                  {dim.issues.slice(0, 2).map((issue, idx) => (
+                                    <p key={idx} className="text-xs text-muted-foreground">• {issue.problem}</p>
+                                  ))}
+                                  {dim.issues.length > 2 && (
+                                    <p className="text-xs text-muted-foreground italic">+{dim.issues.length - 2} more...</p>
+                                  )}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                        </TooltipProvider>
                       </div>
                     ) : (
                       <div className="text-center py-4">
@@ -741,36 +773,31 @@ export default function PIQWorkshop() {
                       </div>
                     </div>
                     {goodDimensions.length > 0 ? (
-                      <div className="space-y-2">
-                        {goodDimensions.slice(0, showAllStrong ? undefined : 3).map(dim => (
-                          <button
-                            key={dim.id}
-                            onClick={() => scrollToDimension(dim.id)}
-                            className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-emerald-950/40 hover:bg-white dark:hover:bg-emerald-950/60 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow group"
-                          >
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                  {dim.name}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  Performing well
-                                </div>
-                              </div>
-                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                                {dim.score}/{dim.maxScore}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                        {goodDimensions.length > 3 && (
-                          <button
-                            onClick={() => setShowAllStrong(!showAllStrong)}
-                            className="w-full text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-medium py-2 hover:underline"
-                          >
-                            {showAllStrong ? '↑ Show less' : `↓ Show ${goodDimensions.length - 3} more`}
-                          </button>
-                        )}
+                      <div className="flex flex-wrap gap-2">
+                        <TooltipProvider>
+                          {goodDimensions.map(dim => (
+                            <Tooltip key={dim.id}>
+                              <TooltipTrigger asChild>
+                                <button
+                                  onClick={() => scrollToDimension(dim.id)}
+                                  className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-emerald-950/40 hover:bg-white dark:hover:bg-emerald-950/60 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow group"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-medium text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                      {dim.name}
+                                    </span>
+                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                      {dim.score}/{dim.maxScore}
+                                    </span>
+                                  </div>
+                                </button>
+                              </TooltipTrigger>
+                              <TooltipContent side="bottom" className="max-w-xs">
+                                <p className="text-xs">{dim.overview}</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          ))}
+                        </TooltipProvider>
                       </div>
                     ) : (
                       <div className="text-center py-4">
@@ -781,17 +808,12 @@ export default function PIQWorkshop() {
                 </div>
               </div>
 
-              {/* Actionable Insights */}
-              <div className="pt-3 border-t">
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/50 dark:border-blue-800/30 rounded-lg p-4">
-                  <div className="flex items-start gap-2">
-                    <Info className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm leading-relaxed text-foreground/90">
-                      <span className="font-semibold text-blue-600 dark:text-blue-400">Top Insights: </span>
-                      {getActionableInsights(dimensions, currentScore)}
-                    </div>
-                  </div>
-                </div>
+              {/* Overview Section */}
+              <div className="pt-4 border-t mt-4">
+                <h3 className="text-sm font-bold text-foreground mb-2 uppercase tracking-wider">Overview</h3>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  {getOverviewParagraph(dimensions, currentScore)}
+                </p>
               </div>
             </Card>
           </div>
