@@ -458,6 +458,68 @@ export default function PIQWorkshop() {
     }
   };
 
+  // Get holistic overview text based on current state
+  const getHolisticOverview = (
+    score: number,
+    needsWork: number,
+    critical: number,
+    dimensions: RubricDimension[]
+  ): string => {
+    const strongest = dimensions
+      .filter(d => d.status === 'good')
+      .sort((a, b) => b.score - a.score)[0];
+    
+    const weakest = [...needsWorkDimensions, ...criticalDimensions]
+      .sort((a, b) => a.score - b.score)[0];
+    
+    let opening = '';
+    if (score >= 85) opening = 'Your essay demonstrates exceptional narrative quality with strong coherence across dimensions.';
+    else if (score >= 70) opening = 'Your essay shows solid narrative coherence with good technical execution.';
+    else if (score >= 55) opening = 'Your essay has a foundation to build on, but several dimensions need strengthening.';
+    else opening = 'Your essay requires significant revision across multiple narrative dimensions.';
+    
+    let strengthNote = strongest ? ` Your ${strongest.name.toLowerCase()} stands out particularly well.` : '';
+    
+    let improvementNote = '';
+    if (critical > 0) {
+      improvementNote = ` ${critical} critical ${critical === 1 ? 'dimension needs' : 'dimensions need'} immediate attention to meet admissions standards.`;
+    } else if (weakest) {
+      improvementNote = ` To elevate from good to exceptional, focus on strengthening ${weakest.name.toLowerCase()}.`;
+    }
+    
+    return opening + strengthNote + improvementNote;
+  };
+
+  // Get top N dimensions by score
+  const getTopDimensions = (dimensions: RubricDimension[], count: number) => {
+    return dimensions
+      .filter(d => d.status === 'good')
+      .sort((a, b) => b.score - a.score)
+      .slice(0, count);
+  };
+
+  // Get top category scores (Impact, Voice, Structure)
+  const getTopCategoryScores = (dimensions: RubricDimension[]) => {
+    const categories = {
+      impact: { name: 'Impact', icon: '🎯', dims: ['Quantified Impact', 'Initiative', 'Transformative Impact'] },
+      voice: { name: 'Voice', icon: '💭', dims: ['Voice Integrity', 'Craft & Language'] },
+      structure: { name: 'Structure', icon: '📊', dims: ['Narrative Arc', 'Opening Hook'] }
+    };
+    
+    return Object.values(categories).map(cat => {
+      const matchingDims = dimensions.filter(d => 
+        cat.dims.some(name => d.name.includes(name.split(' ')[0]))
+      );
+      const avgScore = matchingDims.length > 0
+        ? matchingDims.reduce((sum, d) => sum + (d.score / d.maxScore) * 10, 0) / matchingDims.length
+        : 0;
+      return {
+        ...cat,
+        score: Math.round(avgScore * 10) / 10
+      };
+    });
+  };
+
   const scoreColorConfig = getScoreColor(currentScore);
   const progressPercent = totalIssues > 0 ? (fixedIssues / totalIssues) * 100 : 0;
 
@@ -490,14 +552,20 @@ export default function PIQWorkshop() {
         {/* Hero section */}
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row gap-6 items-start">
-            {/* Premium Narrative Quality Index Card */}
+            {/* Premium Narrative Quality Index Card - Multi-Layer Design */}
             <Card className="flex-1 p-7 bg-gradient-to-br from-background/95 via-background/90 to-purple-50/80 dark:from-background/95 dark:via-background/90 dark:to-purple-950/20 backdrop-blur-xl border shadow-xl">
-              {/* Two-column header */}
-              <div className="grid grid-cols-[1fr,auto] gap-6 items-start mb-6">
-                {/* Left: Title with icon */}
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg">
+              
+              {/* LAYER 1: Hero Header with Floating Elements */}
+              <div className="relative grid grid-cols-[1fr,auto] gap-6 items-start mb-5 pb-6 border-b border-border/50">
+                {/* Decorative gradient accent bar */}
+                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary via-accent to-primary/50 rounded-full shadow-lg" />
+                
+                {/* Left: Title with elevated icon */}
+                <div className="flex items-center gap-3 pl-4">
+                  <div className="relative w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-xl hover:shadow-2xl transition-shadow">
                     <PenTool className="w-6 h-6 text-primary-foreground" />
+                    {/* Glow effect */}
+                    <div className="absolute inset-0 rounded-xl bg-primary/20 blur-xl -z-10" />
                   </div>
                   <div>
                     <GradientText
@@ -506,33 +574,76 @@ export default function PIQWorkshop() {
                     >
                       Narrative Quality Index
                     </GradientText>
+                    <p className="text-xs text-muted-foreground mt-0.5">Real-time essay health dashboard</p>
                   </div>
                 </div>
 
-                {/* Right: Score display */}
-                <div className="text-right">
-                  <div className="flex items-baseline gap-2 justify-end mb-2">
-                    {scoreColorConfig.gradient ? (
-                      <GradientText
-                        className="text-5xl md:text-6xl font-extrabold"
-                        colors={scoreColorConfig.colors}
-                        textOnly
-                      >
-                        {currentScore}
-                      </GradientText>
-                    ) : (
-                      <span className={`text-5xl md:text-6xl font-extrabold ${scoreColorConfig.className}`}>
-                        {currentScore}
-                      </span>
-                    )}
+                {/* Right: Score display with floating badge */}
+                <div className="text-right relative">
+                  {/* Floating action icons - top right */}
+                  <div className="absolute -top-2 -right-2 flex items-center gap-1.5">
+                    <Button
+                      onClick={handleRequestReanalysis}
+                      disabled={!needsReanalysis || isAnalyzing}
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full shadow-md hover:shadow-lg bg-background border border-border/50"
+                      title={needsReanalysis ? "Re-analyze draft" : "Up to date"}
+                    >
+                      {isAnalyzing ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <RefreshCcw className={`w-3.5 h-3.5 ${needsReanalysis ? 'text-primary' : 'text-muted-foreground'}`} />
+                      )}
+                    </Button>
+                    <Button
+                      onClick={() => setShowVersionHistory(true)}
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0 rounded-full shadow-md hover:shadow-lg bg-background border border-border/50"
+                      title="View history"
+                    >
+                      <History className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                  
+                  {/* Large score with depth */}
+                  <div className="flex items-baseline gap-2 justify-end mb-2 mt-6">
+                    <div className="relative">
+                      {scoreColorConfig.gradient ? (
+                        <GradientText
+                          className="text-5xl md:text-7xl font-extrabold"
+                          colors={scoreColorConfig.colors}
+                          textOnly
+                        >
+                          {currentScore}
+                        </GradientText>
+                      ) : (
+                        <span className={`text-5xl md:text-7xl font-extrabold ${scoreColorConfig.className}`}>
+                          {currentScore}
+                        </span>
+                      )}
+                      {/* Score glow effect */}
+                      <div className="absolute inset-0 blur-2xl opacity-20 -z-10" style={{
+                        background: scoreColorConfig.gradient 
+                          ? `linear-gradient(135deg, ${scoreColorConfig.colors.join(', ')})` 
+                          : 'currentColor'
+                      }} />
+                    </div>
                     <span className="text-2xl font-semibold text-muted-foreground">/100</span>
                   </div>
+                  
+                  {/* Status badge and delta */}
                   <div className="flex items-center gap-2 justify-end">
-                    <Badge className={`${nqiConfig.bg} ${nqiConfig.color} border ${nqiConfig.border}`}>
+                    <Badge className={`${nqiConfig.bg} ${nqiConfig.color} border ${nqiConfig.border} shadow-sm px-3 py-1`}>
                       {nqiConfig.label}
                     </Badge>
                     {scoreDelta !== 0 && (
-                      <div className={`flex items-center gap-1 text-sm font-medium ${scoreDelta > 0 ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                      <div className={`flex items-center gap-1 text-sm font-semibold px-2.5 py-1 rounded-full ${
+                        scoreDelta > 0 
+                          ? 'bg-green-50 dark:bg-green-950/30 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800' 
+                          : 'bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                      }`}>
                         {scoreDelta > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                         <span>{scoreDelta > 0 ? '+' : ''}{scoreDelta}</span>
                       </div>
@@ -541,128 +652,169 @@ export default function PIQWorkshop() {
                 </div>
               </div>
 
-              {/* Full-width progress bar */}
-              <div className="space-y-2.5 mb-6">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground font-medium">Issues Resolved</span>
-                  <span className="font-bold text-foreground">
-                    {fixedIssues} / {totalIssues} ({Math.round(progressPercent)}%)
-                  </span>
+              {/* LAYER 2: Holistic Insight Panel - Elevated nested card */}
+              <div className="relative mb-5 p-5 rounded-xl bg-gradient-to-br from-purple-50/80 via-blue-50/60 to-background dark:from-purple-950/20 dark:via-blue-950/15 dark:to-background border-2 border-purple-200/50 dark:border-purple-800/30 shadow-lg hover:shadow-xl transition-all duration-300">
+                {/* Decorative corner accent */}
+                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-primary/10 to-transparent rounded-bl-full blur-xl" />
+                
+                {/* Header with sparkle icon */}
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-purple-500 via-blue-500 to-purple-400 flex items-center justify-center shadow-md">
+                    <span className="text-white text-sm">✨</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground tracking-wide">Where Your Essay Stands</h3>
                 </div>
-                <Progress value={progressPercent} className="h-3" />
+                
+                {/* Dynamic holistic overview */}
+                <div className="relative mb-4 p-4 rounded-lg bg-background/60 dark:bg-background/40 backdrop-blur-sm border border-border/50 shadow-inner">
+                  <p className="text-sm leading-relaxed text-foreground/90">
+                    {getHolisticOverview(currentScore, needsWorkIssues, criticalIssues, dimensions)}
+                  </p>
+                </div>
+                
+                {/* Key Strengths chips */}
+                {getTopDimensions(dimensions, 3).length > 0 && (
+                  <div className="mb-3">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Key Strengths</p>
+                    <div className="flex flex-wrap gap-2">
+                      {getTopDimensions(dimensions, 3).map(dim => (
+                        <button
+                          key={dim.id}
+                          onClick={() => scrollToDimension(dim.id)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 text-xs font-medium hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors shadow-sm"
+                        >
+                          <CheckCircle className="w-3 h-3" />
+                          {dim.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Areas to Refine chips */}
+                {(needsWorkDimensions.length > 0 || criticalDimensions.length > 0) && (
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">Areas to Refine</p>
+                    <div className="flex flex-wrap gap-2">
+                      {[...criticalDimensions, ...needsWorkDimensions].slice(0, 3).map(dim => (
+                        <button
+                          key={dim.id}
+                          onClick={() => scrollToDimension(dim.id)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium hover:opacity-80 transition-opacity shadow-sm ${
+                            dim.status === 'critical'
+                              ? 'bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300'
+                              : 'bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300'
+                          }`}
+                        >
+                          {dim.status === 'critical' ? <XCircle className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                          {dim.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Interactive metrics - 2 columns with hover tooltips */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                {/* Needs Work metric with tooltip */}
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-600 transition-all cursor-help shadow-sm hover:shadow-md">
-                        <div className="flex items-center gap-2 mb-2">
-                          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                          <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">Needs Work</span>
+              {/* LAYER 3: Progress & Quick Metrics - Compact inline layout */}
+              <div className="flex items-center gap-4 mb-5 p-4 rounded-lg bg-background/40 dark:bg-background/20 backdrop-blur-sm border border-border/50 shadow-sm">
+                {/* Progress bar section - 60% width */}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between text-xs mb-2">
+                    <span className="text-muted-foreground font-medium">Issues Resolved</span>
+                    <span className="font-bold text-foreground">
+                      {fixedIssues}/{totalIssues} ({Math.round(progressPercent)}%)
+                    </span>
+                  </div>
+                  <Progress value={progressPercent} className="h-2.5" />
+                </div>
+                
+                {/* Vertical divider */}
+                <div className="w-px h-10 bg-border/50" />
+                
+                {/* Compact metrics - inline badges with tooltips */}
+                <div className="flex items-center gap-3">
+                  {/* Needs Work badge */}
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-600 transition-colors shadow-sm hover:shadow-md">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                          <span className="text-amber-600 dark:text-amber-400 font-semibold text-sm">{needsWorkIssues}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm p-3" side="top">
+                        <div className="space-y-2">
+                          <p className="font-semibold text-xs">Needs Work:</p>
+                          {needsWorkDimensions.length > 0 ? (
+                            <ul className="text-xs space-y-1">
+                              {needsWorkDimensions.map(dim => (
+                                <li key={dim.id}>
+                                  <button
+                                    onClick={() => scrollToDimension(dim.id)}
+                                    className="text-left hover:text-primary hover:underline w-full"
+                                  >
+                                    • {dim.name} ({dim.score}/{dim.maxScore})
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">None 🎉</p>
+                          )}
                         </div>
-                        <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">{needsWorkIssues}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {needsWorkIssues === 1 ? 'Dimension' : 'Dimensions'}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  
+                  {/* Critical badge */}
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600 transition-colors shadow-sm hover:shadow-md">
+                          <XCircle className="w-3.5 h-3.5 text-red-600 dark:text-red-400" />
+                          <span className="text-red-600 dark:text-red-400 font-semibold text-sm">{criticalIssues}</span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-sm p-3" side="top">
+                        <div className="space-y-2">
+                          <p className="font-semibold text-xs">Critical:</p>
+                          {criticalDimensions.length > 0 ? (
+                            <ul className="text-xs space-y-1">
+                              {criticalDimensions.map(dim => (
+                                <li key={dim.id}>
+                                  <button
+                                    onClick={() => scrollToDimension(dim.id)}
+                                    className="text-left hover:text-primary hover:underline w-full"
+                                  >
+                                    • {dim.name} ({dim.score}/{dim.maxScore})
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="text-xs text-muted-foreground">None 🎉</p>
+                          )}
                         </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm p-4" side="top">
-                      <div className="space-y-2">
-                        <p className="font-semibold text-sm">Dimensions needing improvement:</p>
-                        {needsWorkDimensions.length > 0 ? (
-                          <ul className="text-xs space-y-1.5">
-                            {needsWorkDimensions.map(dim => (
-                              <li key={dim.id}>
-                                <button
-                                  onClick={() => scrollToDimension(dim.id)}
-                                  className="text-left hover:text-primary hover:underline w-full transition-colors"
-                                >
-                                  • {dim.name} ({dim.score}/{dim.maxScore})
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No dimensions need work 🎉</p>
-                        )}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                {/* Critical metric with tooltip */}
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="p-4 rounded-xl bg-red-50 dark:bg-red-950/20 border-2 border-red-200 dark:border-red-800 hover:border-red-400 dark:hover:border-red-600 transition-all cursor-help shadow-sm hover:shadow-md">
-                        <div className="flex items-center gap-2 mb-2">
-                          <XCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                          <span className="text-sm font-semibold text-red-600 dark:text-red-400">Critical</span>
-                        </div>
-                        <div className="text-3xl font-bold text-red-600 dark:text-red-400">{criticalIssues}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          {criticalIssues === 1 ? 'Dimension' : 'Dimensions'}
-                        </div>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-sm p-4" side="top">
-                      <div className="space-y-2">
-                        <p className="font-semibold text-sm">Critical dimensions:</p>
-                        {criticalDimensions.length > 0 ? (
-                          <ul className="text-xs space-y-1.5">
-                            {criticalDimensions.map(dim => (
-                              <li key={dim.id}>
-                                <button
-                                  onClick={() => scrollToDimension(dim.id)}
-                                  className="text-left hover:text-primary hover:underline w-full transition-colors"
-                                >
-                                  • {dim.name} ({dim.score}/{dim.maxScore})
-                                </button>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-xs text-muted-foreground">No critical issues 🎉</p>
-                        )}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
               </div>
 
-              {/* Integrated action buttons - primary CTAs */}
-              <div className="grid grid-cols-2 gap-3">
-                <Button 
-                  onClick={handleRequestReanalysis}
-                  disabled={!needsReanalysis || isAnalyzing}
-                  variant={needsReanalysis ? "default" : "secondary"}
-                  size="lg"
-                  className="gap-2 font-semibold shadow-md hover:shadow-lg transition-shadow"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCcw className="w-4 h-4" />
-                      {needsReanalysis ? 'Re-analyze Draft' : 'Up to date ✓'}
-                    </>
-                  )}
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowVersionHistory(true)} 
-                  size="lg"
-                  className="gap-2 font-semibold shadow-sm hover:shadow-md transition-shadow"
-                >
-                  <History className="w-4 h-4" />
-                  View History
-                </Button>
+              {/* LAYER 4: Quick Stats Grid - 3 micro-cards */}
+              <div className="grid grid-cols-3 gap-3">
+                {getTopCategoryScores(dimensions).map(category => (
+                  <div
+                    key={category.name}
+                    className="p-3 rounded-lg bg-gradient-to-br from-background via-background to-primary/5 border border-border/50 shadow-sm hover:shadow-md transition-all cursor-default"
+                  >
+                    <div className="text-center">
+                      <div className="text-lg mb-1">{category.icon}</div>
+                      <div className="text-xs font-medium text-muted-foreground mb-1">{category.name}</div>
+                      <div className="text-lg font-bold text-foreground">{category.score}<span className="text-xs text-muted-foreground">/10</span></div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
           </div>
