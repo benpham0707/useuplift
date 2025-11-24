@@ -472,60 +472,84 @@ export default function PIQWorkshop() {
     // Build comprehensive narrative paragraph
     let overview = '';
     
-    // Current standing
+    // Current standing with context
     const tier = score >= 85 ? 'elite tier' : score >= 70 ? 'competitive range' : score >= 55 ? 'developing stage' : 'needs significant work';
-    overview += `Your narrative scores ${score}/100, placing it in the ${tier}. `;
+    const tierContext = score >= 85 
+      ? 'which places you among the strongest personal insight essays in the admissions pool'
+      : score >= 70 
+      ? 'which demonstrates solid narrative fundamentals but requires polish to reach the elite tier that commands admissions officers\' attention'
+      : score >= 55
+      ? 'which indicates a foundation to build upon but needs substantial revision across multiple dimensions to reach competitive admissions quality'
+      : 'which indicates fundamental gaps that must be addressed to meet baseline admissions standards';
     
-    // Strengths highlight
+    overview += `Your narrative scores ${score}/100, placing it in the ${tier}, ${tierContext}. `;
+    
+    // Strengths highlight with specific examples
     if (good.length > 0) {
-      const topStrengths = good.slice(0, 2).map(d => `${d.name} (${d.score}/${d.maxScore})`).join(' and ');
-      overview += `Your strongest dimensions are ${topStrengths}, which demonstrate solid narrative foundations. `;
+      const topStrengths = good.slice(0, 2);
+      if (topStrengths.length === 1) {
+        overview += `Your strongest dimension is ${topStrengths[0].name} (${topStrengths[0].score}/${topStrengths[0].maxScore}), demonstrating ${topStrengths[0].overview.toLowerCase()} `;
+      } else {
+        overview += `Your strongest dimensions are ${topStrengths[0].name} (${topStrengths[0].score}/${topStrengths[0].maxScore}) and ${topStrengths[1].name} (${topStrengths[1].score}/${topStrengths[1].maxScore}), which show solid narrative craftsmanship. `;
+      }
     }
     
-    // Priority areas
+    // Priority areas with specific guidance
     if (critical.length > 0) {
       const criticalNames = critical.map(d => d.name).join(', ');
-      overview += `However, ${criticalNames} ${critical.length === 1 ? 'requires' : 'require'} immediate attention to meet baseline admissions standards. `;
+      const firstCriticalIssue = critical[0].issues[0];
+      overview += `However, ${criticalNames} ${critical.length === 1 ? 'requires' : 'require'} immediate attention—`;
+      if (firstCriticalIssue) {
+        overview += `specifically, ${firstCriticalIssue.title.toLowerCase()}. `;
+      } else {
+        overview += `these are foundational gaps that limit your entire narrative. `;
+      }
+      overview += `Addressing these critical issues is essential before refining other dimensions. `;
     } else if (needsWork.length > 0) {
       const needsWorkNames = needsWork.map(d => d.name).join(', ');
-      overview += `To reach ${score >= 70 ? 'excellence' : 'competitive quality'}, focus on strengthening ${needsWorkNames}. `;
+      const weakest = needsWork.sort((a, b) => a.score - b.score)[0];
+      overview += `To reach ${score >= 70 ? 'excellence and distinction' : 'competitive admissions quality'}, focus on strengthening ${needsWorkNames}. `;
+      if (weakest.issues[0]) {
+        overview += `Start with ${weakest.name} (${weakest.score}/${weakest.maxScore})—${weakest.issues[0].title.toLowerCase()} is the most impactful area for improvement. `;
+      }
     }
     
-    // Calculate potential gain
+    // Calculate and communicate potential
     const weightedPotential = [...critical, ...needsWork].reduce((sum, dim) => {
       const maxGain = dim.maxScore - dim.score;
       return sum + (maxGain * (dim.weight / 100));
     }, 0);
     const potentialGain = Math.round(weightedPotential * 0.7);
     
-    // Strategic guidance
-    if (critical.length > 0) {
-      overview += `Start by addressing the critical dimensions first, then move to areas needing refinement. `;
-    } else if (needsWork.length > 0) {
-      const sortedByWeight = [...needsWork].sort((a, b) => b.weight - a.weight);
-      overview += `Focus on ${sortedByWeight[0].name} first (${sortedByWeight[0].weight}% weight) for the fastest score improvement. `;
-    }
-    
     if (potentialGain > 0) {
-      overview += `With focused revision, you could reach ${score + potentialGain}+ within 2-3 editing cycles. `;
+      const targetScore = score + potentialGain;
+      const cycles = critical.length > 0 ? '3-4' : needsWork.length > 2 ? '2-3' : '1-2';
+      overview += `With focused revision addressing the flagged issues, you could realistically reach ${targetScore}+ within ${cycles} editing cycles. `;
     }
     
-    // Pattern detection
+    // Pattern detection with actionable insights
     const allIssues = dims.flatMap(d => d.issues);
     if (allIssues.length >= 3) {
-      if (allIssues.filter(i => i.title.toLowerCase().includes('specific')).length >= 2) {
-        overview += `Multiple dimensions need more concrete specificity—add precise details, names, and numbers. `;
-      } else if (allIssues.filter(i => i.title.toLowerCase().includes('emotion') || i.title.toLowerCase().includes('vulnerability')).length >= 2) {
-        overview += `Several areas need deeper emotional engagement—show internal reactions and authentic feelings. `;
+      const specificityIssues = allIssues.filter(i => i.title.toLowerCase().includes('specific'));
+      const emotionIssues = allIssues.filter(i => i.title.toLowerCase().includes('emotion') || i.title.toLowerCase().includes('vulnerability'));
+      const transformationIssues = allIssues.filter(i => i.title.toLowerCase().includes('transform') || i.title.toLowerCase().includes('growth'));
+      
+      if (specificityIssues.length >= 2) {
+        overview += `A key pattern across multiple dimensions: your essay needs more concrete specificity—replace general statements with precise names, numbers, dates, and sensory details that make scenes vivid and memorable. `;
+      } else if (emotionIssues.length >= 2) {
+        overview += `A recurring theme: several dimensions need deeper emotional engagement—move beyond describing what happened to showing your internal reactions, vulnerabilities, and the authentic feelings you experienced in those moments. `;
+      } else if (transformationIssues.length >= 2) {
+        overview += `Multiple dimensions indicate insufficient transformation narrative—admissions officers want to see clear before/after contrasts that prove you\'ve genuinely changed through specific behavioral examples. `;
       }
     }
     
-    // Closing guidance
+    // Strategic next steps
     const totalIssues = dims.reduce((sum, d) => sum + d.issues.length, 0);
     if (totalIssues > 0) {
-      overview += `Review the ${totalIssues} flagged ${totalIssues === 1 ? 'issue' : 'issues'} below and apply the AI-suggested revisions to improve your score.`;
+      const issueVerb = critical.length > 0 ? 'addressing' : 'refining';
+      overview += `Begin by ${issueVerb} the ${totalIssues} flagged ${totalIssues === 1 ? 'issue' : 'issues'} in the dimension analysis below—each includes AI-suggested revisions that demonstrate exactly how to strengthen your narrative while maintaining your authentic voice.`;
     } else {
-      overview += `Your essay demonstrates strong quality across all dimensions. Polish the feedback points to maximize admissions impact.`;
+      overview += `Your essay demonstrates impressive consistency across all dimensions. Continue refining based on the detailed rubric feedback to maximize your admissions impact and ensure every sentence serves your narrative\'s strategic purpose.`;
     }
     
     return overview;
@@ -687,174 +711,144 @@ export default function PIQWorkshop() {
                 <Progress value={progressPercent} className="h-2" />
               </div>
 
-              {/* Interactive Category Boxes */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* Critical Box */}
-                <div className={criticalDimensions.length === 0 ? 'opacity-50' : ''}>
-                  <div className="bg-gradient-to-br from-red-50 to-red-100/80 dark:from-red-950/30 dark:to-red-950/20 border-2 border-red-300 dark:border-red-800 rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <XCircle className="w-5 h-5 text-red-600" />
-                        <h3 className="text-sm font-bold text-red-700 dark:text-red-400 uppercase tracking-wide">
-                          Critical Issues ({criticalDimensions.length})
-                        </h3>
-                      </div>
-                    </div>
-                    {criticalDimensions.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        <TooltipProvider>
-                          {criticalDimensions.map(dim => (
-                            <Tooltip key={dim.id}>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => scrollToDimension(dim.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-red-950/40 hover:bg-white dark:hover:bg-red-950/60 transition-all border border-red-200 dark:border-red-800/50 shadow-sm hover:shadow group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-foreground group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                                      {dim.name}
-                                    </span>
-                                    <span className="text-xs font-bold text-red-600 dark:text-red-400">
-                                      {dim.score}/{dim.maxScore}
-                                    </span>
-                                  </div>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs">
-                                <div className="space-y-1">
-                                  <p className="font-semibold text-xs">{dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''} found:</p>
-                                  {dim.issues.slice(0, 2).map((issue, idx) => (
-                                    <p key={idx} className="text-xs text-muted-foreground">• {issue.problem}</p>
-                                  ))}
-                                  {dim.issues.length > 2 && (
-                                    <p className="text-xs text-muted-foreground italic">+{dim.issues.length - 2} more...</p>
-                                  )}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
+              {/* Compact Category Quick Links */}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-sm font-medium text-muted-foreground">Quick navigate:</span>
+                
+                {/* Critical Badge */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          if (criticalDimensions.length > 0) {
+                            scrollToDimension(criticalDimensions[0].id);
+                          }
+                        }}
+                        disabled={criticalDimensions.length === 0}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                          criticalDimensions.length > 0
+                            ? 'bg-red-100 text-red-700 border border-red-300 hover:bg-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-950/60'
+                            : 'bg-gray-100 text-gray-400 border border-gray-200 dark:bg-gray-900 dark:text-gray-600 dark:border-gray-800 cursor-not-allowed'
+                        }`}
+                      >
+                        <XCircle className="w-3.5 h-3.5" />
+                        Critical ({criticalDimensions.length})
+                      </button>
+                    </TooltipTrigger>
+                    {criticalDimensions.length > 0 && (
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-xs mb-2">Critical Dimensions:</p>
+                          {criticalDimensions.map((dim) => (
+                            <div key={dim.id} className="text-xs">
+                              <span className="font-medium">• {dim.name}</span> ({dim.score}/{dim.maxScore})
+                              {dim.issues.length > 0 && (
+                                <p className="text-muted-foreground ml-3 mt-0.5">{dim.issues[0].title}</p>
+                              )}
+                            </div>
                           ))}
-                        </TooltipProvider>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-xs text-muted-foreground italic">No critical issues</p>
-                      </div>
+                        </div>
+                      </TooltipContent>
                     )}
-                  </div>
-                </div>
+                  </Tooltip>
+                </TooltipProvider>
 
-                {/* Needs Work Box */}
-                <div className={needsWorkDimensions.length === 0 ? 'opacity-50' : ''}>
-                  <div className="bg-gradient-to-br from-amber-50 to-amber-100/80 dark:from-amber-950/30 dark:to-amber-950/20 border-2 border-amber-300 dark:border-amber-800 rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-amber-600" />
-                        <h3 className="text-sm font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wide">
-                          Needs Work ({needsWorkDimensions.length})
-                        </h3>
-                      </div>
-                    </div>
-                    {needsWorkDimensions.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        <TooltipProvider>
-                          {needsWorkDimensions.map(dim => (
-                            <Tooltip key={dim.id}>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => scrollToDimension(dim.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-amber-950/40 hover:bg-white dark:hover:bg-amber-950/60 transition-all border border-amber-200 dark:border-amber-800/50 shadow-sm hover:shadow group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-foreground group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                                      {dim.name}
-                                    </span>
-                                    <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                      {dim.score}/{dim.maxScore}
-                                    </span>
-                                  </div>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs">
-                                <div className="space-y-1">
-                                  <p className="font-semibold text-xs">{dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''} found:</p>
-                                  {dim.issues.slice(0, 2).map((issue, idx) => (
-                                    <p key={idx} className="text-xs text-muted-foreground">• {issue.problem}</p>
-                                  ))}
-                                  {dim.issues.length > 2 && (
-                                    <p className="text-xs text-muted-foreground italic">+{dim.issues.length - 2} more...</p>
-                                  )}
-                                </div>
-                              </TooltipContent>
-                            </Tooltip>
+                {/* Needs Work Badge */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          if (needsWorkDimensions.length > 0) {
+                            scrollToDimension(needsWorkDimensions[0].id);
+                          }
+                        }}
+                        disabled={needsWorkDimensions.length === 0}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                          needsWorkDimensions.length > 0
+                            ? 'bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800 dark:hover:bg-amber-950/60'
+                            : 'bg-gray-100 text-gray-400 border border-gray-200 dark:bg-gray-900 dark:text-gray-600 dark:border-gray-800 cursor-not-allowed'
+                        }`}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        Needs Work ({needsWorkDimensions.length})
+                      </button>
+                    </TooltipTrigger>
+                    {needsWorkDimensions.length > 0 && (
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-xs mb-2">Needs Work Dimensions:</p>
+                          {needsWorkDimensions.map((dim) => (
+                            <div key={dim.id} className="text-xs">
+                              <span className="font-medium">• {dim.name}</span> ({dim.score}/{dim.maxScore})
+                              {dim.issues.length > 0 && (
+                                <p className="text-muted-foreground ml-3 mt-0.5">{dim.issues[0].title}</p>
+                              )}
+                            </div>
                           ))}
-                        </TooltipProvider>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-xs text-muted-foreground italic">None</p>
-                      </div>
+                        </div>
+                      </TooltipContent>
                     )}
-                  </div>
-                </div>
+                  </Tooltip>
+                </TooltipProvider>
 
-                {/* Strong Box */}
-                <div className={goodDimensions.length === 0 ? 'opacity-50' : ''}>
-                  <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/80 dark:from-emerald-950/30 dark:to-emerald-950/20 border-2 border-emerald-300 dark:border-emerald-800 rounded-xl p-4 shadow-sm">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        <h3 className="text-sm font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wide">
-                          Strong Areas ({goodDimensions.length})
-                        </h3>
-                      </div>
-                    </div>
-                    {goodDimensions.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        <TooltipProvider>
-                          {goodDimensions.map(dim => (
-                            <Tooltip key={dim.id}>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => scrollToDimension(dim.id)}
-                                  className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-emerald-950/40 hover:bg-white dark:hover:bg-emerald-950/60 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow group"
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-medium text-foreground group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                      {dim.name}
-                                    </span>
-                                    <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                      {dim.score}/{dim.maxScore}
-                                    </span>
-                                  </div>
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent side="bottom" className="max-w-xs">
-                                <p className="text-xs">{dim.overview}</p>
-                              </TooltipContent>
-                            </Tooltip>
+                {/* Strong Badge */}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          if (goodDimensions.length > 0) {
+                            scrollToDimension(goodDimensions[0].id);
+                          }
+                        }}
+                        disabled={goodDimensions.length === 0}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                          goodDimensions.length > 0
+                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800 dark:hover:bg-emerald-950/60'
+                            : 'bg-gray-100 text-gray-400 border border-gray-200 dark:bg-gray-900 dark:text-gray-600 dark:border-gray-800 cursor-not-allowed'
+                        }`}
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Strong ({goodDimensions.length})
+                      </button>
+                    </TooltipTrigger>
+                    {goodDimensions.length > 0 && (
+                      <TooltipContent side="bottom" className="max-w-xs">
+                        <div className="space-y-1">
+                          <p className="font-semibold text-xs mb-2">Strong Dimensions:</p>
+                          {goodDimensions.slice(0, 5).map((dim) => (
+                            <div key={dim.id} className="text-xs">
+                              <span className="font-medium">• {dim.name}</span> ({dim.score}/{dim.maxScore})
+                            </div>
                           ))}
-                        </TooltipProvider>
-                      </div>
-                    ) : (
-                      <div className="text-center py-4">
-                        <p className="text-xs text-muted-foreground italic">None yet</p>
-                      </div>
+                          {goodDimensions.length > 5 && (
+                            <p className="text-xs text-muted-foreground italic">+{goodDimensions.length - 5} more...</p>
+                          )}
+                        </div>
+                      </TooltipContent>
                     )}
-                  </div>
-                </div>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
 
-              {/* Essay Overview */}
-              <div className="pt-6 mt-6 border-t">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/20 to-accent/20 border border-primary/30 flex items-center justify-center">
-                    <Info className="w-5 h-5 text-primary" />
+              {/* Prominent Essay Overview Section */}
+              <div className="mt-6 pt-6 border-t-2 border-primary/20">
+                <div className="bg-gradient-to-br from-primary/5 via-accent/5 to-primary/5 rounded-xl p-6 border-2 border-primary/20 shadow-sm">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary via-primary/80 to-accent flex items-center justify-center shadow-lg">
+                      <Info className="w-6 h-6 text-primary-foreground" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-foreground">Essay Analysis Overview</h3>
+                      <p className="text-sm text-muted-foreground">Comprehensive quality assessment</p>
+                    </div>
                   </div>
-                  <h3 className="text-xl font-bold text-foreground">Essay Overview</h3>
+                  <p className="text-lg leading-relaxed text-foreground font-medium">
+                    {getDetailedOverview(dimensions, currentScore)}
+                  </p>
                 </div>
-                <p className="text-base leading-relaxed text-foreground/90">
-                  {getDetailedOverview(dimensions, currentScore)}
-                </p>
               </div>
             </Card>
           </div>
