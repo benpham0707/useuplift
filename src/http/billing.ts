@@ -14,6 +14,12 @@ if (!supabaseUrl || !supabaseServiceKey) {
 
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 
+// Check if Stripe is configured
+const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
+if (!isStripeConfigured) {
+  console.warn('⚠️  Stripe not configured - billing features will be disabled');
+}
+
 type SubscriptionPlan = {
   name: string;
   amount: number;
@@ -55,6 +61,10 @@ const PLANS: Record<string, Plan> = {
 
 export const createCheckoutSession = async (req: Request, res: Response) => {
   try {
+    if (!isStripeConfigured) {
+      return res.status(503).json({ error: 'Billing not configured' });
+    }
+
     const { type, successUrl, cancelUrl } = req.body;
     const userId = (req as any).auth?.userId;
 
@@ -135,6 +145,10 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 };
 
 export const handleWebhook = async (req: Request, res: Response) => {
+  if (!isStripeConfigured) {
+    return res.status(503).json({ error: 'Billing not configured' });
+  }
+
   const sig = req.headers['stripe-signature'];
   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -188,6 +202,10 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
 export const verifySession = async (req: Request, res: Response) => {
     try {
+        if (!isStripeConfigured) {
+          return res.status(503).json({ error: 'Billing not configured' });
+        }
+
         const { sessionId } = req.body;
         if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
 

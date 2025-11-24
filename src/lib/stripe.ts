@@ -3,13 +3,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is missing from .env');
-}
+// Make Stripe optional for development - only required if billing features are used
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || 'sk_test_dummy_key_for_dev';
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-11-17.clover', // Use the latest API version
-});
+export const stripe = process.env.STRIPE_SECRET_KEY
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-11-17.clover', // Use the latest API version
+    })
+  : null as any; // Null when no key is provided - billing endpoints will fail but analysis will work
 
 // Constants for Price IDs - these should be replaced with actual Price IDs from your Stripe Dashboard
 // or you can create them programmatically if they don't exist.
