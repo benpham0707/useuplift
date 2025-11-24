@@ -620,9 +620,9 @@ export default function PIQWorkshop() {
               </div>
 
               {/* Interactive Category Boxes */}
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Critical Box */}
-                {criticalDimensions.length > 0 && (
+                <div className={criticalDimensions.length === 0 ? 'opacity-50' : ''}>
                   <div className="bg-gradient-to-br from-red-50 to-red-100/80 dark:from-red-950/30 dark:to-red-950/20 border-2 border-red-300 dark:border-red-800 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -632,41 +632,47 @@ export default function PIQWorkshop() {
                         </h3>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      {criticalDimensions.map(dim => (
-                        <button
-                          key={dim.id}
-                          onClick={() => scrollToDimension(dim.id)}
-                          className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-red-950/40 hover:bg-white dark:hover:bg-red-950/60 transition-all border border-red-200 dark:border-red-800/50 shadow-sm hover:shadow group"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                                {dim.name}
-                              </div>
-                              {dim.issues[0] && (
-                                <div className="text-xs text-muted-foreground line-clamp-2">
-                                  {dim.issues[0].problem}
+                    {criticalDimensions.length > 0 ? (
+                      <div className="space-y-2">
+                        {criticalDimensions.map(dim => (
+                          <button
+                            key={dim.id}
+                            onClick={() => scrollToDimension(dim.id)}
+                            className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-red-950/40 hover:bg-white dark:hover:bg-red-950/60 transition-all border border-red-200 dark:border-red-800/50 shadow-sm hover:shadow group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+                                  {dim.name}
                                 </div>
-                              )}
+                                {dim.issues[0] && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2">
+                                    {dim.issues[0].problem}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-xs font-bold text-red-600 dark:text-red-400">
+                                  {dim.score}/{dim.maxScore}
+                                </span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium">
+                                  {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-xs font-bold text-red-600 dark:text-red-400">
-                                {dim.score}/{dim.maxScore}
-                              </span>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300 font-medium">
-                                {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-muted-foreground italic">No critical issues</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Needs Work Box */}
-                {needsWorkDimensions.length > 0 && (
+                <div className={needsWorkDimensions.length === 0 ? 'opacity-50' : ''}>
                   <div className="bg-gradient-to-br from-amber-50 to-amber-100/80 dark:from-amber-950/30 dark:to-amber-950/20 border-2 border-amber-300 dark:border-amber-800 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -676,49 +682,55 @@ export default function PIQWorkshop() {
                         </h3>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      {needsWorkDimensions.slice(0, showAllNeedsWork ? undefined : 3).map(dim => (
-                        <button
-                          key={dim.id}
-                          onClick={() => scrollToDimension(dim.id)}
-                          className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-amber-950/40 hover:bg-white dark:hover:bg-amber-950/60 transition-all border border-amber-200 dark:border-amber-800/50 shadow-sm hover:shadow group"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
-                                {dim.name}
-                              </div>
-                              {dim.issues[0] && (
-                                <div className="text-xs text-muted-foreground line-clamp-2">
-                                  {dim.issues[0].problem}
+                    {needsWorkDimensions.length > 0 ? (
+                      <div className="space-y-2">
+                        {needsWorkDimensions.slice(0, showAllNeedsWork ? undefined : 3).map(dim => (
+                          <button
+                            key={dim.id}
+                            onClick={() => scrollToDimension(dim.id)}
+                            className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-amber-950/40 hover:bg-white dark:hover:bg-amber-950/60 transition-all border border-amber-200 dark:border-amber-800/50 shadow-sm hover:shadow group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                                  {dim.name}
                                 </div>
-                              )}
+                                {dim.issues[0] && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2">
+                                    {dim.issues[0].problem}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 flex-shrink-0">
+                                <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                                  {dim.score}/{dim.maxScore}
+                                </span>
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">
+                                  {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <span className="text-xs font-bold text-amber-600 dark:text-amber-400">
-                                {dim.score}/{dim.maxScore}
-                              </span>
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 font-medium">
-                                {dim.issues.length} issue{dim.issues.length !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
-                      {needsWorkDimensions.length > 3 && (
-                        <button
-                          onClick={() => setShowAllNeedsWork(!showAllNeedsWork)}
-                          className="w-full text-xs text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 font-medium py-2 hover:underline"
-                        >
-                          {showAllNeedsWork ? '↑ Show less' : `↓ Show ${needsWorkDimensions.length - 3} more`}
-                        </button>
-                      )}
-                    </div>
+                          </button>
+                        ))}
+                        {needsWorkDimensions.length > 3 && (
+                          <button
+                            onClick={() => setShowAllNeedsWork(!showAllNeedsWork)}
+                            className="w-full text-xs text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-300 font-medium py-2 hover:underline"
+                          >
+                            {showAllNeedsWork ? '↑ Show less' : `↓ Show ${needsWorkDimensions.length - 3} more`}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-muted-foreground italic">None</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
 
                 {/* Strong Box */}
-                {goodDimensions.length > 0 && (
+                <div className={goodDimensions.length === 0 ? 'opacity-50' : ''}>
                   <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/80 dark:from-emerald-950/30 dark:to-emerald-950/20 border-2 border-emerald-300 dark:border-emerald-800 rounded-xl p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -728,39 +740,45 @@ export default function PIQWorkshop() {
                         </h3>
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      {goodDimensions.slice(0, showAllStrong ? undefined : 3).map(dim => (
-                        <button
-                          key={dim.id}
-                          onClick={() => scrollToDimension(dim.id)}
-                          className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-emerald-950/40 hover:bg-white dark:hover:bg-emerald-950/60 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow group"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
-                                {dim.name}
+                    {goodDimensions.length > 0 ? (
+                      <div className="space-y-2">
+                        {goodDimensions.slice(0, showAllStrong ? undefined : 3).map(dim => (
+                          <button
+                            key={dim.id}
+                            onClick={() => scrollToDimension(dim.id)}
+                            className="w-full text-left p-3 rounded-lg bg-white/80 dark:bg-emerald-950/40 hover:bg-white dark:hover:bg-emerald-950/60 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow group"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1 min-w-0">
+                                <div className="font-semibold text-sm text-foreground mb-1 group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors">
+                                  {dim.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  Performing well
+                                </div>
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                Performing well
-                              </div>
+                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
+                                {dim.score}/{dim.maxScore}
+                              </span>
                             </div>
-                            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400 flex-shrink-0">
-                              {dim.score}/{dim.maxScore}
-                            </span>
-                          </div>
-                        </button>
-                      ))}
-                      {goodDimensions.length > 3 && (
-                        <button
-                          onClick={() => setShowAllStrong(!showAllStrong)}
-                          className="w-full text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-medium py-2 hover:underline"
-                        >
-                          {showAllStrong ? '↑ Show less' : `↓ Show ${goodDimensions.length - 3} more`}
-                        </button>
-                      )}
-                    </div>
+                          </button>
+                        ))}
+                        {goodDimensions.length > 3 && (
+                          <button
+                            onClick={() => setShowAllStrong(!showAllStrong)}
+                            className="w-full text-xs text-emerald-700 dark:text-emerald-400 hover:text-emerald-900 dark:hover:text-emerald-300 font-medium py-2 hover:underline"
+                          >
+                            {showAllStrong ? '↑ Show less' : `↓ Show ${goodDimensions.length - 3} more`}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <p className="text-xs text-muted-foreground italic">None yet</p>
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Actionable Insights */}
