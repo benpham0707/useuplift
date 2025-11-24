@@ -1,171 +1,239 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, Star, Building } from 'lucide-react';
-
-const pricingTiers = [
-  {
-    name: 'Free Forever',
-    price: '$0',
-    period: 'forever',
-    description: 'Perfect for exploring your options',
-    badge: null,
-    features: [
-      'Basic portfolio scanner',
-      '5 AI consultations per month',
-      'Community access',
-      'Basic goal tracking',
-      'Public resource library',
-      'Email support'
-    ],
-    buttonText: 'Start Free',
-    buttonVariant: 'outline' as const,
-    popular: false
-  },
-  {
-    name: 'Student',
-    price: '$9',
-    period: 'month',
-    description: 'Everything you need to succeed',
-    badge: 'Most Popular',
-    features: [
-      'Everything in Free',
-      'Unlimited AI guidance',
-      'All tools unlocked',
-      'Priority support',
-      'Advanced analytics',
-      'Scholarship matching',
-      'Mentor network access',
-      'Application tracking'
-    ],
-    buttonText: 'Start Building',
-    buttonVariant: 'default' as const,
-    popular: true
-  },
-  {
-    name: 'Schools',
-    price: 'Custom',
-    period: 'pricing',
-    description: 'Comprehensive institutional solution',
-    badge: 'Enterprise',
-    features: [
-      'Whole school access',
-      'Analytics dashboard',
-      'Counselor tools',
-      'Training included',
-      'Custom branding',
-      'API access',
-      'Dedicated support',
-      'Advanced reporting'
-    ],
-    buttonText: 'Contact Sales',
-    buttonVariant: 'outline' as const,
-    popular: false
-  }
-];
+import { Switch } from '@/components/ui/switch';
+import { Slider } from '@/components/ui/slider';
+import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const Pricing = () => {
+  const navigate = useNavigate();
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
+  const [payAsYouGoCredits, setPayAsYouGoCredits] = useState([50]);
+
+  const payAsYouGoPrice = (payAsYouGoCredits[0] / 50) * 10;
+
   return (
-    <section id="pricing" className="py-24 bg-background">
+    <section id="pricing" className="py-24 bg-background font-sans">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Section Header */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl lg:text-5xl font-bold text-foreground mb-6">
-            Accessible to All
+        <div className="text-center space-y-6 mb-16">
+          <h2 className="text-4xl lg:text-5xl font-bold text-foreground tracking-tight">
+            Invest in Your Future
           </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Whether you're just starting to explore or ready to transform your future, 
-            we have a plan that fits your needs and budget.
+          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            Choose the plan that fits your journey. From a single portfolio scan to full application support.
           </p>
+          
+          <div className="flex items-center justify-center gap-4 pt-4">
+            <span className={`text-sm font-medium ${billingInterval === 'monthly' ? 'text-foreground' : 'text-muted-foreground'}`}>
+              Monthly
+            </span>
+            <Switch
+              checked={billingInterval === 'yearly'}
+              onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
+            />
+            <span className={`text-sm font-medium ${billingInterval === 'yearly' ? 'text-foreground' : 'text-muted-foreground'}`}>
+              Annually <span className="text-green-600 text-xs font-bold ml-1">(Save 20%)</span>
+            </span>
+          </div>
         </div>
 
-        {/* Pricing Cards */}
-        <div className="grid lg:grid-cols-3 gap-8 mb-16">
-          {pricingTiers.map((tier, index) => (
-            <Card 
-              key={tier.name}
-              className={`
-                relative shadow-medium hover-lift animate-slide-up
-                ${tier.popular ? 'border-primary shadow-strong scale-105' : 'border-border'}
-              `}
-              style={{animationDelay: `${index * 0.1}s`}}
-            >
-              {tier.badge && (
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <Badge className="bg-primary text-primary-foreground px-3 py-1">
-                    {tier.badge}
-                  </Badge>
-                </div>
+        <div className="grid lg:grid-cols-3 gap-8 items-start">
+          {/* Starter Tier */}
+          <Card className="relative border-border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-2xl">Starter</CardTitle>
+              <CardDescription>Perfect for trying it out</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold">Free</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Get 10 free credits when you create a new account. Enough for a full portfolio scan to see where you stand.
+              </p>
+              <ul className="space-y-3 text-sm">
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>10 Credits on signup</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Full Portfolio Scan</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Basic Insights</span>
+                </li>
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => navigate('/auth')}
+              >
+                Get Started for Free
+              </Button>
+            </CardFooter>
+          </Card>
+
+           {/* Pro Tier */}
+           <Card className="relative border-2 border-primary shadow-xl transform md:-translate-y-4 h-full flex flex-col z-10">
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+              <Badge className="bg-primary text-primary-foreground px-3 py-1 text-sm hover:bg-primary">
+                Most Popular
+              </Badge>
+            </div>
+            <CardHeader>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                Pro
+                <Sparkles className="h-5 w-5 text-primary fill-primary/20" />
+              </CardTitle>
+              <CardDescription>Complete application support</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl font-bold">
+                    {billingInterval === 'monthly' ? '$20' : '$16'}
+                </span>
+                <span className="text-muted-foreground">/mo</span>
+              </div>
+              {billingInterval === 'yearly' && (
+                <p className="text-xs text-green-600 font-medium -mt-4">
+                  Billed $192 yearly (one-time payment)
+                </p>
               )}
+              <p className="text-sm text-muted-foreground">
+                Comprehensive support from 0-100. Access all premium tools to build your strongest application.
+              </p>
+              <ul className="space-y-3 text-sm">
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span className="font-medium">100 Credits per month</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>PIQ Helper & Essay Workshop</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>Deep Dive Assessments</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>Priority Support 24/7</span>
+                </li>
+                 <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>Rollover unused credits</span>
+                </li>
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                className="w-full" 
+                size="lg"
+                onClick={() => navigate('/pricing')}
+              >
+                {billingInterval === 'monthly' ? 'Subscribe Monthly' : 'Subscribe Annually'}
+              </Button>
+            </CardFooter>
+          </Card>
+
+           {/* Pay As You Go Tier */}
+           <Card className="relative border-border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col">
+            <CardHeader>
+              <CardTitle className="text-2xl">Pay As You Go</CardTitle>
+              <CardDescription>Flexible top-ups anytime</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-8 flex-1">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold">${payAsYouGoPrice}</span>
+                <span className="text-muted-foreground">one-time</span>
+              </div>
               
-              <CardHeader className="text-center pb-6">
-                <div className="mb-4">
-                  {tier.name === 'Free Forever' && <Star className="h-12 w-12 mx-auto text-primary" />}
-                  {tier.name === 'Student' && <Check className="h-12 w-12 mx-auto text-primary" />}
-                  {tier.name === 'Schools' && <Building className="h-12 w-12 mx-auto text-primary" />}
-                </div>
-                
-                <CardTitle className="text-2xl mb-2">{tier.name}</CardTitle>
-                <CardDescription className="mb-4">{tier.description}</CardDescription>
-                
-                <div className="mb-6">
-                  <span className="text-4xl font-bold text-foreground">{tier.price}</span>
-                  {tier.price !== 'Custom' && (
-                    <span className="text-muted-foreground">/{tier.period}</span>
-                  )}
-                </div>
-              </CardHeader>
-              
-              <CardContent>
-                <div className="space-y-4 mb-8">
-                  {tier.features.map((feature, featureIndex) => (
-                    <div key={featureIndex} className="flex items-center gap-3">
-                      <div className="w-5 h-5 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                        <Check className="h-3 w-3 text-green-600" />
-                      </div>
-                      <span className="text-foreground text-sm">{feature}</span>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                    <div className="flex justify-between text-sm font-medium">
+                        <span>Credits</span>
+                        <span className="text-primary">{payAsYouGoCredits[0]}</span>
                     </div>
-                  ))}
+                    <Slider
+                        value={payAsYouGoCredits}
+                        onValueChange={setPayAsYouGoCredits}
+                        min={50}
+                        max={500}
+                        step={50}
+                        className="py-4"
+                    />
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>50</span>
+                        <span>500</span>
+                    </div>
                 </div>
                 
-                <Button 
-                  variant={tier.buttonVariant} 
-                  size="lg" 
-                  className={`
-                    w-full font-semibold
-                    ${tier.popular ? 'bg-primary hover:bg-primary-dark text-primary-foreground' : ''}
-                  `}
-                >
-                  {tier.buttonText}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+                <div className="p-4 bg-secondary/30 rounded-lg space-y-2">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                        <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                        <span>What can you do?</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                        {payAsYouGoCredits[0]} credits is enough for about {Math.floor(payAsYouGoCredits[0] / 10)} full portfolio scans or {Math.floor(payAsYouGoCredits[0] / 25)} deep essay reviews.
+                    </p>
+                </div>
+              </div>
+
+              <ul className="space-y-3 text-sm pt-2">
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Never expires</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Use on any tool</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <span>Instant access</span>
+                </li>
+              </ul>
+            </CardContent>
+            <CardFooter>
+              <Button 
+                variant="outline" 
+                className="w-full" 
+                onClick={() => navigate('/pricing')}
+              >
+                Buy Credits
+              </Button>
+            </CardFooter>
+          </Card>
         </div>
 
-        {/* Money Back Guarantee */}
-        <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-2xl p-8 text-center">
-          <h3 className="text-2xl font-bold text-foreground mb-4">
-            30-Day Money-Back Guarantee
-          </h3>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Not satisfied with your progress? Get a full refund within 30 days, 
-            no questions asked. We're confident Uplift will transform your journey.
-          </p>
-        </div>
-
-        {/* FAQ Preview */}
-        <div className="mt-16 text-center">
-          <h3 className="text-xl font-semibold text-foreground mb-4">
-            Questions about pricing?
-          </h3>
-          <p className="text-muted-foreground mb-6">
-            We offer student discounts, family plans, and need-based assistance.
-          </p>
-          <Button variant="outline">
-            View Full FAQ
-          </Button>
+        <div className="grid md:grid-cols-3 gap-8 pt-12 mt-12 border-t">
+            <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <GraduationCap className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold">Expert Guidance</h3>
+                <p className="text-sm text-muted-foreground">Backed by admissions data from top universities.</p>
+            </div>
+            <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <BookOpen className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold">Essay Workshops</h3>
+                <p className="text-sm text-muted-foreground">Step-by-step tools to craft compelling narratives.</p>
+            </div>
+            <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                    <HelpCircle className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold">24/7 Support</h3>
+                <p className="text-sm text-muted-foreground">We're here to help you throughout the entire process.</p>
+            </div>
         </div>
       </div>
     </section>

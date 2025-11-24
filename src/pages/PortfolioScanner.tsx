@@ -496,11 +496,12 @@ const PortfolioScanner = () => {
 
     const loadProfile = async () => {
       // Fetch profile by user_id
+      // Cast result to any to handle 'credits' column which exists in DB but might be missing from generated types
       const { data, error } = await supabase
         .from('profiles')
         .select('id, has_completed_assessment, credits')
         .eq('user_id', user.id)
-        .maybeSingle();
+        .maybeSingle() as { data: any, error: any };
 
       if (error) {
         // eslint-disable-next-line no-console
@@ -526,8 +527,8 @@ const PortfolioScanner = () => {
         setHasCompletedOnboarding(false);
         setCredits(0);
       } else {
-        setHasCompletedOnboarding(false);
-        setCredits(0);
+        setHasCompletedOnboarding(data.has_completed_assessment ?? false);
+        setCredits(data.credits ?? 0);
       }
       setInitializing(false);
     };
