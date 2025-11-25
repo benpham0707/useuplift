@@ -14,7 +14,7 @@ export function cn(...inputs: ClassValue[]) {
 console.log('DEBUG: VITE_API_BASE is:', (import.meta as any)?.env?.VITE_API_BASE);
 
 const API_BASE = ((import.meta as any)?.env?.VITE_API_BASE as string) || 
-  ((import.meta as any)?.env?.DEV ? '' : '');
+  ((import.meta as any)?.env?.DEV ? '' : 'https://uplift-backend-cyqk.onrender.com');
 
 export async function apiFetch(path: string, init: RequestInit = {}) {
   // Warn if in production and no API base is set (unless using a same-domain proxy)
