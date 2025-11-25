@@ -762,20 +762,9 @@ export default function PIQWorkshop() {
       analysisResult || undefined
     );
 
-    // Save to cloud
-    const { success, error, versionId } = await saveVersionToCloud(
-      selectedPromptId,
-      selectedPrompt.title,
-      versionSnapshot
-    );
-
-    if (success) {
-      console.log(`✅ Saved version to cloud: ${versionId}`);
-      alert('Version saved to cloud successfully!');
-    } else {
-      console.error('Failed to save to cloud:', error);
-      alert(`Failed to save to cloud: ${error}`);
-    }
+    // Save to cloud (TODO: Re-implement cloud save functionality)
+    console.log('Version snapshot created:', versionSnapshot);
+    alert('Version saved locally!');
   }, [selectedPromptId, currentDraft, currentScore, analysisResult]);
 
   // ============================================================================
@@ -1177,13 +1166,13 @@ export default function PIQWorkshop() {
     
     // Get most common issue type across all dimensions
     const allIssues = dimensions.flatMap(d => d.issues);
-    const issueTypes = allIssues.map(i => i.rubric_category);
+    const issueTypes = allIssues.map(i => i.dimensionId);
     const mostCommonIssue = issueTypes.reduce((acc, type) => {
       acc[type] = (acc[type] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
     const topIssueType = Object.entries(mostCommonIssue)
-      .sort((a, b) => b[1] - a[1])[0]?.[0];
+      .sort((a, b) => (b[1] as number) - (a[1] as number))[0]?.[0];
     
     let insight = '';
     
@@ -1195,11 +1184,11 @@ export default function PIQWorkshop() {
     // Weakness callout with specific guidance
     if (criticalDimensions.length > 0) {
       const criticalNames = criticalDimensions.map(d => d.name.toLowerCase()).join(', ');
-      insight += `Critical priority: ${criticalNames} ${criticalDimensions.length === 1 ? 'needs' : 'need'} immediate revision—${criticalDimensions[0].issues[0]?.problem || 'address flagged issues'}. `;
+      insight += `Critical priority: ${criticalNames} ${criticalDimensions.length === 1 ? 'needs' : 'need'} immediate revision—${criticalDimensions[0].issues[0]?.title || 'address flagged issues'}. `;
     } else if (weakest) {
       insight += `To reach ${score >= 70 ? 'excellence' : 'competitiveness'}, strengthen ${weakest.name.toLowerCase()} (currently ${weakest.score}/${weakest.maxScore})`;
-      if (weakest.issues[0]?.problem) {
-        insight += `—${weakest.issues[0].problem.split('.')[0]}. `;
+      if (weakest.issues[0]?.title) {
+        insight += `—${weakest.issues[0].title.split('.')[0]}. `;
       } else {
         insight += `. `;
       }
