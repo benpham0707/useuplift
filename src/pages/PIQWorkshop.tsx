@@ -27,6 +27,7 @@ import { DraftVersionHistory } from '@/components/portfolio/extracurricular/work
 
 // PIQ Prompt Selector
 import { PIQPromptSelector, UC_PIQ_PROMPTS } from '@/components/portfolio/piq/workshop/PIQPromptSelector';
+import { PIQCarouselNav } from '@/components/portfolio/piq/workshop/PIQCarouselNav';
 
 // Backend Integration
 import { analyzePIQEntry } from '@/services/piqWorkshopAnalysisService';
@@ -298,7 +299,6 @@ export default function PIQWorkshop() {
 
   // Caching & Save State
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
-  const [showResumeSessionBanner, setShowResumeSessionBanner] = useState(false);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Extract active issues from dimensions
@@ -498,15 +498,6 @@ export default function PIQWorkshop() {
   // AUTO-SAVE & RESUME SESSION
   // ============================================================================
 
-  // Resume session on mount
-  useEffect(() => {
-    const { hasAutoSave, promptId, lastSaved } = hasRecentAutoSave();
-
-    if (hasAutoSave && promptId && lastSaved) {
-      setShowResumeSessionBanner(true);
-      console.log(`📦 Found auto-save from ${formatSaveTime(lastSaved)} for prompt ${promptId}`);
-    }
-  }, []);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -565,32 +556,6 @@ export default function PIQWorkshop() {
     };
   }, [hasUnsavedChanges, currentDraft, selectedPromptId, currentScore, analysisResult, draftVersions]);
 
-  // Resume session handler
-  const handleResumeSession = useCallback(() => {
-    const { promptId } = hasRecentAutoSave();
-    if (!promptId) return;
-
-    const cache = loadFromLocalStorage(promptId);
-    if (!cache) return;
-
-    setCurrentDraft(cache.currentDraft);
-    setSelectedPromptId(cache.promptId);
-    setAnalysisResult(cache.analysisResult);
-    setDraftVersions(cache.versions.map(v => ({
-      text: v.text,
-      timestamp: v.timestamp,
-      score: v.score
-    })));
-    setCurrentVersionIndex(cache.versions.length - 1);
-    setShowResumeSessionBanner(false);
-    setHasUnsavedChanges(false);
-
-    console.log(`✅ Resumed session for ${cache.promptTitle}`);
-  }, []);
-
-  const handleStartFresh = useCallback(() => {
-    setShowResumeSessionBanner(false);
-  }, []);
 
   // Manual save to cloud
   const handleSaveToCloud = useCallback(async () => {
@@ -985,55 +950,28 @@ export default function PIQWorkshop() {
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
-          <div className="text-center">
-            <h1 className="text-xl font-bold text-primary">PIQ Narrative Workshop</h1>
-            <p className="text-xs text-muted-foreground">
-              PIQ #{MOCK_PIQ.piqNumber} · {MOCK_PIQ.category}
-              {lastSaveTime && (
-                <span className="ml-2 text-xs text-green-600 dark:text-green-400">
-                  • Saved {formatSaveTime(lastSaveTime.getTime())}
-                </span>
-              )}
-            </p>
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-center gap-2">
+              <GradientText className="text-lg font-bold">
+                PIQ Narrative Workshop
+              </GradientText>
+              <span className="text-muted-foreground/50">·</span>
+              <span className="text-sm font-medium text-muted-foreground">
+                PIQ #{MOCK_PIQ.piqNumber}: {MOCK_PIQ.category}
+              </span>
+            </div>
+            {lastSaveTime && (
+              <p className="text-xs text-green-600 dark:text-green-400">
+                • Saved {formatSaveTime(lastSaveTime.getTime())}
+              </p>
+            )}
           </div>
-          <div className="w-24" />
+          <PIQCarouselNav
+            currentPromptId={selectedPromptId}
+            onPromptChange={setSelectedPromptId}
+          />
         </div>
       </div>
-
-      {/* Resume Session Banner */}
-      {showResumeSessionBanner && (
-        <div className="mx-auto px-4 py-3 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
-          <div className="flex items-center justify-between max-w-4xl mx-auto">
-            <div className="flex items-center gap-3">
-              <History className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <div>
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
-                  Resume your last session?
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  Draft auto-saved {formatSaveTime(hasRecentAutoSave().lastSaved || Date.now())}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleStartFresh}
-                className="bg-white dark:bg-gray-900"
-              >
-                Start Fresh
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleResumeSession}
-              >
-                Resume
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main content */}
       <div className="relative z-10 mx-auto px-4 py-12 space-y-6">
