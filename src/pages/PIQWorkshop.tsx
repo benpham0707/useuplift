@@ -326,10 +326,15 @@ export default function PIQWorkshop() {
 
   // Scroll-based carousel positioning
   const [scrollY, setScrollY] = useState(0);
-  const SCROLL_THRESHOLD = 200; // pixels to start transition
-  const MAX_OFFSET = 40; // max horizontal shift in pixels
-  const scrollProgress = Math.min(scrollY / SCROLL_THRESHOLD, 1);
-  const scrollOffset = -MAX_OFFSET * scrollProgress; // negative to shift left
+  const SCROLL_THRESHOLD = 150; // Start transition when sticky header engages
+  const TRANSITION_DURATION = 300; // pixels over which to complete the transition
+  const MAX_OFFSET = 120; // max horizontal shift in pixels (positive = shift right)
+  
+  // Only start transition after threshold, complete over TRANSITION_DURATION pixels
+  const scrollProgress = scrollY < SCROLL_THRESHOLD 
+    ? 0 
+    : Math.min((scrollY - SCROLL_THRESHOLD) / TRANSITION_DURATION, 1);
+  const scrollOffset = MAX_OFFSET * scrollProgress; // positive to shift right
 
   // Extract active issues from dimensions
   const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
