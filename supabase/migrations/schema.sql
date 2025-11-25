@@ -35,6 +35,30 @@ CREATE TABLE public.academic_journey (
   CONSTRAINT academic_journey_pkey PRIMARY KEY (id),
   CONSTRAINT academic_journey_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
+CREATE TABLE public.credit_transactions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  amount integer NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['subscription_grant'::text, 'addon_purchase'::text, 'usage'::text, 'bonus'::text])),
+  description text,
+  stripe_payment_id text,
+  created_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT credit_transactions_pkey PRIMARY KEY (id),
+  CONSTRAINT credit_transactions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.devices (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  ua text,
+  os text,
+  browser text,
+  ip_hash text,
+  country text,
+  last_seen timestamp with time zone NOT NULL DEFAULT now(),
+  revoked_at timestamp with time zone,
+  CONSTRAINT devices_pkey PRIMARY KEY (id),
+  CONSTRAINT devices_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
 CREATE TABLE public.experiences_activities (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   profile_id uuid NOT NULL,
@@ -123,6 +147,7 @@ CREATE TABLE public.personal_information (
   parent_guardians jsonb,
   siblings jsonb,
   first_gen boolean,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT personal_information_pkey PRIMARY KEY (id),
   CONSTRAINT personal_information_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
@@ -137,6 +162,21 @@ CREATE TABLE public.portfolio_analytics (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT portfolio_analytics_pkey PRIMARY KEY (id),
   CONSTRAINT portfolio_analytics_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
+);
+CREATE TABLE public.portfolio_analytics_history (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  profile_id uuid NOT NULL,
+  prev_overall numeric,
+  new_overall numeric NOT NULL,
+  prev_dimensions jsonb,
+  new_dimensions jsonb NOT NULL,
+  changed_fields jsonb,
+  reason_summary text,
+  model_used text,
+  cost_cents integer DEFAULT 0,
+  created_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT portfolio_analytics_history_pkey PRIMARY KEY (id),
+  CONSTRAINT portfolio_analytics_history_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
 CREATE TABLE public.profiles (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -159,8 +199,23 @@ CREATE TABLE public.profiles (
   archived_at timestamp with time zone,
   deleted_at timestamp with time zone,
   has_completed_assessment boolean NOT NULL DEFAULT false,
+  credits integer NOT NULL DEFAULT 0,
+  stripe_customer_id text,
+  subscription_status text DEFAULT 'none'::text CHECK (subscription_status = ANY (ARRAY['active'::text, 'canceled'::text, 'past_due'::text, 'none'::text])),
   CONSTRAINT profiles_pkey PRIMARY KEY (id),
   CONSTRAINT profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+);
+CREATE TABLE public.subscriptions (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id uuid NOT NULL,
+  stripe_subscription_id text NOT NULL UNIQUE,
+  status text NOT NULL,
+  current_period_end timestamp with time zone,
+  cancel_at_period_end boolean DEFAULT false,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT subscriptions_pkey PRIMARY KEY (id),
+  CONSTRAINT subscriptions_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
 CREATE TABLE public.support_network (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

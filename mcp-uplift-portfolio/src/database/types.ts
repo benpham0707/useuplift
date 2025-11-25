@@ -32,7 +32,7 @@ export type ProfileStatus = z.infer<typeof ProfileStatusSchema>;
 
 export const ProfileSchema = z.object({
   id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   user_context: UserContextSchema,
   status: ProfileStatusSchema,
   goals: z.object({

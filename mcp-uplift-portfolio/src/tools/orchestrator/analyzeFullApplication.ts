@@ -22,7 +22,7 @@ export const AnalyzeFullApplicationInputSchema = z.object({
     'piq7_community',
     'piq8_open_ended'
   ]),
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 export type AnalyzeFullApplicationInput = z.infer<typeof AnalyzeFullApplicationInputSchema>;

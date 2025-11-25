@@ -31,7 +31,11 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    (req as any).rawBody = buf;
+  }
+}));
 // Mount routes at both /api/v1 (backend) and /api (frontend workshop)
 app.use("/api/v1", routes);
 app.use("/api", routes);

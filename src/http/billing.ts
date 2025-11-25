@@ -38,24 +38,27 @@ type AddonPlan = {
 type Plan = SubscriptionPlan | AddonPlan;
 
 const PLANS: Record<string, Plan> = {
+  pro_monthly: {
+    name: 'Pro Monthly Subscription',
+    amount: 2000, // $20.00
+    currency: 'usd',
+    credits: 100,
+    interval: 'month',
+  },
+  pro_yearly: {
+    name: 'Pro Annual Subscription',
+    amount: 19200, // $192.00 (Save 20%)
+    currency: 'usd',
+    credits: 1200, // 100 * 12
+    interval: 'year',
+  },
+  // Legacy fallback
   subscription: {
     name: 'Monthly Subscription',
     amount: 2000, // $20.00
     currency: 'usd',
     credits: 100,
     interval: 'month',
-  },
-  addon_50: {
-    name: '50 Credits Pack',
-    amount: 1000, // $10.00
-    currency: 'usd',
-    credits: 50,
-  },
-  addon_100: {
-    name: '100 Credits Pack',
-    amount: 2000, // $20.00
-    currency: 'usd',
-    credits: 100,
   },
 };
 
@@ -72,11 +75,25 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    if (!type || !PLANS[type as keyof typeof PLANS]) {
-      return res.status(400).json({ error: 'Invalid plan type' });
+    let plan = PLANS[type as keyof typeof PLANS];
+
+    // Handle dynamic addons (addon_50, addon_100, ..., addon_500)
+    if (!plan && type.startsWith('addon_')) {
+        const credits = parseInt(type.split('_')[1]);
+        // Validate: multiple of 50, between 50 and 500
+        if (!isNaN(credits) && credits % 50 === 0 && credits >= 50 && credits <= 500) {
+             plan = {
+                name: `${credits} Credits Pack`,
+                amount: (credits / 50) * 1000, // $10 per 50 credits ($1000 cents)
+                currency: 'usd',
+                credits: credits,
+             };
+        }
     }
 
-    const plan = PLANS[type as keyof typeof PLANS];
+    if (!plan) {
+      return res.status(400).json({ error: 'Invalid plan type' });
+    }
 
     // Get or create customer
     const { data: profile } = await supabase
@@ -156,7 +173,12 @@ export const handleWebhook = async (req: Request, res: Response) => {
 
   try {
     if (endpointSecret) {
-      event = stripe.webhooks.constructEvent(req.body, sig as string, endpointSecret);
+      const rawBody = (req as any).rawBody;
+      if (!rawBody) {
+        console.error('Webhook Error: Missing raw body for signature verification');
+        return res.status(400).send('Webhook Error: Missing raw body');
+      }
+      event = stripe.webhooks.constructEvent(rawBody, sig as string, endpointSecret);
     } else {
       event = req.body; // For local testing without signature verification if secret is missing
     }
@@ -184,7 +206,8 @@ export const handleWebhook = async (req: Request, res: Response) => {
              .single();
 
            if (subscription) {
-             // Grant monthly credits
+             // Grant monthly credits (100 is default for subscription renewal)
+             // Ideally we should store the plan credits on the subscription or metadata
              await grantCredits(subscription.user_id, 100, 'subscription_renewal', invoice.payment_intent || invoice.id);
            }
         }
@@ -231,7 +254,7 @@ async function processCheckoutSession(session: any) {
     if (userId && credits > 0) {
         await grantCredits(userId, credits, type, paymentId);
         
-        if (type === 'subscription') {
+        if (type === 'pro_monthly' || type === 'pro_yearly' || type === 'subscription') {
             await handleSubscriptionCreated(userId, session);
         }
     }
@@ -274,7 +297,7 @@ async function grantCredits(userId: string, amount: number, type: string, refere
     .insert({
       user_id: userId,
       amount: amount,
-      type: type === 'subscription' || type === 'subscription_renewal' ? 'subscription_grant' : 'addon_purchase',
+      type: type.includes('subscription') || type === 'pro_monthly' || type === 'pro_yearly' ? 'subscription_grant' : 'addon_purchase',
       description: `Purchased ${amount} credits via ${type}`,
       stripe_payment_id: referenceId
     });
