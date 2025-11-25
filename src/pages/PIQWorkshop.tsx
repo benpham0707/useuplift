@@ -1227,41 +1227,38 @@ export default function PIQWorkshop() {
 
       {/* Sticky header */}
       <div className="sticky top-0 z-50 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
-        <div className="mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="mx-auto px-4 py-4 flex items-center justify-between gap-4">
+          {/* Left: Back button */}
           <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-center gap-2">
-              <GradientText className="text-lg font-bold">
-                PIQ Narrative Workshop
-              </GradientText>
-              <span className="text-muted-foreground/50">·</span>
-              <span className="text-sm font-medium text-muted-foreground">
-                PIQ #{MOCK_PIQ.piqNumber}: {MOCK_PIQ.category}
-              </span>
-            </div>
-            {lastSaveTime && (
-              <p className="text-xs text-green-600 dark:text-green-400">
-                • Saved {formatSaveTime(lastSaveTime.getTime())}
-              </p>
-            )}
-          </div>
-          <div className="flex items-center gap-4">
 
-          {/* Save Status Indicator (NEW) */}
-          <div className="flex items-center gap-2">
+          {/* Center: PIQ Carousel Navigation */}
+          <div className="flex-1 flex justify-center">
+            <PIQCarouselNav
+              currentPromptId={selectedPromptId}
+              onPromptChange={setSelectedPromptId}
+            />
+          </div>
+
+          {/* Right: Save Status */}
+          <div className="flex items-center gap-2 min-w-[120px] justify-end">
             {saveStatus === 'saving' && (
               <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Saving...</span>
               </div>
             )}
-            {saveStatus === 'saved' && (
-              <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-                <CheckCircle className="w-4 h-4" />
-                <span>Saved</span>
+            {saveStatus === 'saved' && lastSaveTime && (
+              <div className="flex flex-col items-end gap-0.5">
+                <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
+                  <CheckCircle className="w-4 h-4" />
+                  <span>Saved</span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {formatSaveTime(lastSaveTime.getTime())}
+                </span>
               </div>
             )}
             {saveStatus === 'error' && (
@@ -1285,12 +1282,6 @@ export default function PIQWorkshop() {
                 <span>Sign in to save</span>
               </div>
             )}
-          </div>
-
-          <PIQCarouselNav
-            currentPromptId={selectedPromptId}
-            onPromptChange={setSelectedPromptId}
-          />
           </div>
         </div>
       </div>
