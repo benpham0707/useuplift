@@ -45,7 +45,8 @@ import {
   LogOut
 } from 'lucide-react';
 import Dock from '@/components/Dock';
-import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
+// OnboardingFlow removed for V1 - users go directly to portfolio dashboard
+// import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import PortfolioPathway from '@/components/portfolio/PortfolioPathway';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -540,7 +541,7 @@ const PortfolioScanner = () => {
   useEffect(() => {
     async function fetchStrength() {
       try {
-        if (!user || !hasCompletedOnboarding) return;
+        if (!user) return;
         setAiLoading(true);
         setAiError(null);
         const session = await supabase.auth.getSession();
@@ -583,7 +584,7 @@ const PortfolioScanner = () => {
     const onReconciled = () => fetchStrength();
     window.addEventListener('analytics:reconciled', onReconciled);
     return () => window.removeEventListener('analytics:reconciled', onReconciled);
-  }, [user, hasCompletedOnboarding]);
+  }, [user]);
 
   // Enable scroll snapping on this page only
   useEffect(() => {
@@ -754,22 +755,8 @@ const PortfolioScanner = () => {
     );
   }
 
-  if (!hasCompletedOnboarding) {
-    return (
-      <div className="min-h-screen bg-gradient-subtle">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <OnboardingFlow onComplete={async () => {
-            if (!user) return;
-            await supabase
-              .from('profiles')
-              .update({ has_completed_assessment: true })
-              .eq('user_id', user.id);
-            setHasCompletedOnboarding(true);
-          }} />
-        </div>
-      </div>
-    );
-  }
+  // Assessment flow removed for V1 - users go directly to portfolio dashboard
+  // if (!hasCompletedOnboarding) { ... }
 
   return (
     <div className="min-h-screen bg-background">
