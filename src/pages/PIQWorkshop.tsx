@@ -1299,9 +1299,9 @@ export default function PIQWorkshop() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 mx-auto px-4 py-6 space-y-6">
+      <div className="relative z-10 mx-auto px-4 pt-3 pb-6 space-y-6">
         {/* Hero section */}
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex flex-col md:flex-row gap-6 items-start">
             {/* Narrative Quality Index Card - Professional Data-Dense Design */}
             <Card className="flex-1 p-5">
