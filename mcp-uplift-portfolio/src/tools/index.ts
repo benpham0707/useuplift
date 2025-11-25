@@ -38,58 +38,58 @@ import type {
 
 // Tool 1: get_student_profile
 export const GetStudentProfileInputSchema = z.object({
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 2: get_extracurriculars
 export const GetExtracurricularsInputSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   include_leadership_only: z.boolean().optional().default(false)
 });
 
 // Tool 3: get_academic_context
 export const GetAcademicContextInputSchema = z.object({
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 4: get_context_circumstances
 export const GetContextCircumstancesInputSchema = z.object({
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 5: get_all_essays (placeholder - will integrate with essay system)
 export const GetAllEssaysInputSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   include_analysis: z.boolean().optional().default(false)
 });
 
 // Tool 6: check_repetition
 export const CheckRepetitionInputSchema = z.object({
   current_essay_text: z.string().min(1),
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 7: get_portfolio_analytics
 export const GetPortfolioAnalyticsInputSchema = z.object({
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 8: validate_claim
 export const ValidateClaimInputSchema = z.object({
   claim: z.string().min(1),
   claim_type: z.enum(['leadership', 'activity', 'achievement', 'academic']),
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 9: suggest_piq_prompts
 export const SuggestPIQPromptsInputSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   already_written: z.array(z.number().min(1).max(8)).optional().default([])
 });
 
 // Tool 10: analyze_portfolio_balance
 export const AnalyzePortfolioBalanceInputSchema = z.object({
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   piq_numbers: z.array(z.number().min(1).max(8))
 });
 
@@ -97,12 +97,12 @@ export const AnalyzePortfolioBalanceInputSchema = z.object({
 export const GetBetterStoriesInputSchema = z.object({
   current_essay_text: z.string().min(1),
   piq_prompt_number: z.number().min(1).max(8),
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // Tool 12: check_narrative_consistency
 export const CheckNarrativeConsistencyInputSchema = z.object({
-  user_id: z.string().uuid()
+  user_id: z.string()
 });
 
 // ============================================================================

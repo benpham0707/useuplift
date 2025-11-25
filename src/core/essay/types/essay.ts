@@ -65,7 +65,7 @@ export type AnalysisDepth = z.infer<typeof AnalysisDepthSchema>;
 export const EssaySchema = z.object({
   // Primary keys
   id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   profile_id: z.string().uuid().nullable().optional(),
 
   // Essay metadata
@@ -420,7 +420,7 @@ export type MotifMap = z.infer<typeof MotifMapSchema>;
 export const ApplicationSetSchema = z.object({
   // Primary keys
   id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   profile_id: z.string().uuid().nullable().optional(),
 
   // Set metadata

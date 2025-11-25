@@ -11,7 +11,7 @@ import { z } from "zod";
 
 export const ExperienceEntrySchema = z.object({
   id: z.string().uuid(),
-  user_id: z.string().uuid(),
+  user_id: z.string(),
   created_at: z.string().datetime().optional(),
   updated_at: z.string().datetime().optional(),
 

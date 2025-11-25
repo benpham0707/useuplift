@@ -1,13 +1,12 @@
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase, SUPABASE_URL } from '@/integrations/supabase/client';
+import { createContext, useContext, ReactNode } from 'react';
+import { useUser, useClerk } from '@clerk/clerk-react';
 
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: any | null;
+  session: any | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email?: string, password?: string) => Promise<{ error: any }>;
+  signIn: (email?: string, password?: string) => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<{ error: any }>;
   sendMagicLink: (email: string) => Promise<{ error: any }>;
   requestPasswordReset: (email: string) => Promise<{ error: any }>;
@@ -18,100 +17,61 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user: clerkUser, isLoaded } = useUser();
+  const { signOut: clerkSignOut, openSignIn, openSignUp } = useClerk();
 
-  useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+  // Map Clerk user to a shape compatible with existing code (Supabase-like)
+  const user = clerkUser ? {
+    id: clerkUser.id,
+    email: clerkUser.primaryEmailAddress?.emailAddress,
+    email_confirmed_at: clerkUser.primaryEmailAddress?.verification.status === 'verified' ? new Date().toISOString() : null,
+    user_metadata: clerkUser.publicMetadata,
+    app_metadata: clerkUser.unsafeMetadata,
+  } : null;
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+  const loading = !isLoaded;
 
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const signUp = async (email: string, password: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl
-      }
-    });
-    return { error };
+  // Shim methods to use Clerk UI
+  const signUp = async () => {
+    openSignUp();
+    return { error: null };
   };
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    if (!error) {
-      // best-effort notify new signin
-      try {
-        const ua = navigator.userAgent;
-        await fetch(`${SUPABASE_URL}/functions/v1/notify-new-signin`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token ?? ''}` },
-          body: JSON.stringify({ ua })
-        });
-      } catch (_) {}
-    }
-    return { error };
+  const signIn = async () => {
+    openSignIn();
+    return { error: null };
   };
 
   const signInWithGoogle = async () => {
-    const redirectTo = `${window.location.origin}/portfolio-scanner`;
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo }
-    });
-    return { error };
+    // Clerk handles this in the modal
+    openSignIn();
+    return { error: null };
   };
 
-  const sendMagicLink = async (email: string) => {
-    const emailRedirectTo = `${window.location.origin}/portfolio-scanner`;
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo }
-    });
-    return { error };
+  const sendMagicLink = async () => {
+    openSignIn();
+    return { error: null };
   };
 
-  const requestPasswordReset = async (email: string) => {
-    const redirectTo = `${window.location.origin}/reset-password`;
-    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    return { error };
+  const requestPasswordReset = async () => {
+    openSignIn(); // Clerk handles reset flow
+    return { error: null };
   };
 
-  const updatePassword = async (newPassword: string) => {
-    const { error } = await supabase.auth.updateUser({ password: newPassword });
-    return { error };
+  const updatePassword = async () => {
+    // Clerk manages profile
+    return { error: null };
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    await clerkSignOut();
+    return { error: null };
   };
 
   return (
     <AuthContext.Provider value={{
       user,
-      session,
+      session: null,
       loading,
       signUp,
       signIn,
