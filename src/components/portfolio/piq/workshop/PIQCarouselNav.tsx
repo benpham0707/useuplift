@@ -77,7 +77,7 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
       </div>
 
       {/* Dot indicators */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-2">
         {UC_PIQ_PROMPTS.map((prompt, index) => (
           <TooltipProvider key={prompt.id}>
             <Tooltip>
