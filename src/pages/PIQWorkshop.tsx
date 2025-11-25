@@ -324,6 +324,13 @@ export default function PIQWorkshop() {
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Scroll-based carousel positioning
+  const [scrollY, setScrollY] = useState(0);
+  const SCROLL_THRESHOLD = 200; // pixels to start transition
+  const MAX_OFFSET = 40; // max horizontal shift in pixels
+  const scrollProgress = Math.min(scrollY / SCROLL_THRESHOLD, 1);
+  const scrollOffset = -MAX_OFFSET * scrollProgress; // negative to shift left
+
   // Extract active issues from dimensions
   const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
 
@@ -744,6 +751,12 @@ export default function PIQWorkshop() {
     };
   }, [hasUnsavedChanges, currentDraft, selectedPromptId, currentScore, analysisResult, draftVersions]);
 
+  // Scroll tracking for carousel positioning
+  useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   // Manual save to cloud
   const handleSaveToCloud = useCallback(async () => {
@@ -1216,15 +1229,20 @@ export default function PIQWorkshop() {
 
       {/* Sticky header */}
       <div className="sticky top-0 z-50 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
-        <div className="mx-auto px-4 py-4 flex items-center justify-between gap-4">
+        <div className="mx-auto px-4 py-4 flex items-center justify-between gap-4 relative">
           {/* Left: Back button */}
           <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
 
-          {/* Center: PIQ Carousel Navigation */}
-          <div className="flex-1 flex justify-center">
+          {/* Center: PIQ Carousel Navigation - with dynamic scroll-based positioning */}
+          <div 
+            className="absolute left-1/2 transition-transform duration-300 ease-out"
+            style={{
+              transform: `translateX(calc(-50% + ${scrollOffset}px))`
+            }}
+          >
             <PIQCarouselNav
               currentPromptId={selectedPromptId}
               onPromptChange={setSelectedPromptId}
@@ -1232,7 +1250,7 @@ export default function PIQWorkshop() {
           </div>
 
           {/* Right: Save Status */}
-          <div className="flex items-center gap-2 min-w-[120px] justify-end">
+          <div className="flex items-center gap-2 min-w-[120px] justify-end ml-auto">
             {saveStatus === 'saving' && (
               <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
