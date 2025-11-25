@@ -1299,7 +1299,7 @@ export default function PIQWorkshop() {
       </div>
 
       {/* Main content */}
-      <div className="relative z-10 mx-auto px-4 py-12 space-y-6">
+      <div className="relative z-10 mx-auto px-4 py-6 space-y-6">
         {/* Hero section */}
         <div className="space-y-6">
           <div className="flex flex-col md:flex-row gap-6 items-start">
