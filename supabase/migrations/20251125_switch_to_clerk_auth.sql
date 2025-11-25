@@ -185,3 +185,5 @@ CREATE POLICY "Clerk: Users can view own support" ON public.support_network
 CREATE POLICY "Clerk: Users can modify own support" ON public.support_network
     FOR ALL TO authenticated
     USING (profile_id IN (SELECT id FROM public.profiles WHERE user_id = (select auth.jwt() ->> 'sub')));
+
+
