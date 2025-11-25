@@ -1319,7 +1319,7 @@ export default function PIQWorkshop() {
           {/* Right column: PIQ Prompt Selector + Chat */}
           <div className="space-y-6">
             {/* Chat */}
-            <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg sticky top-32">
+            <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg sticky top-28">
               <ContextualWorkshopChat
                 activity={MOCK_PIQ as any}
                 currentDraft={currentDraft}
