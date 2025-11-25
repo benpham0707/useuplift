@@ -329,29 +329,17 @@ Return ONLY valid JSON with this structure:
       console.log(`📊 Score calibration: ${originalNQI} -> ${rubricAnalysis.narrative_quality_index}`);
     }
 
-    // Stage 4: Surgical Workshop Items (Issues & Suggestions)
-    const workshopResponse = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 16384,
-        temperature: 0.8,
-        system: `You are a surgical essay editor. Identify ALL specific issues in the essay (up to 12 maximum) and provide 3 types of surgical fixes for each:
+    // Stage 4: Surgical Workshop Items (3-Tiered Batched Approach for Maximum Quality)
+    // Tier 1: 4 critical/high severity items with full depth
+    // Tier 2: 4 medium/high items covering uncovered dimensions
+    // Tier 3: 4 final items filling remaining gaps
+    console.log('🔧 Stage 4: Generating workshop items (3-tier batched approach)...');
+
+    const BASE_SYSTEM_PROMPT = `You are a surgical essay editor. Identify specific issues in the essay and provide 3 types of surgical fixes:
 
 1. polished_original: Minimal edits preserving voice
 2. voice_amplifier: Heightens student's existing voice patterns
 3. divergent_strategy: Bold alternative exploring different angle
-
-IMPORTANT:
-- Identify up to 12 distinct issues (do NOT limit yourself to 5)
-- Focus on the most impactful problems first (critical > high > medium > low)
-- Every low-scoring dimension should get at least one workshop item
-- Don't artificially limit your analysis - list ALL significant issues up to 12
 
 For each issue:
 - Extract exact quote from essay
@@ -366,8 +354,8 @@ Return ONLY valid JSON with this structure:
     {
       "id": "unique_id",
       "quote": "exact text from essay",
-      "problem": "brief problem description",
-      "why_it_matters": "impact explanation",
+      "problem": "detailed problem description",
+      "why_it_matters": "concrete impact explanation",
       "severity": "critical" | "high" | "medium" | "low",
       "rubric_category": "dimension_name",
       "suggestions": [
@@ -389,36 +377,188 @@ Return ONLY valid JSON with this structure:
       ]
     }
   ]
-}`,
-        messages: [
-          {
-            role: 'user',
-            content: `Identify ALL surgical fixes for this essay (up to 12 maximum):\n\nPrompt: ${requestBody.promptText}\n\nEssay:\n${requestBody.essayText}\n\nRubric Analysis:\n${JSON.stringify(rubricAnalysis, null, 2)}\n\nIMPORTANT: Provide up to 12 workshop items, prioritized by severity. Don't stop at 5 - list all significant issues you find up to the 12-item cap.`
-          }
-        ]
+}`;
+
+    // Tier 1: Critical/High Priority Items (4 items)
+    console.log('  📍 Tier 1: Generating 4 critical/high priority items...');
+    const tier1Response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        temperature: 0.8,
+        system: BASE_SYSTEM_PROMPT + `
+
+TIER 1: Focus on the 4 MOST CRITICAL issues (severity: critical/high)`,
+        messages: [{
+          role: 'user',
+          content: `Identify 4 critical workshop items for this essay:
+
+Prompt: ${requestBody.promptText}
+
+Essay:
+${requestBody.essayText}
+
+Rubric Analysis:
+${JSON.stringify(rubricAnalysis, null, 2)}
+
+Voice Fingerprint:
+${JSON.stringify(voiceFingerprint, null, 2)}`
+        }]
       })
     });
 
-    if (!workshopResponse.ok) {
-      const errorText = await workshopResponse.text();
-      console.error('Workshop items API error:', errorText);
-      throw new Error(`Workshop items generation failed: ${workshopResponse.status}`);
+    if (!tier1Response.ok) {
+      const errorText = await tier1Response.text();
+      console.error('Tier 1 API error:', errorText);
+      throw new Error(`Tier 1 generation failed: ${tier1Response.status}`);
     }
 
-    const workshopResult = await workshopResponse.json();
-    const workshopText = workshopResult.content[0].text;
-
-    let workshopData;
+    const tier1Result = await tier1Response.json();
+    const tier1Text = tier1Result.content[0].text;
+    let tier1Data;
     try {
-      const jsonMatch = workshopText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      const jsonString = jsonMatch ? jsonMatch[1].trim() : workshopText.trim();
-      workshopData = JSON.parse(jsonString);
+      const jsonMatch = tier1Text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      const jsonString = jsonMatch ? jsonMatch[1].trim() : tier1Text.trim();
+      tier1Data = JSON.parse(jsonString);
     } catch (e) {
-      console.error('Failed to parse workshop JSON:', workshopText);
-      workshopData = { workshopItems: [] };
+      console.error('Failed to parse Tier 1 JSON:', tier1Text);
+      tier1Data = { workshopItems: [] };
     }
 
-    console.log('✅ Workshop items complete');
+    console.log(`  ✅ Tier 1 complete: ${tier1Data.workshopItems?.length || 0} items`);
+
+    // Tier 2: Medium/High Priority Items (4 items, excluding Tier 1 dimensions)
+    console.log('  📍 Tier 2: Generating 4 medium/high priority items...');
+    const tier1Categories = tier1Data.workshopItems?.map((item: any) => item.rubric_category) || [];
+
+    const tier2Response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        temperature: 0.8,
+        system: BASE_SYSTEM_PROMPT + `
+
+TIER 2: Cover dimensions NOT in Tier 1 (severity: medium/high)`,
+        messages: [{
+          role: 'user',
+          content: `Identify 4 workshop items for this essay (excluding already-covered dimensions):
+
+Prompt: ${requestBody.promptText}
+
+Essay:
+${requestBody.essayText}
+
+Rubric Analysis:
+${JSON.stringify(rubricAnalysis, null, 2)}
+
+Voice Fingerprint:
+${JSON.stringify(voiceFingerprint, null, 2)}
+
+Already covered: ${tier1Categories.join(', ')}`
+        }]
+      })
+    });
+
+    if (!tier2Response.ok) {
+      const errorText = await tier2Response.text();
+      console.error('Tier 2 API error:', errorText);
+      throw new Error(`Tier 2 generation failed: ${tier2Response.status}`);
+    }
+
+    const tier2Result = await tier2Response.json();
+    const tier2Text = tier2Result.content[0].text;
+    let tier2Data;
+    try {
+      const jsonMatch = tier2Text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      const jsonString = jsonMatch ? jsonMatch[1].trim() : tier2Text.trim();
+      tier2Data = JSON.parse(jsonString);
+    } catch (e) {
+      console.error('Failed to parse Tier 2 JSON:', tier2Text);
+      tier2Data = { workshopItems: [] };
+    }
+
+    console.log(`  ✅ Tier 2 complete: ${tier2Data.workshopItems?.length || 0} items`);
+
+    // Tier 3: Final Polish Items (4 items, filling remaining gaps)
+    console.log('  📍 Tier 3: Generating 4 final polish items...');
+    const tier2Categories = tier2Data.workshopItems?.map((item: any) => item.rubric_category) || [];
+    const allCoveredCategories = [...tier1Categories, ...tier2Categories];
+
+    const tier3Response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': anthropicApiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 8192,
+        temperature: 0.8,
+        system: BASE_SYSTEM_PROMPT + `
+
+TIER 3: Final 4 items covering remaining dimensions`,
+        messages: [{
+          role: 'user',
+          content: `Identify 4 final workshop items for this essay:
+
+Prompt: ${requestBody.promptText}
+
+Essay:
+${requestBody.essayText}
+
+Rubric Analysis:
+${JSON.stringify(rubricAnalysis, null, 2)}
+
+Voice Fingerprint:
+${JSON.stringify(voiceFingerprint, null, 2)}
+
+Already covered: ${allCoveredCategories.join(', ')}`
+        }]
+      })
+    });
+
+    if (!tier3Response.ok) {
+      const errorText = await tier3Response.text();
+      console.error('Tier 3 API error:', errorText);
+      throw new Error(`Tier 3 generation failed: ${tier3Response.status}`);
+    }
+
+    const tier3Result = await tier3Response.json();
+    const tier3Text = tier3Result.content[0].text;
+    let tier3Data;
+    try {
+      const jsonMatch = tier3Text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      const jsonString = jsonMatch ? jsonMatch[1].trim() : tier3Text.trim();
+      tier3Data = JSON.parse(jsonString);
+    } catch (e) {
+      console.error('Failed to parse Tier 3 JSON:', tier3Text);
+      tier3Data = { workshopItems: [] };
+    }
+
+    console.log(`  ✅ Tier 3 complete: ${tier3Data.workshopItems?.length || 0} items`);
+
+    // Combine all tiers
+    const allWorkshopItems = [
+      ...(tier1Data.workshopItems || []),
+      ...(tier2Data.workshopItems || []),
+      ...(tier3Data.workshopItems || [])
+    ];
+
+    const workshopData = { workshopItems: allWorkshopItems };
+    console.log(`✅ Stage 4 complete: ${allWorkshopItems.length} total workshop items (Tier 1: ${tier1Data.workshopItems?.length || 0}, Tier 2: ${tier2Data.workshopItems?.length || 0}, Tier 3: ${tier3Data.workshopItems?.length || 0})`);
 
     // Assemble final result
     const finalResult = {
