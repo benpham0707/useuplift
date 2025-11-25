@@ -56,6 +56,7 @@ import {
 } from '@/services/piqWorkshop/piqDatabaseService';
 
 // Authentication
+import { useAuth } from '@clerk/clerk-react';
 import { useClerkUserId, useIsAuthenticated } from '@/services/auth/clerkSupabaseAdapter';
 
 // ============================================================================
@@ -285,6 +286,7 @@ export default function PIQWorkshop() {
   // AUTHENTICATION
   // ============================================================================
 
+  const { getToken } = useAuth();
   const userId = useClerkUserId();
   const isAuthenticated = useIsAuthenticated();
 
@@ -457,12 +459,21 @@ export default function PIQWorkshop() {
       // AUTO-SAVE analysis result to database (NEW)
       if (userId && currentEssayId) {
         console.log('📤 Auto-saving analysis result to database...');
-        const saveResult = await saveAnalysisReport(userId, currentEssayId, result);
-        if (saveResult.success) {
-          console.log('✅ Analysis auto-saved to database:', saveResult.reportId);
-        } else {
-          console.warn('⚠️  Failed to auto-save analysis:', saveResult.error);
-          // Non-blocking - don't interrupt user flow
+        try {
+          const token = await getToken({ template: 'supabase' });
+          if (token) {
+            const saveResult = await saveAnalysisReport(token, userId, currentEssayId, result);
+            if (saveResult.success) {
+              console.log('✅ Analysis auto-saved to database:', saveResult.reportId);
+            } else {
+              console.warn('⚠️  Failed to auto-save analysis:', saveResult.error);
+              // Non-blocking - don't interrupt user flow
+            }
+          } else {
+            console.warn('⚠️  No Clerk token available - skipping analysis auto-save');
+          }
+        } catch (error) {
+          console.error('❌ Error getting Clerk token:', error);
         }
       } else if (userId) {
         console.log('📝 Essay not saved yet - skipping analysis auto-save');
@@ -552,7 +563,15 @@ export default function PIQWorkshop() {
       console.log(`📥 Loading essay from database for prompt: ${selectedPromptId}`);
 
       try {
+        const token = await getToken({ template: 'supabase' });
+        if (!token) {
+          console.warn('⚠️  No Clerk token available - skipping database load');
+          setIsLoadingFromDatabase(false);
+          return;
+        }
+
         const { success, essay, analysis, error } = await loadPIQEssay(
+          token,
           userId,
           selectedPromptId,
           selectedPrompt.prompt
@@ -803,9 +822,19 @@ export default function PIQWorkshop() {
     setLastSaveError(null);
 
     try {
+      // Get Clerk token
+      const token = await getToken({ template: 'supabase' });
+      if (!token) {
+        console.error('❌ No Clerk token available');
+        setSaveStatus('error');
+        setLastSaveError('Authentication token not available. Please sign in again.');
+        return;
+      }
+
       // Save essay to database
       console.log('📤 Saving essay to database...');
       const { success, essayId, error, isNew } = await saveOrUpdatePIQEssay(
+        token,
         userId,
         selectedPromptId,
         selectedPrompt.prompt,
@@ -831,7 +860,7 @@ export default function PIQWorkshop() {
       // Save analysis result if present
       if (analysisResult && essayId) {
         console.log('📤 Saving analysis result to database...');
-        const analysisResult2 = await saveAnalysisReport(userId, essayId, analysisResult);
+        const analysisResult2 = await saveAnalysisReport(token, userId, essayId, analysisResult);
 
         if (!analysisResult2.success) {
           console.warn('⚠️  Failed to save analysis result:', analysisResult2.error);

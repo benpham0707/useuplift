@@ -3,11 +3,14 @@
  *
  * Handles persistent storage of PIQ essays, analysis results, and version history
  * Uses existing essay system tables: essays, essay_analysis_reports, essay_revision_history
+ *
+ * IMPORTANT: All functions require a Clerk JWT token to authenticate requests
+ * The token is obtained via: await getToken({ template: 'supabase' })
  */
 
-import { supabase } from '@/integrations/supabase/client';
 import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import { assertAuthenticated } from '../auth/clerkSupabaseAdapter';
+import { getAuthenticatedSupabaseClient, verifyClerkToken } from '../auth/getAuthenticatedSupabaseClient';
 
 // =============================================================================
 // TYPES
@@ -155,6 +158,7 @@ function databaseFormatToAnalysisResult(report: PIQAnalysisReport): AnalysisResu
 /**
  * Save or update a PIQ essay in the database
  *
+ * @param clerkToken - JWT token from Clerk's getToken({ template: 'supabase' })
  * @param userId - Clerk user ID (required for RLS)
  * @param promptId - PIQ identifier (e.g., "piq1", "piq2")
  * @param promptText - Full text of the PIQ prompt
@@ -163,6 +167,7 @@ function databaseFormatToAnalysisResult(report: PIQAnalysisReport): AnalysisResu
  * @returns SaveEssayResult with essay ID
  */
 export async function saveOrUpdatePIQEssay(
+  clerkToken: string,
   userId: string,
   promptId: string,
   promptText: string,
@@ -171,6 +176,14 @@ export async function saveOrUpdatePIQEssay(
 ): Promise<SaveEssayResult> {
   try {
     assertAuthenticated(userId);
+
+    // Verify token
+    if (!verifyClerkToken(clerkToken)) {
+      return { success: false, error: 'Invalid authentication token' };
+    }
+
+    // Create authenticated client
+    const supabase = getAuthenticatedSupabaseClient(clerkToken);
 
     const normalizedPromptId = normalizePromptId(promptId, promptText);
 
@@ -248,18 +261,28 @@ export async function saveOrUpdatePIQEssay(
 /**
  * Save analysis results to database
  *
+ * @param clerkToken - JWT token from Clerk's getToken({ template: 'supabase' })
  * @param userId - Clerk user ID (required for RLS)
  * @param essayId - Essay ID from essays table
  * @param analysisResult - Complete AnalysisResult object from backend
  * @returns SaveAnalysisResult with report ID
  */
 export async function saveAnalysisReport(
+  clerkToken: string,
   userId: string,
   essayId: string,
   analysisResult: AnalysisResult
 ): Promise<SaveAnalysisResult> {
   try {
     assertAuthenticated(userId);
+
+    // Verify token
+    if (!verifyClerkToken(clerkToken)) {
+      return { success: false, error: 'Invalid authentication token' };
+    }
+
+    // Create authenticated client
+    const supabase = getAuthenticatedSupabaseClient(clerkToken);
 
     // Verify user owns this essay (RLS will also check, but good to validate)
     const { data: essay, error: essayError } = await supabase
@@ -310,18 +333,28 @@ export async function saveAnalysisReport(
 /**
  * Load PIQ essay and its latest analysis from database
  *
+ * @param clerkToken - JWT token from Clerk's getToken({ template: 'supabase' })
  * @param userId - Clerk user ID (required for RLS)
  * @param promptId - PIQ identifier (e.g., "piq1")
  * @param promptText - Full text of the PIQ prompt (used to match essay)
  * @returns LoadEssayResult with essay and analysis
  */
 export async function loadPIQEssay(
+  clerkToken: string,
   userId: string,
   promptId: string,
   promptText: string
 ): Promise<LoadEssayResult> {
   try {
     assertAuthenticated(userId);
+
+    // Verify token
+    if (!verifyClerkToken(clerkToken)) {
+      return { success: false, error: 'Invalid authentication token' };
+    }
+
+    // Create authenticated client
+    const supabase = getAuthenticatedSupabaseClient(clerkToken);
 
     // Find essay by user_id + prompt_text
     const { data: essay, error: essayError } = await supabase
@@ -381,16 +414,26 @@ export async function loadPIQEssay(
 /**
  * Get version history for a PIQ essay
  *
+ * @param clerkToken - JWT token from Clerk's getToken({ template: 'supabase' })
  * @param userId - Clerk user ID (required for RLS)
  * @param essayId - Essay ID from essays table
  * @returns VersionHistoryResult with array of versions
  */
 export async function getVersionHistory(
+  clerkToken: string,
   userId: string,
   essayId: string
 ): Promise<VersionHistoryResult> {
   try {
     assertAuthenticated(userId);
+
+    // Verify token
+    if (!verifyClerkToken(clerkToken)) {
+      return { success: false, error: 'Invalid authentication token' };
+    }
+
+    // Create authenticated client
+    const supabase = getAuthenticatedSupabaseClient(clerkToken);
 
     // Verify user owns this essay
     const { data: essay, error: essayError } = await supabase
@@ -469,11 +512,20 @@ export async function deleteVersion(
  * Get the current essay ID for a prompt (helper for other functions)
  */
 export async function getCurrentEssayId(
+  clerkToken: string,
   userId: string,
   promptText: string
 ): Promise<string | null> {
   try {
     assertAuthenticated(userId);
+
+    // Verify token
+    if (!verifyClerkToken(clerkToken)) {
+      return null;
+    }
+
+    // Create authenticated client
+    const supabase = getAuthenticatedSupabaseClient(clerkToken);
 
     const { data: essay } = await supabase
       .from('essays')
