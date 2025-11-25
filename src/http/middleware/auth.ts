@@ -33,9 +33,14 @@ const getUserIdFromToken = async (token: string): Promise<string | null> => {
   // 2. Fallback to Supabase verification (for legacy users or if configured to sync)
   if (supabase) {
     const { data, error } = await supabase.auth.getUser(token);
+    if (error) {
+       console.error('Supabase auth error:', error.message);
+    }
     if (!error && data.user) {
       return data.user.id;
     }
+  } else {
+    console.warn('Supabase client not initialized in auth middleware');
   }
 
   return null;
@@ -56,12 +61,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const userId = await getUserIdFromToken(token);
 
+    // DEBUG: Log detailed auth failure info
     if (!userId) {
-      // eslint-disable-next-line no-console
       console.warn("Auth middleware: token verification failed", {
         path: req.path,
+        tokenPreview: token.substring(0, 10) + '...',
+        envCheck: {
+          hasSupabaseUrl: !!supabaseUrl,
+          hasSupabaseAnon: !!supabaseAnon,
+          hasSupabaseClient: !!supabase
+        }
       });
-      return res.status(401).json({ error: "Unauthorized" });
+      return res.status(401).json({ error: "Unauthorized", debug: "Token verification failed" });
     }
 
     (req as any).auth = { userId: userId };
