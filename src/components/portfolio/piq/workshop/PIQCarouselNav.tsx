@@ -32,9 +32,9 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
   };
 
   return (
-    <div className="flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-2">
       {/* Navigation row with pipes */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-center gap-3 w-full">
         <Button
           variant="ghost"
           size="sm"
@@ -54,7 +54,7 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
                     colors={["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#a855f7"]}
                     className="text-xl font-bold"
                   >
-                    PIQ #{currentIndex + 1}: {currentPrompt?.title.split(' ')[0] || 'Leadership'}
+                    PIQ #{currentIndex + 1}: {currentPrompt?.title || 'Leadership experience'}
                   </GradientText>
                 </span>
               </TooltipTrigger>
@@ -77,14 +77,14 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
       </div>
 
       {/* Dot indicators */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {UC_PIQ_PROMPTS.map((prompt, index) => (
           <TooltipProvider key={prompt.id}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button
                   onClick={() => handleDotClick(index)}
-                  className={`w-2 h-2 rounded-full transition-all ${
+                  className={`w-1.5 h-1.5 rounded-full transition-all ${
                     index === currentIndex
                       ? 'bg-purple-500 scale-125'
                       : 'border border-muted-foreground/30 hover:border-muted-foreground/50 hover:scale-110'
