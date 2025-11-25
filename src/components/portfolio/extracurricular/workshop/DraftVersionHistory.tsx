@@ -64,9 +64,9 @@ export function DraftVersionHistory({
           </Button>
         </div>
 
-        {/* Grid of Version Cards */}
+        {/* Scrollable Single-Column List */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="max-w-2xl mx-auto space-y-3">
             {versions.map((version) => {
               const isCurrent = version.id === currentVersionId;
 
@@ -74,8 +74,8 @@ export function DraftVersionHistory({
                 <Card
                   key={version.id}
                   className={`relative p-4 transition-all hover:shadow-md flex items-center gap-6 ${
-                    isCurrent 
-                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20' 
+                    isCurrent
+                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
                       : 'hover:border-primary/50'
                   }`}
                 >

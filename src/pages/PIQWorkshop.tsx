@@ -32,6 +32,24 @@ import { PIQPromptSelector, UC_PIQ_PROMPTS } from '@/components/portfolio/piq/wo
 import { analyzePIQEntry } from '@/services/piqWorkshopAnalysisService';
 import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 
+// Storage Services
+import {
+  saveToLocalStorage,
+  loadFromLocalStorage,
+  hasRecentAutoSave,
+  cacheAnalysisResult,
+  getCachedAnalysisResult,
+  createVersionSnapshot,
+  formatSaveTime,
+  type PIQWorkshopCache,
+  type DraftVersion as StorageDraftVersion
+} from '@/services/piqWorkshop/storageService';
+import {
+  saveVersionToCloud,
+  loadVersionsFromCloud,
+  type CloudVersion
+} from '@/services/piqWorkshop/supabaseService';
+
 // ============================================================================
 // MOCK DATA - Hardcoded for demonstration
 // ============================================================================
@@ -276,8 +294,20 @@ export default function PIQWorkshop() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
+  // Caching & Save State
+  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
+  const [showResumeSessionBanner, setShowResumeSessionBanner] = useState(false);
+  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // Extract active issues from dimensions
   const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
+
+  // ============================================================================
+  // COMPUTED VALUES (must be before useEffect hooks)
+  // ============================================================================
+
+  const currentScore = analysisResult?.analysis?.narrative_quality_index || 73;
+  const initialScore = initialScoreRef.current;
 
   // ============================================================================
   // REAL BACKEND ANALYSIS - Full Surgical Workshop
@@ -299,13 +329,28 @@ export default function PIQWorkshop() {
         throw new Error('Invalid prompt selection');
       }
 
-      // Call FULL surgical workshop backend (100+ seconds)
-      const result = await analyzePIQEntry(
-        currentDraft,
-        selectedPrompt.title,
-        selectedPrompt.prompt,
-        { essayType: 'uc_piq' }
-      );
+      // Check if analysis is cached for this exact text
+      const cachedResult = getCachedAnalysisResult(currentDraft, selectedPromptId);
+
+      let result: AnalysisResult;
+
+      if (cachedResult) {
+        console.log('✅ Using cached analysis result - skipping API call');
+        result = cachedResult;
+      } else {
+        console.log('🔄 No cache found - calling backend analysis (100+ seconds)');
+        // Call FULL surgical workshop backend (100+ seconds)
+        result = await analyzePIQEntry(
+          currentDraft,
+          selectedPrompt.title,
+          selectedPrompt.prompt,
+          { essayType: 'uc_piq' }
+        );
+
+        // Cache the result
+        cacheAnalysisResult(currentDraft, selectedPromptId, result);
+        console.log('✅ Analysis result cached for future use');
+      }
 
       console.log('📊 Backend result received - FULL OBJECT:');
       console.log(JSON.stringify(result, null, 2));
@@ -399,6 +444,137 @@ export default function PIQWorkshop() {
   }, [currentDraft, selectedPromptId]);
 
   // NO auto-analysis - wait for user to click "Analyze" button
+
+  // ============================================================================
+  // AUTO-SAVE & RESUME SESSION
+  // ============================================================================
+
+  // Resume session on mount
+  useEffect(() => {
+    const { hasAutoSave, promptId, lastSaved } = hasRecentAutoSave();
+
+    if (hasAutoSave && promptId && lastSaved) {
+      setShowResumeSessionBanner(true);
+      console.log(`📦 Found auto-save from ${formatSaveTime(lastSaved)} for prompt ${promptId}`);
+    }
+  }, []);
+
+  // Auto-save every 30 seconds
+  useEffect(() => {
+    if (!selectedPromptId) return;
+
+    // Clear existing timer
+    if (autoSaveTimerRef.current) {
+      clearInterval(autoSaveTimerRef.current);
+    }
+
+    // Set up auto-save timer
+    autoSaveTimerRef.current = setInterval(() => {
+      if (hasUnsavedChanges && currentDraft) {
+        const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
+        if (!selectedPrompt) return;
+
+        // Create version snapshot
+        const versionSnapshot = createVersionSnapshot(
+          currentDraft,
+          currentScore,
+          analysisResult || undefined
+        );
+
+        // Build cache object
+        const cache: PIQWorkshopCache = {
+          promptId: selectedPromptId,
+          promptTitle: selectedPrompt.title,
+          currentDraft,
+          lastSaved: Date.now(),
+          analysisResult,
+          versions: [
+            ...draftVersions.map(v => ({
+              id: `v_${v.timestamp}`,
+              text: v.text,
+              timestamp: v.timestamp,
+              score: v.score,
+              wordCount: v.text.trim().split(/\s+/).length,
+              savedToCloud: false
+            })),
+            versionSnapshot
+          ].slice(-10), // Keep last 10 versions
+          autoSaveEnabled: true
+        };
+
+        saveToLocalStorage(cache);
+        setLastSaveTime(new Date());
+        setHasUnsavedChanges(false);
+        console.log('✅ Auto-saved to localStorage');
+      }
+    }, 30000); // 30 seconds
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearInterval(autoSaveTimerRef.current);
+      }
+    };
+  }, [hasUnsavedChanges, currentDraft, selectedPromptId, currentScore, analysisResult, draftVersions]);
+
+  // Resume session handler
+  const handleResumeSession = useCallback(() => {
+    const { promptId } = hasRecentAutoSave();
+    if (!promptId) return;
+
+    const cache = loadFromLocalStorage(promptId);
+    if (!cache) return;
+
+    setCurrentDraft(cache.currentDraft);
+    setSelectedPromptId(cache.promptId);
+    setAnalysisResult(cache.analysisResult);
+    setDraftVersions(cache.versions.map(v => ({
+      text: v.text,
+      timestamp: v.timestamp,
+      score: v.score
+    })));
+    setCurrentVersionIndex(cache.versions.length - 1);
+    setShowResumeSessionBanner(false);
+    setHasUnsavedChanges(false);
+
+    console.log(`✅ Resumed session for ${cache.promptTitle}`);
+  }, []);
+
+  const handleStartFresh = useCallback(() => {
+    setShowResumeSessionBanner(false);
+  }, []);
+
+  // Manual save to cloud
+  const handleSaveToCloud = useCallback(async () => {
+    if (!selectedPromptId || !currentDraft) {
+      console.warn('Cannot save to cloud: missing prompt or draft');
+      return;
+    }
+
+    const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
+    if (!selectedPrompt) return;
+
+    // Create version snapshot
+    const versionSnapshot = createVersionSnapshot(
+      currentDraft,
+      currentScore,
+      analysisResult || undefined
+    );
+
+    // Save to cloud
+    const { success, error, versionId } = await saveVersionToCloud(
+      selectedPromptId,
+      selectedPrompt.title,
+      versionSnapshot
+    );
+
+    if (success) {
+      console.log(`✅ Saved version to cloud: ${versionId}`);
+      alert('Version saved to cloud successfully!');
+    } else {
+      console.error('Failed to save to cloud:', error);
+      alert(`Failed to save to cloud: ${error}`);
+    }
+  }, [selectedPromptId, currentDraft, currentScore, analysisResult]);
 
   // ============================================================================
   // HANDLERS (Same as ExtracurricularWorkshopFinal)
@@ -537,11 +713,8 @@ export default function PIQWorkshop() {
   }, []);
 
   // ============================================================================
-  // COMPUTED
+  // COMPUTED (continued)
   // ============================================================================
-
-  const currentScore = analysisResult?.analysis?.narrative_quality_index || 73;
-  const initialScore = initialScoreRef.current;
   const totalIssues = dimensions.reduce((sum, d) => sum + d.issues.length, 0);
   const fixedIssues = dimensions.reduce((sum, d) => sum + d.issues.filter(i => i.status === 'fixed').length, 0);
   const criticalIssues = dimensions.filter(d => d.status === 'critical').length;
@@ -758,11 +931,53 @@ export default function PIQWorkshop() {
           </Button>
           <div className="text-center">
             <h1 className="text-xl font-bold text-primary">PIQ Narrative Workshop</h1>
-            <p className="text-xs text-muted-foreground">PIQ #{MOCK_PIQ.piqNumber} · {MOCK_PIQ.category}</p>
+            <p className="text-xs text-muted-foreground">
+              PIQ #{MOCK_PIQ.piqNumber} · {MOCK_PIQ.category}
+              {lastSaveTime && (
+                <span className="ml-2 text-xs text-green-600 dark:text-green-400">
+                  • Saved {formatSaveTime(lastSaveTime.getTime())}
+                </span>
+              )}
+            </p>
           </div>
           <div className="w-24" />
         </div>
       </div>
+
+      {/* Resume Session Banner */}
+      {showResumeSessionBanner && (
+        <div className="mx-auto px-4 py-3 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
+          <div className="flex items-center justify-between max-w-4xl mx-auto">
+            <div className="flex items-center gap-3">
+              <History className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div>
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100">
+                  Resume your last session?
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  Draft auto-saved {formatSaveTime(hasRecentAutoSave().lastSaved || Date.now())}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleStartFresh}
+                className="bg-white dark:bg-gray-900"
+              >
+                Start Fresh
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleResumeSession}
+              >
+                Resume
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="relative z-10 mx-auto px-4 py-12 space-y-6">
@@ -994,6 +1209,7 @@ export default function PIQWorkshop() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onShowHistory={() => setShowVersionHistory(true)}
+                onSaveToCloud={handleSaveToCloud}
               />
             </Card>
 

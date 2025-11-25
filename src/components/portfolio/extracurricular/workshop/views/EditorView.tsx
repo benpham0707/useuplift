@@ -27,6 +27,7 @@ import {
   Clock,
   Sparkles,
   FileEdit,
+  Cloud,
 } from 'lucide-react';
 import GradientText from '@/components/ui/GradientText';
 import type { TeachingIssue } from '../teachingTypes';
@@ -47,6 +48,7 @@ interface EditorViewProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onShowHistory?: () => void;
+  onSaveToCloud?: () => void; // Manual save to cloud
 }
 
 export const EditorView: React.FC<EditorViewProps> = ({
@@ -65,6 +67,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   canUndo = false,
   canRedo = false,
   onShowHistory,
+  onSaveToCloud,
 }) => {
   const [localDraft, setLocalDraft] = useState(currentDraft);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -153,6 +156,17 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   <Save className="w-4 h-4 mr-2" />
                   Save Draft
                 </Button>
+                {onSaveToCloud && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onSaveToCloud}
+                    title="Save version to cloud for cross-device access"
+                  >
+                    <Cloud className="w-4 h-4 mr-2" />
+                    Save to Cloud
+                  </Button>
+                )}
               </div>
             </div>
 

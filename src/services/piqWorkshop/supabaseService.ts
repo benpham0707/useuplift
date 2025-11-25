@@ -4,7 +4,7 @@
  * Handles cloud storage, version history, and cross-device sync
  */
 
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/integrations/supabase/client';
 import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import type { DraftVersion } from './storageService';
 
