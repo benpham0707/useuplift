@@ -147,13 +147,18 @@ export default function PortfolioInsights() {
         const { data: sessionData } = await supabase.auth.getSession();
         const token = sessionData?.session?.access_token;
 
+        if (!token) {
+          console.warn('No token available for insights fetch');
+          return;
+        }
+
         let json: any | null = null;
         try {
           const resp = await fetch(API_URL, {
             method: 'GET',
             headers: {
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              Accept: 'application/json',
+              'Authorization': `Bearer ${token}`,
+              'Accept': 'application/json',
             },
           });
           if (resp.ok) {

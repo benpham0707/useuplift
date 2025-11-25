@@ -544,11 +544,17 @@ const PortfolioScanner = () => {
         if (!user) return;
         setAiLoading(true);
         setAiError(null);
-        const session = await supabase.auth.getSession();
-        const token = session.data.session?.access_token;
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
+        if (!token) {
+          console.warn('No token available for analytics fetch');
+          return;
+        }
+
         const resp = await apiFetch('/api/v1/analytics/portfolio-strength', {
           headers: {
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
+            'Authorization': `Bearer ${token}`
           }
         });
         if (!resp.ok) {
