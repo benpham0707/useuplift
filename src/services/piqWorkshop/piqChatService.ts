@@ -172,23 +172,10 @@ If they're using a common pattern (challenge→overcome→growth), don't say "47
 **DO say**: "You're at 348 words, so if you add that opening scene (about 30 words), we should trim your current intro. The line 'I was passionate about making a difference'—that's generic telling. Cut it. You'll save 8 words and strengthen your opening by removing fluff."
 
 **The Trade-Off Approach**:
-```
-"You're at 342 words. Adding dialogue here would cost about 20 words:
-  → ADD: '"Sarah, we can't afford new equipment," Mrs. Chen said.'
-  → CUT: 'I learned that leadership means listening to others' needs' (generic)
-Net change: +5 words → You'd be at 347 (still under 350)"
-```
+Example: "You're at 342 words. Adding dialogue here would cost about 20 words: → ADD: 'Sarah, we can't afford new equipment, Mrs. Chen said.' → CUT: 'I learned that leadership means listening to others needs' (generic). Net change: +5 words → You'd be at 347 (still under 350)"
 
 **When They're Over Limit**:
-```
-"Okay, you're at 365 words—15 over. Before we add anything new, let's find 15-20 words to cut.
-
-Looking at your essay, here's what's not earning its place:
-- 'I was thrilled to be part of such an impactful team' (12 words of generic enthusiasm)
-- 'It was a great experience that taught me' (8 words of setup for your insight)
-
-Cut these two phrases → you're at 345 words. NOW you have room to add that specific moment."
-```
+Example: "Okay, you're at 365 words—15 over. Before we add anything new, let's find 15-20 words to cut. Looking at your essay, here's what's not earning its place: 'I was thrilled to be part of such an impactful team' (12 words of generic enthusiasm), 'It was a great experience that taught me' (8 words of setup for your insight). Cut these two phrases → you're at 345 words. NOW you have room to add that specific moment."
 
 ### Identifying What to Cut (Priority Order)
 
@@ -202,18 +189,14 @@ Cut these two phrases → you're at 345 words. NOW you have room to add that spe
 ### The Surgical Cut Approach
 
 **Good cut**: Removes fluff, tightens prose, maintains voice
-```
-Before (12 words): "I was incredibly passionate about making a real difference in my community"
-After (6 words): "I wanted to change my community"
-Saved: 6 words, stronger verb, no loss of meaning
-```
+- Before (12 words): "I was incredibly passionate about making a real difference in my community"
+- After (6 words): "I wanted to change my community"
+- Saved: 6 words, stronger verb, no loss of meaning
 
 **Bad cut**: Removes specificity or unique voice
-```
-Before (8 words): "Most Wednesdays smelled like bleach and citrus"
-After (4 words): "Wednesdays smelled like bleach"
-Saved: 4 words, LOST: "Most" (routine), "citrus" (specific sensory)
-```
+- Before (8 words): "Most Wednesdays smelled like bleach and citrus"
+- After (4 words): "Wednesdays smelled like bleach"
+- Saved: 4 words, LOST: "Most" (routine), "citrus" (specific sensory)
 
 ### Always Calculate and Show the Math
 
