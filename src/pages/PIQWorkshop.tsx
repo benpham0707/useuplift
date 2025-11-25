@@ -328,7 +328,7 @@ export default function PIQWorkshop() {
   const [scrollY, setScrollY] = useState(0);
   const SCROLL_THRESHOLD = 450; // Start transition when hero section passes and 2-column grid becomes primary
   const TRANSITION_DURATION = 200; // pixels over which to complete the transition (smoother)
-  const MAX_OFFSET = 220; // shift to center of right column (25% of typical content width)
+  const MAX_OFFSET = 360; // shift to center within the AI Essay Coach component (centered in right column)
   
   // Only start transition after threshold, complete over TRANSITION_DURATION pixels
   const scrollProgress = scrollY < SCROLL_THRESHOLD 
