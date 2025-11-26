@@ -42,6 +42,7 @@ interface EditorViewProps {
   isAnalyzing?: boolean;
   onRequestReanalysis?: () => void;
   hasAnalysisResult?: boolean; // Whether analysis has been run at least once
+  canAnalyze?: boolean; // Whether essay has enough content to analyze
   versionHistory?: Array<{ text: string; timestamp: number; score: number }>;
   onUndo?: () => void;
   onRedo?: () => void;
@@ -61,6 +62,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   isAnalyzing = false,
   onRequestReanalysis,
   hasAnalysisResult = false,
+  canAnalyze = true,
   versionHistory = [],
   onUndo,
   onRedo,
@@ -206,10 +208,23 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   </div>
                 )}
                 {onRequestReanalysis && !isAnalyzing && (
-                  <Button variant="outline" size="sm" onClick={onRequestReanalysis}>
-                    <Sparkles className="w-3 h-3 mr-1" />
-                    {hasAnalysisResult ? 'Re-analyze' : 'Analyze'}
-                  </Button>
+                  <div className="flex flex-col items-end gap-1">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={onRequestReanalysis}
+                      disabled={!canAnalyze}
+                      title={!canAnalyze ? 'Write at least 50 characters to analyze' : ''}
+                    >
+                      <Sparkles className="w-3 h-3 mr-1" />
+                      {hasAnalysisResult ? 'Re-analyze' : 'Analyze'}
+                    </Button>
+                    {!canAnalyze && (
+                      <span className="text-xs text-muted-foreground">
+                        Write more to analyze
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

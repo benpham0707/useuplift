@@ -60,219 +60,15 @@ import {
 import { useAuth } from '@clerk/clerk-react';
 import { useClerkUserId, useIsAuthenticated } from '@/services/auth/clerkSupabaseAdapter';
 
+// Navigation
+import Navigation from '@/components/Navigation';
+
 // ============================================================================
-// MOCK DATA - Hardcoded for demonstration
+// CONSTANTS
 // ============================================================================
 
-// HARDCODED DATA: Sample PIQ response
-const MOCK_PIQ = {
-  id: "piq-1",
-  piqNumber: 1,
-  prompt: "Describe an example of your leadership experience in which you have positively influenced others, helped resolve disputes or contributed to group efforts over time.",
-  description: "During my junior year, I founded the Environmental Action Club at my school with just three members. Initially, our beach cleanups attracted only a handful of students, but I knew we needed to think bigger. I spent weeks researching plastic pollution data and crafting a proposal for the administration. The breakthrough came when I presented to the school board, armed with statistics showing our campus generated over 2,000 plastic bottles weekly. My voice shook, but I pushed through. The board approved funding for water refill stations across all buildings. Within one semester, we reduced single-use plastic waste by 47% and grew our club to 45 active members. More importantly, I learned that leadership isn't about having all the answers—it's about channeling collective passion into measurable change that outlasts your involvement.",
-  wordCount: 142,
-  category: "leadership"
-};
-
-// HARDCODED DATA: Mock analysis with realistic scores (73/100 NQI)
-const MOCK_DIMENSIONS: RubricDimension[] = [
-  {
-    id: 'voice_integrity',
-    name: 'Voice Integrity',
-    score: 7.5,
-    maxScore: 10,
-    status: 'good',
-    weight: 15,
-    overview: 'Authentic voice with genuine nervousness shown. Good use of first-person narrative. Could deepen emotional vulnerability.',
-    issues: [
-      {
-        id: 'issue-voice-1',
-        dimensionId: 'voice_integrity',
-        title: 'Limited Vulnerability - Missing Emotional Depth',
-        excerpt: 'My voice shook, but I pushed through.',
-        analysis: 'You mention nervousness but don\'t let readers feel it. Elite essays show physical symptoms and internal conflict.',
-        impact: 'Costing you 5-8 points in Voice Integrity. Officers read thousands of essays—physical details make yours memorable.',
-        suggestions: [
-          {
-            text: 'My palms left wet marks on the presentation slides. I could feel my pulse in my throat as I faced the board members, their skeptical expressions making my carefully rehearsed pitch feel suddenly hollow.',
-            rationale: 'Notice the specific physical details: wet palms, pulse in throat. Creates tension readers can feel.',
-            type: 'replace'
-          },
-          {
-            text: 'When I stood to present, my hands trembled so badly I had to grip the podium. The board\'s silence felt like judgment, and every statistic I\'d memorized scattered like leaves in my mind.',
-            rationale: 'Shows physical manifestation of anxiety AND its mental impact. Vulnerability signals authenticity.',
-            type: 'replace'
-          }
-        ],
-        status: 'not_fixed',
-        currentSuggestionIndex: 0,
-        expanded: false
-      }
-    ]
-  },
-  {
-    id: 'specificity_evidence',
-    name: 'Specificity & Evidence',
-    score: 8.2,
-    maxScore: 10,
-    status: 'good',
-    weight: 20,
-    overview: 'Strong quantified impact with specific metrics: 2,000 bottles, 47% reduction, 45 members. Excellent use of concrete data.',
-    issues: []
-  },
-  {
-    id: 'transformative_impact',
-    name: 'Transformative Impact',
-    score: 6.5,
-    maxScore: 10,
-    status: 'needs_work',
-    weight: 15,
-    overview: 'Shows growth but transformation is stated rather than shown. Need before/after contrast.',
-    issues: [
-      {
-        id: 'issue-transform-1',
-        dimensionId: 'transformative_impact',
-        title: 'Transformation Stated, Not Shown',
-        excerpt: 'I learned that leadership isn\'t about having all the answers',
-        analysis: 'This is a cliché conclusion. Elite essays show transformation through specific before/after contrasts with concrete examples.',
-        impact: 'Costing you 6-10 points in Transformative Impact—the highest-weighted category.',
-        suggestions: [
-          {
-            text: 'Before: I used to plan every club meeting down to the minute, cutting off members when they diverged from my agenda. After: Now I listen when Mia suggests a campus art installation, even though it wasn\'t in my original plan—and it becomes our most successful campaign.',
-            rationale: 'Specific before behavior with concrete action. Clear after behavior showing different approach. Outcome validates the change.',
-            type: 'replace'
-          },
-          {
-            text: 'My first meeting agenda had every second scheduled. When Emma raised her hand to suggest partnering with local businesses, I dismissed it—"That\'s not what we\'re here for." Six months later, I found myself cold-calling restaurants for donations, using Emma\'s exact idea. The difference? Now I asked: "What else should I consider?"',
-            rationale: 'Shows specific controlling behavior, admits mistake, demonstrates changed approach through action and dialogue.',
-            type: 'replace'
-          }
-        ],
-        status: 'not_fixed',
-        currentSuggestionIndex: 0,
-        expanded: false
-      }
-    ]
-  },
-  {
-    id: 'role_clarity',
-    name: 'Role Clarity & Ownership',
-    score: 7.8,
-    maxScore: 10,
-    status: 'good',
-    weight: 10,
-    overview: 'Clear founder/president role. Good ownership of specific actions: research, proposal, presentation.',
-    issues: []
-  },
-  {
-    id: 'narrative_arc',
-    name: 'Narrative Arc & Stakes',
-    score: 6.0,
-    maxScore: 10,
-    status: 'needs_work',
-    weight: 12,
-    overview: 'Basic chronology present but stakes could be higher. Missing turning point drama.',
-    issues: [
-      {
-        id: 'issue-arc-1',
-        dimensionId: 'narrative_arc',
-        title: 'Missing Dialogue & Scene Details',
-        excerpt: 'The breakthrough came when I presented to the school board',
-        analysis: 'You tell us about the presentation but don\'t show it. Elite essays use dialogue and scene details to create dramatic tension.',
-        impact: 'Missing opportunity to show leadership under pressure.',
-        suggestions: [
-          {
-            text: '"These numbers represent real environmental harm," I said, my voice steadier now as I pointed to the chart. Board member Johnson leaned forward: "And you\'re confident students will actually use these stations?" I met his eyes. "Sir, forty-five students signed up after our last cleanup. They\'re waiting for us to make this easy."',
-            rationale: 'Dialogue makes the scene real. Shows you handling objections. Demonstrates confidence growth.',
-            type: 'insert_after'
-          }
-        ],
-        status: 'not_fixed',
-        currentSuggestionIndex: 0,
-        expanded: false
-      }
-    ]
-  },
-  {
-    id: 'initiative_leadership',
-    name: 'Initiative & Leadership',
-    score: 8.0,
-    maxScore: 10,
-    status: 'good',
-    weight: 12,
-    overview: 'Strong initiative shown: founding club, research, proposal, presentation. Clear leader actions.',
-    issues: []
-  },
-  {
-    id: 'community_collaboration',
-    name: 'Community & Collaboration',
-    score: 7.2,
-    maxScore: 10,
-    status: 'good',
-    weight: 8,
-    overview: 'Shows group growth (3 to 45 members) but individual members remain unnamed. Could add more human connection.',
-    issues: []
-  },
-  {
-    id: 'reflection_meaning',
-    name: 'Reflection & Meaning',
-    score: 6.8,
-    maxScore: 10,
-    status: 'needs_work',
-    weight: 10,
-    overview: 'Generic reflection about leadership. Needs personal insight rooted in specific moments.',
-    issues: [
-      {
-        id: 'issue-reflect-1',
-        dimensionId: 'reflection_meaning',
-        title: 'Generic Reflection - Lacks Personal Insight',
-        excerpt: 'leadership isn\'t about having all the answers—it\'s about channeling collective passion',
-        analysis: 'This could apply to anyone. Elite essays connect insight to specific moments that reveal personal values.',
-        impact: 'Reflection is 10% of your score. Generic insights don\'t distinguish you.',
-        suggestions: [
-          {
-            text: 'Standing in the cafeteria three months later, I watched students line up at the refill station we fought for, and realized: the 47% reduction mattered less than seeing Sarah—a freshman who joined after our first beach cleanup—now leading her own recycling initiative. Real leadership means building systems that don\'t need you.',
-            rationale: 'Ties insight to specific image. Names a person. Reveals value: sustainability of impact over personal glory.',
-            type: 'replace'
-          }
-        ],
-        status: 'not_fixed',
-        currentSuggestionIndex: 0,
-        expanded: false
-      }
-    ]
-  },
-  {
-    id: 'craft_language',
-    name: 'Craft & Language Quality',
-    score: 7.5,
-    maxScore: 10,
-    status: 'good',
-    weight: 8,
-    overview: 'Clear writing with good flow. Effective use of statistics. Some sentences could be more dynamic.',
-    issues: []
-  },
-  {
-    id: 'fit_trajectory',
-    name: 'Fit & Trajectory',
-    score: 7.0,
-    maxScore: 10,
-    status: 'good',
-    weight: 8,
-    overview: 'Shows environmental interest and leadership potential. Could connect more explicitly to future goals.',
-    issues: []
-  },
-  {
-    id: 'time_investment',
-    name: 'Time Investment',
-    score: 8.5,
-    maxScore: 10,
-    status: 'excellent',
-    weight: 7,
-    overview: 'Clear sustained involvement: junior year, research period, one semester of results. Good longitudinal commitment.',
-    issues: []
-  }
-];
+// Minimum characters required to trigger analysis (prevents wasting API credits)
+const MIN_ESSAY_LENGTH = 50;
 
 interface DraftVersion {
   text: string;
@@ -314,17 +110,18 @@ export default function PIQWorkshop() {
   const [isLoadingFromDatabase, setIsLoadingFromDatabase] = useState(false);
   const [showResumeSessionBanner, setShowResumeSessionBanner] = useState(false);
 
-  const [currentDraft, setCurrentDraft] = useState(MOCK_PIQ.description);
-  const [draftVersions, setDraftVersions] = useState<DraftVersion[]>([
-    { text: MOCK_PIQ.description, timestamp: Date.now(), score: 73 }
-  ]);
+  const [currentDraft, setCurrentDraft] = useState('');
+  const [draftVersions, setDraftVersions] = useState<DraftVersion[]>([]);
   const [currentVersionIndex, setCurrentVersionIndex] = useState(0);
-  const [dimensions, setDimensions] = useState<RubricDimension[]>(MOCK_DIMENSIONS);
+  const [dimensions, setDimensions] = useState<RubricDimension[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [needsReanalysis, setNeedsReanalysis] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(null);
-  const initialScoreRef = useRef<number>(73);
+  const initialScoreRef = useRef<number>(0);
+  
+  // Track if essay has enough content to analyze
+  const canAnalyze = currentDraft.trim().length >= MIN_ESSAY_LENGTH;
 
   // NEW: Full Backend Integration State
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(getPromptIdFromUrl()); // Based on URL param
@@ -356,8 +153,9 @@ export default function PIQWorkshop() {
   // COMPUTED VALUES (must be before useEffect hooks)
   // ============================================================================
 
-  const currentScore = analysisResult?.analysis?.narrative_quality_index || 73;
+  const currentScore = analysisResult?.analysis?.narrative_quality_index || 0;
   const initialScore = initialScoreRef.current;
+  const hasAnalysis = analysisResult !== null && dimensions.length > 0;
 
   // ============================================================================
   // REAL BACKEND ANALYSIS - Full Surgical Workshop
@@ -367,6 +165,13 @@ export default function PIQWorkshop() {
     console.log('🔍 performFullAnalysis called');
     console.log('   Current draft length:', currentDraft.length);
     console.log('   Selected prompt:', selectedPromptId);
+    
+    // Guard: Prevent analyzing empty or too-short essays
+    if (currentDraft.trim().length < MIN_ESSAY_LENGTH) {
+      console.warn(`Essay too short (${currentDraft.trim().length} chars) - need at least ${MIN_ESSAY_LENGTH} chars to analyze`);
+      return;
+    }
+    
     if (!selectedPromptId) {
       console.warn('No prompt selected - cannot analyze');
       return;
@@ -1255,11 +1060,14 @@ export default function PIQWorkshop() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Main Navigation with credits */}
+      <Navigation />
+
       {/* Gradient background */}
       <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
 
-      {/* Sticky header */}
-      <div className="sticky top-0 z-50 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
+      {/* Sticky PIQ header */}
+      <div className="sticky top-16 z-40 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
         {/* Main header row */}
         <div className="mx-auto px-4 py-3 flex items-center justify-between gap-4 relative">
           {/* Left: Back button */}
@@ -1340,7 +1148,38 @@ export default function PIQWorkshop() {
           <div className="flex flex-col md:flex-row gap-6 items-start">
             {/* Narrative Quality Index Card - Professional Data-Dense Design */}
             <Card className="flex-1 p-5">
-              
+              {!hasAnalysis ? (
+                /* Empty State - No analysis yet */
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 mx-auto rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 flex items-center justify-center mb-4">
+                    <PenTool className="w-8 h-8 text-primary/60" />
+                  </div>
+                  <GradientText
+                    className="text-2xl font-extrabold uppercase tracking-wide mb-2"
+                    colors={["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#a855f7"]}
+                  >
+                    {isLoadingFromDatabase ? 'Loading...' : 'Ready to Analyze'}
+                  </GradientText>
+                  <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                    {isLoadingFromDatabase 
+                      ? 'Checking for your saved essay...'
+                      : !canAnalyze
+                        ? `Write at least ${MIN_ESSAY_LENGTH} characters to get your essay analyzed with our 11-dimension rubric.`
+                        : 'Click "Analyze" in the editor to get detailed feedback on your essay across 11 dimensions.'
+                    }
+                  </p>
+                  {!isLoadingFromDatabase && (
+                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 border">
+                        <span className="w-2 h-2 rounded-full bg-primary/40"></span>
+                        {currentDraft.trim().length} / {MIN_ESSAY_LENGTH} characters
+                      </span>
+                    </div>
+                  )}
+                </div>
+              ) : (
+              /* Analysis Results */
+              <>
               {/* Header with Score & Actions */}
               <div className="flex items-start justify-between mb-4 pb-4">
                 {/* Left: Title + Icon */}
@@ -1549,6 +1388,8 @@ export default function PIQWorkshop() {
                   </p>
                 </div>
               </div>
+              </>
+              )}
             </Card>
           </div>
         </div>
@@ -1568,7 +1409,8 @@ export default function PIQWorkshop() {
                 initialScore={initialScore}
                 isAnalyzing={isAnalyzing}
                 onRequestReanalysis={handleRequestReanalysis}
-                hasAnalysisResult={analysisResult !== null}
+                hasAnalysisResult={hasAnalysis}
+                canAnalyze={canAnalyze}
                 versionHistory={draftVersions}
                 canUndo={currentVersionIndex > 0}
                 canRedo={currentVersionIndex < draftVersions.length - 1}
@@ -1630,13 +1472,13 @@ export default function PIQWorkshop() {
           {/* Right column: PIQ Prompt Selector + Chat */}
           <div className="space-y-6">
             {/* Chat */}
-            <Card className="sticky top-28 p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
+            <Card className="sticky top-44 p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
               <ContextualWorkshopChat
                 mode="piq"
                 piqPromptId={selectedPromptId}
                 piqPromptText={UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId)?.prompt || ''}
                 piqPromptTitle={UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId)?.title || ''}
-                activity={MOCK_PIQ as any}
+                activity={null}
                 currentDraft={currentDraft}
                 analysisResult={analysisResult}
                 teachingCoaching={null}

@@ -56,8 +56,8 @@ const App = () => (
             <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
             <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
             <Route path="/workshop-demo" element={<WorkshopDemo />} />
-            <Route path="/piq-workshop" element={<PIQWorkshop />} />
-            <Route path="/piq-workshop/:piqNumber" element={<PIQWorkshop />} />
+            <Route path="/piq-workshop" element={<RequireVerified><PIQWorkshop /></RequireVerified>} />
+            <Route path="/piq-workshop/:piqNumber" element={<RequireVerified><PIQWorkshop /></RequireVerified>} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

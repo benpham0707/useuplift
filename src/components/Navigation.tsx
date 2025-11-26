@@ -69,7 +69,7 @@ const Navigation = () => {
               Scanner & Insights
             </button>
             <button 
-              onClick={() => navigate('/piq-workshop')}
+              onClick={() => handleNavigation('/piq-workshop')}
               className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
             >
               Workshop
@@ -159,7 +159,7 @@ const Navigation = () => {
               Scanner & Insights
             </button>
             <button 
-              onClick={() => { navigate('/piq-workshop'); setIsMenuOpen(false); }}
+              onClick={() => { handleNavigation('/piq-workshop'); setIsMenuOpen(false); }}
               className="w-full text-left block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
             >
               Workshop
