@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
@@ -14,6 +15,7 @@ import Navigation from '@/components/Navigation';
 
 const Pricing = () => {
   const { user, loading } = useAuth();
+  const { getToken } = useClerkAuth();
   const navigate = useNavigate();
   const [credits, setCredits] = useState<number | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
@@ -51,8 +53,8 @@ const Pricing = () => {
 
     try {
       setIsProcessing(true);
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
+      // Use Clerk token instead of Supabase auth
+      const token = await getToken();
       
       if (!token) {
         console.error('No access token found');
@@ -74,7 +76,11 @@ const Pricing = () => {
         }),
       });
 
-      if (!response.ok) throw new Error('Checkout failed');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        console.error('Checkout failed:', errData);
+        throw new Error(errData.error || 'Checkout failed');
+      }
       
       const { url } = await response.json();
       if (url) {
@@ -82,6 +88,7 @@ const Pricing = () => {
       }
     } catch (error) {
       console.error('Checkout error:', error);
+      // Don't redirect on error - just log and let user try again
     } finally {
       setIsProcessing(false);
     }

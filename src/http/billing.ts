@@ -96,31 +96,45 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
     }
 
     // Get or create customer
+    // Note: userId is a Clerk ID (string like "user_2q..."), not a Supabase UUID
     const { data: profile } = await supabase
       .from('profiles')
-      .select('stripe_customer_id, email') // Assuming email might be on profile or we fetch from auth
+      .select('stripe_customer_id, email')
       .eq('user_id', userId)
       .single();
 
     let customerId = profile?.stripe_customer_id;
 
     if (!customerId) {
-      // Fetch user email from auth if not in profile (using supabase admin)
-      const { data: userData } = await supabase.auth.admin.getUserById(userId);
-      const email = userData.user?.email;
+      // Get email from profile if available (set during onboarding)
+      // Clerk user IDs are not in Supabase auth.users, so we can't use supabase.auth.admin
+      const email = profile?.email || undefined;
 
       const customer = await stripe.customers.create({
         email: email,
         metadata: {
           userId: userId,
+          authProvider: 'clerk',
         },
       });
       customerId = customer.id;
       
-      await supabase
-        .from('profiles')
-        .update({ stripe_customer_id: customerId })
-        .eq('user_id', userId);
+      // Update or upsert the profile with stripe_customer_id
+      if (profile) {
+        await supabase
+          .from('profiles')
+          .update({ stripe_customer_id: customerId })
+          .eq('user_id', userId);
+      } else {
+        // Create profile if it doesn't exist
+        await supabase
+          .from('profiles')
+          .insert({ 
+            user_id: userId, 
+            stripe_customer_id: customerId,
+            credits: 0 
+          });
+      }
     }
 
     const isSubscription = 'interval' in plan;
