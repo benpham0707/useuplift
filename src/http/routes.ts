@@ -4,9 +4,13 @@ import { completeAssessment } from "@/modules/assessment/complete";
 import { completePersonal } from "@/modules/personal/complete";
 import * as Exp from "@/modules/experiences/controller";
 import * as Billing from "./billing";
+import { handleClerkWebhook } from "./webhooks/clerk";
 import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/analytics/portfolio";
 
 const r = Router();
+
+// Webhooks (no auth required - uses signature verification)
+r.post("/webhooks/clerk", handleClerkWebhook);
 
 // Billing API
 r.post("/billing/checkout", requireAuth, Billing.createCheckoutSession);
