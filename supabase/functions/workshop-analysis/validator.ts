@@ -704,7 +704,7 @@ export async function validateSuggestion(
 }
 
 /**
- * Generate a batch of workshop items (4 items)
+ * Generate a batch of workshop items (3 items)
  * This is the GENERATION step only - validation happens separately
  */
 export async function generateWorkshopBatch(
@@ -717,10 +717,14 @@ export async function generateWorkshopBatch(
   batchNumber: number
 ): Promise<any[]> {
 
-  console.log(`   🔄 Generating batch ${batchNumber} (4 items)...`);
+  console.log(`   🔄 Generating batch ${batchNumber} (3 items)...`);
 
-  // Generate 4 items in one call for efficiency
-  const userPrompt = `Identify the 4 most critical workshop items for this essay:\n\nPrompt: ${promptText}\n\nEssay:\n${essayText}\n\nRubric Analysis:\n${JSON.stringify(rubricAnalysis, null, 2)}\n\n**CRITICAL REQUIREMENTS:**\n- Return EXACTLY 4 distinct workshop items\n- Each item must have 3 suggestions (polished_original, voice_amplifier, divergent_strategy)\n- Focus on the most impactful improvements\n- Ensure each suggestion preserves the student's authentic voice`;
+  // Generate 3 items in one call - focuses on highest-impact issues
+  const userPrompt = `Identify the 3 most critical workshop items for this essay:\n\nPrompt: ${promptText}\n\nEssay:\n${essayText}\n\nRubric Analysis:\n${JSON.stringify(rubricAnalysis, null, 2)}\n\n**CRITICAL REQUIREMENTS:**\n- Return EXACTLY 3 distinct workshop items (prioritize the most impactful issues)
+- Each item must have 3 suggestions (polished_original, voice_amplifier, divergent_strategy)
+- Focus on the highest-impact improvements that will elevate the essay most
+- Ensure each suggestion preserves the student's authentic voice
+- Quality over quantity - each item should address a significant issue`;
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -731,7 +735,7 @@ export async function generateWorkshopBatch(
     },
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000, // More tokens for 4 items
+      max_tokens: 3500, // Appropriate for 3 items
       temperature: 0.8,
       system: baseSystemPrompt,
       messages: [{ role: 'user', content: userPrompt }]
@@ -813,7 +817,7 @@ export async function validateWorkshopItemSuggestions(
     validationResults.forEach((validation, idx) => {
       const suggestion = currentSuggestions[idx];
 
-      if (validation.isValid && validation.qualityScore >= 70) {
+      if (validation.isValid && validation.qualityScore >= 85) {
         console.log(`      ✅ Suggestion ${idx + 1} validated (score: ${validation.qualityScore})`);
         validatedSuggestions.push(suggestion);
       } else {
