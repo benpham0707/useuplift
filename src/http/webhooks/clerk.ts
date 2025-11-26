@@ -125,7 +125,7 @@ export async function handleClerkWebhook(req: Request, res: Response) {
         .insert({
           user_id: clerkUserId,
           user_context: 'high_school_11th', // Default context
-          credits: 0,
+          credits: 10, // Free credits for new users
           has_completed_assessment: false,
           status: 'initial',
         })
