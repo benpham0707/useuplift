@@ -6,7 +6,7 @@
  * Retries with specific feedback if validation fails.
  */
 
-import { generateWorkshopBatch, validateAndRefineSuggestion } from './validator.ts';
+import { generateWorkshopBatch, validateWorkshopItemSuggestions } from './validator.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -392,8 +392,8 @@ Return ONLY valid JSON with this structure:
     const allGeneratedItems = [...batch1Items, ...batch2Items, ...batch3Items];
     console.log(`   ✅ Generated ${allGeneratedItems.length} items total`);
 
-    // STEP 2: Validate and refine each suggestion in each item
-    console.log('   🔄 Step 2: Validating and refining suggestions...');
+    // STEP 2: Validate all suggestions for each item
+    console.log('   🔄 Step 2: Validating suggestions...');
 
     const validatedItems = [];
     for (const item of allGeneratedItems) {
@@ -401,21 +401,15 @@ Return ONLY valid JSON with this structure:
 
       console.log(`   📝 Processing item: "${item.quote?.substring(0, 50)}..."`);
 
-      // Validate each of the 3 suggestions for this item
-      const validatedSuggestions = [];
-      for (const suggestion of item.suggestions) {
-        const validated = await validateAndRefineSuggestion(
-          suggestion,
-          item,
-          voiceFingerprint,
-          anthropicApiKey,
-          3 // maxAttempts
-        );
-
-        if (validated) {
-          validatedSuggestions.push(validated);
-        }
-      }
+      // Validate all 3 suggestions for this item (with retry if needed)
+      const validatedSuggestions = await validateWorkshopItemSuggestions(
+        item,
+        voiceFingerprint,
+        anthropicApiKey,
+        baseSystemPrompt,
+        requestBody.essayText,
+        2 // maxAttempts
+      );
 
       // Only keep items that have at least 1 valid suggestion
       if (validatedSuggestions.length > 0) {
