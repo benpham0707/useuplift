@@ -1,11 +1,19 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { SignIn, SignUp } from '@clerk/clerk-react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const Auth = () => {
-  const [mode, setMode] = useState<'sign-in' | 'sign-up'>('sign-in');
+  const [searchParams] = useSearchParams();
+  const initialMode = searchParams.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in';
+  const [mode, setMode] = useState<'sign-in' | 'sign-up'>(initialMode);
+
+  // Sync mode with URL parameter on navigation
+  useEffect(() => {
+    const urlMode = searchParams.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in';
+    setMode(urlMode);
+  }, [searchParams]);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">

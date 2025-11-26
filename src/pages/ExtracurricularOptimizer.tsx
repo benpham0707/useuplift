@@ -308,7 +308,7 @@ const AcademicPlanningIntelligence = () => {
                   <Button variant="ghost" size="sm" onClick={() => navigate('/auth')}>
                     Sign In
                   </Button>
-                  <Button variant="default" size="sm" onClick={() => navigate('/auth')}>
+                  <Button variant="default" size="sm" onClick={() => navigate('/auth?mode=sign-up')}>
                     Sign Up
                   </Button>
                 </>

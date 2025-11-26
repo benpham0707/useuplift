@@ -131,7 +131,7 @@ const Navigation = () => {
                   <Link to="/auth">Sign In</Link>
                 </Button>
                 <Button size="sm" asChild>
-                  <Link to="/auth">Sign Up</Link>
+                  <Link to="/auth?mode=sign-up">Sign Up</Link>
                 </Button>
               </div>
             )}
@@ -208,7 +208,7 @@ const Navigation = () => {
                     <Link to="/auth">Sign In</Link>
                   </Button>
                   <Button className="w-full" asChild>
-                    <Link to="/auth">Sign Up</Link>
+                    <Link to="/auth?mode=sign-up">Sign Up</Link>
                   </Button>
                 </div>
               )}
