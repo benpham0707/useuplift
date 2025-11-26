@@ -28,7 +28,6 @@ import { DraftVersionHistory } from '@/components/portfolio/extracurricular/work
 // PIQ Prompt Selector
 import { PIQPromptSelector, UC_PIQ_PROMPTS } from '@/components/portfolio/piq/workshop/PIQPromptSelector';
 import { PIQCarouselNav } from '@/components/portfolio/piq/workshop/PIQCarouselNav';
-import { PIQTabsNav } from '@/components/portfolio/piq/workshop/PIQTabsNav';
 
 // Backend Integration
 import { analyzePIQEntry } from '@/services/piqWorkshopAnalysisService';
@@ -1067,7 +1066,7 @@ export default function PIQWorkshop() {
       <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
 
       {/* Sticky PIQ header */}
-      <div className="sticky top-16 z-40 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
+      <div className="sticky top-[68px] z-40 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
         {/* Main header row */}
         <div className="mx-auto px-4 py-3 flex items-center justify-between gap-4 relative">
           {/* Left: Back button */}
@@ -1131,14 +1130,6 @@ export default function PIQWorkshop() {
             )}
           </div>
         </div>
-
-        {/* PIQ Tabs Navigation - shows all 8 PIQs */}
-        <div className="px-4 py-2 border-t border-border/50 bg-muted/30">
-          <PIQTabsNav
-            currentPromptId={selectedPromptId || 'piq1'}
-            onPromptChange={setSelectedPromptId}
-          />
-        </div>
       </div>
 
       {/* Main content */}
@@ -1149,33 +1140,14 @@ export default function PIQWorkshop() {
             {/* Narrative Quality Index Card - Professional Data-Dense Design */}
             <Card className="flex-1 p-5">
               {!hasAnalysis ? (
-                /* Empty State - No analysis yet */
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 mx-auto rounded-lg bg-gradient-to-br from-primary/20 via-primary/10 to-accent/20 flex items-center justify-center mb-4">
-                    <PenTool className="w-8 h-8 text-primary/60" />
-                  </div>
-                  <GradientText
-                    className="text-2xl font-extrabold uppercase tracking-wide mb-2"
-                    colors={["#a855f7", "#8b5cf6", "#c084fc", "#a78bfa", "#a855f7"]}
-                  >
-                    {isLoadingFromDatabase ? 'Loading...' : 'Ready to Analyze'}
-                  </GradientText>
-                  <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+                /* Empty State - Minimal placeholder */
+                <div className="text-center py-6">
+                  <p className="text-muted-foreground text-sm">
                     {isLoadingFromDatabase 
-                      ? 'Checking for your saved essay...'
-                      : !canAnalyze
-                        ? `Write at least ${MIN_ESSAY_LENGTH} characters to get your essay analyzed with our 11-dimension rubric.`
-                        : 'Click "Analyze" in the editor to get detailed feedback on your essay across 11 dimensions.'
+                      ? 'Loading your saved essay...'
+                      : 'Click "Analyze" in the editor to see your 11-dimension analysis here.'
                     }
                   </p>
-                  {!isLoadingFromDatabase && (
-                    <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-muted/50 border">
-                        <span className="w-2 h-2 rounded-full bg-primary/40"></span>
-                        {currentDraft.trim().length} / {MIN_ESSAY_LENGTH} characters
-                      </span>
-                    </div>
-                  )}
                 </div>
               ) : (
               /* Analysis Results */

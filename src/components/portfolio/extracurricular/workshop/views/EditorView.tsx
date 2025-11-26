@@ -29,6 +29,7 @@ import {
   FileEdit,
   Cloud,
 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import GradientText from '@/components/ui/GradientText';
 import type { TeachingIssue } from '../teachingTypes';
 
@@ -43,6 +44,7 @@ interface EditorViewProps {
   onRequestReanalysis?: () => void;
   hasAnalysisResult?: boolean; // Whether analysis has been run at least once
   canAnalyze?: boolean; // Whether essay has enough content to analyze
+  minCharacters?: number; // Minimum characters required to analyze (default 50)
   versionHistory?: Array<{ text: string; timestamp: number; score: number }>;
   onUndo?: () => void;
   onRedo?: () => void;
@@ -63,6 +65,7 @@ export const EditorView: React.FC<EditorViewProps> = ({
   onRequestReanalysis,
   hasAnalysisResult = false,
   canAnalyze = true,
+  minCharacters = 50,
   versionHistory = [],
   onUndo,
   onRedo,
@@ -208,23 +211,33 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   </div>
                 )}
                 {onRequestReanalysis && !isAnalyzing && (
-                  <div className="flex flex-col items-end gap-1">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={onRequestReanalysis}
-                      disabled={!canAnalyze}
-                      title={!canAnalyze ? 'Write at least 50 characters to analyze' : ''}
-                    >
-                      <Sparkles className="w-3 h-3 mr-1" />
-                      {hasAnalysisResult ? 'Re-analyze' : 'Analyze'}
-                    </Button>
-                    {!canAnalyze && (
-                      <span className="text-xs text-muted-foreground">
-                        Write more to analyze
-                      </span>
-                    )}
-                  </div>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={onRequestReanalysis}
+                            disabled={!canAnalyze}
+                          >
+                            <Sparkles className="w-3 h-3 mr-1" />
+                            {hasAnalysisResult ? 'Re-analyze' : 'Analyze'}
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {!canAnalyze && (
+                        <TooltipContent>
+                          <p className="text-xs">
+                            {localDraft.trim().length} / {minCharacters} characters
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Write {minCharacters - localDraft.trim().length} more to analyze
+                          </p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
             </div>
