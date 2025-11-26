@@ -52,7 +52,7 @@ const Auth = () => {
                 >
                   <SignIn 
                     routing="hash"
-                    forceRedirectUrl="/dashboard"
+                    forceRedirectUrl="/portfolio-scanner"
                   />
                   <p className="mt-4 text-sm text-muted-foreground">
                     Don't have an account?{' '}
@@ -75,7 +75,7 @@ const Auth = () => {
                 >
                   <SignUp 
                     routing="hash"
-                    forceRedirectUrl="/dashboard"
+                    forceRedirectUrl="/portfolio-scanner"
                   />
                   <p className="mt-4 text-sm text-muted-foreground">
                     Already have an account?{' '}
