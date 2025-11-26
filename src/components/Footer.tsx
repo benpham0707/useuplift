@@ -23,17 +23,16 @@ const Footer = () => {
           <div>
             <h4 className="font-semibold mb-4">Platform</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><Link to="/login" className="hover:text-foreground transition-colors">Sign In</Link></li>
-              <li><Link to="/signup" className="hover:text-foreground transition-colors">Get Started</Link></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Portfolio Scanner</a></li>
+              <li><Link to="/auth" className="hover:text-foreground transition-colors">Sign In</Link></li>
+              <li><Link to="/auth" className="hover:text-foreground transition-colors">Get Started</Link></li>
+              <li><Link to="/portfolio-scanner" className="hover:text-foreground transition-colors">Portfolio Scanner</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-semibold mb-4">Company</h4>
             <ul className="space-y-2 text-sm text-muted-foreground">
-              <li><a href="#" className="hover:text-foreground transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-foreground transition-colors">Contact</a></li>
+              <li><a href="mailto:support@useuplift.io" className="hover:text-foreground transition-colors">Contact</a></li>
               <li><Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link></li>
               <li><Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link></li>
             </ul>
@@ -44,11 +43,6 @@ const Footer = () => {
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
           <p>© {new Date().getFullYear()} Uplift. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-             <Link to="/parents" className="hover:text-foreground transition-colors">
-               For parents & counselors →
-             </Link>
-          </div>
         </div>
       </div>
     </footer>

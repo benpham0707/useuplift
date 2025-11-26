@@ -7,7 +7,7 @@ const logos = [
   { name: 'Columbia', src: '/uni_logos/columbiatransparent.png', scale: 1.3 },
   { name: 'UPenn', src: '/uni_logos/upenntransparent.png', scale: 1.3 },
   { name: 'UC Berkeley', src: '/uni_logos/ucberkeleytransparent.png', scale: 1 },
-  { name: 'UCLA', src: '/uni_logos/ucla_transparent.png', scale: 1.1 },
+  { name: 'UCLA', src: '/uni_logos/ucla_transparent.png', scale: 0.85 },
   { name: 'UC San Diego', src: '/uni_logos/ucsdtransparent.png', scale: 1.4 },
   { name: 'UCI', src: '/uni_logos/ucitransparent.png', scale: 1 },
 ];
@@ -42,19 +42,11 @@ const UniversityBacked = () => {
         <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-slate-50 to-transparent z-10" />
         <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-slate-50 to-transparent z-10" />
 
-        {/* Scrolling Container */}
-        <motion.div
-          className="flex gap-12 md:gap-20 items-center"
-          animate={{
-            x: ["0%", "-50%"],
-          }}
-          transition={{
-            x: {
-              repeat: Infinity,
-              repeatType: "loop",
-              duration: 30,
-              ease: "linear",
-            },
+        {/* Scrolling Container - Using CSS animation for smooth infinite scroll */}
+        <div 
+          className="flex gap-12 md:gap-20 items-center animate-scroll"
+          style={{
+            animation: 'scroll 40s linear infinite',
           }}
         >
           {[...logos, ...logos].map((logo, index) => (
@@ -64,7 +56,7 @@ const UniversityBacked = () => {
                 filter: filterStyle,
                 opacity: opacityValue
               }}
-              className="flex-shrink-0 h-16 md:h-20 flex items-center justify-center transition-all duration-300"
+              className="flex-shrink-0 h-16 md:h-20 flex items-center justify-center"
             >
               <img
                 src={logo.src}
@@ -74,7 +66,19 @@ const UniversityBacked = () => {
               />
             </motion.div>
           ))}
-        </motion.div>
+        </div>
+
+        {/* CSS Keyframes for smooth infinite scroll */}
+        <style>{`
+          @keyframes scroll {
+            0% {
+              transform: translateX(0);
+            }
+            100% {
+              transform: translateX(-50%);
+            }
+          }
+        `}</style>
       </div>
     </section>
   );

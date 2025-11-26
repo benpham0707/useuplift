@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navigation from '@/components/Navigation';
 import Footer from '@/components/Footer';
@@ -6,6 +7,10 @@ import { ArrowLeft } from 'lucide-react';
 
 const Privacy = () => {
   const lastUpdated = "November 26, 2025";
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background font-sans">
