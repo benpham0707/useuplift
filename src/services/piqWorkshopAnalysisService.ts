@@ -39,10 +39,18 @@ export async function analyzePIQEntry(
   console.log('');
 
   try {
-    // Call workshop-analysis edge function
-    console.log('🌐 Calling workshop-analysis edge function...');
+    // NEW 3-STAGE CHUNKED ARCHITECTURE (v15)
+    console.log('🌐 Calling workshop-analysis edge function (3-stage chunked)...');
+    console.log('   Stage 1: Analysis (~35s)');
+    console.log('   Stage 2: Generation (~35s)');
+    console.log('   Stage 3: Validation (~60s)');
+    console.log('');
 
-    const { data, error } = await supabase.functions.invoke('workshop-analysis', {
+    // STAGE 1: Analysis (voice + experience + rubric)
+    console.log('🔍 Stage 1: Running analysis...');
+    const stage1Start = Date.now();
+
+    const { data: stage1Data, error: stage1Error } = await supabase.functions.invoke('workshop-analysis?stage=1', {
       body: {
         essayText,
         essayType: options.essayType || 'uc_piq',
@@ -57,24 +65,63 @@ export async function analyzePIQEntry(
       }
     });
 
-    if (error) {
-      console.error('❌ Edge function error:', error);
-      throw new Error(`Edge function failed: ${error.message}`);
+    if (stage1Error) {
+      console.error('❌ Stage 1 error:', stage1Error);
+      throw new Error(`Stage 1 failed: ${stage1Error.message}`);
     }
 
-    if (!data || !data.success) {
-      console.error('❌ Edge function returned error:', data);
-      throw new Error(data?.error || 'Edge function returned unsuccessful result');
+    const stage1Time = ((Date.now() - stage1Start) / 1000).toFixed(1);
+    console.log(`✅ Stage 1 complete in ${stage1Time}s`);
+    console.log(`   NQI: ${stage1Data.data?.rubricAnalysis?.narrative_quality_index || 'N/A'}`);
+
+    // STAGE 2: Generation (9 items in 3 batches)
+    console.log('✨ Stage 2: Generating workshop items...');
+    const stage2Start = Date.now();
+
+    const { data: stage2Data, error: stage2Error } = await supabase.functions.invoke('workshop-analysis?stage=2', {
+      body: {
+        continueToken: stage1Data.continueToken
+      }
+    });
+
+    if (stage2Error) {
+      console.error('❌ Stage 2 error:', stage2Error);
+      throw new Error(`Stage 2 failed: ${stage2Error.message}`);
     }
 
-    console.log('✅ Edge function call complete');
-    console.log(`   NQI: ${data.analysis.narrative_quality_index}/100`);
-    console.log(`   Voice Fingerprint: ${data.voiceFingerprint ? 'Yes' : 'Missing!'}`);
-    console.log(`   Experience Fingerprint: ${data.experienceFingerprint ? 'Yes' : 'Not generated'}`);
-    console.log(`   Rubric Dimensions: ${data.rubricDimensionDetails?.length || 0}`);
-    console.log(`   Workshop Items: ${data.workshopItems?.length || 0}`);
+    const stage2Time = ((Date.now() - stage2Start) / 1000).toFixed(1);
+    console.log(`✅ Stage 2 complete in ${stage2Time}s`);
+    console.log(`   Generated: ${stage2Data.data?.workshopItems?.length || 0} items`);
+
+    // STAGE 3: Validation (27 suggestions with 85+ threshold)
+    console.log('✅ Stage 3: Validating suggestions...');
+    const stage3Start = Date.now();
+
+    const { data: stage3Data, error: stage3Error } = await supabase.functions.invoke('workshop-analysis?stage=3', {
+      body: {
+        continueToken: stage2Data.continueToken
+      }
+    });
+
+    if (stage3Error) {
+      console.error('❌ Stage 3 error:', stage3Error);
+      throw new Error(`Stage 3 failed: ${stage3Error.message}`);
+    }
+
+    const stage3Time = ((Date.now() - stage3Start) / 1000).toFixed(1);
+    const totalTime = ((Date.now() - stage1Start) / 1000).toFixed(1);
+
+    console.log(`✅ Stage 3 complete in ${stage3Time}s`);
+    console.log(`✅ Total time: ${totalTime}s`);
+    console.log(`   Voice Fingerprint: ${stage3Data.voiceFingerprint ? 'Yes' : 'Missing!'}`);
+    console.log(`   Experience Fingerprint: ${stage3Data.experienceFingerprint ? 'Yes' : 'Not generated'}`);
+    console.log(`   Rubric Dimensions: ${stage3Data.rubricDimensionDetails?.length || 0}`);
+    console.log(`   Workshop Items: ${stage3Data.workshopItems?.length || 0}`);
     console.log('='.repeat(80));
     console.log('');
+
+    // Use final stage data
+    const data = stage3Data;
 
     // Transform edge function result to AnalysisResult format
     let analysisResult: AnalysisResult = {
