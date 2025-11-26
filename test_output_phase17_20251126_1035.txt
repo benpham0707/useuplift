@@ -1,0 +1,88 @@
+🧪 PIQ WORKSHOP RESTORATION TEST
+================================================================================
+
+Test Essay Length: 1458 chars
+Word Count: 237
+
+📞 Calling workshop-analysis edge function...
+   Endpoint: workshop-analysis
+   Method: Single API call (no staging)
+
+✅ Response received!
+
+================================================================================
+TEST RESULTS
+================================================================================
+
+📊 Test 1: Response Time
+   Time: 134.5s
+   ❌ FAIL - Too slow (>90s)
+
+📊 Test 2: Response Structure
+   success: ✅
+   analysis: ✅
+   voiceFingerprint: ✅
+   experienceFingerprint: ✅
+   rubricDimensionDetails: ✅
+   workshopItems: ✅
+
+📊 Test 3: Workshop Items Count
+   Count: 5 items
+   ✅ PASS - Exactly 5 items (target)
+
+📊 Test 4: Narrative Quality Index
+   NQI: 72/100
+   ✅ PASS - Valid score range
+
+📊 Test 5: Rubric Dimensions
+   Dimensions: 12
+   ✅ PASS - All 12 dimensions present
+
+📊 Test 6: Workshop Item Quality
+   First Workshop Item:
+     - ID: ✅
+     - Quote: ✅ (151 chars)
+     - Problem: ✅ (87 chars)
+     - Why it matters: ✅
+     - Severity: ✅ (critical)
+     - Rubric category: ✅
+     - Suggestions: 3 items
+     - Avg suggestion length: 340 chars
+     ⚠️  WARNING - Suggestions are somewhat long
+
+   📝 Sample Suggestion (for manual quality check):
+   Problem: "The turning point lacks emotional intensity and misses the profound moment of discovery"
+   Quote: "But I realized she wasn't just lost in memory—she was inviting me somewhere. So I started learning V..."
+   Suggestion Type: polished_original
+   Suggestion: "The day she said 'Má ơi' while staring at my face—calling me mother—I finally understood. She wasn't lost in memory; she was creating a time machine. Every story was a door she was opening, showing me..."
+
+📊 Test 7: Voice Fingerprint Details
+   Tone: tender
+   Sentence Structure: ✅
+   Vocabulary: ✅
+   Pacing: ✅
+   ✅ PASS - Voice fingerprint complete
+
+📊 Test 8: Experience Fingerprint Details
+   Uniqueness Dimensions: 0
+   Anti-pattern Flags: ✅
+   Quality Anchors: 3
+   ✅ PASS - Experience fingerprint complete
+
+================================================================================
+SUMMARY
+================================================================================
+
+⏱️  Response Time: 134.5s
+📊 NQI Score: 72/100
+📝 Workshop Items: 5
+📐 Rubric Dimensions: 12
+✅ Voice Fingerprint: Present
+✅ Experience Fingerprint: Present
+
+⚠️  OVERALL: SOME TESTS FAILED OR WARNINGS
+
+Review the test results above for details.
+
+================================================================================
+✅ Test completed successfully

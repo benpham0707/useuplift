@@ -1,0 +1,84 @@
+🧪 PIQ WORKSHOP RESTORATION TEST
+================================================================================
+
+Test Essay Length: 1458 chars
+Word Count: 237
+
+📞 Calling workshop-analysis edge function...
+   Endpoint: workshop-analysis
+   Method: Single API call (no staging)
+
+✅ Response received!
+
+================================================================================
+TEST RESULTS
+================================================================================
+
+📊 Test 1: Response Time
+   Time: 98.9s
+   ❌ FAIL - Too slow (>90s)
+
+📊 Test 2: Response Structure
+   success: ✅
+   analysis: ✅
+   voiceFingerprint: ❌
+   experienceFingerprint: ✅
+   rubricDimensionDetails: ✅
+   workshopItems: ✅
+
+📊 Test 3: Workshop Items Count
+   Count: 5 items
+   ✅ PASS - Exactly 5 items (target)
+
+📊 Test 4: Narrative Quality Index
+   NQI: 74/100
+   ✅ PASS - Valid score range
+
+📊 Test 5: Rubric Dimensions
+   Dimensions: 12
+   ✅ PASS - All 12 dimensions present
+
+📊 Test 6: Workshop Item Quality
+   First Workshop Item:
+     - ID: ✅
+     - Quote: ✅ (122 chars)
+     - Problem: ✅ (79 chars)
+     - Why it matters: ✅
+     - Severity: ✅ (medium)
+     - Rubric category: ✅
+     - Suggestions: 3 items
+     - Avg suggestion length: 169 chars
+     ✅ PASS - Suggestions are concise
+
+   📝 Sample Suggestion (for manual quality check):
+   Problem: "Opening doesn't explicitly mention leadership, making prompt connection unclear"
+   Quote: "I never expected that learning to navigate my grandmother's dementia would teach me how to build bri..."
+   Suggestion Type: polished_original
+   Suggestion: "I never expected that learning to navigate my grandmother's dementia would teach me how to lead by building bridges between cultures...."
+
+📊 Test 7: Voice Fingerprint Details
+   ❌ FAIL - Voice fingerprint missing
+
+📊 Test 8: Experience Fingerprint Details
+   Uniqueness Dimensions: 0
+   Anti-pattern Flags: ✅
+   Quality Anchors: 3
+   ✅ PASS - Experience fingerprint complete
+
+================================================================================
+SUMMARY
+================================================================================
+
+⏱️  Response Time: 98.9s
+📊 NQI Score: 74/100
+📝 Workshop Items: 5
+📐 Rubric Dimensions: 12
+✅ Voice Fingerprint: Missing
+✅ Experience Fingerprint: Present
+
+⚠️  OVERALL: SOME TESTS FAILED OR WARNINGS
+
+Review the test results above for details.
+
+================================================================================
+✅ Test completed successfully
