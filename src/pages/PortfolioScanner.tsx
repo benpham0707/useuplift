@@ -812,15 +812,17 @@ const PortfolioScanner = () => {
                   </p>
                   
                   {/* CTA Button */}
-                  <div className="mt-4 flex items-center gap-3">
+                  <div className="mt-4">
                     <Button 
                       onClick={() => navigate('/piq-workshop')}
-                      className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold"
+                      className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold pr-4"
                     >
                       <Rocket className="h-4 w-4 mr-2" />
                       Try PIQ Workshop
+                      <span className="ml-2 px-1.5 py-0.5 rounded-full bg-white/20 text-[11px] font-medium text-white border border-white/20">
+                        Free to use
+                      </span>
                     </Button>
-                    <span className="text-xs text-gray-500">Free to use</span>
                   </div>
                 </div>
               </div>
