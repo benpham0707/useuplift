@@ -24,6 +24,7 @@ import { RubricDimensionCard } from '@/components/portfolio/extracurricular/work
 import type { RubricDimension, WritingIssue, EditSuggestion } from '@/components/portfolio/extracurricular/workshop/types';
 import ContextualWorkshopChat from '@/components/portfolio/extracurricular/workshop/components/ContextualWorkshopChat';
 import { DraftVersionHistory } from '@/components/portfolio/extracurricular/workshop/DraftVersionHistory';
+import { RandomizingScore } from '@/components/portfolio/piq/workshop/RandomizingScore';
 
 // PIQ Prompt Selector
 import { UC_PIQ_PROMPTS } from '@/components/portfolio/piq/workshop/PIQPromptSelector';
@@ -1393,7 +1394,36 @@ export default function PIQWorkshop() {
           <div className="flex flex-col md:flex-row gap-6 items-start">
             {/* Narrative Quality Index Card - Professional Data-Dense Design */}
             <Card className="flex-1 p-5">
-              {!hasAnalysis ? (
+              {isAnalyzing ? (
+                /* ENHANCED LOADING STATE */
+                <div className="flex flex-col items-center justify-center py-12 space-y-6 text-center">
+                  <div className="relative">
+                    {/* Gradient Spinner */}
+                    <div className="w-16 h-16 rounded-full border-4 border-transparent border-t-blue-500 border-r-purple-500 border-b-pink-500 animate-spin" />
+                    <Target className="w-8 h-8 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-bold">Analyzing Your PIQ Essay</h3>
+                    <p className="text-muted-foreground">
+                      Evaluating across 11 narrative dimensions...
+                    </p>
+                  </div>
+
+                  {/* Spinning Score Preview */}
+                  <div className="flex flex-col items-center gap-2 py-2">
+                    <span className="text-xs text-muted-foreground uppercase tracking-widest font-semibold">Calculating Score</span>
+                    <div className="flex items-baseline gap-1">
+                      <RandomizingScore score={0} isAnalyzing={true} className="text-5xl font-extrabold text-primary" />
+                      <span className="text-xl text-muted-foreground">/100</span>
+                    </div>
+                  </div>
+
+                  <div className="text-sm text-muted-foreground animate-pulse bg-muted/50 px-4 py-2 rounded-full">
+                    This will finish in 2-3 minutes...
+                  </div>
+                </div>
+              ) : !hasAnalysis ? (
                 /* Empty State - Minimal placeholder */
                 <div className="text-center py-6">
                   <p className="text-muted-foreground text-sm">
@@ -1428,13 +1458,19 @@ export default function PIQWorkshop() {
                 <div className="text-right">
                   <div className="flex items-baseline gap-2 justify-end mb-2">
                     {scoreColorConfig.gradient ? (
-                      <GradientText className="text-4xl font-extrabold" colors={scoreColorConfig.colors} textOnly>
-                        {currentScore}
-                      </GradientText>
+                      <div className="relative">
+                         <RandomizingScore 
+                            score={currentScore} 
+                            isAnalyzing={isAnalyzing} 
+                            className="text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[hsl(250,70%,60%)] via-[hsl(185,80%,55%)] to-[hsl(280,90%,65%)]"
+                         />
+                      </div>
                     ) : (
-                      <span className={`text-4xl font-extrabold ${scoreColorConfig.className}`}>
-                        {currentScore}
-                      </span>
+                      <RandomizingScore 
+                         score={currentScore} 
+                         isAnalyzing={isAnalyzing} 
+                         className={`text-4xl font-extrabold ${scoreColorConfig.className}`} 
+                      />
                     )}
                     <span className="text-xl font-semibold text-muted-foreground">/100</span>
                   </div>
