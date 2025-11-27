@@ -388,6 +388,17 @@ export default function PIQWorkshop() {
         return;
       }
 
+      // Reset all PIQ-specific state when switching prompts
+      console.log('🔄 Resetting state for new PIQ...');
+      setCurrentDraft('');
+      setAnalysisResult(null);
+      setDimensions([]);
+      setDraftVersions([]);
+      setCurrentEssayId(null);
+      setNeedsReanalysis(false);
+      setHasUnsavedChanges(false);
+      setNarrativeOverview(null);
+
       setIsLoadingFromDatabase(true);
       console.log(`📥 Loading essay from database for prompt: ${selectedPromptId}`);
 
@@ -589,27 +600,6 @@ export default function PIQWorkshop() {
     }
   }, [piqNumber]);
 
-  // Manual save to cloud
-  const handleSaveToCloud = useCallback(async () => {
-    if (!selectedPromptId || !currentDraft) {
-      console.warn('Cannot save to cloud: missing prompt or draft');
-      return;
-    }
-
-    const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
-    if (!selectedPrompt) return;
-
-    // Create version snapshot
-    const versionSnapshot = createVersionSnapshot(
-      currentDraft,
-      currentScore,
-      analysisResult || undefined
-    );
-
-    // Save to cloud (TODO: Re-implement cloud save functionality)
-    console.log('Version snapshot created:', versionSnapshot);
-    alert('Version saved locally!');
-  }, [selectedPromptId, currentDraft, currentScore, analysisResult]);
 
   // ============================================================================
   // HANDLERS (Same as ExtracurricularWorkshopFinal)
@@ -1389,7 +1379,7 @@ export default function PIQWorkshop() {
                 onUndo={handleUndo}
                 onRedo={handleRedo}
                 onShowHistory={() => setShowVersionHistory(true)}
-                onSaveToCloud={handleSaveToCloud}
+                hasUnsavedChanges={hasUnsavedChanges}
               />
             </Card>
 

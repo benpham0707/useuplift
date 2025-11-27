@@ -27,7 +27,6 @@ import {
   Clock,
   Sparkles,
   FileEdit,
-  Cloud,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import GradientText from '@/components/ui/GradientText';
@@ -51,7 +50,7 @@ interface EditorViewProps {
   canUndo?: boolean;
   canRedo?: boolean;
   onShowHistory?: () => void;
-  onSaveToCloud?: () => void; // Manual save to cloud
+  hasUnsavedChanges?: boolean; // Whether there are unsaved changes (controlled by parent)
 }
 
 export const EditorView: React.FC<EditorViewProps> = ({
@@ -72,17 +71,16 @@ export const EditorView: React.FC<EditorViewProps> = ({
   canUndo = false,
   canRedo = false,
   onShowHistory,
-  onSaveToCloud,
+  hasUnsavedChanges = false,
 }) => {
   const [localDraft, setLocalDraft] = useState(currentDraft);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Track changes
+  // Sync local draft when parent's currentDraft changes (e.g., on PIQ switch)
   useEffect(() => {
-    setHasUnsavedChanges(localDraft !== currentDraft);
-  }, [localDraft, currentDraft]);
+    setLocalDraft(currentDraft);
+  }, [currentDraft]);
 
   // Handle draft change
   const handleDraftChange = (value: string) => {
@@ -94,7 +92,6 @@ export const EditorView: React.FC<EditorViewProps> = ({
   const handleSave = () => {
     onSave();
     setLastSaveTime(new Date());
-    setHasUnsavedChanges(false);
   };
 
   // Score difference calculation
@@ -161,17 +158,6 @@ export const EditorView: React.FC<EditorViewProps> = ({
                   <Save className="w-4 h-4 mr-2" />
                   Save Draft
                 </Button>
-                {onSaveToCloud && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={onSaveToCloud}
-                    title="Save version to cloud for cross-device access"
-                  >
-                    <Cloud className="w-4 h-4 mr-2" />
-                    Save to Cloud
-                  </Button>
-                )}
               </div>
             </div>
 
