@@ -99,7 +99,7 @@ export async function handleClerkWebhook(req: Request, res: Response) {
 
   // Handle user.created event
   if (payload.type === 'user.created') {
-    const { id: clerkUserId, email_addresses, first_name, last_name } = payload.data;
+    const { id: clerkUserId, email_addresses, first_name, last_name } = payload.data as any;
     const primaryEmail = email_addresses?.[0]?.email_address;
 
     console.log(`📥 Clerk webhook: user.created for ${clerkUserId} (${primaryEmail})`);
@@ -151,7 +151,7 @@ export async function handleClerkWebhook(req: Request, res: Response) {
 
   // Handle user.deleted event (optional - for cleanup)
   if (payload.type === 'user.deleted') {
-    const { id: clerkUserId } = payload.data;
+    const { id: clerkUserId } = payload.data as any;
     console.log(`📥 Clerk webhook: user.deleted for ${clerkUserId}`);
     
     // Optional: Delete or soft-delete the profile

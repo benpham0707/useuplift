@@ -81,7 +81,7 @@ const Settings = () => {
         }
 
         // Load recent transactions
-        const { data: txns } = await supabase
+        const { data: txns } = await (supabase as any)
           .from('credit_transactions')
           .select('id, amount, type, description, created_at')
           .eq('user_id', user.id)

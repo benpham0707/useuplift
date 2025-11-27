@@ -2,11 +2,12 @@ import AnnouncementBar from '@/components/AnnouncementBar';
 import Navigation from '@/components/Navigation';
 import HeroSection from '@/components/HeroSection';
 import UniversityBacked from '@/components/UniversityBacked';
+import PIQShowcase from '@/components/landing/PIQShowcase';
+import ExpertiseSection from '@/components/landing/ExpertiseSection';
+import AICoachPreview from '@/components/landing/AICoachPreview';
+import ComingSoonSection from '@/components/landing/ComingSoonSection';
 import EmpathySection from '@/components/EmpathySection';
 import HowItWorks from '@/components/HowItWorks';
-import Features from '@/components/Features';
-import AlternativePaths from '@/components/AlternativePaths';
-import TargetAudience from '@/components/TargetAudience';
 import Testimonials from '@/components/Testimonials';
 import TrustSection from '@/components/TrustSection';
 import FAQ from '@/components/FAQ';
@@ -22,11 +23,12 @@ const Index = () => {
       <main className="flex-1">
         <HeroSection />
         <UniversityBacked />
+        <PIQShowcase />
+        <ExpertiseSection />
+        <AICoachPreview />
+        <ComingSoonSection />
         <EmpathySection />
         <HowItWorks />
-        <Features />
-        <AlternativePaths />
-        <TargetAudience />
         <Testimonials />
         <TrustSection />
         <FAQ />
