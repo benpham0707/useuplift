@@ -290,7 +290,7 @@ export default function ContextualWorkshopChat({
       return;
     }
 
-    // Credit check: Require 1 credit for chat message
+    // Credit check and deduction UPFRONT before sending message
     if (userId && getToken) {
       const token = await getToken({ template: 'supabase' });
       if (token) {
@@ -301,6 +301,17 @@ export default function ContextualWorkshopChat({
           console.warn(`❌ Insufficient credits for chat: ${creditCheck.currentBalance}/${creditCheck.required}`);
           setCurrentCreditBalance(creditCheck.currentBalance);
           setShowInsufficientCreditsModal(true);
+          return;
+        }
+        
+        // Deduct credit IMMEDIATELY before sending
+        const promptName = mode === 'piq' ? piqPromptTitle : activity?.name;
+        const deductResult = await deductForChatMessage(userId, token, promptName);
+        if (deductResult.success) {
+          console.log(`💳 Deducted ${CREDIT_COSTS.CHAT_MESSAGE} credit upfront. New balance: ${deductResult.newBalance}`);
+        } else {
+          console.warn('⚠️ Failed to deduct chat credit:', deductResult.error);
+          // Don't proceed if deduction fails
           return;
         }
       }
@@ -331,19 +342,6 @@ export default function ContextualWorkshopChat({
 
         // Add assistant message
         updateMessages((prev) => [...prev, response.message]);
-
-        // Deduct credit after successful response
-        if (userId && getToken) {
-          const token = await getToken({ template: 'supabase' });
-          if (token) {
-            const deductResult = await deductForChatMessage(userId, token, piqPromptTitle);
-            if (deductResult.success) {
-              console.log(`💳 Deducted ${CREDIT_COSTS.CHAT_MESSAGE} credit. New balance: ${deductResult.newBalance}`);
-            } else {
-              console.warn('⚠️ Failed to deduct chat credit:', deductResult.error);
-            }
-          }
-        }
       } else {
         // Extracurricular mode
         const context = buildContextObject();
@@ -360,19 +358,6 @@ export default function ContextualWorkshopChat({
 
         // Add assistant message
         updateMessages((prev) => [...prev, response.message]);
-
-        // Deduct credit after successful response
-        if (userId && getToken) {
-          const token = await getToken({ template: 'supabase' });
-          if (token) {
-            const deductResult = await deductForChatMessage(userId, token, activity?.name);
-            if (deductResult.success) {
-              console.log(`💳 Deducted ${CREDIT_COSTS.CHAT_MESSAGE} credit. New balance: ${deductResult.newBalance}`);
-            } else {
-              console.warn('⚠️ Failed to deduct chat credit:', deductResult.error);
-            }
-          }
-        }
 
         // Update recommendations (extracurricular only)
         if (response.recommendations && response.recommendations.length > 0) {

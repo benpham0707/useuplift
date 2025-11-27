@@ -188,8 +188,17 @@ export default function PIQWorkshop() {
       return;
     }
 
-    // Credit check: Require 5 credits for essay analysis
-    if (userId) {
+    const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
+    if (!selectedPrompt) {
+      console.warn('Invalid prompt selection');
+      return;
+    }
+
+    // Check if analysis is cached FIRST (before credit check)
+    const cachedResult = getCachedAnalysisResult(currentDraft, selectedPromptId);
+    
+    // Only check/deduct credits if NOT cached
+    if (!cachedResult && userId) {
       const token = await getToken({ template: 'supabase' });
       if (token) {
         const creditCheck = await canAnalyzeEssay(userId, token);
@@ -201,6 +210,16 @@ export default function PIQWorkshop() {
           setShowInsufficientCreditsModal(true);
           return;
         }
+        
+        // Deduct credits IMMEDIATELY before analysis starts
+        const deductResult = await deductForEssayAnalysis(userId, token, selectedPrompt.title);
+        if (deductResult.success) {
+          console.log(`💳 Deducted ${CREDIT_COSTS.ESSAY_ANALYSIS} credits upfront. New balance: ${deductResult.newBalance}`);
+        } else {
+          console.warn('⚠️ Failed to deduct credits:', deductResult.error);
+          // Don't proceed if deduction fails
+          return;
+        }
       }
     }
 
@@ -208,18 +227,10 @@ export default function PIQWorkshop() {
     setValidationLoading(false);
     setValidationComplete(false);
     try {
-      const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
-      if (!selectedPrompt) {
-        throw new Error('Invalid prompt selection');
-      }
-
-      // Check if analysis is cached for this exact text
-      const cachedResult = getCachedAnalysisResult(currentDraft, selectedPromptId);
-
       let result: AnalysisResult;
 
       if (cachedResult) {
-        console.log('✅ Using cached analysis result - skipping API call');
+        console.log('✅ Using cached analysis result - skipping API call (no credits charged)');
         result = cachedResult;
         setIsAnalyzing(false);
         setValidationComplete(true);
@@ -353,20 +364,6 @@ export default function PIQWorkshop() {
         // Cache the result
         cacheAnalysisResult(currentDraft, selectedPromptId, result);
         console.log('✅ Analysis result cached for future use');
-
-        // Deduct credits for non-cached analysis
-        if (userId) {
-          const deductToken = await getToken({ template: 'supabase' });
-          if (deductToken) {
-            const selectedPromptForDeduction = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
-            const deductResult = await deductForEssayAnalysis(userId, deductToken, selectedPromptForDeduction?.title);
-            if (deductResult.success) {
-              console.log(`💳 Deducted ${CREDIT_COSTS.ESSAY_ANALYSIS} credits. New balance: ${deductResult.newBalance}`);
-            } else {
-              console.warn('⚠️ Failed to deduct credits:', deductResult.error);
-            }
-          }
-        }
       }
 
       console.log('📊 Backend result received - FULL OBJECT:');
