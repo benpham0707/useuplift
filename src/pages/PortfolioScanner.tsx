@@ -836,7 +836,11 @@ const PortfolioScanner = () => {
       )}
 
       {/* Header Section with Scores - AcademicPlanner aesthetic */}
-      <div id="overview" ref={overviewRef} className="hero-gradient hero-gradient-fade text-white snap-start snap-always">
+      <div id="overview" ref={overviewRef} className="hero-gradient hero-gradient-fade text-white snap-start snap-always relative">
+        {/* Preview mode gray overlay */}
+        {isPreviewMode && (
+          <div className="absolute inset-0 bg-gray-900/30 pointer-events-none z-[5]" />
+        )}
         <div className="max-w-7xl mx-auto px-4 py-12">
           {/* Header */}
           <div className="text-center mb-12">
@@ -1351,25 +1355,20 @@ const PortfolioScanner = () => {
 
       {/* Main Content Area */}
       <main className="relative">
-        {/* Preview mode overlay */}
+        {/* Preview mode gray overlay */}
         {isPreviewMode && (
-          <div className="pointer-events-none absolute inset-0 z-10">
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/20" />
-          </div>
+          <div className="absolute inset-0 bg-gray-500/20 pointer-events-none z-[5]" />
         )}
         <PortfolioPathway 
           onProgressUpdate={isPreviewMode ? () => {} : setOverallProgress}
           currentProgress={overallProgress}
         />
-        {/* Hide dock in preview mode since navigation won't work */}
-        {!isPreviewMode && (
-          <Dock 
-            items={dockItems}
-            panelHeight={68}
-            baseItemSize={50}
-            magnification={70}
-          />
-        )}
+        <Dock 
+          items={dockItems}
+          panelHeight={68}
+          baseItemSize={50}
+          magnification={70}
+        />
       </main>
     </div>
   );
