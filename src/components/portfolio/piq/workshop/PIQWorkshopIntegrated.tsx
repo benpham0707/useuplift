@@ -29,7 +29,7 @@ import type { RubricDimension, WritingIssue, EditSuggestion } from '@/components
 // PIQ Workshop UI Components
 import { VoiceFingerprintCard } from './VoiceFingerprintCard';
 import { ExperienceFingerprintCard } from './ExperienceFingerprintCard';
-import { PIQPromptSelector } from './PIQPromptSelector';
+import { RandomizingScore } from './RandomizingScore';
 
 // PIQ-specific analysis service
 import { analyzePIQEntry } from '@/services/piqWorkshopAnalysisService';
@@ -315,7 +315,8 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
         <Card className="p-12 max-w-md w-full space-y-6 text-center">
           <div className="flex justify-center">
             <div className="relative">
-              <Loader2 className="w-16 h-16 text-primary animate-spin" />
+              {/* Gradient Spinner */}
+              <div className="w-16 h-16 rounded-full border-4 border-transparent border-t-blue-500 border-r-purple-500 border-b-pink-500 animate-spin" />
               <Sparkles className="w-8 h-8 text-primary absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2" />
             </div>
           </div>
@@ -325,8 +326,8 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
               Evaluating across 11 narrative dimensions...
             </p>
           </div>
-          <div className="text-sm text-muted-foreground">
-            This usually takes 10-15 seconds
+          <div className="text-sm text-muted-foreground animate-pulse">
+            This will finish in 2-3 minutes...
           </div>
         </Card>
       </div>
@@ -370,7 +371,7 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
               <div className="text-right">
                 <div className="text-sm text-muted-foreground">Narrative Quality Index</div>
                 <div className="flex items-center gap-2">
-                  <span className="text-3xl font-bold">{nqi}</span>
+                  <RandomizingScore score={nqi} isAnalyzing={isAnalyzing} className="text-3xl font-bold" />
                   <span className="text-sm text-muted-foreground">/100</span>
                   {scoreChange !== 0 && (
                     <Badge variant={scoreChange > 0 ? 'default' : 'destructive'} className="gap-1">
@@ -390,18 +391,7 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Analysis & Dimensions */}
           <div className="lg:col-span-2 space-y-6">
-            {/* PIQ Prompt Selector */}
-            <PIQPromptSelector
-              selectedPromptId={selectedPromptId}
-              onPromptSelect={(promptId) => {
-                setSelectedPromptId(promptId);
-                // Trigger re-analysis if we already have a draft and analysis
-                if (currentDraft && analysisResult) {
-                  setHasUnsavedChanges(true);
-                }
-              }}
-            />
-
+            {/* PIQ Prompt Selector - Removed */}
             {/* Overall Summary */}
             <Card className="p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -412,7 +402,9 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-4 rounded-lg bg-slate-100 dark:bg-slate-900">
-                  <div className="text-2xl font-bold text-primary">{nqi}</div>
+                  <div className="text-2xl font-bold text-primary">
+                    <RandomizingScore score={nqi} isAnalyzing={isAnalyzing} className="" />
+                  </div>
                   <div className="text-xs text-muted-foreground">Current NQI</div>
                 </div>
                 <div className="text-center p-4 rounded-lg bg-slate-100 dark:bg-slate-900">
@@ -480,10 +472,20 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
                 {hasUnsavedChanges && (
                   <Button
                     onClick={() => performAnalysis(currentDraft, false)}
+                    disabled={isAnalyzing}
                     className="w-full gap-2"
                   >
-                    <Sparkles className="w-4 h-4" />
-                    Re-analyze Essay
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Analyzing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4" />
+                        Re-analyze Essay
+                      </>
+                    )}
                   </Button>
                 )}
               </Card>
