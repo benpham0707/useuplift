@@ -156,18 +156,6 @@ export default function PIQWorkshop() {
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Scroll-based carousel positioning
-  const [scrollY, setScrollY] = useState(0);
-  const SCROLL_THRESHOLD = 450; // Start transition when hero section passes and 2-column grid becomes primary
-  const TRANSITION_DURATION = 200; // pixels over which to complete the transition (smoother)
-  const MAX_OFFSET = 360; // shift to center within the AI Essay Coach component (centered in right column)
-  
-  // Only start transition after threshold, complete over TRANSITION_DURATION pixels
-  const scrollProgress = scrollY < SCROLL_THRESHOLD 
-    ? 0 
-    : Math.min((scrollY - SCROLL_THRESHOLD) / TRANSITION_DURATION, 1);
-  const scrollOffset = MAX_OFFSET * scrollProgress; // positive to shift right
-
   // Extract active issues from dimensions
   const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
 
@@ -852,13 +840,6 @@ export default function PIQWorkshop() {
     };
   }, [hasUnsavedChanges, currentDraft, selectedPromptId, currentScore, analysisResult, draftVersions]);
 
-  // Scroll tracking for carousel positioning
-  useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
   // Sync selectedPromptId when URL changes
   useEffect(() => {
     const newPromptId = getPromptIdFromUrl();
@@ -1352,20 +1333,9 @@ export default function PIQWorkshop() {
       {/* Sticky PIQ header */}
       <div className="sticky top-[72px] z-40 bg-white/90 dark:bg-gray-950/90 backdrop-blur-md border-b shadow-sm">
         {/* Main header row */}
-        <div className="mx-auto px-4 py-4 flex items-center justify-between gap-4 relative">
-          {/* Left: Back button */}
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="gap-2">
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-
-          {/* Center: PIQ Carousel Navigation - with dynamic scroll-based positioning */}
-          <div 
-            className="absolute left-1/2 transition-transform duration-300 ease-out"
-            style={{
-              transform: `translateX(calc(-50% + ${scrollOffset}px))`
-            }}
-          >
+        <div className="mx-auto px-4 py-4 flex items-center justify-center gap-4">
+          {/* Center: PIQ Carousel Navigation - static positioning */}
+          <div className="flex-1 flex justify-center">
             <PIQCarouselNav
               currentPromptId={selectedPromptId || 'piq1'}
               onPromptChange={setSelectedPromptId}
@@ -1373,7 +1343,7 @@ export default function PIQWorkshop() {
           </div>
 
           {/* Right: Save Status */}
-          <div className="flex items-center gap-2 min-w-[120px] justify-end ml-auto">
+          <div className="flex items-center gap-2 min-w-[120px] justify-end absolute right-4">
             {saveStatus === 'saving' && (
               <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400">
                 <Loader2 className="w-4 h-4 animate-spin" />
