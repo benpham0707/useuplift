@@ -11,6 +11,14 @@ export interface EditSuggestion {
   text: string;
   rationale: string;
   type: 'replace' | 'insert_before' | 'insert_after';
+  // Phase 18 validation (optional - added for quality scoring)
+  validation?: {
+    suggestion_id: string;
+    quality_score: number;
+    issues: string[];
+    improvements: string[];
+    verdict: 'excellent' | 'good' | 'needs_work';
+  };
 }
 
 // Legacy type alias for backwards compatibility

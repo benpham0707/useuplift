@@ -6,7 +6,7 @@
  * Returns ALL insights: voice fingerprint, experience fingerprint, 12 dimensions, workshop items
  */
 
-import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
+import type { AnalysisResult, ValidationSummary } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase client for edge function calls
@@ -14,10 +14,192 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// ============================================================================
+// TWO-STEP ANALYSIS CALLBACKS
+// ============================================================================
+
+export interface TwoStepAnalysisCallbacks {
+  onPhase17Complete?: (result: AnalysisResult) => void;
+  onPhase18Complete?: (validatedResult: AnalysisResult) => void;
+  onProgress?: (status: string) => void;
+}
+
+/**
+ * Two-Step Analysis: Phase 17 + Phase 18 Validation
+ *
+ * Splits analysis into two separate API calls to avoid 150s timeout:
+ * 1. Phase 17 (88-133s): Generate workshop suggestions
+ * 2. Phase 18 (20-50s): Validate suggestion quality
+ *
+ * Benefits:
+ * - No timeout errors
+ * - Progressive loading (suggestions appear first, then quality scores)
+ * - Graceful degradation (if Phase 18 fails, user still gets Phase 17 suggestions)
+ */
+export async function analyzePIQEntryTwoStep(
+  essayText: string,
+  promptTitle: string,
+  promptText: string,
+  callbacks: TwoStepAnalysisCallbacks = {},
+  options: {
+    depth?: 'quick' | 'standard' | 'comprehensive';
+    skip_coaching?: boolean;
+    essayType?: 'personal_statement' | 'uc_piq' | 'why_us' | 'supplemental' | 'activity_essay';
+  } = {}
+): Promise<AnalysisResult> {
+
+  console.log('='.repeat(80));
+  console.log('TWO-STEP PIQ WORKSHOP ANALYSIS');
+  console.log('='.repeat(80));
+  console.log(`Prompt: ${promptTitle}`);
+  console.log(`Essay length: ${essayText.length} chars`);
+  console.log('Analysis type: COMPLETE (Phase 17 + Phase 18)');
+  console.log('');
+
+  // ========================================================================
+  // PHASE 17: Generate Workshop Suggestions (88-133s)
+  // ========================================================================
+
+  try {
+    callbacks.onProgress?.('Analyzing your essay and generating suggestions...');
+    console.log('🌐 PHASE 17: Calling workshop-analysis...');
+
+    const phase17Start = Date.now();
+
+    const { data: phase17Data, error: phase17Error } = await supabase.functions.invoke(
+      'workshop-analysis',
+      {
+        body: {
+          essayText,
+          essayType: options.essayType || 'uc_piq',
+          promptText,
+          promptTitle,
+          maxWords: 350,
+          targetSchools: ['UC System'],
+          studentContext: {
+            academicStrength: 'moderate',
+            voicePreference: 'concise',
+          }
+        }
+      }
+    );
+
+    const phase17Time = (Date.now() - phase17Start) / 1000;
+
+    if (phase17Error) {
+      console.error('❌ Phase 17 error:', phase17Error);
+      throw new Error(`Phase 17 failed: ${phase17Error.message}`);
+    }
+
+    if (!phase17Data || !phase17Data.success) {
+      console.error('❌ Phase 17 returned error:', phase17Data);
+      throw new Error(phase17Data?.error || 'Phase 17 failed');
+    }
+
+    console.log(`✅ Phase 17 complete in ${phase17Time.toFixed(1)}s`);
+    console.log(`   NQI: ${phase17Data.analysis.narrative_quality_index}/100`);
+    console.log(`   Workshop Items: ${phase17Data.workshopItems?.length || 0}`);
+    console.log(`   Total Suggestions: ${phase17Data.workshopItems?.reduce((sum: number, item: any) => sum + item.suggestions.length, 0) || 0}`);
+
+    // Transform Phase 17 result to AnalysisResult
+    const phase17Result: AnalysisResult = {
+      analysis: {
+        narrative_quality_index: phase17Data.analysis.narrative_quality_index,
+        overall_strengths: phase17Data.analysis.overall_strengths || [],
+        overall_weaknesses: phase17Data.analysis.overall_weaknesses || [],
+        categories: (phase17Data.rubricDimensionDetails || []).map((dim: any) => ({
+          category: dim.dimension_name,
+          score: dim.final_score,
+          maxScore: 10,
+          comments: [dim.evidence?.justification || ''],
+          evidence: [dim.evidence?.strengths || ''],
+          suggestions: dim.evidence?.gaps || [],
+        })),
+        weights: {},
+        id: 'phase17-' + Date.now(),
+        entry_id: 'piq-' + Date.now(),
+        rubric_version: 'surgical-workshop-v17',
+        created_at: new Date().toISOString(),
+        reader_impression_label: getImpressionLabel(phase17Data.analysis.narrative_quality_index),
+        flags: [],
+        suggested_fixes_ranked: [],
+        analysis_depth: 'comprehensive',
+      },
+      voiceFingerprint: phase17Data.voiceFingerprint,
+      experienceFingerprint: phase17Data.experienceFingerprint,
+      rubricDimensionDetails: phase17Data.rubricDimensionDetails,
+      workshopItems: phase17Data.workshopItems,
+      categories: {},
+    };
+
+    // Notify UI that Phase 17 is complete - suggestions can be displayed!
+    callbacks.onPhase17Complete?.(phase17Result);
+
+    // ========================================================================
+    // PHASE 18: Validate Suggestion Quality (20-50s)
+    // ========================================================================
+
+    callbacks.onProgress?.('Scoring suggestion quality...');
+    console.log('🔍 PHASE 18: Calling validate-workshop...');
+
+    const phase18Start = Date.now();
+
+    const { data: phase18Data, error: phase18Error } = await supabase.functions.invoke(
+      'validate-workshop',
+      {
+        body: {
+          workshopItems: phase17Data.workshopItems,
+          essayText,
+          promptText
+        }
+      }
+    );
+
+    const phase18Time = (Date.now() - phase18Start) / 1000;
+
+    // Graceful degradation: If Phase 18 fails, return Phase 17 results
+    if (phase18Error || !phase18Data?.success) {
+      console.warn('⚠️  Phase 18 failed, proceeding with Phase 17 results only');
+      console.warn('   Error:', phase18Error?.message || phase18Data?.error);
+      console.warn('   User will see suggestions without quality scores');
+      return phase17Result;
+    }
+
+    console.log(`✅ Phase 18 complete in ${phase18Time.toFixed(1)}s`);
+    console.log(`   Average Quality: ${phase18Data.summary?.average_quality.toFixed(1)}/10`);
+    console.log(`   Excellent: ${phase18Data.summary?.excellent_count}`);
+    console.log(`   Good: ${phase18Data.summary?.good_count}`);
+    console.log(`   Needs Work: ${phase18Data.summary?.needs_work_count}`);
+
+    // Merge Phase 18 validations back into Phase 17 result
+    const validatedResult: AnalysisResult = {
+      ...phase17Result,
+      workshopItems: phase18Data.workshopItems, // Now includes validation
+      validationSummary: phase18Data.summary as ValidationSummary
+    };
+
+    // Notify UI that Phase 18 is complete - quality scores can be displayed!
+    callbacks.onPhase18Complete?.(validatedResult);
+
+    console.log('='.repeat(80));
+    console.log(`✅ TWO-STEP ANALYSIS COMPLETE`);
+    console.log(`   Phase 17: ${phase17Time.toFixed(1)}s`);
+    console.log(`   Phase 18: ${phase18Time.toFixed(1)}s`);
+    console.log(`   Total: ${(phase17Time + phase18Time).toFixed(1)}s`);
+    console.log('='.repeat(80));
+
+    return validatedResult;
+
+  } catch (error) {
+    console.error('❌ TWO-STEP ANALYSIS FAILED:', error);
+    throw new Error(`PIQ workshop analysis failed: ${(error as Error).message}`);
+  }
+}
+
 /**
  * Analyze PIQ entry using edge function (server-side surgical workshop)
  *
- * This is the main entry point - calls workshop-analysis edge function
+ * This is the LEGACY single-call method - use analyzePIQEntryTwoStep() instead for timeout-safe operation
  */
 export async function analyzePIQEntry(
   essayText: string,

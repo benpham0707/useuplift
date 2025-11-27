@@ -377,8 +377,40 @@ export interface AnalysisResult {
       text: string;
       rationale: string;
       type: 'polished_original' | 'voice_amplifier' | 'divergent_strategy';
+      // PHASE 18 VALIDATION (Added for quality scoring)
+      validation?: ValidationResult;
     }>;
   }>;
+
+  // PHASE 18 VALIDATION SUMMARY (Added for quality overview)
+  validationSummary?: ValidationSummary;
+}
+
+// ============================================================================
+// PHASE 18 VALIDATION (Quality Scoring for Workshop Suggestions)
+// ============================================================================
+
+/**
+ * Phase 18 Validation Result - Quality score for individual suggestion
+ */
+export interface ValidationResult {
+  suggestion_id: string;
+  quality_score: number; // 0-10
+  issues: string[]; // Quality issues identified
+  improvements: string[]; // Suggested improvements
+  verdict: 'excellent' | 'good' | 'needs_work';
+}
+
+/**
+ * Phase 18 Validation Summary - Aggregate quality metrics
+ */
+export interface ValidationSummary {
+  average_quality: number; // 0-10
+  excellent_count: number;
+  good_count: number;
+  needs_work_count: number;
+  total_suggestions: number;
+  validation_time_seconds: number;
 }
 
 export interface ExtractedFeatures {

@@ -30,7 +30,7 @@ import { PIQPromptSelector, UC_PIQ_PROMPTS } from '@/components/portfolio/piq/wo
 import { PIQCarouselNav } from '@/components/portfolio/piq/workshop/PIQCarouselNav';
 
 // Backend Integration
-import { analyzePIQEntry } from '@/services/piqWorkshopAnalysisService';
+import { analyzePIQEntry, analyzePIQEntryTwoStep } from '@/services/piqWorkshopAnalysisService';
 import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 
 // Storage Services
@@ -118,6 +118,11 @@ export default function PIQWorkshop() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(null);
   const initialScoreRef = useRef<number>(0);
+
+  // Phase 18 validation state
+  const [validationLoading, setValidationLoading] = useState(false);
+  const [validationComplete, setValidationComplete] = useState(false);
+  const [progressMessage, setProgressMessage] = useState('');
   
   // Track if essay has enough content to analyze
   const canAnalyze = currentDraft.trim().length >= MIN_ESSAY_LENGTH;
@@ -164,19 +169,21 @@ export default function PIQWorkshop() {
     console.log('🔍 performFullAnalysis called');
     console.log('   Current draft length:', currentDraft.length);
     console.log('   Selected prompt:', selectedPromptId);
-    
+
     // Guard: Prevent analyzing empty or too-short essays
     if (currentDraft.trim().length < MIN_ESSAY_LENGTH) {
       console.warn(`Essay too short (${currentDraft.trim().length} chars) - need at least ${MIN_ESSAY_LENGTH} chars to analyze`);
       return;
     }
-    
+
     if (!selectedPromptId) {
       console.warn('No prompt selected - cannot analyze');
       return;
     }
 
     setIsAnalyzing(true);
+    setValidationLoading(false);
+    setValidationComplete(false);
     try {
       const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
       if (!selectedPrompt) {
@@ -191,13 +198,132 @@ export default function PIQWorkshop() {
       if (cachedResult) {
         console.log('✅ Using cached analysis result - skipping API call');
         result = cachedResult;
+        setIsAnalyzing(false);
+        setValidationComplete(true);
       } else {
-        console.log('🔄 No cache found - calling backend analysis (100+ seconds)');
-        // Call FULL surgical workshop backend (100+ seconds)
-        result = await analyzePIQEntry(
+        console.log('🔄 No cache found - calling two-step backend analysis');
+        // Call TWO-STEP surgical workshop backend (Phase 17 + Phase 18)
+        result = await analyzePIQEntryTwoStep(
           currentDraft,
           selectedPrompt.title,
           selectedPrompt.prompt,
+          {
+            // Phase 17 complete - display suggestions immediately
+            onPhase17Complete: (phase17Result) => {
+              console.log('📊 Phase 17 complete - displaying suggestions');
+              setAnalysisResult(phase17Result);
+
+              // Transform backend dimensions to UI dimensions
+              if (phase17Result.rubricDimensionDetails && phase17Result.rubricDimensionDetails.length > 0) {
+                const transformedDimensions: RubricDimension[] = phase17Result.rubricDimensionDetails.map((dim) => {
+                  const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
+
+                  const issuesForDimension = (phase17Result.workshopItems || [])
+                    .filter(item => item.rubric_category === dim.dimension_name);
+
+                  const transformedIssues = issuesForDimension.map((item) => ({
+                    id: item.id,
+                    dimensionId: dim.dimension_name,
+                    title: item.problem,
+                    excerpt: item.quote,
+                    analysis: item.why_it_matters,
+                    impact: `Severity: ${item.severity}`,
+                    suggestions: item.suggestions.map((sug) => ({
+                      text: sug.text,
+                      rationale: sug.rationale,
+                      type: sug.type === 'polished_original' ? 'replace' as const :
+                            sug.type === 'voice_amplifier' ? 'replace' as const :
+                            'replace' as const
+                    })),
+                    status: 'not_fixed' as const,
+                    currentSuggestionIndex: 0,
+                    expanded: false,
+                  }));
+
+                  return {
+                    id: dim.dimension_name,
+                    name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    score: dim.final_score,
+                    maxScore: 10,
+                    status,
+                    weight: 10,
+                    overview: dim.evidence?.justification || 'Analysis in progress',
+                    issues: transformedIssues,
+                  };
+                });
+
+                setDimensions(transformedDimensions);
+              }
+
+              // Update initial score ref on first analysis
+              if (initialScoreRef.current === 73 && phase17Result.analysis?.narrative_quality_index) {
+                initialScoreRef.current = phase17Result.analysis.narrative_quality_index;
+              }
+
+              // Phase 17 done, but Phase 18 still loading
+              setIsAnalyzing(false);
+              setValidationLoading(true);
+            },
+
+            // Phase 18 complete - add quality scores
+            onPhase18Complete: (validatedResult) => {
+              console.log('✨ Phase 18 complete - adding quality scores');
+              setAnalysisResult(validatedResult);
+
+              // Re-transform dimensions with validation data
+              if (validatedResult.rubricDimensionDetails && validatedResult.rubricDimensionDetails.length > 0) {
+                const transformedDimensions: RubricDimension[] = validatedResult.rubricDimensionDetails.map((dim) => {
+                  const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
+
+                  const issuesForDimension = (validatedResult.workshopItems || [])
+                    .filter(item => item.rubric_category === dim.dimension_name);
+
+                  const transformedIssues = issuesForDimension.map((item) => ({
+                    id: item.id,
+                    dimensionId: dim.dimension_name,
+                    title: item.problem,
+                    excerpt: item.quote,
+                    analysis: item.why_it_matters,
+                    impact: `Severity: ${item.severity}`,
+                    suggestions: item.suggestions.map((sug) => ({
+                      text: sug.text,
+                      rationale: sug.rationale,
+                      type: sug.type === 'polished_original' ? 'replace' as const :
+                            sug.type === 'voice_amplifier' ? 'replace' as const :
+                            'replace' as const,
+                      // Include validation data for UI display
+                      validation: sug.validation
+                    })),
+                    status: 'not_fixed' as const,
+                    currentSuggestionIndex: 0,
+                    expanded: false,
+                  }));
+
+                  return {
+                    id: dim.dimension_name,
+                    name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    score: dim.final_score,
+                    maxScore: 10,
+                    status,
+                    weight: 10,
+                    overview: dim.evidence?.justification || 'Analysis in progress',
+                    issues: transformedIssues,
+                  };
+                });
+
+                setDimensions(transformedDimensions);
+              }
+
+              setValidationLoading(false);
+              setValidationComplete(true);
+            },
+
+            // Progress updates
+            onProgress: (status) => {
+              console.log('📍', status);
+              setProgressMessage(status);
+            }
+          },
           { essayType: 'uc_piq' }
         );
 
