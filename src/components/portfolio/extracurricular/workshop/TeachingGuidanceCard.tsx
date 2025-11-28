@@ -1,7 +1,7 @@
 /**
- * Teaching Guidance Card - Simplified
+ * Teaching GuidanceCard - Segmented
  *
- * Shows teaching content with truncation and fade effect.
+ * Shows teaching content properly segmented into "The Problem" and "Why This Works".
  * Expands to show full content on "View more" click.
  */
 
@@ -19,105 +19,81 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Build the full teaching content as a single flowing text
-  const buildTeachingContent = () => {
+  // Build The Problem content
+  const buildProblemContent = (expanded: boolean) => {
     const parts: string[] = [];
-
-    // Problem hook
-    if (teaching.problem?.hook) {
-      parts.push(teaching.problem.hook);
+    
+    // Preview parts (always shown)
+    if (teaching.problem?.hook) parts.push(teaching.problem.hook);
+    if (teaching.problem?.whyItMatters?.preview) parts.push(teaching.problem.whyItMatters.preview);
+    
+    if (expanded) {
+      // Expanded parts
+      if (teaching.problem?.description) parts.push('\n\n' + teaching.problem.description);
+      if (teaching.problem?.whyItMatters?.fullExplanation) parts.push('\n\n' + teaching.problem.whyItMatters.fullExplanation);
     }
-
-    // Why it matters preview
-    if (teaching.problem?.whyItMatters?.preview) {
-      parts.push(teaching.problem.whyItMatters.preview);
-    }
-
-    // Craft principle hook
-    if (teaching.craftPrinciple?.hook) {
-      parts.push(teaching.craftPrinciple.hook);
-    }
-
-    // Application quick start
-    if (teaching.applicationStrategy?.quickStart) {
-      parts.push(teaching.applicationStrategy.quickStart);
-    }
-
+    
     return parts.join(' ');
   };
 
-  // Build extended content for expanded view
-  const buildExtendedContent = () => {
+  // Build Why This Works content
+  const buildSolutionContent = (expanded: boolean) => {
     const parts: string[] = [];
-
-    // Full problem description
-    if (teaching.problem?.description) {
-      parts.push(teaching.problem.description);
+    
+    // Preview parts (always shown)
+    if (teaching.craftPrinciple?.hook) parts.push(teaching.craftPrinciple.hook);
+    if (teaching.applicationStrategy?.quickStart) parts.push(teaching.applicationStrategy.quickStart);
+    
+    if (expanded) {
+      // Expanded parts
+      if (teaching.craftPrinciple?.fullTeaching) parts.push('\n\n' + teaching.craftPrinciple.fullTeaching);
+      if (teaching.craftPrinciple?.realWorldExample) parts.push('\n\nExample: ' + teaching.craftPrinciple.realWorldExample);
+      if (teaching.applicationStrategy?.deepDive) parts.push('\n\n' + teaching.applicationStrategy.deepDive);
+      if (teaching.applicationStrategy?.transferability) parts.push('\n\n' + teaching.applicationStrategy.transferability);
+      if (teaching.personalNote) parts.push('\n\nNote: ' + teaching.personalNote);
     }
-
-    // Full why it matters
-    if (teaching.problem?.whyItMatters?.fullExplanation) {
-      parts.push(teaching.problem.whyItMatters.fullExplanation);
-    }
-
-    // Full craft teaching
-    if (teaching.craftPrinciple?.fullTeaching) {
-      parts.push(teaching.craftPrinciple.fullTeaching);
-    }
-
-    // Real world example
-    if (teaching.craftPrinciple?.realWorldExample) {
-      parts.push(teaching.craftPrinciple.realWorldExample);
-    }
-
-    // Deep dive application
-    if (teaching.applicationStrategy?.deepDive) {
-      parts.push(teaching.applicationStrategy.deepDive);
-    }
-
-    // Transferability
-    if (teaching.applicationStrategy?.transferability) {
-      parts.push(teaching.applicationStrategy.transferability);
-    }
-
-    // Personal note
-    if (teaching.personalNote) {
-      parts.push(teaching.personalNote);
-    }
-
-    return parts.join('\n\n');
+    
+    return parts.join(' ');
   };
 
-  const previewContent = buildTeachingContent();
-  const extendedContent = buildExtendedContent();
+  const problemContent = buildProblemContent(isExpanded);
+  const solutionContent = buildSolutionContent(isExpanded);
+  
+  // Check if there is actually more content to show
+  const hasMoreContent = 
+    (teaching.problem?.description || teaching.problem?.whyItMatters?.fullExplanation ||
+     teaching.craftPrinciple?.fullTeaching || teaching.craftPrinciple?.realWorldExample ||
+     teaching.applicationStrategy?.deepDive || teaching.applicationStrategy?.transferability ||
+     teaching.personalNote);
 
   return (
-    <div className="space-y-2">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-        Why This Matters
-      </p>
-
-      <div className="relative">
-        {/* Preview text (always visible) */}
-        <div className={`text-sm text-foreground/80 leading-relaxed ${!isExpanded ? 'line-clamp-3' : ''}`}>
-          {previewContent}
+    <div className="space-y-4">
+      {/* Section 1: The Problem */}
+      {problemContent && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            The Problem
+          </p>
+          <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
+            {problemContent}
+          </div>
         </div>
+      )}
 
-        {/* Fade overlay when collapsed */}
-        {!isExpanded && previewContent.length > 200 && (
-          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-        )}
-      </div>
-
-      {/* Extended content when expanded */}
-      {isExpanded && extendedContent && (
-        <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line mt-3 pt-3 border-t border-border/50">
-          {extendedContent}
+      {/* Section 2: Why This Works */}
+      {solutionContent && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Why This Works
+          </p>
+          <div className="text-sm text-foreground/80 leading-relaxed whitespace-pre-line">
+            {solutionContent}
+          </div>
         </div>
       )}
 
       {/* View more/less button */}
-      {(previewContent.length > 200 || extendedContent) && (
+      {hasMoreContent && (
         <Button
           variant="ghost"
           size="sm"
