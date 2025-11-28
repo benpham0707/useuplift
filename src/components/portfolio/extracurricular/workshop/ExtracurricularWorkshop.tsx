@@ -139,6 +139,15 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
           withTeaching: result.topIssues.filter(i => i.teaching).length,
         });
 
+        // DEBUG: Log what teaching looks like
+        console.log('[DEBUG] First issue with teaching:', result.topIssues.find(i => i.teaching));
+        console.log('[DEBUG] All issues:', result.topIssues.map(i => ({
+          id: i.id,
+          title: i.title,
+          hasTeaching: !!i.teaching,
+          teachingPreview: i.teaching ? `${i.teaching.problem.hook.substring(0, 50)}...` : 'NO TEACHING'
+        })));
+
         // FULL REPLACEMENT: Replace mock dimensions with Phase 19 results
         // This ensures teaching guidance is displayed via TeachingGuidanceCard
         const newDimensions = buildDimensionsFromAnalysis(
@@ -153,6 +162,17 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
             (sum, d) => sum + d.issues.filter(i => i.teaching).length, 0
           ),
         });
+
+        // DEBUG: Log converted issues
+        console.log('[DEBUG] Converted dimensions:', newDimensions.map(d => ({
+          name: d.name,
+          issueCount: d.issues.length,
+          issuesWithTeaching: d.issues.filter(i => i.teaching).length,
+          firstIssue: d.issues[0] ? {
+            title: d.issues[0].title,
+            hasTeaching: !!d.issues[0].teaching,
+          } : null
+        })));
 
         setDimensions(newDimensions);
 

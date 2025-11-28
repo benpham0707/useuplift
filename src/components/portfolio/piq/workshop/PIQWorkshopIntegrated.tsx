@@ -32,7 +32,7 @@ import { ExperienceFingerprintCard } from './ExperienceFingerprintCard';
 import { RandomizingScore } from './RandomizingScore';
 
 // PIQ-specific analysis service
-import { analyzePIQEntry } from '@/services/piqWorkshopAnalysisService';
+import { analyzePIQEntryTwoStep } from '@/services/piqWorkshopAnalysisService';
 import { getTargetTier } from '@/services/piqSurgicalWorkshopService';
 
 interface PIQWorkshopIntegratedProps {
@@ -92,10 +92,24 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
           isInitial
         });
 
-        // Call PIQ analysis service (uses same backend as extracurricular)
-        const result = await analyzePIQEntry(draft, promptTitle, promptText, {
+        // Call PIQ analysis service with Phase 17-19 teaching layer
+        const result = await analyzePIQEntryTwoStep(draft, promptTitle, promptText, {
+          onProgress: (status) => {
+            console.log(`📊 Progress: ${status}`);
+          },
+          onPhase17Complete: (phase17Result) => {
+            console.log('✅ Phase 17 (Analysis) complete - suggestions available');
+          },
+          onPhase18Complete: (phase18Result) => {
+            console.log('✅ Phase 18 (Validation) complete - quality scores added');
+          },
+          onPhase19Complete: (phase19Result) => {
+            console.log('✅ Phase 19 (Teaching) complete - deep guidance added');
+          },
+        }, {
           depth: 'comprehensive',
           skip_coaching: false,
+          essayType: 'uc_piq',
         });
 
         console.log('🎯 PIQ Analysis completed successfully');
