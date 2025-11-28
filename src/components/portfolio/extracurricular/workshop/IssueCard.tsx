@@ -21,8 +21,12 @@ interface IssueCardProps {
 const FallbackTeachingSection: React.FC<{ analysis?: string; impact?: string }> = ({ analysis, impact }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   
-  // Combine analysis and impact into one flowing text
-  const fullContent = [analysis, impact].filter(Boolean).join(' ');
+  // Avoid duplication if analysis and impact are the same
+  const uniqueParts = new Set([analysis, impact].filter(Boolean));
+  let fullContent = Array.from(uniqueParts).join(' ');
+  
+  // Filter out any "Severity: X" text that may have leaked through
+  fullContent = fullContent.replace(/\s*Severity:\s*(critical|high|medium|low)/gi, '').trim();
   
   if (!fullContent) return null;
   

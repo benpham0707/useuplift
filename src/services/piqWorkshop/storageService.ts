@@ -29,8 +29,8 @@ export interface PIQWorkshopCache {
 const STORAGE_PREFIX = 'piq_workshop_';
 const AUTO_SAVE_KEY = 'piq_autosave';
 const MAX_LOCAL_VERSIONS = 10;
-// Cache version - increment to invalidate old caches (Phase 19 added in v2)
-const ANALYSIS_CACHE_VERSION = 'v2';
+// Cache version - increment to invalidate old caches (Phase 19 teaching fix in v3)
+const ANALYSIS_CACHE_VERSION = 'v3';
 
 /**
  * Generate cache key for a specific prompt

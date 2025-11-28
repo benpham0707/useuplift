@@ -740,7 +740,8 @@ export default function PIQWorkshop() {
                   title: item.problem,
                   excerpt: item.quote,
                   analysis: item.why_it_matters,
-                  impact: `Severity: ${item.severity}`,
+                  impact: item.why_it_matters || '',
+                  teaching: item.teaching,
                   suggestions: item.suggestions.map((sug) => ({
                     text: sug.text,
                     rationale: sug.rationale,
