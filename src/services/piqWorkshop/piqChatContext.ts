@@ -210,34 +210,37 @@ export function buildPIQChatContext(
     : null;
 
   // Build experience fingerprint (from analysisResult)
-  const experienceFingerprint = analysisResult?.experienceFingerprint
+  // Cast to any to handle varying property structures from backend
+  const expFp = analysisResult?.experienceFingerprint as any;
+  const experienceFingerprint = expFp
     ? {
-        uniqueElements: analysisResult.experienceFingerprint.uniqueElements || {},
-        antiPatternFlags: analysisResult.experienceFingerprint.antiPatternFlags || {
+        uniqueElements: expFp.uniqueElements || expFp.unique_elements || {},
+        antiPatternFlags: expFp.antiPatternFlags || expFp.anti_pattern_flags || {
           followsTypicalArc: false,
           hasGenericInsight: false,
           hasManufacturedBeat: false,
           hasCrowdPleaser: false,
           warnings: [],
         },
-        divergenceRequirements: analysisResult.experienceFingerprint.divergenceRequirements || {
+        divergenceRequirements: expFp.divergenceRequirements || expFp.divergence_requirements || {
           mustInclude: [],
           mustAvoid: [],
           uniqueAngle: '',
           authenticTension: '',
         },
-        qualityAnchors: analysisResult.experienceFingerprint.qualityAnchors || [],
-        confidenceScore: analysisResult.experienceFingerprint.confidenceScore || 0,
+        qualityAnchors: expFp.qualityAnchors || expFp.quality_anchors || [],
+        confidenceScore: expFp.confidenceScore || expFp.confidence_score || 0,
       }
     : null;
 
   // Build history context
   const historyContext = buildHistoryContext(options.versionHistory, options.currentScore, options.initialScore);
 
+  // Cast to satisfy strict type requirements while preserving runtime flexibility
   return {
-    piqEssay,
+    piqEssay: piqEssay as PIQChatContext['piqEssay'],
     currentState,
-    analysis: analysisContext,
+    analysis: analysisContext as PIQChatContext['analysis'],
     voiceFingerprint,
     experienceFingerprint,
     history: historyContext,
