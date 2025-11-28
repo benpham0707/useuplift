@@ -21,6 +21,7 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey);
 export interface TwoStepAnalysisCallbacks {
   onPhase17Complete?: (result: AnalysisResult) => void;
   onPhase18Complete?: (validatedResult: AnalysisResult) => void;
+  onPhase19Complete?: (teachingResult: AnalysisResult) => void;
   onProgress?: (status: string) => void;
 }
 
@@ -181,14 +182,90 @@ export async function analyzePIQEntryTwoStep(
     // Notify UI that Phase 18 is complete - quality scores can be displayed!
     callbacks.onPhase18Complete?.(validatedResult);
 
+    // ========================================================================
+    // PHASE 19: Teaching Layer (30-60s)
+    // ========================================================================
+
+    callbacks.onProgress?.('Generating deep teaching guidance...');
+    console.log('📚 PHASE 19: Calling teaching-layer...');
+
+    const phase19Start = Date.now();
+
+    const { data: phase19Data, error: phase19Error } = await supabase.functions.invoke(
+      'teaching-layer',
+      {
+        body: {
+          workshopItems: validatedResult.workshopItems.map(item => ({
+            id: item.id,
+            quote: item.quote,
+            severity: item.severity,
+            rubric_category: item.rubric_category,
+            suggestions: item.suggestions,
+          })),
+          essayText,
+          promptText,
+          promptTitle,
+          voiceFingerprint: phase17Result.voiceFingerprint || {},
+          experienceFingerprint: phase17Result.experienceFingerprint || {},
+          rubricDimensionDetails: phase17Result.rubricDimensionDetails || [],
+          currentNQI: phase17Result.analysis?.narrative_quality_index || 70,
+        }
+      }
+    );
+
+    const phase19Time = (Date.now() - phase19Start) / 1000;
+
+    // Graceful degradation: If Phase 19 fails, return Phase 18 results
+    if (phase19Error || !phase19Data?.success) {
+      console.warn('⚠️  Phase 19 failed, proceeding with Phase 18 results only');
+      console.warn('   Error:', phase19Error?.message || phase19Data?.error);
+      console.warn('   User will see suggestions without deep teaching guidance');
+      
+      console.log('='.repeat(80));
+      console.log(`✅ TWO-STEP ANALYSIS COMPLETE (Phase 19 skipped)`);
+      console.log(`   Phase 17: ${phase17Time.toFixed(1)}s`);
+      console.log(`   Phase 18: ${phase18Time.toFixed(1)}s`);
+      console.log(`   Total: ${(phase17Time + phase18Time).toFixed(1)}s`);
+      console.log('='.repeat(80));
+      
+      return validatedResult;
+    }
+
+    console.log(`✅ Phase 19 complete in ${phase19Time.toFixed(1)}s`);
+    console.log(`   Enhanced items: ${phase19Data.enhancedItems?.length || 0}`);
+
+    // Merge teaching guidance into workshopItems
+    const teachingEnhancedItems = validatedResult.workshopItems.map(item => {
+      const enhancement = phase19Data.enhancedItems?.find((e: any) => e.id === item.id);
+      if (enhancement) {
+        console.log(`   📚 Enhanced item ${item.id} with teaching guidance`);
+        return {
+          ...item,
+          teaching: enhancement.teaching,
+          teachingDepth: enhancement.teachingDepth,
+          estimatedImpact: enhancement.estimatedImpact,
+        };
+      }
+      return item;
+    });
+
+    const finalResult: AnalysisResult = {
+      ...validatedResult,
+      workshopItems: teachingEnhancedItems,
+    };
+
+    // Notify UI that Phase 19 is complete - teaching guidance now available!
+    callbacks.onPhase19Complete?.(finalResult);
+
     console.log('='.repeat(80));
-    console.log(`✅ TWO-STEP ANALYSIS COMPLETE`);
+    console.log(`✅ THREE-STEP ANALYSIS COMPLETE`);
     console.log(`   Phase 17: ${phase17Time.toFixed(1)}s`);
     console.log(`   Phase 18: ${phase18Time.toFixed(1)}s`);
-    console.log(`   Total: ${(phase17Time + phase18Time).toFixed(1)}s`);
+    console.log(`   Phase 19: ${phase19Time.toFixed(1)}s`);
+    console.log(`   Total: ${(phase17Time + phase18Time + phase19Time).toFixed(1)}s`);
     console.log('='.repeat(80));
 
-    return validatedResult;
+    return finalResult;
 
   } catch (error) {
     console.error('❌ TWO-STEP ANALYSIS FAILED:', error);
