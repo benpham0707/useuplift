@@ -94,14 +94,20 @@ export async function enhanceWithTeachingLayer(
 ): Promise<WorkshopIssue[]> {
   const startTime = Date.now();
 
-  try {
-    // Build essay text from entry
-    const essayText = `${entry.title}\n\n${entry.description}`;
+  // Generate stable IDs for issues that don't have them
+  const issueIdMap = new Map<WorkshopIssue, string>();
+  issues.forEach((issue) => {
+    issueIdMap.set(issue, issue.id || `issue_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+  });
 
-    // Transform issues to API format
+  try {
+    // Build essay text from entry - use description_original for PIQ essays
+    const essayText = `${entry.title}\n\n${(entry as any).description_original || entry.description || ''}`;
+
+    // Transform issues to API format with stable IDs
     const requestBody: TeachingLayerRequest = {
       workshopItems: issues.map((issue) => ({
-        id: issue.id || `issue_${Date.now()}_${Math.random()}`,
+        id: issueIdMap.get(issue)!,
         quote: issue.from_draft || '',
         severity: mapSeverityToEdgeFormat(issue.severity),
         rubric_category: issue.category,
@@ -113,7 +119,7 @@ export async function enhanceWithTeachingLayer(
         })),
       })),
       essayText,
-      promptText: entry.description, // Full description serves as prompt response
+      promptText: (entry as any).description_original || entry.description || '',
       promptTitle: entry.title,
       voiceFingerprint: analysisContext.voiceFingerprint || {},
       experienceFingerprint: analysisContext.experienceFingerprint || {},
@@ -151,12 +157,13 @@ export async function enhanceWithTeachingLayer(
       costPerItem: data.performance?.cost_per_item,
     });
 
-    // Merge teaching guidance back into issues
+    // Merge teaching guidance back into issues using the stable ID map
     const enhancedIssues = issues.map((issue) => {
-      const issueId = issue.id || `issue_${Date.now()}_${Math.random()}`;
+      const issueId = issueIdMap.get(issue)!;
       const enhancement = data.enhancedItems.find((item) => item.id === issueId);
 
       if (enhancement) {
+        console.log(`[TeachingLayerService] Enhanced issue ${issueId} with teaching guidance`);
         return {
           ...issue,
           teaching: enhancement.teaching,
@@ -165,6 +172,7 @@ export async function enhanceWithTeachingLayer(
         };
       }
 
+      console.warn(`[TeachingLayerService] No teaching found for issue ${issueId}`);
       return issue;
     });
 
