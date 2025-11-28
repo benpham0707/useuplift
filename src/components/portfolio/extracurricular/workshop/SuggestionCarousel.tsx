@@ -2,8 +2,9 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Wand2 } from 'lucide-react';
-import { SuggestedFix } from './types';
+import { SuggestedFix, TeachingGuidance } from './types';
 import { NavigationControls } from '../../NavigationControls';
+import { TeachingGuidanceCard } from './TeachingGuidanceCard';
 
 interface SuggestionCarouselProps {
   suggestions: SuggestedFix[];
@@ -14,6 +15,7 @@ interface SuggestionCarouselProps {
     suggestionText: string,
     type: 'replace' | 'insert_before' | 'insert_after'
   ) => void;
+  teaching?: TeachingGuidance;
 }
 
 export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
@@ -21,7 +23,8 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
   currentIndex,
   onNext,
   onPrev,
-  onApply
+  onApply,
+  teaching
 }) => {
   // Guard against empty suggestions or invalid index
   if (!suggestions || suggestions.length === 0) {
@@ -65,12 +68,18 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
       </div>
 
       <div className="pl-3 border-l-2 border-primary/30">
-        <p className="text-xs font-semibold text-primary mb-1">
-          Why This Works
-        </p>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          {currentSuggestion.rationale || currentSuggestion.why_this_works}
-        </p>
+        {teaching ? (
+          <TeachingGuidanceCard teaching={teaching} mode="solution" />
+        ) : (
+          <>
+            <p className="text-xs font-semibold text-primary mb-1">
+              Why This Works
+            </p>
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              {currentSuggestion.rationale || currentSuggestion.why_this_works}
+            </p>
+          </>
+        )}
       </div>
 
       {currentSuggestion.teaching_example && (

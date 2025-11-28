@@ -183,7 +183,7 @@ export const IssueCard: React.FC<IssueCardProps> = ({
           })()}
           {issue.teaching ? (
             <div className="mb-4">
-              <TeachingGuidanceCard teaching={issue.teaching} />
+              <TeachingGuidanceCard teaching={issue.teaching} mode="problem" />
             </div>
           ) : (
             <FallbackTeachingSection analysis={issue.analysis} impact={issue.impact} />
@@ -196,6 +196,7 @@ export const IssueCard: React.FC<IssueCardProps> = ({
               onNext={() => onNextSuggestion(issue.id)}
               onPrev={() => onPrevSuggestion(issue.id)}
               onApply={(text, type) => onApplySuggestion(issue.id, text, type)}
+              teaching={issue.teaching}
             />
           </div>
         </div>

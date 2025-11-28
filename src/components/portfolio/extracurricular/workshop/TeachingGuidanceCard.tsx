@@ -12,10 +12,12 @@ import { TeachingGuidance } from './backendTypes';
 
 export interface TeachingGuidanceCardProps {
   teaching: TeachingGuidance;
+  mode?: 'full' | 'problem' | 'solution';
 }
 
 export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
   teaching,
+  mode = 'full',
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -59,17 +61,25 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
   const problemContent = buildProblemContent(isExpanded);
   const solutionContent = buildSolutionContent(isExpanded);
   
-  // Check if there is actually more content to show
-  const hasMoreContent = 
-    (teaching.problem?.description || teaching.problem?.whyItMatters?.fullExplanation ||
-     teaching.craftPrinciple?.fullTeaching || teaching.craftPrinciple?.realWorldExample ||
-     teaching.applicationStrategy?.deepDive || teaching.applicationStrategy?.transferability ||
-     teaching.personalNote);
+  // Check if there is actually more content to show (based on mode)
+  const hasMoreContent = mode === 'full' 
+    ? (teaching.problem?.description || teaching.problem?.whyItMatters?.fullExplanation ||
+       teaching.craftPrinciple?.fullTeaching || teaching.craftPrinciple?.realWorldExample ||
+       teaching.applicationStrategy?.deepDive || teaching.applicationStrategy?.transferability ||
+       teaching.personalNote)
+    : mode === 'problem'
+    ? (teaching.problem?.description || teaching.problem?.whyItMatters?.fullExplanation)
+    : (teaching.craftPrinciple?.fullTeaching || teaching.craftPrinciple?.realWorldExample ||
+       teaching.applicationStrategy?.deepDive || teaching.applicationStrategy?.transferability ||
+       teaching.personalNote);
+
+  const showProblem = (mode === 'full' || mode === 'problem') && problemContent;
+  const showSolution = (mode === 'full' || mode === 'solution') && solutionContent;
 
   return (
     <div className="space-y-4">
       {/* Section 1: The Problem */}
-      {problemContent && (
+      {showProblem && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             The Problem
@@ -81,7 +91,7 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
       )}
 
       {/* Section 2: Why This Works */}
-      {solutionContent && (
+      {showSolution && (
         <div className="space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
             Why This Works
