@@ -359,6 +359,57 @@ export default function PIQWorkshop() {
               setValidationComplete(true);
             },
 
+            // Phase 19 complete - teaching guidance available
+            onPhase19Complete: (teachingResult) => {
+              console.log('📚 Phase 19 complete - adding teaching guidance');
+              setAnalysisResult(teachingResult);
+
+              // Re-transform dimensions with teaching data
+              if (teachingResult.rubricDimensionDetails && teachingResult.rubricDimensionDetails.length > 0) {
+                const transformedDimensions: RubricDimension[] = teachingResult.rubricDimensionDetails.map((dim) => {
+                  const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
+
+                  const issuesForDimension = (teachingResult.workshopItems || [])
+                    .filter(item => item.rubric_category === dim.dimension_name);
+
+                  const transformedIssues = issuesForDimension.map((item) => ({
+                    id: item.id,
+                    dimensionId: dim.dimension_name,
+                    title: item.problem,
+                    excerpt: item.quote,
+                    analysis: item.why_it_matters,
+                    impact: item.why_it_matters || '',
+                    teaching: item.teaching, // NOW POPULATED from Phase 19!
+                    suggestions: item.suggestions.map((sug) => ({
+                      text: sug.text,
+                      rationale: sug.rationale,
+                      type: 'replace' as const,
+                      validation: sug.validation
+                    })),
+                    status: 'not_fixed' as const,
+                    currentSuggestionIndex: 0,
+                    expanded: false,
+                  }));
+
+                  return {
+                    id: dim.dimension_name,
+                    name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                    score: dim.final_score,
+                    maxScore: 10,
+                    status,
+                    weight: 10,
+                    overview: dim.evidence?.justification || 'Analysis in progress',
+                    issues: transformedIssues,
+                  };
+                });
+
+                setDimensions(transformedDimensions);
+              }
+
+              setValidationLoading(false);
+              setValidationComplete(true);
+            },
+
             // Progress updates
             onProgress: (status) => {
               console.log('📍', status);
