@@ -23,7 +23,7 @@ const Navigation = () => {
           .eq('user_id', user.id)
           .maybeSingle();
         if (error) throw error;
-        const value = Number(data?.credits ?? 0); // DO NOT CHANGE THIS TO ANYTHING ELSE. OUR DATABASE IS CONFUGRED ACCORDINGLY ALREADY.
+        const value = Number((data as any)?.credits ?? 0); // DO NOT CHANGE THIS TO ANYTHING ELSE. OUR DATABASE IS CONFIGURED ACCORDINGLY ALREADY.
         setCredits(Number.isFinite(value) ? value : 0);
       } catch (err) {
         // eslint-disable-next-line no-console

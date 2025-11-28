@@ -1,11 +1,15 @@
 import { Button } from '@/components/ui/button';
 import { motion } from 'motion/react';
-import { ArrowRight, PlayCircle, CheckCircle } from 'lucide-react';
+import { ArrowRight, PenTool, CheckCircle, Sparkles, Target } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const HeroSection = () => {
   return (
-    <section className="relative overflow-hidden border-b bg-background pt-12 pb-20 lg:pt-20 lg:pb-32">
+    <section className="relative overflow-hidden border-b bg-gradient-to-b from-background via-primary/5 to-background pt-12 pb-20 lg:pt-20 lg:pb-32">
+      {/* Background decorations */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-primary/10 rounded-full blur-3xl -z-10" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl -z-10" />
+      
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
           
@@ -16,17 +20,19 @@ const HeroSection = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium bg-secondary/50 text-secondary-foreground mb-6">
-                For Class of 2026 & 2027
+              <div className="inline-flex items-center rounded-full border px-3 py-1 text-xs font-medium bg-primary/10 text-primary mb-6">
+                <Sparkles className="h-3 w-3 mr-1.5" />
+                PIQ Workshop Available Now
               </div>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-7xl text-foreground">
-                Turn your personal narrative into a{' '}
-                <span className="bg-gradient-to-r from-sky-500 via-indigo-500 to-violet-500 bg-clip-text text-transparent block pb-2 animate-gradient-flow">
-                  powerful story.
+              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-foreground">
+                Craft essays that{' '}
+                <span className="bg-gradient-to-r from-primary via-violet-500 to-indigo-500 bg-clip-text text-transparent">
+                  admissions officers remember.
                 </span>
               </h1>
               <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto lg:mx-0">
-                Uplift scans your classes, jobs, clubs, and real-life responsibilities to show what colleges actually see – and what to do next.
+                Our AI-powered workshop analyzes your UC PIQ essays across <span className="font-medium text-foreground">12 dimensions</span> that 
+                top counselors say matter most—then shows you exactly how to improve, with specific rewrites and real-time coaching.
               </p>
             </motion.div>
 
@@ -37,15 +43,16 @@ const HeroSection = () => {
               className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
             >
               <Button size="lg" className="text-base h-12 px-8 w-full sm:w-auto" asChild>
-                <Link to="/waitlist">
-                  Get my free portfolio scan
+                <Link to="/piq-workshop">
+                  <PenTool className="mr-2 h-4 w-4" />
+                  Try PIQ Workshop Free
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
               <Button size="lg" variant="outline" className="text-base h-12 px-8 w-full sm:w-auto" asChild>
-                <Link to="/how-it-works">
-                  <PlayCircle className="mr-2 h-4 w-4" />
-                  Watch how it works
+                <Link to="/waitlist">
+                  <Target className="mr-2 h-4 w-4" />
+                  Join Portfolio Waitlist
                 </Link>
               </Button>
             </motion.div>
@@ -58,74 +65,30 @@ const HeroSection = () => {
             >
               <div className="flex items-center gap-1">
                 <CheckCircle className="h-3 w-3 text-green-500" />
-                <span>Takes ~5 minutes</span>
+                <span>No signup required</span>
               </div>
               <div className="flex items-center gap-1">
                 <CheckCircle className="h-3 w-3 text-green-500" />
-                <span>You’re not just a GPA</span>
+                <span>Get your score in 2 minutes</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <CheckCircle className="h-3 w-3 text-green-500" />
+                <span>Built with top counselors</span>
               </div>
             </motion.div>
           </div>
 
-          {/* Right: Visual (Card Stack) */}
+          {/* Right: Visual - Score Preview */}
           <motion.div
-            className="flex-1 relative w-full max-w-md lg:max-w-full"
+            className="flex-1 relative w-full max-w-md lg:max-w-lg"
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.7 }}
           >
-            <div className="relative h-[400px] w-full">
-              {/* Decorative background blobs */}
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-primary/5 rounded-full blur-3xl -z-10" />
-
-              {/* Bottom Card (Messy) */}
-              <motion.div
-                className="absolute top-8 left-4 right-4 bottom-0 bg-card border rounded-2xl shadow-lg p-6 transform rotate-[-6deg] opacity-60 scale-95 origin-bottom-left"
-                animate={{ 
-                  rotate: [-6, -4, -6],
-                }}
-                transition={{ 
-                  duration: 4,
-                  repeat: Infinity,
-                  repeatType: "reverse" 
-                }}
-              >
-                <div className="space-y-3 opacity-50">
-                  <div className="h-4 w-3/4 bg-muted rounded" />
-                  <div className="h-4 w-1/2 bg-muted rounded" />
-                  <div className="h-24 w-full bg-muted/50 rounded border border-dashed border-muted-foreground/20 flex items-center justify-center">
-                    <span className="text-xs">Messy Notes...</span>
-                  </div>
-                </div>
-              </motion.div>
-
-               {/* Middle Card */}
-               <motion.div
-                className="absolute top-4 left-2 right-2 bottom-4 bg-card border rounded-2xl shadow-xl p-6 transform rotate-[-3deg] opacity-80 scale-95 origin-bottom-right"
-                animate={{ 
-                  rotate: [-3, -1, -3],
-                }}
-                transition={{ 
-                  duration: 5,
-                  repeat: Infinity,
-                  repeatType: "reverse",
-                  delay: 0.5
-                }}
-              >
-                 <div className="space-y-4 opacity-60">
-                  <div className="flex gap-3">
-                    <div className="h-10 w-10 bg-muted rounded-full" />
-                    <div className="space-y-2 flex-1">
-                      <div className="h-4 w-2/3 bg-muted rounded" />
-                      <div className="h-3 w-1/2 bg-muted rounded" />
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-
-              {/* Top Card (Clean/Uplift) */}
+            <div className="relative">
+              {/* Main Score Card */}
               <motion.div 
-                className="absolute inset-0 bg-card border rounded-2xl shadow-2xl p-6 flex flex-col"
+                className="bg-card border rounded-2xl shadow-2xl overflow-hidden"
                 initial={{ y: 20 }}
                 animate={{ y: 0 }}
                 transition={{
@@ -134,40 +97,80 @@ const HeroSection = () => {
                   damping: 20
                 }}
               >
-                <div className="flex items-center justify-between mb-6 border-b pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      JS
+                {/* Header */}
+                <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white p-5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <PenTool className="h-5 w-5" />
+                      <span className="font-bold text-sm">NARRATIVE QUALITY INDEX</span>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-sm">Your Portfolio</h3>
-                      <p className="text-xs text-muted-foreground">Generated by Uplift</p>
+                    <div className="text-right">
+                      <div className="text-3xl font-bold">73<span className="text-lg opacity-60">/100</span></div>
                     </div>
                   </div>
-                  <div className="px-2 py-1 bg-green-500/10 text-green-600 text-xs font-medium rounded-full">
-                    Top 15% Match
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">Competitive</span>
+                    <span className="text-xs text-white/70">+73 from baseline</span>
                   </div>
                 </div>
 
-                <div className="space-y-4 flex-1">
-                  <div className="p-3 bg-secondary/30 rounded-lg border border-secondary">
-                    <p className="text-xs font-medium text-primary mb-1">HIDDEN STRENGTH</p>
-                    <p className="text-sm font-medium">Community Leadership</p>
-                    <p className="text-xs text-muted-foreground mt-1">Your part-time job shows more initiative than 80% of typical club roles.</p>
-                  </div>
-                  
-                  <div className="p-3 rounded-lg border border-border">
-                     <p className="text-xs font-medium text-orange-500 mb-1">GAP DETECTED</p>
-                    <p className="text-sm font-medium">STEM Documentation</p>
-                    <p className="text-xs text-muted-foreground mt-1">You have the grades, but need one project to prove interest.</p>
+                {/* Quick Stats */}
+                <div className="p-4 border-b">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="text-center p-2 rounded-lg bg-red-50 dark:bg-red-950/30">
+                      <div className="text-lg font-bold text-red-600 dark:text-red-400">1</div>
+                      <div className="text-[10px] text-red-600/70 dark:text-red-400/70">Critical</div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-amber-50 dark:bg-amber-950/30">
+                      <div className="text-lg font-bold text-amber-600 dark:text-amber-400">4</div>
+                      <div className="text-[10px] text-amber-600/70 dark:text-amber-400/70">Needs Work</div>
+                    </div>
+                    <div className="text-center p-2 rounded-lg bg-green-50 dark:bg-green-950/30">
+                      <div className="text-lg font-bold text-green-600 dark:text-green-400">7</div>
+                      <div className="text-[10px] text-green-600/70 dark:text-green-400/70">Strong</div>
+                    </div>
                   </div>
                 </div>
-                
-                <div className="mt-4 pt-4 border-t">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-muted-foreground">Next Step:</span>
-                    <span className="font-medium text-primary cursor-pointer hover:underline">Start STEM Project &rarr;</span>
+
+                {/* Sample Dimensions */}
+                <div className="p-4 space-y-2">
+                  {[
+                    { name: "Opening Hook", score: 8.0, color: "text-green-600" },
+                    { name: "Authentic Voice", score: 8.5, color: "text-green-600" },
+                    { name: "Character Development", score: 7.0, color: "text-amber-600" },
+                    { name: "Specificity & Evidence", score: 6.5, color: "text-amber-600" },
+                  ].map((dim, i) => (
+                    <motion.div 
+                      key={i}
+                      className="flex items-center justify-between p-2 rounded-lg bg-muted/50"
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.5 + i * 0.1 }}
+                    >
+                      <span className="text-sm font-medium">{dim.name}</span>
+                      <span className={`text-sm font-bold ${dim.color}`}>{dim.score}/10</span>
+                    </motion.div>
+                  ))}
+                  <div className="text-center pt-2">
+                    <span className="text-xs text-muted-foreground">+ 8 more dimensions analyzed</span>
                   </div>
+                </div>
+              </motion.div>
+
+              {/* Floating AI Coach bubble */}
+              <motion.div
+                className="absolute -bottom-4 -right-4 bg-card border rounded-xl shadow-lg p-3 max-w-[200px]"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.8 }}
+              >
+                <div className="flex items-start gap-2">
+                  <div className="h-6 w-6 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <Sparkles className="h-3 w-3 text-white" />
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    "Replace your abstract opening with that concrete scene where you cleared your throat three times..."
+                  </p>
                 </div>
               </motion.div>
             </div>
