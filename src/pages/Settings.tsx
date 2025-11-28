@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
@@ -23,7 +22,6 @@ import { apiFetch } from '@/lib/utils';
 import { 
   User, 
   CreditCard, 
-  Zap, 
   AlertTriangle, 
   ExternalLink, 
   LogOut,
@@ -215,281 +213,231 @@ const Settings = () => {
     <div className="min-h-screen bg-background font-sans">
       <Navigation />
       
-      <div className="max-w-4xl mx-auto p-4 md:p-8 pb-20 space-y-8">
-        <div className="space-y-2">
+      <div className="max-w-3xl mx-auto p-4 md:p-8 pb-20 space-y-6">
+        {/* Header */}
+        <div className="space-y-1">
           <h1 className="text-3xl font-bold tracking-tight">Account Settings</h1>
           <p className="text-muted-foreground">
             Manage your account, subscription, and preferences.
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
-            <TabsTrigger value="profile" className="gap-2">
-              <User className="h-4 w-4 hidden sm:inline" />
+        {/* Profile Section */}
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <User className="h-5 w-5 text-primary" />
               Profile
-            </TabsTrigger>
-            <TabsTrigger value="subscription" className="gap-2">
-              <Crown className="h-4 w-4 hidden sm:inline" />
-              Plan
-            </TabsTrigger>
-            <TabsTrigger value="credits" className="gap-2">
-              <Zap className="h-4 w-4 hidden sm:inline" />
-              Credits
-            </TabsTrigger>
-            <TabsTrigger value="danger" className="gap-2">
-              <AlertTriangle className="h-4 w-4 hidden sm:inline" />
-              Account
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Profile Tab */}
-          <TabsContent value="profile" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Profile Information</CardTitle>
-                <CardDescription>
-                  Your account details managed through Clerk.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-                    <User className="h-8 w-8 text-primary" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="font-medium">{user.email}</p>
-                    <p className="text-sm text-muted-foreground">
-                      Account ID: {user.id.slice(0, 12)}...
-                    </p>
-                  </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-6 w-6 text-primary" />
                 </div>
-              </CardContent>
-              <CardFooter>
-                <Button variant="outline" onClick={() => openUserProfile()}>
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Manage Profile
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          {/* Subscription Tab */}
-          <TabsContent value="subscription" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Crown className="h-5 w-5 text-primary" />
-                  Your Plan
-                </CardTitle>
-                <CardDescription>
-                  Manage your subscription and billing.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-lg">
-                        {subscriptionStatus === 'active' ? 'Pro Plan' : 'Free Plan'}
-                      </span>
-                      <Badge variant={subscriptionStatus === 'active' ? 'default' : 'secondary'}>
-                        {subscriptionStatus === 'active' ? 'Active' : 'No subscription'}
-                      </Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {subscriptionStatus === 'active' 
-                        ? '100 credits/month with rollover'
-                        : 'Pay-as-you-go credits only'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1 text-2xl font-bold">
-                      <GradientZap className="h-5 w-5" />
-                      {credits ?? 0}
-                    </div>
-                    <p className="text-xs text-muted-foreground">credits available</p>
-                  </div>
+                <div>
+                  <p className="font-medium">{user.email}</p>
+                  <p className="text-sm text-muted-foreground">
+                    ID: {user.id.slice(0, 12)}...
+                  </p>
                 </div>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => openUserProfile()}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Manage
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-                {subscriptionStatus === 'active' && (
-                  <div className="p-4 border rounded-lg space-y-2">
-                    <p className="text-sm font-medium">Subscription Management</p>
-                    <p className="text-sm text-muted-foreground">
-                      Update payment method, view invoices, or cancel your subscription through the Stripe portal.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-              <CardFooter className="flex gap-3">
-                {subscriptionStatus === 'active' ? (
-                  <Button 
-                    onClick={handleManageSubscription}
-                    disabled={isLoadingPortal}
-                  >
-                    {isLoadingPortal ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <CreditCard className="h-4 w-4 mr-2" />
-                    )}
-                    Manage Subscription
-                  </Button>
-                ) : (
-                  <Button onClick={() => navigate('/pricing')}>
-                    <Crown className="h-4 w-4 mr-2" />
-                    Upgrade to Pro
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => navigate('/pricing')}>
-                  View Plans
-                </Button>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          {/* Credits Tab */}
-          <TabsContent value="credits" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+        {/* Plan & Subscription Section */}
+        <Card>
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Crown className="h-5 w-5 text-primary" />
+              Plan & Subscription
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold">
+                    {subscriptionStatus === 'active' ? 'Pro Plan' : 'Free Plan'}
+                  </span>
+                  <Badge variant={subscriptionStatus === 'active' ? 'default' : 'secondary'} className="text-xs">
+                    {subscriptionStatus === 'active' ? 'Active' : 'No subscription'}
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {subscriptionStatus === 'active' 
+                    ? '100 credits/month with rollover'
+                    : 'Pay-as-you-go credits only'}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="flex items-center gap-1 text-2xl font-bold">
                   <GradientZap className="h-5 w-5" />
-                  Credit Balance
-                </CardTitle>
-                <CardDescription>
-                  Your current balance and usage history.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex items-center justify-between p-6 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Available Credits</p>
-                    <p className="text-4xl font-bold">{credits ?? 0}</p>
-                  </div>
-                  <Button onClick={() => navigate('/pricing')}>
-                    Buy More
-                  </Button>
+                  {credits ?? 0}
                 </div>
+                <p className="text-xs text-muted-foreground">credits</p>
+              </div>
+            </div>
 
-                <Separator />
+            {subscriptionStatus === 'active' && (
+              <p className="text-sm text-muted-foreground">
+                Manage payment methods, view invoices, or cancel through the Stripe portal.
+              </p>
+            )}
+          </CardContent>
+          <CardFooter className="flex gap-2 pt-0">
+            {subscriptionStatus === 'active' ? (
+              <Button 
+                size="sm"
+                onClick={handleManageSubscription}
+                disabled={isLoadingPortal}
+              >
+                {isLoadingPortal ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CreditCard className="h-4 w-4 mr-2" />
+                )}
+                Manage Subscription
+              </Button>
+            ) : (
+              <Button size="sm" onClick={() => navigate('/pricing')}>
+                <Crown className="h-4 w-4 mr-2" />
+                Upgrade to Pro
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => navigate('/pricing')}>
+              View Plans
+            </Button>
+          </CardFooter>
+        </Card>
 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <History className="h-4 w-4 text-muted-foreground" />
-                    <h3 className="font-medium">Recent Transactions</h3>
-                  </div>
-                  
-                  {transactions.length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
-                      No transactions yet.
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {transactions.map((tx) => (
-                        <div 
-                          key={tx.id}
-                          className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
-                        >
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium">{tx.description}</p>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                              <Badge variant="outline" className="text-xs">
-                                {formatTransactionType(tx.type)}
-                              </Badge>
-                              <span>{formatDate(tx.created_at)}</span>
-                            </div>
-                          </div>
-                          <span className={`font-semibold ${tx.amount >= 0 ? 'text-green-600' : 'text-red-500'}`}>
-                            {tx.amount >= 0 ? '+' : ''}{tx.amount}
-                          </span>
-                        </div>
-                      ))}
+        {/* Credits & History Section */}
+        <Card>
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <GradientZap className="h-5 w-5" />
+                Credits & Usage
+              </CardTitle>
+              <Button size="sm" onClick={() => navigate('/pricing')}>
+                Buy More
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <History className="h-4 w-4" />
+              Recent Transactions
+            </div>
+            
+            {transactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-3 text-center border rounded-lg">
+                No transactions yet.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {transactions.map((tx) => (
+                  <div 
+                    key={tx.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="text-sm font-medium">{tx.description}</p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-xs py-0">
+                          {formatTransactionType(tx.type)}
+                        </Badge>
+                        <span>{formatDate(tx.created_at)}</span>
+                      </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Danger Zone Tab */}
-          <TabsContent value="danger" className="space-y-6">
-            <Card className="border-destructive/50">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-destructive">
-                  <AlertTriangle className="h-5 w-5" />
-                  Danger Zone
-                </CardTitle>
-                <CardDescription>
-                  Irreversible actions for your account.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Sign Out */}
-                <div className="flex items-center justify-between p-4 rounded-lg border">
-                  <div className="space-y-1">
-                    <p className="font-medium">Sign Out</p>
-                    <p className="text-sm text-muted-foreground">
-                      Sign out of your account on this device.
-                    </p>
+                    <span className={`font-semibold ${tx.amount >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                      {tx.amount >= 0 ? '+' : ''}{tx.amount}
+                    </span>
                   </div>
-                  <Button variant="outline" onClick={() => signOut()}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Account Actions Section */}
+        <Card className="border-destructive/20">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Danger Zone
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {/* Sign Out */}
+            <div className="flex items-center justify-between p-3 rounded-lg border">
+              <div>
+                <p className="font-medium text-sm">Sign Out</p>
+                <p className="text-xs text-muted-foreground">
+                  Sign out of your account on this device.
+                </p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => signOut()}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </Button>
+            </div>
+
+            {/* Delete Account */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+              <div>
+                <p className="font-medium text-sm text-destructive">Delete Account</p>
+                <p className="text-xs text-muted-foreground">
+                  Permanently delete your account and all data.
+                </p>
+              </div>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" size="sm">
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
                   </Button>
-                </div>
-
-                <Separator />
-
-                {/* Delete Account */}
-                <div className="flex items-center justify-between p-4 rounded-lg border border-destructive/30 bg-destructive/5">
-                  <div className="space-y-1">
-                    <p className="font-medium text-destructive">Delete Account</p>
-                    <p className="text-sm text-muted-foreground">
-                      Permanently delete your account and all associated data. This action cannot be undone.
-                    </p>
-                  </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive">
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete your account
+                      and remove all your data from our servers, including:
+                      <ul className="list-disc list-inside mt-2 space-y-1">
+                        <li>Your profile information</li>
+                        <li>All saved essays and analyses</li>
+                        <li>Your credit balance ({credits ?? 0} credits)</li>
+                        <li>Subscription (if active)</li>
+                      </ul>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDeleteAccount}
+                      disabled={isDeleting}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    >
+                      {isDeleting ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
                         <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          This action cannot be undone. This will permanently delete your account
-                          and remove all your data from our servers, including:
-                          <ul className="list-disc list-inside mt-2 space-y-1">
-                            <li>Your profile information</li>
-                            <li>All saved essays and analyses</li>
-                            <li>Your credit balance ({credits ?? 0} credits)</li>
-                            <li>Subscription (if active)</li>
-                          </ul>
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                          onClick={handleDeleteAccount}
-                          disabled={isDeleting}
-                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                        >
-                          {isDeleting ? (
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4 mr-2" />
-                          )}
-                          Yes, delete my account
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+                      )}
+                      Yes, delete my account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
