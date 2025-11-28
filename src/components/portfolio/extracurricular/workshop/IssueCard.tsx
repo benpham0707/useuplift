@@ -2,6 +2,7 @@ import React from 'react';
 import { Card } from '@/components/ui/card';
 import { WritingIssue } from './types';
 import { SuggestionCarousel } from './SuggestionCarousel';
+import { TeachingGuidanceCard } from './TeachingGuidanceCard';
 import { ChevronDown, ChevronUp, CheckCircle2, Circle, Loader2, Quote, AlertOctagon, Lightbulb } from 'lucide-react';
 
 interface IssueCardProps {
@@ -109,26 +110,36 @@ export const IssueCard: React.FC<IssueCardProps> = ({
             </div>
           )}
 
-          {issue.analysis && (
-            <div>
-              <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
-                The Problem
-              </p>
-              <p className="text-sm text-muted-foreground pl-3 border-l-2 border-red-300 dark:border-red-800">
-                {issue.analysis}
-              </p>
-            </div>
-          )}
-
-          {issue.impact && (
+          {/* Phase 19 Teaching Layer - Replaces old problem/impact sections */}
+          {issue.teaching ? (
             <div className="mb-4">
-              <p className="text-xs font-semibold text-primary mb-1">
-                Why It Matters
-              </p>
-              <p className="text-sm text-muted-foreground pl-3 border-l-2 border-primary/30">
-                {issue.impact}
-              </p>
+              <TeachingGuidanceCard teaching={issue.teaching} />
             </div>
+          ) : (
+            <>
+              {/* Fallback to old sections if teaching not available */}
+              {issue.analysis && (
+                <div>
+                  <p className="text-xs font-semibold text-red-600 dark:text-red-400 mb-1">
+                    The Problem
+                  </p>
+                  <p className="text-sm text-muted-foreground pl-3 border-l-2 border-red-300 dark:border-red-800">
+                    {issue.analysis}
+                  </p>
+                </div>
+              )}
+
+              {issue.impact && (
+                <div className="mb-4">
+                  <p className="text-xs font-semibold text-primary mb-1">
+                    Why It Matters
+                  </p>
+                  <p className="text-sm text-muted-foreground pl-3 border-l-2 border-primary/30">
+                    {issue.impact}
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
           <div className="pt-4 border-t">

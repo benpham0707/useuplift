@@ -1,4 +1,5 @@
 import { ExtracurricularItem } from '../ExtracurricularCard';
+import { TeachingGuidance } from './backendTypes';
 
 export interface DraftVersion {
   id: string;
@@ -35,6 +36,8 @@ export interface WritingIssue {
   status: 'not_fixed' | 'in_progress' | 'fixed';
   currentSuggestionIndex: number;
   expanded: boolean;
+  // Phase 19 Teaching Layer - replaces analysis/impact with deep teaching
+  teaching?: TeachingGuidance;
 }
 
 export interface RubricDimension {

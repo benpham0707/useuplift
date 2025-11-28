@@ -8,6 +8,9 @@ import { DraftEditor } from './DraftEditor';
 import { OverallScoreCard } from './OverallScoreCard';
 import { RubricDimensionCard } from './RubricDimensionCard';
 import { WorkshopComplete } from './WorkshopComplete';
+import { analyzeForWorkshop } from '@/services/workshop/workshopAnalyzer';
+import { ExperienceEntry } from '@/core/types/experience';
+import { Loader2 } from 'lucide-react';
 
 interface ExtracurricularWorkshopProps {
   activity: ExtracurricularItem;
@@ -26,6 +29,11 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const draftRef = useRef<string>(draft);
   useEffect(() => { draftRef.current = draft; }, [draft]);
+
+  // Phase 17-19 Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [hasRunAnalysis, setHasRunAnalysis] = useState(false);
   // Keep live draft in sync when undo/redo changes the selected version
   useEffect(() => {
     setDraft(draftVersions[currentVersionIndex].text);
@@ -92,6 +100,78 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
 
     return () => clearTimeout(timer);
   }, [draft, activity]);
+
+  // Phase 17-19 Analysis - Run once on mount to enhance issues with teaching
+  useEffect(() => {
+    if (hasRunAnalysis) return; // Only run once
+
+    const runPhase19Analysis = async () => {
+      setIsAnalyzing(true);
+      setAnalysisError(null);
+
+      try {
+        // Convert ExtracurricularItem to ExperienceEntry
+        const entry: ExperienceEntry = {
+          id: activity.id,
+          user_id: 'current-user',
+          title: activity.name,
+          description: draft,
+          description_original: draft,
+          organization: activity.organization || '',
+          role: activity.role || '',
+          category: 'extracurricular' as any,
+          hours_per_week: activity.hoursPerWeek || 5,
+          weeks_per_year: 52,
+          start_date: '',
+          end_date: 'Present',
+          time_span: '',
+          version: 1,
+        };
+
+        console.log('[ExtracurricularWorkshop] Running Phase 17-19 analysis...');
+        const result = await analyzeForWorkshop(entry, {
+          enableTeachingLayer: true,
+          maxIssues: 5,
+        });
+
+        console.log('[ExtracurricularWorkshop] Analysis complete!', {
+          topIssues: result.topIssues.length,
+          withTeaching: result.topIssues.filter(i => i.teaching).length,
+        });
+
+        // Merge teaching guidance into existing mock issues
+        setDimensions(prevDimensions => {
+          return prevDimensions.map(dim => ({
+            ...dim,
+            issues: dim.issues.map(issue => {
+              // Find matching teaching from Phase 19 by matching on excerpt/quote
+              const matchingTeaching = result.topIssues.find(
+                t => t.from_draft && issue.excerpt.includes(t.from_draft.substring(0, 50))
+              );
+
+              if (matchingTeaching?.teaching) {
+                return {
+                  ...issue,
+                  teaching: matchingTeaching.teaching,
+                };
+              }
+
+              return issue;
+            }),
+          }));
+        });
+
+        setHasRunAnalysis(true);
+      } catch (error) {
+        console.error('[ExtracurricularWorkshop] Phase 19 analysis failed:', error);
+        setAnalysisError(error instanceof Error ? error.message : 'Analysis failed');
+      } finally {
+        setIsAnalyzing(false);
+      }
+    };
+
+    runPhase19Analysis();
+  }, [activity, draft, hasRunAnalysis]);
 
   const wordCount = draft.trim().split(/\s+/).filter(Boolean).length;
 
@@ -246,6 +326,43 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
       />
 
       <div className="space-y-4">
+        {/* Phase 19 Analysis Loading State */}
+        {isAnalyzing && (
+          <div className="p-6 rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200">
+            <div className="flex items-start gap-4">
+              <Loader2 className="w-6 h-6 text-purple-600 animate-spin flex-shrink-0 mt-1" />
+              <div className="flex-1">
+                <h4 className="font-bold text-lg text-purple-900 mb-2">
+                  Enhancing with Deep Teaching Layer...
+                </h4>
+                <p className="text-sm text-purple-800 mb-3">
+                  Running Phase 17-19 analysis to generate personalized teaching guidance.
+                  This takes ~3 minutes as we analyze your essay with full context.
+                </p>
+                <div className="space-y-1 text-xs text-purple-700">
+                  <p>✓ Phase 17: Core analysis & NQI scoring</p>
+                  <p>✓ Phase 18: Suggestion validation</p>
+                  <p className="flex items-center gap-2">
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    Phase 19: Teaching layer (conversational guidance)
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Phase 19 Analysis Error */}
+        {analysisError && (
+          <div className="p-4 rounded-lg bg-red-50 border border-red-200">
+            <p className="text-sm text-red-800">
+              <strong>Teaching layer unavailable:</strong> {analysisError}
+            </p>
+            <p className="text-xs text-red-600 mt-1">
+              You can still use the workshop with basic guidance.
+            </p>
+          </div>
+        )}
 
         {isComplete ? (
           <WorkshopComplete draft={draft} overallScore={overallScore} />
