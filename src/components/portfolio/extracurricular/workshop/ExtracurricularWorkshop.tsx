@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ExtracurricularItem } from '../ExtracurricularCard';
 import { DraftVersion, RubricDimension, WritingIssue } from './types';
 import { detectAllIssuesWithRubric, getMockDraft } from './issueDetector';
+import { buildDimensionsFromAnalysis, calculateOverallScoreFromDimensions } from './workshopAdapter';
 import { calculateOverallScore } from './rubricScorer';
 import { HeroSection } from './HeroSection';
 import { DraftEditor } from './DraftEditor';
@@ -115,7 +116,6 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
           id: activity.id,
           user_id: 'current-user',
           title: activity.name,
-          description: draft,
           description_original: draft,
           organization: activity.organization || '',
           role: activity.role || '',
@@ -139,27 +139,26 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
           withTeaching: result.topIssues.filter(i => i.teaching).length,
         });
 
-        // Merge teaching guidance into existing mock issues
-        setDimensions(prevDimensions => {
-          return prevDimensions.map(dim => ({
-            ...dim,
-            issues: dim.issues.map(issue => {
-              // Find matching teaching from Phase 19 by matching on excerpt/quote
-              const matchingTeaching = result.topIssues.find(
-                t => t.from_draft && issue.excerpt.includes(t.from_draft.substring(0, 50))
-              );
+        // FULL REPLACEMENT: Replace mock dimensions with Phase 19 results
+        // This ensures teaching guidance is displayed via TeachingGuidanceCard
+        const newDimensions = buildDimensionsFromAnalysis(
+          result.topIssues,
+          result.dimensions
+        );
 
-              if (matchingTeaching?.teaching) {
-                return {
-                  ...issue,
-                  teaching: matchingTeaching.teaching,
-                };
-              }
-
-              return issue;
-            }),
-          }));
+        console.log('[ExtracurricularWorkshop] Replacing dimensions with Phase 19 results...', {
+          dimensionCount: newDimensions.length,
+          issueCount: newDimensions.reduce((sum, d) => sum + d.issues.length, 0),
+          withTeaching: newDimensions.reduce(
+            (sum, d) => sum + d.issues.filter(i => i.teaching).length, 0
+          ),
         });
+
+        setDimensions(newDimensions);
+
+        // Update overall score from Phase 19 NQI (convert 0-100 to 0-10)
+        const nqiScore = result.overallScore / 10;
+        setOverallScore(nqiScore);
 
         setHasRunAnalysis(true);
       } catch (error) {

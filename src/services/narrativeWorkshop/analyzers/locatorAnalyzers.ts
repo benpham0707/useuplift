@@ -97,7 +97,9 @@ function findBestMatch(essayText: string, quote: string): { startIndex: number, 
 function buildProblemDescription(dim: DimensionScoreResult): string {
   const score = dim.final_score;
   const name = dim.dimension_name;
-  const weaknesses = dim.evidence?.weaknesses || [];
+  // Access weaknesses safely - may not exist on all DimensionEvidence types
+  const evidence = dim.evidence as { weaknesses?: string[] } | undefined;
+  const weaknesses = evidence?.weaknesses || [];
 
   if (score < 3) {
     return `Your essay is missing the foundational elements of ${name}. ${weaknesses[0] || 'This dimension needs significant development to meet college admissions standards.'}`;
