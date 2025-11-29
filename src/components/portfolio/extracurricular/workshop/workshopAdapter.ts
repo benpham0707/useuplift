@@ -34,24 +34,6 @@ function mapApplyType(
   }
 }
 
-/**
- * Map backend severity to UI status
- */
-function mapSeverityToStatus(
-  severity: 'critical' | 'important' | 'helpful' | string
-): 'critical' | 'needs_work' | 'good' | 'excellent' {
-  switch (severity) {
-    case 'critical':
-      return 'critical';
-    case 'important':
-      return 'needs_work';
-    case 'helpful':
-      return 'good';
-    default:
-      return 'needs_work';
-  }
-}
-
 // ============================================================================
 // MAIN CONVERSION FUNCTIONS
 // ============================================================================
@@ -107,9 +89,9 @@ export function convertWorkshopIssuesToWritingIssues(
       dimensionId: normalizeDimensionId(issue.category),
       title: issue.title || 'Writing Issue',
       excerpt: issue.from_draft || '',
-      analysis: issue.problem || '', // Fallback only - teaching takes precedence
-      impact: issue.why_matters || '', // Fallback only - teaching takes precedence
-      teaching: issue.teaching, // KEY: Phase 19 teaching guidance
+      analysis: '', // Phase 19 teaching.problem.explanation replaces this
+      impact: '', // Phase 19 teaching.problem.whyItMatters replaces this
+      teaching: issue.teaching, // Phase 19 teaching guidance (REQUIRED)
       suggestions,
       status: 'not_fixed' as const,
       currentSuggestionIndex: 0,

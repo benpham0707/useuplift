@@ -14,65 +14,6 @@ interface IssueCardProps {
   onPrevSuggestion: (issueId: string) => void;
 }
 
-/**
- * Fallback Teaching Section with Progressive Disclosure
- * Shows analysis + impact with fade effect and "View more" button
- */
-const FallbackTeachingSection: React.FC<{ analysis?: string; impact?: string }> = ({ analysis, impact }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  
-  // Avoid duplication if analysis and impact are the same
-  const uniqueParts = new Set([analysis, impact].filter(Boolean));
-  let fullContent = Array.from(uniqueParts).join(' ');
-  
-  // Filter out any "Severity: X" text that may have leaked through
-  fullContent = fullContent.replace(/\s*Severity:\s*(critical|high|medium|low)/gi, '').trim();
-  
-  if (!fullContent) return null;
-  
-  const needsTruncation = fullContent.length > 200;
-  
-  return (
-    <div className="pl-3 border-l-2 border-red-400/50 space-y-2">
-      <p className="text-xs font-semibold text-red-500 uppercase tracking-wide">
-        The Problem
-      </p>
-      
-      <div className="relative">
-        <div className={`text-sm text-foreground/80 leading-relaxed ${!isExpanded && needsTruncation ? 'line-clamp-3' : ''}`}>
-          {fullContent}
-        </div>
-        
-        {/* Fade overlay when collapsed */}
-        {!isExpanded && needsTruncation && (
-          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent pointer-events-none" />
-        )}
-      </div>
-      
-      {needsTruncation && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs text-primary hover:text-primary/80 p-0 h-auto font-medium"
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="w-3 h-3 mr-1" />
-              View less
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-3 h-3 mr-1" />
-              View more
-            </>
-          )}
-        </Button>
-      )}
-    </div>
-  );
-};
-
 export const IssueCard: React.FC<IssueCardProps> = ({
   issue,
   onToggle,
@@ -190,13 +131,10 @@ export const IssueCard: React.FC<IssueCardProps> = ({
             }
             return null;
           })()}
-          {issue.teaching ? (
-            <div className="mb-4">
-              <TeachingGuidanceCard teaching={issue.teaching} mode="problem" />
-            </div>
-          ) : (
-            <FallbackTeachingSection analysis={issue.analysis} impact={issue.impact} />
-          )}
+          {/* Phase 19 Teaching Guidance (REQUIRED) */}
+          <div className="mb-4">
+            <TeachingGuidanceCard teaching={issue.teaching} mode="problem" />
+          </div>
 
           <div className="pt-4 border-t">
             <SuggestionCarousel

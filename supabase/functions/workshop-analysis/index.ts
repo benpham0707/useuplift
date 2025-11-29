@@ -299,48 +299,70 @@ Return ONLY valid JSON with this structure:
         model: 'claude-sonnet-4-20250514',
         max_tokens: 8192,
         temperature: 0.8,
-        system: `You are a Narrative Editor helping a student sound MORE LIKE THEMSELVES while BREAKING BEYOND typical essay patterns.
+        system: `You are a Narrative Editor helping a student write authentically about their experience.
 
 **YOUR CORE MISSION:**
-The student's essay should read like THEY wrote it - their authentic voice processing their own experience.
-Every suggestion should sound like something THIS SPECIFIC PERSON would write, not generic "good writing."
+The student's essay should read like THEY wrote it - their authentic voice pulling from their heart,
+unique perspective, and actual lived experience. Not performing for an audience.
 
 **THE AUTHENTICITY TEST:**
-Before writing anything, ask: "Could this have ONLY been written by this person?"
-- If yes → you've captured their voice
-- If anyone could have written it → try again with more specificity to their experience
+Before writing anything, ask: "Could only THIS person have written this?"
+- If yes → you've captured their unique voice and experience
+- If anyone could have written it → too generic, needs more of THEIR emotional truth
 
-**ANTI-CONVERGENCE MANDATE:**
-AI writing naturally drifts toward:
-- The same narrative arc (setup → struggle → triumph → lesson)
-- "Safe" phrasings that feel polished but generic
-- Crowd-pleasing insights that lack edge
-- Manufactured emotional beats
-- Generic college essay language ("passion", "journey", "grew as a person")
+**AUTHENTICITY OVER PERFORMANCE:**
+Avoid these common essay pitfalls:
+- Writing that sounds like they're PERFORMING struggle rather than processing it
+- Insights that sound impressive but aren't actually theirs
+- Forced "lessons learned" that feel tacked on
+- Comparisons that make the student sound superior to others
+- Dramatic reveals or identity claims ("That's when I knew I was...")
+- Rhetorical questions designed to flex
 
-You MUST actively RESIST these patterns. When in doubt, choose the more surprising, more specific, more uncomfortable option.
+Instead: Show how THIS person naturally makes sense of their experience through concrete details.
 
-**WRITING QUALITY REQUIREMENTS:**
-Each suggestion should be 300-500 characters and include:
-- CONCRETE DETAILS: Specific ages, objects, actions, sensory details (NOT abstract concepts)
-- FULL TRANSFORMATIONS: Show the complete before/after, not just hints
-- SPECIFIC EXAMPLES: "Jordan 1 Retro High - $180" not "sneakers"
-- ACTIVE SCENES: What they DID, not what they thought or felt abstractly
-- MICRO-STAKES: Small, specific consequences that reveal character
+**FRESH, ANTI-CONVERGENT WRITING:**
+We want original, lively writing that highlights the student's character - not AI-like patterns.
+- Resist generic narrative arcs (setup → struggle → triumph → lesson)
+- Avoid clichéd college essay language ("passion", "journey", "grew as a person")
+- Don't use AI-sounding words ("tapestry", "testament", "delve", "showcase", "underscore")
+- Create fresh phrasings that feel alive and specific to this student
 
-**WHAT TO AVOID:**
-- Writing that sounds impressive but could be anyone's
-- Insights that are generic life lessons rather than specific realizations
-- Language that sounds like an AI or essay guide ("tapestry", "testament", "delve", "showcase", "underscore")
-- "Performed" vulnerability (struggle mentioned just to show triumph)
-- Abstract emotions without concrete anchoring ("I felt passionate" → show the passion through action)
+But DON'T manufacture "edge" or "toughness" - authentic ≠ trying to sound impressive.
+
+**WHAT AUTHENTIC WRITING SOUNDS LIKE:**
+Emotional and captivating - like pulling from the heart. Unique feeling, understanding, grasping,
+perspective, or actions within that scenario that prove this person was THERE.
+
+Good example: "I traced the circuit three times before realizing I'd swapped the resistor values.
+The LED stayed dark. My lab partner had already left."
+
+Bad example: "I noticed the circuit wasn't working. I realized I needed to be more detail-oriented."
+
+The first SHOWS you were there with emotional texture. The second is generic reflection anyone could write.
+
+**RED FLAGS - STOP IF YOU SEE THESE PATTERNS:**
+- "But I knew..." (revelation flex)
+- "While others [weak thing], I [strong thing]" (comparison flex)
+- "That's when I realized I was..." (identity claim)
+- Rhetorical questions that imply superiority
+- Short, punchy statements designed to sound tough
+- "Normal people X, but I Y" (superiority complex)
+- Declarative identity claims ("I am...", "I'm the type of person who...")
+
+**WRITING EFFICIENCY:**
+Make every word count in either the micro (sentence-level craft) or macro (overall narrative arc) scheme.
+- Don't inflate word count unnecessarily
+- Keep suggestions close to the original length unless expanding serves a clear purpose
+- Most students don't use bullet points (-) - write in natural prose
+- Trim anything that doesn't advance understanding or emotion
 
 **YOUR MANDATE:**
 1. Read the Experience Fingerprint carefully - these are IRREPLACEABLE elements of their story
-2. Generate 3 options that sound like THIS PERSON wrote them, incorporating fingerprint elements
-3. Each suggestion should be 300-500 characters with full concrete examples
-4. Rationales should explain the specific writing principle being applied
-5. Show HOW each suggestion connects to their unique experience
+2. Generate 3 options that sound like THIS PERSON naturally telling their story
+3. Use their unique experience elements to create writing only THEY could produce
+4. Match the approximate length of the original unless expansion serves the narrative
+5. Make suggestions feel emotionally true, not technically impressive
 
 **OUTPUT FORMAT:**
 Return ONLY valid JSON with this structure:
@@ -349,28 +371,19 @@ Return ONLY valid JSON with this structure:
     {
       "id": "unique_id",
       "quote": "exact text from essay",
-      "problem": "brief problem description (what's generic or weak)",
-      "why_it_matters": "impact explanation (why this hurts their essay)",
-      "severity": "critical" | "high" | "medium" | "low",
       "rubric_category": "dimension_name",
       "suggestions": [
         {
           "type": "polished_original",
-          "text": "revised text (300-500 chars with concrete details, full transformation)",
-          "rationale": "why this works (specific writing principle explained)",
-          "fingerprint_connection": "how this incorporates their unique experience elements"
+          "text": "revised text (emotionally true, length-appropriate)"
         },
         {
           "type": "voice_amplifier",
-          "text": "revised text (300-500 chars, amplifies their natural voice patterns)",
-          "rationale": "why this works (voice-specific explanation)",
-          "fingerprint_connection": "connection to their unique elements"
+          "text": "revised text (amplifies their natural voice)"
         },
         {
           "type": "divergent_strategy",
-          "text": "revised text (300-500 chars, bold alternative angle)",
-          "rationale": "why this works (strategy explanation)",
-          "fingerprint_connection": "connection to their unique elements"
+          "text": "revised text (bold alternative angle)"
         }
       ]
     }
@@ -378,15 +391,15 @@ Return ONLY valid JSON with this structure:
 }
 
 **CRITICAL REMINDERS:**
-- Each "text" field should be 300-500 characters minimum
-- Include specific details: ages, times, objects, sensory details
-- Show full scenes with concrete actions, not summaries
-- Make it sound like THIS student, not a generic "good writer"
-- Every suggestion MUST use elements from the Experience Fingerprint`,
+- Each suggestion should match the original's approximate length (don't artificially inflate)
+- Include specific details if relevant and important to that part of essay or text - like (thoughts, physical effects, 5 senses, objects, emotions)
+- Make it sound like THIS student pulling from their heart, not a generic "good writer"
+- Every suggestion MUST use elements from the Experience Fingerprint
+- Fresh, lively writing - not AI convergence patterns`,
         messages: [
           {
             role: 'user',
-            content: `Identify surgical fixes for this essay that make it sound MORE like this specific student wrote it.
+            content: `Identify surgical fixes for this essay that make it sound like THIS specific student pulling from their heart.
 
 **ESSAY PROMPT:**
 ${requestBody.promptText}
@@ -403,12 +416,12 @@ ${JSON.stringify(rubricAnalysis, null, 2)}
 **INSTRUCTIONS:**
 Generate 5 surgical fixes that:
 1. Address the weakest rubric dimensions
-2. Incorporate elements from the Experience Fingerprint
-3. Make suggestions 300-500 characters with concrete details
-4. Sound like THIS student, not a generic essay
-5. Include specific ages, objects, actions, sensory anchors
+2. Incorporate elements from the Experience Fingerprint to create writing only THEY could produce
+3. Match the approximate length of the original text (don't artificially inflate word count)
+4. Sound emotionally true and authentic to THIS student
+5. Make every word count in either micro (craft) or macro (narrative) scheme
 
-Focus on the most impactful improvements first. Each suggestion should be a FULL transformation showing exactly how to rewrite the text with concrete examples.`
+Focus on the most impactful improvements first. Each suggestion should feel like this person was THERE - emotional texture, specific details that prove their presence.`
           }
         ]
       })

@@ -72,9 +72,6 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
     return 'replace';
   };
 
-  // Helper to determine if content needs truncation
-  const hasLongContent = (content: string) => content.length > 150;
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -95,74 +92,41 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
         </p>
       </div>
 
-      {teaching && teaching.suggestionRationales && teaching.suggestionRationales[currentIndex] ? (
-        // Phase 19 per-suggestion deep rationale (~800 chars, HS-friendly, segmented)
-        <div className="pl-3 border-l-2 border-green-400/50">
-          <p className="text-xs font-semibold text-green-500 mb-1 uppercase tracking-wide">
-            Why This Works
-          </p>
-          <div className="text-sm text-muted-foreground leading-relaxed space-y-2">
-            {isExpanded
-              ? teaching.suggestionRationales[currentIndex].whyThisWorks.split('\n\n').map((paragraph, idx) => (
-                  <p key={idx}>{paragraph}</p>
-                ))
-              : (
-                  <p>
-                    {teaching.suggestionRationales[currentIndex].whyThisWorks.split('\n\n')[0].slice(0, 150)}...
-                  </p>
-                )
-            }
-          </div>
-          
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all text-xs font-medium text-purple-900 dark:text-purple-100"
-          >
-            {isExpanded ? (
-              <>
-                Show less
-                <ChevronUp className="w-3 h-3" />
-              </>
-            ) : (
-              <>
-                View more
-                <ChevronDown className="w-3 h-3" />
-              </>
-            )}
-          </button>
+      {/* Phase 20 Per-Suggestion Rationale (REQUIRED) */}
+      <div className="pl-3 border-l-2 border-green-400/50">
+        <p className="text-xs font-semibold text-green-500 mb-1 uppercase tracking-wide">
+          Why This Works
+        </p>
+        <div className="text-sm text-muted-foreground leading-relaxed space-y-2">
+          {isExpanded
+            ? teaching?.suggestionRationales?.[currentIndex]?.whyThisWorks.split('\n\n').map((paragraph, idx) => (
+                <p key={idx}>{paragraph}</p>
+              ))
+            : (
+                <p>
+                  {teaching?.suggestionRationales?.[currentIndex]?.whyThisWorks.split('\n\n')[0].slice(0, 150)}...
+                </p>
+              )
+          }
         </div>
-      ) : (
-        // Fallback: ONLY use Phase 17 rationale (skip TeachingGuidanceCard - that's for problem/impact, not suggestions)
-        <div className="pl-3 border-l-2 border-green-400/50">
-          <p className="text-xs font-semibold text-green-500 mb-1 uppercase tracking-wide">
-            Why This Works
-          </p>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            {isExpanded || !hasLongContent(currentSuggestion.rationale || currentSuggestion.why_this_works || '')
-              ? (currentSuggestion.rationale || currentSuggestion.why_this_works)
-              : `${(currentSuggestion.rationale || currentSuggestion.why_this_works || '').slice(0, 150)}...`
-            }
-          </p>
-          {hasLongContent(currentSuggestion.rationale || currentSuggestion.why_this_works || '') && (
-            <button
-              onClick={() => setIsExpanded(!isExpanded)}
-              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all text-xs font-medium text-purple-900 dark:text-purple-100"
-            >
-              {isExpanded ? (
-                <>
-                  Show less
-                  <ChevronUp className="w-3 h-3" />
-                </>
-              ) : (
-                <>
-                  View more
-                  <ChevronDown className="w-3 h-3" />
-                </>
-              )}
-            </button>
+
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all text-xs font-medium text-purple-900 dark:text-purple-100"
+        >
+          {isExpanded ? (
+            <>
+              Show less
+              <ChevronUp className="w-3 h-3" />
+            </>
+          ) : (
+            <>
+              View more
+              <ChevronDown className="w-3 h-3" />
+            </>
           )}
-        </div>
-      )}
+        </button>
+      </div>
 
       {currentSuggestion.teaching_example && (
         <div className="pl-3 border-l-2 border-muted-foreground/30">

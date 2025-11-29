@@ -1,267 +1,418 @@
-# Plan: Fix Phase 19 Teaching Not Appearing in Workshop UI
+# Investigation Plan: Suggestion Quality Degradation
 
-## Problem Analysis
+## Problem Statement
+The suggestion system is now generating content that:
+- Sounds cocky and inauthentic
+- Uses a repetitive "flex" pattern instead of natural storytelling
+- Lacks genuine character development
+- Feels forced rather than compelling
 
-The user is still seeing old mock output instead of Phase 19 teaching guidance:
+### Examples of Problematic Output:
+1. "But normal kids don't know what I know: that breaking points are breakthrough points."
+2. "But they were missing the point. While they sought comfort, I was building an immunity to quit. Which one of us was really missing out?"
+3. "My coach stared, confused. That's when I knew: I wasn't addicted to winning. I was addicted to the edge of breaking."
+4. "I started seeking the hardest opponents, longest practices, most brutal conditioning. Other athletes avoid pain. I hunt it down."
+5. "My classmates study until they're tired. I study until I'm addicted to the grind."
+
+## Investigation Steps
+
+### Step 1: Identify Recent Changes to Suggestion Generation System
+- [ ] Review git commit history for the last 5-10 commits
+- [ ] Identify all files related to suggestion generation (Phase 17)
+- [ ] Check for changes to prompts, system messages, or generation logic
+
+### Step 2: Locate Suggestion Generation Components
+Files to examine:
+- [ ] `/supabase/functions/workshop-analysis/index.ts` (Phase 17 - main suggestion generator)
+- [ ] `/supabase/functions/teaching-layer/index.ts` (Phase 19 - should NOT affect suggestions)
+- [ ] `/supabase/functions/suggestion-rationales/index.ts` (Phase 20 - rationales only)
+- [ ] Any prompt configuration files
+- [ ] Any recent changes to temperature, model selection, or generation parameters
+
+### Step 3: Compare Current vs Previous Prompts
+- [ ] Extract current Phase 17 system prompt
+- [ ] Check git history for any modifications to suggestion generation prompts
+- [ ] Identify what changed and when
+- [ ] Determine if changes were intentional or accidental
+
+### Step 4: Test Hypothesis
+Possible causes to investigate:
+- [ ] Temperature setting too high (causing more "creative" but less grounded responses)
+- [ ] Prompt modifications that encourage "dramatic contrast" or "revelation" patterns
+- [ ] Model change (different Claude version)
+- [ ] Examples in prompt that demonstrate this cocky pattern
+- [ ] Removed guardrails about authenticity/naturalness
+
+### Step 5: Root Cause Analysis
+- [ ] Document exactly what changed
+- [ ] Explain why the change caused this degradation
+- [ ] Propose specific fixes
+
+### Step 6: Solution Design
+- [ ] Restore authentic, natural storytelling voice
+- [ ] Add explicit anti-patterns to avoid
+- [ ] Include better examples of genuine character development
+- [ ] Test with real examples to validate improvement
+
+## Files to Investigate (Priority Order)
+
+1. **Phase 17 Suggestion Generator** (HIGHEST PRIORITY)
+   - `/supabase/functions/workshop-analysis/index.ts`
+   - This is where suggestions are created
+
+2. **Recent Commits**
+   - Check commits from the last session
+   - Focus on any prompt changes
+
+3. **Configuration Files**
+   - Any files that might affect suggestion tone/style
+
+## Expected Deliverables
+
+1. **Investigation Report** - Document what changed and why it degraded quality
+2. **Root Cause Analysis** - Specific code/prompt changes that caused the issue
+3. **Restoration Plan** - Detailed steps to fix the suggestion quality
+4. **Testing Strategy** - How to validate the fix works
+
+---
+
+---
+
+## INVESTIGATION FINDINGS
+
+### Root Cause Identified
+
+**COMMIT:** `35a1a25` - "Implement Phase 17: Experience Fingerprinting in workshop prompts"
+**DATE:** Wed Nov 26 10:34:53 2025
+**FILE:** `/supabase/functions/workshop-analysis/index.ts`
+
+### The Problem
+
+The Phase 17 prompt changes introduced problematic language that ENCOURAGES the cocky "flex" pattern:
+
+#### Problematic Instruction (Line 321):
 ```
-The Problem
-Readers tune out immediately when essays start with abstract statements about being 'captivated' - needs concrete scene
-Why It Matters
-Severity: critical
+You MUST actively RESIST these patterns. When in doubt, choose the more surprising,
+more specific, more uncomfortable option.
 ```
 
-### Root Cause
+**This tells Claude:** "Be uncomfortable, be edgy, choose the surprising option"
+**Result:** Students sound cocky because they're trying to be "surprising" and "uncomfortable"
 
-There are **TWO separate issue detection systems** running:
+#### Missing Guardrails
 
-1. **Mock System** (lines 226-300 in `issueDetector.ts`)
-   - Called immediately on workshop load via `detectAllIssuesWithRubric()`
-   - Generates generic issues with `analysis` and `impact` fields
-   - Creates excerpts like: `"I founded and led our school's Computer Science Club..."`
-   - **This is what students currently see**
+The old prompt said:
+- "Minimal edits preserving voice" (for polished_original)
+- "Heightens student's existing voice patterns" (for voice_amplifier)
+- Simple, clear instructions
 
-2. **Real Phase 17-19 System** (in `workshopAnalyzer.ts`)
-   - Called in background via `analyzeForWorkshop()`
-   - Returns `WorkshopIssue[]` with `teaching` field populated
-   - Creates different excerpts via `from_draft` field
-   - Runs successfully but teaching never appears to users
+The new prompt says:
+- "BREAKING BEYOND typical essay patterns"
+- "When in doubt, choose the more surprising, more specific, more uncomfortable option"
+- "Actively RESIST" safe phrasings
+- "Choose uncomfortable option"
 
-### The Matching Problem (Lines 142-162 in ExtracurricularWorkshop.tsx)
+**The new prompt is telling Claude to be BOLD and SURPRISING, which results in cocky flexing.**
+
+### Examples of How This Manifests
+
+User's problematic outputs ALL follow this "uncomfortable/surprising/edgy" pattern:
+
+1. "But normal kids don't know what I know" ← EDGY CONTRAST
+2. "While they sought comfort, I was building an immunity to quit. Which one of us was really missing out?" ← RHETORICAL QUESTION, FLEX
+3. "That's when I knew: I wasn't addicted to winning. I was addicted to the edge of breaking." ← DRAMATIC REVELATION
+4. "Other athletes avoid pain. I hunt it down." ← EDGY CONTRAST, SHORT PUNCHY FLEX
+5. "My classmates study until they're tired. I study until I'm addicted to the grind." ← COMPARISON FLEX
+
+**Pattern:** The prompt's instruction to "choose the more uncomfortable option" is being interpreted as "make the student sound tough/edgy/special."
+
+### The Paradox
+
+The prompt says:
+- "The student's essay should read like THEY wrote it - their authentic voice"
+- **BUT ALSO:** "When in doubt, choose the more surprising, more specific, more uncomfortable option"
+
+These two instructions CONFLICT. The second one overrides the first, causing all students to sound like they're trying to be edgy warriors.
+
+---
+
+## ROOT CAUSE ANALYSIS
+
+### What Changed
+
+**BEFORE (Old Prompt):**
+```typescript
+system: `You are a surgical essay editor. Identify specific issues in the essay
+and provide 3 types of surgical fixes:
+
+1. polished_original: Minimal edits preserving voice
+2. voice_amplifier: Heightens student's existing voice patterns
+3. divergent_strategy: Bold alternative exploring different angle
+
+For each issue:
+- Extract exact quote from essay
+- Explain problem and why it matters
+- Assign severity (critical/high/medium/low)
+- Map to rubric category
+- Provide 3 surgical suggestions with rationale`
+```
+
+**AFTER (Phase 17 Prompt):**
+```typescript
+system: `You are a Narrative Editor helping a student sound MORE LIKE THEMSELVES
+while BREAKING BEYOND typical essay patterns.
+
+**ANTI-CONVERGENCE MANDATE:**
+AI writing naturally drifts toward:
+- The same narrative arc (setup → struggle → triumph → lesson)
+- "Safe" phrasings that feel polished but generic
+- Crowd-pleasing insights that lack edge
+- Manufactured emotional beats
+- Generic college essay language ("passion", "journey", "grew as a person")
+
+You MUST actively RESIST these patterns. When in doubt, choose the more
+surprising, more specific, more uncomfortable option.`
+```
+
+### Why This Causes Cocky Writing
+
+1. **"BREAKING BEYOND typical essay patterns"** → Suggests rejecting normal storytelling
+2. **"RESIST these patterns"** → Tells Claude to avoid natural narrative flow
+3. **"Choose the more surprising, more specific, more uncomfortable option"** → Prioritizes shock value over authenticity
+4. **"Crowd-pleasing insights that lack edge"** → Implies students should have "edge," which reads as cocky
+5. **Anti-convergence focus** → Creates pressure to be different, leading to forced uniqueness
+
+### The Actual Problem We're Solving
+
+The prompt was designed to fix SHORT, GENERIC suggestions (158 chars → 300-500 chars).
+
+But it OVER-CORRECTED by:
+- Adding too much pressure to be "edgy" and "uncomfortable"
+- Creating a new convergence pattern: the "tough guy who embraces pain" archetype
+- Losing the authenticity it was trying to preserve
+
+---
+
+## SOLUTION DESIGN
+
+### Core Principle
+
+**Authenticity ≠ Edginess**
+
+We need to remove the "uncomfortable/surprising" instructions while keeping:
+- Concrete details (300-500 char requirement)
+- Specific examples (Jordan 1 Retro High - $180)
+- Experience Fingerprint integration
+- Anti-AI-language guardrails
+
+### Specific Fixes Required
+
+#### 1. Remove "Uncomfortable/Surprising" Language
+
+**REMOVE:**
+```
+You MUST actively RESIST these patterns. When in doubt, choose the more
+surprising, more specific, more uncomfortable option.
+```
+
+**REPLACE WITH:**
+```
+Focus on what feels TRUE to this student's experience, not what feels impressive
+or dramatic. Natural storytelling beats manufactured edge.
+```
+
+#### 2. Reframe "Anti-Convergence" Section
+
+**CHANGE FROM:**
+```
+**ANTI-CONVERGENCE MANDATE:**
+AI writing naturally drifts toward:
+- Crowd-pleasing insights that lack edge
+- Manufactured emotional beats
+
+You MUST actively RESIST these patterns.
+```
+
+**CHANGE TO:**
+```
+**AUTHENTICITY OVER PERFORMANCE:**
+Avoid these common essay pitfalls:
+- Writing that sounds like they're PERFORMING struggle rather than processing it
+- Insights that sound impressive but aren't actually theirs
+- Forced "lessons learned" that feel tacked on
+
+Instead: Show how THIS person naturally makes sense of their experience.
+```
+
+#### 3. Add Explicit Anti-Flex Guardrails
+
+**ADD NEW SECTION:**
+```
+**WHAT AUTHENTIC WRITING SOUNDS LIKE:**
+- Observational, not declarative ("I noticed..." vs "I am...")
+- Specific actions, not identity claims ("I stayed up debugging" vs "I'm dedicated")
+- Humble discovery, not confident pronouncements
+- Complexity and nuance, not black-and-white statements
+
+**RED FLAGS - STOP IF YOU SEE:**
+- "But I knew..." (revelation flex)
+- "While others [weak thing], I [strong thing]" (comparison flex)
+- "That's when I realized I was..." (identity claim)
+- Rhetorical questions that imply superiority
+- Short, punchy statements designed to sound tough
+```
+
+#### 4. Rewrite Voice Guidelines
+
+**CHANGE FROM:**
+```
+Every suggestion should sound like something THIS SPECIFIC PERSON would write,
+not generic "good writing."
+```
+
+**CHANGE TO:**
+```
+Every suggestion should sound like THIS SPECIFIC PERSON processing their own
+experience - not like they're trying to impress anyone. The best essays sound
+like the student is THINKING, not PERFORMING.
+```
+
+---
+
+## PROPOSED FIX (UPDATED WITH USER FEEDBACK)
+
+### Updated Phase 17 System Prompt
 
 ```typescript
-const matchingTeaching = result.topIssues.find(
-  t => t.from_draft && issue.excerpt.includes(t.from_draft.substring(0, 50))
-);
-```
+system: `You are a Narrative Editor helping a student write authentically about their experience.
 
-**Why this fails:**
-- Mock issues have `excerpt: "I founded and led..."`
-- Real issues have different `from_draft` values
-- Substring matching never succeeds
-- Teaching never attaches to displayed issues
+**YOUR CORE MISSION:**
+The student's essay should read like THEY wrote it - their authentic voice pulling from their heart,
+unique perspective, and actual lived experience. Not performing for an audience.
 
-## Solution Architecture
+**THE AUTHENTICITY TEST:**
+Before writing anything, ask: "Could only THIS person have written this?"
+- If yes → you've captured their unique voice and experience
+- If anyone could have written it → too generic, needs more of THEIR emotional truth
 
-**User Requirement:** "We don't want to replace the entire issue detection as we have really strong and deep issue detection capabilities and analyzers. We want to integrate this on top of that and have it wrap around so it only changes the relevant sections which is replacing the problem, why it works, and why it matters."
+**AUTHENTICITY OVER PERFORMANCE:**
+Avoid these common essay pitfalls:
+- Writing that sounds like they're PERFORMING struggle rather than processing it
+- Insights that sound impressive but aren't actually theirs
+- Forced "lessons learned" that feel tacked on
+- Comparisons that make the student sound superior to others
+- Dramatic reveals or identity claims ("That's when I knew I was...")
+- Rhetorical questions designed to flex
 
-### The Simple Approach: Replace UI to Use Phase 19 Data Directly
+Instead: Show how THIS person naturally makes sense of their experience through concrete details.
 
-**Key Insight:** Why merge two systems when we can just change the UI to render the new backend data?
+**FRESH, ANTI-CONVERGENT WRITING:**
+We want original, lively writing that highlights the student's character - not AI-like patterns.
+- Resist generic narrative arcs (setup → struggle → triumph → lesson)
+- Avoid clichéd college essay language ("passion", "journey", "grew as a person")
+- Don't use AI-sounding words ("tapestry", "testament", "delve", "showcase", "underscore")
+- Create fresh phrasings that feel alive and specific to this student
 
-The mock system is just for **immediate feedback** while Phase 19 runs. Once Phase 19 completes, we should:
+But DON'T manufacture "edge" or "toughness" - authentic ≠ trying to sound impressive.
 
-1. **Keep using mock issues for suggestions** - they already work great
-2. **Replace dimensions/issues with Phase 19 results** - for problem/impact sections only
-3. **No complex matching needed** - just swap the data source
+**WHAT AUTHENTIC WRITING SOUNDS LIKE:**
+Emotional and captivating - like pulling from the heart. Unique feeling, understanding, grasping,
+perspective, or actions within that scenario that prove this person was THERE.
 
-This approach:
-- ✅ **Much simpler** - no matching logic, no merging
-- ✅ **Direct backend integration** - UI renders what Phase 19 returns
-- ✅ **No constraints** - backend can return any structure
-- ✅ **Cleaner separation** - mock for immediate feedback, Phase 19 for final teaching
-- ✅ **Easier to maintain** - one source of truth, no sync issues
+Good example: "I traced the circuit three times before realizing I'd swapped the resistor values.
+The LED stayed dark. My lab partner had already left."
 
-## Implementation Steps
+Bad example: "I noticed the circuit wasn't working. I realized I needed to be more detail-oriented."
 
-### Step 1: Convert Phase 19 WorkshopIssues to UI Format
+The first SHOWS you were there with emotional texture. The second is generic reflection anyone could write.
 
-**File:** `src/components/portfolio/extracurricular/workshop/workshopAdapter.ts` (NEW FILE)
+**RED FLAGS - STOP IF YOU SEE THESE PATTERNS:**
+- "But I knew..." (revelation flex)
+- "While others [weak thing], I [strong thing]" (comparison flex)
+- "That's when I realized I was..." (identity claim)
+- Rhetorical questions that imply superiority
+- Short, punchy statements designed to sound tough
+- "Normal people X, but I Y" (superiority complex)
+- Declarative identity claims ("I am...", "I'm the type of person who...")
 
-**Purpose:** Convert backend `WorkshopIssue[]` to frontend `WritingIssue[]` format
+**WRITING EFFICIENCY:**
+Make every word count in either the micro (sentence-level craft) or macro (overall narrative arc) scheme.
+- Don't inflate word count unnecessarily
+- Keep suggestions close to the original length unless expanding serves a clear purpose
+- Most students don't use bullet points (-) - write in natural prose
+- Trim anything that doesn't advance understanding or emotion
 
-**Implementation:**
-```typescript
-import { WorkshopIssue } from '@/services/workshop/workshopAnalyzer';
-import { WritingIssue, EditSuggestion } from './types';
+**YOUR MANDATE:**
+1. Read the Experience Fingerprint carefully - these are IRREPLACEABLE elements of their story
+2. Generate 3 options that sound like THIS PERSON naturally telling their story
+3. Use their unique experience elements to create writing only THEY could produce
+4. Match the approximate length of the original unless expansion serves the narrative
+5. Make suggestions feel emotionally true, not technically impressive
 
-/**
- * Convert Phase 19 WorkshopIssue to UI WritingIssue format
- *
- * The WritingIssue format is what the UI expects for rendering issue cards.
- * We map Phase 19 data to this format, using teaching for problem/impact sections.
- */
-export function convertWorkshopIssuesToWritingIssues(
-  workshopIssues: WorkshopIssue[]
-): WritingIssue[] {
-  console.log('[WorkshopAdapter] Converting Phase 19 issues to UI format...');
-  console.log(`  Input: ${workshopIssues.length} workshop issues`);
-
-  const writingIssues: WritingIssue[] = workshopIssues.map((issue, idx) => {
-    // Convert suggested_fixes to EditSuggestion format
-    const suggestions: EditSuggestion[] = (issue.suggested_fixes || []).map((fix, fixIdx) => ({
-      text: fix.fix_text,
-      rationale: fix.why_this_works,
-      type: fix.apply_type,
-    }));
-
-    // Create WritingIssue with teaching guidance
-    const writingIssue: WritingIssue = {
-      id: issue.id,
-      dimensionId: issue.category || 'general',
-      title: issue.title || 'Untitled Issue',
-      excerpt: issue.from_draft || '',
-
-      // OLD fields (fallback only - not used if teaching present)
-      analysis: issue.problem || '',
-      impact: issue.why_matters || '',
-
-      // NEW teaching field - this is what we want to display!
-      teaching: issue.teaching,
-
-      // Suggestions - unchanged from Phase 17-18
-      suggestions,
-
-      // UI state
-      status: 'not_fixed',
-      currentSuggestionIndex: 0,
-      expanded: false,
-    };
-
-    console.log(`  ✓ Converted issue ${idx + 1}: "${writingIssue.title}"`, {
-      hasTeaching: !!writingIssue.teaching,
-      suggestionCount: suggestions.length,
-    });
-
-    return writingIssue;
-  });
-
-  console.log(`  Output: ${writingIssues.length} writing issues`);
-  return writingIssues;
+**OUTPUT FORMAT:**
+Return ONLY valid JSON with this structure:
+{
+  "workshopItems": [
+    {
+      "id": "unique_id",
+      "quote": "exact text from essay",
+      "rubric_category": "dimension_name",
+      "suggestions": [
+        {
+          "type": "polished_original",
+          "text": "revised text (emotionally true, length-appropriate)"
+        },
+        {
+          "type": "voice_amplifier",
+          "text": "revised text (amplifies their natural voice)"
+        },
+        {
+          "type": "divergent_strategy",
+          "text": "revised text (bold alternative angle)"
+        }
+      ]
+    }
+  ]
 }
 
-/**
- * Group WritingIssues by dimension for the rubric UI
- */
-export function groupIssuesByDimension(
-  issues: WritingIssue[],
-  dimensionScores: Array<{ id: string; name: string; score: number; status: string }>
-): Array<{ id: string; name: string; score: number; status: string; issues: WritingIssue[] }> {
-  console.log('[WorkshopAdapter] Grouping issues by dimension...');
-
-  return dimensionScores.map(dim => {
-    const dimensionIssues = issues.filter(
-      issue => issue.dimensionId.toLowerCase() === dim.id.toLowerCase() ||
-               issue.dimensionId.toLowerCase().includes(dim.name.toLowerCase().split(' ')[0])
-    );
-
-    console.log(`  ${dim.name}: ${dimensionIssues.length} issues`);
-
-    return {
-      ...dim,
-      issues: dimensionIssues,
-    };
-  });
-}
+**CRITICAL REMINDERS:**
+- Each suggestion should match the original's approximate length (don't artificially inflate)
+- Include specific details that prove this person was there (ages, times, objects, emotions)
+- Make it sound like THIS student pulling from their heart, not a generic "good writer"
+- Every suggestion MUST use elements from the Experience Fingerprint
+- Fresh, lively writing - not AI convergence patterns`
 ```
 
-### Step 2: Update ExtracurricularWorkshop to Replace Dimensions with Phase 19 Data
+---
 
-**File:** `src/components/portfolio/extracurricular/workshop/ExtracurricularWorkshop.tsx` (lines 105-174)
+## TESTING STRATEGY
 
-**Changes:**
-- Replace entire dimensions state with Phase 19 results
-- No merging, no matching - just direct replacement
-- Keep suggestions from Phase 19 (already validated by Phase 18)
+### Test Cases
 
-**New implementation:**
-```typescript
-import { convertWorkshopIssuesToWritingIssues, groupIssuesByDimension } from './workshopAdapter';
+After implementing the fix, test with the user's problematic essay to verify:
 
-// ... inside useEffect after analyzeForWorkshop completes ...
+**BAD PATTERNS ELIMINATED:**
+- ❌ "But normal kids don't know what I know"
+- ❌ "While they sought comfort, I was building immunity"
+- ❌ "That's when I knew: I wasn't addicted to winning"
+- ❌ "Other athletes avoid pain. I hunt it down."
+- ❌ "My classmates study until tired. I study until addicted."
 
-console.log('[ExtracurricularWorkshop] Analysis complete!', {
-  topIssues: result.topIssues.length,
-  withTeaching: result.topIssues.filter(i => i.teaching).length,
-  dimensions: result.dimensions.length,
-});
+**GOOD PATTERNS EXPECTED:**
+- ✅ Specific details about actual experiences
+- ✅ Observational tone ("I noticed..." "I found myself...")
+- ✅ Natural storytelling without dramatic reveals
+- ✅ Genuine discovery through concrete examples
+- ✅ Authentic voice that sounds like a real person thinking
 
-// Convert Phase 19 issues to UI format
-const writingIssues = convertWorkshopIssuesToWritingIssues(result.topIssues);
+---
 
-// Group by dimension for rubric UI
-const newDimensions = groupIssuesByDimension(writingIssues, result.dimensions);
+## IMPLEMENTATION PLAN
 
-// REPLACE dimensions with Phase 19 data (not merge!)
-console.log('[ExtracurricularWorkshop] Replacing dimensions with Phase 19 results...');
-setDimensions(newDimensions);
+1. **Update workshop-analysis/index.ts** with new system prompt
+2. **Deploy to Supabase** with `supabase functions deploy workshop-analysis`
+3. **Test with user's essay** to validate fix
+4. **Compare old vs new suggestions** side by side
+5. **Verify authenticity** without losing concrete details
 
-console.log('[ExtracurricularWorkshop] UI updated with Phase 19 teaching!');
-setHasRunAnalysis(true);
-```
-
-### Step 3: Verify IssueCard Already Handles Teaching Correctly
-
-**File:** `src/components/portfolio/extracurricular/workshop/IssueCard.tsx`
-
-**No changes needed!** The IssueCard already has this logic:
-
-```typescript
-{issue.teaching ? (
-  <TeachingGuidanceCard teaching={issue.teaching} />
-) : (
-  // Fallback to old sections
-  {issue.analysis && <div>The Problem: {issue.analysis}</div>}
-  {issue.impact && <div>Why It Matters: {issue.impact}</div>}
-)}
-```
-
-We just need to verify it's rendering correctly.
-
-## Testing Strategy
-
-### Test 1: Verify Phase 19 Analysis Runs
-1. Open workshop with any extracurricular activity
-2. Check console for: `[ExtracurricularWorkshop] Running Phase 17-19 analysis...`
-3. Wait ~3 minutes for completion
-4. Verify console shows: `Analysis complete! { topIssues: X, withTeaching: Y, dimensions: Z }`
-
-### Test 2: Verify Data Conversion
-1. Check console for: `[WorkshopAdapter] Converting Phase 19 issues to UI format...`
-2. Should see: `✓ Converted issue N: "Title"` for each issue with `{ hasTeaching: true, suggestionCount: X }`
-3. Check console for: `[WorkshopAdapter] Grouping issues by dimension...`
-4. Should see dimension groupings with issue counts
-
-### Test 3: Verify UI Replacement
-1. Check console for: `[ExtracurricularWorkshop] Replacing dimensions with Phase 19 results...`
-2. After Phase 19 completes, UI should update automatically
-3. Issue cards should show Phase 19 teaching instead of mock content
-
-### Test 4: Verify Teaching Display in UI
-1. Expand an issue card
-2. Should see `TeachingGuidanceCard` component with:
-   - "The Problem" section with hook + expandable depth
-   - "The Magic Behind Great Writing" section with craft principle
-   - "How to Apply This" section with strategy
-   - Personal note at bottom validating intelligence
-3. Should see "View More" buttons that expand to full depth (400-600 chars)
-
-### Test 5: Verify Suggestions Work
-1. Check that suggestion carousel appears below teaching
-2. Suggestions should be from Phase 17-18 (from Phase 19's `suggested_fixes`)
-3. Verify Apply/Next/Prev handlers work correctly
-4. Verify suggestions have rationale text (`why_this_works`)
-
-### Test 6: Verify No Breaking Changes
-1. Mock system still provides immediate feedback while Phase 19 runs
-2. No console errors
-3. All UI interactions still work (expand, collapse, apply, etc.)
-
-## Files to Modify
-
-1. `src/components/portfolio/extracurricular/workshop/workshopAdapter.ts` - NEW: Data conversion utility
-2. `src/components/portfolio/extracurricular/workshop/ExtracurricularWorkshop.tsx` - Replace dimensions with Phase 19
-3. `src/components/portfolio/extracurricular/workshop/IssueCard.tsx` - Verify (no changes needed)
-
-## Success Criteria
-
-✓ Phase 19 analysis runs successfully in background
-✓ WorkshopIssues convert to WritingIssues format correctly
-✓ Dimensions replaced with Phase 19 data after analysis completes
-✓ Teaching guidance appears in IssueCard UI with TeachingGuidanceCard
-✓ Progressive disclosure works (hook + "View More" → full depth)
-✓ Personal notes validate student intelligence
-✓ Suggestions from Phase 17-18 render correctly
-✓ No console errors
-✓ Mock system provides immediate feedback, Phase 19 replaces it
-✓ User sees conversational, deep teaching instead of generic problem/impact
-✓ **Much simpler implementation** - no complex matching logic needed!
+**READY FOR YOUR APPROVAL TO IMPLEMENT**
