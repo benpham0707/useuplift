@@ -67,20 +67,18 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
         </p>
       </div>
 
-      <div className="pl-3 border-l-2 border-primary/30">
-        {teaching ? (
-          <TeachingGuidanceCard teaching={teaching} mode="solution" />
-        ) : (
-          <>
-            <p className="text-xs font-semibold text-primary mb-1">
-              Why This Works
-            </p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              {currentSuggestion.rationale || currentSuggestion.why_this_works}
-            </p>
-          </>
-        )}
-      </div>
+      {teaching ? (
+        <TeachingGuidanceCard teaching={teaching} mode="solution" />
+      ) : (
+        <div className="pl-3 border-l-2 border-primary/30">
+          <p className="text-xs font-semibold text-primary mb-1">
+            Why This Works
+          </p>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {currentSuggestion.rationale || currentSuggestion.why_this_works}
+          </p>
+        </div>
+      )}
 
       {currentSuggestion.teaching_example && (
         <div className="pl-3 border-l-2 border-muted-foreground/30">
