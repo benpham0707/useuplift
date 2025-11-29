@@ -373,6 +373,7 @@ export function transformAnalysisToCoaching(
   // Identify quick wins (high impact, simpler principles)
   const quickWins = teachingIssues
     .filter((issue) => {
+      if (!issue.problem?.explanation) return false;
       return (
         issue.severity === 'critical' &&
         ['ANCHOR_WITH_NUMBERS', 'ADD_SPECIFICITY', 'ACTIVE_VOICE'].includes(
@@ -383,9 +384,9 @@ export function transformAnalysisToCoaching(
     .slice(0, 3)
     .map((issue) => ({
       issue_id: issue.id,
-      title: issue.problem.title,
+      title: issue.problem?.title || 'Issue',
       effort: 'low' as const,
-      impact: issue.problem.impact_on_score,
+      impact: issue.problem?.impact_on_score || 'medium',
       estimated_minutes: 10,
     }));
 

@@ -145,7 +145,7 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
           id: i.id,
           title: i.title,
           hasTeaching: !!i.teaching,
-          teachingPreview: i.teaching ? `${i.teaching.problem.hook.substring(0, 50)}...` : 'NO TEACHING'
+          teachingPreview: i.teaching?.problem?.hook ? `${i.teaching.problem.hook.substring(0, 50)}...` : 'NO TEACHING'
         })));
 
         // FULL REPLACEMENT: Replace mock dimensions with Phase 19 results

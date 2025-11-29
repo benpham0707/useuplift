@@ -218,6 +218,7 @@ function generatePatternAnalysis(
       ? `Appears in ~${Math.round((totalOccurrences / sentenceCount) * 100)}% of sentences`
       : `${totalOccurrences} instances found`;
 
+  const problemText = issue.teaching?.problem?.explanation || issue.problem || 'Issue detected';
   return {
     patternType: matchedPatternType,
     occurrenceCount: totalOccurrences,
@@ -225,7 +226,7 @@ function generatePatternAnalysis(
     severity,
     comparison: generateComparisonStatement(totalOccurrences, dimension),
     technicalDetails: [
-      issue.problem,
+      problemText,
       `Detected ${totalOccurrences} instances of this pattern`,
       `This pattern weakens the ${getDimensionDisplayName(dimension)} dimension`,
     ],
@@ -596,11 +597,12 @@ function generateChatPrompt(
 } {
   const dimensionName = getDimensionDisplayName(dimension);
   const quoteSummary = quotes.length > 0 ? quotes[0].text.substring(0, 100) : 'this section';
+  const problemText = issue.teaching?.problem?.explanation || issue.problem || 'this writing issue';
 
   // Generate pre-filled prompt
   const prefilledPrompt = `Help me improve the ${dimensionName} in my extracurricular essay.
 
-Specifically, I want to work on: ${issue.problem}
+Specifically, I want to work on: ${problemText}
 
 Here's an example from my draft:
 "${quoteSummary}${quoteSummary.length >= 100 ? '...' : ''}"
@@ -612,8 +614,8 @@ I'm aiming to go from a ${scores.currentDimensionScore}/10 to at least ${scores.
     issueId: `${dimension}-${Date.now()}`,
     dimension,
     severity,
-    title: issue.problem,
-    technicalAnalysis: issue.problem,
+    title: problemText,
+    technicalAnalysis: problemText,
     draftQuotes: quotes.map(q => q.text),
     patternDetails: [
       `This issue appears ${quotes.length} times in your essay`,
