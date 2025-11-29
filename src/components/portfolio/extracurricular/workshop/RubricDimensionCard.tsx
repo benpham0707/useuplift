@@ -136,9 +136,24 @@ export const RubricDimensionCard: React.FC<RubricDimensionCardProps> = ({
 
       {isExpanded && dimension.issues.length === 0 && (
         <div className="px-4 pb-4 pt-3 border-t">
-          <p className="text-sm text-primary">
-            No issues detected. Great work!
-          </p>
+          {dimension.score >= 9 ? (
+            <p className="text-sm text-primary">
+              No issues detected. Great work!
+            </p>
+          ) : (
+            <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {dimension.score >= 8
+                  ? "This section looks strong! There's room for fine-tuning, but it's not a priority right now."
+                  : dimension.score >= 6
+                  ? "There is a lot of potential to uncover here, but it's not a priority yet."
+                  : "There are issues here that you can address after resolving the more critical ones."}
+              </p>
+              <p className="text-xs text-muted-foreground/70 italic">
+                Note: We provide 5 suggestions at a time so you can focus and iterate effectively. Re-analyze after addressing the current issues to see improvements here.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </Card>

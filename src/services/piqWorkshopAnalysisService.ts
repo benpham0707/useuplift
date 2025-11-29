@@ -258,6 +258,17 @@ export async function analyzePIQEntryTwoStep(
       if (enhancement?.teaching) {
         console.log(`   📚 Enhanced item ${item.id} with teaching guidance`);
         console.log(`      - Problem hook: ${enhancement.teaching.problem?.hook?.substring(0, 50)}...`);
+
+        // CRITICAL: Check if suggestionRationales are present (Phase 19 NEW feature)
+        if (enhancement.teaching.suggestionRationales && enhancement.teaching.suggestionRationales.length > 0) {
+          console.log(`      ✅ HAS SUGGESTION RATIONALES: ${enhancement.teaching.suggestionRationales.length} rationales`);
+          enhancement.teaching.suggestionRationales.forEach((r, i) => {
+            console.log(`         [${i}] ${r.whyThisWorks.length} chars - "${r.whyThisWorks.substring(0, 50)}..."`);
+          });
+        } else {
+          console.warn(`      ⚠️  NO suggestionRationales in teaching (old format or backend issue)`);
+        }
+
         return {
           ...item,
           teaching: enhancement.teaching,

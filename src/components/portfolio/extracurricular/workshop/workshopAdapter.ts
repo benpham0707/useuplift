@@ -64,7 +64,7 @@ function mapSeverityToStatus(
 export function convertWorkshopIssuesToWritingIssues(
   workshopIssues: WorkshopIssue[]
 ): WritingIssue[] {
-  return workshopIssues.map((issue) => {
+  return workshopIssues.map((issue, index) => {
     // Convert suggested_fixes to EditSuggestion format
     const suggestions: EditSuggestion[] = (issue.suggested_fixes || []).map((fix) => ({
       text: fix.fix_text,
@@ -79,6 +79,27 @@ export function convertWorkshopIssuesToWritingIssues(
         rationale: 'Consider revising this section based on the guidance above.',
         type: 'replace',
       });
+    }
+
+    // DEBUG: Log teaching data for this issue
+    console.log(`📊 [WorkshopAdapter] Issue ${index + 1}:`, {
+      id: issue.id,
+      title: issue.title?.substring(0, 40),
+      hasTeaching: !!issue.teaching,
+      hasSuggestionRationales: !!issue.teaching?.suggestionRationales,
+      rationaleCount: issue.teaching?.suggestionRationales?.length || 0,
+      suggestionCount: suggestions.length,
+    });
+
+    if (issue.teaching?.suggestionRationales) {
+      console.log(`   ✅ Has ${issue.teaching.suggestionRationales.length} per-suggestion rationales`);
+      issue.teaching.suggestionRationales.forEach((r, i) => {
+        console.log(`      [${i}] ${r.whyThisWorks.length} chars - "${r.whyThisWorks.substring(0, 60)}..."`);
+      });
+    } else if (issue.teaching) {
+      console.log(`   ⚠️  OLD TEACHING FORMAT - no suggestionRationales array (will show generic fallback)`);
+    } else {
+      console.log(`   ❌ No teaching data at all`);
     }
 
     return {

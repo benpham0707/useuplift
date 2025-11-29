@@ -35,6 +35,15 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
     currentRationale: teaching?.suggestionRationales?.[currentIndex] ? 'EXISTS' : 'MISSING',
   });
 
+  // CRITICAL WARNING: Detect old teaching format without suggestionRationales
+  if (teaching && !teaching.suggestionRationales) {
+    console.warn('⚠️⚠️⚠️ OLD TEACHING FORMAT DETECTED ⚠️⚠️⚠️');
+    console.warn('This analysis was created BEFORE suggestionRationales were added.');
+    console.warn('You are seeing generic fallback content instead of per-suggestion rationales.');
+    console.warn('👉 SOLUTION: Click "Re-analyze Essay" to get fresh Phase 19 data with suggestionRationales!');
+    console.warn('⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️');
+  }
+
   // Guard against empty suggestions or invalid index
   if (!suggestions || suggestions.length === 0) {
     return (
