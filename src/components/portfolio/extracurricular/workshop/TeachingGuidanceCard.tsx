@@ -21,6 +21,25 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // 🔍 SAFETY CHECK: Prevent crash when teaching.problem is undefined
+  if (!teaching?.problem) {
+    console.error('❌ TeachingGuidanceCard: teaching.problem is undefined!', {
+      hasTeaching: !!teaching,
+      teachingKeys: teaching ? Object.keys(teaching) : 'none',
+      mode
+    });
+    return (
+      <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+        <p className="text-sm text-yellow-800 font-medium">
+          Teaching guidance is loading or unavailable.
+        </p>
+        <p className="text-xs text-yellow-600 mt-1">
+          Try re-analyzing this essay to generate fresh teaching content.
+        </p>
+      </div>
+    );
+  }
+
   // Helper to split text if it contains "WHY THIS WORKS"
   const splitContent = (text: string | undefined): { problemPart: string, solutionPart: string } => {
     if (!text) return { problemPart: '', solutionPart: '' };

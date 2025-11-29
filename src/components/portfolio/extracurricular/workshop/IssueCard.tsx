@@ -54,11 +54,23 @@ export const IssueCard: React.FC<IssueCardProps> = ({
   }
 
   if (!issue.expanded) {
+    // Debug: Log teaching data structure
+    if (!issue.teaching?.problem) {
+      console.warn('⚠️ IssueCard: Missing teaching.problem for issue:', {
+        issueId: issue.id,
+        hasTeaching: !!issue.teaching,
+        teachingKeys: issue.teaching ? Object.keys(issue.teaching) : 'none',
+        hasAnalysis: !!issue.analysis,
+        excerpt: issue.excerpt?.substring(0, 50)
+      });
+    }
+
     // Get preview text from Phase 19 teaching.problem.hook or fallback
     const previewText = issue.teaching?.problem?.hook ||
                        issue.teaching?.problem?.description?.substring(0, 120) ||
                        issue.analysis?.substring(0, 120) ||
-                       'Click to view details';
+                       issue.excerpt?.substring(0, 120) ||
+                       'Analysis in progress...';
 
     return (
       <Card
@@ -141,9 +153,20 @@ export const IssueCard: React.FC<IssueCardProps> = ({
             return null;
           })()}
           {/* Phase 19 Teaching Guidance (REQUIRED) */}
-          <div className="mb-4">
-            <TeachingGuidanceCard teaching={issue.teaching} mode="problem" />
-          </div>
+          {issue.teaching ? (
+            <div className="mb-4">
+              <TeachingGuidanceCard teaching={issue.teaching} mode="problem" />
+            </div>
+          ) : (
+            <div className="mb-4 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+              <p className="text-sm text-yellow-800 font-medium">
+                Teaching guidance unavailable
+              </p>
+              <p className="text-xs text-yellow-600 mt-1">
+                This issue was analyzed before teaching layer was enabled. Re-analyze to get deep teaching guidance.
+              </p>
+            </div>
+          )}
 
           <div className="pt-4 border-t">
             <SuggestionCarousel

@@ -256,7 +256,17 @@ export async function analyzePIQEntryTwoStep(
       
       if (enhancement?.teaching) {
         console.log(`   📚 Enhanced item ${item.id} with teaching guidance`);
-        console.log(`      - Problem hook: ${enhancement.teaching.problem?.hook?.substring(0, 50)}...`);
+
+        // 🔍 CRITICAL DEBUG: Log ENTIRE teaching structure from Phase 19
+        console.log('🔍🔍🔍 PHASE 19 RAW TEACHING DATA 🔍🔍🔍');
+        console.log('   Full teaching object:', JSON.stringify(enhancement.teaching, null, 2));
+        console.log('   teaching.problem type:', typeof enhancement.teaching?.problem);
+        console.log('   teaching.problem value:', enhancement.teaching?.problem);
+        console.log('   teaching.problem.hook:', enhancement.teaching?.problem?.hook);
+        console.log('   teaching.problem.description:', enhancement.teaching?.problem?.description?.substring(0, 100));
+        console.log('   teaching.problem.whyItMatters type:', typeof enhancement.teaching?.problem?.whyItMatters);
+        console.log('   teaching.problem.whyItMatters:', enhancement.teaching?.problem?.whyItMatters);
+        console.log('🔍🔍🔍 END PHASE 19 DEBUG 🔍🔍🔍');
 
         // CRITICAL: Check if suggestionRationales are present (Phase 19 NEW feature)
         if (enhancement.teaching.suggestionRationales && enhancement.teaching.suggestionRationales.length > 0) {
