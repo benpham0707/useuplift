@@ -91,7 +91,36 @@ CREATE INDEX IF NOT EXISTS idx_revision_analysis_report
 -- =============================================================================
 ALTER TABLE essay_revision_history DROP COLUMN IF EXISTS source;
 
--- 6. Update RLS policies to account for soft delete
+-- 6. Update the essay_version_increment trigger to use new schema
+-- =============================================================================
+-- The old trigger was inserting with the 'source' column which no longer exists.
+-- We need to either update it or remove it. Since we're now managing versions
+-- explicitly through the application code, we'll simplify the trigger to just
+-- increment the version number without auto-creating revision history entries.
+
+-- Drop the old trigger and function
+DROP TRIGGER IF EXISTS essay_version_increment ON essays;
+DROP FUNCTION IF EXISTS increment_essay_version();
+
+-- Recreate a simpler trigger that only increments version (no auto revision creation)
+CREATE OR REPLACE FUNCTION increment_essay_version()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.draft_current IS DISTINCT FROM OLD.draft_current THEN
+    NEW.version = OLD.version + 1;
+    -- Note: Revision history entries are now created explicitly by the application
+    -- via saveAutosaveVersion, saveMilestoneVersion, or saveAnalysisVersion
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER essay_version_increment
+  BEFORE UPDATE ON essays
+  FOR EACH ROW
+  EXECUTE FUNCTION increment_essay_version();
+
+-- 7. Update RLS policies to account for soft delete
 -- =============================================================================
 
 -- Drop existing select policy if it exists
