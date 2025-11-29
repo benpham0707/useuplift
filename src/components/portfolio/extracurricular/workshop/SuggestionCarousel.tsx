@@ -26,6 +26,15 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
   onApply,
   teaching
 }) => {
+  // DEBUG: Log teaching data
+  console.log('🔍 SuggestionCarousel render:', {
+    currentIndex,
+    hasTeaching: !!teaching,
+    hasSuggestionRationales: !!teaching?.suggestionRationales,
+    rationaleCount: teaching?.suggestionRationales?.length || 0,
+    currentRationale: teaching?.suggestionRationales?.[currentIndex] ? 'EXISTS' : 'MISSING',
+  });
+
   // Guard against empty suggestions or invalid index
   if (!suggestions || suggestions.length === 0) {
     return (

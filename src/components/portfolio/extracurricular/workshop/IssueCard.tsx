@@ -172,13 +172,22 @@ export const IssueCard: React.FC<IssueCardProps> = ({
 
         {/* Phase 19 Teaching Layer - Replaces old problem/impact sections */}
           {(() => {
-            console.log('🔍 IssueCard teaching check:', { 
-              issueId: issue.id, 
+            console.log('🔍 IssueCard teaching check:', {
+              issueId: issue.id,
               hasTeaching: !!issue.teaching,
               teachingKeys: issue.teaching ? Object.keys(issue.teaching) : 'none',
+              hasSuggestionRationales: !!issue.teaching?.suggestionRationales,
+              rationaleCount: issue.teaching?.suggestionRationales?.length || 0,
               fallbackAnalysis: issue.analysis?.substring(0, 50),
               fallbackImpact: issue.impact?.substring(0, 50)
             });
+            if (issue.teaching?.suggestionRationales) {
+              console.log('  📚 Rationales:', issue.teaching.suggestionRationales.map((r, i) => ({
+                index: i,
+                textPreview: r.suggestionText?.substring(0, 50),
+                whyThisWorksLength: r.whyThisWorks?.length || 0
+              })));
+            }
             return null;
           })()}
           {issue.teaching ? (
