@@ -612,7 +612,8 @@ export function getPIQConversationStarters(context: PIQChatContext): string[] {
   // Workshop items
   if (context.analysis.workshopItems.length > 0) {
     const topItem = context.analysis.workshopItems[0];
-    starters.push(`How do I fix this issue: "${topItem.problem.substring(0, 50)}..."?`);
+    const problemText = topItem.teaching?.problem?.explanation || topItem.problem || 'this writing issue';
+    starters.push(`How do I fix this issue: "${problemText.substring(0, 50)}..."?`);
   }
 
   // General

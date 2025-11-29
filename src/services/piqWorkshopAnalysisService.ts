@@ -198,7 +198,6 @@ export async function analyzePIQEntryTwoStep(
           workshopItems: validatedResult.workshopItems.map(item => ({
             id: item.id,
             quote: item.quote,
-            severity: item.severity,
             rubric_category: item.rubric_category,
             suggestions: item.suggestions,
           })),

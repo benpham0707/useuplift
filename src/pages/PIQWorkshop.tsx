@@ -1266,9 +1266,9 @@ export default function PIQWorkshop() {
     }
 
     // What the essay is trying to convey (narrative intent)
-    const hasTransformation = allIssues.some(i => i.title.toLowerCase().includes('transform') || i.title.toLowerCase().includes('growth'));
-    const hasEmotionalDepth = allIssues.some(i => i.title.toLowerCase().includes('emotion') || i.title.toLowerCase().includes('vulnerability'));
-    const hasSpecificity = allIssues.some(i => i.title.toLowerCase().includes('specific') || i.title.toLowerCase().includes('detail'));
+    const hasTransformation = allIssues.some(i => i.title?.toLowerCase().includes('transform') || i.title?.toLowerCase().includes('growth'));
+    const hasEmotionalDepth = allIssues.some(i => i.title?.toLowerCase().includes('emotion') || i.title?.toLowerCase().includes('vulnerability'));
+    const hasSpecificity = allIssues.some(i => i.title?.toLowerCase().includes('specific') || i.title?.toLowerCase().includes('detail'));
 
     if (score >= 70) {
       overview += `What you're trying to show—your growth through experience—comes through clearly. `;
@@ -1292,10 +1292,10 @@ export default function PIQWorkshop() {
     if (critical.length > 0 || needsWork.length >= 3) {
       // Multiple structural issues
       const structuralIssues = allIssues.filter(i =>
-        i.title.toLowerCase().includes('arc') ||
-        i.title.toLowerCase().includes('structure') ||
-        i.title.toLowerCase().includes('hook') ||
-        i.title.toLowerCase().includes('climax')
+        i.title?.toLowerCase().includes('arc') ||
+        i.title?.toLowerCase().includes('structure') ||
+        i.title?.toLowerCase().includes('hook') ||
+        i.title?.toLowerCase().includes('climax')
       );
 
       if (structuralIssues.length >= 2) {
@@ -1318,7 +1318,7 @@ export default function PIQWorkshop() {
     // Encouraging close with concrete next step
     if (allIssues.length > 0) {
       const firstIssue = allIssues[0];
-      if (firstIssue) {
+      if (firstIssue?.title) {
         overview += `Start with this: ${firstIssue.title.toLowerCase()}. Each workshop item below includes specific revisions that maintain your authentic voice while making your narrative more powerful.`;
       } else {
         overview += `The detailed analysis below shows you exactly how to elevate your narrative while keeping your authentic voice intact.`;

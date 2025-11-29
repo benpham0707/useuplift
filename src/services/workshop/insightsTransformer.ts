@@ -107,6 +107,7 @@ export function transformIssueToInsight(
     }
   );
 
+  const problemText = issue.teaching?.problem?.explanation || issue.problem || 'Writing issue detected';
   return {
     id: `insight-${dimensionScore.name}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     dimension: dimensionScore.name as RubricCategory,
@@ -114,7 +115,7 @@ export function transformIssueToInsight(
     severity,
     type: 'issue',
     title: generateInsightTitle(issue, dimensionScore.name as RubricCategory),
-    summary: issue.problem.substring(0, 120) + '...',
+    summary: problemText.substring(0, 120) + '...',
     technical: {
       whatWeDetected: generateTechnicalDetection(issue, patternAnalysis),
       fromYourDraft: quotes,

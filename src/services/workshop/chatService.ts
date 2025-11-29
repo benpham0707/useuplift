@@ -301,11 +301,11 @@ function extractRecommendations(
 
   // Check if AI suggests starting reflection on a specific issue
   context.teaching.topIssues.slice(0, 3).forEach(issue => {
-    const issueTitleLower = issue.title.toLowerCase();
-    if (lowerContent.includes(issueTitleLower) || lowerContent.includes('reflect')) {
+    const issueTitleLower = issue.title?.toLowerCase() || '';
+    if (issueTitleLower && (lowerContent.includes(issueTitleLower) || lowerContent.includes('reflect'))) {
       recommendations.push({
         type: 'start_reflection',
-        title: `Reflect on: ${issue.title}`,
+        title: `Reflect on: ${issue.title || 'this issue'}`,
         description: `Answer guided questions to develop your thinking on this issue`,
         actionData: { issueId: issue.id },
       });
