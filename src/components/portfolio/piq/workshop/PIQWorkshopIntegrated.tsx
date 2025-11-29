@@ -25,6 +25,7 @@ import type { TeachingCoachingOutput, TeachingIssue } from '@/components/portfol
 // UI Components - reuse from extracurricular workshop
 import { RubricDimensionCard } from '@/components/portfolio/extracurricular/workshop/RubricDimensionCard';
 import type { RubricDimension, WritingIssue, EditSuggestion } from '@/components/portfolio/extracurricular/workshop/types';
+import { buildDimensionsFromAnalysis, calculateOverallScoreFromDimensions } from '@/components/portfolio/extracurricular/workshop/workshopAdapter';
 
 // PIQ Workshop UI Components
 import { VoiceFingerprintCard } from './VoiceFingerprintCard';
@@ -115,24 +116,43 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
         console.log('🎯 PIQ Analysis completed successfully');
         console.log('  NQI:', result.analysis.narrative_quality_index);
         console.log('  Categories:', result.analysis.categories.length);
+        console.log('  Workshop Items with Teaching:', result.workshopItems?.filter(i => i.teaching).length || 0);
 
         setAnalysisResult(result);
 
-        // Transform to teaching format
-        const coaching = transformAnalysisToCoaching(
-          result.analysis,
-          result.coaching || null,
-          draft
-        );
-        setTeachingCoaching(coaching);
-        setTeachingIssues(coaching.teaching_issues);
+        // PHASE 19 INTEGRATION: Use workshopItems directly (includes teaching guidance)
+        if (result.workshopItems && result.workshopItems.length > 0) {
+          console.log('✅ Using Phase 19 workshopItems with teaching guidance');
+
+          // Convert Phase 19 workshopItems to dimensions using the adapter
+          const phase19Dimensions = buildDimensionsFromAnalysis(
+            result.workshopItems,
+            result.dimensions || []
+          );
+
+          console.log('  Phase 19 dimensions:', phase19Dimensions.length);
+          console.log('  Issues with teaching:', phase19Dimensions.reduce(
+            (sum, d) => sum + d.issues.filter(i => i.teaching).length, 0
+          ));
+
+          setDimensions(phase19Dimensions);
+        } else {
+          console.log('⚠️  No workshopItems found, falling back to old transform');
+
+          // FALLBACK: Transform to teaching format (old method)
+          const coaching = transformAnalysisToCoaching(
+            result.analysis,
+            result.coaching || null,
+            draft
+          );
+          setTeachingCoaching(coaching);
+          setTeachingIssues(coaching.teaching_issues);
+        }
 
         // Track initial score
         if (isInitial) {
           initialScoreRef.current = result.analysis.narrative_quality_index;
         }
-
-        console.log('✅ PIQ Coaching transformed, issues:', coaching.teaching_issues.length);
       } catch (error) {
         console.error('❌ PIQ Analysis failed:', error);
         setAnalysisError(
@@ -204,12 +224,15 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
     });
   }, []);
 
-  // Transform dimensions when analysis result changes
+  // Transform dimensions when analysis result changes (FALLBACK for old analysis without workshopItems)
   useEffect(() => {
-    if (analysisResult) {
+    if (analysisResult && (!analysisResult.workshopItems || analysisResult.workshopItems.length === 0)) {
+      console.log('⚠️  Using old transformation (no workshopItems available)');
       const transformed = transformCategoriesToDimensions(analysisResult, teachingIssues);
       setDimensions(transformed);
       console.log('✅ Transformed categories to dimensions:', transformed.length);
+    } else if (analysisResult) {
+      console.log('✅ Skipping old transformation - using Phase 19 workshopItems');
     }
   }, [analysisResult, teachingIssues, transformCategoriesToDimensions]);
 

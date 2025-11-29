@@ -6,8 +6,6 @@ import PIQShowcase from '@/components/landing/PIQShowcase';
 import ExpertiseSection from '@/components/landing/ExpertiseSection';
 import AICoachPreview from '@/components/landing/AICoachPreview';
 import ComingSoonSection from '@/components/landing/ComingSoonSection';
-import EmpathySection from '@/components/EmpathySection';
-import HowItWorks from '@/components/HowItWorks';
 import Testimonials from '@/components/Testimonials';
 import TrustSection from '@/components/TrustSection';
 import FAQ from '@/components/FAQ';
@@ -27,8 +25,6 @@ const Index = () => {
         <ExpertiseSection />
         <AICoachPreview />
         <ComingSoonSection />
-        <EmpathySection />
-        <HowItWorks />
         <Testimonials />
         <TrustSection />
         <FAQ />
