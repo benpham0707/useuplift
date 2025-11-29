@@ -1,7 +1,7 @@
 // @ts-nocheck - Legacy workshop file with type mismatches
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Wand2 } from 'lucide-react';
+import { Wand2, ChevronDown, ChevronUp } from 'lucide-react';
 import { SuggestedFix, TeachingGuidance } from './types';
 import { NavigationControls } from '../../NavigationControls';
 import { TeachingGuidanceCard } from './TeachingGuidanceCard';
@@ -26,6 +26,13 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
   onApply,
   teaching
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Reset expanded state when navigating between suggestions
+  useEffect(() => {
+    setIsExpanded(false);
+  }, [currentIndex]);
+
   // DEBUG: Log teaching data
   console.log('🔍 SuggestionCarousel render:', {
     currentIndex,
@@ -65,6 +72,9 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
     return 'replace';
   };
 
+  // Helper to determine if content needs truncation
+  const hasLongContent = (content: string) => content.length > 150;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -92,10 +102,34 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
             Why This Works
           </p>
           <div className="text-sm text-muted-foreground leading-relaxed space-y-2">
-            {teaching.suggestionRationales[currentIndex].whyThisWorks.split('\n\n').map((paragraph, idx) => (
-              <p key={idx}>{paragraph}</p>
-            ))}
+            {isExpanded
+              ? teaching.suggestionRationales[currentIndex].whyThisWorks.split('\n\n').map((paragraph, idx) => (
+                  <p key={idx}>{paragraph}</p>
+                ))
+              : (
+                  <p>
+                    {teaching.suggestionRationales[currentIndex].whyThisWorks.split('\n\n')[0].slice(0, 150)}...
+                  </p>
+                )
+            }
           </div>
+          
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all text-xs font-medium text-purple-900 dark:text-purple-100"
+          >
+            {isExpanded ? (
+              <>
+                Show less
+                <ChevronUp className="w-3 h-3" />
+              </>
+            ) : (
+              <>
+                View more
+                <ChevronDown className="w-3 h-3" />
+              </>
+            )}
+          </button>
         </div>
       ) : (
         // Fallback: ONLY use Phase 17 rationale (skip TeachingGuidanceCard - that's for problem/impact, not suggestions)
@@ -104,8 +138,29 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
             Why This Works
           </p>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            {currentSuggestion.rationale || currentSuggestion.why_this_works}
+            {isExpanded || !hasLongContent(currentSuggestion.rationale || currentSuggestion.why_this_works || '')
+              ? (currentSuggestion.rationale || currentSuggestion.why_this_works)
+              : `${(currentSuggestion.rationale || currentSuggestion.why_this_works || '').slice(0, 150)}...`
+            }
           </p>
+          {hasLongContent(currentSuggestion.rationale || currentSuggestion.why_this_works || '') && (
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all text-xs font-medium text-purple-900 dark:text-purple-100"
+            >
+              {isExpanded ? (
+                <>
+                  Show less
+                  <ChevronUp className="w-3 h-3" />
+                </>
+              ) : (
+                <>
+                  View more
+                  <ChevronDown className="w-3 h-3" />
+                </>
+              )}
+            </button>
+          )}
         </div>
       )}
 

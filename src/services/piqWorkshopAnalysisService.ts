@@ -317,7 +317,13 @@ export async function analyzePIQEntryTwoStep(
           );
 
           if (rationaleError || !rationaleData?.success) {
-            console.warn(`   ⚠️ Phase 20 failed for item ${item.id}:`, rationaleError?.message);
+            console.warn(`   ⚠️ Phase 20 failed for item ${item.id}:`);
+            console.warn(`      Error:`, rationaleError);
+            console.warn(`      Data:`, rationaleData);
+            console.warn(`      Status:`, (rationaleError as any)?.status);
+            if (rationaleError?.message?.includes('403') || rationaleError?.status === 403) {
+               console.error('      CRITICAL: 403 Forbidden. Check RLS policies or function permissions.');
+            }
             return item; // Return without rationales
           }
 
@@ -335,7 +341,11 @@ export async function analyzePIQEntryTwoStep(
 
           return item;
         } catch (err) {
-          console.warn(`   ❌ Phase 20 error for item ${item.id}:`, err);
+          console.error(`   ❌ Phase 20 EXCEPTION for item ${item.id}:`, err);
+          if (err instanceof Error) {
+             console.error(`      Message: ${err.message}`);
+             console.error(`      Stack: ${err.stack}`);
+          }
           return item; // Return without rationales
         }
       })
