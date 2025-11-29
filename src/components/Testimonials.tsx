@@ -11,29 +11,19 @@ import { Card, CardContent } from "@/components/ui/card";
 
 const testimonials = [
   {
-    text: "I was panicking about my essay topic because everyone said avoid 'trauma'. The scanner showed me how to frame my family responsibilities as leadership instead. Accepted to my dream UC!",
+    text: "I spent 3 years modding Discord servers and thought it was a waste of time. The scanner pointed out how that's actually community management and technical leadership. It's now my strongest PIQ.",
     classYear: "Class of 2028",
     gradient: "from-blue-400 to-indigo-500"
   },
   {
-    text: "My counselor has 400 students. This tool gave me the specific feedback on my PIQs that I couldn't get anywhere else. It caught that I wasn't being specific enough about my coding projects.",
+    text: "My first draft was just a list of accomplishments. Uplift told me to focus on *why* I started my baking business, not just how much money I made. It completely changed the tone of my application.",
     classYear: "Class of 2029",
     gradient: "from-purple-400 to-rose-500"
   },
   {
-    text: "I thought I had nothing to write about. The Quick Scan pulled out things I do every day—like translating for my parents—and showed me how valuable they actually are for college apps.",
+    text: "I finished my draft at 1 AM and needed eyes on it. My counselor was asleep, obviously. Uplift caught that I used the word 'passion' six times and gave me better synonyms instantly.",
     classYear: "Class of 2028",
     gradient: "from-amber-400 to-orange-500"
-  },
-  {
-    text: "The feedback wasn't just 'good job'. It told me exactly where I was being vague and how to show my impact. It felt like a real editor was looking at my work.",
-    classYear: "Class of 2029",
-    gradient: "from-emerald-400 to-teal-500"
-  },
-  {
-    text: "Being first-gen, I didn't know the 'language' of admissions. Uplift helped me translate my real life into what colleges are looking for without sounding fake.",
-    classYear: "Class of 2028",
-    gradient: "from-cyan-400 to-blue-500"
   }
 ];
 

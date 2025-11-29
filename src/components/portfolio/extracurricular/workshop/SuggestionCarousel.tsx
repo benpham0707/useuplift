@@ -97,11 +97,8 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
             ))}
           </div>
         </div>
-      ) : teaching ? (
-        // Fallback: Full teaching guidance card if no per-suggestion rationales
-        <TeachingGuidanceCard teaching={teaching} mode="solution" />
       ) : (
-        // Fallback: Phase 17 generic rationale
+        // Fallback: ONLY use Phase 17 rationale (skip TeachingGuidanceCard - that's for problem/impact, not suggestions)
         <div className="pl-3 border-l-2 border-green-400/50">
           <p className="text-xs font-semibold text-green-500 mb-1 uppercase tracking-wide">
             Why This Works

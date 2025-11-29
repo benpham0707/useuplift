@@ -70,7 +70,8 @@ interface EnhancedWorkshopItem {
       suggestionIndex: number;   // Which suggestion (0, 1, or 2)
       suggestionText: string;    // The actual suggestion text from Phase 17
       whyThisWorks: string;      // 750-850 chars - HS-friendly, segmented explanation (3-4 paragraphs with \n\n)
-    }>;    changeMagnitude: 'surgical' | 'moderate' | 'structural';
+    }>;
+    changeMagnitude: 'surgical' | 'moderate' | 'structural';
     magnitudeGuidance: string;
     personalNote: string;        // 150-250 chars - makes them feel seen/special
   };
