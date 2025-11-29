@@ -125,11 +125,12 @@ function formatFullTimestamp(dateStr: string): string {
 /**
  * Get badge config for version type
  */
-function getVersionBadge(createdBy: VersionSourceType, score?: number) {
+function getVersionBadge(createdBy: VersionSourceType, score?: number | null) {
   switch (createdBy) {
     case 'analysis':
       return {
-        label: score !== undefined ? `Score: ${Math.round(score)}` : 'Analyzed',
+        // Only show score in badge if it's meaningful (> 0)
+        label: (score !== undefined && score !== null && score > 0) ? `Score: ${Math.round(score)}` : 'Analyzed',
         icon: Sparkles,
         className: 'bg-purple-100 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-700',
       };
@@ -260,8 +261,8 @@ function VersionPreview({ version, isCurrent, onRestore, isRestoring }: VersionP
           <span>{version.word_count} words</span>
         </div>
 
-        {/* Score display for analysis versions */}
-        {version.score !== undefined && (
+        {/* Score display for analysis versions - only show if score is meaningful (> 0) */}
+        {version.score !== undefined && version.score !== null && version.score > 0 && (
           <div className="mt-3 flex items-center gap-3">
             <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
               {Math.round(version.score)}

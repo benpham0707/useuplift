@@ -599,11 +599,11 @@ export async function getLatestVersion(
     const { data: version, error } = await supabase
       .from('essay_revision_history')
       .select('*')
-      .eq('essay_id', essayId)
+          .eq('essay_id', essayId)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+          .limit(1)
+          .maybeSingle();
 
     if (error) {
       console.error('Error getting latest version:', error);

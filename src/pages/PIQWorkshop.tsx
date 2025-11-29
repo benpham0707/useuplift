@@ -61,7 +61,6 @@ import {
   saveAnalysisReport,
   loadPIQEssay,
   getVersionHistory,
-  saveVersion,
   saveMilestoneVersion,
   saveAnalysisVersion,
   saveAutosaveVersion,
@@ -70,7 +69,6 @@ import {
 } from '@/services/piqWorkshop/piqDatabaseService';
 
 // Stub functions for missing imports (will be implemented in future)
-const saveVersionToHistory = saveVersion;
 const getCurrentEssayId = async () => null as string | null;
 const saveChatMessages = async () => ({ success: true });
 const loadChatMessages = async () => ({ success: true, messages: [] });
@@ -602,19 +600,23 @@ export default function PIQWorkshop() {
                 console.warn('⚠️  Failed to save analysis:', analysisSaveResult.error);
               }
               
-              // Step 3: Save version to history (source='analyze')
-              console.log('📤 Saving version to history...');
-              const versionResult = await saveVersionToHistory(
+              // Step 3: Save ANALYSIS version to history with score and dimension scores
+              console.log('📤 Saving analysis version to history with score...');
+              const score = result.analysis?.narrative_quality_index || 0;
+              const dimensionScores = result.rubricDimensionDetails || [];
+              const versionResult = await saveAnalysisVersion(
                 token,
                 userId,
                 effectiveEssayId,
                 currentDraft,
-                'analyze'
+                score,
+                dimensionScores,
+                analysisSaveResult.reportId // Link to the analysis report
               );
               if (versionResult.success) {
-                console.log(`✅ Version ${versionResult.versionNumber} saved to history`);
+                console.log(`✅ Analysis version ${versionResult.versionNumber} saved (score: ${score})`);
               } else {
-                console.warn('⚠️  Failed to save version:', versionResult.error);
+                console.warn('⚠️  Failed to save analysis version:', versionResult.error);
               }
               
               // Step 4: Save chat messages if present
@@ -1314,20 +1316,20 @@ export default function PIQWorkshop() {
         }
       }
 
-      // Save version to history (source='save_draft' - no analysis)
+      // Save MILESTONE version to history (user-triggered save)
       if (essayId) {
-        console.log('📤 Saving version to history (draft only)...');
-        const versionResult = await saveVersionToHistory(
+        console.log('📤 Saving milestone version to history...');
+        const versionResult = await saveMilestoneVersion(
           token,
           userId,
           essayId,
           currentDraft,
-          'save_draft'
+          undefined // No label for now, could prompt user in future
         );
         if (versionResult.success) {
-          console.log(`✅ Version ${versionResult.versionNumber} saved to history (not reanalyzed)`);
+          console.log(`✅ Milestone version ${versionResult.versionNumber} saved to history`);
         } else {
-          console.warn('⚠️  Failed to save version:', versionResult.error);
+          console.warn('⚠️  Failed to save milestone version:', versionResult.error);
         }
       }
 
