@@ -150,3 +150,4 @@ GRANT UPDATE ON essay_revision_history TO authenticated;
 -- Migration complete
 -- =============================================================================
 
+
