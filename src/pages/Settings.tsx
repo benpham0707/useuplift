@@ -291,41 +291,43 @@ const Settings = () => {
               </p>
             )}
           </CardContent>
-          <CardFooter className="flex gap-2 pt-0">
-            {subscriptionStatus === 'active' ? (
-              <Button 
-                size="sm"
-                onClick={handleManageSubscription}
-                disabled={isLoadingPortal}
-              >
-                {isLoadingPortal ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CreditCard className="h-4 w-4 mr-2" />
-                )}
-                Manage Subscription
+          <CardFooter className="pt-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {subscriptionStatus === 'active' ? (
+                <Button 
+                  size="sm"
+                  onClick={handleManageSubscription}
+                  disabled={isLoadingPortal}
+                >
+                  {isLoadingPortal ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <CreditCard className="h-4 w-4 mr-2" />
+                  )}
+                  Manage Subscription
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => navigate('/pricing')}>
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade to Pro
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => navigate('/pricing')}>
+                View Plans
               </Button>
-            ) : (
-              <Button size="sm" onClick={() => navigate('/pricing')}>
-                <Crown className="h-4 w-4 mr-2" />
-                Upgrade to Pro
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={() => navigate('/pricing')}>
-              View Plans
-            </Button>
+            </div>
           </CardFooter>
         </Card>
 
         {/* Credits & History Section */}
         <Card>
           <CardHeader className="pb-4">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <GradientZap className="h-5 w-5" />
-                Credits & Usage
+                Credits &amp; Usage
               </CardTitle>
-              <Button size="sm" onClick={() => navigate('/pricing')}>
+              <Button size="sm" className="shrink-0" onClick={() => navigate('/pricing')}>
                 Buy More
               </Button>
             </div>
@@ -376,65 +378,69 @@ const Settings = () => {
           </CardHeader>
           <CardContent className="space-y-3">
             {/* Sign Out */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6 p-3 rounded-lg border">
-              <div className="flex-1">
+            <div className="flex flex-row items-center justify-between gap-4 flex-wrap sm:flex-nowrap p-3 rounded-lg border">
+              <div className="flex-1 min-w-[220px]">
                 <p className="font-medium text-sm">Sign Out</p>
                 <p className="text-xs text-muted-foreground">
                   Sign out of your account on this device.
                 </p>
               </div>
-              <Button variant="outline" size="sm" onClick={() => signOut()}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Sign Out
-              </Button>
+              <div className="shrink-0">
+                <Button variant="outline" size="sm" onClick={() => signOut()}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
 
             {/* Delete Account */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-6 p-3 rounded-lg border border-destructive/30 bg-destructive/5">
-              <div className="flex-1">
+            <div className="flex flex-row items-center justify-between gap-4 flex-wrap sm:flex-nowrap p-3 rounded-lg border border-destructive/30 bg-destructive/5">
+              <div className="flex-1 min-w-[220px]">
                 <p className="font-medium text-sm text-destructive">Delete Account</p>
                 <p className="text-xs text-muted-foreground">
                   Permanently delete your account and all data.
                 </p>
               </div>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete your account
-                      and remove all your data from our servers, including:
-                      <ul className="list-disc list-inside mt-2 space-y-1">
-                        <li>Your profile information</li>
-                        <li>All saved essays and analyses</li>
-                        <li>Your credit balance ({credits ?? 0} credits)</li>
-                        <li>Subscription (if active)</li>
-                      </ul>
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDeleteAccount}
-                      disabled={isDeleting}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      ) : (
-                        <Trash2 className="h-4 w-4 mr-2" />
-                      )}
-                      Yes, delete my account
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <div className="shrink-0">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account
+                        and remove all your data from our servers, including:
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          <li>Your profile information</li>
+                          <li>All saved essays and analyses</li>
+                          <li>Your credit balance ({credits ?? 0} credits)</li>
+                          <li>Subscription (if active)</li>
+                        </ul>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleDeleteAccount}
+                        disabled={isDeleting}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isDeleting ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4 mr-2" />
+                        )}
+                        Yes, delete my account
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
             </div>
           </CardContent>
         </Card>
