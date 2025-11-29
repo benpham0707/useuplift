@@ -250,6 +250,27 @@ export default function PIQWorkshop() {
             // Phase 17 complete - display suggestions immediately
             onPhase17Complete: (phase17Result) => {
               console.log('📊 Phase 17 complete - displaying suggestions');
+
+              // 🔍 DEBUG: Log actual Phase 17 output structure
+              console.log('🔍🔍🔍 PHASE 17 ACTUAL OUTPUT 🔍🔍🔍');
+              console.log('   workshopItems count:', phase17Result.workshopItems?.length || 0);
+              if (phase17Result.workshopItems && phase17Result.workshopItems.length > 0) {
+                const firstItem = phase17Result.workshopItems[0];
+                console.log('   First item structure:', {
+                  id: firstItem.id,
+                  has_problem: !!firstItem.problem,
+                  has_why_it_matters: !!firstItem.why_it_matters,
+                  has_quote: !!firstItem.quote,
+                  has_rubric_category: !!firstItem.rubric_category,
+                  has_suggestions: !!firstItem.suggestions,
+                  has_teaching: !!firstItem.teaching,
+                  problem_value: firstItem.problem,
+                  why_it_matters_value: firstItem.why_it_matters,
+                });
+                console.log('   Full first item:', JSON.stringify(firstItem, null, 2));
+              }
+              console.log('🔍🔍🔍 END PHASE 17 DEBUG 🔍🔍🔍');
+
               setAnalysisResult(phase17Result);
 
               // Transform backend dimensions to UI dimensions
@@ -263,11 +284,12 @@ export default function PIQWorkshop() {
                   const transformedIssues = issuesForDimension.map((item) => ({
                     id: item.id,
                     dimensionId: dim.dimension_name,
-                    title: item.problem,
+                    // Phase 17 no longer returns problem/why_it_matters - use fallback until Phase 19 adds teaching
+                    title: item.problem || item.teaching?.problem?.hook || `Issue in ${dim.dimension_name}`,
                     excerpt: item.quote,
-                    analysis: item.why_it_matters,
-                    impact: item.why_it_matters || '',
-                    teaching: item.teaching, // Phase 19 teaching guidance
+                    analysis: item.why_it_matters || item.teaching?.problem?.description || '',
+                    impact: item.why_it_matters || item.teaching?.problem?.whyItMatters?.preview || '',
+                    teaching: item.teaching, // Phase 19 teaching guidance (undefined until Phase 19 completes)
                     suggestions: item.suggestions.map((sug) => ({
                       text: sug.text,
                       rationale: sug.rationale,
