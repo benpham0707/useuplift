@@ -946,35 +946,52 @@ export default function PIQWorkshop() {
     }
   }, [currentEssayId]);
 
-  // Check for local recovery on mount
+  // Check for local recovery on mount - ONLY if we have an existing essay in the database
   useEffect(() => {
     if (!selectedPromptId) return;
+    
+    // IMPORTANT: Only check for recovery if we already have an essay loaded from the database
+    // If currentEssayId is null, it means this is a new essay - don't show recovery for stale localStorage
+    if (!currentEssayId) {
+      // Clear any stale localStorage data for this prompt since there's no server essay
+      console.log('📭 No essay in database for this prompt - clearing stale localStorage');
+      clearAllLocalDrafts(null, selectedPromptId);
+      setShowLocalRecovery(false);
+      setLocalRecoveryData(null);
+      return;
+    }
 
     const checkRecovery = async () => {
-      // Get server timestamp if we have an essay loaded
+      if (!userId) return;
+      
+      // Get server timestamp for the existing essay
       let serverTimestamp: string | undefined;
-      if (currentEssayId && userId) {
-        try {
-          const token = await getToken({ template: 'supabase' });
-          if (token) {
-            const result = await loadPIQEssay(
-              token,
-              userId,
-              selectedPromptId,
-              UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId)?.prompt || ''
-            );
-            if (result.success && result.essay) {
-              serverTimestamp = result.essay.updated_at;
-            }
+      try {
+        const token = await getToken({ template: 'supabase' });
+        if (token) {
+          const result = await loadPIQEssay(
+            token,
+            userId,
+            selectedPromptId,
+            UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId)?.prompt || ''
+          );
+          if (result.success && result.essay) {
+            serverTimestamp = result.essay.updated_at;
           }
-        } catch (error) {
-          console.error('Error getting server timestamp for recovery check:', error);
         }
+      } catch (error) {
+        console.error('Error getting server timestamp for recovery check:', error);
+      }
+
+      // Only show recovery if we have a valid server timestamp to compare against
+      if (!serverTimestamp) {
+        console.log('📭 No server timestamp - skipping recovery check');
+        return;
       }
 
       const recovery = checkLocalRecovery(currentEssayId, selectedPromptId, serverTimestamp);
       
-      if (recovery.hasRecovery && recovery.localDraft) {
+      if (recovery.hasRecovery && recovery.localDraft && recovery.isNewerThanServer) {
         console.log('🔍 Local recovery available:', recovery);
         setLocalRecoveryData({
           content: recovery.localDraft.content,
@@ -982,13 +999,19 @@ export default function PIQWorkshop() {
           wordCount: recovery.localDraft.wordCount,
         });
         setShowLocalRecovery(true);
+      } else {
+        // Clear stale data if local is not newer
+        setShowLocalRecovery(false);
+        setLocalRecoveryData(null);
       }
     };
 
-    // Only check on initial load
-    const timer = setTimeout(checkRecovery, 1000);
-    return () => clearTimeout(timer);
-  }, [selectedPromptId]);
+    // Only check after database load is complete
+    if (!isLoadingFromDatabase) {
+      const timer = setTimeout(checkRecovery, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedPromptId, currentEssayId, isLoadingFromDatabase, userId, getToken]);
 
   // Legacy auto-save to localStorage every 30 seconds (keeping for backward compatibility)
   useEffect(() => {
@@ -1046,12 +1069,27 @@ export default function PIQWorkshop() {
     };
   }, [hasUnsavedChanges, currentDraft, selectedPromptId, currentScore, analysisResult, draftVersions]);
 
-  // Sync selectedPromptId when URL changes
+  // Sync selectedPromptId when URL changes - reset all state for new prompt
   useEffect(() => {
     const newPromptId = getPromptIdFromUrl();
     if (newPromptId !== selectedPromptId) {
+      console.log(`🔄 Switching from ${selectedPromptId} to ${newPromptId} - resetting state`);
       setSelectedPromptId(newPromptId);
       setNeedsReanalysis(true);
+      
+      // Reset score state for new prompt - prevents showing wrong delta
+      initialScoreRef.current = 0;
+      
+      // Reset analysis state
+      setAnalysisResult(null);
+      setDimensions([]);
+      
+      // Reset local recovery state
+      setShowLocalRecovery(false);
+      setLocalRecoveryData(null);
+      
+      // Reset version history
+      setDbVersionHistory([]);
     }
   }, [piqNumber]);
 
@@ -1452,7 +1490,9 @@ export default function PIQWorkshop() {
   };
 
   const nqiConfig = getNQIConfig();
-  const scoreDelta = currentScore - initialScore;
+  // Only calculate delta if we have an actual analysis AND a non-zero initial score
+  // This prevents showing wrong deltas for new essays or after switching prompts
+  const scoreDelta = (hasAnalysis && initialScore > 0) ? (currentScore - initialScore) : 0;
 
   // Filter dimensions by status for hover tooltips
   const goodDimensions = dimensions.filter(d => d.status === 'good');

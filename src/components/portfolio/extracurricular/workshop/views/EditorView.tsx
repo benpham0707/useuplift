@@ -98,8 +98,10 @@ export const EditorView: React.FC<EditorViewProps> = ({
     setLastSaveTime(new Date());
   };
 
-  // Score difference calculation
-  const scoreDiff = currentScore - initialScore;
+  // Score difference calculation - only meaningful when we have analysis AND a valid initial score
+  // Prevents showing wrong deltas for new essays or after switching prompts
+  const hasValidScoreComparison = hasAnalysisResult && initialScore > 0 && currentScore > 0;
+  const scoreDiff = hasValidScoreComparison ? (currentScore - initialScore) : 0;
   const scoreChange = scoreDiff > 0 ? 'improved' : scoreDiff < 0 ? 'decreased' : 'unchanged';
 
   return (
