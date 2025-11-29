@@ -128,23 +128,24 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
       {hasMoreContent && (
         <div className="pl-3">
           <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="text-xs text-primary hover:text-primary/80 p-0 h-auto font-medium"
-        >
-          {isExpanded ? (
-            <>
-              <ChevronUp className="w-3 h-3 mr-1" />
-              View less
-            </>
-          ) : (
-            <>
-              <ChevronDown className="w-3 h-3 mr-1" />
-              View more
-            </>
-          )}
-        </Button>
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-xs text-primary hover:text-primary/80 p-0 h-auto font-medium"
+          >
+            {isExpanded ? (
+              <>
+                <ChevronUp className="w-3 h-3 mr-1" />
+                View less
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3 h-3 mr-1" />
+                View more
+              </>
+            )}
+          </Button>
+        </div>
       )}
     </div>
   );
