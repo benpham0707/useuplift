@@ -407,16 +407,16 @@ function buildTeachingContext(teachingCoaching: TeachingCoachingOutput | null) {
 
   const topIssues = teachingCoaching.teaching_issues.map(issue => ({
     id: issue.id,
-    title: issue.problem.title,
+    title: issue.problem?.title || 'Issue',
     category: issue.category,
     severity: issue.severity,
-    fromDraft: issue.problem.from_draft,
-    problem: issue.problem.explanation,
-    whyMatters: issue.principle.why_officers_care,
-    impactOnScore: issue.problem.impact_on_score,
-    suggestions: issue.examples.map(ex => ex.explanation),
-    hasExample: issue.examples.length > 0,
-    hasReflectionPrompts: issue.reflection_prompts.length > 0,
+    fromDraft: issue.problem?.from_draft || ''',
+    problem: issue.problem?.description || 'Issue detected',
+    whyMatters: issue.principle?.why_officers_care || 'Improve essay',
+    impactOnScore: issue.problem?.impact_on_score || 'medium',
+    suggestions: issue.examples?.map(ex => ex.explanation),
+    hasExample: (issue.examples?.length || 0) > 0,
+    hasReflectionPrompts: (issue.reflection_prompts?.length || 0) > 0,
   }));
 
   const quickWins = teachingCoaching.quick_wins.map(win => ({

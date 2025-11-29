@@ -261,12 +261,12 @@ export function buildWorkshopChatContext(
   // 4. Teaching guidance
   const topIssues = (teachingCoaching?.teaching_issues || []).slice(0, 5).map(issue => ({
     id: issue.id,
-    title: issue.problem.title,
+    title: issue.problem?.title || 'Issue',
     severity: issue.severity,
     category: issue.category,
-    problem: issue.problem.explanation,
-    impact: issue.problem.impact_on_score,
-    fromDraft: issue.problem.from_draft,
+    problem: issue.problem?.description || issue.problem?.explanation || 'Issue detected',
+    impact: issue.problem?.impact_on_score || 'medium',
+    fromDraft: issue.problem?.from_draft || '',
     principle: issue.principle ? {
       name: issue.principle.name,
       description: issue.principle.description,
