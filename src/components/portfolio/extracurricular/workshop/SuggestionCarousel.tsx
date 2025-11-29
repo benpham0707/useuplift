@@ -99,26 +99,38 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
           Why This Works
         </p>
         <div className="text-sm text-muted-foreground leading-relaxed space-y-2">
-          {isExpanded
-            ? teaching?.suggestionRationales?.[currentIndex]?.whyThisWorks.split('\n\n').map((paragraph, idx) => (
-                <p key={idx}>{paragraph}</p>
-              ))
-            : (
-                <p>
-                  {teaching?.suggestionRationales?.[currentIndex]?.whyThisWorks.split('\n\n')[0].slice(0, 150)}...
+          {(() => {
+            const rationale = teaching?.suggestionRationales?.[currentIndex]?.whyThisWorks;
+
+            if (!rationale) {
+              return (
+                <p className="text-yellow-700 italic">
+                  Rationale unavailable. Try re-analyzing to generate suggestion explanations.
                 </p>
-              )
-          }
+              );
+            }
+
+            const paragraphs = rationale.split('\n\n');
+
+            if (isExpanded) {
+              return paragraphs.map((paragraph, idx) => <p key={idx}>{paragraph}</p>);
+            } else {
+              const preview = paragraphs[0]?.slice(0, 150) || rationale.slice(0, 150);
+              return <p>{preview}...</p>;
+            }
+          })()}
         </div>
 
-        <ThemedPillButton
-          variant="green"
-          isExpanded={isExpanded}
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="mt-2"
-        >
-          {isExpanded ? 'Show less' : 'View more'}
-        </ThemedPillButton>
+        {teaching?.suggestionRationales?.[currentIndex]?.whyThisWorks && (
+          <ThemedPillButton
+            variant="green"
+            isExpanded={isExpanded}
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="mt-2"
+          >
+            {isExpanded ? 'Show less' : 'View more'}
+          </ThemedPillButton>
+        )}
       </div>
 
       {currentSuggestion.teaching_example && (

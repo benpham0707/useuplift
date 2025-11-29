@@ -970,7 +970,7 @@ const PortfolioScanner = () => {
                           return avg.toFixed(1);
                         })()} / 10
                       </span>
-                      <Button size="sm" variant="secondary" onClick={() => navigate('/portfolio-insights?metric=overall')} className="text-hero-contrast no-text-shadow">
+                      <Button size="sm" variant="secondary" disabled className="text-hero-contrast no-text-shadow opacity-50 cursor-not-allowed">
                         View full insights
                       </Button>
                     </div>

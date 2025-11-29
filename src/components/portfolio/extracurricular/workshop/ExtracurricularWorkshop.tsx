@@ -129,9 +129,22 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
         };
 
         console.log('[ExtracurricularWorkshop] Running Phase 17-19 analysis...');
+        console.log('[ExtracurricularWorkshop] Entry:', {
+          title: entry.title,
+          descriptionLength: draft.length,
+          enableTeachingLayer: true,
+        });
+
         const result = await analyzeForWorkshop(entry, {
           enableTeachingLayer: true,
           maxIssues: 5,
+        });
+
+        console.log('[ExtracurricularWorkshop] analyzeForWorkshop returned:', {
+          topIssuesCount: result.topIssues?.length || 0,
+          hasTopIssues: !!result.topIssues,
+          firstIssueHasTeaching: result.topIssues?.[0]?.teaching ? 'YES' : 'NO',
+          firstIssueTeachingKeys: result.topIssues?.[0]?.teaching ? Object.keys(result.topIssues[0].teaching) : 'none',
         });
 
         console.log('[ExtracurricularWorkshop] Analysis complete!', {
