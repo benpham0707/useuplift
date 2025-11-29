@@ -210,11 +210,12 @@ export default function PIQWorkshop() {
   // REAL BACKEND ANALYSIS - Full Surgical Workshop
   // ============================================================================
 
-  const performFullAnalysis = useCallback(async (overrideEssayId?: string) => {
+  const performFullAnalysis = useCallback(async (overrideEssayId?: string, forceReanalysis?: boolean) => {
     console.log('🔍 performFullAnalysis called');
     console.log('   Current draft length:', currentDraft.length);
     console.log('   Selected prompt:', selectedPromptId);
     console.log('   Override essay ID:', overrideEssayId || 'none');
+    console.log('   Force re-analysis:', forceReanalysis || false);
     
     // Guard: Prevent analyzing empty or too-short essays
     if (currentDraft.trim().length < MIN_ESSAY_LENGTH) {
@@ -234,7 +235,12 @@ export default function PIQWorkshop() {
     }
 
     // Check if analysis is cached FIRST (before credit check)
-    const cachedResult = getCachedAnalysisResult(currentDraft, selectedPromptId);
+    // Skip cache if user explicitly requested re-analysis
+    const cachedResult = forceReanalysis ? null : getCachedAnalysisResult(currentDraft, selectedPromptId);
+    
+    if (forceReanalysis) {
+      console.log('🔄 Force re-analysis requested - bypassing cache');
+    }
     
     // Only check/deduct credits if NOT cached
     if (!cachedResult && userId) {
@@ -1376,7 +1382,8 @@ export default function PIQWorkshop() {
   }, [currentVersionIndex, draftVersions]);
 
   const handleRequestReanalysis = useCallback(() => {
-    performFullAnalysis(); // Use REAL backend analysis
+    // Force re-analysis when user explicitly clicks - bypass cache to get fresh results
+    performFullAnalysis(undefined, true);
   }, [performFullAnalysis]);
 
   const toggleDimensionExpand = useCallback((dimensionId: string) => {
