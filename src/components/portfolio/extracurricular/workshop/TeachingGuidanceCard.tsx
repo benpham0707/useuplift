@@ -21,8 +21,23 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Build The Problem content
-  const buildProblemContent = (expanded: boolean) => {
+  // Helper to split text if it contains "WHY THIS WORKS"
+  const splitContent = (text: string | undefined): { problemPart: string, solutionPart: string } => {
+    if (!text) return { problemPart: '', solutionPart: '' };
+    // Look for "WHY THIS WORKS" or similar headers, case insensitive
+    const splitRegex = /(?:^|\n+)(?:WHY THIS WORKS|Why This Works|Why this works|WHY IT WORKS|Why It Works)(?:[:\s]|$)/i;
+    const match = text.match(splitRegex);
+    if (match && match.index !== undefined) {
+      return {
+        problemPart: text.substring(0, match.index).trim(),
+        solutionPart: text.substring(match.index + match[0].length).trim()
+      };
+    }
+    return { problemPart: text, solutionPart: '' };
+  };
+
+  // Build The Problem content (raw)
+  const buildRawProblemContent = (expanded: boolean) => {
     const parts: string[] = [];
     
     // Preview parts (always shown)
@@ -38,8 +53,8 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
     return parts.join(' ');
   };
 
-  // Build Why This Works content
-  const buildSolutionContent = (expanded: boolean) => {
+  // Build Why This Works content (raw)
+  const buildRawSolutionContent = (expanded: boolean) => {
     const parts: string[] = [];
     
     // Preview parts (always shown)
@@ -58,10 +73,17 @@ export const TeachingGuidanceCard: React.FC<TeachingGuidanceCardProps> = ({
     return parts.join(' ');
   };
 
-  const problemContent = buildProblemContent(isExpanded);
-  const solutionContent = buildSolutionContent(isExpanded);
+  // Process content to handle mixed data
+  const rawProblem = buildRawProblemContent(isExpanded);
+  const rawSolution = buildRawSolutionContent(isExpanded);
+
+  const { problemPart: cleanProblem, solutionPart: extractedSolution } = splitContent(rawProblem);
+  
+  const problemContent = cleanProblem;
+  const solutionContent = rawSolution ? rawSolution : extractedSolution;
   
   // Check if there is actually more content to show (based on mode)
+  // We approximate this by checking if raw content has enough length or if split occurred
   const hasMoreContent = mode === 'full' 
     ? (teaching.problem?.description || teaching.problem?.whyItMatters?.fullExplanation ||
        teaching.craftPrinciple?.fullTeaching || teaching.craftPrinciple?.realWorldExample ||
