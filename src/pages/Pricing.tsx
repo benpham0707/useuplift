@@ -19,7 +19,7 @@ const Pricing = () => {
   const navigate = useNavigate();
   const [credits, setCredits] = useState<number | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingType, setProcessingType] = useState<string | null>(null);
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [payAsYouGoCredits, setPayAsYouGoCredits] = useState([50]);
 
@@ -52,7 +52,7 @@ const Pricing = () => {
     }
 
     try {
-      setIsProcessing(true);
+      setProcessingType(type);
       // Use Clerk token instead of Supabase auth
       const token = await getToken();
       
@@ -90,7 +90,7 @@ const Pricing = () => {
       console.error('Checkout error:', error);
       // Don't redirect on error - just log and let user try again
     } finally {
-      setIsProcessing(false);
+      setProcessingType(null);
     }
   };
 
@@ -258,9 +258,9 @@ const Pricing = () => {
                 className="w-full" 
                 size="lg"
                 onClick={() => handleCheckout(billingInterval === 'monthly' ? 'pro_monthly' : 'pro_yearly')}
-                disabled={isProcessing || subscriptionStatus === 'active'}
+                disabled={processingType !== null || subscriptionStatus === 'active'}
               >
-                {isProcessing ? (
+                {(processingType === 'pro_monthly' || processingType === 'pro_yearly') ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Redirecting to checkout...
@@ -334,9 +334,9 @@ const Pricing = () => {
                 variant="outline" 
                 className="w-full" 
                 onClick={() => handleCheckout(`addon_${payAsYouGoCredits[0]}`)}
-                disabled={isProcessing}
+                disabled={processingType !== null}
               >
-                {isProcessing ? (
+                {processingType?.startsWith('addon_') ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Redirecting to checkout...
