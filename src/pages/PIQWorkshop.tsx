@@ -373,9 +373,10 @@ export default function PIQWorkshop() {
                 initialScoreRef.current = phase17Result.analysis.narrative_quality_index;
               }
 
-              // Phase 17 done, but Phase 18 still loading
-              setIsAnalyzing(false);
-              setValidationLoading(true);
+              // Phase 17 done, but Phase 18+ still running - KEEP isAnalyzing TRUE
+              // Don't let users think analysis is done when there's still work happening
+              // setIsAnalyzing(false); // REMOVED - was causing premature "done" state
+              setValidationLoading(true); // Show that validation is in progress
             },
 
             // Phase 18 complete - add quality scores
