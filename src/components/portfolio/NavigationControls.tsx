@@ -27,10 +27,10 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
   return (
     <div 
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-1',
+        'inline-flex items-center gap-1 px-2 py-1',
         isPurple 
-          ? 'bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800'
-          : 'border border-border/50 rounded-md px-1 py-0.5',
+          ? 'rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800'
+          : 'rounded-md border border-border/50 px-1 py-0.5',
         className
       )}
     >
