@@ -78,21 +78,21 @@ export const IssueCard: React.FC<IssueCardProps> = ({
         onClick={onToggle}
       >
         <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-2 flex-1 min-w-0">
-            <StatusIcon className={`w-4 h-4 ${
-              issue.status === 'not_fixed' ? 'text-red-500' : 'text-yellow-500'
-            } ${issue.status === 'in_progress' ? 'animate-spin' : ''} flex-shrink-0 mt-0.5`} />
+          <div className="flex gap-3 flex-1 min-w-0">
+            <StatusIcon className={`w-5 h-5 ${
+              issue.status === 'not_fixed' ? 'text-yellow-500' : 'text-yellow-500'
+            } ${issue.status === 'in_progress' ? 'animate-spin' : ''} flex-shrink-0`} />
             <div className="min-w-0 flex-1 space-y-1">
               <h4 className="font-medium text-sm">{issue.title}</h4>
-              <p className="text-sm font-semibold text-muted-foreground line-clamp-2 leading-relaxed">
+              <p className="text-sm font-medium text-purple-600/80 dark:text-purple-400/80 line-clamp-2 leading-relaxed">
                 {previewText}
               </p>
-              <p className="text-xs text-muted-foreground/60">
+              <p className="text-xs text-purple-500/60 dark:text-purple-400/50">
                 {issue.suggestions.length} suggestion{issue.suggestions.length !== 1 ? 's' : ''}
               </p>
             </div>
           </div>
-          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
         </div>
       </Card>
     );
