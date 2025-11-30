@@ -27,9 +27,9 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
   return (
     <div 
       className={cn(
-        'inline-flex items-center gap-1 rounded-lg px-2 py-1',
+        'inline-flex items-center gap-1 rounded-full px-2 py-1',
         isPurple 
-          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 dark:from-purple-700 dark:to-indigo-700 shadow-sm'
+          ? 'bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800'
           : 'border border-border/50 rounded-md px-1 py-0.5',
         className
       )}
@@ -42,7 +42,7 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
         className={cn(
           'h-5 w-5',
           isPurple 
-            ? 'text-white/90 hover:text-white hover:bg-white/10 disabled:text-white/40' 
+            ? 'text-purple-900 dark:text-purple-100 hover:bg-purple-100 dark:hover:bg-purple-900/30 disabled:text-purple-400' 
             : 'hover:bg-accent/50'
         )}
       >
@@ -51,7 +51,7 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
       <span 
         className={cn(
           'text-[10px] px-1 min-w-[2.5rem] text-center font-medium',
-          isPurple ? 'text-white' : 'text-muted-foreground'
+          isPurple ? 'text-purple-900 dark:text-purple-100' : 'text-muted-foreground'
         )}
       >
         {current + 1} of {total}
@@ -64,7 +64,7 @@ export const NavigationControls: React.FC<NavigationControlsProps> = ({
         className={cn(
           'h-5 w-5',
           isPurple 
-            ? 'text-white/90 hover:text-white hover:bg-white/10 disabled:text-white/40' 
+            ? 'text-purple-900 dark:text-purple-100 hover:bg-purple-100 dark:hover:bg-purple-900/30 disabled:text-purple-400' 
             : 'hover:bg-accent/50'
         )}
       >
