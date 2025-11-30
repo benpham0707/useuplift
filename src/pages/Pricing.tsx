@@ -9,7 +9,7 @@ import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
-import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle } from 'lucide-react';
+import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle, Loader2 } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
 import Navigation from '@/components/Navigation';
 
@@ -260,7 +260,12 @@ const Pricing = () => {
                 onClick={() => handleCheckout(billingInterval === 'monthly' ? 'pro_monthly' : 'pro_yearly')}
                 disabled={isProcessing || subscriptionStatus === 'active'}
               >
-                {subscriptionStatus === 'active' ? 'Current Plan' : billingInterval === 'monthly' ? 'Subscribe Monthly' : 'Subscribe Annually'}
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Redirecting to checkout...
+                  </>
+                ) : subscriptionStatus === 'active' ? 'Current Plan' : billingInterval === 'monthly' ? 'Subscribe Monthly' : 'Subscribe Annually'}
               </Button>
             </CardFooter>
           </Card>
@@ -331,7 +336,14 @@ const Pricing = () => {
                 onClick={() => handleCheckout(`addon_${payAsYouGoCredits[0]}`)}
                 disabled={isProcessing}
               >
-                Buy {payAsYouGoCredits[0]} Credits
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Redirecting to checkout...
+                  </>
+                ) : (
+                  `Buy ${payAsYouGoCredits[0]} Credits`
+                )}
               </Button>
             </CardFooter>
           </Card>
