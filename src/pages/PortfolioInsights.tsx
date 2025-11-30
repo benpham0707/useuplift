@@ -96,7 +96,7 @@ export default function PortfolioInsights() {
         if (!cancelled && !data) {
           const { data: created, error: insertError } = await supabase
             .from('profiles')
-            .insert({ user_id: user.id, user_context: 'high_school_11th', has_completed_assessment: false })
+            .insert({ user_id: user.id, user_context: 'high_school_11th', has_completed_assessment: false, credits: 10 })
             .select('id, has_completed_assessment')
             .single();
           if (insertError) throw insertError;

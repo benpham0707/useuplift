@@ -16,7 +16,7 @@ const AnnouncementBar = () => {
         >
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 text-center text-sm font-medium">
             <span className="inline-block mr-2">✨</span>
-            Early access for Class of 2026 & 2027 – limited spots available
+            Early access for HS Class of 2026 & 2027 – limited spots available
             <button
               onClick={() => setIsVisible(false)}
               className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-indigo-500 rounded-full transition-colors"

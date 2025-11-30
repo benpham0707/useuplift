@@ -35,6 +35,29 @@ CREATE TABLE public.academic_journey (
   CONSTRAINT academic_journey_pkey PRIMARY KEY (id),
   CONSTRAINT academic_journey_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
 );
+CREATE TABLE public.bug_reports (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  user_id text,
+  user_email text,
+  title text NOT NULL,
+  description text NOT NULL,
+  category text DEFAULT 'general'::text,
+  severity text DEFAULT 'medium'::text,
+  page_url text,
+  browser_info text,
+  screen_size text,
+  credits_affected integer,
+  compensation_status text DEFAULT 'pending'::text,
+  compensation_amount integer,
+  compensation_notes text,
+  status text DEFAULT 'new'::text,
+  admin_notes text,
+  resolved_at timestamp with time zone,
+  resolved_by text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT bug_reports_pkey PRIMARY KEY (id)
+);
 CREATE TABLE public.credit_transactions (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id text NOT NULL,
@@ -112,11 +135,19 @@ CREATE TABLE public.essay_revision_history (
   version integer NOT NULL CHECK (version > 0),
   draft_content text NOT NULL,
   change_summary text,
-  source text,
   coaching_plan_id uuid,
   word_count integer,
   created_at timestamp with time zone DEFAULT now(),
-  CONSTRAINT essay_revision_history_pkey PRIMARY KEY (id)
+  created_by USER-DEFINED NOT NULL DEFAULT 'autosave'::version_source_type,
+  label text,
+  parent_version_id uuid,
+  score numeric CHECK (score IS NULL OR score >= 0::numeric AND score <= 100::numeric),
+  dimension_scores jsonb,
+  analysis_report_id uuid,
+  is_deleted boolean NOT NULL DEFAULT false,
+  CONSTRAINT essay_revision_history_pkey PRIMARY KEY (id),
+  CONSTRAINT essay_revision_history_parent_version_id_fkey FOREIGN KEY (parent_version_id) REFERENCES public.essay_revision_history(id),
+  CONSTRAINT essay_revision_history_analysis_report_id_fkey FOREIGN KEY (analysis_report_id) REFERENCES public.essay_analysis_reports(id)
 );
 CREATE TABLE public.essays (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

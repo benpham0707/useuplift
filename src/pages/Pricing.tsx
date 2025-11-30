@@ -133,15 +133,15 @@ const Pricing = () => {
       
       <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20 space-y-16">
         <div className="text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full mb-4 animate-pulse">
-            <span className="text-red-500 font-bold text-sm">🎉 LAUNCH SALE</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full mb-4">
+            <span className="text-red-500 font-bold text-sm">LAUNCH SALE</span>
             <span className="text-red-600 font-extrabold text-sm">50% OFF EVERYTHING</span>
           </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             Invest in Your Future
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Choose the plan that fits your journey. From a single portfolio scan to full application support.
+            Choose the plan that fits your journey. From a single essay analysis to full UC PIQ support.
           </p>
           
           <div className="flex items-center justify-center gap-4 pt-4">
@@ -170,7 +170,7 @@ const Pricing = () => {
                 <span className="text-4xl font-bold">Free</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Get 10 free credits when you create a new account. Enough for a full portfolio scan to see where you stand.
+                Get 10 free credits when you create a new account. Enough for 2 full essay analyses to see how our PIQ Workshop works.
               </p>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
@@ -179,11 +179,11 @@ const Pricing = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                  <span>Full Portfolio Scan</span>
+                  <span>2 Full PIQ Analyses (5 credits each)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                  <span>Basic Insights</span>
+                  <span>11-Dimension Rubric Feedback</span>
                 </li>
               </ul>
             </CardContent>
@@ -228,7 +228,7 @@ const Pricing = () => {
                 </p>
               )}
               <p className="text-sm text-muted-foreground">
-                Comprehensive support from 0-100. Access all premium tools to build your strongest application.
+                Perfect for all 8 UC PIQs. 100 credits gives you 20 full analyses or unlimited AI coaching sessions.
               </p>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
@@ -237,15 +237,15 @@ const Pricing = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>PIQ Helper & Essay Workshop</span>
+                  <span>20 PIQ Analyses (5 credits each)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>Deep Dive Assessments</span>
+                  <span>AI Writing Coach (1 credit/message)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>Priority Support 24/7</span>
+                  <span>11-Dimension Rubric Analysis</span>
                 </li>
                  <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -309,7 +309,7 @@ const Pricing = () => {
                         <span>What can you do?</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                        {payAsYouGoCredits[0]} credits is enough for about {Math.floor(payAsYouGoCredits[0] / 10)} full portfolio scans or {Math.floor(payAsYouGoCredits[0] / 25)} deep essay reviews.
+                        {payAsYouGoCredits[0]} credits = {Math.floor(payAsYouGoCredits[0] / 5)} PIQ analyses or {payAsYouGoCredits[0]} AI coach messages. Mix and match as needed!
                     </p>
                 </div>
               </div>
@@ -354,22 +354,22 @@ const Pricing = () => {
                 <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <GraduationCap className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold">Expert Guidance</h3>
-                <p className="text-sm text-muted-foreground">Backed by admissions data from top universities.</p>
+                <h3 className="font-semibold">11-Dimension Analysis</h3>
+                <p className="text-sm text-muted-foreground">Deep rubric-based feedback on narrative quality, voice, and impact.</p>
             </div>
             <div className="text-center space-y-2">
                 <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <BookOpen className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold">Essay Workshops</h3>
-                <p className="text-sm text-muted-foreground">Step-by-step tools to craft compelling narratives.</p>
+                <h3 className="font-semibold">PIQ Workshop</h3>
+                <p className="text-sm text-muted-foreground">Craft all 8 UC Personal Insight Questions with surgical precision.</p>
             </div>
             <div className="text-center space-y-2">
                 <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <HelpCircle className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold">24/7 Support</h3>
-                <p className="text-sm text-muted-foreground">We're here to help you throughout the entire process.</p>
+                <h3 className="font-semibold">AI Writing Coach</h3>
+                <p className="text-sm text-muted-foreground">Get personalized guidance to strengthen your essays in real-time.</p>
             </div>
         </div>
       </div>

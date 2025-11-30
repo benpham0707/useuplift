@@ -530,7 +530,8 @@ const PortfolioScanner = () => {
           .from('profiles')
           .insert({
             user_id: user.id,
-            user_context: 'high_school_11th'
+            user_context: 'high_school_11th',
+            credits: 10 // Free credits for new users
           })
           .select('id')
           .single();
@@ -541,7 +542,7 @@ const PortfolioScanner = () => {
           return;
         }
         setHasCompletedOnboarding(false);
-        if (!isPreviewMode) setCredits(0);
+        if (!isPreviewMode) setCredits(10);
       } else {
         setHasCompletedOnboarding(data.has_completed_assessment ?? false);
         if (!isPreviewMode) setCredits(data.credits ?? 0);
