@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
+import BugReportWidget from "@/components/BugReportWidget";
 import Index from "./pages/Index";
 import PortfolioScanner from "./pages/PortfolioScanner";
 import ExtracurricularOptimizer from "./pages/ExtracurricularOptimizer";
@@ -66,6 +67,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
           <ClickSparkGlobal />
+          <BugReportWidget />
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
