@@ -7,7 +7,6 @@
 
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
 import { 
   ScanLine, 
   TrendingUp, 
@@ -169,16 +168,14 @@ const ComingSoonSection = () => {
           <Button 
             size="lg" 
             variant="outline" 
-            className="h-12 px-8 border-violet-300 dark:border-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/50" 
-            asChild
+            className="h-12 px-8 border-violet-300 dark:border-violet-700 opacity-50 cursor-not-allowed" 
+            disabled
           >
-            <Link to="/waitlist">
-              <Bell className="mr-2 h-4 w-4" />
-              Get notified when it launches
-            </Link>
+            <Bell className="mr-2 h-4 w-4" />
+            Get notified when it launches
           </Button>
           <p className="mt-4 text-sm text-muted-foreground">
-            Join 500+ students already on the waitlist
+            Waitlist temporarily closed. Check back soon!
           </p>
         </motion.div>
       </div>

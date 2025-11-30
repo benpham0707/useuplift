@@ -1,6 +1,5 @@
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
 
 const FinalCTA = () => {
@@ -55,14 +54,12 @@ const FinalCTA = () => {
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.4 }}
         >
-          <Button size="lg" className="h-12 px-8 text-base" asChild>
-            <Link to="/waitlist">
-              Join early access
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
+          <Button size="lg" className="h-12 px-8 text-base opacity-50 cursor-not-allowed" disabled>
+            Join early access
+            <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
           <p className="text-xs text-muted-foreground">
-            We’ll only email you about your scan and launch updates. No spam.
+            Portfolio scanner coming soon. Check back later!
           </p>
         </motion.div>
       </div>

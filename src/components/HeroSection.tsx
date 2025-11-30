@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { motion } from 'motion/react';
-import { ArrowRight, PenTool, CheckCircle, Sparkles, Target } from 'lucide-react';
+import { ArrowRight, PenTool, CheckCircle, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const HeroSection = () => {
@@ -47,12 +47,6 @@ const HeroSection = () => {
                   <PenTool className="mr-2 h-4 w-4" />
                   Try PIQ Workshop Free
                   <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-              <Button size="lg" variant="outline" className="text-base h-12 px-8 w-full sm:w-auto" asChild>
-                <Link to="/waitlist">
-                  <Target className="mr-2 h-4 w-4" />
-                  Join Portfolio Waitlist
                 </Link>
               </Button>
             </motion.div>
