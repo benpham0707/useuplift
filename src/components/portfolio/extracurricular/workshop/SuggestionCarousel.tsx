@@ -76,7 +76,7 @@ export const SuggestionCarousel: React.FC<SuggestionCarouselProps> = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm font-semibold text-primary">
-          Suggest Fix Example
+          Suggested Fix Example
         </span>
         <NavigationControls
           current={currentIndex}
