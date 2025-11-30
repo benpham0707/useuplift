@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
-import { SUPABASE_URL } from '@/integrations/supabase/client';
+import { SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 interface BugReportData {
@@ -106,6 +106,7 @@ export function BugReportWidget() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'apikey': SUPABASE_PUBLISHABLE_KEY,
         },
         body: JSON.stringify(payload),
       });
