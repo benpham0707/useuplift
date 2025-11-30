@@ -168,6 +168,9 @@ export default function PIQWorkshop() {
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [expandedDimensionId, setExpandedDimensionId] = useState<string | null>(null);
   const initialScoreRef = useRef<number>(0);
+  
+  // Lock to prevent concurrent analyses (ref is synchronous, unlike state)
+  const analysisInProgressRef = useRef<boolean>(false);
 
   // Phase 18 validation state
   const [validationLoading, setValidationLoading] = useState(false);
@@ -216,6 +219,12 @@ export default function PIQWorkshop() {
     console.log('   Selected prompt:', selectedPromptId);
     console.log('   Override essay ID:', overrideEssayId || 'none');
     console.log('   Force re-analysis:', forceReanalysis || false);
+    
+    // CRITICAL: Prevent concurrent analyses (use ref for synchronous check)
+    if (analysisInProgressRef.current) {
+      console.warn('⚠️ Analysis already in progress - ignoring duplicate call');
+      return;
+    }
     
     // Guard: Prevent analyzing empty or too-short essays
     if (currentDraft.trim().length < MIN_ESSAY_LENGTH) {
@@ -268,6 +277,8 @@ export default function PIQWorkshop() {
       }
     }
 
+    // Set the lock IMMEDIATELY (synchronous) to prevent race conditions
+    analysisInProgressRef.current = true;
     setIsAnalyzing(true);
     setValidationLoading(false);
     setValidationComplete(false);
@@ -659,6 +670,8 @@ export default function PIQWorkshop() {
       // Show alert to user - DO NOT SILENTLY FAIL
       alert(`Analysis failed! Check console for details.\n\nError: ${(error as Error).message}`);
     } finally {
+      // ALWAYS release the lock when analysis completes (success or error)
+      analysisInProgressRef.current = false;
       setIsAnalyzing(false);
     }
   }, [currentDraft, selectedPromptId, userId, currentEssayId, chatMessages]);
