@@ -121,7 +121,9 @@ const Pricing = () => {
     }
   }, [user]);
 
-  const payAsYouGoPrice = (payAsYouGoCredits[0] / 50) * 10;
+  // LAUNCH SALE: 50% off - was $10 per 50 credits, now $5
+  const payAsYouGoPrice = (payAsYouGoCredits[0] / 50) * 5;
+  const payAsYouGoOriginalPrice = (payAsYouGoCredits[0] / 50) * 10;
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
@@ -131,6 +133,10 @@ const Pricing = () => {
       
       <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20 space-y-16">
         <div className="text-center space-y-6">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full mb-4 animate-pulse">
+            <span className="text-red-500 font-bold text-sm">🎉 LAUNCH SALE</span>
+            <span className="text-red-600 font-extrabold text-sm">50% OFF EVERYTHING</span>
+          </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
             Invest in Your Future
           </h1>
@@ -208,14 +214,17 @@ const Pricing = () => {
             </CardHeader>
             <CardContent className="space-y-6 flex-1">
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-bold">
+                <span className="text-2xl text-muted-foreground line-through">
                     {billingInterval === 'monthly' ? '$20' : '$16'}
+                </span>
+                <span className="text-5xl font-bold text-red-500">
+                    {billingInterval === 'monthly' ? '$10' : '$8'}
                 </span>
                 <span className="text-muted-foreground">/mo</span>
               </div>
               {billingInterval === 'yearly' && (
                 <p className="text-xs text-green-600 font-medium -mt-4">
-                  Billed $192 yearly (one-time payment)
+                  Billed <span className="line-through">$192</span> $96 yearly (one-time payment)
                 </p>
               )}
               <p className="text-sm text-muted-foreground">
@@ -264,7 +273,8 @@ const Pricing = () => {
             </CardHeader>
             <CardContent className="space-y-8 flex-1">
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-bold">${payAsYouGoPrice}</span>
+                <span className="text-xl text-muted-foreground line-through">${payAsYouGoOriginalPrice}</span>
+                <span className="text-4xl font-bold text-red-500">${payAsYouGoPrice}</span>
                 <span className="text-muted-foreground">one-time</span>
               </div>
               

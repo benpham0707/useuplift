@@ -37,25 +37,26 @@ type AddonPlan = {
 
 type Plan = SubscriptionPlan | AddonPlan;
 
+// LAUNCH SALE: 50% OFF ALL PLANS
 const PLANS: Record<string, Plan> = {
   pro_monthly: {
-    name: 'Pro Monthly Subscription',
-    amount: 2000, // $20.00
+    name: 'Pro Monthly Subscription (Launch Sale - 50% Off)',
+    amount: 1000, // $10.00 (was $20.00)
     currency: 'usd',
     credits: 100,
     interval: 'month',
   },
   pro_yearly: {
-    name: 'Pro Annual Subscription',
-    amount: 19200, // $192.00 (Save 20%)
+    name: 'Pro Annual Subscription (Launch Sale - 50% Off)',
+    amount: 9600, // $96.00 (was $192.00)
     currency: 'usd',
     credits: 1200, // 100 * 12
     interval: 'year',
   },
   // Legacy fallback
   subscription: {
-    name: 'Monthly Subscription',
-    amount: 2000, // $20.00
+    name: 'Monthly Subscription (Launch Sale - 50% Off)',
+    amount: 1000, // $10.00 (was $20.00)
     currency: 'usd',
     credits: 100,
     interval: 'month',
@@ -78,13 +79,14 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
     let plan = PLANS[type as keyof typeof PLANS];
 
     // Handle dynamic addons (addon_50, addon_100, ..., addon_500)
+    // LAUNCH SALE: 50% OFF - was $10 per 50 credits, now $5
     if (!plan && type.startsWith('addon_')) {
         const credits = parseInt(type.split('_')[1]);
         // Validate: multiple of 50, between 50 and 500
         if (!isNaN(credits) && credits % 50 === 0 && credits >= 50 && credits <= 500) {
              plan = {
-                name: `${credits} Credits Pack`,
-                amount: (credits / 50) * 1000, // $10 per 50 credits ($1000 cents)
+                name: `${credits} Credits Pack (Launch Sale - 50% Off)`,
+                amount: (credits / 50) * 500, // $5 per 50 credits ($500 cents) - was $10
                 currency: 'usd',
                 credits: credits,
              };

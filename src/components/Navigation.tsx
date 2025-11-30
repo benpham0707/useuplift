@@ -76,9 +76,12 @@ const Navigation = () => {
             </button>
             <button 
               onClick={() => navigate('/pricing')}
-              className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
+              className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium relative"
             >
               Pricing
+              <span className="absolute -top-1 -right-4 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full transform scale-90 animate-pulse whitespace-nowrap">
+                SALE
+              </span>
             </button>
             <div className="text-muted-foreground cursor-not-allowed px-3 py-2 rounded-lg text-sm font-medium relative opacity-80">
               For Schools
@@ -168,7 +171,7 @@ const Navigation = () => {
               onClick={() => { navigate('/pricing'); setIsMenuOpen(false); }}
               className="w-full text-left block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
             >
-              Pricing
+              Pricing <span className="ml-2 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full animate-pulse">SALE</span>
             </button>
             <div className="block px-3 py-2 text-muted-foreground cursor-not-allowed rounded-lg text-sm font-medium">
               For Schools <span className="ml-2 text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded-full">SOON</span>
