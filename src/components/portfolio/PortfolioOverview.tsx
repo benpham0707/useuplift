@@ -44,7 +44,7 @@ const MOCK_INSIGHTS: InsightCardProps[] = [
     ),
     action: {
       label: 'Explore Non-Technical Leadership Opportunities',
-      onClick: () => {},
+      onClick: () => ,
     },
     priority: 'critical',
     impactScore: 9,
@@ -85,7 +85,7 @@ const MOCK_INSIGHTS: InsightCardProps[] = [
     ],
     action: {
       label: 'Add Metrics to Community Activities',
-      onClick: () => {},
+      onClick: () => ,
     },
     priority: 'high',
     impactScore: 7,
@@ -136,7 +136,7 @@ const MOCK_INSIGHTS: InsightCardProps[] = [
     ],
     action: {
       label: 'Research Journal Submission Guide',
-      onClick: () => {},
+      onClick: () => ,
     },
     priority: 'medium',
     impactScore: 8,
@@ -165,7 +165,7 @@ const MOCK_INSIGHTS: InsightCardProps[] = [
     ],
     action: {
       label: 'Draft Explanation for Additional Info',
-      onClick: () => {},
+      onClick: () => ,
     },
     priority: 'critical',
     impactScore: 9,

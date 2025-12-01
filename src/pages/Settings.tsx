@@ -146,30 +146,20 @@ const Settings = () => {
         return;
       }
 
-      // Call the account deletion API endpoint
-      // This soft-deletes the profile AND deletes the Clerk user
-      const response = await apiFetch('/api/v1/account', {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Soft-delete profile by setting deleted_at
+      const { error } = await supabase
+        .from('profiles')
+        .update({ deleted_at: new Date().toISOString() })
+        .eq('user_id', user?.id);
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        console.error('Failed to delete account:', result.error);
-        alert('Failed to delete account. Please try again or contact support.');
+      if (error) {
         return;
       }
 
-      // Sign out and redirect
+      // Sign out after deletion
       await signOut();
       navigate('/');
     } catch (error) {
-      console.error('Account deletion error:', error);
-      alert('An error occurred. Please try again.');
     } finally {
       setIsDeleting(false);
     }
@@ -417,19 +407,15 @@ const Settings = () => {
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Your Account</AlertDialogTitle>
-                      <AlertDialogDescription className="space-y-3">
-                        <p>
-                          This will delete your account and sign you out. Your data will be preserved 
-                          for 30 days in case you change your mind.
-                        </p>
-                        <p className="font-medium text-foreground">
-                          If you sign up again with the same email:
-                        </p>
-                        <ul className="list-disc list-inside space-y-1">
-                          <li>Your essays and analyses will be restored</li>
-                          <li>Your credit balance ({credits ?? 0} credits) will be restored</li>
-                          <li className="text-amber-600 dark:text-amber-400">You will NOT receive new free credits</li>
+                      <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete your account
+                        and remove all your data from our servers, including:
+                        <ul className="list-disc list-inside mt-2 space-y-1">
+                          <li>Your profile information</li>
+                          <li>All saved essays and analyses</li>
+                          <li>Your credit balance ({credits ?? 0} credits)</li>
+                          <li>Subscription (if active)</li>
                         </ul>
                       </AlertDialogDescription>
                     </AlertDialogHeader>

@@ -52,9 +52,7 @@ Deno.serve(async (req) => {
         last_seen: new Date().toISOString()
       }, { onConflict: 'user_id,ip_hash,ua' })
 
-    if (upsertErr) {
-      // Log error but don't fail the request
-    }
+    if (upsertErr) 
     // TODO: send branded email via Supabase SMTP or provider. Placeholder no-op.
 
     return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

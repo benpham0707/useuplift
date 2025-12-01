@@ -43,15 +43,13 @@ type ClerkWebhookEvent = ClerkUserCreatedEvent | ClerkUserDeletedEvent | { type:
  * Handles Clerk webhook events.
  * 
  * Currently handles:
- * - user.created: Creates a profile row in Supabase, or re-links an orphaned profile
- *   if the user previously had an account with the same email
- * - user.deleted: Soft-deletes the profile (sets deleted_at timestamp)
- *   Data is preserved so returning users can recover their account
+ * - user.created: Creates a profile row in Supabase
+ * - user.deleted: (Optional) Could delete profile row
  * 
  * Setup in Clerk Dashboard:
  * 1. Go to Webhooks > Add Endpoint
- * 2. URL: https://uplift-backend-cyqk.onrender.com/api/v1/webhooks/clerk
- * 3. Select events: user.created, user.deleted
+ * 2. URL: https://your-api-domain.com/api/v1/webhooks/clerk
+ * 3. Select events: user.created
  * 4. Copy signing secret to CLERK_WEBHOOK_SECRET env var
  */
 export async function handleClerkWebhook(req: Request, res: Response) {
@@ -99,7 +97,7 @@ export async function handleClerkWebhook(req: Request, res: Response) {
     const primaryEmail = email_addresses?.[0]?.email_address;
 
     try {
-      // Check if profile already exists with this Clerk ID (idempotency)
+      // Check if profile already exists (idempotency)
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('id')
@@ -110,41 +108,9 @@ export async function handleClerkWebhook(req: Request, res: Response) {
         return res.json({ received: true, action: 'profile_exists' });
       }
 
-      // Check if there's an orphaned profile with the same email (user re-registering)
-      // This handles the case where a user was deleted from Clerk but their data remains
-      if (primaryEmail) {
-        const { data: orphanedProfile } = await supabase
-          .from('personal_information')
-          .select('profile_id, profiles!inner(id, user_id, deleted_at)')
-          .eq('primary_email', primaryEmail.toLowerCase())
-          .not('profiles.deleted_at', 'is', null) // Only match soft-deleted profiles
-          .maybeSingle();
-
-        if (orphanedProfile?.profile_id) {
-          // Re-link the orphaned profile to the new Clerk user ID
-          const { error: relinkError } = await supabase
-            .from('profiles')
-            .update({ 
-              user_id: clerkUserId,
-              deleted_at: null, // Reactivate the profile
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', orphanedProfile.profile_id);
-
-          if (relinkError) {
-            return res.json({ received: true, error: relinkError.message });
-          }
-
-          return res.json({ 
-            received: true, 
-            action: 'profile_relinked', 
-            profileId: orphanedProfile.profile_id,
-            message: 'Existing profile restored for returning user'
-          });
-        }
-      }
-
-      // Create new profile for first-time user
+      // Create the profile
+      // Note: Email is stored in personal_information.primary_email, not in profiles
+      // The user's email is available from Clerk and will be captured during onboarding
       const { data: newProfile, error: insertError } = await supabase
         .from('profiles')
         .insert({
@@ -159,6 +125,7 @@ export async function handleClerkWebhook(req: Request, res: Response) {
 
       if (insertError) {
         // Return 200 anyway to prevent Clerk from retrying
+        // Log the error for investigation
         return res.json({ received: true, error: insertError.message });
       }
 
@@ -170,29 +137,13 @@ export async function handleClerkWebhook(req: Request, res: Response) {
     }
   }
 
-  // Handle user.deleted event - Soft delete to preserve data
+  // Handle user.deleted event (optional - for cleanup)
   if (payload.type === 'user.deleted') {
     const { id: clerkUserId } = payload.data as any;
     
-    try {
-      // Soft delete: Mark profile as deleted but preserve all data
-      // If the user re-registers with the same email, their profile will be restored
-      const { error: softDeleteError } = await supabase
-        .from('profiles')
-        .update({ 
-          deleted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', clerkUserId);
-
-      if (softDeleteError) {
-        return res.json({ received: true, error: softDeleteError.message });
-      }
-
-      return res.json({ received: true, action: 'profile_soft_deleted' });
-    } catch (err: any) {
-      return res.json({ received: true, error: err?.message });
-    }
+    // Optional: Delete or soft-delete the profile
+    // For now, just acknowledge
+    return res.json({ received: true, action: 'user_deleted_acknowledged' });
   }
 
   // Acknowledge other events we don't handle

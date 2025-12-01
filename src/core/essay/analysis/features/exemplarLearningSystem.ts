@@ -703,7 +703,7 @@ export async function runContinuousLearning(
     iterations.push(result);
 
     // Log insights
-    result.insights.forEach(insight => {});
+    result.insights.forEach(insight => );
 
     // Log adjustments
     result.rubric_adjustments_proposed.forEach(adj => {
