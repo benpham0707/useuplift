@@ -33,7 +33,7 @@ const UniversityBacked = () => {
     <section ref={containerRef} className="py-8 border-y bg-slate-50/50 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-6 text-center">
         <p className="text-sm font-medium text-muted-foreground">
-          Backed by professionals from
+          Collaborated with professionals from
         </p>
       </div>
 
