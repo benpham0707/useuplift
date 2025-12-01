@@ -54,7 +54,6 @@ Return ONLY the JSON object representing the VoiceFingerprint.`;
  * Analyzes the voice fingerprint of an essay.
  */
 export async function analyzeVoiceFingerprint(essayText: string): Promise<VoiceFingerprint> {
-  console.log('🔍 Analyzing Voice Fingerprint...');
   const startTime = Date.now();
 
   try {
@@ -85,15 +84,10 @@ export async function analyzeVoiceFingerprint(essayText: string): Promise<VoiceF
     }
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Voice Fingerprint Analysis complete (${duration}ms)`);
-    console.log(`   Tone: ${fingerprint.tone}`);
-    console.log(`   Cadence: ${fingerprint.cadence}`);
-    console.log(`   Markers: ${fingerprint.markers.join(', ')}`);
 
     return fingerprint;
 
   } catch (error) {
-    console.error('❌ Error in Voice Fingerprint Analysis:', error);
     // Return fallback
     return {
       tone: 'Neutral',

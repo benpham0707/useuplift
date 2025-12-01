@@ -629,7 +629,6 @@ r.post("/analyze-entry", async (req, res) => {
     }
   } catch (err: any) {
     // eslint-disable-next-line no-console
-    console.error('Extracurricular analysis failed:', err?.message || err);
     return res.status(500).json({ message: 'Analysis failed', error: String(err?.message || err) });
   }
 });
@@ -646,5 +645,4 @@ r.get('/health', (_req, res) => {
 });
 
 export default r;
-
 

@@ -302,11 +302,9 @@ export async function detectContentType(
   promptId?: number | null,
   explicitType?: PIQContentType
 ): Promise<ContentTypeDetectionResult> {
-  console.log('   🔍 Running multi-signal content type detection...');
 
   // If explicit type provided, return immediately with high confidence
   if (explicitType) {
-    console.log(`   ✅ Using explicit type: ${explicitType}`);
     return {
       primary_type: explicitType,
       confidence: 1.0,
@@ -323,7 +321,6 @@ export async function detectContentType(
   // If prompt ID provided, use prompt mapping with high confidence
   if (promptId && promptId >= 1 && promptId <= 8) {
     const mappedType = PROMPT_TYPE_MAP[promptId];
-    console.log(`   ✅ Using prompt mapping: Prompt ${promptId} → ${mappedType}`);
 
     // Still run detection for alternatives
     const keywordScores = calculateKeywordScores(text);
@@ -343,13 +340,10 @@ export async function detectContentType(
   }
 
   // Full multi-signal detection
-  console.log('   📊 Running keyword frequency analysis...');
   const keywordScores = calculateKeywordScores(text);
 
-  console.log('   🔍 Detecting structural patterns...');
   const structuralPatterns = findStructuralPatterns(text);
 
-  console.log('   🧠 Analyzing semantic markers...');
   const semanticMarkers = extractSemanticMarkers(text);
 
   // Fuse signals to determine primary type
@@ -378,11 +372,8 @@ export async function detectContentType(
 
   const reasoning = explainTypeMatch(primaryType, keywordScores, structuralPatterns);
 
-  console.log(`   ✅ Primary type: ${primaryType} (confidence: ${(confidence * 100).toFixed(1)}%)`);
   if (alternatives.length > 0) {
-    console.log(`   📋 Alternatives detected:`);
     alternatives.forEach(alt => {
-      console.log(`      - ${alt.type} (${(alt.confidence * 100).toFixed(1)}%)`);
     });
   }
 

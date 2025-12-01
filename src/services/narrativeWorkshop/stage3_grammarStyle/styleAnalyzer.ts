@@ -237,7 +237,6 @@ export async function analyzeStyle(
   input: NarrativeEssayInput,
   essayType: string
 ): Promise<WritingStyleAnalysis> {
-  console.log('  → Stage 3.2: Writing Style Analysis (LLM)');
   const startTime = Date.now();
 
   try {
@@ -266,17 +265,10 @@ export async function analyzeStyle(
     analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
-    console.log(`     ✓ Style analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-    console.log(`       Formality: ${analysis.formalityLevel}/10, Energy: ${analysis.energyLevel}/10`);
-    console.log(`       Warmth: ${analysis.warmth}/10, Confidence: ${analysis.confidence}/10`);
-    console.log(`       Imagery: ${analysis.imageryStrength}/10, Originality: ${analysis.originalityScore}/10`);
-    console.log(`       Voice distinctiveness: ${analysis.voiceDistinctiveness}`);
-    console.log(`       Overall style: ${analysis.overallStyleScore}/10`);
 
     return analysis;
 
   } catch (error) {
-    console.error('     ✗ Style analysis failed:', error);
     throw error;
   }
 }

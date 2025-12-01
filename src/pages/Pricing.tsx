@@ -57,7 +57,6 @@ const Pricing = () => {
       const token = await getToken();
       
       if (!token) {
-        console.error('No access token found');
         navigate('/auth');
         return;
       }
@@ -78,7 +77,6 @@ const Pricing = () => {
 
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}));
-        console.error('Checkout failed:', errData);
         throw new Error(errData.error || 'Checkout failed');
       }
       
@@ -87,7 +85,6 @@ const Pricing = () => {
         window.location.href = url;
       }
     } catch (error) {
-      console.error('Checkout error:', error);
       // Don't redirect on error - just log and let user try again
     } finally {
       setProcessingType(null);

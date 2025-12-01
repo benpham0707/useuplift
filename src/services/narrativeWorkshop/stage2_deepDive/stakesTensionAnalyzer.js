@@ -206,7 +206,6 @@ Return ONLY valid JSON, no markdown, no explanation.`;
  * Analyze stakes and tension
  */
 export async function analyzeStakesTension(input, essayType) {
-    console.log('  → Stage 2.6: Stakes & Tension Analysis');
     const startTime = Date.now();
     try {
         const prompt = buildStakesTensionPrompt(input.essayText, essayType);
@@ -228,16 +227,9 @@ export async function analyzeStakesTension(input, essayType) {
         }
         analysis.tokensUsed = response.usage?.total_tokens || 0;
         const duration = Date.now() - startTime;
-        console.log(`     ✓ Stakes/tension analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-        console.log(`       Tension: ${analysis.tensionPresent ? 'Yes' : 'No'} (level: ${analysis.tensionLevel}/10, pacing: ${analysis.tensionPacing})`);
-        console.log(`       Conflict: ${analysis.conflictType} (clarity: ${analysis.conflictClarity}/10, complexity: ${analysis.conflictComplexity}/10)`);
-        console.log(`       Stakes: ${analysis.stakesSpecificity} (established at ${analysis.stakesEstablishedByPercent}%)`);
-        console.log(`       Reader investment: ${analysis.readerInvestment}/10`);
-        console.log(`       Resolution: ${analysis.resolutionQuality}`);
         return analysis;
     }
     catch (error) {
-        console.error('     ✗ Stakes/tension analysis failed:', error);
         throw error;
     }
 }

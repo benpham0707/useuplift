@@ -162,8 +162,6 @@ Deno.serve(async (req) => {
   try {
     const request: SuggestionRationaleRequest = await req.json();
 
-    console.log('📝 Generating rationales for', request.suggestions.length, 'suggestions');
-
     // Initialize Anthropic client
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
@@ -194,25 +192,19 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Anthropic API error:', error);
       throw new Error(`Anthropic API failed: ${response.status}`);
     }
 
     const anthropicData = await response.json();
     const rawContent = anthropicData.content?.[0]?.text || '';
 
-    console.log('✅ Received response from Claude');
-
     // Parse JSON response
     const jsonMatch = rawContent.match(/\{[\s\S]*"rationales"[\s\S]*\}/);
     if (!jsonMatch) {
-      console.error('Failed to extract JSON from response:', rawContent.substring(0, 200));
       throw new Error('Invalid response format from Claude');
     }
 
     const result = JSON.parse(jsonMatch[0]);
-
-    console.log('✅ Generated', result.rationales?.length || 0, 'rationales');
 
     return new Response(
       JSON.stringify({
@@ -224,7 +216,6 @@ Deno.serve(async (req) => {
       }
     );
   } catch (error) {
-    console.error('❌ Suggestion rationales generation failed:', error);
     return new Response(
       JSON.stringify({
         success: false,

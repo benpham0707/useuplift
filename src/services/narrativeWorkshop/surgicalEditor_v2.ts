@@ -126,9 +126,7 @@ export async function generateSurgicalFixes(
   preComputedDiagnosis?: SymptomDiagnosis,
   experienceFingerprint?: ExperienceFingerprint
 ): Promise<WorkshopItem> {
-  console.log(`🔪 Surgical Editor v2: Fixing "${issue.quote.substring(0, 20)}..." (Score: ${overallScore})`);
   if (experienceFingerprint) {
-    console.log(`   📍 Experience Fingerprint provided - incorporating unique elements`);
   }
 
   try {
@@ -140,7 +138,6 @@ export async function generateSurgicalFixes(
     );
 
     if (!diagnosis) {
-        console.log("   🔍 Running JIT Diagnosis...");
         diagnosis = await diagnoseSymptom(issue.quote, contextSnippetRaw);
     }
 
@@ -199,7 +196,6 @@ export async function generateSurgicalFixes(
     const validatedSuggestions: SuggestionType[] = [];
 
     while (attemptNumber <= maxAttempts && validatedSuggestions.length < 3) {
-      console.log(`   🔄 Generation attempt ${attemptNumber}/${maxAttempts}`);
 
       // Build prompt (with retry guidance if applicable)
       let promptToUse = contextBundle.contextDocument;
@@ -264,7 +260,6 @@ ${promptToUse}
       }
 
       if (generatedSuggestions.length === 0) {
-        console.warn(`   ⚠️ No suggestions generated on attempt ${attemptNumber}`);
         attemptNumber++;
         continue;
       }
@@ -282,10 +277,8 @@ ${promptToUse}
         const validation = await validator.validate(validationContext);
 
         if (validation.isValid) {
-          console.log(`   ✅ Suggestion validated (score: ${validation.score})`);
           validatedSuggestions.push(suggestion);
         } else {
-          console.log(`   ⚠️ Suggestion failed validation (${validation.criticalCount} critical, ${validation.warningCount} warnings)`);
 
           // Store retry guidance for next attempt
           if (validation.retryGuidance) {
@@ -304,7 +297,6 @@ ${promptToUse}
 
     // STEP 6: FALLBACK (if no valid suggestions after all attempts)
     if (validatedSuggestions.length === 0) {
-        console.warn('   ⚠️ All validation attempts failed, using fallback');
         validatedSuggestions.push({
             text: issue.quote,
             rationale: generateFallbackRationale(issue.quote, issue.quote, issue.rubricCategory),
@@ -328,7 +320,6 @@ ${promptToUse}
     };
 
   } catch (error) {
-    console.error('❌ Error in Surgical Editor:', error);
     return {
       id: uuidv4(),
       rubric_category: issue.rubricCategory,

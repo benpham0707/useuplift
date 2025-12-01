@@ -181,7 +181,6 @@ export async function analyzeBodyDevelopment(
   input: NarrativeEssayInput,
   essayType: string
 ): Promise<BodyDevelopmentAnalysis> {
-  console.log('  → Stage 2.2: Body Development Analysis');
   const startTime = Date.now();
 
   try {
@@ -210,16 +209,10 @@ export async function analyzeBodyDevelopment(
     analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
-    console.log(`     ✓ Body development analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-    console.log(`       Specificity: ${analysis.specificityLevel}/10, Quantification: ${analysis.quantificationPresence}/10`);
-    console.log(`       Show vs Tell: ${analysis.showVsTell.balance}`);
-    console.log(`       Agency: ${analysis.agencyDemonstration}/10, Progression: ${analysis.narrativeProgression}/10`);
-    console.log(`       Issues detected: ${analysis.detectedIssues.length}`);
 
     return analysis;
 
   } catch (error) {
-    console.error('     ✗ Body development analysis failed:', error);
     throw error;
   }
 }

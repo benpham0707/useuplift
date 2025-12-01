@@ -12,7 +12,6 @@ export { HolisticAnalyzer } from './holisticAnalyzer';
  * 3. Returns the comprehensive "God-mode" insights
  */
 export async function analyzeFullApplication(essayText, promptType, profile) {
-    console.log('[Orchestrator] Starting Full Application Analysis...');
     // 1. Run Essay Analysis (includes Universal + Specialized Analyzers)
     const essayAnalysis = await EssayOrchestrator.analyzeEssay(essayText, promptType, profile);
     // 2. Run Holistic Analysis (Meta-Layer)
@@ -21,7 +20,6 @@ export async function analyzeFullApplication(essayText, promptType, profile) {
     // The current implementation of analyzeEssay attaches it to essayAnalysis.holistic_context.
     let holisticAnalysis = essayAnalysis.holistic_context;
     if (!holisticAnalysis) {
-        console.log('[Orchestrator] Holistic context missing, running explicitly...');
         holisticAnalysis = await HolisticAnalyzer.analyze(essayText, profile, essayAnalysis);
     }
     return {

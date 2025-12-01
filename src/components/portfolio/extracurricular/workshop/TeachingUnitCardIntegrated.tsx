@@ -131,7 +131,6 @@ export const TeachingUnitCardIntegrated: React.FC<TeachingUnitCardIntegratedProp
 
       setReflectionPrompts(prompts);
     } catch (error) {
-      console.error('[TeachingUnitCardIntegrated] Failed to load prompts:', error);
       setPromptsError('Unable to generate personalized questions. Please try again.');
     } finally {
       setIsLoadingPrompts(false);

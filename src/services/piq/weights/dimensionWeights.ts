@@ -48,7 +48,6 @@ export const BASELINE_WEIGHTS: Record<PIQRubricDimension, number> = {
 // Verify baseline sums to 1.0
 const baselineSum = Object.values(BASELINE_WEIGHTS).reduce((sum, w) => sum + w, 0);
 if (Math.abs(baselineSum - 1.0) > 0.001) {
-  console.warn(`⚠️  Baseline weights sum to ${baselineSum.toFixed(3)}, not 1.0`);
 }
 
 // ============================================================================
@@ -237,7 +236,6 @@ export const PIQ_WEIGHT_PROFILES: Record<PIQPromptType, PIQWeightProfile> = {
 Object.entries(PIQ_WEIGHT_PROFILES).forEach(([key, profile]) => {
   const sum = profile.dimensionWeights.reduce((total, dw) => total + dw.weight, 0);
   if (Math.abs(sum - 1.0) > 0.001) {
-    console.warn(`⚠️  ${key} weights sum to ${sum.toFixed(3)}, not 1.0`);
   }
 });
 

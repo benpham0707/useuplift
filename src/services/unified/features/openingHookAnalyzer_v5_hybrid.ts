@@ -77,8 +77,6 @@ export async function analyzeOpeningHookV5(
   } = {}
 ): Promise<HookAnalysisResult> {
 
-  console.log('[Hook Analyzer V5] Starting hybrid analysis...');
-
   const sentences = fullEssay.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const opening = sentences.slice(0, 3).join('. ') + '.';
 
@@ -89,14 +87,11 @@ export async function analyzeOpeningHookV5(
     deterministicResult = quickDeterministicCheck(opening);
 
     if (deterministicResult && deterministicResult.confidence >= 0.85) {
-      console.log(`[Hook Analyzer V5] ✓ High-confidence deterministic match: ${deterministicResult.type} (${(deterministicResult.confidence * 100).toFixed(0)}%)`);
     } else {
-      console.log(`[Hook Analyzer V5] Low-confidence or no deterministic match, using LLM...`);
     }
   }
 
   // STAGE 2: LLM analysis (always run for deep insights)
-  console.log('[Hook Analyzer V5] Calling Claude for deep analysis...');
 
   const llmAnalysis = await analyzWithLLM(
     opening,
@@ -114,8 +109,6 @@ export async function analyzeOpeningHookV5(
   const detectionMethod = deterministicResult && deterministicResult.confidence >= 0.85
     ? 'hybrid' // Used both
     : 'llm'; // LLM only
-
-  console.log(`[Hook Analyzer V5] ✓ Final: ${finalType} via ${detectionMethod}`);
 
   return {
     hook_type: finalType,

@@ -34,7 +34,6 @@ import { GrammarAnalysis } from '../types';
  * Analyze grammar and mechanics deterministically
  */
 export function analyzeGrammar(essayText: string): GrammarAnalysis {
-  console.log('  → Stage 3.1: Grammar & Mechanics Analysis (deterministic)');
   const startTime = Date.now();
 
   try {
@@ -58,13 +57,6 @@ export function analyzeGrammar(essayText: string): GrammarAnalysis {
     const greenFlags = detectGreenFlags(essayText, sentenceMetrics, verbAnalysis, wordChoice);
 
     const duration = Date.now() - startTime;
-
-    console.log(`     ✓ Grammar analyzed (${duration}ms, deterministic)`);
-    console.log(`       Sentences: ${sentenceMetrics.totalSentences}, Avg length: ${sentenceMetrics.averageLength} words`);
-    console.log(`       Variety score: ${sentenceMetrics.varietyScore}/10`);
-    console.log(`       Passive voice: ${verbAnalysis.passivePercentage.toFixed(1)}%`);
-    console.log(`       Lexical diversity: ${wordChoice.lexicalDiversity.toFixed(3)}`);
-    console.log(`       Red flags: ${redFlags.length}, Green flags: ${greenFlags.length}`);
 
     return {
       sentenceMetrics,
@@ -99,7 +91,6 @@ export function analyzeGrammar(essayText: string): GrammarAnalysis {
     };
 
   } catch (error) {
-    console.error('     ✗ Grammar analysis failed:', error);
     throw error;
   }
 }

@@ -84,67 +84,51 @@ export interface ChangeHighlight {
 export async function generateRewriteCandidates(
   request: RewriteRequest
 ): Promise<RewriteOutput> {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`GENERATING REWRITE CANDIDATES`);
-  console.log(`Original: "${request.originalEntry.description_original}"`);
-  console.log(`Target Issues: ${request.targetIssues.map(i => i.title).join(', ')}`);
-  console.log(`User Reflections: ${request.userReflections ? 'Yes' : 'No'}`);
-  console.log(`${'='.repeat(80)}\n`);
 
   // ============================================================================
   // STEP 1: Analyze original to get baseline score
   // ============================================================================
 
-  console.log('Step 1: Analyzing original draft...');
   const originalAnalysis = await analyzeEntry(request.originalEntry, {
     depth: 'quick',
     skip_coaching: true,
   });
   const originalScore = originalAnalysis.report.narrative_quality_index;
-  console.log(`  Original NQI: ${originalScore}/100\n`);
 
   // ============================================================================
   // STEP 2: Build generation profiles for each style
   // ============================================================================
 
-  console.log('Step 2: Building generation profiles...');
   const profiles = buildGenerationProfiles(request, originalScore);
-  console.log(`  Generated ${profiles.length} style profiles\n`);
 
   // ============================================================================
   // STEP 3: Generate candidates in parallel
   // ============================================================================
 
-  console.log('Step 3: Generating candidates (parallel)...');
   const generationPromises = profiles.map(profile =>
     generateCandidate(profile, request)
   );
 
   const results = await Promise.all(generationPromises);
-  console.log(`  ✓ Generated ${results.length} candidates\n`);
 
   // ============================================================================
   // STEP 4: Analyze candidates and estimate scores
   // ============================================================================
 
-  console.log('Step 4: Analyzing candidates...');
   const candidates = await analyzeCandidates(
     results,
     request.originalEntry,
     originalScore
   );
-  console.log(`  ✓ Analyzed ${candidates.length} candidates\n`);
 
   // ============================================================================
   // STEP 5: Build comparison view
   // ============================================================================
 
-  console.log('Step 5: Building comparison view...');
   const comparisonView = buildComparisonView(
     request.originalEntry.description_original,
     candidates
   );
-  console.log(`  ✓ Comparison view ready\n`);
 
   // ============================================================================
   // STEP 6: Assemble output
@@ -161,12 +145,6 @@ export async function generateRewriteCandidates(
       timestamp: new Date().toISOString(),
     },
   };
-
-  console.log(`${'='.repeat(80)}`);
-  console.log(`GENERATION COMPLETE`);
-  console.log(`Candidates: ${candidates.length}`);
-  console.log(`Estimated Improvements: ${candidates.map(c => `+${c.estimatedScoreGain}`).join(', ')}`);
-  console.log(`${'='.repeat(80)}\n`);
 
   return output;
 }
@@ -323,8 +301,6 @@ async function generateCandidate(
 
   const styleLabel = styleLabels[profile.studentVoice] || 'Balanced';
 
-  console.log(`  Generating: ${styleLabel}...`);
-
   // Use transformEssay for more controlled improvement
   const result = await transformEssay(
     request.originalEntry.description_original,
@@ -350,8 +326,6 @@ async function analyzeCandidates(
   for (let i = 0; i < results.length; i++) {
     const result = results[i];
 
-    console.log(`  Analyzing candidate ${i + 1}: ${result.styleLabel}...`);
-
     // Quick analysis to estimate score
     const candidateEntry = { ...originalEntry, description_original: result.essay };
     const analysis = await analyzeEntry(candidateEntry, {
@@ -361,8 +335,6 @@ async function analyzeCandidates(
 
     const estimatedScore = analysis.report.narrative_quality_index;
     const scoreGain = estimatedScore - originalScore;
-
-    console.log(`    Score: ${originalScore} → ${estimatedScore} (+${scoreGain})`);
 
     // Build rationale
     const rationale = buildRationale(result, scoreGain);

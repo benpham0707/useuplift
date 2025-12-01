@@ -53,7 +53,6 @@ export function calculateDimensionScores(
   stage3: GrammarStyleAnalysis,
   essayType: string
 ): DimensionScores {
-  console.log('  → Calculating 12 dimension scores...');
 
   // Base scores (0-10 raw)
   const baseScores: DimensionScores = {
@@ -74,13 +73,6 @@ export function calculateDimensionScores(
   // Apply essay-type-specific weights
   const typeProfile = getEssayTypeProfile(essayType as any);
   const weightedScores = applyEssayTypeWeights(baseScores, typeProfile.dimensionWeightAdjustments);
-
-  console.log(`     ✓ Dimension scores calculated`);
-  console.log(`       Opening Power: ${weightedScores.openingPower.toFixed(1)}/10`);
-  console.log(`       Narrative Arc: ${weightedScores.narrativeArc.toFixed(1)}/10`);
-  console.log(`       Interiority/Vulnerability: ${weightedScores.characterInteriority.toFixed(1)}/10`);
-  console.log(`       Show Don't Tell: ${weightedScores.showDontTell.toFixed(1)}/10`);
-  console.log(`       Reflection/Meaning: ${weightedScores.reflectionMeaningMaking.toFixed(1)}/10`);
 
   return weightedScores;
 }

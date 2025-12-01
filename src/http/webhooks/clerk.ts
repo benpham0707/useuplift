@@ -7,7 +7,6 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('⚠️  Supabase credentials missing for Clerk webhook');
 }
 
 const supabase = supabaseUrl && supabaseServiceKey
@@ -57,12 +56,10 @@ export async function handleClerkWebhook(req: Request, res: Response) {
   const webhookSecret = process.env.CLERK_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error('❌ CLERK_WEBHOOK_SECRET not configured');
     return res.status(500).json({ error: 'Webhook secret not configured' });
   }
 
   if (!supabase) {
-    console.error('❌ Supabase client not available for webhook');
     return res.status(500).json({ error: 'Database not configured' });
   }
 
@@ -72,14 +69,12 @@ export async function handleClerkWebhook(req: Request, res: Response) {
   const svixSignature = req.headers['svix-signature'] as string;
 
   if (!svixId || !svixTimestamp || !svixSignature) {
-    console.error('❌ Missing Svix headers');
     return res.status(400).json({ error: 'Missing webhook headers' });
   }
 
   // Get raw body for signature verification
   const rawBody = (req as any).rawBody;
   if (!rawBody) {
-    console.error('❌ Raw body not available for webhook verification');
     return res.status(400).json({ error: 'Raw body not available' });
   }
 
@@ -93,7 +88,6 @@ export async function handleClerkWebhook(req: Request, res: Response) {
       'svix-signature': svixSignature,
     }) as ClerkWebhookEvent;
   } catch (err: any) {
-    console.error('❌ Webhook signature verification failed:', err?.message);
     return res.status(400).json({ error: 'Invalid signature' });
   }
 
@@ -101,8 +95,6 @@ export async function handleClerkWebhook(req: Request, res: Response) {
   if (payload.type === 'user.created') {
     const { id: clerkUserId, email_addresses, first_name, last_name } = payload.data as any;
     const primaryEmail = email_addresses?.[0]?.email_address;
-
-    console.log(`📥 Clerk webhook: user.created for ${clerkUserId} (${primaryEmail})`);
 
     try {
       // Check if profile already exists (idempotency)
@@ -113,7 +105,6 @@ export async function handleClerkWebhook(req: Request, res: Response) {
         .maybeSingle();
 
       if (existingProfile) {
-        console.log(`ℹ️  Profile already exists for ${clerkUserId}`);
         return res.json({ received: true, action: 'profile_exists' });
       }
 
@@ -133,17 +124,14 @@ export async function handleClerkWebhook(req: Request, res: Response) {
         .single();
 
       if (insertError) {
-        console.error('❌ Failed to create profile:', insertError);
         // Return 200 anyway to prevent Clerk from retrying
         // Log the error for investigation
         return res.json({ received: true, error: insertError.message });
       }
 
-      console.log(`✅ Profile created for ${clerkUserId}: ${newProfile.id}`);
       return res.json({ received: true, action: 'profile_created', profileId: newProfile.id });
 
     } catch (err: any) {
-      console.error('❌ Error handling user.created:', err?.message);
       // Return 200 to prevent retry loops
       return res.json({ received: true, error: err?.message });
     }
@@ -152,7 +140,6 @@ export async function handleClerkWebhook(req: Request, res: Response) {
   // Handle user.deleted event (optional - for cleanup)
   if (payload.type === 'user.deleted') {
     const { id: clerkUserId } = payload.data as any;
-    console.log(`📥 Clerk webhook: user.deleted for ${clerkUserId}`);
     
     // Optional: Delete or soft-delete the profile
     // For now, just acknowledge
@@ -160,6 +147,5 @@ export async function handleClerkWebhook(req: Request, res: Response) {
   }
 
   // Acknowledge other events we don't handle
-  console.log(`📥 Clerk webhook: ${payload.type} (not handled)`);
   return res.json({ received: true, action: 'event_not_handled' });
 }

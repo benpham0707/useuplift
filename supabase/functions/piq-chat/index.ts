@@ -75,15 +75,6 @@ Deno.serve(async (req) => {
     // Parse request
     const requestBody: PIQChatRequest = await req.json();
 
-    console.log('💬 PIQ Chat Request:', {
-      promptId: requestBody.promptId,
-      promptTitle: requestBody.promptTitle,
-      userMessage: requestBody.userMessage.substring(0, 100) + '...',
-      essayLength: requestBody.essayText?.length,
-      currentScore: requestBody.options?.currentScore,
-      conversationLength: requestBody.conversationHistory?.length || 0,
-    });
-
     // Validate required fields
     if (!requestBody.userMessage || !requestBody.essayText || !requestBody.promptId) {
       return new Response(
@@ -102,7 +93,6 @@ Deno.serve(async (req) => {
     }
 
     // Build PIQ context
-    console.log('📊 Building PIQ context...');
     const context = buildPIQContext(
       requestBody.promptId,
       requestBody.promptText,
@@ -126,10 +116,6 @@ Deno.serve(async (req) => {
       contextBlock,
       conversationContext
     );
-
-    console.log('🤖 Calling Claude...');
-    console.log(`   Context size: ${contextBlock.length} chars`);
-    console.log(`   Conversation history: ${requestBody.conversationHistory?.length || 0} messages`);
 
     // Call Anthropic
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -161,21 +147,14 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('❌ Anthropic API error:', error);
       throw new Error(`Anthropic API error: ${response.statusText}`);
     }
 
     const result = await response.json();
     const duration = Date.now() - startTime;
 
-    console.log('✅ Chat response generated');
-    console.log(`   Duration: ${duration}ms`);
-    console.log(`   Input tokens: ${result.usage.input_tokens}`);
-    console.log(`   Output tokens: ${result.usage.output_tokens}`);
     if (result.usage.cache_read_input_tokens) {
-      console.log(`   Cache read tokens: ${result.usage.cache_read_input_tokens}`);
     }
-    console.log(`   Cost: $${calculateCost(result.usage)}`);
 
     // Build response
     const chatResponse: PIQChatResponse = {
@@ -198,7 +177,6 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('❌ PIQ Chat Error:', error);
 
     return new Response(
       JSON.stringify({

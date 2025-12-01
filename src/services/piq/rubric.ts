@@ -269,7 +269,6 @@ export const PIQ_RUBRIC_DIMENSIONS: PIQDimensionMetadata[] = [
 // Verify weights sum to 1.0
 const totalWeight = PIQ_RUBRIC_DIMENSIONS.reduce((sum, dim) => sum + dim.weight, 0);
 if (Math.abs(totalWeight - 1.0) > 0.001) {
-  console.warn(`⚠️  PIQ rubric baseline weights sum to ${totalWeight.toFixed(3)}, not 1.0`);
 }
 
 // ============================================================================

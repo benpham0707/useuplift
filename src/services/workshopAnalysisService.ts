@@ -99,14 +99,6 @@ export async function analyzeExtracurricularEntry(
     skip_coaching?: boolean;
   } = {}
 ): Promise<AnalysisResult> {
-  console.log('='.repeat(80));
-  console.log('WORKSHOP ANALYSIS SERVICE');
-  console.log('='.repeat(80));
-  console.log(`Activity: ${activity.name}`);
-  console.log(`Category: ${activity.category}`);
-  console.log(`Description length: ${description.length} chars`);
-  console.log(`Depth: ${options.depth || 'standard'}`);
-  console.log('');
 
   try {
     // Fast fail if backend is not reachable to avoid long UI hangs
@@ -116,15 +108,12 @@ export async function analyzeExtracurricularEntry(
 
     for (const path of healthPaths) {
       try {
-        console.log(`[Health Check] Trying ${path}...`);
         const healthRes = await fetch(path, { signal: AbortSignal.timeout(10000) });
         if (healthRes.ok) {
-          console.log(`[Health Check] ✅ Success via ${path}`);
           healthCheckPassed = true;
           break;
         }
       } catch (err) {
-        console.log(`[Health Check] ❌ Failed via ${path}:`, err);
       }
     }
 
@@ -144,16 +133,12 @@ export async function analyzeExtracurricularEntry(
     });
 
   // Run elite pattern detection
-  console.log('Running elite pattern detection...');
   const elitePatterns = analyzeElitePatterns(description);
 
   // Run literary sophistication detection
-  console.log('Running literary sophistication detection...');
   const literarySophistication = analyzeLiterarySophistication(description);
 
   // Debug: Check what we got from backend
-  console.log('Backend result.report.categories:', result.report.categories.length, 'categories');
-  console.log('First category:', result.report.categories[0]);
 
   // Transform to frontend AnalysisResult format
   const analysisResult: AnalysisResult = {
@@ -300,28 +285,9 @@ export async function analyzeExtracurricularEntry(
   };
 
     // DEBUG: Log the exact NQI we're returning
-    console.log('');
-    console.log('🔍 DEBUG: Exact values being returned:');
-    console.log('  result.report.narrative_quality_index (from API):', result.report.narrative_quality_index);
-    console.log('  analysisResult.analysis.narrative_quality_index (mapped):', analysisResult.analysis.narrative_quality_index);
-    console.log('  Categories count:', analysisResult.analysis.categories.length);
-    console.log('  First category score:', analysisResult.analysis.categories[0]?.score, '/', analysisResult.analysis.categories[0]?.maxScore);
-    console.log('');
-    console.log('✓ Analysis complete');
-    console.log(`  NQI: ${analysisResult.analysis.narrative_quality_index}/100`);
-    console.log(`  Categories returned: ${analysisResult.analysis.categories.length}`);
-    console.log(`  First category:`, analysisResult.analysis.categories[0]);
-    console.log(`  Elite patterns: ${analysisResult.elite_patterns.overallScore}/100 (Tier ${analysisResult.elite_patterns.tier})`);
-    console.log(`  Literary sophistication: ${analysisResult.literary_sophistication.overallScore}/100`);
-    console.log(`  Coaching issues: ${analysisResult.coaching?.prioritized_issues.length || 0}`);
-    console.log('='.repeat(80));
-    console.log('');
 
     return analysisResult;
   } catch (error) {
-    console.error('❌ [workshopAnalysisService] Analysis failed:', error);
-    console.error('❌ [workshopAnalysisService] Error details:', error instanceof Error ? error.message : String(error));
-    console.error('❌ [workshopAnalysisService] Stack:', error instanceof Error ? error.stack : 'No stack');
 
     // DO NOT FALLBACK TO MOCK - throw the error so we can see what's wrong
     throw new Error(`Backend analysis failed: ${error instanceof Error ? error.message : String(error)}`);

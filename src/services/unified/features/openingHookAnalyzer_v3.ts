@@ -140,8 +140,6 @@ export async function analyzeOpeningHook(
   const depth = options.depth || 'comprehensive';
   const essayType = options.essayType || 'leadership';
 
-  console.log(`[OpeningHookAnalyzer V3] Analyzing with storytelling layer (${depth} mode)`);
-
   // Extract opening
   const sentences = fullEssay.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const opening = sentences.slice(0, 3).join('. ') + '.';
@@ -149,7 +147,6 @@ export async function analyzeOpeningHook(
   // Check cache
   const cacheKey = `hook-v3-${fullEssay.substring(0, 100)}-${depth}`;
   if (!options.skipCache && analysisCache.has(cacheKey)) {
-    console.log('[OpeningHookAnalyzer V3] Cache HIT');
     return analysisCache.get(cacheKey)!;
   }
 
@@ -158,7 +155,6 @@ export async function analyzeOpeningHook(
   const userPrompt = buildUserPrompt(opening, fullEssay, essayType, depth);
 
   // Call Claude API
-  console.log('[OpeningHookAnalyzer V3] Calling Claude API...');
   const response = await callClaudeWithRetry<HookAnalysis>(
     userPrompt,
     {
@@ -171,8 +167,6 @@ export async function analyzeOpeningHook(
 
   // ROBUST JSON PARSING (V3 improvement)
   const analysis = parseJsonWithFallbacks(response.content);
-
-  console.log(`[OpeningHookAnalyzer V3] ✓ Complete: ${analysis.hook_type} (${analysis.effectiveness_score}/10)`);
 
   // Cache result
   analysisCache.set(cacheKey, analysis);

@@ -27,9 +27,6 @@ export async function analyzeExtracurricular(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout to avoid long UI hangs
 
-  console.log('[extracurricularAnalysis] Starting API call to backend...');
-  console.log('[extracurricularAnalysis] Timeout set to 30 seconds');
-
   try {
     const response = await fetch(`${API_BASE_URL}/api/analyze-entry`, {
       method: 'POST',
@@ -47,11 +44,9 @@ export async function analyzeExtracurricular(
     });
 
     clearTimeout(timeoutId);
-    console.log('[extracurricularAnalysis] Response received!', response.status);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Analysis failed' }));
-      console.error('[extracurricularAnalysis] API error:', error);
       throw new Error(error.message || `Analysis failed with status ${response.status}`);
     }
 
@@ -61,15 +56,12 @@ export async function analyzeExtracurricular(
     // Unwrap the nested structure
     const unwrapped = result.success ? result.result : result;
 
-    console.log('[extracurricularAnalysis] SUCCESS! NQI:', unwrapped.report.narrative_quality_index);
     return unwrapped;
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('[extracurricularAnalysis] TIMEOUT after 90 seconds');
       throw new Error('Analysis timed out. Is the backend running on :8789? Try "npm run server" or "npm run dev:full".');
     }
-    console.error('[extracurricularAnalysis] Error:', error);
     throw error;
   }
 }

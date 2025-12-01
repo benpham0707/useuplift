@@ -95,12 +95,9 @@ export async function analyzeOpeningHook(
   const firstSentence = sentences[0]?.trim() || '';
   const wordCount = firstSentence.split(/\s+/).length;
 
-  console.log(`[OpeningHookAnalyzer] Analyzing opening (${depth} mode): "${firstSentence.substring(0, 80)}..."`);
-
   // Check cache
   const cacheKey = getCacheKey(firstSentence, depth);
   if (!options.skipCache && analysisCache.has(cacheKey)) {
-    console.log('[OpeningHookAnalyzer] Cache HIT');
     return analysisCache.get(cacheKey)!;
   }
 
@@ -109,7 +106,6 @@ export async function analyzeOpeningHook(
   const userPrompt = buildHookAnalysisUserPrompt(firstSentence, depth);
 
   // Call Claude API
-  console.log('[OpeningHookAnalyzer] Calling Claude API...');
   const response = await callClaudeWithRetry<HookAnalysisResponse>(
     userPrompt,
     {
@@ -124,8 +120,6 @@ export async function analyzeOpeningHook(
   const analysisData = typeof response.content === 'string'
     ? JSON.parse(response.content)
     : response.content;
-
-  console.log(`[OpeningHookAnalyzer] ✓ Analysis complete: ${analysisData.hook_type} hook, ${analysisData.effectiveness_score}/10`);
 
   // Structure final analysis
   const analysis: HookAnalysis = {

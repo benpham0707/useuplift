@@ -23,7 +23,6 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 
 async function sendEmail(bugReport: BugReportPayload & { userId?: string, reportId: string, createdAt: string }) {
   if (!RESEND_API_KEY) {
-    console.log('No RESEND_API_KEY configured, skipping email notification')
     return { success: false, error: 'Email service not configured' }
   }
 
@@ -158,13 +157,11 @@ async function sendEmail(bugReport: BugReportPayload & { userId?: string, report
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Resend API error:', errorText)
       return { success: false, error: errorText }
     }
 
     return { success: true }
   } catch (error) {
-    console.error('Email send error:', error)
     return { success: false, error: String(error) }
   }
 }
@@ -229,7 +226,6 @@ Deno.serve(async (req) => {
       .single()
 
     if (insertError) {
-      console.error('Database insert error:', insertError)
       return new Response(
         JSON.stringify({ error: 'Failed to save bug report', details: insertError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -256,7 +252,6 @@ Deno.serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('submit-bug-report error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

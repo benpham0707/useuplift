@@ -61,10 +61,8 @@ export async function synthesizePortfolio(
 
     return parseSynthesisResponse(textContent.text, weightedScore);
   } catch (error) {
-    console.error('Portfolio Synthesis failed:', error);
 
     try {
-      console.log('Retrying Portfolio Synthesis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
@@ -80,7 +78,6 @@ export async function synthesizePortfolio(
 
       return parseSynthesisResponse(retryText.text, weightedScore);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicSynthesis(holistic, dimensions, mode, weightedScore);
     }
   }
@@ -531,7 +528,6 @@ function parseSynthesisResponse(text: string, weightedScore: number): PortfolioS
 
     return result;
   } catch (error) {
-    console.error('Failed to parse synthesis JSON:', error);
     throw new Error('Invalid JSON from synthesis engine');
   }
 }

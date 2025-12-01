@@ -25,13 +25,6 @@ export async function analyzePIQWithFullWorkshop(
     essayType?: 'personal_statement' | 'uc_piq' | 'why_us' | 'supplemental' | 'activity_essay';
   }
 ): Promise<SurgicalWorkshopResult> {
-  console.log('='.repeat(80));
-  console.log('PIQ SURGICAL WORKSHOP - FULL ANALYSIS');
-  console.log('='.repeat(80));
-  console.log(`Prompt: ${promptTitle}`);
-  console.log(`Essay length: ${essayText.length} chars`);
-  console.log(`Word count: ${essayText.trim().split(/\s+/).filter(Boolean).length}`);
-  console.log('');
 
   // Prepare input for surgical workshop
   const input: NarrativeEssayInput = {
@@ -47,10 +40,6 @@ export async function analyzePIQWithFullWorkshop(
     }
   };
 
-  console.log('🚀 Starting FULL surgical workshop pipeline...');
-  console.log('   This will take 100-120 seconds for complete analysis.');
-  console.log('');
-
   try {
     // Run the COMPLETE surgical workshop
     // This includes:
@@ -62,24 +51,12 @@ export async function analyzePIQWithFullWorkshop(
     // - Surgical fix generation with 3 suggestion types
     const result = await runSurgicalWorkshop(input);
 
-    console.log('');
-    console.log('✅ SURGICAL WORKSHOP COMPLETE');
-    console.log(`   EQI Score: ${result.overallScore}/100`);
-    console.log(`   Workshop Items: ${result.workshopItems.length}`);
-    console.log(`   Voice Fingerprint: ${result.voiceFingerprint ? 'Yes' : 'No'}`);
-    console.log(`   Experience Fingerprint: ${result.experienceFingerprint ? 'Yes' : 'No'}`);
-    console.log(`   Total Time: ${result.performanceMetrics.totalMs}ms`);
-    console.log('='.repeat(80));
-    console.log('');
-
     // Validate we got all expected data
     validateFullDataIntegrity(result);
 
     return result;
 
   } catch (error) {
-    console.error('❌ SURGICAL WORKSHOP FAILED:', error);
-    console.error('   Error details:', error instanceof Error ? error.message : String(error));
     throw new Error(`PIQ Surgical Workshop analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
@@ -122,14 +99,12 @@ function validateFullDataIntegrity(result: SurgicalWorkshopResult): void {
 
   // Warning for optional but expected data
   if (!result.experienceFingerprint) {
-    console.warn('⚠️  Experience fingerprint not generated - this is optional but valuable');
   }
 
   if (errors.length > 0) {
     throw new Error(`Data integrity validation failed:\n  ${errors.join('\n  ')}`);
   }
 
-  console.log('✅ Data integrity validated - all critical fields present');
 }
 
 /**

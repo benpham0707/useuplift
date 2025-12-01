@@ -67,10 +67,6 @@ export async function analyzePortfolio(
   const startTime = Date.now();
   const analysisId = uuidv4();
 
-  console.log(`[Portfolio Scanner] Starting analysis ${analysisId}`);
-  console.log(`[Portfolio Scanner] Mode: ${options.uc_mode}`);
-  console.log(`[Portfolio Scanner] Depth: ${options.depth}`);
-
   const stageTimings = {
     stage1_holistic_ms: 0,
     stage2_dimensions_ms: 0,
@@ -84,19 +80,16 @@ export async function analyzePortfolio(
     // =========================================================================
     // STAGE 1: Holistic Portfolio Understanding
     // =========================================================================
-    console.log('[Portfolio Scanner] Stage 1: Holistic Analysis starting...');
     const stage1Start = Date.now();
 
     const holistic = await analyzeHolisticPortfolio(portfolio, options.uc_mode);
     llmCalls += 1;
 
     stageTimings.stage1_holistic_ms = Date.now() - stage1Start;
-    console.log(`[Portfolio Scanner] Stage 1 complete in ${stageTimings.stage1_holistic_ms}ms`);
 
     // =========================================================================
     // STAGE 2: Dimension Deep Dive (6 parallel LLM calls)
     // =========================================================================
-    console.log('[Portfolio Scanner] Stage 2: Dimension Analysis starting (6 parallel calls)...');
     const stage2Start = Date.now();
 
     // Run all 6 dimension analyzers in parallel
@@ -131,7 +124,6 @@ export async function analyzePortfolio(
     };
 
     stageTimings.stage2_dimensions_ms = Date.now() - stage2Start;
-    console.log(`[Portfolio Scanner] Stage 2 complete in ${stageTimings.stage2_dimensions_ms}ms`);
 
     // =========================================================================
     // STAGE 3: Synthesis (if enabled)
@@ -139,14 +131,12 @@ export async function analyzePortfolio(
     let synthesis: PortfolioSynthesis;
 
     if (options.include_synthesis) {
-      console.log('[Portfolio Scanner] Stage 3: Synthesis starting...');
       const stage3Start = Date.now();
 
       synthesis = await synthesizePortfolio(portfolio, holistic, dimensions, options.uc_mode);
       llmCalls += 1;
 
       stageTimings.stage3_synthesis_ms = Date.now() - stage3Start;
-      console.log(`[Portfolio Scanner] Stage 3 complete in ${stageTimings.stage3_synthesis_ms}ms`);
     } else {
       // Generate minimal synthesis without LLM
       synthesis = generateMinimalSynthesis(holistic, dimensions);
@@ -158,7 +148,6 @@ export async function analyzePortfolio(
     let guidance: StrategicGuidance;
 
     if (options.include_guidance) {
-      console.log('[Portfolio Scanner] Stage 4: Strategic Guidance starting...');
       const stage4Start = Date.now();
 
       guidance = await generateStrategicGuidance(
@@ -171,7 +160,6 @@ export async function analyzePortfolio(
       llmCalls += 1;
 
       stageTimings.stage4_guidance_ms = Date.now() - stage4Start;
-      console.log(`[Portfolio Scanner] Stage 4 complete in ${stageTimings.stage4_guidance_ms}ms`);
     } else {
       // Generate minimal guidance without LLM
       guidance = generateMinimalGuidance();
@@ -206,13 +194,8 @@ export async function analyzePortfolio(
       confidence: calculateOverallConfidence(holistic, dimensions, synthesis),
     };
 
-    console.log(`[Portfolio Scanner] Analysis complete in ${totalDuration}ms`);
-    console.log(`[Portfolio Scanner] Total LLM calls: ${llmCalls}`);
-    console.log(`[Portfolio Scanner] Overall Score: ${synthesis.overallScore}/10`);
-
     return result;
   } catch (error) {
-    console.error('[Portfolio Scanner] Analysis failed:', error);
     throw error;
   }
 }
@@ -416,7 +399,6 @@ export async function analyzePortfolioFromDatabase(
     include_guidance: true,
   }
 ): Promise<PortfolioAnalysisResult> {
-  console.log(`[Portfolio Scanner] Starting database analysis for profile: ${profileId}`);
 
   // Fetch and transform all portfolio data from database
   const portfolioData = await fetchAndTransformPortfolioData(supabase, profileId);

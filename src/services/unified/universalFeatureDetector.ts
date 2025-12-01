@@ -88,15 +88,9 @@ export async function runUniversalFeatureDetection(
 ): Promise<UnifiedPIQResult['features']> {
   const startTime = Date.now();
 
-  console.log('   🔬 Initializing universal feature detection...');
-  console.log(`   📊 Depth: ${depth}`);
-  console.log('');
-
   // ========================================================================
   // PARALLEL DETECTION EXECUTION
   // ========================================================================
-
-  console.log('   ⚡ Running 6 detections in parallel...');
 
   const detectionPromises = {
     scenes: measureTime('Scene Detection', () => detectScenes(text)),
@@ -117,47 +111,33 @@ export async function runUniversalFeatureDetection(
     detectionPromises.literary
   ]);
 
-  console.log('   ✅ All detections complete');
-  console.log('');
-
   // ========================================================================
   // SYNTHESIS & ENHANCEMENT
   // ========================================================================
 
-  console.log('   🔄 Synthesizing results and calculating quality scores...');
-
   // Scene Analysis with Quality Scoring
   const sceneAnalysis = await enhanceSceneDetection(scenes, text);
-  console.log(`      Scenes: ${sceneAnalysis.count} detected (quality: ${sceneAnalysis.quality_score.toFixed(1)}/10)`);
 
   // Dialogue Analysis with Quality Scoring
   const dialogueAnalysis = await enhanceDialogueExtraction(dialogue, text);
-  console.log(`      Dialogue: ${dialogueAnalysis.count} instances (quality: ${dialogueAnalysis.quality_score.toFixed(1)}/10)`);
 
   // Interiority Analysis with Depth Assessment
   const interiorityAnalysis = await enhanceInteriorityDetection(interiority, text);
-  console.log(`      Interiority: ${interiorityAnalysis.overall_score.toFixed(1)}/10 (${interiorityAnalysis.depth_level})`);
 
   // Authenticity Analysis with Signal Breakdown
   const authenticityAnalysis = await enhanceAuthenticityAnalysis(authenticity, text);
-  console.log(`      Authenticity: ${authenticityAnalysis.score.toFixed(1)}/10 (${authenticityAnalysis.voice_type})`);
 
   // Elite Patterns with Pattern-Level Detail
   const elitePatternsAnalysis = await enhanceElitePatternDetection(elitePatterns, text);
-  console.log(`      Elite Patterns: ${elitePatternsAnalysis.overall_score}/100 (Tier ${elitePatternsAnalysis.tier})`);
 
   // Literary Sophistication with Technique Breakdown
   const literaryAnalysis = await enhanceLiterarySophistication(literary, text);
-  console.log(`      Literary: ${literaryAnalysis.overall_score}/100 (Tier ${literaryAnalysis.tier})`);
-
-  console.log('');
 
   // ========================================================================
   // CROSS-VALIDATION
   // ========================================================================
 
   if (depth === 'comprehensive') {
-    console.log('   🔍 Running cross-validation checks...');
 
     const validationResults = crossValidateFeatures({
       scenes: sceneAnalysis,
@@ -169,27 +149,20 @@ export async function runUniversalFeatureDetection(
     });
 
     if (validationResults.warnings.length > 0) {
-      console.log('   ⚠️  Validation warnings:');
       validationResults.warnings.forEach(warning => {
-        console.log(`      - ${warning}`);
       });
     }
 
     if (validationResults.insights.length > 0) {
-      console.log('   💡 Validation insights:');
       validationResults.insights.forEach(insight => {
-        console.log(`      - ${insight}`);
       });
     }
 
-    console.log('');
   }
 
   // ========================================================================
   // OPPORTUNITY IDENTIFICATION
   // ========================================================================
-
-  console.log('   💡 Identifying missing opportunities...');
 
   const opportunities = identifyMissingOpportunities({
     text,
@@ -200,17 +173,11 @@ export async function runUniversalFeatureDetection(
   });
 
   if (opportunities.high_impact.length > 0) {
-    console.log(`   🎯 High-impact opportunities: ${opportunities.high_impact.length}`);
   }
   if (opportunities.medium_impact.length > 0) {
-    console.log(`   📊 Medium-impact opportunities: ${opportunities.medium_impact.length}`);
   }
 
-  console.log('');
-
   const totalTime = Date.now() - startTime;
-  console.log(`   ⏱️  Total feature detection time: ${totalTime}ms`);
-  console.log('');
 
   // ========================================================================
   // RETURN SYNTHESIZED RESULTS
@@ -663,7 +630,6 @@ async function measureTime<T>(
   const start = Date.now();
   const result = await fn();
   const duration = Date.now() - start;
-  console.log(`      ✓ ${label}: ${duration}ms`);
   return result;
 }
 

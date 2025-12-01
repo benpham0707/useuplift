@@ -288,10 +288,8 @@ export default function ContextualWorkshopChat({
       const token = await getToken({ template: 'supabase' });
       if (token) {
         const creditCheck = await canSendChatMessage(userId, token);
-        console.log(`💳 Chat credit check: ${creditCheck.currentBalance} credits available, ${creditCheck.required} required`);
         
         if (!creditCheck.hasEnough) {
-          console.warn(`❌ Insufficient credits for chat: ${creditCheck.currentBalance}/${creditCheck.required}`);
           setCurrentCreditBalance(creditCheck.currentBalance);
           setShowInsufficientCreditsModal(true);
           return;
@@ -301,9 +299,7 @@ export default function ContextualWorkshopChat({
         const promptName = mode === 'piq' ? piqPromptTitle : activity?.name;
         const deductResult = await deductForChatMessage(userId, token, promptName);
         if (deductResult.success) {
-          console.log(`💳 Deducted ${CREDIT_COSTS.CHAT_MESSAGE} credit upfront. New balance: ${deductResult.newBalance}`);
         } else {
-          console.warn('⚠️ Failed to deduct chat credit:', deductResult.error);
           // Don't proceed if deduction fails
           return;
         }
@@ -359,7 +355,6 @@ export default function ContextualWorkshopChat({
         }
       }
     } catch (error) {
-      console.error('Chat error:', error);
 
       // Add error message with details
       const errorMessage: ChatMessage = {

@@ -32,7 +32,6 @@ export class NarrativeGenerator {
    * Engine B: The Alchemist.
    */
   static async generate(request: GenerationRequest): Promise<string> {
-    console.log(`[NarrativeGenerator] Generating content for focus area: ${request.focusArea}`);
 
     const systemPrompt = NarrativeGenerator.buildSystemPrompt(request);
     const userPrompt = NarrativeGenerator.buildUserPrompt(request);
@@ -49,7 +48,6 @@ export class NarrativeGenerator {
       return typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
     } catch (error) {
-      console.error('[NarrativeGenerator] Generation failed:', error);
       throw new Error('Failed to generate narrative content.');
     }
   }

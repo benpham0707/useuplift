@@ -619,7 +619,6 @@ export function selectBestValidatedAngle(
   const usableAngles = validated.filter(v => v.recommendation !== 'avoid');
 
   if (usableAngles.length === 0) {
-    console.warn('⚠️ All angles flagged as "avoid" - using least-bad option');
     return { angle: validated[0].angle, validation: validated[0] };
   }
 

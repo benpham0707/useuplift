@@ -96,7 +96,6 @@ export const TeachingUnitCard: React.FC<TeachingUnitCardProps> = ({
 
       setReflectionPrompts(prompts);
     } catch (error) {
-      console.error('[TeachingUnitCard] Failed to load prompts:', error);
       setPromptsError('Unable to load reflection questions. Please try again.');
     } finally {
       setIsLoadingPrompts(false);

@@ -65,7 +65,6 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.warn('[TeachingLayerService] Missing Supabase credentials');
 }
 
 const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
@@ -127,12 +126,6 @@ export async function enhanceWithTeachingLayer(
       currentNQI: analysisContext.currentNQI,
     };
 
-    console.log('[TeachingLayerService] Calling teaching-layer edge function...', {
-      itemCount: issues.length,
-      essayLength: essayText.length,
-      currentNQI: analysisContext.currentNQI,
-    });
-
     // Call edge function
     const { data, error } = await supabase.functions.invoke<TeachingLayerResponse>(
       'teaching-layer',
@@ -142,20 +135,12 @@ export async function enhanceWithTeachingLayer(
     );
 
     if (error) {
-      console.error('[TeachingLayerService] Edge function error:', error);
       throw error;
     }
 
     if (!data || !data.success) {
-      console.error('[TeachingLayerService] Invalid response:', data);
       throw new Error(data?.error || 'Failed to enhance items');
     }
-
-    console.log('[TeachingLayerService] Success!', {
-      itemsEnhanced: data.enhancedItems.length,
-      duration: data.performance?.duration_s,
-      costPerItem: data.performance?.cost_per_item,
-    });
 
     // Merge teaching guidance back into issues using the stable ID map
     const enhancedIssues = issues.map((issue) => {
@@ -163,7 +148,6 @@ export async function enhanceWithTeachingLayer(
       const enhancement = data.enhancedItems.find((item) => item.id === issueId);
 
       if (enhancement) {
-        console.log(`[TeachingLayerService] Enhanced issue ${issueId} with teaching guidance`);
         return {
           ...issue,
           teaching: enhancement.teaching,
@@ -172,16 +156,13 @@ export async function enhanceWithTeachingLayer(
         };
       }
 
-      console.warn(`[TeachingLayerService] No teaching found for issue ${issueId}`);
       return issue;
     });
 
     const totalTime = Date.now() - startTime;
-    console.log('[TeachingLayerService] Total time:', totalTime, 'ms');
 
     return enhancedIssues;
   } catch (error) {
-    console.error('[TeachingLayerService] Failed to enhance issues:', error);
     // Return original issues on error - teaching layer is enhancement, not required
     return issues;
   }

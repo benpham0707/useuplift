@@ -153,10 +153,6 @@ export function saveVersion(
   // Save back to storage
   localStorage.setItem(getStorageKey(activity.id), JSON.stringify(trimmedVersions));
 
-  console.log(`✅ Saved version ${version.id} for activity ${activity.id}`);
-  console.log(`   NQI: ${version.analysis.nqi}/100`);
-  console.log(`   Total versions: ${trimmedVersions.length}`);
-
   return version;
 }
 
@@ -173,7 +169,6 @@ export function getVersions(activityId: string): EssayVersion[] {
     // Sort by timestamp (newest first)
     return versions.sort((a, b) => b.timestamp - a.timestamp);
   } catch (error) {
-    console.error('Failed to load versions:', error);
     return [];
   }
 }
@@ -209,7 +204,6 @@ export function deleteVersion(activityId: string, versionId: string): boolean {
     localStorage.setItem(getStorageKey(activityId), JSON.stringify(filtered));
     return true;
   } catch (error) {
-    console.error('Failed to delete version:', error);
     return false;
   }
 }
@@ -235,7 +229,6 @@ export function addVersionNote(activityId: string, versionId: string, note: stri
     localStorage.setItem(getStorageKey(activityId), JSON.stringify(versions));
     return true;
   } catch (error) {
-    console.error('Failed to add note:', error);
     return false;
   }
 }
@@ -415,12 +408,10 @@ export function cleanupOldVersions(): void {
         }
       }
     } catch (error) {
-      console.error(`Failed to clean up ${key}:`, error);
     }
   }
 
   if (totalRemoved > 0) {
-    console.log(`🧹 Cleaned up ${totalRemoved} old versions`);
   }
 }
 
@@ -472,7 +463,6 @@ export function importVersionHistory(activityId: string, jsonData: string): bool
 
     return true;
   } catch (error) {
-    console.error('Failed to import version history:', error);
     return false;
   }
 }

@@ -258,8 +258,6 @@ async function runDeepReflectionIfNeeded(
     return { score: null, duration_ms: 0 };
   }
 
-  console.log('Running deep reflection analysis (initial score < 6)...');
-
   const deepScore = await scoreSingleCategory('reflection_meaning', entry, features, authenticity);
 
   const duration = Date.now() - startTime;
@@ -277,9 +275,6 @@ export async function analyzeEntry(
   entry: ExperienceEntry,
   options: AnalysisOptions = { depth: 'standard' }
 ): Promise<AnalysisResult> {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`ANALYZING ENTRY: ${entry.title}`);
-  console.log(`${'='.repeat(80)}\n`);
 
   const performanceTracking = {
     stage1_ms: 0,
@@ -296,7 +291,6 @@ export async function analyzeEntry(
   // ==========================================================================
 
   const stage1Start = Date.now();
-  console.log('Stage 1: Feature Extraction + Authenticity Detection...');
 
   const features = await extractFeatures(entry);
 
@@ -309,20 +303,12 @@ export async function analyzeEntry(
   const authenticity = analyzeAuthenticity(entry.description_original);
 
   performanceTracking.stage1_ms = Date.now() - stage1Start;
-  console.log(`✓ Stage 1 complete (${performanceTracking.stage1_ms}ms)`);
-  console.log(`  - Word count: ${features.word_count}`);
-  console.log(`  - Active verbs: ${features.voice.active_verb_count}, Passive: ${features.voice.passive_verb_count}`);
-  console.log(`  - Numbers found: ${features.evidence.number_count}`);
-  console.log(`  - Reflection quality: ${features.reflection.reflection_quality}`);
-  console.log(`  - Authenticity score: ${authenticity.authenticity_score}/10 (${authenticity.voice_type})`);
-  console.log(`  - Red flags: ${authenticity.red_flags.length}, Green flags: ${authenticity.green_flags.length}\n`);
 
   // ==========================================================================
   // STAGE 2: PARALLEL CATEGORY SCORING
   // ==========================================================================
 
   const stage2Start = Date.now();
-  console.log('Stage 2: Parallel Category Scoring (3 batches)...');
 
   const { scores: categoryScores, totalUsage } = await scoreAllCategories(entry, features, authenticity);
 
@@ -332,8 +318,6 @@ export async function analyzeEntry(
   }
 
   performanceTracking.stage2_ms = Date.now() - stage2Start;
-  console.log(`✓ Stage 2 complete (${performanceTracking.stage2_ms}ms)`);
-  console.log(`  - Scored ${categoryScores.length} categories in ${totalUsage.batches} parallel batches\n`);
 
   // ==========================================================================
   // STAGE 3: CONDITIONAL DEEP REFLECTION
@@ -356,21 +340,17 @@ export async function analyzeEntry(
     const reflectionIndex = categoryScores.findIndex(s => s.name === 'reflection_meaning');
     if (reflectionIndex !== -1) {
       categoryScores[reflectionIndex] = deepReflectionScore;
-      console.log(`✓ Deep reflection analysis updated score: ${initialReflectionScore} → ${deepReflectionScore.score_0_to_10}`);
     }
   } else {
-    console.log(`⊘ Skipped deep reflection (initial score ${initialReflectionScore} ≥ 6)`);
   }
 
   performanceTracking.stage3_ms = stage3Duration;
-  console.log();
 
   // ==========================================================================
   // STAGE 4: NQI CALCULATION & FLAG GENERATION
   // ==========================================================================
 
   const stage4Start = Date.now();
-  console.log('Stage 4: NQI Calculation & Diagnostics...');
 
   // Build scores map - map display names to keys
   const scoresMap: Record<RubricCategory, number> = {} as any;
@@ -394,12 +374,10 @@ export async function analyzeEntry(
     if (categoryKey) {
       scoresMap[categoryKey] = score.score_0_to_10;
     } else {
-      console.warn(`Could not map category name "${score.name}" to a valid category key`);
     }
   }
 
   // Apply authenticity-based score adjustments
-  console.log('Applying authenticity-based adjustments...');
 
   // Calculate adjustment based on authenticity score
   // Calibrated for extracurricular context (more forgiving than personal statement essays)
@@ -426,8 +404,6 @@ export async function analyzeEntry(
   if (voiceIntegrityAdjustment !== 0) {
     const originalVoiceScore = scoresMap.voice_integrity;
     scoresMap.voice_integrity = Math.max(0, Math.min(10, scoresMap.voice_integrity + voiceIntegrityAdjustment));
-    console.log(`  - Voice Integrity: ${originalVoiceScore} → ${scoresMap.voice_integrity} (${voiceIntegrityAdjustment > 0 ? '+' : ''}${voiceIntegrityAdjustment})`);
-    console.log(`  - Reason: ${adjustmentReason}`);
 
     // Update the category score object as well
     const voiceScoreIdx = categoryScores.findIndex(s => s.name === 'voice_integrity' || s.name === 'Voice Integrity');
@@ -448,11 +424,9 @@ export async function analyzeEntry(
   if (quietExcellenceBonus > 0) {
     const originalNqi = nqi;
     nqi = Math.min(100, nqi + quietExcellenceBonus);
-    console.log(`  - Quiet Excellence bonus: +${quietExcellenceBonus} (${originalNqi} → ${nqi}) - sustained authenticity with strong fundamentals`);
   }
 
   const readerLabel = getReaderImpressionLabel(nqi);
-  console.log(`  - Using adaptive weights for category: ${entry.category}`);
 
   // Generate flags
   const flags = generateFlags(scoresMap, features, authenticity);
@@ -461,10 +435,6 @@ export async function analyzeEntry(
   const suggestedFixes = rankSuggestedFixes(scoresMap, flags);
 
   performanceTracking.stage4_ms = Date.now() - stage4Start;
-  console.log(`✓ Stage 4 complete (${performanceTracking.stage4_ms}ms)`);
-  console.log(`  - NQI: ${nqi}/100`);
-  console.log(`  - Label: ${readerLabel}`);
-  console.log(`  - Flags: ${flags.length}\n`);
 
   // ==========================================================================
   // ASSEMBLE REPORT
@@ -500,13 +470,7 @@ export async function analyzeEntry(
   if (!options.skip_coaching) {
     const { generateCoaching } = await import('./coaching');
     coaching = generateCoaching(entry, report, authenticity, features);
-    console.log(`✓ Coaching generated: ${coaching.overall.total_issues} issues detected\n`);
   }
-
-  console.log(`${'='.repeat(80)}`);
-  console.log(`ANALYSIS COMPLETE`);
-  console.log(`Total time: ${performanceTracking.total_ms}ms`);
-  console.log(`${'='.repeat(80)}\n`);
 
   return {
     report,

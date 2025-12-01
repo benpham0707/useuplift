@@ -98,7 +98,6 @@ export async function diagnoseSymptom(quote: string, surroundingContext: string)
             }
         };
     } catch (e) {
-        console.error("Error in Symptom Diagnoser:", e);
         return {
             diagnosis: "Analysis failed",
             specific_weakness: "Could not determine specific weakness",
@@ -113,15 +112,4 @@ export async function diagnoseSymptom(quote: string, surroundingContext: string)
         };
     }
 }
-
-
-
-
-
-
-
-
-
-
-
 

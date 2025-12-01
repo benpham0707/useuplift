@@ -16,7 +16,6 @@ import { callClaudeWithRetry } from '../../../lib/llm/claude';
 // HYBRID DETECTION: Deterministic + LLM
 // ============================================================================
 export async function analyzeOpeningHookV5(fullEssay, options = {}) {
-    console.log('[Hook Analyzer V5] Starting hybrid analysis...');
     const sentences = fullEssay.split(/[.!?]+/).filter(s => s.trim().length > 0);
     const opening = sentences.slice(0, 3).join('. ') + '.';
     // STAGE 1: Try deterministic classification (fast path)
@@ -24,14 +23,11 @@ export async function analyzeOpeningHookV5(fullEssay, options = {}) {
     if (!options.forceLLM) {
         deterministicResult = quickDeterministicCheck(opening);
         if (deterministicResult && deterministicResult.confidence >= 0.85) {
-            console.log(`[Hook Analyzer V5] ✓ High-confidence deterministic match: ${deterministicResult.type} (${(deterministicResult.confidence * 100).toFixed(0)}%)`);
         }
         else {
-            console.log(`[Hook Analyzer V5] Low-confidence or no deterministic match, using LLM...`);
         }
     }
     // STAGE 2: LLM analysis (always run for deep insights)
-    console.log('[Hook Analyzer V5] Calling Claude for deep analysis...');
     const llmAnalysis = await analyzWithLLM(opening, fullEssay, deterministicResult, // Pass hint to LLM
     options.essayType || 'leadership', options.depth || 'comprehensive');
     // STAGE 3: Combine results
@@ -41,7 +37,6 @@ export async function analyzeOpeningHookV5(fullEssay, options = {}) {
     const detectionMethod = deterministicResult && deterministicResult.confidence >= 0.85
         ? 'hybrid' // Used both
         : 'llm'; // LLM only
-    console.log(`[Hook Analyzer V5] ✓ Final: ${finalType} via ${detectionMethod}`);
     return {
         hook_type: finalType,
         hook_type_confidence: deterministicResult?.confidence || llmAnalysis.hook_type_confidence,

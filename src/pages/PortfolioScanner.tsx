@@ -333,7 +333,6 @@ const PortfolioScanner = () => {
           window.dispatchEvent(new CustomEvent('analytics:reconciled'));
         } catch (e: any) {
           // eslint-disable-next-line no-console
-          console.error('Update reconcile failed', e);
           setAiError(e?.message || 'Failed to update analytics');
         } finally {
           setAiLoading(false);
@@ -521,7 +520,6 @@ const PortfolioScanner = () => {
 
       if (error) {
         // eslint-disable-next-line no-console
-        console.error('Failed to load profile', error);
       }
 
       if (!data) {
@@ -537,7 +535,6 @@ const PortfolioScanner = () => {
           .single();
         if (insertError) {
           // eslint-disable-next-line no-console
-          console.error('Failed to create profile', insertError);
           setInitializing(false);
           return;
         }
@@ -566,7 +563,6 @@ const PortfolioScanner = () => {
         const token = session?.access_token;
 
         if (!token) {
-          console.warn('No token available for analytics fetch');
           return;
         }
 
@@ -596,7 +592,6 @@ const PortfolioScanner = () => {
         }));
       } catch (e: any) {
         // eslint-disable-next-line no-console
-        console.error('AI analytics error', e);
         setAiError(e?.message || 'Failed to compute portfolio strength');
       } finally {
         setAiLoading(false);

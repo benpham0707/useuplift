@@ -195,7 +195,6 @@ Return ONLY valid JSON, no markdown, no explanation.`;
  * Analyze conclusion and reflection
  */
 export async function analyzeConclusionReflection(input, essayType) {
-    console.log('  → Stage 2.4: Conclusion & Reflection Analysis');
     const startTime = Date.now();
     try {
         const prompt = buildConclusionReflectionPrompt(input.essayText, essayType);
@@ -217,16 +216,9 @@ export async function analyzeConclusionReflection(input, essayType) {
         }
         analysis.tokensUsed = response.usage?.total_tokens || 0;
         const duration = Date.now() - startTime;
-        console.log(`     ✓ Conclusion/reflection analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-        console.log(`       Type: ${analysis.conclusionType} (strength: ${analysis.conclusionStrength}/10)`);
-        console.log(`       Reflection: ${analysis.reflectionType} (depth: ${analysis.reflectionDepth}/10)`);
-        console.log(`       Micro→Macro: ${analysis.microToMacro.present ? 'Yes' : 'No'} (connection: ${analysis.microToMacro.connectionQuality}/10)`);
-        console.log(`       Philosophical depth: ${analysis.philosophicalDepth}/10`);
-        console.log(`       Clichés detected: ${analysis.clichesDetected.length}`);
         return analysis;
     }
     catch (error) {
-        console.error('     ✗ Conclusion/reflection analysis failed:', error);
         throw error;
     }
 }

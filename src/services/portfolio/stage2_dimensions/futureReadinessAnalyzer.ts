@@ -60,10 +60,8 @@ export async function analyzeFutureReadiness(
 
     return parseFutureReadinessAnalysis(textContent.text);
   } catch (error) {
-    console.error('Future Readiness analysis failed:', error);
 
     try {
-      console.log('Retrying Future Readiness analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 2500,
@@ -79,7 +77,6 @@ export async function analyzeFutureReadiness(
 
       return parseFutureReadinessAnalysis(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicFutureReadinessAnalysis(portfolio, mode);
     }
   }
@@ -476,7 +473,6 @@ function parseFutureReadinessAnalysis(text: string): FutureReadinessAnalysis {
 
     return result;
   } catch (error) {
-    console.error('Failed to parse future readiness analysis JSON:', error);
     throw new Error('Invalid JSON from future readiness analyzer');
   }
 }

@@ -98,8 +98,6 @@ async function validateSuggestions(
   anthropicApiKey: string
 ): Promise<ValidationResult[]> {
 
-  console.log(`🔍 Validating ${suggestions.length} suggestions...`);
-
   const userMessage = `Review these ${suggestions.length} workshop suggestions for quality.
 
 ESSAY CONTEXT: ${essayContext.substring(0, 500)}...
@@ -143,14 +141,9 @@ Return JSON array of validation results.`;
     const excellentCount = validations.filter((v: ValidationResult) => v.verdict === 'excellent').length;
     const needsWorkCount = validations.filter((v: ValidationResult) => v.verdict === 'needs_work').length;
 
-    console.log(`✅ Validation complete:`);
-    console.log(`   Avg Score: ${avgScore.toFixed(1)}/10`);
-    console.log(`   Excellent: ${excellentCount}, Needs Work: ${needsWorkCount}`);
-
     return validations;
 
   } catch (error) {
-    console.error('❌ Validation error:', error);
     throw error;
   }
 }
@@ -166,11 +159,6 @@ Deno.serve(async (req) => {
 
   try {
     const body: ValidateRequest = await req.json();
-
-    console.log('🔍 Phase 18 Validation Request:', {
-      itemCount: body.workshopItems?.length,
-      suggestionCount: body.workshopItems?.reduce((sum, item) => sum + item.suggestions.length, 0)
-    });
 
     // Validate input
     if (!body.workshopItems || !body.essayText) {
@@ -197,8 +185,6 @@ Deno.serve(async (req) => {
       }))
     );
 
-    console.log(`   Total suggestions to validate: ${allSuggestions.length}`);
-
     const startTime = Date.now();
 
     // Run validation (single API call, ~40-50s)
@@ -209,7 +195,6 @@ Deno.serve(async (req) => {
     );
 
     const elapsed = Date.now() - startTime;
-    console.log(`   Validation completed in ${(elapsed / 1000).toFixed(1)}s`);
 
     // Map validations back to workshop structure
     const enrichedWorkshopItems = body.workshopItems.map((item, itemIdx) => ({
@@ -233,13 +218,6 @@ Deno.serve(async (req) => {
       validation_time_seconds: elapsed / 1000
     };
 
-    console.log('✅ Phase 18 Complete:', {
-      avgQuality: summary.average_quality.toFixed(1),
-      excellent: summary.excellent_count,
-      good: summary.good_count,
-      needsWork: summary.needs_work_count
-    });
-
     return new Response(
       JSON.stringify({
         success: true,
@@ -252,7 +230,6 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Phase 18 validation error:', error);
     return new Response(
       JSON.stringify({
         success: false,

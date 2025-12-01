@@ -21,17 +21,14 @@ function getClient() {
     
     // Only initialize in backend/edge function context
     if (isBrowser) {
-        console.warn('[Claude API] Skipping initialization in browser context - use edge functions instead');
         return null;
     }
     
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-        console.warn('[Claude API] ANTHROPIC_API_KEY not found - use edge functions for AI operations');
         return null;
     }
     
-    console.log(`[Claude API] Initializing client with API key: ${apiKey.substring(0, 20)}...${apiKey.substring(apiKey.length - 4)}`);
     
     client = new Anthropic({
         apiKey: apiKey,
@@ -80,18 +77,15 @@ export async function callClaude(userPrompt, options = {}) {
             ...(systemParam ? { system: systemParam } : {}),
         };
         // Make API call with timeout (30 seconds for chat, 90 seconds for deep analysis)
-        console.log('[Claude API] Starting API call...');
         const timeoutMs = maxTokens >= 3000 ? 90000 : maxTokens >= 2000 ? 60000 : 30000; // World-class analysis needs 90s
         let timeoutId;
         const timeoutPromise = new Promise((_, reject) => {
             timeoutId = setTimeout(() => {
-                console.log(`[Claude API] Timeout triggered after ${timeoutMs}ms`);
                 reject(new Error(`Claude API call timed out after ${timeoutMs / 1000} seconds`));
             }, timeoutMs);
         });
         const response = await Promise.race([
             anthropicClient.messages.create(requestParams).then(res => {
-                console.log('[Claude API] Call completed successfully');
                 clearTimeout(timeoutId);
                 return res;
             }),
@@ -155,7 +149,6 @@ export async function callClaudeWithRetry(userPrompt, options = {}, maxRetries =
             if (error instanceof Error && error.message.includes('429')) {
                 // Exponential backoff: 1s, 2s, 4s
                 const waitTime = Math.pow(2, attempt) * 1000;
-                console.warn(`Rate limited, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
                 await new Promise(resolve => setTimeout(resolve, waitTime));
                 continue;
             }

@@ -34,12 +34,6 @@ Deno.serve(async (req) => {
     // Parse request body
     const requestBody: WorkshopRequest = await req.json();
 
-    console.log('🔧 Workshop Analysis Request:', {
-      essayType: requestBody.essayType,
-      essayLength: requestBody.essayText?.length,
-      promptTitle: requestBody.promptTitle,
-    });
-
     // Validate required fields
     if (!requestBody.essayText || !requestBody.promptText) {
       return new Response(
@@ -59,8 +53,6 @@ Deno.serve(async (req) => {
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured in environment');
     }
-
-    console.log('🤖 Starting surgical workshop analysis...');
 
     // Stage 1: Voice Fingerprint Analysis
     const voiceFingerprintResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -106,7 +98,6 @@ Return ONLY valid JSON with this structure:
 
     if (!voiceFingerprintResponse.ok) {
       const errorText = await voiceFingerprintResponse.text();
-      console.error('Voice fingerprint API error:', errorText);
       throw new Error(`Voice fingerprint analysis failed: ${voiceFingerprintResponse.status}`);
     }
 
@@ -120,11 +111,8 @@ Return ONLY valid JSON with this structure:
       const jsonString = jsonMatch ? jsonMatch[1].trim() : voiceFingerprintText.trim();
       voiceFingerprint = JSON.parse(jsonString);
     } catch (e) {
-      console.error('Failed to parse voice fingerprint JSON:', voiceFingerprintText);
       voiceFingerprint = null;
     }
-
-    console.log('✅ Voice fingerprint complete');
 
     // Stage 2: Experience Fingerprint (Anti-Convergence Analysis)
     const experienceFingerprintResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -181,7 +169,6 @@ Return ONLY valid JSON with this structure:
 
     if (!experienceFingerprintResponse.ok) {
       const errorText = await experienceFingerprintResponse.text();
-      console.error('Experience fingerprint API error:', errorText);
       throw new Error(`Experience fingerprint analysis failed: ${experienceFingerprintResponse.status}`);
     }
 
@@ -194,11 +181,8 @@ Return ONLY valid JSON with this structure:
       const jsonString = jsonMatch ? jsonMatch[1].trim() : experienceFingerprintText.trim();
       experienceFingerprint = JSON.parse(jsonString);
     } catch (e) {
-      console.error('Failed to parse experience fingerprint JSON:', experienceFingerprintText);
       experienceFingerprint = null;
     }
-
-    console.log('✅ Experience fingerprint complete');
 
     // Stage 3: 12-Dimension Rubric Analysis
     const rubricResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -268,7 +252,6 @@ Return ONLY valid JSON with this structure:
 
     if (!rubricResponse.ok) {
       const errorText = await rubricResponse.text();
-      console.error('Rubric analysis API error:', errorText);
       throw new Error(`Rubric analysis failed: ${rubricResponse.status}`);
     }
 
@@ -281,11 +264,8 @@ Return ONLY valid JSON with this structure:
       const jsonString = jsonMatch ? jsonMatch[1].trim() : rubricText.trim();
       rubricAnalysis = JSON.parse(jsonString);
     } catch (e) {
-      console.error('Failed to parse rubric JSON:', rubricText);
       throw new Error('Failed to parse rubric analysis');
     }
-
-    console.log('✅ Rubric analysis complete');
 
     // Stage 4: Surgical Workshop Items (Issues & Suggestions) - PHASE 17 WITH EXPERIENCE FINGERPRINTING
     const workshopResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -429,7 +409,6 @@ Focus on the most impactful improvements first. Each suggestion should feel like
 
     if (!workshopResponse.ok) {
       const errorText = await workshopResponse.text();
-      console.error('Workshop items API error:', errorText);
       throw new Error(`Workshop items generation failed: ${workshopResponse.status}`);
     }
 
@@ -442,11 +421,8 @@ Focus on the most impactful improvements first. Each suggestion should feel like
       const jsonString = jsonMatch ? jsonMatch[1].trim() : workshopText.trim();
       workshopData = JSON.parse(jsonString);
     } catch (e) {
-      console.error('Failed to parse workshop JSON:', workshopText);
       workshopData = { workshopItems: [] };
     }
-
-    console.log('✅ Workshop items complete');
 
     // Assemble final result
     const finalResult = {
@@ -462,11 +438,6 @@ Focus on the most impactful improvements first. Each suggestion should feel like
       workshopItems: workshopData.workshopItems || [],
     };
 
-    console.log('🎉 Full surgical workshop analysis complete');
-    console.log(`   - NQI: ${finalResult.analysis.narrative_quality_index}`);
-    console.log(`   - Dimensions: ${finalResult.rubricDimensionDetails.length}`);
-    console.log(`   - Workshop Items: ${finalResult.workshopItems.length}`);
-
     return new Response(
       JSON.stringify(finalResult),
       {
@@ -475,7 +446,6 @@ Focus on the most impactful improvements first. Each suggestion should feel like
     );
 
   } catch (error) {
-    console.error('❌ Workshop analysis error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({

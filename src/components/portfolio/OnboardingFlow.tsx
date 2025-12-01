@@ -63,7 +63,6 @@ const OnboardingFlow = ({ onComplete }: OnboardingFlowProps) => {
         if (!resp.ok) throw new Error('server_unavailable');
         onComplete();
       } catch (e) {
-        console.error("Assessment submission failed:", e);
         // Fallback: write directly from the client using the user's Supabase session
         try {
           await completeAssessmentClientSide(payload);

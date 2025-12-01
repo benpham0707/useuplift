@@ -223,7 +223,7 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
               window.addEventListener('deviceorientation', deviceOrientationHandler);
             }
           })
-          .catch((err: unknown) => console.error(err));
+          .catch((err: unknown) => );
       } else {
         window.addEventListener('deviceorientation', deviceOrientationHandler);
       }
@@ -344,5 +344,4 @@ const ProfileCardComponent: React.FC<ProfileCardProps> = ({
 const ProfileCard = React.memo(ProfileCardComponent);
 
 export default ProfileCard;
-
 

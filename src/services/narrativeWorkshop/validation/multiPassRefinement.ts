@@ -124,15 +124,11 @@ export class MultiPassRefiner {
     let currentRationale = initialRationale;
     let passNumber = 1;
 
-    console.log(`\n🔄 Multi-Pass Refinement: Starting from score ${currentScore} (target: ${this.config.targetScore})`);
-
     // Refinement loop
     while (
       passNumber <= this.config.maxPasses &&
       currentScore < this.config.targetScore
     ) {
-
-      console.log(`   Pass ${passNumber}/${this.config.maxPasses}: Current score ${currentScore}...`);
 
       // Step 1: Generate refinement goals
       const goals = this.generateRefinementGoals(
@@ -142,7 +138,6 @@ export class MultiPassRefiner {
       );
 
       if (goals.length === 0) {
-        console.log(`   ✅ No clear refinement goals - score ${currentScore} is sufficient`);
         break;
       }
 
@@ -169,8 +164,6 @@ export class MultiPassRefiner {
 
       const improvement = newValidation.score - currentScore;
 
-      console.log(`   ${improvement > 0 ? '✅' : '⚠️'} Pass ${passNumber} result: ${currentScore} → ${newValidation.score} (${improvement > 0 ? '+' : ''}${improvement.toFixed(1)})`);
-
       // Record this pass
       const pass: RefinementPass = {
         passNumber,
@@ -189,12 +182,10 @@ export class MultiPassRefiner {
 
       // Step 4: Decide whether to keep refinement
       if (improvement <= 0) {
-        console.log(`   ⚠️ Refinement didn't improve quality - reverting to previous version`);
         break; // Don't update current, keep previous
       }
 
       if (improvement < this.config.minImprovementPerPass) {
-        console.log(`   ⚠️ Diminishing returns (${improvement.toFixed(1)} < ${this.config.minImprovementPerPass}) - stopping`);
         // Update current (accept the improvement) but stop refining
         currentScore = newValidation.score;
         currentText = refined.text;
@@ -210,7 +201,6 @@ export class MultiPassRefiner {
 
       // Check if we've reached target
       if (currentScore >= this.config.targetScore) {
-        console.log(`   ✅ Target score reached: ${currentScore} >= ${this.config.targetScore}`);
         break;
       }
     }
@@ -228,9 +218,6 @@ export class MultiPassRefiner {
     }
 
     const totalImprovement = currentScore - initialValidation.score;
-
-    console.log(`\n   Final: ${initialValidation.score} → ${currentScore} (+${totalImprovement.toFixed(1)}) in ${history.length} pass(es)`);
-    console.log(`   Reason: ${stoppedReason}\n`);
 
     return {
       originalScore: initialValidation.score,
@@ -399,7 +386,6 @@ NO additional commentary. Just the JSON.`;
       if (typeof content === 'object' && content !== null) {
         const contentObj = content as Record<string, unknown>;
         if (contentObj.text && contentObj.rationale) {
-          console.log('   ✓ LLM returned parsed JSON object');
           return {
             text: String(contentObj.text),
             rationale: String(contentObj.rationale)
@@ -411,7 +397,6 @@ NO additional commentary. Just the JSON.`;
       if (typeof content === 'string') {
         const jsonMatch = content.match(/\{[\s\S]*"text"[\s\S]*"rationale"[\s\S]*\}/);
         if (!jsonMatch) {
-          console.warn('⚠️ Refinement response not JSON format, using original');
           return { text: currentText, rationale: currentRationale };
         }
 
@@ -434,11 +419,9 @@ NO additional commentary. Just the JSON.`;
         };
       }
 
-      console.warn('⚠️ Could not parse response, using original');
       return { text: currentText, rationale: currentRationale };
 
     } catch (error) {
-      console.error('❌ Refinement pass failed:', error);
       return { text: currentText, rationale: currentRationale };
     }
   }

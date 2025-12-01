@@ -87,25 +87,16 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
       setAnalysisError(null);
 
       try {
-        console.log('🔍 Starting PIQ analysis...', {
-          draft: draft.substring(0, 50) + '...',
-          promptTitle,
-          isInitial
-        });
 
         // Call PIQ analysis service with Phase 17-19 teaching layer
         const result = await analyzePIQEntryTwoStep(draft, promptTitle, promptText, {
           onProgress: (status) => {
-            console.log(`📊 Progress: ${status}`);
           },
           onPhase17Complete: (phase17Result) => {
-            console.log('✅ Phase 17 (Analysis) complete - suggestions available');
           },
           onPhase18Complete: (phase18Result) => {
-            console.log('✅ Phase 18 (Validation) complete - quality scores added');
           },
           onPhase19Complete: (phase19Result) => {
-            console.log('✅ Phase 19 (Teaching) complete - deep guidance added');
           },
         }, {
           depth: 'comprehensive',
@@ -113,16 +104,10 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
           essayType: 'uc_piq',
         });
 
-        console.log('🎯 PIQ Analysis completed successfully');
-        console.log('  NQI:', result.analysis.narrative_quality_index);
-        console.log('  Categories:', result.analysis.categories.length);
-        console.log('  Workshop Items with Teaching:', result.workshopItems?.filter(i => i.teaching).length || 0);
-
         setAnalysisResult(result);
 
         // PHASE 19 INTEGRATION: Use workshopItems directly (includes teaching guidance)
         if (result.workshopItems && result.workshopItems.length > 0) {
-          console.log('✅ Using Phase 19 workshopItems with teaching guidance');
 
           // Convert Phase 19 workshopItems to dimensions using the adapter
           const phase19Dimensions = buildDimensionsFromAnalysis(
@@ -130,14 +115,8 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
             result.dimensions || []
           );
 
-          console.log('  Phase 19 dimensions:', phase19Dimensions.length);
-          console.log('  Issues with teaching:', phase19Dimensions.reduce(
-            (sum, d) => sum + d.issues.filter(i => i.teaching).length, 0
-          ));
-
           setDimensions(phase19Dimensions);
         } else {
-          console.log('⚠️  No workshopItems found, falling back to old transform');
 
           // FALLBACK: Transform to teaching format (old method)
           const coaching = transformAnalysisToCoaching(
@@ -154,7 +133,6 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
           initialScoreRef.current = result.analysis.narrative_quality_index;
         }
       } catch (error) {
-        console.error('❌ PIQ Analysis failed:', error);
         setAnalysisError(
           error instanceof Error ? error.message : 'Analysis failed. Please try again.'
         );
@@ -227,12 +205,9 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
   // Transform dimensions when analysis result changes (FALLBACK for old analysis without workshopItems)
   useEffect(() => {
     if (analysisResult && (!analysisResult.workshopItems || analysisResult.workshopItems.length === 0)) {
-      console.log('⚠️  Using old transformation (no workshopItems available)');
       const transformed = transformCategoriesToDimensions(analysisResult, teachingIssues);
       setDimensions(transformed);
-      console.log('✅ Transformed categories to dimensions:', transformed.length);
     } else if (analysisResult) {
-      console.log('✅ Skipping old transformation - using Phase 19 workshopItems');
     }
   }, [analysisResult, teachingIssues, transformCategoriesToDimensions]);
 
@@ -279,7 +254,6 @@ export const PIQWorkshopIntegrated: React.FC<PIQWorkshopIntegratedProps> = ({
   }, []);
 
   const handleApplySuggestion = useCallback((issueId: string, suggestionText: string, type: 'replace' | 'insert_before' | 'insert_after') => {
-    console.log('Apply suggestion:', { issueId, suggestionText: suggestionText.substring(0, 30), type });
     // For PIQ, we'll implement this later - just log for now
   }, []);
 

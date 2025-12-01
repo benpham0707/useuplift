@@ -26,16 +26,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 type TestScenario = 'simple' | 'complex' | 'edge-no-example' | 'edge-long';
 
 export default function TestTeachingUnit() {
-  console.log('[TestTeachingUnit] Component mounting...');
-  console.log('[TestTeachingUnit] simpleEntry:', simpleEntry);
-  console.log('[TestTeachingUnit] simpleIssue:', simpleIssue);
 
   const [scenario, setScenario] = useState<TestScenario>('simple');
   const [expandedIssueIds, setExpandedIssueIds] = useState<Set<string>>(new Set());
   const [reflectionAnswers, setReflectionAnswers] = useState<Record<string, Record<string, string>>>({});
   const [completedIssues, setCompletedIssues] = useState<Set<string>>(new Set());
-
-  console.log('[TestTeachingUnit] Current scenario:', scenario);
 
   // Toggle expansion state
   const handleToggle = (issueId: string) => {
@@ -61,8 +56,6 @@ export default function TestTeachingUnit() {
   // Handle mark complete
   const handleMarkComplete = (issueId: string) => {
     setCompletedIssues(prev => new Set([...prev, issueId]));
-    console.log(`[TestHarness] Issue ${issueId} marked complete`);
-    console.log('Reflection answers:', reflectionAnswers[issueId]);
   };
 
   // Get current test data

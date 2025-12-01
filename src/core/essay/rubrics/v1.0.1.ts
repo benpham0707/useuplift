@@ -889,7 +889,5 @@ export const DIMENSION_WEIGHTS_V1_0_1 = dimensions.reduce((acc, dim) => {
 // Validate weights sum to 1.0
 const total_weight = dimensions.reduce((sum, dim) => sum + dim.weight, 0);
 if (Math.abs(total_weight - 1.0) > 0.001) {
-  console.warn(`⚠️  Rubric v1.0.1 weights sum to ${total_weight}, not 1.0`);
 } else {
-  console.log(`✅ Rubric v1.0.1 weights validated: ${total_weight.toFixed(3)}`);
 }

@@ -40,22 +40,14 @@ async function generateSpecificInsights(
   stage3: GrammarStyleAnalysis,
   synthesis: SynthesizedInsights
 ): Promise<SpecificInsights> {
-  console.log('\n' + '='.repeat(80));
-  console.log('STAGE 5: SENTENCE-LEVEL INSIGHT GENERATION');
-  console.log('='.repeat(80) + '\n');
 
   const startTime = Date.now();
 
   try {
-    console.log('  → Parsing essay into sentences...');
     const sentences = parseEssayIntoSentences(input.essayText);
-    console.log(`     ✓ Parsed ${sentences.length} sentences`);
 
-    console.log('  → Matching issues to specific sentences...');
     const matches = matchIssuesToSentences(sentences, stage2, stage3, synthesis);
-    console.log(`     ✓ Found ${matches.length} issue matches`);
 
-    console.log('  → Generating detailed insights...');
     const sentenceLevelInsights: SentenceLevelInsight[] = matches.map(match =>
       generateSentenceLevelInsight(
         match.sentence,
@@ -67,7 +59,6 @@ async function generateSpecificInsights(
         sentences
       )
     );
-    console.log(`     ✓ Generated ${sentenceLevelInsights.length} sentence-level insights`);
 
     // Organize by section
     const bySection = {
@@ -94,17 +85,13 @@ async function generateSpecificInsights(
     });
 
     // Generate general insights from synthesis
-    console.log('  → Generating general insights...');
     const generalInsights = generateGeneralInsights(synthesis);
-    console.log(`     ✓ Generated ${generalInsights.length} general insights`);
 
     // Prioritize insights
-    console.log('  → Prioritizing insights by impact...');
     const prioritizedInsights = prioritizeInsights(
       sentenceLevelInsights,
       synthesis.dimensionScores
     ).slice(0, 10); // Top 10
-    console.log(`     ✓ Top 10 prioritized insights selected`);
 
     const duration = Date.now() - startTime;
 
@@ -117,22 +104,9 @@ async function generateSpecificInsights(
       prioritizedInsights
     };
 
-    console.log('\n✅ Specific insights generation complete');
-    console.log(`   Duration: ${duration}ms`);
-    console.log(`   Total sentence-level insights: ${sentenceLevelInsights.length}`);
-    console.log(`   Critical: ${bySeverity.critical.length}`);
-    console.log(`   Major: ${bySeverity.major.length}`);
-    console.log(`   Minor: ${bySeverity.minor.length}`);
-    console.log(`   Opening: ${bySection.opening.length}`);
-    console.log(`   Body: ${bySection.body.length}`);
-    console.log(`   Climax: ${bySection.climax.length}`);
-    console.log(`   Conclusion: ${bySection.conclusion.length}`);
-    console.log('\n' + '='.repeat(80) + '\n');
-
     return result;
 
   } catch (error) {
-    console.error('❌ Specific insights generation failed:', error);
     throw error;
   }
 }

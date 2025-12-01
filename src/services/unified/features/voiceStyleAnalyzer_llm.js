@@ -143,7 +143,6 @@ Provide your analysis as JSON following the exact format specified.`;
         return response.content;
     }
     catch (error) {
-        console.error('[Voice Style LLM Analyzer] API call failed:', error);
         return {
             score: 0,
             quality_level: 'essay_speak',

@@ -51,8 +51,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    console.log(`Fetching portfolio data for user: ${user.id}`);
-
     // Get profile
     const { data: profile } = await supabase
       .from('profiles')
@@ -96,8 +94,6 @@ Deno.serve(async (req) => {
       family_responsibilities,
       support_network
     };
-
-    console.log('Analyzing portfolio with AI...');
 
     // Call AI to analyze portfolio
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
@@ -154,12 +150,10 @@ Be thorough but concise. Provide 2-3 strengths and 2 growth areas per dimension.
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error('AI API Error:', errorText);
       throw new Error(`AI analysis failed: ${aiResponse.status}`);
     }
 
     const aiResult = await aiResponse.json();
-    console.log('AI analysis complete');
 
     const analysis = JSON.parse(aiResult.choices[0].message.content);
 
@@ -169,7 +163,6 @@ Be thorough but concise. Provide 2-3 strengths and 2 growth areas per dimension.
     });
 
   } catch (error) {
-    console.error('Error analyzing portfolio:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({ error: errorMessage }),

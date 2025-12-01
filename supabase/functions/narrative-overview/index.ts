@@ -30,12 +30,6 @@ Deno.serve(async (req) => {
   try {
     const requestBody: OverviewRequest = await req.json();
 
-    console.log('📝 Narrative Overview Request:', {
-      essayLength: requestBody.essayText?.length,
-      nqi: requestBody.narrativeQualityIndex,
-      dimensions: requestBody.rubricDimensionDetails?.length,
-    });
-
     // Validate required fields
     if (!requestBody.essayText || !requestBody.promptText) {
       return new Response(
@@ -134,7 +128,6 @@ Write an empowering 3-5 sentence overview that:
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Claude API error:', errorText);
       throw new Error(`Overview generation failed: ${response.status}`);
     }
 
@@ -148,12 +141,9 @@ Write an empowering 3-5 sentence overview that:
       const parsed = JSON.parse(jsonString);
       narrativeOverview = parsed.narrative_overview;
     } catch (e) {
-      console.error('Failed to parse overview JSON:', overviewText);
       // Fallback: use the raw text if JSON parsing fails
       narrativeOverview = overviewText;
     }
-
-    console.log('✅ Narrative overview generated');
 
     return new Response(
       JSON.stringify({
@@ -166,7 +156,6 @@ Write an empowering 3-5 sentence overview that:
     );
 
   } catch (error) {
-    console.error('❌ Narrative overview error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
       JSON.stringify({

@@ -286,7 +286,6 @@ const PersonalGrowthWizard: React.FC<Props> = ({ onComplete, onCancel, onProgres
 
       onComplete();
     } catch (error) {
-      console.error('Error saving personal growth:', error);
       toast({
         title: "Error saving stories",
         description: "Please try again. If the problem persists, contact support.",

@@ -167,7 +167,6 @@ Return ONLY valid JSON, no markdown, no explanation.`;
  * Analyze climax and turning point
  */
 export async function analyzeClimaxTurningPoint(input, essayType) {
-    console.log('  → Stage 2.3: Climax & Turning Point Analysis');
     const startTime = Date.now();
     try {
         const prompt = buildClimaxTurningPointPrompt(input.essayText, essayType);
@@ -189,15 +188,9 @@ export async function analyzeClimaxTurningPoint(input, essayType) {
         }
         analysis.tokensUsed = response.usage?.total_tokens || 0;
         const duration = Date.now() - startTime;
-        console.log(`     ✓ Climax/turning point analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-        console.log(`       Climax: ${analysis.hasIdentifiableClimax ? 'Yes' : 'No'} (strength: ${analysis.climaxStrength}/10)`);
-        console.log(`       Turning point: ${analysis.hasTurningPoint ? analysis.turningPointType : 'None'} (depth: ${analysis.turningPointDepth}/10)`);
-        console.log(`       Vulnerability moments: ${analysis.vulnerabilityMoments.length}`);
-        console.log(`       Conflict: ${analysis.conflictType} (complexity: ${analysis.conflictComplexity}/10)`);
         return analysis;
     }
     catch (error) {
-        console.error('     ✗ Climax/turning point analysis failed:', error);
         throw error;
     }
 }

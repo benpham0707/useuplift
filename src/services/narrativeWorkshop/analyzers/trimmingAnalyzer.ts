@@ -44,7 +44,6 @@ export async function generateTrimmingSuggestions(
     essayText: string,
     holisticContext?: HolisticUnderstanding
 ): Promise<TrimmingSuggestion[]> {
-    console.log('✂️  Running Trimming Analyzer...');
     
     let promptContext = `Essay Text:\n"""\n${essayText}\n"""`;
 
@@ -82,7 +81,6 @@ export async function generateTrimmingSuggestions(
         return [];
 
     } catch (error) {
-        console.error('❌ Trimming Analyzer failed:', error);
         return [];
     }
 }

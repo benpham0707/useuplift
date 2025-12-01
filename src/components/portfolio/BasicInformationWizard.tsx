@@ -324,7 +324,6 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
 
       onComplete();
     } catch (error) {
-      console.error('Error saving personal information:', error);
       toast({
         title: "Error saving information",
         description: "Please try again. If the problem persists, contact support.",

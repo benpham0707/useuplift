@@ -16,12 +16,6 @@ interface PortfolioProgressStandingProps {
 }
 
 export function PortfolioProgressStanding({ data }: PortfolioProgressStandingProps) {
-  console.log('PortfolioProgressStanding received data:', {
-    hasTrajectory: !!data?.trajectory,
-    hasCurrent: !!data?.current,
-    hasHistory: !!data?.history,
-    trajectoryKeys: data?.trajectory ? Object.keys(data.trajectory) : 'no trajectory',
-  });
   
   const { current, history, competitiveStanding, trajectory, projection } = data;
   const [isExpanded, setIsExpanded] = useState(false);
@@ -35,7 +29,6 @@ export function PortfolioProgressStanding({ data }: PortfolioProgressStandingPro
   
   // Safety check for trajectory
   if (!trajectory) {
-    console.error('Trajectory data is missing:', data);
     return (
       <Card className="bg-gradient-to-br from-primary/5 via-background to-secondary/5">
         <CardContent className="p-6">

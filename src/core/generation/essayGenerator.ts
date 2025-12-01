@@ -363,12 +363,8 @@ Generate essay now. Return ONLY the essay text, no commentary or preamble.`;
  * 5. Select best with detailed reporting
  */
 export function selectOptimalAngle(angles: NarrativeAngle[], profile: GenerationProfile): NarrativeAngle {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`📊 MULTI-STAGE ANGLE VALIDATION (${angles.length} candidates)`);
-  console.log(`${'='.repeat(80)}\n`);
 
   // Stage 1: Validate all angles
-  console.log(`Stage 1: Validating angle quality...`);
   const validated = validateAndRankAngles(angles, profile);
 
   // Stage 2: Filter by recommendation
@@ -378,52 +374,28 @@ export function selectOptimalAngle(angles: NarrativeAngle[], profile: Generation
   const risky = validated.filter(v => v.recommendation === 'risky');
   const avoid = validated.filter(v => v.recommendation === 'avoid');
 
-  console.log(`\nStage 2: Quality Distribution:`);
-  console.log(`  • Excellent: ${excellent.length}`);
-  console.log(`  • Good: ${good.length}`);
-  console.log(`  • Acceptable: ${acceptable.length}`);
-  console.log(`  • Risky: ${risky.length}`);
-  console.log(`  • Avoid: ${avoid.length}\n`);
-
   // Stage 3: Select best usable angle
   const usable = [...excellent, ...good, ...acceptable];
 
   if (usable.length === 0) {
-    console.warn(`⚠️  WARNING: All angles flagged as risky/avoid. Using least-bad option.\n`);
     return validated[0].angle;
   }
 
   const selected = usable[0];
 
   // Stage 4: Report selection
-  console.log(`Stage 3: Selected Angle`);
-  console.log(`${'─'.repeat(80)}`);
-  console.log(`Title: "${selected.angle.title}"`);
-  console.log(`Originality: ${selected.angle.originality}/10 | Risk: ${selected.angle.riskLevel}`);
-  console.log(`\n🎯 Quality Scores:`);
-  console.log(`  • Overall Quality: ${selected.overallQuality}/100`);
-  console.log(`  • Grounding: ${selected.groundingScore}/100`);
-  console.log(`  • Bridge (Tech-Human): ${selected.bridgeScore}/100`);
-  console.log(`  • Authenticity Potential: ${selected.authenticityPotential}/100`);
-  console.log(`  • Implementability: ${selected.implementabilityScore}/100`);
-  console.log(`\n✅ Recommendation: ${selected.recommendation.toUpperCase()} (confidence: ${Math.round(selected.confidence * 100)}%)`);
 
   if (selected.strengths.length > 0) {
-    console.log(`\n💪 Strengths:`);
-    selected.strengths.forEach(s => console.log(`  • ${s}`));
+    selected.strengths.forEach(s => );
   }
 
   if (selected.warnings.length > 0) {
-    console.log(`\n⚠️  Warnings:`);
-    selected.warnings.forEach(w => console.log(`  • ${w}`));
+    selected.warnings.forEach(w => );
   }
 
   if (selected.redFlags.length > 0) {
-    console.log(`\n🚨 Red Flags:`);
-    selected.redFlags.forEach(f => console.log(`  • ${f}`));
+    selected.redFlags.forEach(f => );
   }
-
-  console.log(`\n${'='.repeat(80)}\n`);
 
   return selected.angle;
 }
@@ -432,16 +404,11 @@ export async function generateEssay(
   profile: GenerationProfile,
   maxIterations: number = 3
 ): Promise<GenerationResult> {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`GENERATING ESSAY: ${profile.role}`);
-  console.log(`Target Tier: ${profile.targetTier}, Voice: ${profile.studentVoice}, Risk: ${profile.riskTolerance}`);
-  console.log(`${'='.repeat(80)}\n`);
 
   // Generate narrative angle if requested (Session 18 optimization)
   let narrativeAngle = profile.narrativeAngle;
 
   if (profile.generateAngle && !narrativeAngle) {
-    console.log(`🎨 GENERATING NARRATIVE ANGLES...\n`);
 
     const angles = await generateNarrativeAngles({
       profile,
@@ -449,17 +416,10 @@ export async function generateEssay(
       prioritize: 'originality',
     });
 
-    console.log(`✓ Generated ${angles.length} unique angles`);
-
     // Use smart selection (prioritize moderate risk + grounded)
     narrativeAngle = selectOptimalAngle(angles, profile);
 
-    console.log(`\n🎯 SELECTED ANGLE: "${narrativeAngle.title}"`);
-    console.log(`   Originality: ${narrativeAngle.originality}/10 | Risk: ${narrativeAngle.riskLevel}`);
-    console.log(`   Hook: "${narrativeAngle.hook}"`);
-    console.log(`   Connection: ${narrativeAngle.unusualConnection}\n`);
   } else if (narrativeAngle) {
-    console.log(`🎯 USING PROVIDED ANGLE: "${narrativeAngle.title}"\n`);
   }
 
   // Select techniques
@@ -467,20 +427,14 @@ export async function generateEssay(
     ? profile.literaryTechniques
     : selectLiteraryTechniques(profile);
 
-  console.log(`📝 Selected Literary Techniques: ${techniques.join(', ')}\n`);
-
   let bestResult: GenerationResult | null = null;
   let iteration = 1;
 
   while (iteration <= maxIterations) {
-    console.log(`\n${'─'.repeat(80)}`);
-    console.log(`ITERATION ${iteration}/${maxIterations}`);
-    console.log(`${'─'.repeat(80)}\n`);
 
     // Generate essay (pass narrative angle if available)
     const prompt = buildGenerationPrompt(profile, techniques, iteration, narrativeAngle);
 
-    console.log(`Generating essay with Claude...`);
     const response = await callClaudeWithRetry<{ essay: string }>(
       prompt,
       {
@@ -491,10 +445,8 @@ export async function generateEssay(
     );
 
     const essay = response.content;
-    console.log(`✓ Generated ${essay.length} characters\n`);
 
     // Analyze the generated essay
-    console.log(`Analyzing generated essay...`);
 
     const authenticity = analyzeAuthenticity(essay);
     const elitePatterns = analyzeElitePatterns(essay);
@@ -510,12 +462,6 @@ export async function generateEssay(
       (elitePatternsScore / 100) * 40 +
       (literaryScore / 100) * 40
     );
-
-    console.log(`\n📊 SCORES:`);
-    console.log(`  Authenticity:            ${authenticityScore.toFixed(1)}/10  → ${Math.round((authenticityScore / 10) * 20)}/20`);
-    console.log(`  Elite Patterns:          ${elitePatternsScore}/100 → ${Math.round((elitePatternsScore / 100) * 40)}/40`);
-    console.log(`  Literary Sophistication: ${literaryScore}/100 → ${Math.round((literaryScore / 100) * 40)}/40`);
-    console.log(`  COMBINED:                ${combinedScore}/100\n`);
 
     // Collect feedback
     const strengths = [...elitePatterns.strengths, ...literary.strengths];
@@ -555,18 +501,12 @@ export async function generateEssay(
     const targetScore = profile.targetTier === 1 ? 85 : profile.targetTier === 2 ? 75 : 65;
 
     if (combinedScore >= targetScore) {
-      console.log(`\n✅ TARGET REACHED: ${combinedScore}/100 (target: ${targetScore})`);
-      console.log(`Stopping after ${iteration} iteration(s)\n`);
       return result;
     }
-
-    console.log(`\n⚠️  Below target (${combinedScore}/100 < ${targetScore})`);
-    console.log(`Key gaps: ${gaps.slice(0, 3).join('; ')}`);
 
     iteration++;
   }
 
-  console.log(`\n⚠️  Max iterations reached. Returning best result: ${bestResult!.combinedScore}/100\n`);
   return bestResult!;
 }
 
@@ -578,12 +518,8 @@ export async function transformEssay(
   weakEssay: string,
   profile: GenerationProfile
 ): Promise<GenerationResult> {
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`TRANSFORMING WEAK ESSAY → ELITE`);
-  console.log(`${'='.repeat(80)}\n`);
 
   // First, analyze the weak essay
-  console.log(`Analyzing input essay...`);
   const initialAuth = analyzeAuthenticity(weakEssay);
   const initialElite = analyzeElitePatterns(weakEssay);
   const initialLiterary = analyzeLiterarySophistication(weakEssay);
@@ -593,12 +529,6 @@ export async function transformEssay(
     (initialElite.overallScore / 100) * 40 +
     (initialLiterary.overallScore / 100) * 40
   );
-
-  console.log(`\n📊 INITIAL SCORES:`);
-  console.log(`  Combined: ${initialScore}/100`);
-  console.log(`  Authenticity: ${initialAuth.authenticity_score}/10 (${initialAuth.voice_type})`);
-  console.log(`  Elite Patterns: ${initialElite.overallScore}/100 (Tier ${initialElite.tier})`);
-  console.log(`  Literary: ${initialLiterary.overallScore}/100 (Tier ${initialLiterary.tier})\n`);
 
   // Identify specific problems
   const problems: string[] = [];
@@ -634,11 +564,9 @@ export async function transformEssay(
     solutions.push('Add central metaphor sustained throughout');
   }
 
-  console.log(`⚠️  PROBLEMS IDENTIFIED (${problems.length}):`);
-  problems.forEach(p => console.log(`  • ${p}`));
+  problems.forEach(p => );
 
-  console.log(`\n💡 SOLUTIONS TO APPLY:`);
-  solutions.forEach(s => console.log(`  → ${s}`));
+  solutions.forEach(s => );
 
   // Build transformation prompt
   const transformPrompt = `You are transforming a weak extracurricular essay into an elite one.
@@ -688,7 +616,6 @@ Generate the transformed essay now. Make it score 85+.
 Return ONLY the transformed essay, no additional commentary.`;
 
   // Generate transformation
-  console.log(`\nGenerating transformation...`);
   const response = await callClaudeWithRetry<{ essay: string }>(
     transformPrompt,
     {
@@ -699,10 +626,8 @@ Return ONLY the transformed essay, no additional commentary.`;
   );
 
   const transformedEssay = response.content;
-  console.log(`✓ Generated ${transformedEssay.length} characters\n`);
 
   // Analyze transformed essay
-  console.log(`Analyzing transformed essay...`);
   const finalAuth = analyzeAuthenticity(transformedEssay);
   const finalElite = analyzeElitePatterns(transformedEssay);
   const finalLiterary = analyzeLiterarySophistication(transformedEssay);
@@ -712,12 +637,6 @@ Return ONLY the transformed essay, no additional commentary.`;
     (finalElite.overallScore / 100) * 40 +
     (finalLiterary.overallScore / 100) * 40
   );
-
-  console.log(`\n📊 FINAL SCORES:`);
-  console.log(`  Combined: ${finalScore}/100 (↑ ${finalScore - initialScore})`);
-  console.log(`  Authenticity: ${finalAuth.authenticity_score}/10 (${finalAuth.voice_type})`);
-  console.log(`  Elite Patterns: ${finalElite.overallScore}/100 (Tier ${finalElite.tier})`);
-  console.log(`  Literary: ${finalLiterary.overallScore}/100 (Tier ${finalLiterary.tier})\n`);
 
   return {
     essay: transformedEssay,

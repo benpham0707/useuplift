@@ -90,7 +90,6 @@ const Settings = () => {
           setTransactions(txns);
         }
       } catch (err) {
-        console.error('[Settings] Error loading profile:', err);
       } finally {
         setProfileLoading(false);
       }
@@ -131,7 +130,6 @@ const Settings = () => {
         window.location.href = url;
       }
     } catch (error) {
-      console.error('Portal error:', error);
     } finally {
       setIsLoadingPortal(false);
     }
@@ -155,7 +153,6 @@ const Settings = () => {
         .eq('user_id', user?.id);
 
       if (error) {
-        console.error('Delete error:', error);
         return;
       }
 
@@ -163,7 +160,6 @@ const Settings = () => {
       await signOut();
       navigate('/');
     } catch (error) {
-      console.error('Delete error:', error);
     } finally {
       setIsDeleting(false);
     }

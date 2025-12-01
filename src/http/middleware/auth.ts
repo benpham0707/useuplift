@@ -48,9 +48,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     
     if (!token) {
       // eslint-disable-next-line no-console
-      console.warn("Auth middleware: missing token", {
-        path: req.path
-      });
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -58,9 +55,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     if (!userId) {
       // eslint-disable-next-line no-console
-      console.warn("Auth middleware: token verification failed", {
-        path: req.path,
-      });
       return res.status(401).json({ error: "Unauthorized" });
     }
 
@@ -68,7 +62,6 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     next();
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.warn("Auth middleware: exception", { path: req.path, error: e });
     return res.status(401).json({ error: "Unauthorized" });
   }
 }

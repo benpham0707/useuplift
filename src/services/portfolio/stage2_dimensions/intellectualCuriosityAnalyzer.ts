@@ -61,10 +61,8 @@ export async function analyzeIntellectualCuriosity(
 
     return parseIntellectualCuriosityAnalysis(textContent.text);
   } catch (error) {
-    console.error('Intellectual Curiosity analysis failed:', error);
 
     try {
-      console.log('Retrying Intellectual Curiosity analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
@@ -80,7 +78,6 @@ export async function analyzeIntellectualCuriosity(
 
       return parseIntellectualCuriosityAnalysis(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicIntellectualCuriosityAnalysis(portfolio);
     }
   }
@@ -534,7 +531,6 @@ function parseIntellectualCuriosityAnalysis(text: string): IntellectualCuriosity
 
     return result;
   } catch (error) {
-    console.error('Failed to parse intellectual curiosity analysis JSON:', error);
     throw new Error('Invalid JSON from intellectual curiosity analyzer');
   }
 }

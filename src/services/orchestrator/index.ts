@@ -23,7 +23,6 @@ export async function analyzeFullApplication(
   essayAnalysis: EssayAnalysisResult;
   holisticAnalysis: HolisticAnalysis;
 }> {
-  console.log('[Orchestrator] Starting Full Application Analysis...');
   
   // 1. Run Essay Analysis (includes Universal + Specialized Analyzers)
   const essayAnalysis = await EssayOrchestrator.analyzeEssay(essayText, promptType, profile);
@@ -36,7 +35,6 @@ export async function analyzeFullApplication(
   let holisticAnalysis = essayAnalysis.holistic_context;
 
   if (!holisticAnalysis) {
-    console.log('[Orchestrator] Holistic context missing, running explicitly...');
     holisticAnalysis = await HolisticAnalyzer.analyze(essayText, profile, essayAnalysis);
   }
 

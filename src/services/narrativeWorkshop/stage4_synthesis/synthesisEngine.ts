@@ -349,7 +349,6 @@ export async function synthesizeInsights(
   stage3: GrammarStyleAnalysis,
   dimensionScores: DimensionScores
 ): Promise<SynthesizedInsights> {
-  console.log('  → Synthesizing holistic insights and roadmap (LLM)');
   const startTime = Date.now();
 
   try {
@@ -386,19 +385,10 @@ export async function synthesizeInsights(
     synthesis.synthesizedAt = new Date().toISOString();
 
     const duration = Date.now() - startTime;
-    console.log(`     ✓ Synthesis complete (${duration}ms, ${synthesis.tokensUsed} tokens)`);
-    console.log(`       Overall Score: ${synthesis.overallQualityScore}/100 (${synthesis.impressionLabel})`);
-    console.log(`       Top Strengths: ${synthesis.topStrengths.length}`);
-    console.log(`       Critical Gaps: ${synthesis.criticalGaps.length}`);
-    console.log(`       Quick Wins: ${synthesis.improvementRoadmap.quickWins.length}`);
-    console.log(`       Strategic Moves: ${synthesis.improvementRoadmap.strategicMoves.length}`);
-    console.log(`       Transformative Moves: ${synthesis.improvementRoadmap.transformativeMoves.length}`);
-    console.log(`       Percentile: ${synthesis.comparativeContext.percentileEstimate}`);
 
     return synthesis;
 
   } catch (error) {
-    console.error('     ✗ Synthesis failed:', error);
     throw error;
   }
 }

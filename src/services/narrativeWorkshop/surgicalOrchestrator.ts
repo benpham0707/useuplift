@@ -42,13 +42,11 @@ export interface SurgicalWorkshopResult {
 export async function runSurgicalWorkshop(
   input: NarrativeEssayInput
 ): Promise<SurgicalWorkshopResult> {
-  console.log('\n🚀 STARTING SURGICAL WORKSHOP ORCHESTRATION');
   const startTotal = Date.now();
   const stages: Record<string, number> = {};
 
   try {
     // 1. Holistic Analysis (Parallel with Voice)
-    console.log('Step 1: Holistic Understanding & Voice Fingerprint...');
     const t1 = Date.now();
     const [holistic, voice] = await Promise.all([
       analyzeHolisticUnderstanding(input),
@@ -57,7 +55,6 @@ export async function runSurgicalWorkshop(
     stages.holistic_voice = Date.now() - t1;
 
     // 1.5. Experience Fingerprint (Phase 17 - Anti-Convergence)
-    console.log('Step 1.5: Experience Fingerprint (extracting unique elements)...');
     const t15 = Date.now();
     const experienceFingerprint = await analyzeExperienceFingerprint(
       input.essayText,
@@ -76,33 +73,26 @@ export async function runSurgicalWorkshop(
       if (flags.hasCrowdPleaser) warnings.push('crowd-pleaser');
 
       if (warnings.length > 0) {
-        console.log(`   ⚠️ Convergence risks: ${warnings.join(', ')}`);
       }
     }
 
     // 2. Rubric Scoring (The Heavy Lifting)
-    console.log('Step 2: Rubric Scoring (13 Dimensions)...');
     const t2 = Date.now();
     const rawScores = await getRubricScores(input, holistic);
     
     // Deterministic Scorer (Apply Interaction Rules)
     const rubricResult = scoreWithRubric(rawScores, input.essayText);
     stages.rubric_scoring = Date.now() - t2;
-    console.log(`   EQI Score: ${rubricResult.essay_quality_index}/100`);
 
     // 3. Locator Bridge (Map Scores to Text)
-    console.log('Step 3: Locating Issues...');
     const t3 = Date.now();
     const allLocators = findAllLocators(input.essayText, rubricResult);
     stages.locators = Date.now() - t3;
-    console.log(`   Found ${allLocators.length} potential issues.`);
 
     // 4. Generate workshop items for ALL located issues
     // Don't limit - let the user choose what to work on
-    console.log(`   Generating surgical fixes for all ${allLocators.length} issues...`);
 
     // 5. Surgical Editor (Generate Fixes with Experience Fingerprint)
-    console.log('Step 4: Generating Surgical Fixes (with anti-convergence)...');
     const t4 = Date.now();
     const itemPromises = allLocators.map(locator =>
       generateSurgicalFixes(
@@ -119,7 +109,6 @@ export async function runSurgicalWorkshop(
     stages.surgical_editor = Date.now() - t4;
 
     const totalMs = Date.now() - startTotal;
-    console.log(`✅ WORKSHOP COMPLETE in ${totalMs}ms\n`);
 
     return {
       analysisId: uuidv4(),
@@ -135,7 +124,6 @@ export async function runSurgicalWorkshop(
     };
 
   } catch (error) {
-    console.error('❌ SURGICAL WORKSHOP FAILED:', error);
     throw error;
   }
 }

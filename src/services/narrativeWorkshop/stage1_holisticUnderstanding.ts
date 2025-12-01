@@ -153,19 +153,12 @@ Begin your analysis:`;
 export async function analyzeHolisticUnderstanding(
   input: NarrativeEssayInput
 ): Promise<HolisticUnderstanding> {
-  console.log('\n' + '='.repeat(80));
-  console.log('STAGE 1: HOLISTIC UNDERSTANDING');
-  console.log('='.repeat(80) + '\n');
 
   const startTime = Date.now();
 
   try {
     // Build prompt
     const prompt = buildHolisticUnderstandingPrompt(input);
-
-    console.log('📝 Calling Claude API for holistic analysis...');
-    console.log(`   Essay length: ${input.essayText.split(/\s+/).length} words`);
-    console.log(`   Essay type: ${input.essayType || 'inferred'}\n`);
 
     // Call Claude
     const response = await callClaudeWithRetry(
@@ -200,37 +193,19 @@ export async function analyzeHolisticUnderstanding(
 
     const duration = Date.now() - startTime;
 
-    console.log('✅ Holistic understanding complete');
-    console.log(`   Duration: ${duration}ms`);
-    console.log(`   Tokens used: ${analysis.tokensUsed}`);
-    console.log(`   Central theme: ${analysis.centralTheme}`);
-    console.log(`   Strength tier: ${analysis.estimatedStrengthTier}`);
-    console.log(`   Voice: ${analysis.primaryVoice} (consistency: ${analysis.voiceConsistency}/10)`);
-    console.log(`   Structure: ${analysis.essayStructure}`);
-    console.log(`   Key moments identified: ${analysis.keyMoments.length}`);
-    console.log(`   Authenticity signals: ${analysis.authenticitySignals.length}`);
-    console.log(`   Red flags: ${analysis.redFlags.length}`);
-
     if (analysis.redFlags.length > 0) {
-      console.log('\n⚠️  Red Flags Detected:');
       analysis.redFlags.forEach((flag, i) => {
-        console.log(`   ${i + 1}. ${flag}`);
       });
     }
 
     if (analysis.authenticitySignals.length > 0) {
-      console.log('\n✨ Authenticity Signals:');
       analysis.authenticitySignals.slice(0, 3).forEach((signal, i) => {
-        console.log(`   ${i + 1}. ${signal}`);
       });
     }
-
-    console.log('\n' + '='.repeat(80) + '\n');
 
     return analysis;
 
   } catch (error) {
-    console.error('❌ Error in holistic understanding analysis:', error);
 
     // Return fallback analysis on error
     const fallbackAnalysis: HolisticUnderstanding = {

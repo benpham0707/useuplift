@@ -22,7 +22,6 @@ export class EssayOrchestrator {
      * Routes the essay to the appropriate analyzers based on prompt type.
      */
     static async analyzeEssay(text, promptType, profile) {
-        console.log(`[EssayOrchestrator] Starting analysis for ${promptType}...`);
         const startTime = Date.now();
         // 1. Define Universal Analyzers (Run for ALL essays)
         const safeRun = async (name, promise) => {
@@ -30,7 +29,6 @@ export class EssayOrchestrator {
                 return await promise;
             }
             catch (e) {
-                console.error(`[EssayOrchestrator] Analyzer '${name}' failed:`, e);
                 return { error: 'Analysis failed', details: String(e) };
             }
         };
@@ -99,13 +97,11 @@ export class EssayOrchestrator {
         // 5. Holistic Analysis (Meta-Layer)
         // Runs AFTER the base analyzers to use their insights + profile data
         if (profile) {
-            console.log('[EssayOrchestrator] Running Holistic Analyzer...');
             const holisticResult = await safeRun('Holistic Context', HolisticAnalyzer.analyze(text, profile, result));
             if (holisticResult && !holisticResult.error) {
                 result.holistic_context = holisticResult;
             }
         }
-        console.log(`[EssayOrchestrator] Analysis complete in ${Date.now() - startTime}ms`);
         return result;
     }
     /**
@@ -173,7 +169,6 @@ export class EssayOrchestrator {
                 break;
             default:
                 // Default fallback if prompt type is unknown
-                console.warn(`[EssayOrchestrator] Unknown prompt type: ${promptType}. Running only Universal analyzers.`);
         }
         return { primary, secondary };
     }

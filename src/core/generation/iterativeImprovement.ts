@@ -304,16 +304,11 @@ export async function generateWithIterativeImprovement(
   maxIterations: number = 5,
   targetScore: number = 85
 ): Promise<GenerationResult & { iterationHistory: GenerationResult[] }> {
-  console.log(`\n${'█'.repeat(80)}`);
-  console.log(`ITERATIVE IMPROVEMENT ENGINE: ${profile.role}`);
-  console.log(`Target Score: ${targetScore}/100, Max Iterations: ${maxIterations}`);
-  console.log(`${'█'.repeat(80)}\n`);
 
   // Generate narrative angle if requested (Session 18 optimization)
   let narrativeAngle = profile.narrativeAngle;
 
   if (profile.generateAngle && !narrativeAngle) {
-    console.log(`🎨 GENERATING NARRATIVE ANGLES...\n`);
 
     const angles = await generateNarrativeAngles({
       profile,
@@ -321,17 +316,10 @@ export async function generateWithIterativeImprovement(
       prioritize: 'originality',
     });
 
-    console.log(`✓ Generated ${angles.length} unique angles`);
-
     // Use smart selection (prioritize moderate risk + grounded)
     narrativeAngle = selectOptimalAngle(angles, profile);
 
-    console.log(`\n🎯 SELECTED ANGLE: "${narrativeAngle.title}"`);
-    console.log(`   Originality: ${narrativeAngle.originality}/10 | Risk: ${narrativeAngle.riskLevel}`);
-    console.log(`   Hook: "${narrativeAngle.hook}"`);
-    console.log(`   Connection: ${narrativeAngle.unusualConnection}\n`);
   } else if (narrativeAngle) {
-    console.log(`🎯 USING PROVIDED ANGLE: "${narrativeAngle.title}"\n`);
   }
 
   const techniques = profile.literaryTechniques.length > 0
@@ -345,13 +333,9 @@ export async function generateWithIterativeImprovement(
   let iteration = 1;
 
   // Initial generation (no learning yet)
-  console.log(`\n${'▓'.repeat(80)}`);
-  console.log(`ITERATION 1: Initial Generation`);
-  console.log(`${'▓'.repeat(80)}\n`);
 
   // Use intelligent prompting from the start (no previous essay for iteration 1)
   const initialPrompt = buildIntelligentPrompt(profile, techniques, null, 1, narrativeAngle);
-  console.log(`Generating initial essay with intelligent prompting...`);
 
   const initialResponse = await callClaudeWithRetry<{ essay: string }>(
     initialPrompt,
@@ -364,31 +348,19 @@ export async function generateWithIterativeImprovement(
 
   currentEssay = initialResponse.content;
   bestEssay = currentEssay;
-  console.log(`✓ Generated ${currentEssay.length} characters\n`);
 
   // Analyze initial
   const initialResult = await analyzeEssay(currentEssay, profile, techniques, 1, narrativeAngle);
   iterationHistory.push(initialResult);
   bestScore = initialResult.combinedScore;
 
-  console.log(`📊 INITIAL SCORES:`);
-  console.log(`  Combined: ${initialResult.combinedScore}/100`);
-  console.log(`  Authenticity: ${initialResult.authenticityScore}/10`);
-  console.log(`  Elite Patterns: ${initialResult.elitePatternsScore}/100`);
-  console.log(`  Literary: ${initialResult.literarySophisticationScore}/100\n`);
-
   if (initialResult.combinedScore >= targetScore) {
-    console.log(`✅ TARGET REACHED on iteration 1!\n`);
     return { ...initialResult, iterationHistory };
   }
 
   // Iterative improvement
   while (iteration < maxIterations) {
     iteration++;
-
-    console.log(`\n${'▓'.repeat(80)}`);
-    console.log(`ITERATION ${iteration}: Learning & Improving`);
-    console.log(`${'▓'.repeat(80)}\n`);
 
     // CRITICAL: Always analyze gaps from BEST result, not just previous
     const bestResult = iterationHistory.reduce((best, current) =>
@@ -401,8 +373,6 @@ export async function generateWithIterativeImprovement(
 
     const emphasis = identifyEmphasis(bestEssay);
     if (emphasis.category !== 'none') {
-      console.log(`🎯 INTELLIGENT FOCUS: ${emphasis.category.replace(/_/g, ' ').toUpperCase()}`);
-      console.log(`   Reason: ${emphasis.reason}\n`);
     }
 
     const intelligentPrompt = buildIntelligentPrompt(
@@ -412,8 +382,6 @@ export async function generateWithIterativeImprovement(
       iteration,
       narrativeAngle
     );
-
-    console.log(`Generating improved essay (~${Math.round(intelligentPrompt.length / 4)} tokens)...`);
 
     const improvedResponse = await callClaudeWithRetry<{ essay: string }>(
       intelligentPrompt,
@@ -425,7 +393,6 @@ export async function generateWithIterativeImprovement(
     );
 
     currentEssay = improvedResponse.content;
-    console.log(`✓ Generated ${currentEssay.length} characters\n`);
 
     // Analyze improved version
     const improvedResult = await analyzeEssay(currentEssay, profile, techniques, iteration, narrativeAngle);
@@ -435,32 +402,21 @@ export async function generateWithIterativeImprovement(
     if (improvedResult.combinedScore > bestScore) {
       bestScore = improvedResult.combinedScore;
       bestEssay = currentEssay;
-      console.log(`🎯 NEW BEST SCORE! ${bestScore}/100\n`);
     }
 
     const previousResult = iterationHistory[iterationHistory.length - 2];
     const improvement = improvedResult.combinedScore - previousResult.combinedScore;
 
-    console.log(`📊 ITERATION ${iteration} SCORES:`);
-    console.log(`  Combined: ${improvedResult.combinedScore}/100 (${improvement >= 0 ? '+' : ''}${improvement})`);
-    console.log(`  Authenticity: ${improvedResult.authenticityScore}/10 (${improvedResult.authenticityScore >= previousResult.authenticityScore ? '+' : ''}${(improvedResult.authenticityScore - previousResult.authenticityScore).toFixed(1)})`);
-    console.log(`  Elite Patterns: ${improvedResult.elitePatternsScore}/100 (${improvedResult.elitePatternsScore >= previousResult.elitePatternsScore ? '+' : ''}${improvedResult.elitePatternsScore - previousResult.elitePatternsScore})`);
-    console.log(`  Literary: ${improvedResult.literarySophisticationScore}/100 (${improvedResult.literarySophisticationScore >= previousResult.literarySophisticationScore ? '+' : ''}${improvedResult.literarySophisticationScore - previousResult.literarySophisticationScore})\n`);
-
     if (improvement > 0) {
-      console.log(`✓ Improvement: +${improvement} points\n`);
     } else {
-      console.log(`⚠️  Regression: ${improvement} points (but keeping best: ${bestScore}/100)\n`);
     }
 
     if (improvedResult.combinedScore >= targetScore) {
-      console.log(`✅ TARGET REACHED: ${improvedResult.combinedScore}/100\n`);
       return { ...improvedResult, iterationHistory };
     }
 
     // COST OPTIMIZATION: Exit if within 3 points of target
     if (improvedResult.combinedScore >= targetScore - 3) {
-      console.log(`💡 CLOSE TO TARGET: ${improvedResult.combinedScore}/${targetScore} (within 3 pts). Exiting early to save cost.\n`);
       return { ...bestResult, iterationHistory };
     }
 
@@ -473,8 +429,6 @@ export async function generateWithIterativeImprovement(
       ];
 
       if (improvements.every(imp => Math.abs(imp) < 2)) {
-        console.log(`⚠️  PLATEAU DETECTED: Last 2 improvements < 2 pts each. Exiting early.\n`);
-        console.log(`💰 Cost saved: ${maxIterations - iteration} iterations (~$${((maxIterations - iteration) * 0.011).toFixed(3)})\n`);
         return { ...bestResult, iterationHistory };
       }
 
@@ -482,7 +436,6 @@ export async function generateWithIterativeImprovement(
       const minRecent = Math.min(...recentScores);
 
       if (maxRecent - minRecent < 3) {
-        console.log(`⚠️  Scores oscillating (range: ${minRecent}-${maxRecent}). Next iteration will try radical changes...\n`);
       }
     }
   }
@@ -492,7 +445,6 @@ export async function generateWithIterativeImprovement(
     current.combinedScore > best.combinedScore ? current : best
   );
 
-  console.log(`\n⚠️  Max iterations reached. Best score: ${bestResult.combinedScore}/100\n`);
   return { ...bestResult, iterationHistory };
 }
 

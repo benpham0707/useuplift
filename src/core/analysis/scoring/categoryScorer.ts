@@ -235,7 +235,6 @@ export async function scoreAllCategories(
   features: ExtractedFeatures,
   authenticity: AuthenticityAnalysis
 ): Promise<{ scores: RubricCategoryScore[]; totalUsage: any }> {
-  console.log(`Scoring all categories for entry ${entry.id}...`);
 
   // Execute all three batches in parallel
   const [textScores, outcomeScores, narrativeScores] = await Promise.all([
@@ -253,10 +252,7 @@ export async function scoreAllCategories(
 
   const missingCategories = expectedCategories.filter(cat => !scoredCategories.has(cat));
   if (missingCategories.length > 0) {
-    console.warn(`Missing category scores: ${missingCategories.join(', ')}`);
   }
-
-  console.log(`Scored ${allScores.length} categories successfully`);
 
   return {
     scores: allScores,
@@ -313,7 +309,6 @@ export function validateCategoryScores(scores: RubricCategoryScore[]): { valid: 
   }
 
   if (warnings.length > 0) {
-    console.warn(`Validation warnings: ${warnings.join(', ')}`);
   }
 
   return {

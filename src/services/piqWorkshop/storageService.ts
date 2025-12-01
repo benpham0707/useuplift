@@ -135,7 +135,6 @@ export function saveLocalDraft(
     if (essayId) {
       const newKey = getDraftKey(essayId);
       localStorage.setItem(newKey, JSON.stringify(localDraft));
-      console.log(`💾 Saved local draft (new format): ${newKey}`);
     }
 
     // Also save to legacy format for backward compatibility
@@ -163,7 +162,6 @@ export function saveLocalDraft(
     localStorage.setItem(AUTO_SAVE_KEY, legacyKey);
 
   } catch (error) {
-    console.error('Failed to save local draft:', error);
   }
 }
 
@@ -177,7 +175,6 @@ export function getLocalDraftByEssayId(essayId: string): LocalDraft | null {
     if (!data) return null;
     return JSON.parse(data) as LocalDraft;
   } catch (error) {
-    console.error('Failed to get local draft by essay ID:', error);
     return null;
   }
 }
@@ -202,7 +199,6 @@ export function getLocalDraftByPromptId(promptId: string): LocalDraft | null {
       wordCount: cache.currentDraft.trim().split(/\s+/).filter(Boolean).length,
     };
   } catch (error) {
-    console.error('Failed to get local draft by prompt ID:', error);
     return null;
   }
 }
@@ -262,7 +258,6 @@ export function checkLocalRecovery(
     };
 
   } catch (error) {
-    console.error('Error checking local recovery:', error);
     return { hasRecovery: false, isNewerThanServer: false };
   }
 }
@@ -274,9 +269,7 @@ export function clearLocalDraft(essayId: string): void {
   try {
     const key = getDraftKey(essayId);
     localStorage.removeItem(key);
-    console.log(`🗑️ Cleared local draft: ${key}`);
   } catch (error) {
-    console.error('Failed to clear local draft:', error);
   }
 }
 
@@ -290,7 +283,6 @@ export function clearAllLocalDrafts(essayId: string | null, promptId: string): v
     }
     clearCache(promptId);
   } catch (error) {
-    console.error('Failed to clear all local drafts:', error);
   }
 }
 
@@ -318,9 +310,7 @@ export function saveToLocalStorage(cache: PIQWorkshopCache): void {
     localStorage.setItem(key, JSON.stringify(dataToSave));
     localStorage.setItem(AUTO_SAVE_KEY, key); // Track last auto-save location
 
-    console.log(`✅ Auto-saved to localStorage: ${key}`);
   } catch (error) {
-    console.error('Failed to save to localStorage:', error);
   }
 }
 
@@ -335,11 +325,9 @@ export function loadFromLocalStorage(promptId: string): PIQWorkshopCache | null 
     if (!data) return null;
 
     const cache = JSON.parse(data) as PIQWorkshopCache;
-    console.log(`✅ Loaded from localStorage: ${key}`);
 
     return cache;
   } catch (error) {
-    console.error('Failed to load from localStorage:', error);
     return null;
   }
 }
@@ -368,7 +356,6 @@ export function hasRecentAutoSave(): { hasAutoSave: boolean; promptId?: string; 
 
     return { hasAutoSave: false };
   } catch (error) {
-    console.error('Error checking auto-save:', error);
     return { hasAutoSave: false };
   }
 }
@@ -380,9 +367,7 @@ export function clearCache(promptId: string): void {
   try {
     const key = getLegacyCacheKey(promptId);
     localStorage.removeItem(key);
-    console.log(`✅ Cleared cache: ${key}`);
   } catch (error) {
-    console.error('Failed to clear cache:', error);
   }
 }
 
@@ -408,9 +393,7 @@ export function cacheAnalysisResult(
     };
 
     localStorage.setItem(cacheKey, JSON.stringify(cacheData));
-    console.log(`✅ Cached analysis result: ${cacheKey}`);
   } catch (error) {
-    console.error('Failed to cache analysis:', error);
   }
 }
 
@@ -439,19 +422,16 @@ export function getCachedAnalysisResult(
         // This ensures Phase 19 data is present
         const workshopItems = cached.result?.workshopItems;
         if (workshopItems?.length > 0 && !workshopItems[0]?.teaching) {
-          console.log(`⚠️ Cache invalidated: missing teaching data (pre-Phase19 cache)`);
           localStorage.removeItem(cacheKey);
           return null;
         }
         
-        console.log(`✅ Using cached analysis (${ageInHours.toFixed(1)} hours old)`);
         return cached.result;
       }
     }
 
     return null;
   } catch (error) {
-    console.error('Error retrieving cached analysis:', error);
     return null;
   }
 }

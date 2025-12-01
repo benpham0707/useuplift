@@ -697,44 +697,31 @@ export async function runContinuousLearning(
   let iteration = 1;
   let previous_score = 100; // Start high
 
-  console.log('🎓 Starting Continuous Learning Loop...\n');
-
   while (true) {
-    console.log(`📚 Iteration ${iteration}: Analyzing ${essays.length} exemplar essays...`);
 
     const result = runLearningIteration(essays, iteration);
     iterations.push(result);
 
     // Log insights
-    console.log(`\n✨ Insights from Iteration ${iteration}:`);
-    result.insights.forEach(insight => console.log(`   ${insight}`));
+    result.insights.forEach(insight => );
 
     // Log adjustments
-    console.log(`\n🔧 Proposed Rubric Adjustments (${result.rubric_adjustments_proposed.length}):`);
     result.rubric_adjustments_proposed.forEach(adj => {
-      console.log(`   • ${adj.dimension}: ${adj.adjustment_type}`);
-      console.log(`     Rationale: ${adj.rationale}`);
-      console.log(`     Confidence: ${(adj.confidence * 100).toFixed(0)}%\n`);
     });
 
     // Check convergence
     const improvement_delta = Math.abs(result.improvement_score - previous_score);
-    console.log(`📈 Improvement Score: ${result.improvement_score} (Δ = ${improvement_delta.toFixed(1)})`);
 
     if (improvement_delta < convergence_threshold) {
-      console.log(`\n✅ Convergence reached! Improvement delta (${improvement_delta.toFixed(1)}) < threshold (${convergence_threshold})`);
-      console.log(`🎯 Total iterations: ${iteration}`);
       break;
     }
 
     if (iteration >= 10) {
-      console.log(`\n⚠️  Max iterations (10) reached. Stopping loop.`);
       break;
     }
 
     previous_score = result.improvement_score;
     iteration++;
-    console.log(`\n${'─'.repeat(80)}\n`);
   }
 
   return iterations;

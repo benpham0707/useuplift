@@ -99,7 +99,6 @@ export function getWeightsForCategory(category: string): Record<RubricCategory, 
   // Verify still sums to 1.0
   const sum = Object.values(adjusted).reduce((s, w) => s + w, 0);
   if (Math.abs(sum - 1.0) > 0.001) {
-    console.warn(`Adaptive weights for category "${category}" sum to ${sum}, not 1.0`);
   }
 
   return adjusted as Record<RubricCategory, number>;

@@ -65,8 +65,6 @@ export async function generateReflectionPrompts(
   const systemPrompt = buildReflectionSystemPrompt(tone);
   const userPrompt = buildReflectionUserPrompt(issue, entry, depth);
 
-  console.log('[reflectionPrompts] Generating adaptive prompts for issue:', issue.id);
-
   const response = await callClaudeWithRetry<{
     prompts: Array<{
       question: string;
@@ -247,8 +245,6 @@ export async function generateReflectionPromptsForIssues(
   const maxIssues = options.maxIssues || 5;
   const issuesToProcess = issues.slice(0, maxIssues);
 
-  console.log(`[reflectionPrompts] Generating prompts for ${issuesToProcess.length} issues in parallel`);
-
   // Generate all prompts in parallel for speed
   const promptSets = await Promise.all(
     issuesToProcess.map(issue =>
@@ -299,7 +295,6 @@ export async function generateReflectionPromptsWithCache(
 
   // Check cache first
   if (!options.skipCache && promptCache.has(cacheKey)) {
-    console.log('[reflectionPrompts] Cache HIT for issue:', issue.id);
     return promptCache.get(cacheKey)!;
   }
 
@@ -308,37 +303,31 @@ export async function generateReflectionPromptsWithCache(
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`[reflectionPrompts] Generation attempt ${attempt}/${maxRetries} for issue: ${issue.id}`);
 
       const promptSet = await generateReflectionPrompts(issue, entry, options);
 
       // Validate quality before accepting
       const validation = validatePromptQuality(promptSet);
       if (!validation.valid && attempt < maxRetries) {
-        console.warn(`[reflectionPrompts] Quality validation failed (attempt ${attempt}):`, validation.warnings);
         continue; // Retry
       }
 
       // Success - cache and return
       promptCache.set(cacheKey, promptSet);
-      console.log(`[reflectionPrompts] ✓ Generation successful on attempt ${attempt}`);
       return promptSet;
 
     } catch (error) {
       lastError = error as Error;
-      console.error(`[reflectionPrompts] Attempt ${attempt} failed:`, error);
 
       if (attempt < maxRetries) {
         // Wait before retry (exponential backoff)
         const delayMs = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-        console.log(`[reflectionPrompts] Retrying in ${delayMs}ms...`);
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
   }
 
   // All retries failed - throw error (no fallback)
-  console.error(`[reflectionPrompts] ❌ All ${maxRetries} attempts failed for issue: ${issue.id}`);
   throw new Error(
     `Failed to generate reflection prompts after ${maxRetries} attempts. Last error: ${lastError?.message || 'Unknown error'}`
   );

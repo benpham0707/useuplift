@@ -1188,8 +1188,6 @@ export const PIQ_ISSUE_PATTERNS: PIQIssuePattern[] = [
   ...COHERENCE_ISSUES,
 ];
 
-console.log(`✓ PIQ Issue Patterns loaded: ${PIQ_ISSUE_PATTERNS.length} total patterns across 9 dimensions`);
-
 /**
  * Get all issue patterns for a specific dimension
  */

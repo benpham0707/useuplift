@@ -131,7 +131,6 @@ export async function getRubricScores(
   input: NarrativeEssayInput,
   holisticContext?: HolisticUnderstanding
 ): Promise<DimensionRawScore[]> {
-  console.log('📊 Running Rubric Analysis (v1.0.1)...');
   
   const batches = getBatches();
   const promises = batches.map(async (batch) => {
@@ -171,7 +170,6 @@ export async function getRubricScores(
   );
 
   if (missing.length > 0) {
-    console.warn(`⚠️ Missing scores for dimensions: ${missing.join(', ')}`);
     // Fill with zeros to prevent crashes
     missing.forEach(d => {
         allScores.push({
@@ -186,7 +184,6 @@ export async function getRubricScores(
     });
   }
 
-  console.log(`✅ Scored ${allScores.length} dimensions.`);
   return allScores;
 }
 

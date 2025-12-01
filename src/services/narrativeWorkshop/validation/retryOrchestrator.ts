@@ -58,14 +58,12 @@ export class RetryOrchestrator {
     let lastValidation: ValidationResult | null = null;
 
     while (attemptNumber <= this.maxRetries + 1) {
-      console.log(`   🔄 Generation attempt ${attemptNumber}/${this.maxRetries + 1}`);
 
       // Step 1: Generate suggestion
       const retryGuidance = attemptNumber > 1 ? lastValidation?.retryGuidance : undefined;
       const suggestion = await generateFn(retryGuidance, attemptNumber);
 
       if (!suggestion || !suggestion.text) {
-        console.error(`   ❌ Generation failed on attempt ${attemptNumber}`);
         attemptNumber++;
         continue;
       }
@@ -91,7 +89,6 @@ export class RetryOrchestrator {
 
       // Step 5: Check if valid
       if (lastValidation.isValid) {
-        console.log(`   ✅ Validation passed on attempt ${attemptNumber} (score: ${lastValidation.score})`);
         return {
           success: true,
           suggestion,
@@ -103,20 +100,16 @@ export class RetryOrchestrator {
 
       // Step 6: Check if should retry
       if (!lastValidation.shouldRetry) {
-        console.log(`   ⚠️ Validation failed, no more retries (attempt ${attemptNumber})`);
         break;
       }
 
       // Step 7: Prepare for retry
-      console.log(`   ⚠️ Validation failed (${lastValidation.criticalCount} critical, ${lastValidation.warningCount} warnings)`);
-      console.log(`   🔁 Retrying with specific guidance...`);
 
       previousFailures = lastValidation.failures;
       attemptNumber++;
     }
 
     // All retries exhausted
-    console.error(`   ❌ All ${attemptNumber - 1} attempts failed validation`);
 
     return {
       success: false,

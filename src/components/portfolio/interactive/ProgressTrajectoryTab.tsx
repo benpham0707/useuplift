@@ -38,7 +38,6 @@ interface ProgressTrajectoryTabProps {
 export function ProgressTrajectoryTab({ history, trajectory, projection }: ProgressTrajectoryTabProps) {
   // Safety checks
   if (!trajectory || !trajectory.growthAnalysis) {
-    console.error('Invalid trajectory data:', trajectory);
     return (
       <div className="text-center p-6 text-muted-foreground">
         Trajectory data is not available

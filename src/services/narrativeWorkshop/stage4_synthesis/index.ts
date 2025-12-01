@@ -31,9 +31,6 @@ export async function runSynthesis(
   stage2: DeepDiveAnalyses,
   stage3: GrammarStyleAnalysis
 ): Promise<SynthesizedInsights> {
-  console.log('\n' + '='.repeat(80));
-  console.log('STAGE 4: CONTEXTUALIZATION & SYNTHESIS');
-  console.log('='.repeat(80) + '\n');
 
   const startTime = Date.now();
 
@@ -53,18 +50,9 @@ export async function runSynthesis(
 
     const duration = Date.now() - startTime;
 
-    console.log('\n✅ Synthesis complete');
-    console.log(`   Duration: ${duration}ms`);
-    console.log(`   Overall Quality: ${synthesis.overallQualityScore}/100 (${synthesis.impressionLabel})`);
-    console.log(`   Percentile: ${synthesis.comparativeContext.percentileEstimate}`);
-    console.log(`   Memorability: ${synthesis.officerPerspective.memorabilityFactor}/10`);
-    console.log(`   Total tokens: ${synthesis.tokensUsed}`);
-    console.log('\n' + '='.repeat(80) + '\n');
-
     return synthesis;
 
   } catch (error) {
-    console.error('❌ Synthesis failed:', error);
     throw error;
   }
 }

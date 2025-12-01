@@ -126,12 +126,10 @@ export class OutputValidator {
    * Uses LLM for nuanced quality assessment
    */
   async validate(context: ValidationContext): Promise<ValidationResult> {
-    console.log(`🔍 Validating suggestion (attempt ${context.attemptNumber})...`);
 
     // Step 1: Fast deterministic pre-checks (banned terms)
     const quickFailures = this.runDeterministicChecks(context);
     if (quickFailures.length > 0 && this.config.failOnCritical) {
-      console.log(`   ⚠️ Failed deterministic checks (${quickFailures.length} issues)`);
       return this.buildValidationResult(quickFailures, context);
     }
 
@@ -269,7 +267,6 @@ export class OutputValidator {
       };
 
     } catch (error) {
-      console.error('❌ LLM validation failed:', error);
       // Fallback: assume it's okay but log the error
       return {
         failures: [],

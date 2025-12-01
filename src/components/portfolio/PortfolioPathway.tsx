@@ -145,7 +145,6 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
         });
 
       } catch (error) {
-        console.error('Error fetching progress:', error);
       }
     };
 
@@ -259,7 +258,6 @@ const PortfolioPathway = ({ onProgressUpdate, currentProgress }: PortfolioPathwa
         window.dispatchEvent(new CustomEvent('refreshProgress'));
       }
     } catch (error) {
-      console.error('Error refreshing progress:', error);
     }
     
     setOpenSection(null);

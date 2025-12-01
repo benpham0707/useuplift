@@ -24,7 +24,6 @@ app.use(cors({
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      console.log('[CORS] Allowed origin:', origin);
       callback(null, true); // Allow all for development
     }
   },
@@ -44,9 +43,5 @@ const port = process.env.PORT || 8789;
 // Bind to 0.0.0.0 to accept connections from all network interfaces
 app.listen(port, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
-  console.log(`✅ API server listening on 0.0.0.0:${port}`);
-  console.log(`   - Local:    http://localhost:${port}`);
-  console.log(`   - Network:  http://127.0.0.1:${port}`);
 });
-
 

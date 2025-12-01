@@ -441,8 +441,6 @@ export async function validateAuthenticity(
   anthropicApiKey: string
 ): Promise<AuthenticityResult[]> {
 
-  console.log(`🔍 Stage 1: Validating authenticity for ${suggestions.length} suggestions...`);
-
   const userMessage = `Validate these ${suggestions.length} suggestions for authenticity and AI-detection risk.
 
 ORIGINAL ESSAY:
@@ -488,12 +486,9 @@ Return a JSON array of validation objects, one for each suggestion.`;
     const result = await response.json();
     const validations = JSON.parse(result.content[0].text);
 
-    console.log(`✅ Stage 1 complete: ${validations.length} suggestions validated`);
-
     return validations;
 
   } catch (error) {
-    console.error('❌ Stage 1 validation error:', error);
     throw error;
   }
 }

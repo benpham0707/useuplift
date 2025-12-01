@@ -90,19 +90,12 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
       setAnalysisError(null);
 
       try {
-        console.log('Starting analysis...', { draft: draft.substring(0, 50) + '...', isInitial });
 
         // Call real backend analysis system
         const result = await analyzeExtracurricularEntry(draft, activity, {
           depth: 'comprehensive', // product API calls should use ANTHROPIC_API_KEY as normal
           skip_coaching: false,
         });
-
-        console.log('🎯 Analysis completed successfully');
-        console.log('  NQI from backend:', result.analysis.narrative_quality_index);
-        console.log('  Reader impression:', result.analysis.reader_impression_label);
-        console.log('  Categories:', result.analysis.categories.length);
-        console.log('  First 3 category scores:', result.analysis.categories.slice(0, 3).map(c => `${c.category}: ${c.score}/${c.maxScore}`));
 
         setAnalysisResult(result);
 
@@ -124,8 +117,6 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
           draft,
         };
 
-        console.log('Cached analysis to activity object');
-
         // Auto-save version to localStorage for persistence
         try {
           const savedVersion = saveVersion(
@@ -137,9 +128,7 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
               engine: 'sophisticated_19_iteration_system',
             }
           );
-          console.log(`✅ Version saved to localStorage: ${savedVersion.id}`);
         } catch (versionError) {
-          console.error('Failed to save version:', versionError);
           // Don't fail the whole analysis if version save fails
         }
 
@@ -160,7 +149,6 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
 
         setNeedsReanalysis(false);
       } catch (error) {
-        console.error('Analysis failed:', error);
         setAnalysisError(
           error instanceof Error ? error.message : 'Analysis failed. Please try again.'
         );
@@ -177,10 +165,6 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
     const hasCachedAnalysis = (activity as any).workshopAnalysis;
 
     if (hasCachedAnalysis) {
-      console.log('⚠️ WARNING: Using cached workshop analysis from activity object');
-      console.log('  Cached NQI:', hasCachedAnalysis.analysisResult?.analysis?.narrative_quality_index);
-      console.log('  Cached timestamp:', new Date(hasCachedAnalysis.timestamp).toLocaleString());
-      console.log('  If score seems wrong, clear browser cache or close/reopen workshop');
       setAnalysisResult(hasCachedAnalysis.analysisResult);
       setTeachingCoaching(hasCachedAnalysis.teachingCoaching);
       setTeachingIssues(hasCachedAnalysis.teachingIssues);
@@ -194,7 +178,6 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
       }]);
     } else if (activity.description) {
       // Only run analysis if no cached data
-      console.log('No cached analysis found, running initial analysis...');
       performAnalysis(activity.description, true);
     }
   }, []); // Only run once on mount
@@ -394,7 +377,6 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
     setCurrentDraft(versionDescription);
     setShowVersionHistory(false);
     setNeedsReanalysis(true);
-    console.log('✅ Version restored, draft updated. Click Re-analyze to see new scores.');
   }, []);
 
   // ============================================================================
@@ -713,9 +695,6 @@ export const ExtracurricularWorkshopNew: React.FC<ExtracurricularWorkshopProps> 
 
               // Debug logging
               if (isExpanded && !relatedIssue) {
-                console.log('No issue found for category:', category.category);
-                console.log('Available issues:', teachingIssues.map(i => ({ id: i.id, rubric_category: i.rubric_category })));
-                console.log('Category has suggestions?', category.suggestions);
               }
 
               return (

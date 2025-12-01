@@ -52,15 +52,12 @@ Deno.serve(async (req) => {
         last_seen: new Date().toISOString()
       }, { onConflict: 'user_id,ip_hash,ua' })
 
-    if (upsertErr) console.error('devices upsert error', upsertErr)
-
+    if (upsertErr) 
     // TODO: send branded email via Supabase SMTP or provider. Placeholder no-op.
 
     return new Response(JSON.stringify({ ok: true }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
-    console.error('notify-new-signin error', e)
     return new Response(JSON.stringify({ error: 'Internal error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
-
 

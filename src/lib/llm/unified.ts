@@ -136,8 +136,6 @@ async function callClaude<T = any>(
     useJsonMode = false,
   } = options;
 
-  console.log(`[Claude] Calling ${model} (temp: ${temperature}, json: ${useJsonMode})`);
-
   try {
     const response = await anthropicClient.messages.create({
       model,
@@ -182,7 +180,6 @@ async function callClaude<T = any>(
       stopReason: response.stop_reason || undefined,
     };
   } catch (error) {
-    console.error('[Claude] API call failed:', error);
     throw error;
   }
 }
@@ -206,8 +203,6 @@ async function callGPT5<T = any>(
     systemPrompt,
     useJsonMode = false,
   } = options;
-
-  console.log(`[GPT-5] Calling ${model} (temp: ${temperature}, json: ${useJsonMode})`);
 
   try {
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
@@ -254,7 +249,6 @@ async function callGPT5<T = any>(
       stopReason: response.choices[0]?.finish_reason || undefined,
     };
   } catch (error) {
-    console.error('[GPT-5] API call failed:', error);
     throw error;
   }
 }

@@ -158,7 +158,6 @@ export default function ApplicationWizard() {
           setCurrentStep(parsed.currentStep);
         }
       } catch (error) {
-        console.error('Error loading saved progress:', error);
       }
     }
   }, []);
@@ -254,7 +253,6 @@ export default function ApplicationWizard() {
       // Show review dialog
       setShowReview(true);
     } catch (error) {
-      console.error('Error saving application:', error);
       toast({
         title: "Error",
         description: "Failed to save your application. Please try again.",
@@ -278,7 +276,6 @@ export default function ApplicationWizard() {
       };
 
       // TODO: Submit to API
-      console.log('Final application data:', applicationData);
       
       // Clear saved progress
       localStorage.removeItem('college-application-progress');
@@ -292,7 +289,6 @@ export default function ApplicationWizard() {
       // Navigate to portfolio scanner
       navigate('/portfolio-scanner');
     } catch (error) {
-      console.error('Error submitting application:', error);
       toast({
         title: "Error",
         description: "Failed to submit your application. Please try again.",

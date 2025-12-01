@@ -214,32 +214,23 @@ export default function PIQWorkshop() {
   // ============================================================================
 
   const performFullAnalysis = useCallback(async (overrideEssayId?: string, forceReanalysis?: boolean) => {
-    console.log('🔍 performFullAnalysis called');
-    console.log('   Current draft length:', currentDraft.length);
-    console.log('   Selected prompt:', selectedPromptId);
-    console.log('   Override essay ID:', overrideEssayId || 'none');
-    console.log('   Force re-analysis:', forceReanalysis || false);
     
     // CRITICAL: Prevent concurrent analyses (use ref for synchronous check)
     if (analysisInProgressRef.current) {
-      console.warn('⚠️ Analysis already in progress - ignoring duplicate call');
       return;
     }
     
     // Guard: Prevent analyzing empty or too-short essays
     if (currentDraft.trim().length < MIN_ESSAY_LENGTH) {
-      console.warn(`Essay too short (${currentDraft.trim().length} chars) - need at least ${MIN_ESSAY_LENGTH} chars to analyze`);
       return;
     }
 
     if (!selectedPromptId) {
-      console.warn('No prompt selected - cannot analyze');
       return;
     }
 
     const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
     if (!selectedPrompt) {
-      console.warn('Invalid prompt selection');
       return;
     }
 
@@ -248,7 +239,6 @@ export default function PIQWorkshop() {
     const cachedResult = forceReanalysis ? null : getCachedAnalysisResult(currentDraft, selectedPromptId);
     
     if (forceReanalysis) {
-      console.log('🔄 Force re-analysis requested - bypassing cache');
     }
     
     // Only check/deduct credits if NOT cached
@@ -256,10 +246,8 @@ export default function PIQWorkshop() {
       const token = await getToken({ template: 'supabase' });
       if (token) {
         const creditCheck = await canAnalyzeEssay(userId, token);
-        console.log(`💳 Credit check: ${creditCheck.currentBalance} credits available, ${creditCheck.required} required`);
         
         if (!creditCheck.hasEnough) {
-          console.warn(`❌ Insufficient credits: ${creditCheck.currentBalance}/${creditCheck.required}`);
           setCurrentCreditBalance(creditCheck.currentBalance);
           setShowInsufficientCreditsModal(true);
           return;
@@ -268,9 +256,7 @@ export default function PIQWorkshop() {
         // Deduct credits IMMEDIATELY before analysis starts
         const deductResult = await deductForEssayAnalysis(userId, token, selectedPrompt.title);
         if (deductResult.success) {
-          console.log(`💳 Deducted ${CREDIT_COSTS.ESSAY_ANALYSIS} credits upfront. New balance: ${deductResult.newBalance}`);
         } else {
-          console.warn('⚠️ Failed to deduct credits:', deductResult.error);
           // Don't proceed if deduction fails
           return;
         }
@@ -286,12 +272,10 @@ export default function PIQWorkshop() {
       let result: AnalysisResult;
 
       if (cachedResult) {
-        console.log('✅ Using cached analysis result - skipping API call (no credits charged)');
         result = cachedResult;
         setIsAnalyzing(false);
         setValidationComplete(true);
       } else {
-        console.log('🔄 No cache found - calling two-step backend analysis');
         // Call TWO-STEP surgical workshop backend (Phase 17 + Phase 18)
         result = await analyzePIQEntryTwoStep(
           currentDraft,
@@ -300,27 +284,11 @@ export default function PIQWorkshop() {
           {
             // Phase 17 complete - display suggestions immediately
             onPhase17Complete: (phase17Result) => {
-              console.log('📊 Phase 17 complete - displaying suggestions');
 
               // 🔍 DEBUG: Log actual Phase 17 output structure
-              console.log('🔍🔍🔍 PHASE 17 ACTUAL OUTPUT 🔍🔍🔍');
-              console.log('   workshopItems count:', phase17Result.workshopItems?.length || 0);
               if (phase17Result.workshopItems && phase17Result.workshopItems.length > 0) {
                 const firstItem = phase17Result.workshopItems[0];
-                console.log('   First item structure:', {
-                  id: firstItem.id,
-                  has_problem: !!firstItem.problem,
-                  has_why_it_matters: !!firstItem.why_it_matters,
-                  has_quote: !!firstItem.quote,
-                  has_rubric_category: !!firstItem.rubric_category,
-                  has_suggestions: !!firstItem.suggestions,
-                  has_teaching: !!firstItem.teaching,
-                  problem_value: firstItem.problem,
-                  why_it_matters_value: firstItem.why_it_matters,
-                });
-                console.log('   Full first item:', JSON.stringify(firstItem, null, 2));
               }
-              console.log('🔍🔍🔍 END PHASE 17 DEBUG 🔍🔍🔍');
 
               setAnalysisResult(phase17Result);
 
@@ -381,7 +349,6 @@ export default function PIQWorkshop() {
 
             // Phase 18 complete - add quality scores
             onPhase18Complete: (validatedResult) => {
-              console.log('✨ Phase 18 complete - adding quality scores');
               setAnalysisResult(validatedResult);
 
               // Re-transform dimensions with validation data
@@ -435,7 +402,6 @@ export default function PIQWorkshop() {
 
             // Phase 19 complete - teaching guidance available
             onPhase19Complete: (teachingResult) => {
-              console.log('📚 Phase 19 complete - adding teaching guidance');
               setAnalysisResult(teachingResult);
 
               // Re-transform dimensions with teaching data
@@ -486,7 +452,6 @@ export default function PIQWorkshop() {
 
             // Progress updates
             onProgress: (status) => {
-              console.log('📍', status);
               setProgressMessage(status);
             }
           },
@@ -495,26 +460,13 @@ export default function PIQWorkshop() {
 
         // Cache the result
         cacheAnalysisResult(currentDraft, selectedPromptId, result);
-        console.log('✅ Analysis result cached for future use');
       }
-
-      console.log('📊 Backend result received - FULL OBJECT:');
-      console.log(JSON.stringify(result, null, 2));
 
       setAnalysisResult(result);
 
-      console.log('📊 Result properties:');
-      console.log('   - rubricDimensionDetails:', result.rubricDimensionDetails?.length || 0, 'dimensions');
-      console.log('   - workshopItems:', result.workshopItems?.length || 0, 'items');
-      console.log('   - voiceFingerprint type:', typeof result.voiceFingerprint, result.voiceFingerprint ? 'PRESENT' : 'MISSING');
-      console.log('   - experienceFingerprint type:', typeof result.experienceFingerprint, result.experienceFingerprint ? 'PRESENT' : 'MISSING');
-
       // Transform backend dimensions to UI dimensions
       if (result.rubricDimensionDetails && result.rubricDimensionDetails.length > 0) {
-        console.log('📝 Transforming dimensions...');
-        console.log('📦 Workshop Items:', result.workshopItems?.length || 0);
         if (result.workshopItems && result.workshopItems.length > 0) {
-          console.log('🔍 Workshop item categories:', result.workshopItems.map(item => item.rubric_category));
         }
 
         const transformedDimensions: RubricDimension[] = result.rubricDimensionDetails.map((dim) => {
@@ -523,8 +475,6 @@ export default function PIQWorkshop() {
           // Transform workshop items to issues
           const issuesForDimension = (result.workshopItems || [])
             .filter(item => item.rubric_category === dim.dimension_name);
-
-          console.log(`   - ${dim.dimension_name}: ${dim.final_score}/10, ${issuesForDimension.length} issues found`);
 
           const transformedIssues = issuesForDimension.map((item) => ({
               id: item.id,
@@ -558,24 +508,17 @@ export default function PIQWorkshop() {
           };
         });
 
-        console.log(`✅ Transformed ${transformedDimensions.length} dimensions with ${transformedDimensions.reduce((sum, d) => sum + d.issues.length, 0)} total issues`);
-        console.log('🔄 About to call setDimensions with transformed data...');
         setDimensions(transformedDimensions);
-        console.log('✅ setDimensions completed successfully');
 
         // Update initial score ref on first analysis
         if (initialScoreRef.current === 73 && result.analysis?.narrative_quality_index) {
-          console.log(`📊 Updating initial score from ${initialScoreRef.current} to ${result.analysis.narrative_quality_index}`);
           initialScoreRef.current = result.analysis.narrative_quality_index;
         }
       } else {
-        console.warn('⚠️  No rubricDimensionDetails in result - using mock dimensions');
-        console.log('   Result keys:', Object.keys(result));
         // Keep mock dimensions if backend doesn't return rubric details
       }
 
       setNeedsReanalysis(false);
-      console.log('✅ Analysis complete - UI updated');
 
       // AUTO-SAVE: Essay, Analysis, Version History, and Chat
       // This ensures everything persists when user switches PIQs
@@ -589,7 +532,6 @@ export default function PIQWorkshop() {
             
             // Step 1: Save essay first if no essayId exists
             if (!effectiveEssayId) {
-              console.log('📤 Saving essay before analysis (first time)...');
               const essaySaveResult = await saveOrUpdatePIQEssay(
                 token,
                 userId,
@@ -602,24 +544,18 @@ export default function PIQWorkshop() {
               if (essaySaveResult.success && essaySaveResult.essayId) {
                 effectiveEssayId = essaySaveResult.essayId;
                 setCurrentEssayId(essaySaveResult.essayId);
-                console.log('✅ Essay saved:', essaySaveResult.essayId);
               } else {
-                console.warn('⚠️  Failed to save essay:', essaySaveResult.error);
               }
             }
             
             // Step 2: Save analysis result
             if (effectiveEssayId) {
-              console.log('📤 Saving analysis result...');
               const analysisSaveResult = await saveAnalysisReport(token, userId, effectiveEssayId, result);
               if (analysisSaveResult.success) {
-                console.log('✅ Analysis saved:', analysisSaveResult.reportId);
               } else {
-                console.warn('⚠️  Failed to save analysis:', analysisSaveResult.error);
               }
               
               // Step 3: Save ANALYSIS version to history with score and dimension scores
-              console.log('📤 Saving analysis version to history with score...');
               const score = result.analysis?.narrative_quality_index || 0;
               const dimensionScores = result.rubricDimensionDetails || [];
               const versionResult = await saveAnalysisVersion(
@@ -632,19 +568,14 @@ export default function PIQWorkshop() {
                 analysisSaveResult.reportId // Link to the analysis report
               );
               if (versionResult.success) {
-                console.log(`✅ Analysis version ${versionResult.versionNumber} saved (score: ${score})`);
               } else {
-                console.warn('⚠️  Failed to save analysis version:', versionResult.error);
               }
               
               // Step 4: Save chat messages if present
               if (chatMessages.length > 0) {
-                console.log('📤 Saving chat messages...');
                 const chatSaveResult = await saveChatMessages(token, userId, effectiveEssayId, chatMessages);
                 if (chatSaveResult.success) {
-                  console.log(`✅ Chat messages saved (${chatMessages.length} messages)`);
                 } else {
-                  console.warn('⚠️  Failed to save chat:', chatSaveResult.error);
                 }
               }
             }
@@ -656,20 +587,14 @@ export default function PIQWorkshop() {
             setLastSaveTime(new Date());
             
           } else {
-            console.warn('⚠️  No Clerk token available - skipping auto-save');
           }
         } catch (error) {
-          console.error('❌ Error during auto-save:', error);
         }
       }
 
       // Call separate narrative overview endpoint (non-blocking)
       fetchNarrativeOverview(result);
     } catch (error) {
-      console.error('❌ Analysis failed:', error);
-      console.error('Full error object:', error);
-      console.error('Error message:', (error as Error).message);
-      console.error('Error stack:', (error as Error).stack);
 
       // Show alert to user - DO NOT SILENTLY FAIL
       alert(`Analysis failed! Check console for details.\n\nError: ${(error as Error).message}`);
@@ -713,13 +638,10 @@ export default function PIQWorkshop() {
         const result = await response.json();
         if (result.success && result.narrative_overview) {
           setNarrativeOverview(result.narrative_overview);
-          console.log('✅ Narrative overview loaded');
         }
       } else {
-        console.warn('⚠️  Narrative overview failed, using frontend fallback');
       }
     } catch (error) {
-      console.error('Failed to fetch narrative overview:', error);
       // Silently fall back to frontend-generated overview
     } finally {
       setLoadingOverview(false);
@@ -734,18 +656,15 @@ export default function PIQWorkshop() {
   useEffect(() => {
     async function loadFromDatabase() {
       if (!userId || !selectedPromptId) {
-        console.log('⏭️  Skipping database load: no user or prompt selected');
         return;
       }
 
       const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
       if (!selectedPrompt) {
-        console.warn('Invalid prompt selection on mount');
         return;
       }
 
       // Reset all PIQ-specific state when switching prompts
-      console.log('🔄 Resetting state for new PIQ...');
       setCurrentDraft('');
       setAnalysisResult(null);
       setDimensions([]);
@@ -757,12 +676,10 @@ export default function PIQWorkshop() {
       setChatMessages([]); // Reset chat when switching PIQs
 
       setIsLoadingFromDatabase(true);
-      console.log(`📥 Loading essay from database for prompt: ${selectedPromptId}`);
 
       try {
         const token = await getToken({ template: 'supabase' });
         if (!token) {
-          console.warn('⚠️  No Clerk token available - skipping database load');
           setIsLoadingFromDatabase(false);
           return;
         }
@@ -775,13 +692,11 @@ export default function PIQWorkshop() {
         );
 
         if (!success) {
-          console.error('❌ Failed to load from database:', error);
           setIsLoadingFromDatabase(false);
           return;
         }
 
         if (essay) {
-          console.log(`✅ Loaded essay from database: ${essay.id} (version ${essay.version})`);
 
           // Update state with database data
           setCurrentEssayId(essay.id);
@@ -799,14 +714,11 @@ export default function PIQWorkshop() {
 
           // Load analysis if available
           if (analysis) {
-            console.log(`✅ Loaded analysis from database: NQI ${analysis.analysis?.narrative_quality_index}`);
             
             // Check if this is pre-Phase19 analysis (no teaching data)
             const hasTeachingData = analysis.workshopItems?.some(item => item.teaching);
-            console.log(`📚 Teaching data check: ${hasTeachingData ? 'HAS teaching' : 'MISSING teaching'}`);
             
             if (!hasTeachingData && analysis.workshopItems?.length > 0) {
-              console.log('⚠️ Loaded analysis missing teaching data - needs re-analysis for Phase 19');
               // Still load the analysis but flag it as needing upgrade
               setAnalysisResult({ ...analysis, needsTeachingUpgrade: true } as any);
             } else {
@@ -865,7 +777,6 @@ export default function PIQWorkshop() {
           }
 
           // Load version history from database
-          console.log('📥 Loading version history...');
           const versionResult = await getVersionHistory(token, userId, essay.id);
           if (versionResult.success && versionResult.versions && versionResult.versions.length > 0) {
             // Transform database versions to UI format
@@ -880,14 +791,11 @@ export default function PIQWorkshop() {
             }));
             setDraftVersions(loadedVersions);
             setCurrentVersionIndex(loadedVersions.length - 1);
-            console.log(`✅ Loaded ${loadedVersions.length} versions from history`);
           } else {
             // No version history - use current essay as single version
-            console.log('📭 No version history found, using current essay');
           }
 
           // Load chat messages for this essay
-          console.log('📥 Loading chat messages...');
           const chatResult = await loadChatMessages(token, userId, essay.id);
           if (chatResult.success && chatResult.messages && chatResult.messages.length > 0) {
             const loadedMessages: ChatMessage[] = chatResult.messages.map(msg => ({
@@ -897,22 +805,17 @@ export default function PIQWorkshop() {
               timestamp: msg.message_timestamp
             }));
             setChatMessages(loadedMessages);
-            console.log(`✅ Loaded ${loadedMessages.length} chat messages`);
           } else {
-            console.log('📭 No chat messages found for this essay');
           }
 
           setLastSaveTime(new Date(essay.updated_at));
           setHasUnsavedChanges(false);
-          console.log('✅ Database load complete');
 
         } else {
-          console.log('📭 No saved essay in database for this prompt');
           // Fall through to localStorage check
         }
 
       } catch (error) {
-        console.error('❌ Unexpected error loading from database:', error);
       } finally {
         setIsLoadingFromDatabase(false);
       }
@@ -930,7 +833,6 @@ export default function PIQWorkshop() {
 
     if (hasAutoSave && promptId && lastSaved && !currentEssayId) {
       setShowResumeSessionBanner(true);
-      console.log(`📦 Found auto-save from ${formatSaveTime(lastSaved)} for prompt ${promptId}`);
     }
   }, [isLoadingFromDatabase, currentEssayId]);
 
@@ -979,7 +881,6 @@ export default function PIQWorkshop() {
     // If currentEssayId is null, it means this is a new essay - don't show recovery for stale localStorage
     if (!currentEssayId) {
       // Clear any stale localStorage data for this prompt since there's no server essay
-      console.log('📭 No essay in database for this prompt - clearing stale localStorage');
       clearAllLocalDrafts(null, selectedPromptId);
       setShowLocalRecovery(false);
       setLocalRecoveryData(null);
@@ -1005,19 +906,16 @@ export default function PIQWorkshop() {
           }
         }
       } catch (error) {
-        console.error('Error getting server timestamp for recovery check:', error);
       }
 
       // Only show recovery if we have a valid server timestamp to compare against
       if (!serverTimestamp) {
-        console.log('📭 No server timestamp - skipping recovery check');
         return;
       }
 
       const recovery = checkLocalRecovery(currentEssayId, selectedPromptId, serverTimestamp);
       
       if (recovery.hasRecovery && recovery.localDraft && recovery.isNewerThanServer) {
-        console.log('🔍 Local recovery available:', recovery);
         setLocalRecoveryData({
           content: recovery.localDraft.content,
           savedAt: recovery.localDraft.savedAt,
@@ -1083,7 +981,6 @@ export default function PIQWorkshop() {
 
         saveToLocalStorage(cache);
         setLastSaveTime(new Date());
-        console.log('✅ Auto-saved to localStorage (legacy)');
       }
     }, 30000); // 30 seconds
 
@@ -1098,7 +995,6 @@ export default function PIQWorkshop() {
   useEffect(() => {
     const newPromptId = getPromptIdFromUrl();
     if (newPromptId !== selectedPromptId) {
-      console.log(`🔄 Switching from ${selectedPromptId} to ${newPromptId} - resetting state`);
       setSelectedPromptId(newPromptId);
       setNeedsReanalysis(true);
       
@@ -1117,7 +1013,6 @@ export default function PIQWorkshop() {
       setDbVersionHistory([]);
     }
   }, [piqNumber]);
-
 
   // ============================================================================
   // HANDLERS (Same as ExtracurricularWorkshopFinal)
@@ -1198,7 +1093,6 @@ export default function PIQWorkshop() {
         
         // If the version has analysis data (score & dimensions), restore that too
         if (version.score !== undefined && version.score !== null && version.score > 0) {
-          console.log(`📊 Restoring analysis state from version: score=${version.score}`);
           
           // Restore the score
           setCurrentScore(version.score);
@@ -1206,7 +1100,6 @@ export default function PIQWorkshop() {
           
           // Restore dimension scores if available
           if (version.dimension_scores && Array.isArray(version.dimension_scores)) {
-            console.log(`📊 Restoring ${version.dimension_scores.length} dimensions`);
             
             // Transform dimension_scores back to the format expected by the UI
             const restoredDimensions = version.dimension_scores.map((d: any) => ({
@@ -1251,7 +1144,6 @@ export default function PIQWorkshop() {
         await loadVersionHistory();
       }
     } catch (error) {
-      console.error('Failed to restore version:', error);
     }
   }, [currentEssayId, userId, currentDraft, getToken, loadVersionHistory]);
 
@@ -1296,7 +1188,6 @@ export default function PIQWorkshop() {
   }, [currentEssayId, selectedPromptId]);
 
   const handleSave = useCallback(async () => {
-    console.log('💾 handleSave called');
 
     // 1. Update local state (keep existing logic for UI responsiveness)
     const newVersion: DraftVersion = {
@@ -1311,7 +1202,6 @@ export default function PIQWorkshop() {
 
     // 2. Save to database (NEW)
     if (!selectedPromptId || !userId) {
-      console.warn('Cannot save to database: missing prompt or userId');
       if (!userId) {
         alert('Please sign in to save your work to the cloud');
       }
@@ -1321,7 +1211,6 @@ export default function PIQWorkshop() {
 
     const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
     if (!selectedPrompt) {
-      console.warn('Cannot save: invalid prompt selection');
       return;
     }
 
@@ -1332,14 +1221,12 @@ export default function PIQWorkshop() {
       // Get Clerk token
       const token = await getToken({ template: 'supabase' });
       if (!token) {
-        console.error('❌ No Clerk token available');
         setSaveStatus('error');
         setLastSaveError('Authentication token not available. Please sign in again.');
         return;
       }
 
       // Save essay to database
-      console.log('📤 Saving essay to database...');
       const { success, essayId, error, isNew } = await saveOrUpdatePIQEssay(
         token,
         userId,
@@ -1350,7 +1237,6 @@ export default function PIQWorkshop() {
       );
 
       if (!success) {
-        console.error('❌ Failed to save essay:', error);
         setSaveStatus('error');
         setLastSaveError(error || 'Failed to save essay');
         // Don't block the user - they can try again
@@ -1362,37 +1248,28 @@ export default function PIQWorkshop() {
         setCurrentEssayId(essayId);
       }
 
-      console.log(`✅ Essay ${isNew ? 'created' : 'updated'}: ${essayId}`);
-
       // Save analysis result if present
       if (analysisResult && essayId) {
-        console.log('📤 Saving analysis result to database...');
         const analysisResult2 = await saveAnalysisReport(token, userId, essayId, analysisResult);
 
         if (!analysisResult2.success) {
-          console.warn('⚠️  Failed to save analysis result:', analysisResult2.error);
           // Non-blocking - analysis can be regenerated
         } else {
-          console.log('✅ Analysis result saved:', analysisResult2.reportId);
         }
       }
 
       // Save chat messages if present
       if (chatMessages.length > 0 && essayId) {
-        console.log('📤 Saving chat messages to database...');
         const chatSaveResult = await saveChatMessages(token, userId, essayId, chatMessages);
 
         if (!chatSaveResult.success) {
-          console.warn('⚠️  Failed to save chat messages:', chatSaveResult.error);
           // Non-blocking - chat can be regenerated
         } else {
-          console.log(`✅ Chat messages saved (${chatMessages.length} messages)`);
         }
       }
 
       // Save MILESTONE version to history (user-triggered save)
       if (essayId) {
-        console.log('📤 Saving milestone version to history...');
         const versionResult = await saveMilestoneVersion(
           token,
           userId,
@@ -1401,9 +1278,7 @@ export default function PIQWorkshop() {
           undefined // No label for now, could prompt user in future
         );
         if (versionResult.success) {
-          console.log(`✅ Milestone version ${versionResult.versionNumber} saved to history`);
         } else {
-          console.warn('⚠️  Failed to save milestone version:', versionResult.error);
         }
       }
 
@@ -1414,13 +1289,10 @@ export default function PIQWorkshop() {
       setLastSaveTime(new Date());
       setHasUnsavedChanges(false);
 
-      console.log('✅ Save complete (draft only - no analysis triggered)');
-
       // NOTE: Save Draft does NOT trigger re-analysis
       // User must click "Analyze" button to run analysis
 
     } catch (error) {
-      console.error('❌ Unexpected error during save:', error);
       setSaveStatus('error');
       setLastSaveError((error as Error).message);
     }
@@ -1704,7 +1576,6 @@ export default function PIQWorkshop() {
 
     return overview;
     } catch (error) {
-      console.error('Error in getDetailedOverview:', error);
       return 'Analysis complete. View detailed breakdown below.';
     }
   };

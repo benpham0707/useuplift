@@ -365,7 +365,6 @@ export function VersionHistoryDrawer({
       setShowRestoreConfirm(false);
       onClose();
     } catch (error) {
-      console.error('Failed to restore version:', error);
     } finally {
       setIsRestoring(false);
     }
@@ -535,5 +534,4 @@ export function VersionHistoryDrawer({
 }
 
 export default VersionHistoryDrawer;
-
 

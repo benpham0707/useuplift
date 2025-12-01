@@ -11,7 +11,6 @@
 import { callClaude } from '@/lib/llm/claude';
 export class HolisticAnalyzer {
     static async analyze(essayText, profile, essayAnalysis) {
-        console.log('[HolisticAnalyzer] Starting deep cross-reference analysis...');
         const systemPrompt = `You are a Senior Admissions Officer at a top-tier university (Stanford/Harvard/UC Berkeley).
     
     Your job is to VALIDATE the application package and provide STRATEGIC INSIGHTS.
@@ -101,7 +100,6 @@ export class HolisticAnalyzer {
             return response.content;
         }
         catch (error) {
-            console.error('[HolisticAnalyzer] Failed:', error);
             // Return a safe fallback
             return {
                 consistency_check: {

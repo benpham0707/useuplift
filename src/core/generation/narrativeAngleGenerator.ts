@@ -185,7 +185,6 @@ Generate angles following these PROVEN ARCHETYPES from successful essays. Each a
 - Target 7/10 originality (the sweet spot for authenticity + memorability)
 - Use GROUNDED language that students can authentically tell`;
 
-
 // ============================================================================
 // PROMPT BUILDER
 // ============================================================================
@@ -273,7 +272,6 @@ function parseAnglesFromResponse(response: any): NarrativeAngle[] {
 
     throw new Error('Unexpected response format');
   } catch (error) {
-    console.error('Failed to parse angles:', error);
     // Return empty array if parsing fails
     return [];
   }
@@ -368,7 +366,4 @@ const angles = await generateNarrativeAngles({
 
 const bestAngle = await selectBestAngle(angles, myProfile);
 
-console.log('Best Angle:', bestAngle.title);
-console.log('Hook:', bestAngle.hook);
-console.log('Throughline:', bestAngle.throughline);
 */

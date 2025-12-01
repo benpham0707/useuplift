@@ -229,7 +229,6 @@ Provide your analysis as JSON following the exact format specified.`;
     return response.content;
 
   } catch (error) {
-    console.error('[Fit & Trajectory LLM Analyzer] API call failed, falling back to Heuristic Analysis:', error);
     
     const heuristic = analyzeFitHeuristic(essayText);
 

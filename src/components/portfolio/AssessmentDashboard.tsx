@@ -175,7 +175,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       }
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load personal progress');
     }
   };
 
@@ -231,7 +230,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       } : s));
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load experiences progress');
     }
   };
 
@@ -266,7 +264,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       setGrowthStatus(status);
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load personal growth status');
     }
   };
 
@@ -308,7 +305,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       } : s));
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load academic progress');
     }
   };
 
@@ -348,7 +344,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       } : s));
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load family progress');
     }
   };
 
@@ -390,7 +385,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       } : s));
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load goals progress');
     }
   };
 
@@ -431,7 +425,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       } : s));
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.warn('Could not load support progress');
     }
   };
 
@@ -560,7 +553,6 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
       </Card>
 
       {/* Moved Action Recommendations to dedicated Extracurricular Optimizer page */}
-
 
       {/* Wizards */}
       <Dialog open={openSection === 'personal'} onOpenChange={(v) => {

@@ -148,7 +148,6 @@ export default function PortfolioInsights() {
         const token = sessionData?.session?.access_token;
 
         if (!token) {
-          console.warn('No token available for insights fetch');
           return;
         }
 

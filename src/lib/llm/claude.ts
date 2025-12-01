@@ -19,18 +19,15 @@ const isBrowser = typeof import.meta !== 'undefined' && import.meta.env;
 function getApiKey(): string | null {
   // Don't throw in browser context - just return null
   if (isBrowser) {
-    console.warn('[Claude API] Skipping initialization in browser - use edge functions');
     return null;
   }
 
   const key = process.env.ANTHROPIC_API_KEY;
 
   if (!key) {
-    console.warn('[Claude API] ANTHROPIC_API_KEY not found - use edge functions for AI operations');
     return null;
   }
 
-  console.log(`[Claude API] Using API key: ${key.substring(0, 20)}...${key.substring(key.length - 4)}`);
   return key;
 }
 
@@ -42,7 +39,6 @@ function getClient(): Anthropic | null {
 
   const apiKey = getApiKey();
   if (!apiKey) {
-    console.warn('[Claude API] Cannot create client - no API key available');
     return null;
   }
 
@@ -135,20 +131,17 @@ export async function callClaude<T = any>(
     }
 
     // Make API call with timeout (30 seconds for chat, 120 seconds for deep analysis)
-    console.log('[Claude API] Starting API call...');
     const timeoutMs = maxTokens >= 3000 ? 120000 : maxTokens >= 2000 ? 90000 : 45000; // Increased for reliability
     let timeoutId: NodeJS.Timeout;
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
-        console.log(`[Claude API] Timeout triggered after ${timeoutMs}ms`);
         reject(new Error(`Claude API call timed out after ${timeoutMs/1000} seconds`));
       }, timeoutMs);
     });
 
     const response = await Promise.race([
       client.messages.create(requestParams).then(res => {
-        console.log('[Claude API] Call completed successfully');
         clearTimeout(timeoutId);
         return res;
       }),
@@ -180,8 +173,6 @@ export async function callClaude<T = any>(
 
           content = JSON.parse(jsonString);
         } catch (parseError) {
-          console.error('[Claude API] JSON Parse Error:', parseError);
-          console.error('[Claude API] Failed Content Snippet:', textContent.substring(0, 500));
           throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
       } else {
@@ -231,7 +222,6 @@ export async function callClaudeWithRetry<T = any>(
       if (error instanceof Error && error.message.includes('429')) {
         // Exponential backoff: 1s, 2s, 4s
         const waitTime = Math.pow(2, attempt) * 1000;
-        console.warn(`Rate limited, retrying in ${waitTime}ms (attempt ${attempt + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }

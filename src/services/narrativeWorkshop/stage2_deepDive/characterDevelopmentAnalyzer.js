@@ -214,7 +214,6 @@ Return ONLY valid JSON, no markdown, no explanation.`;
  * Analyze character development and voice authenticity
  */
 export async function analyzeCharacterDevelopment(input, essayType) {
-    console.log('  → Stage 2.5: Character Development Analysis');
     const startTime = Date.now();
     try {
         const prompt = buildCharacterDevelopmentPrompt(input.essayText, essayType);
@@ -236,16 +235,9 @@ export async function analyzeCharacterDevelopment(input, essayType) {
         }
         analysis.tokensUsed = response.usage?.total_tokens || 0;
         const duration = Date.now() - startTime;
-        console.log(`     ✓ Character development analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-        console.log(`       Interiority: ${analysis.interiorityPresent ? 'Yes' : 'No'} (depth: ${analysis.interiorityDepth}/10)`);
-        console.log(`       Voice authenticity: ${analysis.voiceAuthenticity}/10, Distinctiveness: ${analysis.voiceDistinctiveness}/10`);
-        console.log(`       Growth: ${analysis.growthDemonstrated}`);
-        console.log(`       Emotion type: ${analysis.emotionDescriptionType}`);
-        console.log(`       Agency: ${analysis.agencyType} (level: ${analysis.agencyLevel}/10)`);
         return analysis;
     }
     catch (error) {
-        console.error('     ✗ Character development analysis failed:', error);
         throw error;
     }
 }

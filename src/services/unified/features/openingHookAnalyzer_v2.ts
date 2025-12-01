@@ -212,8 +212,6 @@ export async function analyzeOpeningHook(
   const depth = options.depth || 'comprehensive';
   const essayType = options.essayType || 'leadership';
 
-  console.log(`[OpeningHookAnalyzer v2] Analyzing hook with FULL ESSAY context (${depth} mode)`);
-
   // Extract opening (first 1-3 sentences for focused analysis)
   const sentences = fullEssay.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const opening = sentences.slice(0, 3).join('. ') + '.';
@@ -221,7 +219,6 @@ export async function analyzeOpeningHook(
   // Check cache
   const cacheKey = getCacheKey(fullEssay, depth);
   if (!options.skipCache && analysisCache.has(cacheKey)) {
-    console.log('[OpeningHookAnalyzer v2] Cache HIT');
     return analysisCache.get(cacheKey)!;
   }
 
@@ -230,7 +227,6 @@ export async function analyzeOpeningHook(
   const userPrompt = buildWorldClassUserPrompt(opening, fullEssay, essayType, depth);
 
   // Call Claude API
-  console.log('[OpeningHookAnalyzer v2] Calling Claude API for world-class analysis...');
   const response = await callClaudeWithRetry<HookAnalysisResponse>(
     userPrompt,
     {
@@ -245,8 +241,6 @@ export async function analyzeOpeningHook(
   const analysisData = typeof response.content === 'string'
     ? JSON.parse(response.content)
     : response.content;
-
-  console.log(`[OpeningHookAnalyzer v2] ✓ Analysis complete: ${analysisData.hook_type} (${analysisData.effectiveness_score}/10)`);
 
   // Structure final analysis
   const analysis: HookAnalysis = analysisData;

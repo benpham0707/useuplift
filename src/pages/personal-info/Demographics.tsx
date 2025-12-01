@@ -38,7 +38,6 @@ export default function DemographicsPage() {
           setData({ ...data, ...parsed.demographics });
         }
       } catch (e) {
-        console.warn('Could not load saved data');
       }
     }
   }, []);

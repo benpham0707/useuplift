@@ -240,7 +240,6 @@ export async function analyzeExperienceFingerprint(
   voiceFingerprint?: VoiceFingerprint,
   holistic?: HolisticUnderstanding
 ): Promise<ExperienceFingerprint> {
-  console.log('🔬 Extracting Experience Fingerprint...');
   const startTime = Date.now();
 
   try {
@@ -274,14 +273,11 @@ export async function analyzeExperienceFingerprint(
     fingerprint.extractedAt = new Date().toISOString();
 
     const duration = Date.now() - startTime;
-    console.log(`✅ Experience Fingerprint extracted (${duration}ms)`);
 
     // Log key findings (with safe access)
     if (fingerprint.unusualCircumstance?.description) {
-      console.log(`   Unusual Circumstance: ${fingerprint.unusualCircumstance.description.substring(0, 50)}...`);
     }
     if (fingerprint.contraryInsight?.insight) {
-      console.log(`   Contrary Insight: ${fingerprint.contraryInsight.insight.substring(0, 50)}...`);
     }
 
     // Log anti-pattern warnings (with safe access)
@@ -293,15 +289,12 @@ export async function analyzeExperienceFingerprint(
     if (flags.hasCrowdPleaser) warnings.push('crowd-pleaser');
 
     if (warnings.length > 0) {
-      console.log(`   ⚠️ Convergence risks detected: ${warnings.join(', ')}`);
     } else {
-      console.log(`   ✅ Strong divergence - experience feels unique`);
     }
 
     return fingerprint;
 
   } catch (error) {
-    console.error('❌ Error extracting Experience Fingerprint:', error);
     // Return a minimal fallback that flags the need for human review
     return createFallbackFingerprint();
   }

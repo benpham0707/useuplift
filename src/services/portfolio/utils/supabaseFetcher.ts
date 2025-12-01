@@ -44,7 +44,6 @@ export async function fetchCompletePortfolioData(
   supabase: SupabaseClient<Database>,
   profileId: string
 ): Promise<CompletePortfolioData> {
-  console.log(`[Supabase Fetcher] Fetching complete data for profile: ${profileId}`);
 
   // Fetch all tables in parallel for efficiency
   const [
@@ -103,7 +102,6 @@ export async function fetchCompletePortfolioData(
   ].filter(Boolean);
 
   if (errors.length > 0) {
-    console.log(`[Supabase Fetcher] No data found for tables: ${errors.join(', ')} (this is normal for incomplete profiles)`);
   }
 
   // Transform database rows to our internal types
@@ -234,9 +232,6 @@ export async function fetchCompletePortfolioData(
     personal_growth,
     support_network,
   };
-
-  console.log(`[Supabase Fetcher] Successfully fetched data for profile: ${profileId}`);
-  console.log(`[Supabase Fetcher] Data sections present: profile${personal_info ? ', personal_info' : ''}${academic_journey ? ', academic_journey' : ''}${experiences ? ', experiences' : ''}${family_responsibilities ? ', family_responsibilities' : ''}${goals_aspirations ? ', goals_aspirations' : ''}${personal_growth ? ', personal_growth' : ''}${support_network ? ', support_network' : ''}`);
 
   return completeData;
 }

@@ -32,7 +32,6 @@ export default function CommunicationsPage() {
           setData({ ...data, ...parsed.communications });
         }
       } catch (e) {
-        console.warn('Could not load saved data');
       }
     }
   }, []);

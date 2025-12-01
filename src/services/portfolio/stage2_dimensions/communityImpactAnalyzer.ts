@@ -60,10 +60,8 @@ export async function analyzeCommunityImpact(
 
     return parseCommunityImpactAnalysis(textContent.text);
   } catch (error) {
-    console.error('Community Impact analysis failed:', error);
 
     try {
-      console.log('Retrying Community Impact analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
@@ -79,7 +77,6 @@ export async function analyzeCommunityImpact(
 
       return parseCommunityImpactAnalysis(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicCommunityImpactAnalysis(portfolio);
     }
   }
@@ -525,7 +522,6 @@ function parseCommunityImpactAnalysis(text: string): CommunityImpactAnalysis {
 
     return result;
   } catch (error) {
-    console.error('Failed to parse community impact analysis JSON:', error);
     throw new Error('Invalid JSON from community impact analyzer');
   }
 }

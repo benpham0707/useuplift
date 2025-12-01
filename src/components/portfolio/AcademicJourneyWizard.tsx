@@ -448,7 +448,6 @@ const AcademicJourneyWizard: React.FC<Props> = ({ onComplete, onCancel, onProgre
 
       onComplete();
     } catch (error) {
-      console.error('Error saving academic journey:', error);
       toast({
         title: "Error saving academic journey",
         description: "Please try again. If the problem persists, contact support.",

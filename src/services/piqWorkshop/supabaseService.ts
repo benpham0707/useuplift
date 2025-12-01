@@ -87,15 +87,12 @@ export async function saveVersionToCloud(
       .single();
 
     if (error) {
-      console.error('Supabase save error:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Saved version ${nextVersionNumber} to cloud:`, data.id);
     return { success: true, versionId: data.id };
 
   } catch (error) {
-    console.error('Failed to save to cloud:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -121,15 +118,12 @@ export async function loadVersionsFromCloud(
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Supabase load error:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Loaded ${data?.length || 0} versions from cloud`);
     return { success: true, versions: data || [] };
 
   } catch (error) {
-    console.error('Failed to load from cloud:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -156,7 +150,6 @@ export async function loadCurrentVersionFromCloud(
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      console.error('Supabase load error:', error);
       return { success: false, error: error.message };
     }
 
@@ -164,11 +157,9 @@ export async function loadCurrentVersionFromCloud(
       return { success: true, version: undefined }; // No current version
     }
 
-    console.log(`✅ Loaded current version from cloud`);
     return { success: true, version: data };
 
   } catch (error) {
-    console.error('Failed to load current version:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -193,15 +184,12 @@ export async function deleteVersionFromCloud(
       .eq('user_id', user.id); // Security: only delete own versions
 
     if (error) {
-      console.error('Supabase delete error:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Deleted version from cloud:`, versionId);
     return { success: true };
 
   } catch (error) {
-    console.error('Failed to delete from cloud:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -231,15 +219,12 @@ export async function updateVersionMetadata(
       .eq('user_id', user.id);
 
     if (error) {
-      console.error('Supabase update error:', error);
       return { success: false, error: error.message };
     }
 
-    console.log(`✅ Updated version metadata:`, versionId);
     return { success: true };
 
   } catch (error) {
-    console.error('Failed to update metadata:', error);
     return { success: false, error: (error as Error).message };
   }
 }

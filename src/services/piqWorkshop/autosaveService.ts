@@ -281,13 +281,11 @@ export class AutosaveManager {
         this.retryAttempts++;
         
         if (this.retryAttempts > this.config.maxRetryAttempts) {
-          console.log('❌ Max retry attempts reached, giving up');
           this.cancelRetryTimer();
           this.updateStatus('error', 'Max retry attempts reached');
           return;
         }
 
-        console.log(`🔄 Retry attempt ${this.retryAttempts}/${this.config.maxRetryAttempts}`);
         await this.performSave();
       }
     }, this.config.retryIntervalMs);
@@ -339,7 +337,6 @@ export class AutosaveManager {
         }
 
         this.essayId = essayResult.essayId!;
-        console.log(`📝 Essay created: ${this.essayId}`);
       }
 
       // Save autosave version
@@ -375,12 +372,10 @@ export class AutosaveManager {
       this.cancelRetryTimer();
       this.updateStatus('saved');
 
-      console.log('✅ Autosave successful');
       return true;
 
     } catch (error) {
       const errorMessage = (error as Error).message;
-      console.error('❌ Autosave failed:', errorMessage);
       
       // Save to local as backup
       this.saveToLocal();
@@ -414,19 +409,16 @@ export class AutosaveManager {
         this.lastSavedAt?.toISOString()
       );
     } catch (error) {
-      console.error('Failed to save to localStorage:', error);
     }
   }
 
   private handleOnline = (): void => {
-    console.log('🌐 Network online, retrying save...');
     if (this.hasUnsavedChanges && !this.isSaving) {
       this.performSave();
     }
   };
 
   private handleOffline = (): void => {
-    console.log('📴 Network offline');
     if (this.hasUnsavedChanges) {
       this.updateStatus('offline');
       this.saveToLocal();
@@ -489,5 +481,4 @@ export function getStatusDisplayText(state: AutosaveState): string {
       return '';
   }
 }
-
 

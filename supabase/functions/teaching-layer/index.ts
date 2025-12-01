@@ -387,17 +387,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('🎓 TEACHING LAYER - Phase 19 Starting...');
     const startTime = Date.now();
 
     // Parse request
     const requestBody: TeachingLayerRequest = await req.json();
-
-    console.log('📊 Request details:', {
-      workshopItems: requestBody.workshopItems?.length || 0,
-      essayLength: requestBody.essayText?.length || 0,
-      currentNQI: requestBody.currentNQI,
-    });
 
     // Validate required fields
     if (!requestBody.workshopItems || !requestBody.essayText || !requestBody.promptText) {
@@ -421,9 +414,6 @@ Deno.serve(async (req) => {
 
     // Build user message
     const userMessage = buildUserMessage(requestBody);
-
-    console.log('🤖 Calling Claude API for teaching guidance...');
-    console.log(`   Processing ${requestBody.workshopItems.length} workshop items`);
 
     // Call Claude API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -449,14 +439,11 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Claude API error:', errorText);
       throw new Error(`Claude API failed: ${response.status}`);
     }
 
     const result = await response.json();
     const responseText = result.content[0].text;
-
-    console.log('📝 Raw response preview:', responseText.substring(0, 200) + '...');
 
     // Parse JSON from response
     let enhancedData;
@@ -465,24 +452,14 @@ Deno.serve(async (req) => {
       const jsonString = jsonMatch ? jsonMatch[1].trim() : responseText.trim();
       enhancedData = JSON.parse(jsonString);
     } catch (e) {
-      console.error('❌ Failed to parse teaching layer JSON:', responseText);
       throw new Error('Failed to parse teaching guidance response');
     }
 
     const duration = (Date.now() - startTime) / 1000;
 
-    console.log('✅ Teaching layer complete');
-    console.log(`   Duration: ${duration.toFixed(1)}s`);
-    console.log(`   Enhanced items: ${enhancedData.enhancedItems?.length || 0}`);
-
     // Log sample of first item for quality check
     if (enhancedData.enhancedItems && enhancedData.enhancedItems.length > 0) {
       const firstItem = enhancedData.enhancedItems[0];
-      console.log('📊 Sample output (first item):');
-      console.log(`   Problem description length: ${firstItem.teaching?.problem?.description?.length || 0} chars`);
-      console.log(`   Why it matters length: ${firstItem.teaching?.problem?.whyItMatters?.length || 0} chars`);
-      console.log(`   Craft principle length: ${firstItem.teaching?.craftPrinciple?.length || 0} chars`);
-      console.log(`   Magnitude: ${firstItem.teaching?.changeMagnitude}`);
     }
 
     return new Response(
@@ -497,7 +474,6 @@ Deno.serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Teaching layer error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
 
     return new Response(

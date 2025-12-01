@@ -129,7 +129,6 @@ export const ExtracurricularWorkshopUnified: React.FC<ExtracurricularWorkshopUni
 
         setNeedsReanalysis(false);
       } catch (error) {
-        console.error('Analysis failed:', error);
         setAnalysisError(
           error instanceof Error ? error.message : 'Analysis failed. Please try again.'
         );
@@ -246,7 +245,6 @@ export const ExtracurricularWorkshopUnified: React.FC<ExtracurricularWorkshopUni
 
       setReflectionPromptsMap(prev => new Map(prev).set(issueId, prompts));
     } catch (error) {
-      console.error('[Workshop] Failed to load reflection prompts:', error);
     } finally {
       setLoadingPromptsFor(prev => {
         const next = new Set(prev);

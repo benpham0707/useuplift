@@ -159,10 +159,8 @@ export const ExtracurricularWorkshopIntegrated: React.FC<ExtracurricularWorkshop
             engine: 'sophisticated_19_iteration_system',
           });
         } catch (versionError) {
-          console.error('Failed to save version:', versionError);
         }
       } catch (error) {
-        console.error('Analysis failed:', error);
         setAnalysisError(
           error instanceof Error ? error.message : 'Analysis failed. Please try again.'
         );
@@ -260,7 +258,6 @@ export const ExtracurricularWorkshopIntegrated: React.FC<ExtracurricularWorkshop
         return next;
       });
     } catch (error) {
-      console.error('Failed to load reflection prompts:', error);
     } finally {
       setLoadingPromptsFor((prev) => {
         const next = new Set(prev);

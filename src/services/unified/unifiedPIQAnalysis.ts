@@ -556,25 +556,10 @@ export async function analyzeUnifiedPIQ(
   // ========================================================================
   // HEADER
   // ========================================================================
-  console.log('');
-  console.log('╔' + '═'.repeat(78) + '╗');
-  console.log('║' + ' '.repeat(18) + '🎯 UNIFIED PIQ ANALYSIS SYSTEM 🎯' + ' '.repeat(18) + '║');
-  console.log('║' + ' '.repeat(15) + 'Best of Both Worlds + Enhanced' + ' '.repeat(16) + '║');
-  console.log('║' + ' '.repeat(25) + 'v2.0.0-unified' + ' '.repeat(26) + '║');
-  console.log('╚' + '═'.repeat(78) + '╝');
-  console.log('');
-  console.log('📝 Input Analysis:');
-  console.log(`   Text length: ${input.text.length} characters`);
-  console.log(`   Word count: ${input.text.split(/\s+/).filter(w => w.length > 0).length} words`);
-  console.log(`   Prompt ID: ${input.prompt_id || 'auto-detect'}`);
-  console.log(`   Depth: ${input.options?.depth || 'standard'}`);
-  console.log('');
 
   // ========================================================================
   // STEP 1: CONTENT TYPE DETECTION
   // ========================================================================
-  console.log('🔍 STEP 1: Content Type Detection');
-  console.log('─'.repeat(80));
 
   const contentTypeResult = await detectContentType(
     input.text,
@@ -582,50 +567,20 @@ export async function analyzeUnifiedPIQ(
     input.content_type
   );
 
-  console.log(`   Detected: ${contentTypeResult.primary_type}`);
-  console.log(`   Confidence: ${(contentTypeResult.confidence * 100).toFixed(1)}%`);
   if (contentTypeResult.alternatives.length > 0) {
-    console.log(`   Alternatives:`);
     contentTypeResult.alternatives.forEach(alt => {
-      console.log(`     - ${alt.type} (${(alt.confidence * 100).toFixed(1)}%)`);
     });
   }
-  console.log('✅ Content type detected');
-  console.log('');
 
   // ========================================================================
   // STEP 2: UNIVERSAL FEATURE DETECTION
   // ========================================================================
-  console.log('🔬 STEP 2: Universal Feature Detection');
-  console.log('─'.repeat(80));
-  console.log('   Running parallel detections:');
-  console.log('   - Scene detection (temporal/spatial/sensory)');
-  console.log('   - Dialogue extraction (quoted speech analysis)');
-  console.log('   - Interiority detection (vulnerability, emotion, inner debate)');
-  console.log('   - Authenticity analysis (voice type, manufactured signals)');
-  console.log('   - Elite pattern detection (7 Harvard/Berkeley patterns)');
-  console.log('   - Literary sophistication (10 advanced techniques)');
-  console.log('');
 
   const features = await runUniversalFeatureDetection(input.text, input.options?.depth || 'standard');
-
-  console.log('📊 Detection Results:');
-  console.log(`   Scenes: ${features.scenes?.scene_count || 0} detected (quality: ${features.scenes?.quality_score || 0}/10)`);
-  console.log(`   Dialogue: ${features.dialogue?.dialogue_count || 0} instances (quality: ${features.dialogue?.quality_score || 0}/10)`);
-  console.log(`   Interiority: ${features.interiority?.overall_score || 0}/10`);
-  console.log(`   Authenticity: ${features.authenticity?.overall_voice_score || 0}/10`);
-  console.log('✅ Feature detection complete');
-  console.log('');
 
   // ========================================================================
   // STEP 3: ADAPTIVE RUBRIC SCORING
   // ========================================================================
-  console.log('🎯 STEP 3: Adaptive Rubric Scoring');
-  console.log('─'.repeat(80));
-  console.log('   Applying content-aware dimension weights...');
-  console.log(`   Content type: ${contentTypeResult.primary_type}`);
-  console.log('   Scoring 8-16 dimensions with evidence...');
-  console.log('');
 
   const rubricResult = await scoreWithAdaptiveRubric(
     input.text,
@@ -634,53 +589,26 @@ export async function analyzeUnifiedPIQ(
     input.context
   );
 
-  console.log('📈 Scoring Complete:');
-  console.log(`   PQI Score: ${rubricResult.pqi_score}/100`);
-  console.log(`   Tier: ${rubricResult.tier} (${rubricResult.tier_label})`);
-  console.log(`   Active Dimensions: ${rubricResult.active_dimensions.length}`);
-  console.log(`   Top Strengths: ${rubricResult.strengths.slice(0, 2).join(', ')}`);
-  console.log('✅ Adaptive rubric scoring complete');
-  console.log('');
-
   // ========================================================================
   // STEP 4: PROMPT ALIGNMENT ANALYSIS
   // ========================================================================
   let promptAnalysisResult = null;
 
   if (input.prompt_id && !input.options?.skip_prompt_alignment) {
-    console.log('📋 STEP 4: Prompt Alignment Analysis');
-    console.log('─'.repeat(80));
-    console.log(`   Analyzing alignment with UC Prompt ${input.prompt_id}...`);
-    console.log('');
 
     promptAnalysisResult = await analyzePromptAlignment(
       input.text,
       input.prompt_id as UCPromptID
     );
 
-    console.log('📊 Prompt Analysis:');
-    console.log(`   Alignment Score: ${promptAnalysisResult.alignment_score}/10 (${promptAnalysisResult.alignment_label})`);
-    console.log(`   Requirements Met: ${promptAnalysisResult.requirements_met.filter(r => r.met).length}/${promptAnalysisResult.requirements_met.length}`);
     if (promptAnalysisResult.critical_missing.length > 0) {
-      console.log(`   ⚠️  Critical Missing: ${promptAnalysisResult.critical_missing.join(', ')}`);
     }
-    console.log('✅ Prompt alignment analysis complete');
-    console.log('');
   } else {
-    console.log('⏭️  STEP 4: Prompt Alignment (Skipped)');
-    console.log('');
   }
 
   // ========================================================================
   // STEP 5: IMPROVEMENT ROADMAP GENERATION
   // ========================================================================
-  console.log('🗺️  STEP 5: Improvement Roadmap Generation');
-  console.log('─'.repeat(80));
-  console.log('   Generating prioritized improvements...');
-  console.log('   - Quick Wins (5-10 min, +1-3 points)');
-  console.log('   - Strategic Moves (20-30 min, +3-5 points)');
-  console.log('   - Transformative Changes (45-60 min, +5-10 points)');
-  console.log('');
 
   const roadmap = await generateImprovementRoadmap(
     input.text,
@@ -701,30 +629,15 @@ export async function analyzeUnifiedPIQ(
     contentTypeResult.primary_type
   );
 
-  console.log('📋 Roadmap Generated:');
-  console.log(`   Quick Wins: ${roadmap.quick_wins.length} actions`);
-  console.log(`   Strategic Moves: ${roadmap.strategic_moves.length} actions`);
-  console.log(`   Transformative Changes: ${roadmap.transformative_changes.length} actions`);
-  console.log(`   Estimated Gain: ${roadmap.estimated_total_gain}`);
-  console.log(`   Target Tier: ${roadmap.target_tier}`);
-  console.log('✅ Improvement roadmap generated');
-  console.log('');
-
   // ========================================================================
   // STEP 6: WORD COUNT & FLAGS
   // ========================================================================
-  console.log('📏 STEP 6: Word Count & Validation');
-  console.log('─'.repeat(80));
 
   const words = input.text.split(/\s+/).filter(w => w.length > 0);
   const wordCount = words.length;
   const maxWords = 350; // UC PIQ limit
   const withinLimit = wordCount <= maxWords;
   const utilization = (wordCount / maxWords) * 100;
-
-  console.log(`   Word Count: ${wordCount}/${maxWords}`);
-  console.log(`   Utilization: ${utilization.toFixed(1)}%`);
-  console.log(`   Status: ${withinLimit ? '✅ Within limit' : '⚠️  Over limit'}`);
 
   const flags: Array<{
     type: string;
@@ -769,23 +682,10 @@ export async function analyzeUnifiedPIQ(
     });
   }
 
-  console.log(`   Flags: ${flags.length} (${flags.filter(f => f.severity === 'critical').length} critical)`);
-  console.log('✅ Validation complete');
-  console.log('');
-
   // ========================================================================
   // FINALIZATION
   // ========================================================================
   const processingTime = Date.now() - startTime;
-
-  console.log('╔' + '═'.repeat(78) + '╗');
-  console.log('║' + ' '.repeat(26) + '✅ ANALYSIS COMPLETE ✅' + ' '.repeat(26) + '║');
-  console.log('╚' + '═'.repeat(78) + '╝');
-  console.log('');
-  console.log(`⏱️  Processing Time: ${processingTime}ms`);
-  console.log(`🎯 Final Score: ${rubricResult.pqi_score}/100 (Tier ${rubricResult.tier})`);
-  console.log(`📊 Overall: ${rubricResult.overall_evaluation}`);
-  console.log('');
 
   // Map dimension scores to expected format
   const dimensionScores = rubricResult.dimension_scores.map(d => ({

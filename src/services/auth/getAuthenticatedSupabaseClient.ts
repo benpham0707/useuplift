@@ -47,14 +47,11 @@ export function verifyClerkToken(token: string): boolean {
 
     // Check for 'sub' claim (Clerk user ID)
     if (!payload.sub || !payload.sub.startsWith('user_')) {
-      console.error('Invalid JWT: missing or invalid "sub" claim');
       return false;
     }
 
-    console.log('✅ JWT verified - user ID:', payload.sub);
     return true;
   } catch (error) {
-    console.error('Failed to verify JWT:', error);
     return false;
   }
 }

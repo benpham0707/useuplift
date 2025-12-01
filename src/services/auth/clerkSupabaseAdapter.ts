@@ -48,7 +48,6 @@ export function useSupabaseToken(): () => Promise<string | null> {
       const token = await getToken({ template: 'supabase' });
       return token;
     } catch (error) {
-      console.error('Failed to get Supabase token from Clerk:', error);
       return null;
     }
   };
@@ -90,7 +89,6 @@ export async function getSupabaseAuthHeaders(
   try {
     const token = await getToken({ template: 'supabase' });
     if (!token) {
-      console.warn('No Supabase token available from Clerk');
       return null;
     }
 
@@ -98,7 +96,6 @@ export async function getSupabaseAuthHeaders(
       Authorization: `Bearer ${token}`
     };
   } catch (error) {
-    console.error('Failed to create Supabase auth headers:', error);
     return null;
   }
 }

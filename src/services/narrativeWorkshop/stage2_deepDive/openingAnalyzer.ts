@@ -158,7 +158,6 @@ export async function analyzeOpening(
   input: NarrativeEssayInput,
   essayType: string
 ): Promise<OpeningAnalysis> {
-  console.log('  → Stage 2.1: Opening Analysis');
   const startTime = Date.now();
 
   try {
@@ -187,15 +186,10 @@ export async function analyzeOpening(
     analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
-    console.log(`     ✓ Opening analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-    console.log(`       Hook: ${analysis.hookType} (${analysis.hookStrength}/10)`);
-    console.log(`       Scene: ${analysis.hasOpeningScene ? 'Yes' : 'No'} (vividness: ${analysis.sceneVividness}/10)`);
-    console.log(`       Engagement: ${analysis.readerEngagement}/10`);
 
     return analysis;
 
   } catch (error) {
-    console.error('     ✗ Opening analysis failed:', error);
     throw error;
   }
 }

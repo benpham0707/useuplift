@@ -452,7 +452,6 @@ export function loadConversationHistory(activityId: string): ChatMessage[] {
   try {
     return JSON.parse(stored);
   } catch (error) {
-    console.error('Failed to parse conversation history:', error);
     return [];
   }
 }

@@ -138,13 +138,6 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     includeRecommendations = true,
   } = options;
 
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`WORKSHOP CHAT REQUEST`);
-  console.log(`Activity: ${context.activity.name}`);
-  console.log(`Current Score: ${context.analysis.nqi}/100`);
-  console.log(`User Message: "${userMessage.substring(0, 100)}${userMessage.length > 100 ? '...' : ''}"`);
-  console.log(`${'='.repeat(80)}\n`);
-
   // Build system prompt
   const systemPrompt = getSystemPrompt(tone);
 
@@ -158,7 +151,6 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
   const fullUserPrompt = buildUserPrompt(userMessage, contextBlock, conversationContext);
 
   // Call Claude (with fallback to mock mode if API key invalid)
-  console.log('Calling Claude with context...');
   const startTime = Date.now();
 
   let response;
@@ -174,13 +166,9 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
     );
 
     const duration = Date.now() - startTime;
-    console.log(`✓ Response received (${duration}ms)`);
-    console.log(`  Tokens: ${response.usage.input_tokens} in, ${response.usage.output_tokens} out`);
-    console.log(`  Cost: $${response.usage.input_tokens * 0.000003 + response.usage.output_tokens * 0.000015}\n`);
   } catch (error) {
     // If API fails (invalid key, no credits, etc.), use intelligent mock mode
     if (error instanceof Error && (error.message.includes('authentication_error') || error.message.includes('invalid x-api-key'))) {
-      console.warn('⚠️ API key invalid - using intelligent mock mode for development');
       response = {
         content: generateIntelligentMockResponse(userMessage, context),
         usage: { input_tokens: 0, output_tokens: 0 },

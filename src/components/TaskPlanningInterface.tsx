@@ -366,7 +366,6 @@ const TaskPlanningInterface: React.FC<TaskPlanningInterfaceProps> = ({ isOpen, o
                         className="h-9 w-9 p-0"
                         onClick={() => {
                           // Regenerate task logic would go here
-                          console.log('Regenerating task based on chat discussion...');
                         }}
                       >
                         <RefreshCw className="h-4 w-4" />

@@ -456,7 +456,6 @@ export async function analyzeOpeningHookV4(
     essayType?: 'leadership' | 'challenge' | 'creative' | 'academic' | 'growth';
   } = {}
 ): Promise<HookDetectionResult> {
-  console.log('[Hook Analyzer V4] Starting deterministic detection...');
 
   // Extract opening
   const sentences = fullEssay.split(/[.!?]+/).filter(s => s.trim().length > 0);
@@ -464,8 +463,6 @@ export async function analyzeOpeningHookV4(
 
   // STEP 1: Deterministic detection
   const detection = detectHookType(opening);
-
-  console.log(`[Hook Analyzer V4] ✓ Detected: ${detection.type} (${(detection.confidence * 100).toFixed(0)}% confidence)`);
 
   // If skipping LLM, return early
   if (options.skipLLMScoring) {
@@ -478,7 +475,6 @@ export async function analyzeOpeningHookV4(
   }
 
   // STEP 2: LLM scoring for insights
-  console.log('[Hook Analyzer V4] Calling Claude for scoring and insights...');
 
   const scoringPrompt = buildScoringPrompt(opening, fullEssay, detection, options.essayType || 'leadership');
 
@@ -505,8 +501,6 @@ export async function analyzeOpeningHookV4(
   const scoring = typeof response.content === 'object'
     ? response.content
     : JSON.parse(response.content as string);
-
-  console.log(`[Hook Analyzer V4] ✓ Scoring: ${scoring.effectiveness_score}/10 (${scoring.hook_tier})`);
 
   return {
     ...detection,

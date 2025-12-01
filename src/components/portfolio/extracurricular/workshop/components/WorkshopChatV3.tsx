@@ -158,7 +158,6 @@ export default function WorkshopChatV3({
       setMessages(prev => [...prev, response.message]);
 
     } catch (err: any) {
-      console.error('Chat error:', err);
       setError(err.message || 'Failed to get response');
 
       // Add error message

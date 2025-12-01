@@ -61,10 +61,8 @@ export async function analyzeAuthenticityVoice(
 
     return parseAuthenticityVoiceAnalysis(textContent.text);
   } catch (error) {
-    console.error('Authenticity & Voice analysis failed:', error);
 
     try {
-      console.log('Retrying Authenticity & Voice analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3500,
@@ -80,7 +78,6 @@ export async function analyzeAuthenticityVoice(
 
       return parseAuthenticityVoiceAnalysis(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicAuthenticityAnalysis(portfolio);
     }
   }
@@ -517,7 +514,6 @@ function parseAuthenticityVoiceAnalysis(text: string): AuthenticityVoiceAnalysis
 
     return result;
   } catch (error) {
-    console.error('Failed to parse authenticity voice analysis JSON:', error);
     throw new Error('Invalid JSON from authenticity voice analyzer');
   }
 }

@@ -62,7 +62,6 @@ export const ExtracurricularModal: React.FC<ExtracurricularModalProps> = ({
   const handleSave = (updatedEntry: ExperienceEntry) => {
     // Update activity with new description
     // In production, this would call an API to persist changes
-    console.log('Saving updated description:', updatedEntry.description_original);
   };
 
   if (!activity) return null;

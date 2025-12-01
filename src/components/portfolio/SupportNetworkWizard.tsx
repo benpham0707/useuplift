@@ -216,7 +216,6 @@ const SupportNetworkWizard: React.FC<Props> = ({ onComplete, onCancel, onProgres
 
       onComplete();
     } catch (error) {
-      console.error('Error saving support network:', error);
       toast({
         title: "Error saving information",
         description: "Please try again. If the problem persists, contact support.",

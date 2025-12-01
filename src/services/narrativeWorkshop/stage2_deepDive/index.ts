@@ -27,9 +27,6 @@ export async function runDeepDiveAnalyses(
   input: NarrativeEssayInput,
   essayType: string
 ): Promise<DeepDiveAnalyses> {
-  console.log('\n' + '='.repeat(80));
-  console.log('STAGE 2: DEEP DIVE ANALYSIS (6 Parallel Analyzers)');
-  console.log('='.repeat(80) + '\n');
 
   const startTime = Date.now();
 
@@ -72,15 +69,9 @@ export async function runDeepDiveAnalyses(
       analysesCompletedAt: new Date().toISOString()
     };
 
-    console.log('\n✅ Deep dive analyses complete');
-    console.log(`   Duration: ${duration}ms (parallel execution)`);
-    console.log(`   Total tokens: ${totalTokensUsed}`);
-    console.log('\n' + '='.repeat(80) + '\n');
-
     return result;
 
   } catch (error) {
-    console.error('❌ Deep dive analyses failed:', error);
     throw error;
   }
 }

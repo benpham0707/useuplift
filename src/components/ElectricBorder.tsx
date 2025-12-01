@@ -64,7 +64,6 @@ const ElectricBorder = ({ children, color = '#5227FF', speed = 1, chaos = 1, thi
           try {
             (a as SVGAnimationElement).beginElement();
           } catch {
-            console.warn('ElectricBorder: beginElement failed, this may be due to a browser limitation.');
           }
         }
       });

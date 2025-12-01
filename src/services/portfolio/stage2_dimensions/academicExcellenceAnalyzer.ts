@@ -70,11 +70,9 @@ export async function analyzeAcademicExcellence(
 
     return parseAcademicAnalysis(textContent.text);
   } catch (error) {
-    console.error('Academic Excellence analysis failed:', error);
 
     // Retry once
     try {
-      console.log('Retrying Academic Excellence analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
@@ -90,7 +88,6 @@ export async function analyzeAcademicExcellence(
 
       return parseAcademicAnalysis(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicAcademicAnalysis(portfolio, mode);
     }
   }
@@ -454,7 +451,6 @@ function parseAcademicAnalysis(text: string): AcademicExcellenceAnalysis {
 
     return result;
   } catch (error) {
-    console.error('Failed to parse academic analysis JSON:', error);
     throw new Error('Invalid JSON from academic analyzer');
   }
 }

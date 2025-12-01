@@ -79,7 +79,6 @@ export async function generateSurgicalFixes(
   overallScore: number = 50,
   preComputedDiagnosis?: SymptomDiagnosis // Optional: Allow external diagnosis
 ): Promise<WorkshopItem> {
-  console.log(`🔪 Surgical Editor: Fixing "${issue.quote.substring(0, 20)}..." (Score Tier: ${overallScore})`);
 
   try {
     // STEP 1: DIAGNOSIS (Layer 1)
@@ -88,7 +87,6 @@ export async function generateSurgicalFixes(
     const contextSnippetRaw = essayText.substring(Math.max(0, issue.startIndex - 100), Math.min(essayText.length, issue.endIndex + 100));
     
     if (!diagnosis) {
-        console.log("   🔍 Running JIT Diagnosis...");
         diagnosis = await diagnoseSymptom(issue.quote, contextSnippetRaw);
     }
 
@@ -151,8 +149,7 @@ export async function generateSurgicalFixes(
     
     suggestions = suggestions.filter(s => {
         const hasBanned = BANNED_TERMS.some(term => s.text.toLowerCase().includes(term));
-        if (hasBanned) console.warn(`⚠️ Filtered suggestion with banned term: "${s.text.substring(0, 20)}..."`);
-        return !hasBanned;
+        if (hasBanned)         return !hasBanned;
     });
 
     // Fallback
@@ -180,7 +177,6 @@ export async function generateSurgicalFixes(
     };
 
   } catch (error) {
-    console.error('❌ Error in Surgical Editor:', error);
     return {
       id: uuidv4(),
       rubric_category: issue.rubricCategory,

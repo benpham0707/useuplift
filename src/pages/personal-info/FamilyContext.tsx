@@ -37,7 +37,6 @@ export default function FamilyContextPage() {
           setData({ ...data, ...parsed.familyContext });
         }
       } catch (e) {
-        console.warn('Could not load saved data');
       }
     }
   }, []);

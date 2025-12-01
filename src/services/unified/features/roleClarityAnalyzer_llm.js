@@ -152,7 +152,6 @@ Provide your analysis as JSON following the exact format specified in the system
         return response.content;
     }
     catch (error) {
-        console.error('[Role Clarity LLM Analyzer] API call failed:', error);
         return {
             score: 0,
             quality_level: 'passenger',

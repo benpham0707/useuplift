@@ -138,7 +138,6 @@ export default function RightSidePersonalizationChat() {
                     variant="outline"
                     className="p-0"
                     onClick={() =>
-                      console.log('Regenerating task based on chat discussion...')
                     }
                     aria-label="Regenerate based on chat"
                     style={{ height: buttonSize, width: buttonSize }}

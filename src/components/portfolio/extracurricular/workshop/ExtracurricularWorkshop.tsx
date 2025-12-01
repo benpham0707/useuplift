@@ -128,38 +128,12 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
           version: 1,
         };
 
-        console.log('[ExtracurricularWorkshop] Running Phase 17-19 analysis...');
-        console.log('[ExtracurricularWorkshop] Entry:', {
-          title: entry.title,
-          descriptionLength: draft.length,
-          enableTeachingLayer: true,
-        });
-
         const result = await analyzeForWorkshop(entry, {
           enableTeachingLayer: true,
           maxIssues: 5,
         });
 
-        console.log('[ExtracurricularWorkshop] analyzeForWorkshop returned:', {
-          topIssuesCount: result.topIssues?.length || 0,
-          hasTopIssues: !!result.topIssues,
-          firstIssueHasTeaching: result.topIssues?.[0]?.teaching ? 'YES' : 'NO',
-          firstIssueTeachingKeys: result.topIssues?.[0]?.teaching ? Object.keys(result.topIssues[0].teaching) : 'none',
-        });
-
-        console.log('[ExtracurricularWorkshop] Analysis complete!', {
-          topIssues: result.topIssues.length,
-          withTeaching: result.topIssues.filter(i => i.teaching).length,
-        });
-
         // DEBUG: Log what teaching looks like
-        console.log('[DEBUG] First issue with teaching:', result.topIssues.find(i => i.teaching));
-        console.log('[DEBUG] All issues:', result.topIssues.map(i => ({
-          id: i.id,
-          title: i.title,
-          hasTeaching: !!i.teaching,
-          teachingPreview: i.teaching?.problem?.hook ? `${i.teaching?.problem?.hook.substring(0, 50)}...` : 'NO TEACHING'
-        })));
 
         // FULL REPLACEMENT: Replace mock dimensions with Phase 19 results
         // This ensures teaching guidance is displayed via TeachingGuidanceCard
@@ -168,24 +142,7 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
           result.dimensions
         );
 
-        console.log('[ExtracurricularWorkshop] Replacing dimensions with Phase 19 results...', {
-          dimensionCount: newDimensions.length,
-          issueCount: newDimensions.reduce((sum, d) => sum + d.issues.length, 0),
-          withTeaching: newDimensions.reduce(
-            (sum, d) => sum + d.issues.filter(i => i.teaching).length, 0
-          ),
-        });
-
         // DEBUG: Log converted issues
-        console.log('[DEBUG] Converted dimensions:', newDimensions.map(d => ({
-          name: d.name,
-          issueCount: d.issues.length,
-          issuesWithTeaching: d.issues.filter(i => i.teaching).length,
-          firstIssue: d.issues[0] ? {
-            title: d.issues[0].title,
-            hasTeaching: !!d.issues[0].teaching,
-          } : null
-        })));
 
         setDimensions(newDimensions);
 
@@ -195,7 +152,6 @@ export const ExtracurricularWorkshop: React.FC<ExtracurricularWorkshopProps> = (
 
         setHasRunAnalysis(true);
       } catch (error) {
-        console.error('[ExtracurricularWorkshop] Phase 19 analysis failed:', error);
         setAnalysisError(error instanceof Error ? error.message : 'Analysis failed');
       } finally {
         setIsAnalyzing(false);

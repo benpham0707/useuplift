@@ -20,9 +20,6 @@ export async function runGrammarStyleAnalysis(
   input: NarrativeEssayInput,
   essayType: string
 ): Promise<GrammarStyleAnalysis> {
-  console.log('\n' + '='.repeat(80));
-  console.log('STAGE 3: GRAMMAR & STYLE ANALYSIS');
-  console.log('='.repeat(80) + '\n');
 
   const startTime = Date.now();
 
@@ -42,17 +39,9 @@ export async function runGrammarStyleAnalysis(
       analysisCompletedAt: new Date().toISOString()
     };
 
-    console.log('\n✅ Grammar & style analysis complete');
-    console.log(`   Duration: ${duration}ms`);
-    console.log(`   Grammar score: ${grammarAnalysis.overallGrammarScore}/10`);
-    console.log(`   Style score: ${styleAnalysis.overallStyleScore}/10`);
-    console.log(`   Total tokens: ${result.totalTokensUsed}`);
-    console.log('\n' + '='.repeat(80) + '\n');
-
     return result;
 
   } catch (error) {
-    console.error('❌ Grammar & style analysis failed:', error);
     throw error;
   }
 }

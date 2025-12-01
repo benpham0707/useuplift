@@ -456,8 +456,6 @@ export const PIQ_TEACHING_EXAMPLES: PIQTeachingExample[] = [
   // - COHERENCE_EXAMPLES (5-10 examples)
 ];
 
-console.log(`✓ PIQ Teaching Examples loaded: ${PIQ_TEACHING_EXAMPLES.length} examples across ${new Set(PIQ_TEACHING_EXAMPLES.map(e => e.dimension)).size} dimensions`);
-
 /**
  * Get teaching example by ID
  */

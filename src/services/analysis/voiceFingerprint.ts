@@ -17,7 +17,6 @@ export class VoiceFingerprintAnalyzer {
    * This fingerprint is used to constrain future edits so they sound authentic.
    */
   static async analyze(text: string): Promise<VoiceFingerprint> {
-    console.log('[VoiceFingerprintAnalyzer] Extracting voice DNA...');
 
     const systemPrompt = `You are a Linguistic Forensic Analyst. 
     Your goal is to analyze a student's essay and extract their unique "Voice Fingerprint."
@@ -53,7 +52,6 @@ export class VoiceFingerprintAnalyzer {
       return response.content;
 
     } catch (error) {
-      console.error('[VoiceFingerprintAnalyzer] Failed:', error);
       // Safe Fallback
       return {
         tone: "Neutral",

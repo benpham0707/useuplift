@@ -75,11 +75,9 @@ export async function analyzeHolisticPortfolio(
     const result = parseHolisticAnalysis(textContent.text);
     return result;
   } catch (error) {
-    console.error('Stage 1 Holistic Analysis failed:', error);
 
     // Retry once before falling back to heuristic
     try {
-      console.log('Retrying Stage 1 analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
@@ -100,7 +98,6 @@ export async function analyzeHolisticPortfolio(
 
       return parseHolisticAnalysis(retryTextContent.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic fallback:', retryError);
       return generateHeuristicHolisticAnalysis(portfolio, mode);
     }
   }
@@ -598,7 +595,6 @@ function parseHolisticAnalysis(text: string): HolisticPortfolioUnderstanding {
 
     return result;
   } catch (error) {
-    console.error('Failed to parse holistic analysis JSON:', error);
     throw new Error('Invalid JSON response from holistic analyzer');
   }
 }

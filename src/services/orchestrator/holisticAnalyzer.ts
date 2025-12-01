@@ -19,7 +19,6 @@ export class HolisticAnalyzer {
     profile: StudentProfile,
     essayAnalysis: EssayAnalysisResult
   ): Promise<HolisticAnalysis> {
-    console.log('[HolisticAnalyzer] Starting deep cross-reference analysis...');
 
     const systemPrompt = `You are a Senior Admissions Officer at a top-tier university (Stanford/Harvard/UC Berkeley).
     
@@ -170,7 +169,6 @@ export class HolisticAnalyzer {
       return response.content;
 
     } catch (error) {
-      console.error('[HolisticAnalyzer] Failed:', error);
       // Return a safe fallback
       return {
         consistency_check: {

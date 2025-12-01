@@ -76,8 +76,6 @@ export async function validateSuggestions(
   anthropicApiKey: string
 ): Promise<ValidationResult[]> {
 
-  console.log(`🔍 Validating ${suggestions.length} suggestions...`);
-
   const userMessage = `Review these ${suggestions.length} workshop suggestions for quality.
 
 ESSAY CONTEXT: ${essayContext.substring(0, 500)}...
@@ -121,14 +119,9 @@ Return JSON array of validation results.`;
     const excellentCount = validations.filter((v: ValidationResult) => v.verdict === 'excellent').length;
     const needsWorkCount = validations.filter((v: ValidationResult) => v.verdict === 'needs_work').length;
 
-    console.log(`✅ Validation complete:`);
-    console.log(`   Avg Score: ${avgScore.toFixed(1)}/10`);
-    console.log(`   Excellent: ${excellentCount}, Needs Work: ${needsWorkCount}`);
-
     return validations;
 
   } catch (error) {
-    console.error('❌ Validation error:', error);
     throw error;
   }
 }

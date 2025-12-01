@@ -63,10 +63,8 @@ export async function analyzeLeadership(
 
     return parseLeadershipAnalysis(textContent.text);
   } catch (error) {
-    console.error('Leadership analysis failed:', error);
 
     try {
-      console.log('Retrying Leadership analysis...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
@@ -82,7 +80,6 @@ export async function analyzeLeadership(
 
       return parseLeadershipAnalysis(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicLeadershipAnalysis(portfolio);
     }
   }
@@ -502,7 +499,6 @@ function parseLeadershipAnalysis(text: string): LeadershipInitiativeAnalysis {
 
     return result;
   } catch (error) {
-    console.error('Failed to parse leadership analysis JSON:', error);
     throw new Error('Invalid JSON from leadership analyzer');
   }
 }

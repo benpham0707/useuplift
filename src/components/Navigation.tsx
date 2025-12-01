@@ -27,7 +27,6 @@ const Navigation = () => {
         setCredits(Number.isFinite(value) ? value : 0);
       } catch (err) {
         // eslint-disable-next-line no-console
-        console.warn('[Navbar] Credits fetch failed, defaulting to 0:', err);
         setCredits(0);
       }
     };

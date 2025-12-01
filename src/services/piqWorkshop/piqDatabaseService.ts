@@ -283,7 +283,6 @@ export async function saveOrUpdatePIQEssay(
       .maybeSingle();
 
     if (fetchError) {
-      console.error('Error fetching existing essay:', fetchError);
       return { success: false, error: fetchError.message };
     }
 
@@ -291,7 +290,6 @@ export async function saveOrUpdatePIQEssay(
     if (existing) {
       // Only update if content actually changed
       if (existing.draft_current === currentDraft) {
-        console.log('✅ Essay unchanged, skipping update');
         return { success: true, essayId: existing.id, isNew: false };
       }
 
@@ -306,11 +304,9 @@ export async function saveOrUpdatePIQEssay(
         .single();
 
       if (updateError) {
-        console.error('Error updating essay:', updateError);
         return { success: false, error: updateError.message };
       }
 
-      console.log(`✅ Essay updated: ${existing.id} (version ${existing.version} -> ${existing.version + 1})`);
       return { success: true, essayId: updated.id, isNew: false };
     }
 
@@ -331,15 +327,12 @@ export async function saveOrUpdatePIQEssay(
       .single();
 
     if (insertError) {
-      console.error('Error inserting essay:', insertError);
       return { success: false, error: insertError.message };
     }
 
-    console.log(`✅ New essay created: ${inserted.id}`);
     return { success: true, essayId: inserted.id, isNew: true };
 
   } catch (error) {
-    console.error('Unexpected error in saveOrUpdatePIQEssay:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -399,15 +392,12 @@ export async function saveAnalysisReport(
       .single();
 
     if (insertError) {
-      console.error('Error inserting analysis report:', insertError);
       return { success: false, error: insertError.message };
     }
 
-    console.log(`✅ Analysis report saved: ${inserted.id} (NQI: ${reportData.essay_quality_index})`);
     return { success: true, reportId: inserted.id };
 
   } catch (error) {
-    console.error('Unexpected error in saveAnalysisReport:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -454,13 +444,11 @@ export async function loadPIQEssay(
       .maybeSingle();
 
     if (essayError) {
-      console.error('Error loading essay:', essayError);
       return { success: false, error: essayError.message };
     }
 
     if (!essay) {
       // No essay found - not an error, just means user hasn't saved yet
-      console.log('📭 No saved essay found for this prompt');
       return { success: true, essay: undefined, analysis: undefined };
     }
 
@@ -474,15 +462,12 @@ export async function loadPIQEssay(
       .maybeSingle();
 
     if (reportError) {
-      console.error('Error loading analysis report:', reportError);
       // Continue without analysis rather than failing completely
     }
 
     const analysisResult = report ? databaseFormatToAnalysisResult(report) : undefined;
 
-    console.log(`✅ Loaded essay: ${essay.id} (version ${essay.version})`);
     if (analysisResult) {
-      console.log(`✅ Loaded analysis: NQI ${analysisResult.analysis?.narrative_quality_index}`);
     }
 
     return {
@@ -492,7 +477,6 @@ export async function loadPIQEssay(
     };
 
   } catch (error) {
-    console.error('Unexpected error in loadPIQEssay:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -547,7 +531,6 @@ export async function getVersionHistory(
       .order('created_at', { ascending: false });
 
     if (versionsError) {
-      console.error('Error loading version history:', versionsError);
       return { success: false, error: versionsError.message };
     }
 
@@ -569,11 +552,9 @@ export async function getVersionHistory(
       created_at: v.created_at,
     }));
 
-    console.log(`✅ Loaded ${mappedVersions.length} versions for essay ${essayId}`);
     return { success: true, versions: mappedVersions };
 
   } catch (error) {
-    console.error('Unexpected error in getVersionHistory:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -606,14 +587,12 @@ export async function getLatestVersion(
           .maybeSingle();
 
     if (error) {
-      console.error('Error getting latest version:', error);
       return { success: false, error: error.message };
     }
 
     return { success: true, version: version as PIQVersion | undefined };
 
   } catch (error) {
-    console.error('Unexpected error in getLatestVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -680,7 +659,6 @@ export async function saveVersion(
       .single();
 
     if (insertError) {
-      console.error('Error saving version:', insertError);
       return { success: false, error: insertError.message };
     }
 
@@ -690,11 +668,9 @@ export async function saveVersion(
       .update({ version: newVersionNumber })
       .eq('id', essayId);
 
-    console.log(`✅ Version ${newVersionNumber} (${options.createdBy}) saved for essay ${essayId}`);
     return { success: true, versionId: version.id, versionNumber: newVersionNumber };
 
   } catch (error) {
-    console.error('Unexpected error in saveVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -747,13 +723,11 @@ export async function saveAutosaveVersion(
         charDiff < AUTOSAVE_MIN_CHAR_DIFF &&
         timeSinceLastSave < AUTOSAVE_MIN_INTERVAL_MS
       ) {
-        console.log(`⏭️ Autosave skipped (charDiff: ${charDiff}, timeSince: ${Math.round(timeSinceLastSave / 1000)}s)`);
         return { success: true, skipped: true };
       }
 
       // Also skip if content is exactly the same
       if (latestVersion.draft_content === draftContent) {
-        console.log('⏭️ Autosave skipped (content unchanged)');
         return { success: true, skipped: true };
       }
     }
@@ -767,7 +741,6 @@ export async function saveAutosaveVersion(
     return result;
 
   } catch (error) {
-    console.error('Unexpected error in saveAutosaveVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -819,7 +792,6 @@ export async function saveMilestoneVersion(
     return result;
 
   } catch (error) {
-    console.error('Unexpected error in saveMilestoneVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -877,7 +849,6 @@ export async function saveAnalysisVersion(
     return result;
 
   } catch (error) {
-    console.error('Unexpected error in saveAnalysisVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -936,7 +907,6 @@ export async function restoreVersion(
       .eq('user_id', userId);
 
     if (updateError) {
-      console.error('Error restoring version:', updateError);
       return { success: false, error: updateError.message };
     }
 
@@ -946,11 +916,9 @@ export async function restoreVersion(
       changeSummary: `Restored from version ${versionId}`,
     });
 
-    console.log(`✅ Restored version ${versionId} for essay ${essayId}`);
     return { success: true, restoredContent: version.draft_content };
 
   } catch (error) {
-    console.error('Unexpected error in restoreVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -994,15 +962,12 @@ export async function softDeleteVersion(
       .eq('essay_id', essayId);
 
     if (updateError) {
-      console.error('Error soft deleting version:', updateError);
       return { success: false, error: updateError.message };
     }
 
-    console.log(`✅ Soft deleted version ${versionId}`);
     return { success: true };
 
   } catch (error) {
-    console.error('Unexpected error in softDeleteVersion:', error);
     return { success: false, error: (error as Error).message };
   }
 }
@@ -1032,13 +997,11 @@ export async function hasAnyPIQEssays(
       .eq('essay_type', 'uc_piq');
 
     if (error) {
-      console.error('Error checking PIQ essays:', error);
       return false;
     }
 
     return (count || 0) > 0;
   } catch (error) {
-    console.error('Unexpected error in hasAnyPIQEssays:', error);
     return false;
   }
 }
@@ -1067,7 +1030,6 @@ export async function getAllPIQEssaySummaries(
       .order('updated_at', { ascending: false });
 
     if (error) {
-      console.error('Error loading essay summaries:', error);
       return { success: false, error: error.message };
     }
 
@@ -1081,7 +1043,6 @@ export async function getAllPIQEssaySummaries(
     return { success: true, essays: summaries };
 
   } catch (error) {
-    console.error('Unexpected error in getAllPIQEssaySummaries:', error);
     return { success: false, error: (error as Error).message };
   }
 }

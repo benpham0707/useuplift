@@ -110,16 +110,10 @@ export async function analyzeForWorkshop(
     enableTeachingLayer: shouldEnableTeaching = true,
   } = options;
 
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`WORKSHOP ANALYSIS: ${entry.title}`);
-  console.log(`Depth: ${depth}, Max Issues: ${maxIssues}`);
-  console.log(`${'='.repeat(80)}\n`);
-
   // ============================================================================
   // STEP 1: Run core analysis engine
   // ============================================================================
 
-  console.log('Step 1: Running core analysis engine...');
   const analysisStart = Date.now();
 
   const analysis = await analyzeEntry(entry, {
@@ -128,15 +122,11 @@ export async function analyzeForWorkshop(
   });
 
   const analysisMs = Date.now() - analysisStart;
-  console.log(`✓ Analysis complete (${analysisMs}ms)`);
-  console.log(`  NQI: ${analysis.report.narrative_quality_index}/100`);
-  console.log(`  Issues detected: ${analysis.coaching?.overall.total_issues || 0}\n`);
 
   // ============================================================================
   // STEP 2: Prioritize and enrich issues
   // ============================================================================
 
-  console.log('Step 2: Prioritizing and enriching issues...');
   const enrichStart = Date.now();
 
   const allIssues = await enrichIssuesWithTeaching(
@@ -148,9 +138,6 @@ export async function analyzeForWorkshop(
   const prioritizedIssues = prioritizeIssues(allIssues, maxIssues);
 
   const enrichMs = Date.now() - enrichStart;
-  console.log(`✓ Issues enriched (${enrichMs}ms)`);
-  console.log(`  Top issues: ${prioritizedIssues.length}`);
-  console.log(`  All issues: ${allIssues.length}\n`);
 
   // ============================================================================
   // STEP 3: Generate reflection prompts (LLM)
@@ -158,15 +145,12 @@ export async function analyzeForWorkshop(
 
   let promptsMs = 0;
   if (shouldGeneratePrompts && prioritizedIssues.length > 0) {
-    console.log('Step 3: Generating reflection prompts (LLM)...');
     const promptsStart = Date.now();
 
     await generatePromptsForIssues(prioritizedIssues, entry, reflectionTone);
 
     promptsMs = Date.now() - promptsStart;
-    console.log(`✓ Prompts generated (${promptsMs}ms)\n`);
   } else {
-    console.log('Step 3: Skipping reflection prompts (disabled or no issues)\n');
   }
 
   // ============================================================================
@@ -177,7 +161,6 @@ export async function analyzeForWorkshop(
   let enhancedIssues = prioritizedIssues;
 
   if (shouldEnableTeaching && isTeachingLayerAvailable() && prioritizedIssues.length > 0) {
-    console.log('Step 3.5: Phase 19 - Enhancing with teaching layer (LLM)...');
     const teachingStart = Date.now();
 
     // Pass full entry and analysis context for rich teaching
@@ -193,28 +176,23 @@ export async function analyzeForWorkshop(
     );
 
     teachingMs = Date.now() - teachingStart;
-    console.log(`✓ Teaching guidance added (${teachingMs}ms)`);
-    console.log(`  Items enhanced: ${enhancedIssues.filter(i => i.teaching).length}\n`);
   } else {
     const reason = !shouldEnableTeaching
       ? 'disabled'
       : !isTeachingLayerAvailable()
       ? 'not available'
       : 'no issues';
-    console.log(`Step 3.5: Skipping teaching layer (${reason})\n`);
   }
 
   // ============================================================================
   // STEP 4: Build dimension scores
   // ============================================================================
 
-  console.log('Step 4: Building dimension scores...');
   const dimensions = buildDimensionScores(
     analysis.report.categories,
     analysis.report.weights,
     analysis.coaching?.categories || []
   );
-  console.log(`✓ ${dimensions.length} dimensions mapped\n`);
 
   // ============================================================================
   // STEP 5: Assemble workshop result
@@ -244,13 +222,6 @@ export async function analyzeForWorkshop(
     },
   };
 
-  console.log(`${'='.repeat(80)}`);
-  console.log(`WORKSHOP ANALYSIS COMPLETE`);
-  console.log(`NQI: ${result.overallScore}/100 (${result.scoreTier})`);
-  console.log(`Top Issues: ${result.topIssues.length}`);
-  console.log(`Total Time: ${totalMs}ms`);
-  console.log(`${'='.repeat(80)}\n`);
-
   return result;
 }
 
@@ -277,9 +248,7 @@ async function enrichIssuesWithTeaching(
       );
 
       if (teachingExample) {
-        console.log(`  ✓ Found teaching example for: ${issue.title}`);
       } else {
-        console.log(`  ⚠ No teaching example for: ${issue.title} (will use fix strategies only)`);
       }
 
       enrichedIssues.push({
@@ -346,7 +315,6 @@ async function generatePromptsForIssues(
   // Attach prompts to issues
   promptSets.forEach((promptSet, idx) => {
     issues[idx].reflectionPrompts = promptSet;
-    console.log(`    ✓ Prompts for: ${issues[idx].title}`);
   });
 }
 
@@ -452,7 +420,6 @@ export async function analyzeAndCompare(
   previousAnalysis: WorkshopAnalysisResult,
   options: WorkshopAnalysisOptions = {}
 ): Promise<WorkshopDelta> {
-  console.log('\n🔄 RE-ANALYZING for iteration comparison...\n');
 
   // Run fresh analysis
   const afterAnalysis = await analyzeForWorkshop(entry, options);
@@ -490,12 +457,6 @@ export async function analyzeAndCompare(
     issuesResolved.length,
     afterAnalysis.scoreTier
   );
-
-  console.log(`\n📊 DELTA SUMMARY:`);
-  console.log(`  NQI: ${previousAnalysis.overallScore} → ${afterAnalysis.overallScore} (${overallDelta > 0 ? '+' : ''}${overallDelta})`);
-  console.log(`  Issues resolved: ${issuesResolved.length}`);
-  console.log(`  Issues remaining: ${issuesRemaining.length}`);
-  console.log(`  Message: ${celebrationMessage}\n`);
 
   return {
     before: previousAnalysis,

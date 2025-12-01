@@ -436,13 +436,6 @@ export async function sendPIQChatMessage(request: ChatRequest): Promise<ChatResp
     temperature = 0.7, // Balanced creativity
   } = options;
 
-  console.log(`\n${'='.repeat(80)}`);
-  console.log(`PIQ CHAT REQUEST`);
-  console.log(`Prompt: ${context.piqEssay.promptTitle}`);
-  console.log(`Current Score: ${context.analysis.nqi}/100`);
-  console.log(`User Message: "${userMessage.substring(0, 100)}${userMessage.length > 100 ? '...' : ''}"`);
-  console.log(`${'='.repeat(80)}\n`);
-
   try {
     // Call PIQ Chat API (Supabase edge function)
     const response = await callPIQChatAPI({
@@ -466,7 +459,6 @@ export async function sendPIQChatMessage(request: ChatRequest): Promise<ChatResp
 
     return response;
   } catch (error) {
-    console.error('❌ PIQ Chat API call failed:', error);
 
     // Return intelligent fallback
     const fallbackMessage: ChatMessage = {

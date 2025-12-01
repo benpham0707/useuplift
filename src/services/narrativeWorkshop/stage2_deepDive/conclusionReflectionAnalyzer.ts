@@ -211,7 +211,6 @@ export async function analyzeConclusionReflection(
   input: NarrativeEssayInput,
   essayType: string
 ): Promise<ConclusionReflectionAnalysis> {
-  console.log('  → Stage 2.4: Conclusion & Reflection Analysis');
   const startTime = Date.now();
 
   try {
@@ -240,17 +239,10 @@ export async function analyzeConclusionReflection(
     analysis.tokensUsed = (response.usage?.input_tokens || 0) + (response.usage?.output_tokens || 0);
 
     const duration = Date.now() - startTime;
-    console.log(`     ✓ Conclusion/reflection analyzed (${duration}ms, ${analysis.tokensUsed} tokens)`);
-    console.log(`       Type: ${analysis.conclusionType} (strength: ${analysis.conclusionStrength}/10)`);
-    console.log(`       Reflection: ${analysis.reflectionType} (depth: ${analysis.reflectionDepth}/10)`);
-    console.log(`       Micro→Macro: ${analysis.microToMacro.present ? 'Yes' : 'No'} (connection: ${analysis.microToMacro.connectionQuality}/10)`);
-    console.log(`       Philosophical depth: ${analysis.philosophicalDepth}/10`);
-    console.log(`       Clichés detected: ${analysis.clichesDetected.length}`);
 
     return analysis;
 
   } catch (error) {
-    console.error('     ✗ Conclusion/reflection analysis failed:', error);
     throw error;
   }
 }

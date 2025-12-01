@@ -56,10 +56,8 @@ export async function generateStrategicGuidance(
 
     return parseGuidanceResponse(textContent.text);
   } catch (error) {
-    console.error('Strategic Guidance generation failed:', error);
 
     try {
-      console.log('Retrying Strategic Guidance generation...');
       const retryResponse = await anthropic.messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
@@ -75,7 +73,6 @@ export async function generateStrategicGuidance(
 
       return parseGuidanceResponse(retryText.text);
     } catch (retryError) {
-      console.error('Retry failed, using heuristic:', retryError);
       return generateHeuristicGuidance(dimensions, synthesis, portfolio.profile?.grade);
     }
   }
@@ -406,7 +403,6 @@ function parseGuidanceResponse(text: string): StrategicGuidance {
 
     return result;
   } catch (error) {
-    console.error('Failed to parse guidance JSON:', error);
     throw new Error('Invalid JSON from guidance engine');
   }
 }

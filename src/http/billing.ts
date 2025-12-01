@@ -9,7 +9,6 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Supabase credentials missing for billing service');
 }
 
 const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
@@ -17,7 +16,6 @@ const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 // Check if Stripe is configured
 const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
 if (!isStripeConfigured) {
-  console.warn('⚠️  Stripe not configured - billing features will be disabled');
 }
 
 type SubscriptionPlan = {
@@ -175,7 +173,6 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (error: any) {
-    console.error('Error creating checkout session:', error);
     res.status(500).json({ error: error.message });
   }
 };
@@ -194,7 +191,6 @@ export const handleWebhook = async (req: Request, res: Response) => {
     if (endpointSecret) {
       const rawBody = (req as any).rawBody;
       if (!rawBody) {
-        console.error('Webhook Error: Missing raw body for signature verification');
         return res.status(400).send('Webhook Error: Missing raw body');
       }
       event = stripe.webhooks.constructEvent(rawBody, sig as string, endpointSecret);
@@ -202,7 +198,6 @@ export const handleWebhook = async (req: Request, res: Response) => {
       event = req.body; // For local testing without signature verification if secret is missing
     }
   } catch (err: any) {
-    console.error(`Webhook Error: ${err.message}`);
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
@@ -235,7 +230,6 @@ export const handleWebhook = async (req: Request, res: Response) => {
       // Handle subscription updates/cancellations as needed
     }
   } catch (error) {
-     console.error('Error processing webhook:', error);
      return res.status(500).json({ error: 'Webhook processing failed' });
   }
 
@@ -259,7 +253,6 @@ export const verifySession = async (req: Request, res: Response) => {
             res.status(400).json({ error: 'Payment not successful' });
         }
     } catch (error: any) {
-        console.error('Error verifying session:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -296,7 +289,6 @@ export const createPortalSession = async (req: Request, res: Response) => {
 
         res.json({ url: session.url });
     } catch (error: any) {
-        console.error('Error creating portal session:', error);
         res.status(500).json({ error: error.message });
     }
 }
@@ -326,7 +318,6 @@ async function grantCredits(userId: string, amount: number, type: string, refere
           .single();
       
       if (existing) {
-          console.log(`Transaction ${referenceId} already processed.`);
           return;
       }
   }

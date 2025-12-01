@@ -77,14 +77,12 @@ export async function getCredits(userId: string, token?: string): Promise<number
       .maybeSingle();
 
     if (error) {
-      console.error('[Credits] Error fetching credits:', error);
       return 0;
     }
 
     const credits = Number(data?.credits ?? 0);
     return Number.isFinite(credits) ? credits : 0;
   } catch (err) {
-    console.error('[Credits] Unexpected error fetching credits:', err);
     return 0;
   }
 }
@@ -179,7 +177,6 @@ export async function deductCredits(
       .select();
 
     if (updateError) {
-      console.error('[Credits] Error updating credits:', updateError);
       return {
         success: false,
         newBalance: currentBalance,
@@ -201,10 +198,8 @@ export async function deductCredits(
 
       if (transactionError) {
         // Log but don't fail - the deduction succeeded
-        console.warn('[Credits] Failed to log transaction:', transactionError);
       }
     } catch (txErr) {
-      console.warn('[Credits] Transaction logging skipped:', txErr);
     }
 
     // Dispatch event to update UI components
@@ -212,14 +207,11 @@ export async function deductCredits(
       window.dispatchEvent(new CustomEvent('credits:updated'));
     }
 
-    console.log(`[Credits] Deducted ${amount} credits from user ${userId}. New balance: ${newBalance}`);
-
     return {
       success: true,
       newBalance,
     };
   } catch (err) {
-    console.error('[Credits] Unexpected error deducting credits:', err);
     return {
       success: false,
       newBalance: 0,

@@ -392,17 +392,8 @@ Deno.serve(async (req) => {
   try {
     const requestBody: StrategicAnalysisRequest = await req.json();
 
-    console.log('🎯 Strategic Constraints Analysis Request:', {
-      essayLength: requestBody.essayText?.length,
-      currentWordCount: requestBody.currentWordCount,
-      targetWordCount: requestBody.targetWordCount,
-      workshopItems: requestBody.workshopItems?.length,
-      nqi: requestBody.analysis?.narrative_quality_index,
-    });
-
     // Validate required fields
     if (!requestBody.essayText || !requestBody.promptText) {
-      console.error('❌ Missing required fields');
       return new Response(
         JSON.stringify({
           success: false,
@@ -417,7 +408,6 @@ Deno.serve(async (req) => {
 
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
-      console.error('❌ ANTHROPIC_API_KEY not configured');
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
@@ -459,7 +449,6 @@ Deno.serve(async (req) => {
       },
     };
 
-    console.log('📤 Calling Claude Sonnet 4 for strategic analysis...');
     const claudeStartTime = Date.now();
 
     // Call Claude Sonnet 4 with comprehensive strategic analysis prompt
@@ -484,13 +473,11 @@ Deno.serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Claude API error:', response.status, errorText);
       throw new Error(`Claude API error: ${response.status} - ${errorText}`);
     }
 
     const claudeResponse = await response.json();
     const claudeDuration = ((Date.now() - claudeStartTime) / 1000).toFixed(1);
-    console.log(`✅ Claude response received in ${claudeDuration}s`);
 
     // Extract JSON from Claude's response
     let strategicAnalysis: StrategicAnalysisResult;
@@ -510,17 +497,7 @@ Deno.serve(async (req) => {
         ...parsedAnalysis
       };
 
-      console.log('✅ Strategic analysis parsed successfully:', {
-        efficiency_score: strategicAnalysis.wordCountAnalysis?.efficiency_score,
-        balance_recommendation: strategicAnalysis.strategicBalance?.recommendation,
-        topic_verdict: strategicAnalysis.topicViability?.verdict,
-        enhanced_items: strategicAnalysis.enhancedWorkshopItems?.length,
-        strategic_recommendations: strategicAnalysis.strategicRecommendations?.length,
-      });
-
     } catch (parseError) {
-      console.error('❌ Failed to parse Claude response:', parseError);
-      console.error('Raw content:', claudeResponse.content[0].text.substring(0, 500));
 
       // Return graceful fallback
       return new Response(
@@ -537,7 +514,6 @@ Deno.serve(async (req) => {
     }
 
     const totalDuration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(`🎯 Strategic constraints analysis completed in ${totalDuration}s`);
 
     return new Response(
       JSON.stringify(strategicAnalysis),
@@ -549,7 +525,6 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     const errorDuration = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.error(`❌ Strategic constraints error after ${errorDuration}s:`, error);
 
     return new Response(
       JSON.stringify({

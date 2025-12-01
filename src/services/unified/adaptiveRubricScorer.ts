@@ -436,7 +436,6 @@ async function scoreDimensions(
   for (const dim of activeDimensions) {
     const scorer = DIMENSION_SCORERS[dim.id];
     if (!scorer) {
-      console.warn(`No scorer found for dimension: ${dim.id}`);
       continue;
     }
 

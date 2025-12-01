@@ -76,7 +76,6 @@ export default function PersonalInfoHub() {
           completed: data[`${section.id}Completed`] || false
         })));
       } catch (e) {
-        console.warn('Could not load completion status');
       }
     }
   }, []);

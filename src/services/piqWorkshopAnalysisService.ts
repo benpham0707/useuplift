@@ -49,21 +49,12 @@ export async function analyzePIQEntryTwoStep(
   } = {}
 ): Promise<AnalysisResult> {
 
-  console.log('='.repeat(80));
-  console.log('TWO-STEP PIQ WORKSHOP ANALYSIS');
-  console.log('='.repeat(80));
-  console.log(`Prompt: ${promptTitle}`);
-  console.log(`Essay length: ${essayText.length} chars`);
-  console.log('Analysis type: COMPLETE (Phase 17 + Phase 18)');
-  console.log('');
-
   // ========================================================================
   // PHASE 17: Generate Workshop Suggestions (88-133s)
   // ========================================================================
 
   try {
     callbacks.onProgress?.('Analyzing your essay and generating suggestions...');
-    console.log('🌐 PHASE 17: Calling workshop-analysis...');
 
     const phase17Start = Date.now();
 
@@ -88,19 +79,12 @@ export async function analyzePIQEntryTwoStep(
     const phase17Time = (Date.now() - phase17Start) / 1000;
 
     if (phase17Error) {
-      console.error('❌ Phase 17 error:', phase17Error);
       throw new Error(`Phase 17 failed: ${phase17Error.message}`);
     }
 
     if (!phase17Data || !phase17Data.success) {
-      console.error('❌ Phase 17 returned error:', phase17Data);
       throw new Error(phase17Data?.error || 'Phase 17 failed');
     }
-
-    console.log(`✅ Phase 17 complete in ${phase17Time.toFixed(1)}s`);
-    console.log(`   NQI: ${phase17Data.analysis.narrative_quality_index}/100`);
-    console.log(`   Workshop Items: ${phase17Data.workshopItems?.length || 0}`);
-    console.log(`   Total Suggestions: ${phase17Data.workshopItems?.reduce((sum: number, item: any) => sum + item.suggestions.length, 0) || 0}`);
 
     // Transform Phase 17 result to AnalysisResult
     const phase17Result: AnalysisResult = {
@@ -141,7 +125,6 @@ export async function analyzePIQEntryTwoStep(
     // ========================================================================
 
     callbacks.onProgress?.('Scoring suggestion quality...');
-    console.log('🔍 PHASE 18: Calling validate-workshop...');
 
     const phase18Start = Date.now();
 
@@ -160,17 +143,8 @@ export async function analyzePIQEntryTwoStep(
 
     // Graceful degradation: If Phase 18 fails, return Phase 17 results
     if (phase18Error || !phase18Data?.success) {
-      console.warn('⚠️  Phase 18 failed, proceeding with Phase 17 results only');
-      console.warn('   Error:', phase18Error?.message || phase18Data?.error);
-      console.warn('   User will see suggestions without quality scores');
       return phase17Result;
     }
-
-    console.log(`✅ Phase 18 complete in ${phase18Time.toFixed(1)}s`);
-    console.log(`   Average Quality: ${phase18Data.summary?.average_quality.toFixed(1)}/10`);
-    console.log(`   Excellent: ${phase18Data.summary?.excellent_count}`);
-    console.log(`   Good: ${phase18Data.summary?.good_count}`);
-    console.log(`   Needs Work: ${phase18Data.summary?.needs_work_count}`);
 
     // Merge Phase 18 validations back into Phase 17 result
     const validatedResult: AnalysisResult = {
@@ -187,7 +161,6 @@ export async function analyzePIQEntryTwoStep(
     // ========================================================================
 
     callbacks.onProgress?.('Generating deep teaching guidance...');
-    console.log('📚 PHASE 19: Calling teaching-layer...');
 
     const phase19Start = Date.now();
 
@@ -216,31 +189,13 @@ export async function analyzePIQEntryTwoStep(
 
     // Graceful degradation: If Phase 19 fails, return Phase 18 results
     if (phase19Error || !phase19Data?.success) {
-      console.error('❌ Phase 19 FAILED - Detailed diagnostics:');
-      console.error('   Error object:', phase19Error);
-      console.error('   Error message:', phase19Error?.message);
-      console.error('   Response success:', phase19Data?.success);
-      console.error('   Response error:', phase19Data?.error);
-      console.error('   Workshop items sent:', validatedResult.workshopItems.length);
-      console.error('   Enhanced items received:', phase19Data?.enhancedItems?.length || 0);
-      console.warn('   User will see suggestions without deep teaching guidance');
       
       // Notify UI that teaching is unavailable
       callbacks.onProgress?.('⚠️ Deep teaching guidance unavailable - showing basic guidance');
       
-      console.log('='.repeat(80));
-      console.log(`✅ TWO-STEP ANALYSIS COMPLETE (Phase 19 skipped)`);
-      console.log(`   Phase 17: ${phase17Time.toFixed(1)}s`);
-      console.log(`   Phase 18: ${phase18Time.toFixed(1)}s`);
-      console.log(`   Total: ${(phase17Time + phase18Time).toFixed(1)}s`);
-      console.log('='.repeat(80));
       
       return validatedResult;
     }
-
-    console.log(`✅ Phase 19 complete in ${phase19Time.toFixed(1)}s`);
-    console.log(`   Enhanced items from API: ${phase19Data.enhancedItems?.length || 0}`);
-    console.log(`   Workshop items to enhance: ${validatedResult.workshopItems.length}`);
 
     // Merge teaching guidance into workshopItems
     // Use index-based matching as primary (more reliable than ID matching from AI)
@@ -251,31 +206,17 @@ export async function analyzePIQEntryTwoStep(
       // Fallback to index-based matching if ID match fails
       if (!enhancement && phase19Data.enhancedItems?.[index]) {
         enhancement = phase19Data.enhancedItems[index];
-        console.log(`   ⚠️ Item ${item.id}: ID mismatch, using index ${index} fallback`);
       }
       
       if (enhancement?.teaching) {
-        console.log(`   📚 Enhanced item ${item.id} with teaching guidance`);
 
         // 🔍 CRITICAL DEBUG: Log ENTIRE teaching structure from Phase 19
-        console.log('🔍🔍🔍 PHASE 19 RAW TEACHING DATA 🔍🔍🔍');
-        console.log('   Full teaching object:', JSON.stringify(enhancement.teaching, null, 2));
-        console.log('   teaching.problem type:', typeof enhancement.teaching?.problem);
-        console.log('   teaching.problem value:', enhancement.teaching?.problem);
-        console.log('   teaching.problem.hook:', enhancement.teaching?.problem?.hook);
-        console.log('   teaching.problem.description:', enhancement.teaching?.problem?.description?.substring(0, 100));
-        console.log('   teaching.problem.whyItMatters type:', typeof enhancement.teaching?.problem?.whyItMatters);
-        console.log('   teaching.problem.whyItMatters:', enhancement.teaching?.problem?.whyItMatters);
-        console.log('🔍🔍🔍 END PHASE 19 DEBUG 🔍🔍🔍');
 
         // CRITICAL: Check if suggestionRationales are present (Phase 19 NEW feature)
         if (enhancement.teaching.suggestionRationales && enhancement.teaching.suggestionRationales.length > 0) {
-          console.log(`      ✅ HAS SUGGESTION RATIONALES: ${enhancement.teaching.suggestionRationales.length} rationales`);
           enhancement.teaching.suggestionRationales.forEach((r, i) => {
-            console.log(`         [${i}] ${r.whyThisWorks.length} chars - "${r.whyThisWorks.substring(0, 50)}..."`);
           });
         } else {
-          console.warn(`      ⚠️  NO suggestionRationales in teaching (old format or backend issue)`);
         }
 
         return {
@@ -285,7 +226,6 @@ export async function analyzePIQEntryTwoStep(
           estimatedImpact: enhancement.estimatedImpact,
         };
       } else {
-        console.warn(`   ❌ No teaching found for item ${item.id} (index ${index})`);
       }
       return item;
     });
@@ -300,7 +240,6 @@ export async function analyzePIQEntryTwoStep(
     // PHASE 20: Generate Suggestion Rationales (separate, focused request)
     // ========================================================================
 
-    console.log('📝 PHASE 20: Generating suggestion rationales...');
     const phase20Start = Date.now();
 
     // Call suggestion-rationales function for EACH workshop item
@@ -326,19 +265,13 @@ export async function analyzePIQEntryTwoStep(
           );
 
           if (rationaleError || !rationaleData?.success) {
-            console.warn(`   ⚠️ Phase 20 failed for item ${item.id}:`);
-            console.warn(`      Error:`, rationaleError);
-            console.warn(`      Data:`, rationaleData);
-            console.warn(`      Status:`, (rationaleError as any)?.status);
             if (rationaleError?.message?.includes('403') || rationaleError?.status === 403) {
-               console.error('      CRITICAL: 403 Forbidden. Check RLS policies or function permissions.');
             }
             return item; // Return without rationales
           }
 
           // Merge rationales into teaching
           if (item.teaching && rationaleData.rationales) {
-            console.log(`   ✅ Generated ${rationaleData.rationales.length} rationales for item ${index + 1}`);
             return {
               ...item,
               teaching: {
@@ -350,10 +283,7 @@ export async function analyzePIQEntryTwoStep(
 
           return item;
         } catch (err) {
-          console.error(`   ❌ Phase 20 EXCEPTION for item ${item.id}:`, err);
           if (err instanceof Error) {
-             console.error(`      Message: ${err.message}`);
-             console.error(`      Stack: ${err.stack}`);
           }
           return item; // Return without rationales
         }
@@ -361,26 +291,15 @@ export async function analyzePIQEntryTwoStep(
     );
 
     const phase20Time = (Date.now() - phase20Start) / 1000;
-    console.log(`✅ Phase 20 complete in ${phase20Time.toFixed(1)}s`);
 
     const finalResult: AnalysisResult = {
       ...validatedResult,
       workshopItems: phase20Enhanced,
     };
 
-    console.log('='.repeat(80));
-    console.log(`✅ FOUR-STEP ANALYSIS COMPLETE`);
-    console.log(`   Phase 17: ${phase17Time.toFixed(1)}s`);
-    console.log(`   Phase 18: ${phase18Time.toFixed(1)}s`);
-    console.log(`   Phase 19: ${phase19Time.toFixed(1)}s`);
-    console.log(`   Phase 20: ${phase20Time.toFixed(1)}s`);
-    console.log(`   Total: ${(phase17Time + phase18Time + phase19Time + phase20Time).toFixed(1)}s`);
-    console.log('='.repeat(80));
-
     return finalResult;
 
   } catch (error) {
-    console.error('❌ TWO-STEP ANALYSIS FAILED:', error);
     throw new Error(`PIQ workshop analysis failed: ${(error as Error).message}`);
   }
 }
@@ -400,17 +319,9 @@ export async function analyzePIQEntry(
     essayType?: 'personal_statement' | 'uc_piq' | 'why_us' | 'supplemental' | 'activity_essay';
   } = {}
 ): Promise<AnalysisResult> {
-  console.log('='.repeat(80));
-  console.log('PIQ WORKSHOP ANALYSIS - EDGE FUNCTION CALL');
-  console.log('='.repeat(80));
-  console.log(`Prompt: ${promptTitle}`);
-  console.log(`Essay length: ${essayText.length} chars`);
-  console.log(`Analysis type: COMPLETE (Voice + Experience + 12 Dimensions + Workshop Items)`);
-  console.log('');
 
   try {
     // Call workshop-analysis edge function
-    console.log('🌐 Calling workshop-analysis edge function...');
 
     const { data, error } = await supabase.functions.invoke('workshop-analysis', {
       body: {
@@ -428,23 +339,12 @@ export async function analyzePIQEntry(
     });
 
     if (error) {
-      console.error('❌ Edge function error:', error);
       throw new Error(`Edge function failed: ${error.message}`);
     }
 
     if (!data || !data.success) {
-      console.error('❌ Edge function returned error:', data);
       throw new Error(data?.error || 'Edge function returned unsuccessful result');
     }
-
-    console.log('✅ Edge function call complete');
-    console.log(`   NQI: ${data.analysis.narrative_quality_index}/100`);
-    console.log(`   Voice Fingerprint: ${data.voiceFingerprint ? 'Yes' : 'Missing!'}`);
-    console.log(`   Experience Fingerprint: ${data.experienceFingerprint ? 'Yes' : 'Not generated'}`);
-    console.log(`   Rubric Dimensions: ${data.rubricDimensionDetails?.length || 0}`);
-    console.log(`   Workshop Items: ${data.workshopItems?.length || 0}`);
-    console.log('='.repeat(80));
-    console.log('');
 
     // Transform edge function result to AnalysisResult format
     const analysisResult: AnalysisResult = {
@@ -463,9 +363,6 @@ export async function analyzePIQEntry(
     return analysisResult;
 
   } catch (error) {
-    console.error('❌ PIQ ANALYSIS FAILED:', error);
-    console.error('Error details:', error);
-    console.error('Stack trace:', (error as Error).stack);
 
     // THROW THE ERROR - DO NOT FALL BACK
     throw new Error(`PIQ workshop analysis failed: ${(error as Error).message}`);
@@ -671,20 +568,16 @@ async function OLD_analyzePIQEntry_Fallback() {
 
     for (const path of healthPaths) {
       try {
-        console.log(`[Health Check] Trying ${path}...`);
         const healthRes = await fetch(path, { signal: AbortSignal.timeout(10000) });
         if (healthRes.ok) {
-          console.log(`[Health Check] ✅ Success via ${path}`);
           healthCheckPassed = true;
           break;
         }
       } catch (err) {
-        console.log(`[Health Check] ❌ Failed via ${path}:`, err);
       }
     }
 
     if (!healthCheckPassed) {
-      console.warn('[PIQ Analysis] Health check failed, using client-side heuristic fallback');
       // Return a heuristic-based analysis when server is not available
       return generateHeuristicFallback(essayText, promptTitle);
     }
@@ -712,7 +605,6 @@ async function OLD_analyzePIQEntry_Fallback() {
     };
 
     // Call the backend API
-    console.log('Calling backend API for PIQ analysis...');
     const response = await fetch('/api/analyze-entry', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -735,16 +627,10 @@ async function OLD_analyzePIQEntry_Fallback() {
       throw new Error(result.message || 'Analysis failed');
     }
 
-    console.log('✅ Backend API call successful');
-    console.log('  NQI:', result.result.report.narrative_quality_index);
-    console.log('  Categories:', result.result.report.categories.length);
-
     // Run elite pattern detection (client-side)
-    console.log('Running elite pattern detection...');
     const elitePatterns = analyzeElitePatterns(essayText);
 
     // Run literary sophistication detection (client-side)
-    console.log('Running literary sophistication detection...');
     const literarySophistication = analyzeLiterarySophistication(essayText);
 
     // Transform backend result to AnalysisResult format
@@ -890,23 +776,10 @@ async function OLD_analyzePIQEntry_Fallback() {
       } : undefined,
     };
 
-    console.log('');
-    console.log('✓ PIQ Analysis complete');
-    console.log(`  NQI: ${analysisResult.analysis.narrative_quality_index}/100`);
-    console.log(`  Categories returned: ${analysisResult.analysis.categories.length}`);
-    console.log(`  Elite patterns: ${analysisResult.elite_patterns.overallScore}/100 (Tier ${analysisResult.elite_patterns.tier})`);
-    console.log(`  Literary sophistication: ${analysisResult.literary_sophistication.overallScore}/100`);
-    console.log(`  Coaching issues: ${analysisResult.coaching?.prioritized_issues.length || 0}`);
-    console.log('='.repeat(80));
-    console.log('');
-
     return analysisResult;
   } catch (error) {
-    console.error('❌ [piqWorkshopAnalysisService] Analysis failed:', error);
-    console.error('❌ [piqWorkshopAnalysisService] Error details:', error instanceof Error ? error.message : String(error));
 
     // Instead of throwing, use the heuristic fallback for a better user experience
-    console.warn('[PIQ Analysis] Falling back to heuristic analysis due to error');
     return generateHeuristicFallback(essayText, promptTitle);
   }
 }
