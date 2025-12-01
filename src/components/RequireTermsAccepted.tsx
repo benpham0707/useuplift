@@ -28,11 +28,12 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
     const checkTermsAccepted = async () => {
       try {
+        // Cast to any to handle 'terms_accepted_at' column that may not be in generated types
         const { data, error } = await supabase
           .from('profiles')
           .select('terms_accepted_at')
           .eq('user_id', user.id)
-          .maybeSingle();
+          .maybeSingle() as { data: any; error: any };
 
         if (error) {
           console.error('Error checking terms acceptance:', error);
@@ -59,9 +60,10 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
     setIsSubmitting(true);
     try {
+      // Cast to any to handle 'terms_accepted_at' column that may not be in generated types
       const { error } = await supabase
         .from('profiles')
-        .update({ terms_accepted_at: new Date().toISOString() })
+        .update({ terms_accepted_at: new Date().toISOString() } as any)
         .eq('user_id', user.id);
 
       if (error) {
