@@ -323,7 +323,7 @@ export interface InsightsState {
   targetNQI: number;
   potentialGain: number;
 
-  // Dimension summaries (11 dimensions)
+  // Dimension summaries (12 dimensions)
   dimensions: DimensionSummary[];
 
   // All insights (flat list for filtering/sorting)

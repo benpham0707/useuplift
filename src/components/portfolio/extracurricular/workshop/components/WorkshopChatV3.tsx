@@ -2,7 +2,7 @@
  * Workshop Chat V3 - Analysis-Powered Coaching Interface
  *
  * Full-featured chat UI that leverages:
- * - Deep context aggregation (11 dimensions + teaching + history)
+ * - Deep context aggregation (12 dimensions + teaching + history)
  * - World-class coaching (quotes actual draft, specific insights)
  * - Conversation history (persisted in localStorage)
  * - Action integration (expand categories, load reflections, trigger analysis)

@@ -78,7 +78,7 @@ export interface WorkshopChatContext {
     tier: 'excellent' | 'strong' | 'good' | 'needs_work' | 'weak';
     label: string; // reader_impression_label
 
-    // Rubric breakdown (11 dimensions)
+    // Rubric breakdown (12 dimensions)
     categories: Array<{
       name: string;
       score: number;

@@ -3,7 +3,7 @@
  * Chat Context V2 - Comprehensive Context Aggregation
  *
  * Provides DEEP understanding of the student's narrative by aggregating:
- * - Full 11-dimension rubric analysis with specific evidence from their draft
+ * - Full 12-dimension rubric analysis with specific evidence from their draft
  * - Teaching issues with examples of what strong looks like
  * - Generation system insights (what makes elite narratives excellent)
  * - Version history showing improvement patterns
@@ -45,12 +45,12 @@ export interface WorkshopChatContext {
     needsReanalysis: boolean;
   };
 
-  // 3. DEEP ANALYSIS (11 dimensions + patterns)
+  // 3. DEEP ANALYSIS (12 dimensions + patterns)
   analysis: {
     nqi: number;
     tier: 'captivating_grounded' | 'strong_distinct_voice' | 'solid_needs_polish' | 'patchy_narrative' | 'generic_unclear';
 
-    // 11 rubric categories with evidence
+    // 12 rubric categories with evidence
     categories: Array<{
       name: string;
       score: number;

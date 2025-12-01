@@ -180,7 +180,7 @@ const Pricing = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                  <span>11-Dimension Rubric Feedback</span>
+                  <span>12-Dimension Rubric Feedback</span>
                 </li>
               </ul>
             </CardContent>
@@ -242,7 +242,7 @@ const Pricing = () => {
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>11-Dimension Rubric Analysis</span>
+                  <span>12-Dimension Rubric Analysis</span>
                 </li>
                  <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -351,7 +351,7 @@ const Pricing = () => {
                 <div className="mx-auto w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
                     <GraduationCap className="h-6 w-6 text-primary" />
                 </div>
-                <h3 className="font-semibold">11-Dimension Analysis</h3>
+                <h3 className="font-semibold">12-Dimension Analysis</h3>
                 <p className="text-sm text-muted-foreground">Deep rubric-based feedback on narrative quality, voice, and impact.</p>
             </div>
             <div className="text-center space-y-2">

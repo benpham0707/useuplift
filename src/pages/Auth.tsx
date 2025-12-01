@@ -77,7 +77,18 @@ const Auth = () => {
                     routing="hash"
                     forceRedirectUrl="/portfolio-scanner"
                   />
-                  <p className="mt-4 text-sm text-muted-foreground">
+                  {/* Terms of Service notice */}
+                  <p className="mt-4 text-xs text-muted-foreground text-center max-w-sm">
+                    By signing up, you agree to our{' '}
+                    <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                      Terms of Service
+                    </Link>{' '}
+                    and{' '}
+                    <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                      Privacy Policy
+                    </Link>
+                  </p>
+                  <p className="mt-3 text-sm text-muted-foreground">
                     Already have an account?{' '}
                     <button
                       onClick={() => setMode('sign-in')}

@@ -544,7 +544,7 @@ export default function PIQNarrativeWorkshop() {
             {/* Rubric dimensions */}
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-primary">11-Dimension Analysis</h2>
+                <h2 className="text-2xl font-bold text-primary">12-Dimension Analysis</h2>
                 <Badge variant="outline" className="gap-2">
                   <Target className="w-3 h-3" />
                   {dimensions.length} Categories

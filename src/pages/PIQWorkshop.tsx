@@ -2017,7 +2017,7 @@ export default function PIQWorkshop() {
                   colors={["#9333ea", "#a855f7", "#c084fc", "#e9d5ff", "#9333ea"]}
                   animationSpeed={8}
                 >
-                  11-Dimension Analysis
+                  12-Dimension Analysis
                 </GradientText>
               </div>
 
@@ -2045,7 +2045,7 @@ export default function PIQWorkshop() {
                     <p className="text-muted-foreground text-sm max-w-[250px] mx-auto">
                       {isLoadingFromDatabase 
                         ? 'Loading your saved essay...'
-                        : 'Click "Analyze" in the editor to see your 11-dimension analysis here.'
+                        : 'Click "Analyze" in the editor to see your 12-dimension analysis here.'
                       }
                     </p>
                   </Card>

@@ -4,7 +4,7 @@
  * Version: 2.0.0-unified
  *
  * World-class analysis combining the best of:
- * - Extracurricular Analysis (11-dimension activity rubric)
+ * - Extracurricular Analysis (12-dimension activity rubric)
  * - Essay Analysis (12-dimension essay rubric)
  * - Narrative Workshop (5-stage pipeline insights)
  * - Session 19 breakthrough patterns
@@ -539,7 +539,7 @@ export const UC_PIQ_PROMPTS: Record<number, string> = {
  * Analyze PIQ with unified best-of-both-worlds approach
  *
  * This function orchestrates a comprehensive analysis combining:
- * - Activity rubric insights (11 dimensions)
+ * - Activity rubric insights (12 dimensions)
  * - Essay rubric insights (12 dimensions)
  * - Universal feature detection (scene, dialogue, interiority, etc.)
  * - Adaptive weighting based on content type

@@ -14,7 +14,7 @@
 import { ExtracurricularItem } from '../ExtracurricularCard';
 
 // ============================================================================
-// RUBRIC CATEGORIES (11 dimensions from v1.0.0)
+// RUBRIC CATEGORIES (12 dimensions from v1.0.0)
 // ============================================================================
 
 export type RubricCategory =

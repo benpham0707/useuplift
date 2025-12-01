@@ -2,7 +2,7 @@
  * Narrative Pattern Detection Database
  *
  * Comprehensive pattern library for detecting narrative issues in college essays.
- * Built upon learnings from extracurricular workshop (38 patterns across 11 dimensions)
+ * Built upon learnings from extracurricular workshop (38 patterns across 12 dimensions)
  * but specifically adapted for personal narrative essays.
  *
  * Patterns organized by 12-dimension rubric:

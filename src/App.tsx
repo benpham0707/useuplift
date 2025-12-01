@@ -20,6 +20,7 @@ import PortfolioInsightsNew from "./pages/PortfolioInsightsNew";
 import VerifyEmail from "./pages/VerifyEmail";
 import ResetPassword from "./pages/ResetPassword";
 import RequireVerified from "@/components/RequireVerified";
+import RequireTermsAccepted from "@/components/RequireTermsAccepted";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 import WorkshopDemo from "./pages/WorkshopDemo";
@@ -42,8 +43,8 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/verify-email" element={<VerifyEmail />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/portfolio-scanner" element={<RequireVerified><PortfolioScanner /></RequireVerified>} />
-            <Route path="/portfolio-insights" element={<RequireVerified><PortfolioInsightsNew /></RequireVerified>} />
+            <Route path="/portfolio-scanner" element={<RequireVerified><RequireTermsAccepted><PortfolioScanner /></RequireTermsAccepted></RequireVerified>} />
+            <Route path="/portfolio-insights" element={<RequireVerified><RequireTermsAccepted><PortfolioInsightsNew /></RequireTermsAccepted></RequireVerified>} />
             <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
             <Route path="/academic-planner" element={<AcademicPlanner />} />
             <Route path="/project-incubation" element={<ProjectIncubationHub />} />
@@ -58,11 +59,11 @@ const App = () => (
             <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
             <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
             <Route path="/workshop-demo" element={<WorkshopDemo />} />
-            <Route path="/piq-workshop" element={<RequireVerified><PIQWorkshop /></RequireVerified>} />
-            <Route path="/piq-workshop/:piqNumber" element={<RequireVerified><PIQWorkshop /></RequireVerified>} />
+            <Route path="/piq-workshop" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
+            <Route path="/piq-workshop/:piqNumber" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
-            <Route path="/settings" element={<RequireVerified><Settings /></RequireVerified>} />
+            <Route path="/settings" element={<RequireVerified><RequireTermsAccepted><Settings /></RequireTermsAccepted></RequireVerified>} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
