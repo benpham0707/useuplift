@@ -137,8 +137,7 @@ export default function RightSidePersonalizationChat() {
                   <Button
                     variant="outline"
                     className="p-0"
-                    onClick={() =>
-                    }
+                    onClick={() => {}}
                     aria-label="Regenerate based on chat"
                     style={{ height: buttonSize, width: buttonSize }}
                   >
