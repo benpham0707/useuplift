@@ -59,27 +59,46 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
     setIsSubmitting(true);
     try {
-      // Use upsert to handle case where profile doesn't exist yet
-      // This ensures terms acceptance is saved even if webhook didn't create profile
-      const { data, error } = await supabase
+      const now = new Date().toISOString();
+      
+      // First, try to update existing profile
+      const { data: updateData, error: updateError } = await supabase
         .from('profiles')
-        .upsert(
-          {
-            user_id: user.id,
-            terms_accepted_at: new Date().toISOString(),
-          },
-          {
-            onConflict: 'user_id',
-            ignoreDuplicates: false,
-          }
-        )
+        .update({ terms_accepted_at: now })
+        .eq('user_id', user.id)
+        .select('terms_accepted_at')
+        .maybeSingle();
+
+      if (updateError) {
+        console.error('Error updating terms:', updateError);
+        alert('There was an error saving your acceptance. Please try again.');
+        return;
+      }
+
+      // If update worked (profile existed), we're done
+      if (updateData?.terms_accepted_at) {
+        setHasAcceptedTerms(true);
+        return;
+      }
+
+      // Profile doesn't exist - create it with required fields
+      // This handles the case where Clerk webhook didn't fire
+      const { data: insertData, error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          user_id: user.id,
+          terms_accepted_at: now,
+          user_context: 'high_school_11th',
+          credits: 10,
+          has_completed_assessment: false,
+        })
         .select('terms_accepted_at')
         .single();
 
-      if (error) {
-        console.error('Error accepting terms:', error);
+      if (insertError) {
+        console.error('Error creating profile:', insertError);
         alert('There was an error saving your acceptance. Please try again.');
-      } else if (data?.terms_accepted_at) {
+      } else if (insertData?.terms_accepted_at) {
         setHasAcceptedTerms(true);
       } else {
         console.error('Terms acceptance not saved - no data returned');
