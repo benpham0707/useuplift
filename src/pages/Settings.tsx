@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
+import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
@@ -46,6 +47,7 @@ const Settings = () => {
   const { getToken } = useClerkAuth();
   const { openUserProfile } = useClerk();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const [credits, setCredits] = useState<number | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
@@ -130,6 +132,11 @@ const Settings = () => {
         window.location.href = url;
       }
     } catch (error) {
+      toast({
+        title: "Unable to open billing portal",
+        description: error instanceof Error ? error.message : "Please try again or contact support.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoadingPortal(false);
     }
