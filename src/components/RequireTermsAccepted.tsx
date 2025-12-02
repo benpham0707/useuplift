@@ -1,6 +1,8 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getAuthenticatedSupabaseClient } from '@/services/auth/getAuthenticatedSupabaseClient';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -14,6 +16,7 @@ interface RequireTermsAcceptedProps {
 
 const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
   const { user, loading: authLoading } = useAuth();
+  const { getToken } = useClerkAuth();
   const [loading, setLoading] = useState(true);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false);
   const [isChecked, setIsChecked] = useState(false);
@@ -59,10 +62,20 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
     setIsSubmitting(true);
     try {
+      // Get Clerk JWT token for authenticated Supabase requests
+      const token = await getToken({ template: 'supabase' });
+      if (!token) {
+        console.error('Failed to get auth token');
+        alert('Authentication error. Please try signing out and back in.');
+        return;
+      }
+
+      // Create authenticated Supabase client that passes RLS checks
+      const authSupabase = getAuthenticatedSupabaseClient(token);
       const now = new Date().toISOString();
       
       // First, try to update existing profile
-      const { data: updateData, error: updateError } = await supabase
+      const { data: updateData, error: updateError } = await authSupabase
         .from('profiles')
         .update({ terms_accepted_at: now })
         .eq('user_id', user.id)
@@ -83,7 +96,7 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
       // Profile doesn't exist - create it with required fields
       // This handles the case where Clerk webhook didn't fire
-      const { data: insertData, error: insertError } = await supabase
+      const { data: insertData, error: insertError } = await authSupabase
         .from('profiles')
         .insert({
           user_id: user.id,
