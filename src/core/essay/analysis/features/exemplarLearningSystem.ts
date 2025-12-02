@@ -703,10 +703,11 @@ export async function runContinuousLearning(
     iterations.push(result);
 
     // Log insights
-    result.insights.forEach(insight => );
+    result.insights.forEach(insight => { console.log('Insight:', insight); });
 
     // Log adjustments
     result.rubric_adjustments_proposed.forEach(adj => {
+      console.log('Adjustment:', adj);
     });
 
     // Check convergence

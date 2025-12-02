@@ -386,15 +386,15 @@ export function selectOptimalAngle(angles: NarrativeAngle[], profile: Generation
   // Stage 4: Report selection
 
   if (selected.strengths.length > 0) {
-    selected.strengths.forEach(s => );
+    selected.strengths.forEach(s => { console.log('Strength:', s); });
   }
 
   if (selected.warnings.length > 0) {
-    selected.warnings.forEach(w => );
+    selected.warnings.forEach(w => { console.warn('Warning:', w); });
   }
 
   if (selected.redFlags.length > 0) {
-    selected.redFlags.forEach(f => );
+    selected.redFlags.forEach(f => { console.error('Red flag:', f); });
   }
 
   return selected.angle;
@@ -564,9 +564,9 @@ export async function transformEssay(
     solutions.push('Add central metaphor sustained throughout');
   }
 
-  problems.forEach(p => );
+  problems.forEach(p => { console.log('Problem:', p); });
 
-  solutions.forEach(s => );
+  solutions.forEach(s => { console.log('Solution:', s); });
 
   // Build transformation prompt
   const transformPrompt = `You are transforming a weak extracurricular essay into an elite one.
