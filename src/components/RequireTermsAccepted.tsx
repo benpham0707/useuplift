@@ -59,16 +59,31 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
+      // Use upsert to handle case where profile doesn't exist yet
+      // This ensures terms acceptance is saved even if webhook didn't create profile
+      const { data, error } = await supabase
         .from('profiles')
-        .update({ terms_accepted_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+        .upsert(
+          {
+            user_id: user.id,
+            terms_accepted_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'user_id',
+            ignoreDuplicates: false,
+          }
+        )
+        .select('terms_accepted_at')
+        .single();
 
       if (error) {
         console.error('Error accepting terms:', error);
         alert('There was an error saving your acceptance. Please try again.');
-      } else {
+      } else if (data?.terms_accepted_at) {
         setHasAcceptedTerms(true);
+      } else {
+        console.error('Terms acceptance not saved - no data returned');
+        alert('There was an error saving your acceptance. Please try again.');
       }
     } catch (err) {
       console.error('Error accepting terms:', err);
