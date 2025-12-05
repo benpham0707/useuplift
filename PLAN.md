@@ -1,418 +1,691 @@
-# Investigation Plan: Suggestion Quality Degradation
+# PIQ Workshop Essay Overview Issue - Analysis & Solution Plan
 
 ## Problem Statement
-The suggestion system is now generating content that:
-- Sounds cocky and inauthentic
-- Uses a repetitive "flex" pattern instead of natural storytelling
-- Lacks genuine character development
-- Feels forced rather than compelling
 
-### Examples of Problematic Output:
-1. "But normal kids don't know what I know: that breaking points are breakthrough points."
-2. "But they were missing the point. While they sought comfort, I was building an immunity to quit. Which one of us was really missing out?"
-3. "My coach stared, confused. That's when I knew: I wasn't addicted to winning. I was addicted to the edge of breaking."
-4. "I started seeking the hardest opponents, longest practices, most brutal conditioning. Other athletes avoid pain. I hunt it down."
-5. "My classmates study until they're tired. I study until I'm addicted to the grind."
+The main essay overview at the top of the PIQ Workshop is showing **generic, fallback text** instead of a personalized, AI-generated narrative overview. Users see text like:
 
-## Investigation Steps
+> "Your essay shows genuine effort and authentic voice. The core of what you're trying to convey is there, but it needs sharper focus and more vivid storytelling. The surgical suggestions below show you exactly where and how to strengthen your narrative."
 
-### Step 1: Identify Recent Changes to Suggestion Generation System
-- [ ] Review git commit history for the last 5-10 commits
-- [ ] Identify all files related to suggestion generation (Phase 17)
-- [ ] Check for changes to prompts, system messages, or generation logic
-
-### Step 2: Locate Suggestion Generation Components
-Files to examine:
-- [ ] `/supabase/functions/workshop-analysis/index.ts` (Phase 17 - main suggestion generator)
-- [ ] `/supabase/functions/teaching-layer/index.ts` (Phase 19 - should NOT affect suggestions)
-- [ ] `/supabase/functions/suggestion-rationales/index.ts` (Phase 20 - rationales only)
-- [ ] Any prompt configuration files
-- [ ] Any recent changes to temperature, model selection, or generation parameters
-
-### Step 3: Compare Current vs Previous Prompts
-- [ ] Extract current Phase 17 system prompt
-- [ ] Check git history for any modifications to suggestion generation prompts
-- [ ] Identify what changed and when
-- [ ] Determine if changes were intentional or accidental
-
-### Step 4: Test Hypothesis
-Possible causes to investigate:
-- [ ] Temperature setting too high (causing more "creative" but less grounded responses)
-- [ ] Prompt modifications that encourage "dramatic contrast" or "revelation" patterns
-- [ ] Model change (different Claude version)
-- [ ] Examples in prompt that demonstrate this cocky pattern
-- [ ] Removed guardrails about authenticity/naturalness
-
-### Step 5: Root Cause Analysis
-- [ ] Document exactly what changed
-- [ ] Explain why the change caused this degradation
-- [ ] Propose specific fixes
-
-### Step 6: Solution Design
-- [ ] Restore authentic, natural storytelling voice
-- [ ] Add explicit anti-patterns to avoid
-- [ ] Include better examples of genuine character development
-- [ ] Test with real examples to validate improvement
-
-## Files to Investigate (Priority Order)
-
-1. **Phase 17 Suggestion Generator** (HIGHEST PRIORITY)
-   - `/supabase/functions/workshop-analysis/index.ts`
-   - This is where suggestions are created
-
-2. **Recent Commits**
-   - Check commits from the last session
-   - Focus on any prompt changes
-
-3. **Configuration Files**
-   - Any files that might affect suggestion tone/style
-
-## Expected Deliverables
-
-1. **Investigation Report** - Document what changed and why it degraded quality
-2. **Root Cause Analysis** - Specific code/prompt changes that caused the issue
-3. **Restoration Plan** - Detailed steps to fix the suggestion quality
-4. **Testing Strategy** - How to validate the fix works
+This is coming from the **frontend fallback logic**, not from the AI-powered `narrative-overview` edge function that's supposed to provide deep, essay-specific insights.
 
 ---
 
----
+## Root Cause Analysis
 
-## INVESTIGATION FINDINGS
+### **Architecture Overview**
 
-### Root Cause Identified
+The essay overview generation has a two-tier system:
 
-**COMMIT:** `35a1a25` - "Implement Phase 17: Experience Fingerprinting in workshop prompts"
-**DATE:** Wed Nov 26 10:34:53 2025
-**FILE:** `/supabase/functions/workshop-analysis/index.ts`
+1. **Primary (AI-Generated)**: `narrative-overview` Supabase edge function
+2. **Fallback (Frontend)**: `getDetailedOverview()` function in PIQWorkshop.tsx
 
-### The Problem
+### **Detailed Investigation**
 
-The Phase 17 prompt changes introduced problematic language that ENCOURAGES the cocky "flex" pattern:
+#### 1. **The Primary System (AI-Generated Overview)**
 
-#### Problematic Instruction (Line 321):
-```
-You MUST actively RESIST these patterns. When in doubt, choose the more surprising,
-more specific, more uncomfortable option.
+**Location**: [supabase/functions/narrative-overview/index.ts](supabase/functions/narrative-overview/index.ts)
+
+**How it should work**:
+- Called AFTER Phase 17-19 analysis completes
+- Receives full context: voiceFingerprint, experienceFingerprint, rubricDimensionDetails, workshopItems
+- Calls Claude API with detailed prompt asking for holistic, empowering 3-5 sentence overview
+- Returns essay-specific insights
+
+**Status**: ✅ Function EXISTS and is DEPLOYED
+```bash
+$ supabase functions list | grep narrative
+narrative-overview | ACTIVE | 2025-11-25 11:32:50
 ```
 
-**This tells Claude:** "Be uncomfortable, be edgy, choose the surprising option"
-**Result:** Students sound cocky because they're trying to be "surprising" and "uncomfortable"
+#### 2. **The Calling Code**
 
-#### Missing Guardrails
+**Location**: [src/pages/PIQWorkshop.tsx:667](src/pages/PIQWorkshop.tsx#L667)
 
-The old prompt said:
-- "Minimal edits preserving voice" (for polished_original)
-- "Heightens student's existing voice patterns" (for voice_amplifier)
-- Simple, clear instructions
-
-The new prompt says:
-- "BREAKING BEYOND typical essay patterns"
-- "When in doubt, choose the more surprising, more specific, more uncomfortable option"
-- "Actively RESIST" safe phrasings
-- "Choose uncomfortable option"
-
-**The new prompt is telling Claude to be BOLD and SURPRISING, which results in cocky flexing.**
-
-### Examples of How This Manifests
-
-User's problematic outputs ALL follow this "uncomfortable/surprising/edgy" pattern:
-
-1. "But normal kids don't know what I know" ← EDGY CONTRAST
-2. "While they sought comfort, I was building an immunity to quit. Which one of us was really missing out?" ← RHETORICAL QUESTION, FLEX
-3. "That's when I knew: I wasn't addicted to winning. I was addicted to the edge of breaking." ← DRAMATIC REVELATION
-4. "Other athletes avoid pain. I hunt it down." ← EDGY CONTRAST, SHORT PUNCHY FLEX
-5. "My classmates study until they're tired. I study until I'm addicted to the grind." ← COMPARISON FLEX
-
-**Pattern:** The prompt's instruction to "choose the more uncomfortable option" is being interpreted as "make the student sound tough/edgy/special."
-
-### The Paradox
-
-The prompt says:
-- "The student's essay should read like THEY wrote it - their authentic voice"
-- **BUT ALSO:** "When in doubt, choose the more surprising, more specific, more uncomfortable option"
-
-These two instructions CONFLICT. The second one overrides the first, causing all students to sound like they're trying to be edgy warriors.
-
----
-
-## ROOT CAUSE ANALYSIS
-
-### What Changed
-
-**BEFORE (Old Prompt):**
+After analysis completes:
 ```typescript
-system: `You are a surgical essay editor. Identify specific issues in the essay
-and provide 3 types of surgical fixes:
-
-1. polished_original: Minimal edits preserving voice
-2. voice_amplifier: Heightens student's existing voice patterns
-3. divergent_strategy: Bold alternative exploring different angle
-
-For each issue:
-- Extract exact quote from essay
-- Explain problem and why it matters
-- Assign severity (critical/high/medium/low)
-- Map to rubric category
-- Provide 3 surgical suggestions with rationale`
+// Call separate narrative overview endpoint (non-blocking)
+fetchNarrativeOverview(result);
 ```
 
-**AFTER (Phase 17 Prompt):**
-```typescript
-system: `You are a Narrative Editor helping a student sound MORE LIKE THEMSELVES
-while BREAKING BEYOND typical essay patterns.
-
-**ANTI-CONVERGENCE MANDATE:**
-AI writing naturally drifts toward:
-- The same narrative arc (setup → struggle → triumph → lesson)
-- "Safe" phrasings that feel polished but generic
-- Crowd-pleasing insights that lack edge
-- Manufactured emotional beats
-- Generic college essay language ("passion", "journey", "grew as a person")
-
-You MUST actively RESIST these patterns. When in doubt, choose the more
-surprising, more specific, more uncomfortable option.`
-```
-
-### Why This Causes Cocky Writing
-
-1. **"BREAKING BEYOND typical essay patterns"** → Suggests rejecting normal storytelling
-2. **"RESIST these patterns"** → Tells Claude to avoid natural narrative flow
-3. **"Choose the more surprising, more specific, more uncomfortable option"** → Prioritizes shock value over authenticity
-4. **"Crowd-pleasing insights that lack edge"** → Implies students should have "edge," which reads as cocky
-5. **Anti-convergence focus** → Creates pressure to be different, leading to forced uniqueness
-
-### The Actual Problem We're Solving
-
-The prompt was designed to fix SHORT, GENERIC suggestions (158 chars → 300-500 chars).
-
-But it OVER-CORRECTED by:
-- Adding too much pressure to be "edgy" and "uncomfortable"
-- Creating a new convergence pattern: the "tough guy who embraces pain" archetype
-- Losing the authenticity it was trying to preserve
-
----
-
-## SOLUTION DESIGN
-
-### Core Principle
-
-**Authenticity ≠ Edginess**
-
-We need to remove the "uncomfortable/surprising" instructions while keeping:
-- Concrete details (300-500 char requirement)
-- Specific examples (Jordan 1 Retro High - $180)
-- Experience Fingerprint integration
-- Anti-AI-language guardrails
-
-### Specific Fixes Required
-
-#### 1. Remove "Uncomfortable/Surprising" Language
-
-**REMOVE:**
-```
-You MUST actively RESIST these patterns. When in doubt, choose the more
-surprising, more specific, more uncomfortable option.
-```
-
-**REPLACE WITH:**
-```
-Focus on what feels TRUE to this student's experience, not what feels impressive
-or dramatic. Natural storytelling beats manufactured edge.
-```
-
-#### 2. Reframe "Anti-Convergence" Section
-
-**CHANGE FROM:**
-```
-**ANTI-CONVERGENCE MANDATE:**
-AI writing naturally drifts toward:
-- Crowd-pleasing insights that lack edge
-- Manufactured emotional beats
-
-You MUST actively RESIST these patterns.
-```
-
-**CHANGE TO:**
-```
-**AUTHENTICITY OVER PERFORMANCE:**
-Avoid these common essay pitfalls:
-- Writing that sounds like they're PERFORMING struggle rather than processing it
-- Insights that sound impressive but aren't actually theirs
-- Forced "lessons learned" that feel tacked on
-
-Instead: Show how THIS person naturally makes sense of their experience.
-```
-
-#### 3. Add Explicit Anti-Flex Guardrails
-
-**ADD NEW SECTION:**
-```
-**WHAT AUTHENTIC WRITING SOUNDS LIKE:**
-- Observational, not declarative ("I noticed..." vs "I am...")
-- Specific actions, not identity claims ("I stayed up debugging" vs "I'm dedicated")
-- Humble discovery, not confident pronouncements
-- Complexity and nuance, not black-and-white statements
-
-**RED FLAGS - STOP IF YOU SEE:**
-- "But I knew..." (revelation flex)
-- "While others [weak thing], I [strong thing]" (comparison flex)
-- "That's when I realized I was..." (identity claim)
-- Rhetorical questions that imply superiority
-- Short, punchy statements designed to sound tough
-```
-
-#### 4. Rewrite Voice Guidelines
-
-**CHANGE FROM:**
-```
-Every suggestion should sound like something THIS SPECIFIC PERSON would write,
-not generic "good writing."
-```
-
-**CHANGE TO:**
-```
-Every suggestion should sound like THIS SPECIFIC PERSON processing their own
-experience - not like they're trying to impress anyone. The best essays sound
-like the student is THINKING, not PERFORMING.
-```
-
----
-
-## PROPOSED FIX (UPDATED WITH USER FEEDBACK)
-
-### Updated Phase 17 System Prompt
+**Location**: [src/pages/PIQWorkshop.tsx:689-727](src/pages/PIQWorkshop.tsx#L689-L727)
 
 ```typescript
-system: `You are a Narrative Editor helping a student write authentically about their experience.
+const fetchNarrativeOverview = useCallback(async (analysisData: AnalysisResult) => {
+  setLoadingOverview(true);
+  try {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/narrative-overview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        essayText: currentDraft,
+        promptText: UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId)?.prompt || '',
+        voiceFingerprint: analysisData.voiceFingerprint,
+        experienceFingerprint: analysisData.experienceFingerprint,
+        rubricDimensionDetails: analysisData.rubricDimensionDetails,
+        workshopItems: analysisData.workshopItems,
+        narrativeQualityIndex: analysisData.analysis?.narrative_quality_index || 50,
+      }),
+    });
 
-**YOUR CORE MISSION:**
-The student's essay should read like THEY wrote it - their authentic voice pulling from their heart,
-unique perspective, and actual lived experience. Not performing for an audience.
-
-**THE AUTHENTICITY TEST:**
-Before writing anything, ask: "Could only THIS person have written this?"
-- If yes → you've captured their unique voice and experience
-- If anyone could have written it → too generic, needs more of THEIR emotional truth
-
-**AUTHENTICITY OVER PERFORMANCE:**
-Avoid these common essay pitfalls:
-- Writing that sounds like they're PERFORMING struggle rather than processing it
-- Insights that sound impressive but aren't actually theirs
-- Forced "lessons learned" that feel tacked on
-- Comparisons that make the student sound superior to others
-- Dramatic reveals or identity claims ("That's when I knew I was...")
-- Rhetorical questions designed to flex
-
-Instead: Show how THIS person naturally makes sense of their experience through concrete details.
-
-**FRESH, ANTI-CONVERGENT WRITING:**
-We want original, lively writing that highlights the student's character - not AI-like patterns.
-- Resist generic narrative arcs (setup → struggle → triumph → lesson)
-- Avoid clichéd college essay language ("passion", "journey", "grew as a person")
-- Don't use AI-sounding words ("tapestry", "testament", "delve", "showcase", "underscore")
-- Create fresh phrasings that feel alive and specific to this student
-
-But DON'T manufacture "edge" or "toughness" - authentic ≠ trying to sound impressive.
-
-**WHAT AUTHENTIC WRITING SOUNDS LIKE:**
-Emotional and captivating - like pulling from the heart. Unique feeling, understanding, grasping,
-perspective, or actions within that scenario that prove this person was THERE.
-
-Good example: "I traced the circuit three times before realizing I'd swapped the resistor values.
-The LED stayed dark. My lab partner had already left."
-
-Bad example: "I noticed the circuit wasn't working. I realized I needed to be more detail-oriented."
-
-The first SHOWS you were there with emotional texture. The second is generic reflection anyone could write.
-
-**RED FLAGS - STOP IF YOU SEE THESE PATTERNS:**
-- "But I knew..." (revelation flex)
-- "While others [weak thing], I [strong thing]" (comparison flex)
-- "That's when I realized I was..." (identity claim)
-- Rhetorical questions that imply superiority
-- Short, punchy statements designed to sound tough
-- "Normal people X, but I Y" (superiority complex)
-- Declarative identity claims ("I am...", "I'm the type of person who...")
-
-**WRITING EFFICIENCY:**
-Make every word count in either the micro (sentence-level craft) or macro (overall narrative arc) scheme.
-- Don't inflate word count unnecessarily
-- Keep suggestions close to the original length unless expanding serves a clear purpose
-- Most students don't use bullet points (-) - write in natural prose
-- Trim anything that doesn't advance understanding or emotion
-
-**YOUR MANDATE:**
-1. Read the Experience Fingerprint carefully - these are IRREPLACEABLE elements of their story
-2. Generate 3 options that sound like THIS PERSON naturally telling their story
-3. Use their unique experience elements to create writing only THEY could produce
-4. Match the approximate length of the original unless expansion serves the narrative
-5. Make suggestions feel emotionally true, not technically impressive
-
-**OUTPUT FORMAT:**
-Return ONLY valid JSON with this structure:
-{
-  "workshopItems": [
-    {
-      "id": "unique_id",
-      "quote": "exact text from essay",
-      "rubric_category": "dimension_name",
-      "suggestions": [
-        {
-          "type": "polished_original",
-          "text": "revised text (emotionally true, length-appropriate)"
-        },
-        {
-          "type": "voice_amplifier",
-          "text": "revised text (amplifies their natural voice)"
-        },
-        {
-          "type": "divergent_strategy",
-          "text": "revised text (bold alternative angle)"
-        }
-      ]
+    if (response.ok) {
+      const result = await response.json();
+      if (result.success && result.narrative_overview) {
+        setNarrativeOverview(result.narrative_overview); // ✅ Should set state
+        console.log('✅ Narrative overview loaded');
+      }
+    } else {
+      console.warn('⚠️  Narrative overview failed, using frontend fallback');
     }
-  ]
-}
+  } catch (error) {
+    console.error('Failed to fetch narrative overview:', error);
+    // Silently fall back to frontend-generated overview
+  } finally {
+    setLoadingOverview(false);
+  }
+}, [currentDraft, selectedPromptId]);
+```
 
-**CRITICAL REMINDERS:**
-- Each suggestion should match the original's approximate length (don't artificially inflate)
-- Include specific details that prove this person was there (ages, times, objects, emotions)
-- Make it sound like THIS student pulling from their heart, not a generic "good writer"
-- Every suggestion MUST use elements from the Experience Fingerprint
-- Fresh, lively writing - not AI convergence patterns`
+#### 3. **The Fallback System**
+
+**Location**: [src/pages/PIQWorkshop.tsx:1605-1710](src/pages/PIQWorkshop.tsx#L1605-L1710)
+
+```typescript
+const getDetailedOverview = (dims: RubricDimension[], score: number): string => {
+  // Use API-generated overview if available
+  if (narrativeOverview) {
+    return narrativeOverview; // ✅ Should use AI-generated
+  }
+
+  // Loading state
+  if (loadingOverview && analysisResult) {
+    return 'Generating personalized narrative overview...';
+  }
+
+  // Fallback to frontend-generated overview (GENERIC TEXT)
+  // ... 100+ lines of heuristic-based text generation
+}
+```
+
+### **Why It's Not Working: Hypothesis**
+
+There are several possible reasons why `narrativeOverview` state is `null` (causing fallback):
+
+#### **Hypothesis 1: API Call is Failing Silently** ⚠️ MOST LIKELY
+
+The `fetchNarrativeOverview` function catches errors and falls back silently:
+
+```typescript
+} else {
+  console.warn('⚠️  Narrative overview failed, using frontend fallback');
+}
+```
+
+Possible causes:
+- ❌ **CORS issues** - Edge function might not have proper CORS headers for the request
+- ❌ **Authorization failure** - The `ANON_KEY` might not have access to this function
+- ❌ **API timeout** - Claude API call might be timing out (no timeout set)
+- ❌ **Malformed request** - Some required data might be missing or malformed
+- ❌ **Claude API error** - API key issues, rate limits, or service errors
+- ❌ **JSON parsing failure** - The edge function expects JSON from Claude but gets different format
+
+#### **Hypothesis 2: State Update Timing Issue**
+
+The overview is fetched AFTER analysis completes, but the UI might render before the state updates:
+
+```typescript
+// Analysis completes → Sets analysisResult
+// Then calls fetchNarrativeOverview (async, non-blocking)
+// UI renders with analysisResult but narrativeOverview is still null
+```
+
+#### **Hypothesis 3: Component Unmounting/Remounting**
+
+If the component remounts, `narrativeOverview` state is reset to `null` but not refetched.
+
+**Location**: [src/pages/PIQWorkshop.tsx:756](src/pages/PIQWorkshop.tsx#L756)
+```typescript
+setNarrativeOverview(null); // Reset when switching PIQs
+```
+
+#### **Hypothesis 4: Edge Function Error**
+
+The edge function might be:
+- Throwing errors during Claude API call
+- Getting malformed responses from Claude
+- Failing to parse JSON from Claude's response
+- Hitting Anthropic API rate limits or quota issues
+
+---
+
+## Investigation Steps (To Determine Root Cause)
+
+### **Step 1: Check Browser Console Logs**
+
+Look for these console messages when running analysis:
+- ✅ `"✅ Narrative overview loaded"` - Success path
+- ⚠️ `"⚠️ Narrative overview failed, using frontend fallback"` - HTTP error
+- ❌ `"Failed to fetch narrative overview:"` - Network/exception error
+
+### **Step 2: Check Supabase Edge Function Logs**
+
+```bash
+supabase functions logs narrative-overview --tail
+```
+
+Look for:
+- Incoming requests
+- Claude API errors
+- JSON parsing errors
+- Success/failure responses
+
+### **Step 3: Check Network Tab**
+
+In browser DevTools Network tab:
+- Is the request to `narrative-overview` being made?
+- What's the response status code?
+- What's the response body?
+- Are there CORS errors?
+
+### **Step 4: Test Edge Function Directly**
+
+```bash
+curl -X POST https://zclaplpkuvxkrdwsgrul.supabase.co/functions/v1/narrative-overview \
+  -H "Authorization: Bearer ${ANON_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "essayText": "test essay...",
+    "promptText": "test prompt...",
+    "narrativeQualityIndex": 70
+  }'
 ```
 
 ---
 
-## TESTING STRATEGY
+## Solution Design
 
-### Test Cases
+### **Solution 1: Add Comprehensive Debugging** (IMMEDIATE)
 
-After implementing the fix, test with the user's problematic essay to verify:
+**Goal**: Determine exactly why the API call is failing
 
-**BAD PATTERNS ELIMINATED:**
-- ❌ "But normal kids don't know what I know"
-- ❌ "While they sought comfort, I was building immunity"
-- ❌ "That's when I knew: I wasn't addicted to winning"
-- ❌ "Other athletes avoid pain. I hunt it down."
-- ❌ "My classmates study until tired. I study until addicted."
+**Changes**:
 
-**GOOD PATTERNS EXPECTED:**
-- ✅ Specific details about actual experiences
-- ✅ Observational tone ("I noticed..." "I found myself...")
-- ✅ Natural storytelling without dramatic reveals
-- ✅ Genuine discovery through concrete examples
-- ✅ Authentic voice that sounds like a real person thinking
+1. **Enhanced logging in fetchNarrativeOverview**:
+
+```typescript
+const fetchNarrativeOverview = useCallback(async (analysisData: AnalysisResult) => {
+  setLoadingOverview(true);
+  console.log('🔍 [Narrative Overview] Starting fetch...', {
+    hasVoiceFingerprint: !!analysisData.voiceFingerprint,
+    hasExperienceFingerprint: !!analysisData.experienceFingerprint,
+    rubricDimensionCount: analysisData.rubricDimensionDetails?.length,
+    workshopItemCount: analysisData.workshopItems?.length,
+    nqi: analysisData.analysis?.narrative_quality_index,
+  });
+
+  try {
+    const requestBody = {
+      essayText: currentDraft,
+      promptText: UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId)?.prompt || '',
+      voiceFingerprint: analysisData.voiceFingerprint,
+      experienceFingerprint: analysisData.experienceFingerprint,
+      rubricDimensionDetails: analysisData.rubricDimensionDetails,
+      workshopItems: analysisData.workshopItems,
+      narrativeQualityIndex: analysisData.analysis?.narrative_quality_index || 50,
+    };
+
+    console.log('🔍 [Narrative Overview] Request body size:',
+      JSON.stringify(requestBody).length, 'bytes');
+
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/narrative-overview`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${ANON_KEY}`,
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('🔍 [Narrative Overview] Response status:', response.status);
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log('🔍 [Narrative Overview] Response:', {
+        success: result.success,
+        hasOverview: !!result.narrative_overview,
+        overviewLength: result.narrative_overview?.length,
+        overviewPreview: result.narrative_overview?.substring(0, 100),
+      });
+
+      if (result.success && result.narrative_overview) {
+        setNarrativeOverview(result.narrative_overview);
+        console.log('✅ [Narrative Overview] Successfully set state');
+      } else {
+        console.error('❌ [Narrative Overview] Invalid response structure:', result);
+      }
+    } else {
+      const errorBody = await response.text();
+      console.error('❌ [Narrative Overview] HTTP error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
+      });
+    }
+  } catch (error) {
+    console.error('❌ [Narrative Overview] Exception:', error);
+    if (error instanceof Error) {
+      console.error('   Message:', error.message);
+      console.error('   Stack:', error.stack);
+    }
+  } finally {
+    setLoadingOverview(false);
+  }
+}, [currentDraft, selectedPromptId]);
+```
+
+2. **Add UI indicator for loading/error states**:
+
+In the overview display section, show:
+```typescript
+{loadingOverview && (
+  <div className="text-sm text-muted-foreground animate-pulse">
+    🤔 Generating personalized narrative overview...
+  </div>
+)}
+{!loadingOverview && !narrativeOverview && (
+  <div className="text-xs text-yellow-600 dark:text-yellow-400">
+    ⚠️ Using quick analysis (AI overview unavailable)
+  </div>
+)}
+```
+
+### **Solution 2: Fix Edge Function Issues** (BASED ON FINDINGS)
+
+Potential fixes depending on what we find:
+
+#### **If CORS Issue**:
+Verify edge function CORS headers allow the request.
+
+#### **If Timeout Issue**:
+Add timeout handling:
+```typescript
+const controller = new AbortController();
+const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+
+const response = await fetch(url, {
+  ...options,
+  signal: controller.signal,
+});
+
+clearTimeout(timeoutId);
+```
+
+#### **If Claude API Error**:
+Check edge function logs for API errors. Possible fixes:
+- Verify `ANTHROPIC_API_KEY` is set correctly
+- Check API rate limits
+- Add error handling for specific API errors
+
+#### **If JSON Parsing Error**:
+The edge function has JSON parsing logic:
+```typescript
+const jsonMatch = overviewText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+const jsonString = jsonMatch ? jsonMatch[1].trim() : overviewText.trim();
+const parsed = JSON.parse(jsonString);
+```
+
+This might fail if Claude returns text in a different format. Fix:
+- Make the prompt more explicit about JSON format
+- Add better fallback handling
+- Return raw text if JSON parsing fails
+
+### **Solution 3: Add Retry Logic** (RESILIENCE)
+
+If the API call fails temporarily, retry:
+
+```typescript
+const fetchNarrativeOverview = useCallback(async (analysisData: AnalysisResult, retryCount = 0) => {
+  const MAX_RETRIES = 2;
+
+  setLoadingOverview(true);
+  try {
+    // ... existing fetch logic ...
+
+    if (!response.ok && retryCount < MAX_RETRIES) {
+      console.log(`⚠️ Retrying narrative overview (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2s
+      return fetchNarrativeOverview(analysisData, retryCount + 1);
+    }
+  } catch (error) {
+    if (retryCount < MAX_RETRIES) {
+      console.log(`⚠️ Retrying after error (attempt ${retryCount + 1}/${MAX_RETRIES})...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      return fetchNarrativeOverview(analysisData, retryCount + 1);
+    }
+    // Final failure - fall back
+  } finally {
+    setLoadingOverview(false);
+  }
+}, [currentDraft, selectedPromptId]);
+```
+
+### **Solution 4: Persist Overview to Database** (LONG-TERM)
+
+Once generated, save the overview to the database so it persists:
+
+```typescript
+if (result.success && result.narrative_overview) {
+  setNarrativeOverview(result.narrative_overview);
+
+  // Persist to database
+  if (currentEssayId) {
+    await saveNarrativeOverviewToDatabase(currentEssayId, result.narrative_overview);
+  }
+}
+```
+
+Then load it when resuming:
+```typescript
+if (essay && essay.narrative_overview) {
+  setNarrativeOverview(essay.narrative_overview);
+}
+```
+
+### **Solution 5: Improve Fallback Quality** (BACKUP PLAN)
+
+If AI overview continues to fail, improve the frontend fallback to be more personalized:
+
+```typescript
+// Use actual dimension evidence instead of generic text
+const getDetailedOverview = (dims: RubricDimension[], score: number, analysisData?: AnalysisResult): string => {
+  if (narrativeOverview) return narrativeOverview;
+
+  // Enhanced fallback using dimension evidence
+  let overview = '';
+
+  // Use actual strength from top dimension's evidence
+  const topDimension = dims.filter(d => d.status === 'good').sort((a, b) => b.score - a.score)[0];
+  if (topDimension && topDimension.overview) {
+    overview += `Your essay's strongest asset is ${topDimension.overview.split('.')[0].toLowerCase()}. `;
+  }
+
+  // Use voice fingerprint if available
+  if (analysisData?.voiceFingerprint?.tone?.primary) {
+    overview += `Your ${analysisData.voiceFingerprint.tone.primary.toLowerCase()} voice comes through clearly. `;
+  }
+
+  // ... rest of enhanced fallback
+}
+```
 
 ---
 
-## IMPLEMENTATION PLAN
+## Implementation Plan (TDD Approach)
 
-1. **Update workshop-analysis/index.ts** with new system prompt
-2. **Deploy to Supabase** with `supabase functions deploy workshop-analysis`
-3. **Test with user's essay** to validate fix
-4. **Compare old vs new suggestions** side by side
-5. **Verify authenticity** without losing concrete details
+### **Phase 1: Investigation & Debugging** (IMMEDIATE)
 
-**READY FOR YOUR APPROVAL TO IMPLEMENT**
+**Goal**: Determine root cause
+
+**Steps**:
+1. ✅ Add comprehensive console logging to `fetchNarrativeOverview`
+2. ✅ Add UI indicators for loading/error states
+3. ✅ Test with real essay
+4. ✅ Check browser console logs
+5. ✅ Check Supabase edge function logs
+6. ✅ Check network tab for request/response
+7. ✅ Document exact failure mode
+
+**Deliverable**: Clear understanding of WHY the overview is not being generated
+
+### **Phase 2: Fix Core Issue** (BASED ON FINDINGS)
+
+**Tests to Write First**:
+
+```typescript
+describe('Narrative Overview Generation', () => {
+  it('should call edge function after analysis completes', async () => {
+    // Mock analysis completion
+    // Verify fetch is called with correct parameters
+  });
+
+  it('should set narrativeOverview state on success', async () => {
+    // Mock successful API response
+    // Verify state is updated
+  });
+
+  it('should handle API errors gracefully', async () => {
+    // Mock API error
+    // Verify fallback is used
+    // Verify error is logged
+  });
+
+  it('should retry on temporary failures', async () => {
+    // Mock temporary failure then success
+    // Verify retry logic works
+  });
+
+  it('should timeout after 30 seconds', async () => {
+    // Mock slow response
+    // Verify timeout occurs
+  });
+});
+```
+
+**Implementation**:
+1. ✅ Write tests (RED)
+2. ✅ Implement fix based on root cause
+3. ✅ Add retry logic
+4. ✅ Add timeout handling
+5. ✅ Run tests (GREEN)
+6. ✅ Refactor
+
+### **Phase 3: Edge Function Improvements**
+
+**Tests** (using Deno test framework):
+
+```typescript
+Deno.test('narrative-overview should return valid JSON', async () => {
+  // Test with sample data
+  // Verify response structure
+});
+
+Deno.test('narrative-overview should handle missing Claude API key', async () => {
+  // Test with missing key
+  // Verify error response
+});
+
+Deno.test('narrative-overview should parse Claude response correctly', async () => {
+  // Mock Claude API response
+  // Verify parsing works
+});
+```
+
+**Implementation**:
+1. ✅ Add better error handling in edge function
+2. ✅ Improve JSON parsing robustness
+3. ✅ Add request validation
+4. ✅ Add timeout to Claude API call
+5. ✅ Add detailed logging
+
+### **Phase 4: Persistence** (OPTIONAL)
+
+**Database Schema**:
+
+```sql
+ALTER TABLE piq_essays
+ADD COLUMN narrative_overview TEXT;
+```
+
+**Implementation**:
+1. ✅ Add column to database
+2. ✅ Save overview after generation
+3. ✅ Load overview when resuming
+4. ✅ Update when re-analyzing
+
+### **Phase 5: Integration Testing**
+
+**Manual Testing Checklist**:
+
+- [ ] Start new essay analysis
+- [ ] Verify "Generating personalized narrative overview..." appears
+- [ ] Wait for analysis to complete
+- [ ] Check browser console for narrative overview logs
+- [ ] Verify AI-generated overview appears (not fallback text)
+- [ ] Check that overview is essay-specific and insightful
+- [ ] Re-analyze same essay
+- [ ] Verify overview updates
+- [ ] Close and reopen workshop
+- [ ] Verify overview persists (if persistence implemented)
+- [ ] Test with failing API (disconnect network)
+- [ ] Verify fallback appears with appropriate messaging
+
+---
+
+## Expected Outcomes
+
+### **Before (Current State)**
+
+Generic fallback text:
+> "Your essay shows genuine effort and authentic voice. The core of what you're trying to convey is there, but it needs sharper focus and more vivid storytelling. The surgical suggestions below show you exactly where and how to strengthen your narrative."
+
+### **After (AI-Generated)**
+
+Essay-specific, empowering overview:
+> "Your essay's strongest asset is the vivid sensory detail in your opening scene—the 'metallic tang of solder' and 'satisfying click of components fitting together' immediately transport us into your engineering workspace. You're showing us a transformation: from someone intimidated by circuits to someone who finds beauty in their logic. To make this truly captivating, dig deeper into that moment of shift—what exactly scared you before? What specific realization changed everything? Start by expanding the moment where you first understood how circuits 'speak' to each other."
+
+---
+
+## Success Criteria
+
+✅ **Technical Success**:
+- [ ] `narrative-overview` edge function is called after every analysis
+- [ ] API call succeeds 95%+ of the time
+- [ ] State is updated correctly
+- [ ] Overview appears within 5 seconds of analysis completion
+- [ ] Errors are logged clearly for debugging
+- [ ] Fallback works when API fails
+
+✅ **User Experience Success**:
+- [ ] User sees personalized, essay-specific overview
+- [ ] Overview mentions actual content from their essay
+- [ ] Overview is empowering and actionable
+- [ ] Loading state is clear
+- [ ] No jarring flash of fallback text
+
+✅ **Code Quality**:
+- [ ] Comprehensive error handling
+- [ ] Detailed logging for debugging
+- [ ] Tests cover success and failure cases
+- [ ] Code is maintainable and well-documented
+
+---
+
+## Risk Assessment
+
+**Low Risk**:
+- Changes are primarily debugging/logging additions
+- Fallback system already exists
+- No breaking changes to API contract
+- No database schema changes (unless persistence added)
+
+**Medium Risk**:
+- Edge function changes could affect deployed function
+- Claude API rate limits could cause issues at scale
+
+**Mitigation**:
+- Test thoroughly in development first
+- Deploy edge function changes carefully
+- Monitor logs after deployment
+- Keep fallback system robust
+
+---
+
+## Files to Modify
+
+### **Core Changes**
+1. ✅ `src/pages/PIQWorkshop.tsx`
+   - Add comprehensive logging to `fetchNarrativeOverview`
+   - Add retry logic
+   - Add timeout handling
+   - Add UI loading/error indicators
+   - Improve fallback quality (optional)
+
+2. ✅ `supabase/functions/narrative-overview/index.ts`
+   - Add better error handling
+   - Improve JSON parsing
+   - Add request validation
+   - Add timeout to Claude API call
+   - Add detailed logging
+
+### **Optional (Persistence)**
+3. ⚠️ Database migration (if adding persistence)
+4. ⚠️ Save/load functions for overview
+
+### **Test Files**
+5. ✅ `src/pages/__tests__/PIQWorkshop.test.tsx` (create or update)
+6. ✅ `supabase/functions/narrative-overview/test.ts` (create)
+
+---
+
+## Timeline Estimate
+
+- **Phase 1** (Investigation): 1-2 hours
+  - Add logging: 30 min
+  - Test and document findings: 1 hour
+
+- **Phase 2** (Fix core issue): 2-3 hours
+  - Write tests: 45 min
+  - Implement fix: 1 hour
+  - Add retry/timeout: 45 min
+  - Testing: 30 min
+
+- **Phase 3** (Edge function improvements): 1-2 hours
+  - Error handling: 45 min
+  - Testing: 45 min
+  - Deployment: 30 min
+
+- **Phase 4** (Persistence - optional): 1-2 hours
+  - Schema change: 15 min
+  - Implementation: 1 hour
+  - Testing: 45 min
+
+- **Phase 5** (Integration testing): 1 hour
+
+**Total: 6-10 hours** (4-6 hours without persistence)
+
+---
+
+## Next Steps
+
+### **Immediate Actions** (Do This First):
+
+1. **Add Debug Logging** to `fetchNarrativeOverview` in PIQWorkshop.tsx
+2. **Test with Real Essay** and check:
+   - Browser console logs
+   - Network tab
+   - Supabase function logs
+3. **Document Findings** - What exactly is failing?
+
+### **Then Proceed Based on Findings**:
+
+- **If API call not being made** → Fix calling logic
+- **If API call failing** → Check edge function logs, fix root cause
+- **If API call succeeding but state not updating** → Fix state management
+- **If edge function erroring** → Fix edge function implementation
+
+---
+
+## Questions for Approval
+
+1. Should I start with Phase 1 (Investigation) to determine root cause before implementing fixes?
+2. Should we add persistence for the narrative overview? (Recommended for better UX)
+3. What's the acceptable latency for overview generation? (Current: ~3-5 seconds)
+4. Should we show a more detailed loading state (e.g., progress indicator)?
+5. If AI overview fails repeatedly, should we notify the user or silently use fallback?
+
+---
+
+**Ready to begin investigation!** Please approve and I'll start with Phase 1 to determine exactly why the AI-generated overview isn't appearing. 🔍
+
