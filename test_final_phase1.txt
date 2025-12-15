@@ -1,0 +1,52 @@
+═══════════════════════════════════════════════════════════
+SIMPLE WORKSHOP TEST
+═══════════════════════════════════════════════════════════
+
+Starting complete workshop...
+
+🎓 Starting Complete Common App Workshop...
+   College: Stanford University
+   Prompt: What matters most to you, and why? (250 words)...
+
+🎨 Stage 0: Running voice excavation pipeline...
+  Stage 0A: Analyzing spark gap...
+    Spark Score: 15/100 (full_essay_mode)
+    Register: WONDER_CURIOSITY
+  Stage 0B: Identifying core story...
+    Story: "A student discovers that their most 'useless' curiosity—obsessing over snow sounds at 3 AM—reveals what actually matters most to them."
+  Stage 0C: Constructing scenes...
+    Scenes: 2
+    Flow: Natural—the calculus grade connects directly to the 3 AM choice, and walking on snow brings the research full circle
+  Stage 0D: Integrating voice...
+    Word count: 185
+    Spark moments: 2
+  Stage 0E: Verifying quality...
+    Overall score: 4.8/5
+    Passes quality: true
+✓ Voice excavation complete
+  Spark: 15/100 → 96/100
+  Register: wonder_curiosity
+  Cost: $0.070
+📚 Stage 1: Running consolidated foundation teaching...
+  1/2: Running Haiku pre-analysis...
+  2/2: Running Sonnet consolidated teaching...
+✓ Stage 1 complete
+  Top 3 issues identified with PIQ-level depth
+  Cost: $0.064
+⚠️  Stage 1 warnings: Issue 1 missing 'missing_elements' field, Issue 2 missing 'missing_elements' field
+🔬 Stage 2: Running surgical teaching with batch generation...
+  1/4: Preparing issue contexts...
+  2/4: Running Haiku diagnosis for all issues...
+
+✗ Test failed: Cannot read properties of undefined (reading 'value_name')
+TypeError: Cannot read properties of undefined (reading 'value_name')
+    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:343:35)
+    at Array.filter (<anonymous>)
+    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:340:49)
+    at Array.map (<anonymous>)
+    at Stage2BatchService.diagnoseAllIssues (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:336:45)
+    at Stage2BatchService.generateStage2Teaching (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:177:40)
+    at HandoffService.runStage2 (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:320:31)
+    at HandoffService.runCompleteWorkshop (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:157:37)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async runSimpleTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-commonapp-simple.ts:149:18)

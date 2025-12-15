@@ -3,7 +3,18 @@
  *
  * Runs the full surgical workshop analysis on the backend where Claude API calls are allowed.
  * This edge function wraps the surgicalOrchestrator to enable frontend access.
+ *
+ * FRAUD PREVENTION INTEGRATION:
+ * - Checks essay duplication across accounts
+ * - Tracks essay hashes in database
+ * - Runs in parallel with AI analysis (no added latency)
  */
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import {
+  checkEssayDuplication,
+  getClientIP,
+} from '../_shared/fraudPrevention.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +42,18 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Get authorization header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - missing authorization header' }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Parse request body
     const requestBody: WorkshopRequest = await req.json();
 
@@ -45,6 +68,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Create Supabase client for fraud checks
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    // Get user from auth header
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      console.warn('[Workshop] Auth check failed:', userError);
+      // Continue anyway (graceful degradation)
+    }
+
     // Import the surgical workshop orchestrator
     // Note: We need to transpile TypeScript files or use a bundled version
     // For now, we'll make a Claude API call directly with the workshop logic
@@ -53,6 +91,33 @@ Deno.serve(async (req) => {
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured in environment');
     }
+
+    // =====================================================
+    // FRAUD PREVENTION: Check essay duplication in parallel with AI analysis
+    // This adds ZERO latency since it runs alongside AI processing
+    // =====================================================
+    let fraudCheckPromise: Promise<any> | null = null;
+
+    if (user) {
+      fraudCheckPromise = checkEssayDuplication(
+        supabase,
+        user.id,
+        requestBody.essayText,
+        requestBody.promptText
+      ).then(result => {
+        if (!result.allowed) {
+          console.warn('[Workshop] Essay duplication detected:', result);
+        }
+        return result;
+      }).catch(error => {
+        console.error('[Workshop] Fraud check failed:', error);
+        return { allowed: true, warnings: ['Fraud check failed'] };
+      });
+    }
+
+    // =====================================================
+    // AI ANALYSIS: Run in parallel with fraud check
+    // =====================================================
 
     // Stage 1: Voice Fingerprint Analysis
     const voiceFingerprintResponse = await fetch('https://api.anthropic.com/v1/messages', {
@@ -424,6 +489,36 @@ Focus on the most impactful improvements first. Each suggestion should feel like
       workshopData = { workshopItems: [] };
     }
 
+    // =====================================================
+    // FRAUD CHECK COMPLETION: Wait for fraud check to complete
+    // =====================================================
+    let fraudCheckResult = null;
+    if (fraudCheckPromise) {
+      try {
+        fraudCheckResult = await fraudCheckPromise;
+
+        // If essay is blocked due to duplication, return error
+        if (fraudCheckResult && !fraudCheckResult.allowed) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Essay duplication detected',
+              blocked: true,
+              reason: fraudCheckResult.reason,
+              metadata: fraudCheckResult.metadata,
+            }),
+            {
+              status: 403,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      } catch (error) {
+        console.error('[Workshop] Fraud check failed:', error);
+        // Continue anyway (graceful degradation)
+      }
+    }
+
     // Assemble final result
     const finalResult = {
       success: true,
@@ -436,6 +531,8 @@ Focus on the most impactful improvements first. Each suggestion should feel like
       experienceFingerprint: experienceFingerprint,
       rubricDimensionDetails: rubricAnalysis.dimensions || [],
       workshopItems: workshopData.workshopItems || [],
+      // Include fraud warnings (if any)
+      ...(fraudCheckResult?.warnings ? { warnings: fraudCheckResult.warnings } : {}),
     };
 
     return new Response(

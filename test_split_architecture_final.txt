@@ -1,0 +1,35 @@
+═══════════════════════════════════════════════════════════
+SIMPLE WORKSHOP TEST
+═══════════════════════════════════════════════════════════
+
+Starting complete workshop...
+
+🎓 Starting Complete Common App Workshop...
+   College: Stanford University
+   Prompt: What matters most to you, and why? (250 words)...
+
+🎨 Stage 0: Running voice excavation pipeline...
+  Stage 0A: Analyzing spark gap...
+    Spark Score: 15/100 (full_essay_mode)
+    Register: ENERGETIC_ENTHUSIASM
+  Stage 0B: Identifying core story...
+    Story: "A student discovers that their deepest joy comes from diving into completely 'useless' knowledge rabbit holes at 1 AM."
+  Stage 0C: Constructing scenes...
+    Scenes: 2
+    Flow: Natural - 'This wasn't unusual for me' acknowledges the pattern while moving to show broader impact
+  Stage 0D: Integrating voice...
+    Word count: 182
+    Spark moments: 2
+  Stage 0E: Verifying quality...
+
+✗ Test failed: Unexpected non-whitespace character after JSON at position 254 (line 15 column 1)
+SyntaxError: Unexpected non-whitespace character after JSON at position 254 (line 15 column 1)
+    at JSON.parse (<anonymous>)
+    at parseJsonFromResponse (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0MultiStageService.ts:508:15)
+    at Stage0MultiStageService.verifyQuality (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0MultiStageService.ts:767:20)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Stage0MultiStageService.runMultiStagePipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0MultiStageService.ts:901:73)
+    at async Stage0ConditionalService.runStage0 (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0ConditionalService.ts:174:24)
+    at async HandoffService.runStage0 (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:323:20)
+    at async HandoffService.runCompleteWorkshop (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:194:26)
+    at async runSimpleTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-commonapp-simple.ts:149:18)

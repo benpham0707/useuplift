@@ -1,0 +1,36 @@
+═══════════════════════════════════════════════════════════
+SIMPLE WORKSHOP TEST
+═══════════════════════════════════════════════════════════
+
+Starting complete workshop...
+
+🎓 Starting Complete Common App Workshop...
+   College: Stanford University
+   Prompt: What matters most to you, and why? (250 words)...
+
+🎨 Stage 0: Running voice excavation pipeline...
+  Stage 0A: Analyzing spark gap...
+    Spark Score: 5/100 (full_essay_mode)
+    Register: ENERGETIC_ENTHUSIASM
+  Stage 0B: Identifying core story...
+    Story: "A student discovers that their deepest joy comes from chasing knowledge that serves no purpose except pure understanding."
+  Stage 0C: Constructing scenes...
+    Scenes: 3
+    Flow: Natural—each transition builds momentum by connecting the previous thought to the next logical step
+  Stage 0D: Integrating voice...
+    Word count: 193
+    Spark moments: 3
+  Stage 0E: Verifying quality...
+
+✗ Test failed: 500 {"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":null}
+Error: 500 {"type":"error","error":{"type":"api_error","message":"Internal server error"},"request_id":null}
+    at APIError.generate (/Users/tuepham/uplift-final-final-18698-62030/node_modules/@anthropic-ai/sdk/src/core/error.ts:91:14)
+    at Anthropic.makeStatusError (/Users/tuepham/uplift-final-final-18698-62030/node_modules/@anthropic-ai/sdk/src/client.ts:429:28)
+    at Anthropic.makeRequest (/Users/tuepham/uplift-final-final-18698-62030/node_modules/@anthropic-ai/sdk/src/client.ts:664:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Stage0MultiStageService.verifyQuality (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0MultiStageService.ts:756:22)
+    at async Stage0MultiStageService.runMultiStagePipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0MultiStageService.ts:901:73)
+    at async Stage0ConditionalService.runStage0 (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage0ConditionalService.ts:174:24)
+    at async HandoffService.runStage0 (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:278:20)
+    at async HandoffService.runCompleteWorkshop (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:149:26)
+    at async runSimpleTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-commonapp-simple.ts:149:18)
