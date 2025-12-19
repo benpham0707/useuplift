@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
+import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
 import BugReportWidget from "@/components/BugReportWidget";
 import Index from "./pages/Index";
@@ -35,42 +36,44 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/verify-email" element={<VerifyEmail />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/portfolio-scanner" element={<RequireVerified><RequireTermsAccepted><PortfolioScanner /></RequireTermsAccepted></RequireVerified>} />
-            <Route path="/portfolio-insights" element={<RequireVerified><RequireTermsAccepted><PortfolioInsightsNew /></RequireTermsAccepted></RequireVerified>} />
-            <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
-            <Route path="/academic-planner" element={<AcademicPlanner />} />
-            <Route path="/project-incubation" element={<ProjectIncubationHub />} />
-            <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
-            <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
-            <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
-            <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
-            <Route path="/project-incubation/projects" element={<ProjectManagement />} />
-            <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
-            <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
-            <Route path="/workshop-demo" element={<WorkshopDemo />} />
-            <Route path="/piq-workshop" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
-            <Route path="/piq-workshop/:piqNumber" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/settings" element={<RequireVerified><RequireTermsAccepted><Settings /></RequireTermsAccepted></RequireVerified>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-          <ClickSparkGlobal />
-          <BugReportWidget />
-        </BrowserRouter>
-      </TooltipProvider>
+      <FraudTrackingProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Index />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/portfolio-scanner" element={<RequireVerified><RequireTermsAccepted><PortfolioScanner /></RequireTermsAccepted></RequireVerified>} />
+              <Route path="/portfolio-insights" element={<RequireVerified><RequireTermsAccepted><PortfolioInsightsNew /></RequireTermsAccepted></RequireVerified>} />
+              <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
+              <Route path="/academic-planner" element={<AcademicPlanner />} />
+              <Route path="/project-incubation" element={<ProjectIncubationHub />} />
+              <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
+              <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
+              <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
+              <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
+              <Route path="/project-incubation/projects" element={<ProjectManagement />} />
+              <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
+              <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
+              <Route path="/workshop-demo" element={<WorkshopDemo />} />
+              <Route path="/piq-workshop" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
+              <Route path="/piq-workshop/:piqNumber" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/settings" element={<RequireVerified><RequireTermsAccepted><Settings /></RequireTermsAccepted></RequireVerified>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+            <ClickSparkGlobal />
+            <BugReportWidget />
+          </BrowserRouter>
+        </TooltipProvider>
+      </FraudTrackingProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

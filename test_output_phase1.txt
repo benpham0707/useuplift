@@ -1,0 +1,49 @@
+═══════════════════════════════════════════════════════════
+SIMPLE WORKSHOP TEST
+═══════════════════════════════════════════════════════════
+
+Starting complete workshop...
+
+🎓 Starting Complete Common App Workshop...
+   College: Stanford University
+   Prompt: What matters most to you, and why? (250 words)...
+
+🎨 Stage 0: Running voice excavation pipeline...
+  Stage 0A: Analyzing spark gap...
+    Spark Score: 5/100 (full_essay_mode)
+    Register: ENERGETIC_ENTHUSIASM
+  Stage 0B: Identifying core story...
+    Story: "A student discovers that their deepest joy comes from chasing knowledge that serves no purpose except to satisfy an insatiable curiosity."
+  Stage 0C: Constructing scenes...
+    Scenes: 3
+    Flow: Natural - each transition builds on the previous scene's momentum without forced connections
+  Stage 0D: Integrating voice...
+    Word count: 208
+    Spark moments: 3
+  Stage 0E: Verifying quality...
+    Overall score: 4.8/5
+    Passes quality: true
+✓ Voice excavation complete
+  Spark: 5/100 → 96/100
+  Register: energetic_enthusiasm
+  Cost: $0.078
+📚 Stage 1: Running consolidated foundation teaching...
+  1/2: Running Haiku pre-analysis...
+  2/2: Running Sonnet consolidated teaching...
+✓ Stage 1 complete
+  Top 3 issues identified with PIQ-level depth
+  Cost: $0.057
+⚠️  Stage 1 warnings: Issue 1 missing 'missing_elements' field, Issue 2 missing 'missing_elements' field
+🔬 Stage 2: Running surgical teaching with batch generation...
+  1/4: Preparing issue contexts...
+
+✗ Test failed: Cannot read properties of undefined (reading 'length')
+TypeError: Cannot read properties of undefined (reading 'length')
+    at Stage2BatchService.prepIssueContext (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:279:32)
+    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:167:12)
+    at Array.map (<anonymous>)
+    at Stage2BatchService.generateStage2Teaching (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/stage2BatchService.ts:166:49)
+    at HandoffService.runStage2 (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:320:31)
+    at HandoffService.runCompleteWorkshop (/Users/tuepham/uplift-final-final-18698-62030/src/services/commonAppWorkshop/services/handoffService.ts:157:37)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async runSimpleTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-commonapp-simple.ts:149:18)
