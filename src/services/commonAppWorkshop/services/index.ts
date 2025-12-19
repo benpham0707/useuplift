@@ -143,3 +143,83 @@ export type {
 
 // Citation Processor Service (Parse, Validate, Enrich Citations)
 export { CitationProcessor, citationProcessor } from './citationProcessor';
+
+// Type-Specific Teaching Service (14 Essay Types)
+export { TYPE_TEACHING_FOCUS, buildTypeTeachingGuidance } from './typeSpecificTeaching';
+export type { TypeTeachingFocus } from './typeSpecificTeaching';
+
+// ============================================================================
+// EVOLVED WORKSHOP SYSTEM (14 Universal Types + College Overlay)
+// ============================================================================
+
+// Type-Aware Scoring Service (12 Dimensions × 14 Type Weights)
+export { TypeAwareScoringService } from './typeAwareScoringService';
+export type {
+  DimensionScore,
+  DetectedIssue,
+  RedFlagDetection,
+  CriticalDimensionAssessment,
+  TypeAwareScoringOutput,
+} from './typeAwareScoringService';
+
+// Type-Specific Suggestion Service (PIQ-Quality + College Context + Word Count Aware)
+export { TypeSpecificSuggestionService, TYPE_SUGGESTION_CONSTRAINTS } from './typeSpecificSuggestionService';
+export type {
+  WordCountConstraints,
+  TypeSpecificConstraints,
+  IssueContext,
+  PolishedOriginalSuggestion as TypePolishedSuggestion,
+  VoiceAmplifierSuggestion as TypeVoiceSuggestion,
+  SuggestionTeaching,
+  IssueSuggestion as TypeIssueSuggestion,
+  TypeSpecificSuggestionOutput,
+} from './typeSpecificSuggestionService';
+
+// College-Type Integration Service (Bridge Universal + College-Specific)
+export { CollegeTypeIntegrationService } from './collegeTypeIntegrationService';
+export type {
+  ValueDimensionMapping,
+  CollegeExcellenceRequirement,
+  IntegratedTypeRubric,
+  CitationRecommendation,
+} from './collegeTypeIntegrationService';
+
+// Evolved Workshop Orchestrator (Complete Pipeline)
+export { EvolvedWorkshopOrchestrator } from './evolvedWorkshopOrchestrator';
+export type {
+  Stage0Output,
+  Stage1Output,
+  Stage2Output,
+  Stage3Output,
+  EvolvedWorkshopOutput,
+  WorkshopOptions,
+} from './evolvedWorkshopOrchestrator';
+
+// ============================================================================
+// SEMANTIC SCORING SYSTEM (Principles-Based Assessment)
+// ============================================================================
+
+// Semantic Scoring Service (Principles-Based, Not Pattern-Based)
+export {
+  SemanticScoringService,
+  identifyApproachDiscrepancy,
+  DEFAULT_WORD_LIMITS,
+  TYPE_WORD_EFFICIENCY
+} from './semanticScoringService';
+export type {
+  SemanticDimensionScore,
+  PerformativeAssessment,
+  SemanticScoringOutput,
+  WordCountConfig,
+  WordCountAssessment,
+  WordEfficiencyMode,
+} from './semanticScoringService';
+
+// Unified Scoring Service (Quality-First with Cost Optimization)
+export { UnifiedScoringService } from './unifiedScoringService';
+export type {
+  PatternIssue,
+  QuickTriageResult,
+  UnifiedScoringOutput,
+  UnifiedScoringOptions,
+} from './unifiedScoringService';
