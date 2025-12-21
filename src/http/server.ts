@@ -42,6 +42,8 @@ app.use("/api", routes);
 const port = process.env.PORT || 8789;
 // Bind to 0.0.0.0 to accept connections from all network interfaces
 app.listen(port, '0.0.0.0', () => {
-  // eslint-disable-next-line no-console
+  console.log(`🚀 Server running on http://localhost:${port}`);
+  console.log(`📍 API endpoints: http://localhost:${port}/api/v1/`);
+  console.log(`🔧 Development endpoints: http://localhost:${port}/api/v1/dev/`);
 });
 

@@ -9,11 +9,23 @@ const Auth = () => {
   const initialMode = searchParams.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in';
   const [mode, setMode] = useState<'sign-in' | 'sign-up'>(initialMode);
 
+  // Capture referral code from URL on mount
+  useEffect(() => {
+    const refCode = searchParams.get('ref');
+    if (refCode) {
+      // Store in localStorage for claiming after signup/login
+      localStorage.setItem('pendingReferralCode', refCode.trim().toUpperCase());
+    }
+  }, [searchParams]);
+
   // Sync mode with URL parameter on navigation
   useEffect(() => {
     const urlMode = searchParams.get('mode') === 'sign-up' ? 'sign-up' : 'sign-in';
     setMode(urlMode);
   }, [searchParams]);
+
+  // Check if there's a pending referral code to show UI hint
+  const hasPendingReferral = Boolean(localStorage.getItem('pendingReferralCode'));
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -77,6 +89,14 @@ const Auth = () => {
                     routing="hash"
                     forceRedirectUrl="/portfolio-scanner"
                   />
+                  {/* Referral notice */}
+                  {hasPendingReferral && mode === 'sign-up' && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg">
+                      <p className="text-xs text-green-800 dark:text-green-200 text-center font-medium">
+                        🎁 Sign up with referral: +10 credits & 10% off credit packs!
+                      </p>
+                    </div>
+                  )}
                   {/* Terms of Service notice */}
                   <p className="mt-4 text-xs text-muted-foreground text-center max-w-sm">
                     By signing up, you agree to our{' '}

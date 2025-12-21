@@ -4,10 +4,33 @@ import { completeAssessment } from "@/modules/assessment/complete";
 import { completePersonal } from "@/modules/personal/complete";
 import * as Exp from "@/modules/experiences/controller";
 import * as Billing from "./billing";
+import * as Referrals from "./referrals";
+import * as DevAuth from "./dev-auth";
 import { handleClerkWebhook } from "./webhooks/clerk";
 import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/analytics/portfolio";
 
 const r = Router();
+
+// Development-only routes (bypasses Clerk authentication)
+const isDevelopment = process.env.NODE_ENV !== 'production';
+console.log('🔧 Development mode:', isDevelopment ? 'ENABLED' : 'DISABLED');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+
+if (isDevelopment) {
+  console.log('✅ Loading development routes...');
+  // Test user management
+  r.post("/dev/test-user", DevAuth.createTestUser);
+  r.get("/dev/test-users", DevAuth.getTestUsers);
+  
+  // Referrals (development bypass)
+  r.get("/dev/referrals/me", DevAuth.devAuthBypass, Referrals.getReferralInfo);
+  r.post("/dev/referrals/claim", DevAuth.devAuthBypass, Referrals.claimReferral);
+  
+  // Billing (development bypass)
+  r.post("/dev/billing/checkout", DevAuth.devAuthBypass, Billing.createCheckoutSession);
+  
+  console.log('✅ Development routes loaded successfully');
+}
 
 // Webhooks (no auth required - uses signature verification)
 r.post("/webhooks/clerk", handleClerkWebhook);
@@ -17,6 +40,10 @@ r.post("/billing/checkout", requireAuth, Billing.createCheckoutSession);
 r.post("/billing/webhook", Billing.handleWebhook);
 r.post("/billing/verify-session", requireAuth, Billing.verifySession);
 r.post("/billing/portal", requireAuth, Billing.createPortalSession);
+
+// Referrals API
+r.get("/referrals/me", requireAuth, Referrals.getReferralInfo);
+r.post("/referrals/claim", requireAuth, Referrals.claimReferral);
 
 r.post("/assessment/complete", requireAuth, completeAssessment);
 r.post("/personal/complete", requireAuth, completePersonal);

@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode } from 'react';
+import { createContext, useContext, ReactNode, useEffect } from 'react';
 import { useUser, useClerk } from '@clerk/clerk-react';
 
 interface AuthContextType {
@@ -30,6 +30,49 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   } : null;
     
   const loading = !isLoaded;
+
+  // Auto-claim referral code after login
+  useEffect(() => {
+    if (!user || loading) return;
+
+    const claimPendingReferral = async () => {
+      const pendingCode = localStorage.getItem('pendingReferralCode');
+      if (!pendingCode) return;
+
+      try {
+        // Get Clerk token for authentication
+        const { getToken } = await import('@clerk/clerk-react');
+        const token = await getToken();
+        
+        if (!token) return;
+
+        const response = await fetch('/api/v1/referrals/claim', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ code: pendingCode }),
+        });
+
+        if (response.ok) {
+          // Successfully claimed - remove pending code and refresh credits
+          localStorage.removeItem('pendingReferralCode');
+          window.dispatchEvent(new CustomEvent('credits:updated'));
+        } else {
+          const error = await response.json().catch(() => ({}));
+          // Only remove if already claimed or invalid
+          if (error.alreadyClaimed || response.status === 404) {
+            localStorage.removeItem('pendingReferralCode');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to claim referral:', error);
+      }
+    };
+
+    claimPendingReferral();
+  }, [user, loading]);
 
   // Shim methods to use Clerk UI
   const signUp = async () => {

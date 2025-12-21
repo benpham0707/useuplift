@@ -19,20 +19,19 @@ import { useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { apiFetch } from '@/lib/utils';
 import { 
   User, 
-  CreditCard, 
   AlertTriangle, 
   ExternalLink, 
   LogOut,
   Trash2,
   History,
-  Crown,
-  Loader2
+  Loader2,
+  Zap
 } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
 import Navigation from '@/components/Navigation';
+import { ReferralCard } from '@/components/ReferralCard';
 
 interface CreditTransaction {
   id: string;
@@ -50,9 +49,7 @@ const Settings = () => {
   const { toast } = useToast();
   
   const [credits, setCredits] = useState<number | null>(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
-  const [isLoadingPortal, setIsLoadingPortal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
 
@@ -68,16 +65,15 @@ const Settings = () => {
       try {
         setProfileLoading(true);
         
-        // Load profile with credits and subscription status
+        // Load profile with credits
         const { data: profile } = await supabase
           .from('profiles')
-          .select('credits, subscription_status')
+          .select('credits')
           .eq('user_id', user.id)
           .maybeSingle() as { data: any; error: any };
 
         if (profile) {
           setCredits(profile.credits ?? 0);
-          setSubscriptionStatus(profile.subscription_status ?? 'none');
         }
 
         // Load recent transactions
@@ -99,48 +95,6 @@ const Settings = () => {
 
     loadProfile();
   }, [user, authLoading, navigate]);
-
-  // Handle Stripe Customer Portal
-  const handleManageSubscription = async () => {
-    try {
-      setIsLoadingPortal(true);
-      const token = await getToken();
-      
-      if (!token) {
-        navigate('/auth');
-        return;
-      }
-
-      const response = await apiFetch('/api/v1/billing/portal', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          returnUrl: `${window.location.origin}/settings`,
-        }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || 'Failed to open billing portal');
-      }
-
-      const { url } = await response.json();
-      if (url) {
-        window.location.href = url;
-      }
-    } catch (error) {
-      toast({
-        title: "Unable to open billing portal",
-        description: error instanceof Error ? error.message : "Please try again or contact support.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoadingPortal(false);
-    }
-  };
 
   // Handle account deletion
   const handleDeleteAccount = async () => {
@@ -254,93 +208,47 @@ const Settings = () => {
           </CardContent>
         </Card>
 
-        {/* Plan & Subscription Section */}
+        {/* Credits Overview */}
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Crown className="h-5 w-5 text-primary" />
-              Plan & Subscription
+              <GradientZap className="h-5 w-5" />
+              Credits & Billing
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between p-4 rounded-lg bg-secondary/30">
               <div className="space-y-1">
+                <span className="text-sm text-muted-foreground">Current Balance</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold">
-                    {subscriptionStatus === 'active' ? 'Pro Plan' : 'Free Plan'}
-                  </span>
-                  <Badge variant={subscriptionStatus === 'active' ? 'default' : 'secondary'} className="text-xs">
-                    {subscriptionStatus === 'active' ? 'Active' : 'No subscription'}
-                  </Badge>
+                  <p className="text-3xl font-bold">{credits ?? 0}</p>
+                  <span className="text-sm text-muted-foreground">credits</span>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  {subscriptionStatus === 'active' 
-                    ? '100 credits/month with rollover'
-                    : 'Pay-as-you-go credits only'}
-                </p>
               </div>
-              <div className="text-right">
-                <div className="flex items-center gap-1 text-2xl font-bold">
-                  <GradientZap className="h-5 w-5" />
-                  {credits ?? 0}
-                </div>
-                <p className="text-xs text-muted-foreground">credits</p>
-              </div>
+              <Zap className="h-8 w-8 text-yellow-500 fill-yellow-500 opacity-20" />
             </div>
-
-            {subscriptionStatus === 'active' && (
-              <p className="text-sm text-muted-foreground">
-                Manage payment methods, view invoices, or cancel through the Stripe portal.
-              </p>
-            )}
           </CardContent>
           <CardFooter className="pt-0">
-            <div className="flex flex-wrap items-center gap-2">
-              {subscriptionStatus === 'active' ? (
-                <Button 
-                  size="sm"
-                  onClick={handleManageSubscription}
-                  disabled={isLoadingPortal}
-                >
-                  {isLoadingPortal ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <CreditCard className="h-4 w-4 mr-2" />
-                  )}
-                  Manage Subscription
-                </Button>
-              ) : (
-                <Button size="sm" onClick={() => navigate('/pricing')}>
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Pro
-                </Button>
-              )}
-              <Button variant="outline" size="sm" onClick={() => navigate('/pricing')}>
-                View Plans
-              </Button>
-            </div>
+            <Button size="sm" onClick={() => navigate('/pricing')}>
+              Buy More Credits
+            </Button>
           </CardFooter>
         </Card>
+
+        {/* Referral Card */}
+        <ReferralCard />
 
         {/* Credits & History Section */}
         <Card>
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <CardTitle className="flex items-center gap-2 text-lg">
-                <GradientZap className="h-5 w-5" />
-                Credits &amp; Usage
+                <History className="h-5 w-5 text-primary" />
+                Transaction History
               </CardTitle>
-              <Button size="sm" className="shrink-0" onClick={() => navigate('/pricing')}>
-                Buy More
-              </Button>
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <History className="h-4 w-4" />
-              Recent Transactions
-            </div>
-            
             {transactions.length === 0 ? (
               <p className="text-sm text-muted-foreground py-3 text-center border rounded-lg">
                 No transactions yet.
@@ -422,7 +330,6 @@ const Settings = () => {
                           <li>Your profile information</li>
                           <li>All saved essays and analyses</li>
                           <li>Your credit balance ({credits ?? 0} credits)</li>
-                          <li>Subscription (if active)</li>
                         </ul>
                       </AlertDialogDescription>
                     </AlertDialogHeader>

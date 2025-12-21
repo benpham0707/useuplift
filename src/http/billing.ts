@@ -18,46 +18,26 @@ const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
 if (!isStripeConfigured) {
 }
 
-type SubscriptionPlan = {
-  name: string;
-  amount: number;
-  currency: string;
-  credits: number;
-  interval: 'month' | 'year';
-};
-
-type AddonPlan = {
+type CreditPack = {
   name: string;
   amount: number;
   currency: string;
   credits: number;
 };
 
-type Plan = SubscriptionPlan | AddonPlan;
-
-// LAUNCH SALE: 50% OFF ALL PLANS
-const PLANS: Record<string, Plan> = {
-  pro_monthly: {
-    name: 'Pro Monthly Subscription (Launch Sale - 50% Off)',
-    amount: 1000, // $10.00 (was $20.00)
+// NEW CREDIT PACKS (no subscriptions)
+const CREDIT_PACKS: Record<string, CreditPack> = {
+  starter_pack: {
+    name: 'Starter Pack',
+    amount: 8000, // $80.00
     currency: 'usd',
-    credits: 100,
-    interval: 'month',
+    credits: 400,
   },
-  pro_yearly: {
-    name: 'Pro Annual Subscription (Launch Sale - 50% Off)',
-    amount: 9600, // $96.00 (was $192.00)
+  full_season_pack: {
+    name: 'Full Season Pack',
+    amount: 20000, // $200.00
     currency: 'usd',
-    credits: 1200, // 100 * 12
-    interval: 'year',
-  },
-  // Legacy fallback
-  subscription: {
-    name: 'Monthly Subscription (Launch Sale - 50% Off)',
-    amount: 1000, // $10.00 (was $20.00)
-    currency: 'usd',
-    credits: 100,
-    interval: 'month',
+    credits: 1200,
   },
 };
 
@@ -74,40 +54,48 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    let plan = PLANS[type as keyof typeof PLANS];
+    let pack = CREDIT_PACKS[type as keyof typeof CREDIT_PACKS];
 
-    // Handle dynamic addons (addon_50, addon_100, ..., addon_500)
-    // LAUNCH SALE: 50% OFF - was $10 per 50 credits, now $5
-    if (!plan && type.startsWith('addon_')) {
+    // Handle dynamic custom packs (custom_50, custom_100, ..., custom_2000)
+    // $13 per 50 credits
+    if (!pack && type.startsWith('custom_')) {
         const credits = parseInt(type.split('_')[1]);
-        // Validate: multiple of 50, between 50 and 500
-        if (!isNaN(credits) && credits % 50 === 0 && credits >= 50 && credits <= 500) {
-             plan = {
-                name: `${credits} Credits Pack (Launch Sale - 50% Off)`,
-                amount: (credits / 50) * 500, // $5 per 50 credits ($500 cents) - was $10
+        // Validate: multiple of 50, between 50 and 2000
+        if (!isNaN(credits) && credits % 50 === 0 && credits >= 50 && credits <= 2000) {
+             pack = {
+                name: `${credits} Credits (Custom Pack)`,
+                amount: (credits / 50) * 1300, // $13 per 50 credits ($1300 cents)
                 currency: 'usd',
                 credits: credits,
              };
         }
     }
 
-    if (!plan) {
-      return res.status(400).json({ error: 'Invalid plan type' });
+    if (!pack) {
+      return res.status(400).json({ error: 'Invalid pack type' });
     }
 
-    // Get or create customer
-    // Note: userId is a Clerk ID (string like "user_2q..."), not a Supabase UUID
+    // Check if user has referral discount active (10% off)
     const { data: profile } = await supabase
       .from('profiles')
-      .select('stripe_customer_id, email')
+      .select('stripe_customer_id, email, referral_discount_active')
       .eq('user_id', userId)
       .single();
 
+    let finalAmount = pack.amount;
+    let referralDiscountApplied = false;
+
+    if (profile?.referral_discount_active) {
+      // Apply 10% discount
+      finalAmount = Math.round(pack.amount * 0.9);
+      referralDiscountApplied = true;
+    }
+
+    // Get or create customer
     let customerId = profile?.stripe_customer_id;
 
     if (!customerId) {
       // Get email from profile if available (set during onboarding)
-      // Clerk user IDs are not in Supabase auth.users, so we can't use supabase.auth.admin
       const email = profile?.email || undefined;
 
       const customer = await stripe.customers.create({
@@ -137,8 +125,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       }
     }
 
-    const isSubscription = 'interval' in plan;
-    
+    // All credit packs are one-time payments (no subscriptions)
     const sessionConfig: any = {
       customer: customerId,
       payment_method_types: ['card'],
@@ -149,23 +136,28 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       line_items: [
         {
           price_data: {
-            currency: plan.currency,
+            currency: pack.currency,
             product_data: {
-              name: plan.name,
+              name: pack.name,
+              description: referralDiscountApplied 
+                ? `${pack.credits} credits (10% referral discount applied)` 
+                : `${pack.credits} credits`,
             },
-            unit_amount: plan.amount,
-            ...(isSubscription ? { recurring: { interval: (plan as SubscriptionPlan).interval } } : {}),
+            unit_amount: finalAmount,
           },
           quantity: 1,
         },
       ],
-      mode: isSubscription ? 'subscription' : 'payment',
-      success_url: successUrl || `${req.headers.origin}/billing/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: cancelUrl || `${req.headers.origin}/billing/cancel`,
+      mode: 'payment', // Always one-time payment
+      success_url: successUrl || `${req.headers.origin}/pricing?success=true`,
+      cancel_url: cancelUrl || `${req.headers.origin}/pricing?canceled=true`,
       metadata: {
         userId,
         type,
-        credits: plan.credits,
+        credits: pack.credits,
+        referral_discount_applied: referralDiscountApplied ? 'true' : 'false',
+        original_amount: pack.amount,
+        final_amount: finalAmount,
       },
     };
 
@@ -208,26 +200,7 @@ export const handleWebhook = async (req: Request, res: Response) => {
         await processCheckoutSession(session);
         break;
       }
-      case 'invoice.payment_succeeded': {
-        // Handle recurring payments for subscriptions
-        const invoice = event.data.object as any;
-        if (invoice.billing_reason === 'subscription_cycle') {
-           const subscriptionId = invoice.subscription;
-           const { data: subscription } = await supabase
-             .from('subscriptions')
-             .select('user_id')
-             .eq('stripe_subscription_id', subscriptionId)
-             .single();
-
-           if (subscription) {
-             // Grant monthly credits (100 is default for subscription renewal)
-             // Ideally we should store the plan credits on the subscription or metadata
-             await grantCredits(subscription.user_id, 100, 'subscription_renewal', invoice.payment_intent || invoice.id);
-           }
-        }
-        break;
-      }
-      // Handle subscription updates/cancellations as needed
+      // Removed subscription renewal logic - we only do one-time credit packs now
     }
   } catch (error) {
      return res.status(500).json({ error: 'Webhook processing failed' });
@@ -258,53 +231,93 @@ export const verifySession = async (req: Request, res: Response) => {
 }
 
 export const createPortalSession = async (req: Request, res: Response) => {
-    try {
-        if (!isStripeConfigured) {
-            return res.status(503).json({ error: 'Billing not configured' });
-        }
-
-        const userId = (req as any).auth?.userId;
-        if (!userId) {
-            return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { returnUrl } = req.body;
-
-        // Get customer ID from profile
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('stripe_customer_id')
-            .eq('user_id', userId)
-            .single();
-
-        if (!profile?.stripe_customer_id) {
-            return res.status(400).json({ error: 'No billing account found. Please subscribe first.' });
-        }
-
-        // Create Stripe Customer Portal session
-        const session = await stripe.billingPortal.sessions.create({
-            customer: profile.stripe_customer_id,
-            return_url: returnUrl || `${req.headers.origin}/settings`,
-        });
-
-        res.json({ url: session.url });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
+    // No longer needed - we don't have subscriptions to manage
+    // Users can just buy more credit packs as needed
+    return res.status(404).json({ 
+        error: 'Customer portal not available. Purchase credit packs directly from the pricing page.' 
+    });
 }
 
 async function processCheckoutSession(session: any) {
     const userId = session.metadata?.userId;
     const type = session.metadata?.type;
     const credits = parseInt(session.metadata?.credits || '0');
-    const paymentId = session.payment_intent as string || session.subscription as string || session.id;
+    const paymentId = session.payment_intent as string || session.id;
 
     if (userId && credits > 0) {
         await grantCredits(userId, credits, type, paymentId);
         
-        if (type === 'pro_monthly' || type === 'pro_yearly' || type === 'subscription') {
-            await handleSubscriptionCreated(userId, session);
+        // Check if this is the referee's first purchase and grant referrer bonus
+        await grantReferrerPurchaseBonus(userId, paymentId);
+    }
+}
+
+async function grantReferrerPurchaseBonus(refereeUserId: string, paymentId: string) {
+    try {
+        // Check if this user is a referee and the purchase bonus hasn't been granted
+        const { data: referral } = await supabase
+            .from('referrals')
+            .select('referrer_user_id, purchase_bonus_granted_at')
+            .eq('referee_user_id', refereeUserId)
+            .maybeSingle();
+
+        if (!referral || referral.purchase_bonus_granted_at) {
+            // Either not a referee or bonus already granted
+            return;
         }
+
+        const referrerId = referral.referrer_user_id;
+        const now = new Date().toISOString();
+
+        // Check for idempotency - make sure we haven't already granted this specific bonus
+        const bonusDescription = `Referral purchase bonus: ${refereeUserId.slice(0, 8)}... made first purchase (+25 credits)`;
+        const { data: existingBonus } = await supabase
+            .from('credit_transactions')
+            .select('id')
+            .eq('user_id', referrerId)
+            .eq('type', 'bonus')
+            .eq('stripe_payment_id', `referral_purchase_${paymentId}`)
+            .maybeSingle();
+
+        if (existingBonus) {
+            // Bonus already granted for this payment
+            return;
+        }
+
+        // Grant referrer +25 credits
+        const { data: referrerProfile } = await supabase
+            .from('profiles')
+            .select('credits')
+            .eq('user_id', referrerId)
+            .single();
+
+        if (referrerProfile) {
+            const newBalance = (referrerProfile.credits || 0) + 25;
+            await supabase
+                .from('profiles')
+                .update({ credits: newBalance })
+                .eq('user_id', referrerId);
+
+            // Log the bonus transaction with unique reference
+            await supabase
+                .from('credit_transactions')
+                .insert({
+                    user_id: referrerId,
+                    amount: 25,
+                    type: 'bonus',
+                    description: bonusDescription,
+                    stripe_payment_id: `referral_purchase_${paymentId}`,
+                });
+
+            // Mark purchase bonus as granted
+            await supabase
+                .from('referrals')
+                .update({ purchase_bonus_granted_at: now })
+                .eq('referee_user_id', refereeUserId);
+        }
+    } catch (error) {
+        console.error('Error granting referrer purchase bonus:', error);
+        // Don't throw - we don't want to fail the entire checkout processing
     }
 }
 
@@ -315,7 +328,8 @@ async function grantCredits(userId: string, amount: number, type: string, refere
           .from('credit_transactions')
           .select('id')
           .eq('stripe_payment_id', referenceId)
-          .single();
+          .eq('user_id', userId)
+          .maybeSingle();
       
       if (existing) {
           return;
@@ -344,33 +358,8 @@ async function grantCredits(userId: string, amount: number, type: string, refere
     .insert({
       user_id: userId,
       amount: amount,
-      type: type.includes('subscription') || type === 'pro_monthly' || type === 'pro_yearly' ? 'subscription_grant' : 'addon_purchase',
+      type: 'addon_purchase', // All are credit pack purchases now
       description: `Purchased ${amount} credits via ${type}`,
       stripe_payment_id: referenceId
     });
-}
-
-async function handleSubscriptionCreated(userId: string, session: any) {
-    // Check if subscription already exists
-    const { data: existing } = await supabase
-        .from('subscriptions')
-        .select('id')
-        .eq('stripe_subscription_id', session.subscription)
-        .single();
-
-    if (existing) return;
-
-    await supabase
-      .from('subscriptions')
-      .insert({
-        user_id: userId,
-        stripe_subscription_id: session.subscription,
-        status: 'active',
-        current_period_end: new Date(session.expires_at ? session.expires_at * 1000 : Date.now() + 30 * 24 * 60 * 60 * 1000) 
-      });
-      
-    await supabase
-        .from('profiles')
-        .update({ subscription_status: 'active' })
-        .eq('user_id', userId);
 }
