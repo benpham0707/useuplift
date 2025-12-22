@@ -172,40 +172,48 @@ const Auth = () => {
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="p-4 border-2 border-primary/20 rounded-lg bg-primary/5"
+                          className="p-5 border-2 border-primary/20 rounded-lg bg-primary/5"
                         >
-                          <div className="flex items-center gap-2 mb-3">
-                            <Gift className="w-4 h-4 text-primary" />
-                            <span className="text-sm font-medium">Enter referral code</span>
+                          <div className="flex items-center gap-2 mb-4">
+                            <Gift className="w-5 h-5 text-primary" />
+                            <span className="text-sm font-semibold">Enter referral code</span>
                           </div>
-                          <div className="flex gap-2">
+                          
+                          {/* Input on its own line for better visibility */}
+                          <div className="space-y-3">
                             <Input
                               placeholder="e.g. ABC123"
                               value={manualReferralCode}
                               onChange={(e) => setManualReferralCode(e.target.value.toUpperCase())}
                               onKeyDown={(e) => e.key === 'Enter' && handleApplyReferralCode()}
-                              className="flex-1 font-mono text-base h-11 px-4"
+                              className="w-full font-mono text-lg h-14 px-5 tracking-widest text-center placeholder:tracking-normal placeholder:text-base"
                               maxLength={20}
+                              autoFocus
                             />
-                            <Button
-                              onClick={handleApplyReferralCode}
-                              disabled={!manualReferralCode.trim()}
-                              className="h-11 px-6"
-                            >
-                              Apply
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setShowReferralInput(false);
-                                setManualReferralCode('');
-                              }}
-                              variant="ghost"
-                              className="h-11 px-4"
-                            >
-                              Cancel
-                            </Button>
+                            
+                            {/* Buttons below input */}
+                            <div className="flex gap-2">
+                              <Button
+                                onClick={handleApplyReferralCode}
+                                disabled={!manualReferralCode.trim()}
+                                className="flex-1 h-11 font-medium"
+                              >
+                                Apply Code
+                              </Button>
+                              <Button
+                                onClick={() => {
+                                  setShowReferralInput(false);
+                                  setManualReferralCode('');
+                                }}
+                                variant="outline"
+                                className="h-11 px-6"
+                              >
+                                Cancel
+                              </Button>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-2">
+                          
+                          <p className="text-xs text-muted-foreground mt-3 text-center">
                             Get +10 credits and 10% off credit packs when you sign up with a friend's code
                           </p>
                         </motion.div>
