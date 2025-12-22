@@ -43,10 +43,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         // Get Clerk token for authentication
         const { getToken } = await import('@clerk/clerk-react');
         const token = await getToken();
-        
+
         if (!token) return;
 
-        const response = await fetch('/api/v1/referrals/claim', {
+        // Use VITE_API_BASE if set (production), otherwise use relative path (development proxy)
+        const apiBase = import.meta.env.VITE_API_BASE || '';
+        const apiUrl = `${apiBase}/api/v1/referrals/claim`;
+
+        const response = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
