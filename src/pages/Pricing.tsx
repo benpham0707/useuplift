@@ -12,6 +12,7 @@ import { apiFetch } from '@/lib/utils';
 import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle, Loader2 } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
 import Navigation from '@/components/Navigation';
+import { ReferralCard } from '@/components/ReferralCard';
 
 const Pricing = () => {
   const { user, loading } = useAuth();
@@ -388,6 +389,13 @@ const Pricing = () => {
             </Button>
           </CardFooter>
         </Card>
+
+        {/* Referral Section */}
+        {user && (
+          <div className="max-w-3xl mx-auto">
+            <ReferralCard />
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-8 pt-12 border-t">
             <div className="text-center space-y-2">

@@ -22,6 +22,7 @@ export const ReferralCard = () => {
   const { toast } = useToast();
   const [referralData, setReferralData] = useState<ReferralStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -31,8 +32,12 @@ export const ReferralCard = () => {
   const loadReferralData = async () => {
     try {
       setLoading(true);
+      setError(null);
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        setError('Not authenticated');
+        return;
+      }
 
       const response = await fetch('/api/v1/referrals/me', {
         headers: {
@@ -43,9 +48,12 @@ export const ReferralCard = () => {
       if (response.ok) {
         const data = await response.json();
         setReferralData(data);
+      } else {
+        setError('Failed to load referral data');
       }
     } catch (error) {
       console.error('Failed to load referral data:', error);
+      setError('Failed to load referral data');
     } finally {
       setLoading(false);
     }
@@ -87,7 +95,34 @@ export const ReferralCard = () => {
     );
   }
 
-  if (!referralData) return null;
+  if (error || !referralData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Share2 className="h-5 w-5 text-primary" />
+            Refer a Friend
+          </CardTitle>
+          <CardDescription>
+            Share your link and earn rewards when friends join
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground text-center py-4">
+            {error || 'Failed to load referral data'}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadReferralData}
+            className="w-full"
+          >
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
