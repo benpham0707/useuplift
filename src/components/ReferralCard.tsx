@@ -39,21 +39,41 @@ export const ReferralCard = () => {
         return;
       }
 
-      const response = await fetch('/api/v1/referrals/me', {
+      // Use VITE_API_BASE if set (production), otherwise use relative path (development proxy)
+      const apiBase = import.meta.env.VITE_API_BASE || '';
+      const apiUrl = `${apiBase}/api/v1/referrals/me`;
+
+      const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setReferralData(data);
-      } else {
-        setError('Failed to load referral data');
+      if (!response.ok) {
+        const contentType = response.headers.get('content-type');
+        let errorMessage = 'Failed to load referral data';
+
+        if (contentType?.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        }
+
+        setError(errorMessage);
+        return;
       }
+
+      const contentType = response.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        console.error('Expected JSON but got:', contentType);
+        setError('Server returned invalid response format');
+        return;
+      }
+
+      const data = await response.json();
+      setReferralData(data);
     } catch (error) {
       console.error('Failed to load referral data:', error);
-      setError('Failed to load referral data');
+      setError(error instanceof Error ? error.message : 'Failed to load referral data');
     } finally {
       setLoading(false);
     }
