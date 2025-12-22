@@ -184,13 +184,13 @@ const Auth = () => {
                               value={manualReferralCode}
                               onChange={(e) => setManualReferralCode(e.target.value.toUpperCase())}
                               onKeyDown={(e) => e.key === 'Enter' && handleApplyReferralCode()}
-                              className="flex-1 font-mono"
+                              className="flex-1 font-mono text-base h-11 px-4"
                               maxLength={20}
                             />
                             <Button
                               onClick={handleApplyReferralCode}
                               disabled={!manualReferralCode.trim()}
-                              size="sm"
+                              className="h-11 px-6"
                             >
                               Apply
                             </Button>
@@ -200,7 +200,7 @@ const Auth = () => {
                                 setManualReferralCode('');
                               }}
                               variant="ghost"
-                              size="sm"
+                              className="h-11 px-4"
                             >
                               Cancel
                             </Button>
