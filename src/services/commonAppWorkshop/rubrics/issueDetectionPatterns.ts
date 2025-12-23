@@ -558,6 +558,292 @@ const MAJOR_ISSUES: IssuePattern[] = [
       'Think: What would surprise someone who read my other essays?',
       'Consider skipping optional essays if you can\'t add something new'
     ]
+  },
+
+  {
+    id: 'DEFENSIVE_OR_APOLOGETIC',
+    name: 'Defensive or Apologetic Tone',
+    description: 'Essay adopts a defensive, apologetic, or self-deprecating tone',
+    severity: 'major',
+    relevant_types: ['diversity', 'challenge', 'additional_info'],
+    affected_dimensions: ['authenticity_voice', 'vulnerability_balance', 'personal_connection'],
+    score_impact: -3,
+
+    detection_phrases: [
+      'I\'m sorry that',
+      'I apologize for',
+      'unfortunately I',
+      'I had to',
+      'I was forced to',
+      'despite my background',
+      'even though I\'m',
+      'although I\'m not',
+      'I know it\'s not much',
+      'it\'s not a big deal',
+      'I don\'t mean to complain',
+      'I hope you understand'
+    ],
+    detection_patterns: [
+      'I (apologize|am sorry|regret) (for|that)',
+      '(unfortunately|sadly|regrettably),? I',
+      '(despite|in spite of) (my|being)',
+      'I (had|was forced|was made) to',
+      'I know (it\'?s?|this is) not (much|impressive|special)'
+    ],
+    detection_logic: 'Essay uses language that apologizes for circumstances or minimizes achievements',
+
+    problem_description: 'Your essay sounds apologetic or defensive. You\'re minimizing your experiences instead of owning them.',
+    why_it_matters: 'Apologetic tone signals you don\'t believe in yourself. Admissions wants to see pride in who you are, not shame about your circumstances.',
+    fix_suggestions: [
+      'Replace "I had to" with "I chose to" or "I learned to"',
+      'Delete phrases that minimize your experiences',
+      'Reframe challenges as sources of strength, not excuses',
+      'Own your story with confidence - your perspective is valuable',
+      'Replace apologies with statements of growth and agency'
+    ],
+    example_before: 'I\'m sorry that my family couldn\'t afford extracurriculars. Unfortunately, I had to work instead of joining clubs.',
+    example_after: 'Working 20 hours weekly at my uncle\'s restaurant taught me customer service, inventory management, and how to calm angry customers - skills no club could have provided.'
+  },
+
+  {
+    id: 'BRAGGING_WITHOUT_VULNERABILITY',
+    name: 'Bragging Without Vulnerability',
+    description: 'Essay focuses on achievements without any genuine vulnerability or struggle',
+    severity: 'major',
+    relevant_types: ['leadership', 'extracurricular', 'challenge'],
+    affected_dimensions: ['vulnerability_balance', 'authenticity_voice', 'growth_transformation'],
+    score_impact: -3,
+
+    detection_phrases: [
+      'I excelled at',
+      'I was the best',
+      'I always succeeded',
+      'naturally talented',
+      'everyone looked to me',
+      'I never failed',
+      'I easily achieved',
+      'people admired me',
+      'recognized for my excellence',
+      'stood out from others'
+    ],
+    detection_patterns: [
+      'I (excelled|dominated|outperformed|surpassed)',
+      'I (am|was) (the best|exceptional|outstanding|superior)',
+      '(everyone|people) (looked to|admired|respected) me',
+      'I (never|rarely) (failed|struggled|doubted)',
+      '(naturally|effortlessly|easily) (talented|skilled|capable)'
+    ],
+    detection_logic: 'Essay lists achievements without acknowledging any struggles, doubts, or failures',
+
+    problem_description: 'Your essay reads like a highlight reel without any genuine struggle or vulnerability.',
+    why_it_matters: 'Admissions officers see thousands of accomplished students. What makes you memorable is how you handle difficulty, not just success.',
+    fix_suggestions: [
+      'Add at least one genuine moment of struggle or doubt',
+      'Share a failure and what you learned from it',
+      'Discuss a time when you questioned yourself',
+      'Show growth: who were you BEFORE you developed this strength?',
+      'Include a moment when you needed help from others'
+    ],
+    example_before: 'As captain, I led our debate team to state finals. I was recognized for my exceptional speaking skills and everyone looked to me for guidance.',
+    example_after: 'The first debate I ever lost, I cried in the bathroom for twenty minutes. My partner found me and said, "Good. Now you\'ll work harder." She was right. Two years later, I led us to state finals - but I never forgot that losing is what taught me to prepare.'
+  },
+
+  {
+    id: 'UNREALISTIC_GOALS',
+    name: 'Unrealistic or Grandiose Goals',
+    description: 'Essay makes unrealistic claims about changing the world or solving major problems',
+    severity: 'major',
+    relevant_types: ['future_goals', 'why_major', 'community'],
+    affected_dimensions: ['strategic_coherence', 'authenticity_voice', 'reflection_insight'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'change the world',
+      'solve world hunger',
+      'cure cancer',
+      'end poverty',
+      'revolutionize the industry',
+      'transform society',
+      'make the world a better place',
+      'impact millions',
+      'save the planet',
+      'eradicate disease'
+    ],
+    detection_patterns: [
+      '(change|save|transform|revolutionize) the (world|planet|industry)',
+      '(solve|end|cure|eradicate) (world hunger|poverty|cancer|disease)',
+      'impact (millions|billions|countless)',
+      'make the world (a better place|better)'
+    ],
+    detection_logic: 'Essay makes grandiose claims without concrete, actionable steps',
+
+    problem_description: 'Your goals sound grandiose rather than genuine. "Change the world" is a red flag for admissions.',
+    why_it_matters: 'Admissions officers have read thousands of essays promising to "change the world." They prefer specific, achievable goals that show you understand how change actually happens.',
+    fix_suggestions: [
+      'Replace "change the world" with a specific, achievable impact',
+      'Focus on one community, one problem, one solution',
+      'Show you understand the complexity of the issue',
+      'Connect your goal to something you\'ve already started doing',
+      'Be specific: Who will you help? How? With what resources?'
+    ],
+    example_before: 'I want to major in biology so I can cure cancer and change the world.',
+    example_after: 'After watching my grandmother\'s chemotherapy side effects, I became interested in targeted drug delivery. I want to research how nanoparticles can reduce off-target effects in cancer treatment.'
+  },
+
+  {
+    id: 'JUST_DESCRIBING',
+    name: 'Just Describing Without Reflection',
+    description: 'Essay describes events chronologically without reflection or insight',
+    severity: 'major',
+    relevant_types: ['challenge', 'extracurricular', 'leadership'],
+    affected_dimensions: ['reflection_insight', 'growth_transformation', 'personal_connection'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'and then',
+      'after that',
+      'the next day',
+      'first we',
+      'then we',
+      'finally we',
+      'we started by',
+      'we ended with'
+    ],
+    detection_patterns: [
+      '(and then|after that|next we|then we|finally we)',
+      '(first|second|third|finally),? (we|I) (did|went|started)',
+      'the next (day|week|month),? (we|I)'
+    ],
+    detection_logic: 'Essay reads like a chronological list of events without pausing for reflection',
+
+    problem_description: 'Your essay reads like a timeline of events without any reflection on meaning or growth.',
+    why_it_matters: 'Admissions wants to understand how you THINK, not just what you DID. Description without reflection misses the point.',
+    fix_suggestions: [
+      'After describing an event, add: "What this taught me was..."',
+      'Replace some "and then" transitions with "I realized" or "This made me question"',
+      'Cut half the events and double the reflection',
+      'Ask: What would someone who wasn\'t there NOT understand about this?',
+      'Focus on one key moment and go deep, not wide'
+    ],
+    example_before: 'First we fundraised, then we planned the event, then we organized volunteers, and finally we held the event.',
+    example_after: 'When only three volunteers showed up for an event we\'d planned for months, I learned that enthusiasm doesn\'t equal commitment. That night, I redesigned our volunteer training to build real ownership.'
+  },
+
+  {
+    id: 'MAKING_EXCUSES',
+    name: 'Making Excuses for Performance',
+    description: 'Essay frames weaknesses as excuses rather than areas for growth',
+    severity: 'major',
+    relevant_types: ['additional_info', 'challenge'],
+    affected_dimensions: ['growth_transformation', 'authenticity_voice', 'vulnerability_balance'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'wasn\'t my fault',
+      'I couldn\'t because',
+      'the teacher was',
+      'if only',
+      'they didn\'t let me',
+      'I would have but',
+      'circumstances prevented',
+      'I wasn\'t given the chance'
+    ],
+    detection_patterns: [
+      '(wasn\'t|isn\'t|won\'t) my fault',
+      'if only (I|the|my)',
+      '(they|the teacher|my parents) (didn\'t|wouldn\'t) (let|allow)',
+      'I (couldn\'t|wouldn\'t|didn\'t) because (my|the|they)'
+    ],
+    detection_logic: 'Essay places blame externally rather than showing ownership',
+
+    problem_description: 'Your essay sounds like you\'re making excuses rather than taking ownership.',
+    why_it_matters: 'Admissions wants students who take responsibility. External blame suggests you won\'t grow from challenges.',
+    fix_suggestions: [
+      'Replace "I couldn\'t because X" with "I chose to prioritize Y"',
+      'Focus on what you learned, not why it wasn\'t your fault',
+      'Show what you would do differently now',
+      'Own your choices, even difficult ones',
+      'Reframe obstacles as context, not excuses'
+    ],
+    example_before: 'My grades dropped junior year because my teacher didn\'t explain things well and I wasn\'t given extra help.',
+    example_after: 'My grades dropped junior year because I didn\'t ask for help when I needed it. I\'ve since learned to advocate for myself - I now visit office hours regularly.'
+  },
+
+  {
+    id: 'PASSIVE_PARTICIPATION',
+    name: 'Passive Participation Description',
+    description: 'Essay describes being part of something without showing individual contribution',
+    severity: 'major',
+    relevant_types: ['extracurricular', 'leadership', 'community'],
+    affected_dimensions: ['specificity_evidence', 'personal_connection', 'growth_transformation'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'I was part of',
+      'I was a member of',
+      'I participated in',
+      'we accomplished',
+      'our team achieved',
+      'together we',
+      'as a group we'
+    ],
+    detection_patterns: [
+      'I (was|am) (a |part of |member of )(the |our |a )?',
+      'I participated in',
+      '(we|our team|the group|together we) (accomplished|achieved|won|succeeded)'
+    ],
+    detection_logic: 'Essay uses collective language without showing individual initiative or contribution',
+
+    problem_description: 'Your essay describes group achievements without clarifying YOUR specific role and contribution.',
+    why_it_matters: 'Admissions is evaluating YOU, not your team. They need to understand what YOU specifically did.',
+    fix_suggestions: [
+      'Replace "we accomplished" with "I proposed/built/led/designed..."',
+      'Specify your unique role: "While others did X, I focused on Y"',
+      'Show a decision YOU made that affected the outcome',
+      'Describe a moment when YOU took initiative',
+      'Use "I" more than "we" when describing actions'
+    ],
+    example_before: 'I was part of our school\'s robotics team. We won the state championship and accomplished amazing things together.',
+    example_after: 'On our robotics team, I redesigned the gripper mechanism after our first prototype kept dropping objects. My solution—adding a pressure sensor—became standard for the whole team.'
+  },
+
+  {
+    id: 'RESUME_LISTING',
+    name: 'Resume-Style Achievement Listing',
+    description: 'Essay lists achievements without narrative connection or meaning',
+    severity: 'major',
+    relevant_types: ['extracurricular', 'leadership', 'additional_info'],
+    affected_dimensions: ['narrative_clarity', 'authenticity_voice', 'reflection_insight'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'I also',
+      'in addition',
+      'additionally',
+      'furthermore',
+      'moreover',
+      'not only... but also',
+      'I have also',
+      'I am also'
+    ],
+    detection_patterns: [
+      '(I also|In addition|Additionally|Furthermore|Moreover),? (I )?(am|have|was|serve)',
+      'Not only.{10,50}but also',
+      '(President|Captain|Founder|Member) of.{5,30}(President|Captain|Founder|Member) of'
+    ],
+    detection_logic: 'Essay reads like a resume with multiple disconnected achievements',
+
+    problem_description: 'Your essay reads like a list of achievements from your resume, not a story.',
+    why_it_matters: 'Admissions already has your resume. Essays should reveal something deeper—your thinking, values, or growth.',
+    fix_suggestions: [
+      'Choose ONE achievement and go deep',
+      'Remove all "I also" and "Additionally" transitions',
+      'Ask: What would someone learn about me from this story?',
+      'Focus on the journey, not the destination',
+      'Show the WHY behind one thing rather than the WHAT of many'
+    ],
+    example_before: 'I am President of NHS. I also captain the debate team. Additionally, I founded the coding club and serve as class treasurer.',
+    example_after: 'Founding the coding club wasn\'t about my resume. It started when I noticed freshmen struggling alone with the same problems I\'d solved years ago. I wanted to build what I wished I\'d had.'
   }
 ];
 
@@ -830,24 +1116,101 @@ function hasDialogue(text: string): boolean {
 }
 
 /**
+ * Check if text has contribution/giving language (for ONE_SIDED_FIT)
+ */
+function hasContributionLanguage(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  const contributionPhrases = [
+    'i will contribute',
+    'i\'d contribute',
+    'i would contribute',
+    'i will bring',
+    'i\'d bring',
+    'i can bring',
+    'i can offer',
+    'i will share',
+    'contribute to',
+    'my experience with',
+    'my background in',
+    'i founded',
+    'i created',
+    'i built',
+    'i developed',
+    'sharing my',
+    'bring my'
+  ];
+
+  return contributionPhrases.some(phrase => lowerText.includes(phrase));
+}
+
+/**
+ * Patterns that require balanced detection (check for presence AND absence of something)
+ */
+const BALANCED_PATTERNS = ['ONE_SIDED_FIT'];
+
+/**
  * Check text for phrase-based detection
  * Returns list of pattern IDs that match
+ *
+ * @param text - The essay text to analyze
+ * @param essayType - Optional essay type for type-aware detection
  */
-export function detectPhrasePatterns(text: string): string[] {
+export function detectPhrasePatterns(text: string, essayType?: SupplementalType): string[] {
   const lowerText = text.toLowerCase();
   const matchedPatterns: string[] = [];
+
+  // Essay types where NO_NUMBERS is NOT expected (narrative/reflective types)
+  const typesWhereNumbersOptional: SupplementalType[] = [
+    'intellectual', 'values', 'diversity', 'creative', 'challenge'
+  ];
+
+  // Essay types where NO_DIALOGUE is NOT expected (analytical types)
+  const typesWhereDialogueOptional: SupplementalType[] = [
+    'why_us', 'why_major', 'values', 'future_goals', 'intellectual'
+  ];
 
   for (const pattern of ALL_ISSUE_PATTERNS) {
     let matched = false;
 
-    // Handle inverted/absence patterns specially
+    // Handle inverted/absence patterns specially with type awareness
     if (ABSENCE_PATTERNS.includes(pattern.id)) {
       if (pattern.id === 'NO_NUMBERS' && !hasNumbers(text)) {
+        // Skip NO_NUMBERS detection for types where numbers aren't expected
+        if (essayType && typesWhereNumbersOptional.includes(essayType)) {
+          continue; // Don't flag - numbers not expected for this type
+        }
         matched = true;
       } else if (pattern.id === 'NO_DIALOGUE' && !hasDialogue(text)) {
+        // Skip NO_DIALOGUE detection for analytical essay types
+        if (essayType && typesWhereDialogueOptional.includes(essayType)) {
+          continue; // Don't flag - dialogue not expected for this type
+        }
         matched = true;
       }
+    } else if (BALANCED_PATTERNS.includes(pattern.id)) {
+      // Handle balanced patterns that need both presence AND absence checks
+      if (pattern.id === 'ONE_SIDED_FIT') {
+        // Check if essay has receiving language
+        let hasReceivingLanguage = false;
+        for (const phrase of pattern.detection_phrases) {
+          if (lowerText.includes(phrase.toLowerCase())) {
+            hasReceivingLanguage = true;
+            break;
+          }
+        }
+        // Only flag if there's receiving language WITHOUT contribution language
+        if (hasReceivingLanguage && !hasContributionLanguage(text)) {
+          matched = true;
+        }
+      }
     } else {
+      // Check if pattern is relevant to this essay type
+      if (essayType && pattern.relevant_types !== 'all') {
+        if (!pattern.relevant_types.includes(essayType)) {
+          continue; // Pattern not relevant for this essay type
+        }
+      }
+
       // Check detection phrases
       for (const phrase of pattern.detection_phrases) {
         if (lowerText.includes(phrase.toLowerCase())) {

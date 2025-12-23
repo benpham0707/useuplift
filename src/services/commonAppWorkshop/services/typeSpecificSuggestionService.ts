@@ -60,6 +60,32 @@ const BANNED_TERMS = [
   'incredible', 'amazing', 'life-changing', 'transformative experience'
 ];
 
+// Performative authenticity patterns - phrases that SIGNAL authenticity without DEMONSTRATING it
+// These are essay-speak clichés that admissions officers see constantly
+const PERFORMATIVE_AUTHENTICITY_PATTERNS = [
+  // "I did it on my own time" trope
+  'not for a class', 'not for school', 'on my own time', 'just because',
+  'outside of class', 'in my free time', 'without being asked',
+
+  // Generic excitement claims
+  'blew my mind', 'changed my life', 'opened my eyes', 'sparked my passion',
+  'ignited my interest', 'awakened something in me', 'I was hooked',
+  'I couldn\'t stop thinking about', 'I fell in love with',
+
+  // Empty depth claims
+  'I realized', 'I discovered', 'I learned that', 'it taught me',
+  'taught me that', 'showed me that', 'showed me', 'made me understand',
+  'I came to understand', 'I began to see', 'it dawned on me',
+
+  // Forced vulnerability
+  'I\'m not afraid to admit', 'I\'ll be honest', 'the truth is',
+  'I never told anyone', 'for the first time', 'I finally understood',
+
+  // Meta-commentary on authenticity
+  'this is who I really am', 'my true self', 'the real me',
+  'what makes me unique', 'unlike other students', 'what sets me apart'
+];
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -315,6 +341,66 @@ export interface TypeSpecificSuggestionOutput {
 }
 
 // ============================================================================
+// SOCRATIC DEPTH TYPES
+// ============================================================================
+
+/**
+ * A single depth probe - a question designed to extract unique insight
+ */
+export interface DepthProbe {
+  probe_type: 'limitation' | 'contradiction' | 'application' | 'synthesis' | 'personal_stake';
+  question: string;
+  why_this_matters: string;
+  what_genuine_answer_looks_like: string;
+  red_flags_in_answer: string[]; // Signs the student is still being performative
+  example_weak_answer: string;
+  example_strong_answer: string;
+}
+
+/**
+ * Socratic depth output for a single issue
+ * Instead of giving polished prose, gives questions that extract authentic insight
+ */
+export interface SocraticDepthOutput {
+  issue_id: string;
+  issue_quote: string;
+  diagnosis: {
+    what_is_missing: string;
+    why_current_version_feels_performative: string;
+    what_genuine_depth_would_look_like: string;
+  };
+  depth_probes: DepthProbe[];
+  synthesis_guidance: {
+    how_to_combine_answers: string;
+    what_to_avoid: string[];
+    signs_you_have_genuine_insight: string[];
+  };
+}
+
+/**
+ * Complete Socratic depth batch output
+ */
+export interface SocraticDepthBatchOutput {
+  essay_type: SupplementalType;
+  type_name: string;
+  college_name: string | null;
+
+  issues: SocraticDepthOutput[];
+
+  meta_guidance: {
+    overall_depth_gap: string;
+    common_thread: string;
+    how_issues_connect: string;
+  };
+
+  cost: number;
+  tokens_used: {
+    input: number;
+    output: number;
+  };
+}
+
+// ============================================================================
 // SUGGESTION PROMPT
 // ============================================================================
 
@@ -330,6 +416,57 @@ CRITICAL REQUIREMENTS:
    - VOICE AMPLIFIER: Authentic, risky alternative that amplifies personality
 6. WORD COUNT CONSTRAINTS: {wordCountGuidance}
 7. SUGGESTION LENGTH: Max {maxSuggestionLength} words per replacement
+
+═══════════════════════════════════════════════════════════
+⛔ PERFORMATIVE AUTHENTICITY - ABSOLUTE BAN ⛔
+═══════════════════════════════════════════════════════════
+
+NEVER use these phrases - they SIGNAL passion without DEMONSTRATING it:
+
+BANNED (claiming "I did it for fun"):
+✗ "not for a class" → ✓ just describe the action without qualifying
+✗ "on my own time" → ✓ show what you did, not when
+✗ "just because" → ✓ let the action speak for itself
+
+BANNED (claiming excitement):
+✗ "blew my mind" → ✓ describe the specific insight
+✗ "I was hooked" → ✓ show what you did next
+✗ "sparked my passion" → ✓ show the work, not the feeling
+
+BANNED (claiming realization):
+✗ "I realized" → ✓ state the insight directly
+✗ "I discovered" → ✓ state what you found
+✗ "it taught me" / "taught me that" → ✓ show the knowledge in action
+✗ "showed me" / "showed me that" → ✓ demonstrate the insight through action
+✗ "made me understand" → ✓ state the understanding directly
+
+The pattern: Don't TELL readers you're passionate. SHOW the specific work, insight, or action that only a passionate person would do.
+
+EXAMPLE TRANSFORMATIONS:
+✗ "My grandmother's struggles taught me that AI needs to be more accessible"
+✓ "My grandmother gave up on her smartphone after a week. The buttons were too small, the menus too deep. Her AI assistant couldn't understand her accent."
+
+✗ "I discovered Dr. Li's research on ImageNet"
+✓ "Dr. Li's ImageNet paper changed how I debugged my grandmother's navigation app"
+
+═══════════════════════════════════════════════════════════
+WRITING QUALITY REQUIREMENTS
+═══════════════════════════════════════════════════════════
+
+Every suggestion must be MEMORABLE, not just correct:
+
+1. CONCRETE beats ABSTRACT
+   ✗ "accuracy dropped to 23%" → ✓ "couldn't tell her walker from a dining chair"
+
+2. PERSON beats CONCEPT
+   ✗ "accessibility applications" → ✓ "people like my grandmother"
+
+3. IMPLY emotion through ACTION
+   ✗ "I was devastated" → ✓ "I sat in my car for twenty minutes"
+
+4. SHORTER beats LONGER - same length or shorter than original
+
+5. ONE unforgettable image per suggestion
 
 ═══════════════════════════════════════════════════════════
 ESSAY CONTEXT
@@ -448,6 +585,191 @@ OUTPUT FORMAT (JSON)
 }`;
 
 // ============================================================================
+// SOCRATIC DEPTH PROMPT
+// ============================================================================
+
+const SOCRATIC_DEPTH_PROMPT = `You are an expert college admissions counselor who specializes in extracting GENUINE insight from students.
+
+Your job is NOT to write polished prose for the student. Instead, you generate PROBING QUESTIONS that help students discover their own unique, authentic insight.
+
+═══════════════════════════════════════════════════════════
+THE PROBLEM WITH MOST ESSAY ADVICE
+═══════════════════════════════════════════════════════════
+
+Most essay suggestions produce "performative authenticity" - writing that SIGNALS passion without DEMONSTRATING it.
+
+Examples of PERFORMATIVE authenticity (BAD):
+- "Not for a class—just because her methodology blew my mind"
+- "I spent three hours reading..." (claiming dedication)
+- "I couldn't stop thinking about..." (claiming obsession)
+- "It opened my eyes to..." (claiming enlightenment)
+
+These phrases TELL readers the student is passionate. They don't SHOW unique insight that could only come from genuine engagement.
+
+Examples of GENUINE authenticity (GOOD):
+- Identifying a LIMITATION in the research they admire
+- Finding a CONTRADICTION between two ideas they've explored
+- Describing their OWN FAILED ATTEMPT to solve a problem
+- Articulating a QUESTION they're still wrestling with
+- Showing how their SPECIFIC BACKGROUND gives them a unique angle
+
+The difference: genuine authenticity reveals HOW the student THINKS, not just what they claim to feel.
+
+═══════════════════════════════════════════════════════════
+CRITICAL: MEMORABLE vs. MERELY ACCURATE
+═══════════════════════════════════════════════════════════
+
+Strong answers must be MEMORABLE, not just technically correct.
+
+BAD (accurate but forgettable):
+"ImageNet's training data skewed toward objects in well-lit, uncluttered environments. When I tested existing models in my grandmother's dimly-lit hallway with family photos and furniture, accuracy dropped to 23%."
+
+GOOD (memorable and efficient):
+"The model couldn't tell my grandmother's walker from a dining chair. After three weeks of failed fixes, I understood why Dr. Li's 'democratized' AI hadn't reached people like her."
+
+The difference:
+1. CONCRETE IMAGE (walker vs. chair) beats abstract category (accuracy percentage)
+2. TIME IMPLIES STRUGGLE (three weeks) without claiming passion
+3. EMOTIONAL ANCHOR (people like her) beats technical jargon (deployment gap)
+4. HALF THE WORDS - efficiency matters
+
+RULES FOR EXAMPLE ANSWERS:
+- Strong answers must be ≤30 words (same length or shorter than weak)
+- Use ONE specific image that sticks in the reader's mind
+- Connect to a person, not a concept
+- Let the detail imply the emotion - don't state it
+
+═══════════════════════════════════════════════════════════
+PERFORMATIVE PATTERNS TO AVOID
+═══════════════════════════════════════════════════════════
+
+NEVER suggest writing that includes these performative patterns:
+{performativePatterns}
+
+═══════════════════════════════════════════════════════════
+DEPTH PROBE TYPES
+═══════════════════════════════════════════════════════════
+
+Generate questions of these types to extract genuine insight:
+
+1. LIMITATION PROBE
+   - What weakness or blind spot have you identified in the research/work you admire?
+   - Where does the methodology fall short?
+   - What can't this approach explain?
+
+2. CONTRADICTION PROBE
+   - What two ideas in this field seem to conflict?
+   - Where do experts disagree, and why does it matter to you?
+   - What's the tension you're trying to resolve?
+
+3. APPLICATION PROBE
+   - How have you tried to apply this idea yourself?
+   - What happened when you tested this in your own context?
+   - Where did you get stuck, and what did that teach you?
+
+4. SYNTHESIS PROBE
+   - What connection have you made that others haven't?
+   - How does your background let you see this differently?
+   - What would you add to the existing conversation?
+
+5. PERSONAL STAKE PROBE
+   - Why does this matter to YOU specifically, not just abstractly?
+   - What would you lose if this problem stayed unsolved?
+   - Who in your life is affected by this?
+
+═══════════════════════════════════════════════════════════
+ESSAY CONTEXT
+═══════════════════════════════════════════════════════════
+
+ESSAY TYPE: {essayType}
+TYPE NAME: {typeName}
+
+CRITICAL DIMENSIONS:
+{criticalDimensions}
+
+EXCELLENCE REQUIREMENTS:
+{excellenceRequirements}
+
+═══════════════════════════════════════════════════════════
+COLLEGE CONTEXT
+═══════════════════════════════════════════════════════════
+
+{collegeContext}
+
+═══════════════════════════════════════════════════════════
+FULL ESSAY DRAFT
+═══════════════════════════════════════════════════════════
+
+{essayDraft}
+
+═══════════════════════════════════════════════════════════
+ISSUES TO PROBE
+═══════════════════════════════════════════════════════════
+
+{issuesFormatted}
+
+═══════════════════════════════════════════════════════════
+OUTPUT REQUIREMENTS
+═══════════════════════════════════════════════════════════
+
+For EACH issue, generate 3-4 depth probes that will help the student discover their genuine insight.
+
+Each probe must include:
+- probe_type: limitation | contradiction | application | synthesis | personal_stake
+- question: The actual question to ask the student (concise, direct)
+- why_this_matters: Why this question leads to genuine insight (1 sentence)
+- what_genuine_answer_looks_like: Characteristics of an authentic response (1 sentence)
+- red_flags_in_answer: Signs the student is still being performative (2-3 bullet points)
+- example_weak_answer: Performative response (≤25 words)
+- example_strong_answer: Memorable, efficient insight (≤30 words, uses concrete image, connects to person)
+
+CRITICAL FOR EXAMPLE_STRONG_ANSWER:
+- Must be ≤30 words - same or shorter than weak answer
+- Must contain ONE concrete, visual detail (walker vs. chair, not "accuracy dropped")
+- Must connect to a person or relationship (grandmother, neighbor, teammate)
+- Must imply emotion through detail, never state it
+- Must be something a reader would remember after 100 essays
+
+═══════════════════════════════════════════════════════════
+OUTPUT FORMAT (JSON)
+═══════════════════════════════════════════════════════════
+
+{
+  "issues": [
+    {
+      "issue_id": "...",
+      "issue_quote": "...",
+      "diagnosis": {
+        "what_is_missing": "What genuine insight is absent",
+        "why_current_version_feels_performative": "Why it reads as fake passion",
+        "what_genuine_depth_would_look_like": "What authentic engagement looks like"
+      },
+      "depth_probes": [
+        {
+          "probe_type": "limitation",
+          "question": "...",
+          "why_this_matters": "...",
+          "what_genuine_answer_looks_like": "...",
+          "red_flags_in_answer": ["...", "..."],
+          "example_weak_answer": "...",
+          "example_strong_answer": "..."
+        }
+      ],
+      "synthesis_guidance": {
+        "how_to_combine_answers": "How to weave probe answers into essay",
+        "what_to_avoid": ["performative patterns to avoid"],
+        "signs_you_have_genuine_insight": ["indicators of real depth"]
+      }
+    }
+  ],
+  "meta_guidance": {
+    "overall_depth_gap": "What's fundamentally missing from the essay",
+    "common_thread": "Theme connecting the issues",
+    "how_issues_connect": "How addressing one helps the others"
+  }
+}`;
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -526,7 +848,7 @@ ${issue.relevant_quotes.map(q => `- "${q.quote}" (${q.source})`).join('\n') || '
 }
 
 /**
- * Validate suggestion (no banned terms, different from original)
+ * Validate suggestion (no banned terms, no performative authenticity, different from original)
  */
 function validateSuggestion(
   suggestion: any,
@@ -544,9 +866,18 @@ function validateSuggestion(
   }
 
   const lowerText = suggestion.text.toLowerCase();
+
+  // Check for banned terms
   for (const term of BANNED_TERMS) {
     if (lowerText.includes(term.toLowerCase())) {
       warnings.push(`Contains banned term: "${term}"`);
+    }
+  }
+
+  // Check for performative authenticity patterns
+  for (const pattern of PERFORMATIVE_AUTHENTICITY_PATTERNS) {
+    if (lowerText.includes(pattern.toLowerCase())) {
+      warnings.push(`Contains performative authenticity pattern: "${pattern}"`);
     }
   }
 
@@ -863,6 +1194,94 @@ export class TypeSpecificSuggestionService {
       relevant_quotes: relevantQuotes.slice(0, 2)
     };
   }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // SOCRATIC DEPTH MODE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Generate Socratic depth probes instead of polished prose
+   *
+   * Use this mode when:
+   * - The essay lacks genuine insight (just performative enthusiasm)
+   * - The student needs to discover their own unique angle
+   * - You want to extract authentic thinking, not give them words to copy
+   *
+   * This mode generates questions that help students find their own depth,
+   * rather than giving them polished prose that still sounds like essay-speak.
+   */
+  async generateSocraticDepth(
+    essayDraft: string,
+    essayType: SupplementalType,
+    issues: IssueContext[],
+    options: {
+      college?: CollegeResearch;
+    } = {}
+  ): Promise<SocraticDepthBatchOutput> {
+    const { college } = options;
+
+    if (issues.length === 0 || issues.length > 5) {
+      throw new Error('Socratic depth supports 1-5 issues (optimal: 2-3)');
+    }
+
+    const config = TYPE_WEIGHT_CONFIGS[essayType];
+
+    // Build prompt with Socratic depth focus
+    const prompt = SOCRATIC_DEPTH_PROMPT
+      .replace('{performativePatterns}', PERFORMATIVE_AUTHENTICITY_PATTERNS.join(', '))
+      .replace('{essayType}', essayType)
+      .replace('{typeName}', config.name)
+      .replace('{criticalDimensions}', getCriticalDimensions(essayType).map(d => {
+        const def = DIMENSION_DEFINITIONS[d];
+        return `- ${def.name}: ${def.what_it_measures}`;
+      }).join('\n'))
+      .replace('{excellenceRequirements}', getExcellenceRequirements(essayType).map((r, i) => `${i + 1}. ${r}`).join('\n'))
+      .replace('{collegeContext}', formatCollegeContext(college))
+      .replace('{essayDraft}', essayDraft)
+      .replace('{issuesFormatted}', formatIssues(issues));
+
+    // Make API call
+    const response = await this.client.messages.create({
+      model: SONNET_MODEL,
+      max_tokens: 6000,
+      temperature: 0.6, // Slightly lower for more focused probes
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const content = response.content[0];
+    if (content.type !== 'text') {
+      throw new Error('Unexpected response type');
+    }
+
+    // Parse response
+    const parsed = parseClaudeJSON(content.text, 'SocraticDepthBatchOutput');
+
+    // Calculate cost
+    const cost = calculateCost(
+      response.usage.input_tokens,
+      response.usage.output_tokens
+    );
+
+    return {
+      essay_type: essayType,
+      type_name: config.name,
+      college_name: college?.collegeName || null,
+
+      issues: parsed.issues || [],
+
+      meta_guidance: parsed.meta_guidance || {
+        overall_depth_gap: 'Essay lacks genuine insight',
+        common_thread: 'Student shows interest but not unique thinking',
+        how_issues_connect: 'Addressing depth in one area will help others'
+      },
+
+      cost,
+      tokens_used: {
+        input: response.usage.input_tokens,
+        output: response.usage.output_tokens
+      }
+    };
+  }
 }
 
 // ============================================================================
@@ -870,4 +1289,5 @@ export class TypeSpecificSuggestionService {
 // All types, interfaces, and constants are exported at their definitions above.
 // TypeSpecificSuggestionService is the main class export.
 // TYPE_SUGGESTION_CONSTRAINTS contains all 14 type-specific constraint configs.
+// PERFORMATIVE_AUTHENTICITY_PATTERNS contains patterns to avoid in suggestions.
 // ============================================================================

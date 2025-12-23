@@ -274,7 +274,8 @@ export class EvolvedWorkshopOrchestrator {
       essayType,
       stage1Output.priority_issues.slice(0, maxIssues),
       stage0Output.voice_fingerprint,
-      college
+      college,
+      stage1Output.scoring.total_score // Pass current score for projection
     );
 
     costs.stage2 = stage2Output.suggestions.cost;
@@ -490,15 +491,19 @@ export class EvolvedWorkshopOrchestrator {
 
   /**
    * Stage 2: Generate surgical suggestions for priority issues
+   *
+   * @param currentScore - The current score from Stage 1 (needed for projection)
    */
   private async runStage2(
     essayDraft: string,
     essayType: SupplementalType,
     priorityIssues: PatternIssue[],
     voiceFingerprint: VoiceFingerprint,
-    college?: CollegeResearch
+    college: CollegeResearch | undefined,
+    currentScore: number // Added: need current score for projection
   ): Promise<Stage2Output> {
     if (priorityIssues.length === 0) {
+      // No issues = essay is already good, project current score
       return {
         suggestions: {
           essay_type: essayType,
@@ -515,21 +520,32 @@ export class EvolvedWorkshopOrchestrator {
           tokens_used: { input: 0, output: 0 }
         },
         issue_count: 0,
-        projected_score_after_fixes: 0,
+        projected_score_after_fixes: currentScore, // Fixed: return current score, not 0
         implementation_order: []
       };
     }
 
     // Convert pattern issues to issue contexts for suggestion generation
+    // Note: Pattern issues don't have specific text spans, so we use the essay excerpt
     const issueContexts: IssueContext[] = priorityIssues.map((issue) => ({
       issue_id: issue.pattern_id,
-      problem_description: issue.problem_description,
-      affected_dimensions: issue.affected_dimensions,
-      severity: issue.severity === 'moderate' ? 'major' : issue.severity as 'critical' | 'major' | 'minor',
-      score_impact: issue.score_impact,
-      original_text: '', // Pattern issues don't have specific text spans
-      suggested_approach: issue.fix_suggestions.join(' '),
-      college_value_opportunity: college ? `Demonstrate ${college.collegeName}'s values` : undefined
+      quote: essayDraft.substring(0, 200), // Pattern issues don't have specific text spans
+      location: 'Throughout essay',
+      diagnosis: {
+        problem: issue.problem_description,
+        symptom_type: issue.pattern_id,
+        affected_dimensions: issue.affected_dimensions,
+        score_impact: issue.score_impact
+      },
+      surrounding_context: essayDraft.substring(0, 500),
+      relevant_college_values: college?.coreValues?.slice(0, 2).map(v => ({
+        value_name: v.valueName,
+        what_demonstrates_it: v.essayImplication
+      })) || [],
+      relevant_quotes: college?.keyQuotes?.slice(0, 2).map(q => ({
+        quote: q.quote,
+        source: q.source?.name || 'Unknown'
+      })) || []
     }));
 
     // Generate suggestions
@@ -541,13 +557,15 @@ export class EvolvedWorkshopOrchestrator {
     );
 
     // Estimate score improvement
+    // Each severity point of impact roughly translates to 5-7 real score points when fixed
     const totalScoreImpact = priorityIssues.reduce((sum, i) => sum + Math.abs(i.score_impact), 0);
-    const projectedImprovement = Math.round(totalScoreImpact * 6); // Each point impact ≈ 6 points improvement
+    const projectedImprovement = Math.round(totalScoreImpact * 5); // Conservative estimate
+    const projectedScore = Math.min(100, currentScore + projectedImprovement); // Fixed: add to current score
 
     return {
       suggestions,
       issue_count: priorityIssues.length,
-      projected_score_after_fixes: projectedImprovement,
+      projected_score_after_fixes: projectedScore, // Fixed: return actual projected score
       implementation_order: suggestions.overall_strategy?.priority_order
         ? [suggestions.overall_strategy.priority_order]
         : priorityIssues.map((_, i) => `Issue ${i + 1}`)
