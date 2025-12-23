@@ -966,12 +966,7 @@ const PortfolioScanner = () => {
                           return avg.toFixed(1);
                         })()} / 10
                       </span>
-                      <Button 
-                        size="sm" 
-                        variant="secondary" 
-                        className="text-hero-contrast no-text-shadow"
-                        onClick={() => setIsInsightsOpen(true)}
-                      >
+                      <Button size="sm" variant="secondary" disabled className="text-hero-contrast no-text-shadow opacity-50 cursor-not-allowed">
                         View full insights
                       </Button>
                     </div>

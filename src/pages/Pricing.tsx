@@ -12,16 +12,16 @@ import { apiFetch } from '@/lib/utils';
 import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle, Loader2 } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
 import Navigation from '@/components/Navigation';
+import { ReferralCard } from '@/components/ReferralCard';
 
 const Pricing = () => {
   const { user, loading } = useAuth();
   const { getToken } = useClerkAuth();
   const navigate = useNavigate();
   const [credits, setCredits] = useState<number | null>(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [referralDiscountActive, setReferralDiscountActive] = useState(false);
   const [processingType, setProcessingType] = useState<string | null>(null);
-  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
-  const [payAsYouGoCredits, setPayAsYouGoCredits] = useState([50]);
+  const [customCredits, setCustomCredits] = useState([50]);
 
   useEffect(() => {
     if (loading) return;
@@ -32,13 +32,13 @@ const Pricing = () => {
       // Cast result to any to handle 'credits' column
       const { data } = await supabase
         .from('profiles')
-        .select('id, credits, subscription_status')
+        .select('id, credits, referral_discount_active')
         .eq('user_id', user.id)
         .maybeSingle() as { data: any, error: any };
       
       if (data) {
         setCredits(data.credits ?? 0);
-        setSubscriptionStatus(data.subscription_status);
+        setReferralDiscountActive(data.referral_discount_active ?? false);
       }
     };
 
@@ -94,21 +94,19 @@ const Pricing = () => {
   // Check for success/cancel query params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const sessionId = params.get('session_id');
     const success = params.get('success');
 
     if (success && user) {
-        // In a real app we would verify the session ID with the backend
-        // For now, we just refresh the profile
+        // Refresh the profile
         supabase
         .from('profiles')
-        .select('id, credits, subscription_status')
+        .select('id, credits, referral_discount_active')
         .eq('user_id', user.id)
         .single()
         .then(({ data }: any) => {
             if (data) {
                 setCredits(data.credits ?? 0);
-                setSubscriptionStatus(data.subscription_status);
+                setReferralDiscountActive(data.referral_discount_active ?? false);
                 // Notify other components (like Navigation) that credits have changed
                 window.dispatchEvent(new CustomEvent('credits:updated'));
             }
@@ -118,9 +116,8 @@ const Pricing = () => {
     }
   }, [user]);
 
-  // LAUNCH SALE: 50% off - was $10 per 50 credits, now $5
-  const payAsYouGoPrice = (payAsYouGoCredits[0] / 50) * 5;
-  const payAsYouGoOriginalPrice = (payAsYouGoCredits[0] / 50) * 10;
+  // Custom pack: $13 per 50 credits
+  const customPrice = (customCredits[0] / 50) * 13;
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
@@ -130,44 +127,36 @@ const Pricing = () => {
       
       <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20 space-y-16">
         <div className="text-center space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full mb-4">
-            <span className="text-red-500 font-bold text-sm">LAUNCH SALE</span>
-            <span className="text-red-600 font-extrabold text-sm">50% OFF EVERYTHING</span>
-          </div>
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">
-            Invest in Your Future
+            Get More Credits
           </h1>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Choose the plan that fits your journey. From a single essay analysis to full UC PIQ support.
+            Choose the credit pack that fits your needs. All packs include full access to our PIQ Workshop and AI coaching.
           </p>
           
-          <div className="flex items-center justify-center gap-4 pt-4">
-            <span className={`text-sm font-medium ${billingInterval === 'monthly' ? 'text-foreground' : 'text-muted-foreground'}`}>
-              Monthly
-            </span>
-            <Switch
-              checked={billingInterval === 'yearly'}
-              onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
-            />
-            <span className={`text-sm font-medium ${billingInterval === 'yearly' ? 'text-foreground' : 'text-muted-foreground'}`}>
-              Annually <span className="text-green-600 text-xs font-bold ml-1">(Save 20%)</span>
-            </span>
-          </div>
+          {referralDiscountActive && (
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-full">
+              <Sparkles className="h-4 w-4 text-green-600" />
+              <span className="text-green-700 dark:text-green-200 font-medium text-sm">
+                Referral discount active: 10% off all packs!
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 items-start">
-            {/* Starter Tier */}
+            {/* Free Tier */}
           <Card className="relative border-border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col">
             <CardHeader>
-              <CardTitle className="text-2xl">Starter</CardTitle>
-              <CardDescription>Perfect for trying it out</CardDescription>
+              <CardTitle className="text-2xl">Free Starter</CardTitle>
+              <CardDescription>Try before you buy</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 flex-1">
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold">Free</span>
               </div>
               <p className="text-sm text-muted-foreground">
-                Get 10 free credits when you create a new account. Enough for 2 full essay analyses to see how our PIQ Workshop works.
+                Get 10 free credits when you create an account{referralDiscountActive ? ' (+10 referral bonus = 20 total!)' : ''}. Enough for 2 full PIQ analyses.
               </p>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
@@ -195,46 +184,41 @@ const Pricing = () => {
             </CardFooter>
           </Card>
 
-           {/* Pro Tier */}
-           <Card className={`relative border-2 ${subscriptionStatus === 'active' ? 'border-primary/50 bg-primary/5' : 'border-primary shadow-xl'} transform md:-translate-y-4 h-full flex flex-col z-10`}>
-            <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-              <Badge className="bg-primary text-primary-foreground px-3 py-1 text-sm hover:bg-primary">
-                Most Popular
-              </Badge>
-            </div>
+           {/* Starter Pack */}
+           <Card className={`relative border-2 ${!referralDiscountActive ? 'border-primary shadow-xl' : 'border-border'} h-full flex flex-col`}>
+            {!referralDiscountActive && (
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                <Badge className="bg-primary text-primary-foreground px-3 py-1 text-sm hover:bg-primary">
+                  Most Popular
+                </Badge>
+              </div>
+            )}
             <CardHeader>
               <CardTitle className="text-2xl flex items-center gap-2">
-                Pro
-                <Sparkles className="h-5 w-5 text-primary fill-primary/20" />
+                Starter Pack
               </CardTitle>
-              <CardDescription>Complete application support</CardDescription>
+              <CardDescription>Perfect for 8 UC PIQs</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 flex-1">
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl text-muted-foreground line-through">
-                    {billingInterval === 'monthly' ? '$20' : '$16'}
-                </span>
-                <span className="text-5xl font-bold text-red-500">
-                    {billingInterval === 'monthly' ? '$10' : '$8'}
-                </span>
-                <span className="text-muted-foreground">/mo</span>
+                <span className="text-5xl font-bold">${referralDiscountActive ? '72' : '80'}</span>
               </div>
-              {billingInterval === 'yearly' && (
+              {referralDiscountActive && (
                 <p className="text-xs text-green-600 font-medium -mt-4">
-                  Billed <span className="line-through">$192</span> $96 yearly (one-time payment)
+                  <span className="line-through">$80</span> 10% referral discount applied!
                 </p>
               )}
               <p className="text-sm text-muted-foreground">
-                Perfect for all 8 UC PIQs. 100 credits gives you 20 full analyses or unlimited AI coaching sessions.
+                400 credits = 80 full PIQ analyses or 400 AI coach messages. Perfect for all your UC essays!
               </p>
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span className="font-medium">100 Credits per month</span>
+                  <span className="font-medium">400 Credits</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>20 PIQ Analyses (5 credits each)</span>
+                  <span>80 PIQ Analyses (5 credits each)</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
@@ -246,7 +230,7 @@ const Pricing = () => {
                 </li>
                  <li className="flex items-start gap-2">
                   <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
-                  <span>Rollover unused credits</span>
+                  <span>Never expires</span>
                 </li>
               </ul>
             </CardContent>
@@ -254,97 +238,164 @@ const Pricing = () => {
               <Button 
                 className="w-full" 
                 size="lg"
-                onClick={() => handleCheckout(billingInterval === 'monthly' ? 'pro_monthly' : 'pro_yearly')}
-                disabled={processingType !== null || subscriptionStatus === 'active'}
+                onClick={() => handleCheckout('starter_pack')}
+                disabled={processingType !== null}
               >
-                {(processingType === 'pro_monthly' || processingType === 'pro_yearly') ? (
+                {processingType === 'starter_pack' ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Redirecting to checkout...
+                    Redirecting...
                   </>
-                ) : subscriptionStatus === 'active' ? 'Current Plan' : billingInterval === 'monthly' ? 'Subscribe Monthly' : 'Subscribe Annually'}
+                ) : (
+                  'Buy Starter Pack'
+                )}
               </Button>
             </CardFooter>
           </Card>
 
-           {/* Pay As You Go Tier */}
-           <Card className="relative border-border shadow-sm hover:shadow-md transition-all duration-300 h-full flex flex-col">
+           {/* Full Season Pack */}
+           <Card className={`relative border-2 ${referralDiscountActive ? 'border-primary shadow-xl' : 'border-border'} h-full flex flex-col`}>
+            {referralDiscountActive && (
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                <Badge className="bg-primary text-primary-foreground px-3 py-1 text-sm hover:bg-primary">
+                  Best Value
+                </Badge>
+              </div>
+            )}
             <CardHeader>
-              <CardTitle className="text-2xl">Pay As You Go</CardTitle>
-              <CardDescription>Flexible top-ups anytime</CardDescription>
+              <CardTitle className="text-2xl flex items-center gap-2">
+                Full Season Pack
+                <Sparkles className="h-5 w-5 text-primary fill-primary/20" />
+              </CardTitle>
+              <CardDescription>Complete application support</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-8 flex-1">
+            <CardContent className="space-y-6 flex-1">
               <div className="flex items-baseline gap-2">
-                <span className="text-xl text-muted-foreground line-through">${payAsYouGoOriginalPrice}</span>
-                <span className="text-4xl font-bold text-red-500">${payAsYouGoPrice}</span>
-                <span className="text-muted-foreground">one-time</span>
+                <span className="text-5xl font-bold">${referralDiscountActive ? '180' : '200'}</span>
               </div>
-              
-              <div className="space-y-6">
-                <div className="space-y-2">
-                    <div className="flex justify-between text-sm font-medium">
-                        <span>Credits</span>
-                        <span className="text-primary">{payAsYouGoCredits[0]}</span>
-                    </div>
-                    <Slider
-                        value={payAsYouGoCredits}
-                        onValueChange={setPayAsYouGoCredits}
-                        min={50}
-                        max={500}
-                        step={50}
-                        className="py-4"
-                    />
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>50</span>
-                        <span>500</span>
-                    </div>
-                </div>
-                
-                <div className="p-4 bg-secondary/30 rounded-lg space-y-2">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                        <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                        <span>What can you do?</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground leading-relaxed">
-                        {payAsYouGoCredits[0]} credits = {Math.floor(payAsYouGoCredits[0] / 5)} PIQ analyses or {payAsYouGoCredits[0]} AI coach messages. Mix and match as needed!
-                    </p>
-                </div>
-              </div>
-
-              <ul className="space-y-3 text-sm pt-2">
+              {referralDiscountActive && (
+                <p className="text-xs text-green-600 font-medium -mt-4">
+                  <span className="line-through">$200</span> 10% referral discount applied!
+                </p>
+              )}
+              <p className="text-sm text-muted-foreground">
+                1200 credits = 240 PIQ analyses or 1200 AI coach messages. Everything you need for the entire application season.
+              </p>
+              <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span className="font-medium">1200 Credits</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>240 PIQ Analyses</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>Unlimited AI Coach Sessions</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                  <span>12-Dimension Rubric Analysis</span>
+                </li>
+                 <li className="flex items-start gap-2">
+                  <Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />
                   <span>Never expires</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                  <span>Use on any tool</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                  <span>Instant access</span>
                 </li>
               </ul>
             </CardContent>
             <CardFooter>
               <Button 
-                variant="outline" 
                 className="w-full" 
-                onClick={() => handleCheckout(`addon_${payAsYouGoCredits[0]}`)}
+                size="lg"
+                onClick={() => handleCheckout('full_season_pack')}
                 disabled={processingType !== null}
               >
-                {processingType?.startsWith('addon_') ? (
+                {processingType === 'full_season_pack' ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Redirecting to checkout...
+                    Redirecting...
                   </>
                 ) : (
-                  `Buy ${payAsYouGoCredits[0]} Credits`
+                  'Buy Full Season Pack'
                 )}
               </Button>
             </CardFooter>
           </Card>
         </div>
+
+        {/* Custom Pack */}
+        <Card className="max-w-3xl mx-auto">
+          <CardHeader>
+            <CardTitle className="text-2xl">Custom Pack</CardTitle>
+            <CardDescription>Pick exactly what you need</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="flex items-baseline gap-2">
+              <span className="text-4xl font-bold">${referralDiscountActive ? (customPrice * 0.9).toFixed(2) : customPrice}</span>
+              <span className="text-muted-foreground">one-time</span>
+            </div>
+            {referralDiscountActive && (
+              <p className="text-xs text-green-600 font-medium -mt-4">
+                <span className="line-through">${customPrice}</span> 10% referral discount applied!
+              </p>
+            )}
+            
+            <div className="space-y-6">
+              <div className="space-y-2">
+                  <div className="flex justify-between text-sm font-medium">
+                      <span>Credits</span>
+                      <span className="text-primary">{customCredits[0]}</span>
+                  </div>
+                  <Slider
+                      value={customCredits}
+                      onValueChange={setCustomCredits}
+                      min={50}
+                      max={2000}
+                      step={50}
+                      className="py-4"
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>50</span>
+                      <span>2000</span>
+                  </div>
+              </div>
+              
+              <div className="p-4 bg-secondary/30 rounded-lg space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                      <Zap className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                      <span>What can you do?</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                      {customCredits[0]} credits = {Math.floor(customCredits[0] / 5)} PIQ analyses or {customCredits[0]} AI coach messages. Mix and match as needed!
+                  </p>
+              </div>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              className="w-full" 
+              onClick={() => handleCheckout(`custom_${customCredits[0]}`)}
+              disabled={processingType !== null}
+            >
+              {processingType?.startsWith('custom_') ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Redirecting...
+                </>
+              ) : (
+                `Buy ${customCredits[0]} Credits`
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Referral Section */}
+        {user && (
+          <div className="max-w-3xl mx-auto">
+            <ReferralCard />
+          </div>
+        )}
 
         <div className="grid md:grid-cols-3 gap-8 pt-12 border-t">
             <div className="text-center space-y-2">
