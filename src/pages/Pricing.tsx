@@ -6,44 +6,29 @@ import { Switch } from '@/components/ui/switch';
 import { Slider } from '@/components/ui/slider';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
 import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle, Loader2 } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
 import Navigation from '@/components/Navigation';
 import { ReferralCard } from '@/components/ReferralCard';
+import { usePricingData } from '@/query/usePricingData';
 
 const Pricing = () => {
   const { user, loading } = useAuth();
   const { getToken } = useClerkAuth();
   const navigate = useNavigate();
-  const [credits, setCredits] = useState<number | null>(null);
-  const [referralDiscountActive, setReferralDiscountActive] = useState(false);
   const [processingType, setProcessingType] = useState<string | null>(null);
   const [customCredits, setCustomCredits] = useState([50]);
 
-  useEffect(() => {
-    if (loading) return;
-    
-    const loadProfile = async () => {
-      if (!user) return;
-      
-      // Cast result to any to handle 'credits' column
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, credits, referral_discount_active')
-        .eq('user_id', user.id)
-        .maybeSingle() as { data: any, error: any };
-      
-      if (data) {
-        setCredits(data.credits ?? 0);
-        setReferralDiscountActive(data.referral_discount_active ?? false);
-      }
-    };
+  // Load pricing data from React Query cache
+  const {
+    data: pricingData,
+    invalidateAfterPurchase,
+  } = usePricingData(user?.id || null);
 
-    loadProfile();
-  }, [user, loading]);
+  const credits = pricingData?.credits ?? 0;
+  const referralDiscountActive = pricingData?.referralDiscountActive ?? false;
 
   const handleCheckout = async (type: string, metadata?: any) => {
     if (!user) {
@@ -97,24 +82,14 @@ const Pricing = () => {
     const success = params.get('success');
 
     if (success && user) {
-        // Refresh the profile
-        supabase
-        .from('profiles')
-        .select('id, credits, referral_discount_active')
-        .eq('user_id', user.id)
-        .single()
-        .then(({ data }: any) => {
-            if (data) {
-                setCredits(data.credits ?? 0);
-                setReferralDiscountActive(data.referral_discount_active ?? false);
-                // Notify other components (like Navigation) that credits have changed
-                window.dispatchEvent(new CustomEvent('credits:updated'));
-            }
-        });
-        // Clean URL
-        window.history.replaceState({}, document.title, window.location.pathname);
+      // Invalidate React Query cache to refetch updated credits
+      invalidateAfterPurchase();
+      // Notify other components (like Navigation) that credits have changed
+      window.dispatchEvent(new CustomEvent('credits:updated'));
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     }
-  }, [user]);
+  }, [user, invalidateAfterPurchase]);
 
   // Custom pack: $13 per 50 credits
   const customPrice = (customCredits[0] / 50) * 13;

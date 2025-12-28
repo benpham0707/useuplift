@@ -5,12 +5,30 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import GradientZap from '@/components/ui/GradientZap';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/query/queryKeys';
 
 const Navigation = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [credits, setCredits] = useState<number | null>(null);
+
+  // Prefetch Settings/Pricing data on hover for instant navigation
+  const prefetchSettings = () => {
+    if (!user?.id) return;
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.credits(user.id),
+    });
+  };
+
+  const prefetchPricing = () => {
+    if (!user?.id) return;
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.profile(user.id),
+    });
+  };
 
   // Load credits safely; default to 0 if column is missing or request fails
   useEffect(() => {
@@ -75,6 +93,7 @@ const Navigation = () => {
             </button>
             <button 
               onClick={() => navigate('/pricing')}
+              onMouseEnter={prefetchPricing}
               className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium relative"
             >
               Pricing
@@ -101,6 +120,7 @@ const Navigation = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => navigate('/pricing')}
+                  onMouseEnter={prefetchPricing}
                   className="flex items-center gap-2 border-primary/20 hover:bg-primary/10 text-foreground mr-2"
                 >
                   <GradientZap className="h-4 w-4" />
@@ -111,6 +131,7 @@ const Navigation = () => {
                   variant="ghost"
                   size="icon"
                   onClick={() => navigate('/settings')}
+                  onMouseEnter={prefetchSettings}
                   className="text-foreground hover:text-primary"
                   aria-label="Settings"
                 >
