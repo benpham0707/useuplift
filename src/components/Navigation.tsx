@@ -20,6 +20,31 @@ const Navigation = () => {
     if (!user?.id) return;
     queryClient.prefetchQuery({
       queryKey: queryKeys.credits(user.id),
+      queryFn: async () => {
+        // Load profile with credits
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('credits')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (profileError) throw profileError;
+
+        // Load recent transactions
+        const { data: txns, error: txnsError } = await supabase
+          .from('credit_transactions')
+          .select('id, amount, type, description, created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (txnsError) throw txnsError;
+
+        return {
+          credits: profile?.credits ?? 0,
+          transactions: txns || [],
+        };
+      },
     });
   };
 
@@ -27,6 +52,20 @@ const Navigation = () => {
     if (!user?.id) return;
     queryClient.prefetchQuery({
       queryKey: queryKeys.profile(user.id),
+      queryFn: async () => {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('credits, referral_discount_active')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        return {
+          credits: data?.credits ?? 0,
+          referralDiscountActive: data?.referral_discount_active ?? false,
+        };
+      },
     });
   };
 

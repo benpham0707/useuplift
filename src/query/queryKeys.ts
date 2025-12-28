@@ -33,5 +33,6 @@ export const queryKeys = {
   
   // Assessment progress (combines all sections)
   assessmentProgress: (profileId: string) => ['assessmentProgress', profileId] as const,
+  portfolioProgress: (profileId: string) => ['portfolioProgress', profileId] as const,
 };
 

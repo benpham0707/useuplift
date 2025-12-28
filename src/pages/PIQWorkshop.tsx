@@ -130,7 +130,14 @@ export default function PIQWorkshop() {
   const isAuthenticated = useIsAuthenticated();
   const queryClient = useQueryClient();
 
-  // Get current prompt for loading
+  // ============================================================================
+  // STATE (selectedPromptId must be initialized before use)
+  // ============================================================================
+
+  // Initialize selectedPromptId FIRST before any usage
+  const [selectedPromptId, setSelectedPromptId] = useState<string>(getPromptIdFromUrl());
+
+  // Now we can safely use selectedPromptId
   const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
   
   // Load PIQ essay from React Query cache (instant on revisit)
@@ -139,9 +146,7 @@ export default function PIQWorkshop() {
     isLoading: isLoadingPIQData,
   } = usePIQEssay(userId, selectedPromptId, selectedPrompt?.prompt || '');
 
-  // ============================================================================
-  // STATE
-  // ============================================================================
+  // Other state below
 
   // Database state (NEW)
   const [currentEssayId, setCurrentEssayId] = useState<string | null>(null);
@@ -195,8 +200,7 @@ export default function PIQWorkshop() {
   // Track if essay has enough content to analyze
   const canAnalyze = currentDraft.trim().length >= MIN_ESSAY_LENGTH;
 
-  // NEW: Full Backend Integration State
-  const [selectedPromptId, setSelectedPromptId] = useState<string>(getPromptIdFromUrl()); // Based on URL param
+  // NEW: Full Backend Integration State (selectedPromptId moved up to avoid TDZ)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [narrativeOverview, setNarrativeOverview] = useState<string | null>(null);
