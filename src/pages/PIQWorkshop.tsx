@@ -130,12 +130,14 @@ export default function PIQWorkshop() {
   const isAuthenticated = useIsAuthenticated();
   const queryClient = useQueryClient();
 
+  // Get current prompt for loading
+  const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
+  
   // Load PIQ essay from React Query cache (instant on revisit)
   const {
     data: piqData,
     isLoading: isLoadingPIQData,
-    prefetchAdjacentPIQs,
-  } = usePIQEssay(userId, selectedPromptId);
+  } = usePIQEssay(userId, selectedPromptId, selectedPrompt?.prompt || '');
 
   // ============================================================================
   // STATE
@@ -693,13 +695,11 @@ export default function PIQWorkshop() {
         setCurrentEssayId(null);
         setNeedsReanalysis(false);
         setHasUnsavedChanges(false);
-        setNarrativeOverview(null);
-        setChatMessages([]);
-      }
-      // Prefetch adjacent PIQs for faster navigation
-      prefetchAdjacentPIQs();
-      return;
+      setNarrativeOverview(null);
+      setChatMessages([]);
     }
+    return;
+  }
 
     const { essay, analysis } = piqData;
 
@@ -830,10 +830,7 @@ export default function PIQWorkshop() {
 
     setLastSaveTime(new Date(essay.updated_at));
     setHasUnsavedChanges(false);
-
-    // Prefetch adjacent PIQs for instant navigation
-    prefetchAdjacentPIQs();
-  }, [piqData, isLoadingPIQData, userId, getToken, prefetchAdjacentPIQs]); // React to cache data changes
+  }, [piqData, isLoadingPIQData, userId, getToken]); // React to cache data changes
 
   // Resume session on mount (fallback to localStorage if database has nothing)
   useEffect(() => {
@@ -1659,13 +1656,25 @@ export default function PIQWorkshop() {
               currentPromptId={selectedPromptId || 'piq1'}
               onPromptChange={setSelectedPromptId}
               onPrefetch={(promptId) => {
-                // Prefetch using the built-in prefetch function from usePIQEssay hook
-                // This is safe because it's called from a React component callback
-                if (userId) {
-                  queryClient.prefetchQuery({
-                    queryKey: queryKeys.piqEssay(userId, promptId),
-                  });
-                }
+                // Prefetch PIQ essay data for instant navigation
+                if (!userId) return;
+                
+                const prompt = UC_PIQ_PROMPTS.find(p => p.id === promptId);
+                if (!prompt) return;
+
+                queryClient.prefetchQuery({
+                  queryKey: queryKeys.piqEssay(userId, promptId),
+                  queryFn: async () => {
+                    const token = await getToken({ template: 'supabase' });
+                    if (!token) return { essay: null, analysis: null };
+
+                    const result = await loadPIQEssay(token, userId, promptId, prompt.prompt);
+                    return {
+                      essay: result.essay || null,
+                      analysis: result.analysis || null,
+                    };
+                  },
+                });
               }}
             />
           </div>
