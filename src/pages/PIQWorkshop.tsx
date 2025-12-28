@@ -82,7 +82,7 @@ import { useClerkUserId, useIsAuthenticated } from '@/services/auth/clerkSupabas
 
 // React Query for caching
 import { useQueryClient } from '@tanstack/react-query';
-import { usePIQEssay } from '@/query/usePIQEssay';
+import { usePIQEssay, type PIQEssayData } from '@/query/usePIQEssay';
 import { queryKeys } from '@/query/queryKeys';
 
 // Navigation
@@ -227,6 +227,112 @@ export default function PIQWorkshop() {
   const currentScore = analysisResult?.analysis?.narrative_quality_index || 0;
   const initialScore = initialScoreRef.current;
   const hasAnalysis = analysisResult !== null && dimensions.length > 0;
+
+  // ============================================================================
+  // INSTANT PER-PROMPT HYDRATION (runs immediately on prompt switch)
+  // ============================================================================
+  
+  // Hydrate editor state immediately when prompt changes (source of truth)
+  useEffect(() => {
+    if (!userId || !selectedPromptId) return;
+
+    // Read cached essay data synchronously from React Query cache
+    const cachedData = queryClient.getQueryData<PIQEssayData>(
+      queryKeys.piqEssay(userId, selectedPromptId)
+    );
+
+    if (cachedData?.essay) {
+      // Cached essay exists - hydrate immediately for instant display
+      const { essay, analysis } = cachedData;
+      
+      setCurrentEssayId(essay.id);
+      setCurrentDraft(essay.draft_current || essay.draft_original);
+      
+      // Create initial version from loaded essay
+      const initialVersion: DraftVersion = {
+        text: essay.draft_current || essay.draft_original,
+        timestamp: new Date(essay.updated_at).getTime(),
+        score: analysis?.analysis?.narrative_quality_index || 73,
+      };
+      
+      setDraftVersions([initialVersion]);
+      setCurrentVersionIndex(0);
+      
+      // Load analysis if available
+      if (analysis) {
+        const hasTeachingData = analysis.workshopItems?.some(item => item.teaching);
+        
+        if (!hasTeachingData && analysis.workshopItems?.length > 0) {
+          setAnalysisResult({ ...analysis, needsTeachingUpgrade: true } as any);
+        } else {
+          setAnalysisResult(analysis);
+        }
+        
+        // Update initial score
+        if (analysis.analysis?.narrative_quality_index) {
+          initialScoreRef.current = analysis.analysis.narrative_quality_index;
+        }
+        
+        // Transform analysis to UI dimensions
+        if (analysis.rubricDimensionDetails && analysis.rubricDimensionDetails.length > 0) {
+          const transformedDimensions: RubricDimension[] = analysis.rubricDimensionDetails.map(dim => {
+            const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
+            
+            const issuesForDimension = (analysis.workshopItems || []).filter(
+              item => item.rubric_category === dim.dimension_name
+            );
+            
+            const transformedIssues = issuesForDimension.map(item => ({
+              id: item.id,
+              dimensionId: dim.dimension_name,
+              title: item.problem,
+              excerpt: item.quote,
+              analysis: item.why_it_matters,
+              impact: item.why_it_matters || '',
+              teaching: item.teaching,
+              suggestions: item.suggestions.map(sug => ({
+                text: sug.text,
+                rationale: sug.rationale,
+                type: 'replace' as const,
+              })),
+              status: 'not_fixed' as const,
+              currentSuggestionIndex: 0,
+              expanded: false,
+            }));
+            
+            return {
+              id: dim.dimension_name,
+              name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              score: dim.final_score,
+              maxScore: 10,
+              status,
+              weight: 10,
+              overview: dim.evidence?.justification || 'Analysis in progress',
+              issues: transformedIssues,
+            };
+          });
+          
+          setDimensions(transformedDimensions);
+        }
+      }
+      
+      setHasUnsavedChanges(false);
+      setNeedsReanalysis(false);
+    } else {
+      // No cached essay - clear immediately for this prompt
+      setCurrentDraft('');
+      setCurrentEssayId(null);
+      setDraftVersions([]);
+      setCurrentVersionIndex(0);
+      setAnalysisResult(null);
+      setDimensions([]);
+      setChatMessages([]);
+      setNeedsReanalysis(false);
+      setHasUnsavedChanges(false);
+      setNarrativeOverview(null);
+      initialScoreRef.current = 0;
+    }
+  }, [selectedPromptId, userId, queryClient]);
 
   // ============================================================================
   // REAL BACKEND ANALYSIS - Full Surgical Workshop
@@ -678,7 +784,7 @@ export default function PIQWorkshop() {
   // AUTO-SAVE & RESUME SESSION
   // ============================================================================
 
-  // Hydrate state from React Query cache (instant on revisit)
+  // Hydrate state from React Query cache (background refetch handler)
   useEffect(() => {
     // Don't reset state if we're just loading - keep previous data visible
     if (isLoadingPIQData) {
@@ -688,26 +794,22 @@ export default function PIQWorkshop() {
 
     setIsLoadingFromDatabase(false);
 
-    // If no data (new essay), reset to empty state
+    // If no data (new essay), this is already handled by the instant hydration effect above
+    // No need to reset here as the instant effect runs first on prompt change
     if (!piqData?.essay) {
-      // Only reset if we actually switched prompts and have no cached data
-      if (!currentDraft) {
-        setCurrentDraft('');
-        setAnalysisResult(null);
-        setDimensions([]);
-        setDraftVersions([]);
-        setCurrentEssayId(null);
-        setNeedsReanalysis(false);
-        setHasUnsavedChanges(false);
-      setNarrativeOverview(null);
-      setChatMessages([]);
+      return;
     }
-    return;
-  }
 
     const { essay, analysis } = piqData;
 
-    // Update state with cached data (instant!)
+    // Safety guard: Don't overwrite if user is actively typing
+    // The instant hydration effect handles initial load; this only handles background refetches
+    if (hasUnsavedChanges) {
+      // User has unsaved changes - skip applying fetched data to avoid overwriting their work
+      return;
+    }
+
+    // Update state with cached data (from background refetch)
     setCurrentEssayId(essay.id);
     setCurrentDraft(essay.draft_current || essay.draft_original);
 
@@ -834,7 +936,7 @@ export default function PIQWorkshop() {
 
     setLastSaveTime(new Date(essay.updated_at));
     setHasUnsavedChanges(false);
-  }, [piqData, isLoadingPIQData, userId, getToken]); // React to cache data changes
+  }, [piqData, isLoadingPIQData, userId, getToken, hasUnsavedChanges]); // React to cache data changes
 
   // Resume session on mount (fallback to localStorage if database has nothing)
   useEffect(() => {
@@ -1284,8 +1386,24 @@ export default function PIQWorkshop() {
       // Clear localStorage after successful database save (both formats)
       clearAllLocalDrafts(essayId || null, selectedPromptId);
       
-      // Invalidate React Query cache to reflect updated essay
-      if (userId) {
+      // Update React Query cache immediately for instant prompt switching
+      if (userId && essayId) {
+        const updatedEssayData: PIQEssayData = {
+          essay: {
+            id: essayId,
+            draft_current: currentDraft,
+            draft_original: draftVersions[0]?.text || currentDraft,
+            updated_at: new Date().toISOString(),
+          },
+          analysis: analysisResult,
+        };
+        
+        queryClient.setQueryData(
+          queryKeys.piqEssay(userId, selectedPromptId),
+          updatedEssayData
+        );
+        
+        // Also invalidate to ensure eventual consistency with server timestamps
         queryClient.invalidateQueries({
           queryKey: queryKeys.piqEssay(userId, selectedPromptId),
         });
@@ -2012,6 +2130,7 @@ export default function PIQWorkshop() {
             {/* Editor */}
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
             <EditorView
+                key={selectedPromptId}
                 currentDraft={currentDraft}
                 onDraftChange={handleDraftChange}
                 onSave={handleSave}
