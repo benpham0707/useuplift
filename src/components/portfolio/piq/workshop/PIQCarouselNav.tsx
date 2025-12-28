@@ -11,11 +11,6 @@ import {
 import { UC_PIQ_PROMPTS } from './PIQPromptSelector';
 import GradientText from '@/components/ui/GradientText';
 import { cn } from '@/lib/utils';
-import { useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
-import { queryKeys } from '@/query/queryKeys';
-import { loadPIQEssay } from '@/services/piqWorkshop/piqDatabaseService';
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 
 interface PIQCarouselNavProps {
   currentPromptId: string;
@@ -24,42 +19,27 @@ interface PIQCarouselNavProps {
   useRoutes?: boolean;
   /** Optional: map of promptId to essay status for showing completion indicators */
   essayStatus?: Record<string, 'empty' | 'draft' | 'complete'>;
+  /** Optional: callback to prefetch a PIQ essay */
+  onPrefetch?: (promptId: string) => void;
 }
 
 export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
   currentPromptId,
   onPromptChange,
   useRoutes = true,
-  essayStatus = {}
+  essayStatus = {},
+  onPrefetch,
 }) => {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { getToken } = useClerkAuth();
-  const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
   const currentIndex = UC_PIQ_PROMPTS.findIndex(p => p.id === currentPromptId);
   const currentPrompt = UC_PIQ_PROMPTS[currentIndex];
 
-  // Prefetch a PIQ essay on hover for instant navigation
+  // Trigger prefetch callback if provided
   const prefetchPIQ = (promptId: string) => {
-    if (!user?.id) return;
-
-    const prompt = UC_PIQ_PROMPTS.find(p => p.id === promptId);
-    if (!prompt) return;
-
-    queryClient.prefetchQuery({
-      queryKey: queryKeys.piqEssay(user.id, promptId),
-      queryFn: async () => {
-        const token = await getToken({ template: 'supabase' });
-        if (!token) return { essay: null, analysis: null };
-
-        const result = await loadPIQEssay(token, user.id, promptId, prompt.prompt);
-        return {
-          essay: result.essay || null,
-          analysis: result.analysis || null,
-        };
-      },
-    });
+    if (onPrefetch) {
+      onPrefetch(promptId);
+    }
   };
 
   const handleNavigate = (prompt: typeof UC_PIQ_PROMPTS[0]) => {

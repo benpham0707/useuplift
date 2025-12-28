@@ -1658,6 +1658,15 @@ export default function PIQWorkshop() {
             <PIQCarouselNav
               currentPromptId={selectedPromptId || 'piq1'}
               onPromptChange={setSelectedPromptId}
+              onPrefetch={(promptId) => {
+                // Prefetch using the built-in prefetch function from usePIQEssay hook
+                // This is safe because it's called from a React component callback
+                if (userId) {
+                  queryClient.prefetchQuery({
+                    queryKey: queryKeys.piqEssay(userId, promptId),
+                  });
+                }
+              }}
             />
           </div>
 
