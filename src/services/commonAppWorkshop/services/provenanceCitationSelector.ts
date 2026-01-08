@@ -191,6 +191,7 @@ export class CitationSelector {
 
   /**
    * Map issue string to ClicheSymptomType for optimized lookup
+   * Extended with opening-specific issue types from deep research
    */
   private mapIssueToSymptomType(issue: string): ClicheSymptomType | null {
     // Map common issue types to ClicheSymptomType
@@ -214,9 +215,46 @@ export class CitationSelector {
       'LACKS_VOICE': 'cliche_language',
       'VAGUE_CLAIMS': 'telling_not_showing',
       'GENERIC': 'cliche_language',
+
+      // Opening-specific issue types (from deep research)
+      // These map to existing cliche types for source lookup
+      'dictionary_definition_opening': 'cliche_essay_formula',
+      'childhood_opening_cliche': 'cliche_essay_formula',
+      'famous_quote_opening': 'cliche_essay_formula',
+      'rhetorical_question_flat': 'cliche_language',
+      'thesis_statement_opening': 'cliche_essay_formula',
+      'melodramatic_opening': 'cliche_narrative_arc',
+      'generic_scene_setting': 'cliche_language',
+      'weak_opening': 'cliche_essay_formula',
+      'generic_opening': 'cliche_language',
+
+      // Additional semantic mappings
+      'abstract_language': 'telling_not_showing',
+      'passive_agency': 'telling_not_showing',
+      'weak_verb': 'telling_not_showing',
+      'generic_pacing': 'cliche_narrative_arc',
     };
 
     return mapping[issue] || null;
+  }
+
+  /**
+   * Extended issue type for opening-specific issues
+   * Returns the original issue type if it's an opening-specific one
+   */
+  private getExtendedIssueType(issue: string): string {
+    const openingIssues = [
+      'dictionary_definition_opening',
+      'childhood_opening_cliche',
+      'famous_quote_opening',
+      'rhetorical_question_flat',
+      'thesis_statement_opening',
+      'melodramatic_opening',
+      'generic_scene_setting',
+      'weak_opening',
+      'generic_opening',
+    ];
+    return openingIssues.includes(issue) ? issue : this.mapIssueToSymptomType(issue) || issue;
   }
 
   /**
@@ -279,16 +317,55 @@ export class CitationSelector {
 
   /**
    * Calculate relevance score from LabeledSource pre-computed data
+   * Enhanced to check both mapped symptom type AND extended issue types
    */
   private calculateLabeledSourceScore(
     source: import('../types/labeledSourceTypes').LabeledSource,
     issue: string
   ): number {
-    const symptomType = this.mapIssueToSymptomType(issue);
-    if (!symptomType || !source.issue_relevance[symptomType]) {
-      return 60; // Default score for unmapped issues
+    // First, try direct lookup with the extended issue type
+    const extendedIssue = this.getExtendedIssueType(issue);
+    if (source.issue_relevance[extendedIssue as keyof typeof source.issue_relevance]) {
+      const relevance = source.issue_relevance[extendedIssue as keyof typeof source.issue_relevance];
+      if (relevance && typeof relevance === 'object' && 'score' in relevance) {
+        return (relevance as { score: number }).score;
+      }
     }
-    return source.issue_relevance[symptomType].score;
+
+    // Fall back to mapped symptom type
+    const symptomType = this.mapIssueToSymptomType(issue);
+    if (symptomType && source.issue_relevance[symptomType]) {
+      return source.issue_relevance[symptomType].score;
+    }
+
+    // Check if this source is relevant to opening hooks category
+    if (
+      source.taxonomy?.primary_category === 'opening_hooks' &&
+      this.isOpeningRelatedIssue(issue)
+    ) {
+      return 85; // High relevance for opening sources to opening issues
+    }
+
+    return 60; // Default score for unmapped issues
+  }
+
+  /**
+   * Check if an issue is related to essay openings
+   */
+  private isOpeningRelatedIssue(issue: string): boolean {
+    const openingRelatedIssues = [
+      'dictionary_definition_opening',
+      'childhood_opening_cliche',
+      'famous_quote_opening',
+      'rhetorical_question_flat',
+      'thesis_statement_opening',
+      'melodramatic_opening',
+      'generic_scene_setting',
+      'weak_opening',
+      'generic_opening',
+      'cliche_essay_formula', // Often affects openings
+    ];
+    return openingRelatedIssues.includes(issue);
   }
 
   /**

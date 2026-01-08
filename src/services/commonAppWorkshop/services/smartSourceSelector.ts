@@ -40,21 +40,47 @@ export class SmartSourceSelector {
   /**
    * Select best sources for an issue + college combination
    * Returns a complete SourceBundle with primary, supporting, and formatted output
+   *
+   * @param issue - The issue being addressed
+   * @param collegeId - Target college
+   * @param options - Selection options
+   * @param essayType - Optional essay type for context-aware selection
    */
   selectForIssue(
     issue: CriticalIssue | { symptom_type: string },
     collegeId: CollegeId,
-    options: Partial<SourceSelectionOptions> = {}
+    options: Partial<SourceSelectionOptions> = {},
+    essayType?: string
   ): SourceBundle {
     const opts = { ...DEFAULT_SELECTION_OPTIONS, ...options };
     const issueType = issue.symptom_type as ClicheSymptomType;
 
     // Get candidates from index
-    const candidates = this.indexer.getBestForCollegeAndIssue(
+    let candidates = this.indexer.getBestForCollegeAndIssue(
       collegeId,
       issueType,
       opts.max_sources * 2 // Get extra for diversity filtering
     );
+
+    // Apply essay type filtering if specified
+    if (essayType && candidates.length > 0) {
+      candidates = this.filterByEssayType(candidates, essayType);
+
+      // If essay type filtering reduced candidates too much, get more
+      if (candidates.length < opts.max_sources) {
+        const additionalCandidates = this.indexer.getBestForCollegeAndIssue(
+          collegeId,
+          issueType,
+          opts.max_sources * 3
+        ).filter(c => !candidates.includes(c));
+        candidates = [...candidates, ...additionalCandidates];
+      }
+    }
+
+    // Check for opening-specific issues and prioritize opening_hooks sources
+    if (this.isOpeningRelatedIssue(issueType)) {
+      candidates = this.prioritizeOpeningSources(candidates);
+    }
 
     if (candidates.length === 0) {
       // Fallback to any sources for this issue type
@@ -67,6 +93,77 @@ export class SmartSourceSelector {
     }
 
     return this.buildBundle(candidates, collegeId, issueType, opts);
+  }
+
+  /**
+   * Filter candidates by essay type applicability
+   */
+  private filterByEssayType(candidates: IndexedSource[], essayType: string): IndexedSource[] {
+    return candidates.filter(candidate => {
+      const source = candidate.source as import('../types/labeledSourceTypes').EnhancedLabeledSource;
+
+      // Check if source has scope metadata
+      if (!source.scope) return true; // No scope = universal
+
+      // Check never_use_for exclusions
+      if (source.scope.never_use_for?.prompt_types) {
+        const excluded = source.scope.never_use_for.prompt_types;
+        if (Array.isArray(excluded) && excluded.includes(essayType as any)) {
+          return false;
+        }
+      }
+
+      // If universal scope, always include
+      if (source.scope.level === 'universal') return true;
+
+      // If prompt-specific, check applies_to
+      if (source.scope.level === 'prompt_specific' && source.scope.applies_to?.prompt_types) {
+        const promptTypes = source.scope.applies_to.prompt_types;
+        if (Array.isArray(promptTypes)) {
+          return promptTypes.includes(essayType as any);
+        }
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Check if issue type is related to essay openings
+   */
+  private isOpeningRelatedIssue(issueType: string): boolean {
+    const openingIssues = [
+      'dictionary_definition_opening',
+      'childhood_opening_cliche',
+      'famous_quote_opening',
+      'rhetorical_question_flat',
+      'thesis_statement_opening',
+      'melodramatic_opening',
+      'generic_scene_setting',
+      'weak_opening',
+      'generic_opening',
+    ];
+    return openingIssues.includes(issueType);
+  }
+
+  /**
+   * Prioritize opening_hooks category sources for opening-related issues
+   */
+  private prioritizeOpeningSources(candidates: IndexedSource[]): IndexedSource[] {
+    const openingSources: IndexedSource[] = [];
+    const otherSources: IndexedSource[] = [];
+
+    for (const candidate of candidates) {
+      const source = candidate.source as import('../types/labeledSourceTypes').EnhancedLabeledSource;
+      if (source.taxonomy?.primary_category === 'opening_hooks') {
+        openingSources.push(candidate);
+      } else {
+        otherSources.push(candidate);
+      }
+    }
+
+    // Opening sources first, then others
+    return [...openingSources, ...otherSources];
   }
 
   /**

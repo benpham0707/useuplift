@@ -42,8 +42,10 @@ import { ALL_PROSE_QUALITY_SOURCES } from './proseQualitySources';
 // Batch 5: Essay Openings & First Impressions (January 2025)
 import { ESSAY_OPENINGS_SOURCES } from './essayOpeningsSources';
 
+// Batch 6: Essay Endings & Conclusions (January 2025)
+import { ESSAY_ENDINGS_SOURCES } from './essayEndingsSources';
+
 // Future batches (uncomment as implemented):
-// import { ALL_ENDINGS_SOURCES } from './endingsSources';
 // import { ALL_STRUCTURE_PACING_SOURCES } from './structurePacingSources';
 // import { ALL_SPECIFICITY_SOURCES } from './specificitySources';
 
@@ -122,12 +124,12 @@ export const RESEARCH_BATCHES: ResearchBatchMetadata[] = [
   {
     id: 'endings',
     name: 'Endings & Conclusions',
-    description: 'Closing strategies, resolution, lasting impressions',
+    description: 'Closing strategies, peak-end rule, lasting impressions, resolution without summary',
     perplexityPromptNumber: 6,
-    dateIntegrated: '',
-    sourceCount: 0,
-    categories: ['narrative_structure', 'vulnerability'],
-    status: 'pending',
+    dateIntegrated: '2025-01-08',
+    sourceCount: ESSAY_ENDINGS_SOURCES.length,
+    categories: ['essay_endings', 'narrative_structure', 'vulnerability', 'closure'],
+    status: 'integrated',
   },
   {
     id: 'structure_pacing',
@@ -192,8 +194,8 @@ export const ALL_ENHANCED_DEEP_RESEARCH_SOURCES: EnhancedLabeledSource[] = [
   ...ALL_INTELLECTUAL_DEPTH_SOURCES,
   ...ALL_PROSE_QUALITY_SOURCES,
   ...ESSAY_OPENINGS_SOURCES,
+  ...ESSAY_ENDINGS_SOURCES,
   // Add future batches here as they're integrated:
-  // ...ALL_ENDINGS_SOURCES,
   // ...ALL_STRUCTURE_PACING_SOURCES,
   // ...ALL_SPECIFICITY_SOURCES,
 ];
@@ -224,6 +226,8 @@ export function getSourcesByBatch(batchId: string): EnhancedLabeledSource[] {
       return ALL_PROSE_QUALITY_SOURCES;
     case 'opening_lines':
       return ESSAY_OPENINGS_SOURCES;
+    case 'endings':
+      return ESSAY_ENDINGS_SOURCES;
     // Add future batches:
     default:
       return [];
@@ -363,4 +367,5 @@ export {
   ALL_INTELLECTUAL_DEPTH_SOURCES,
   ALL_PROSE_QUALITY_SOURCES,
   ESSAY_OPENINGS_SOURCES,
+  ESSAY_ENDINGS_SOURCES,
 };

@@ -880,6 +880,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      thesis_statement_opening: { score: 100, aspect: 'problem', keywords_matched: ['thesis statement', 'academic paper', 'proves that'] },
       weak_opening: { score: 100, aspect: 'problem', keywords_matched: ['thesis statement', 'academic paper'] },
       generic_opening: { score: 95, aspect: 'problem', keywords_matched: ['many experiences', 'throughout my life'] },
       telling_not_showing: { score: 100, aspect: 'problem', keywords_matched: ['tells rather than shows'] },
@@ -905,7 +906,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: ['weak_opening', 'generic_opening', 'telling_not_showing', 'cliche_essay_formula'],
+        issue_types: ['thesis_statement_opening', 'weak_opening', 'generic_opening', 'telling_not_showing', 'cliche_essay_formula'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -1315,6 +1316,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      melodramatic_opening: { score: 100, aspect: 'problem', keywords_matched: ['little did I know', 'melodramatic', 'change forever', 'exaggeration'] },
       weak_opening: { score: 95, aspect: 'problem', keywords_matched: ['little did I know', 'melodramatic'] },
       generic_opening: { score: 95, aspect: 'problem', keywords_matched: ['could open any essay', 'lacks specificity'] },
       cliche_essay_formula: { score: 90, aspect: 'problem', keywords_matched: ['change forever', 'exaggeration'] },
@@ -1340,7 +1342,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: ['weak_opening', 'generic_opening', 'cliche_essay_formula', 'telling_not_showing'],
+        issue_types: ['melodramatic_opening', 'weak_opening', 'generic_opening', 'cliche_essay_formula', 'telling_not_showing'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -1373,6 +1375,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      dictionary_definition_opening: { score: 90, aspect: 'principle', keywords_matched: ['gimmick', 'artificially imposed'] },
       weak_opening: { score: 90, aspect: 'principle', keywords_matched: ['hook', 'gimmick', 'distinction'] },
       generic_opening: { score: 85, aspect: 'principle', keywords_matched: ['authenticity', 'genuine'] },
       cliche_essay_formula: { score: 95, aspect: 'principle', keywords_matched: ['artificially imposed', 'trying too hard'] },
@@ -1397,7 +1400,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: ['weak_opening', 'generic_opening', 'cliche_essay_formula'],
+        issue_types: ['dictionary_definition_opening', 'weak_opening', 'generic_opening', 'cliche_essay_formula'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -1427,6 +1430,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      dictionary_definition_opening: { score: 95, aspect: 'principle', keywords_matched: ['impersonal', 'could be anyone'] },
       weak_opening: { score: 100, aspect: 'principle', keywords_matched: ['personal', 'couldn\'t put anyone else'] },
       generic_opening: { score: 100, aspect: 'principle', keywords_matched: ['specific to student', 'still be true'] },
       cliche_essay_formula: { score: 95, aspect: 'principle', keywords_matched: ['so personal'] },
@@ -1452,7 +1456,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: 'all',
+        issue_types: ['dictionary_definition_opening', 'weak_opening', 'generic_opening', 'cliche_essay_formula', 'cliche_ai_convergence'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -1482,6 +1486,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      melodramatic_opening: { score: 85, aspect: 'problem', keywords_matched: ['gimmicky', 'hollow', 'manipulative'] },
       weak_opening: { score: 85, aspect: 'problem', keywords_matched: ['gimmicky', 'hollow'] },
       cliche_essay_formula: { score: 95, aspect: 'problem', keywords_matched: ['lose charm', 'manipulative'] },
     },
@@ -1505,7 +1510,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: ['weak_opening', 'cliche_essay_formula'],
+        issue_types: ['melodramatic_opening', 'weak_opening', 'cliche_essay_formula'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -1588,6 +1593,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      thesis_statement_opening: { score: 90, aspect: 'solution', keywords_matched: ['too formal', 'contrived', 'speak naturally'] },
       weak_opening: { score: 85, aspect: 'solution', keywords_matched: ['coffee shop', 'friend', 'natural'] },
       generic_opening: { score: 90, aspect: 'solution', keywords_matched: ['contrived', 'authentic voice'] },
       cliche_ai_convergence: { score: 95, aspect: 'solution', keywords_matched: ['speak', 'contractions', 'natural'] },
@@ -1612,7 +1618,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: ['weak_opening', 'generic_opening', 'cliche_ai_convergence'],
+        issue_types: ['thesis_statement_opening', 'weak_opening', 'generic_opening', 'cliche_ai_convergence'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -1968,6 +1974,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
     },
 
     issue_relevance: {
+      thesis_statement_opening: { score: 95, aspect: 'principle', keywords_matched: ['formal school assignment', 'not formal'] },
       weak_opening: { score: 90, aspect: 'principle', keywords_matched: ['personality shine', 'not formal'] },
       generic_opening: { score: 85, aspect: 'principle', keywords_matched: ['one spot', 'personality'] },
       cliche_essay_formula: { score: 90, aspect: 'problem', keywords_matched: ['formal school assignment'] },
@@ -1992,7 +1999,7 @@ export const ESSAY_OPENINGS_SOURCES: EnhancedLabeledSource[] = [
       applies_to: {
         prompt_types: 'all',
         colleges: 'all',
-        issue_types: ['weak_opening', 'generic_opening', 'cliche_essay_formula'],
+        issue_types: ['thesis_statement_opening', 'weak_opening', 'generic_opening', 'cliche_essay_formula'],
       },
       peer_applicable: true,
       peer_weight_reduction: 0,
@@ -2592,10 +2599,15 @@ export function getAdmissionsOfficerOpeningInsights(): EnhancedLabeledSource[] {
 
 /**
  * Get opening technique examples (what works)
+ * Includes technique examples, data supporting techniques, and principle explanations
  */
 export function getOpeningTechniqueExamples(): EnhancedLabeledSource[] {
   return ESSAY_OPENINGS_SOURCES.filter(
-    source => source.advice_type === 'technique' || source.advice_type === 'example'
+    source =>
+      source.advice_type === 'technique' ||
+      source.advice_type === 'example' ||
+      source.advice_type === 'data' ||
+      source.advice_type === 'principle'
   );
 }
 

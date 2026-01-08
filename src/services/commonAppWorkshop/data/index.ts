@@ -364,6 +364,44 @@ export {
   getOpeningsSourceStats,
 } from './essayOpeningsSources';
 
+// Export Essay Endings and Conclusions deep research sources
+export {
+  ESSAY_ENDINGS_SOURCES,
+  getEssayEndingsSources,
+  getEndingSourcesForIssue,
+  getAdmissionsOfficerEndingInsights,
+  getEndingTechniqueExamples,
+  getEndingWarnings,
+  getEndingScienceData,
+  getEndingGuidanceForPromptType,
+  getEndingsSourceStats,
+} from './essayEndingsSources';
+
+// Export Industry Insights (context for why deep feedback matters)
+export {
+  INDUSTRY_STATISTICS,
+  ENGAGEMENT_LEVELS,
+  ESSAY_PHASE_ALLOCATION,
+  getAllIndustryStatistics,
+  getStatisticsByCategory,
+  getEssayFocusedStatistics,
+  getEngagementLevels,
+  getEssayPhaseAllocation,
+  getRandomWhyMattersInsight,
+  getHelpfulnessThresholdContext,
+  getEssayEditingImportance,
+  getSatisfactionComparison,
+  getOutcomeMultiplierContext,
+  getDeepFeedbackJustification,
+  getQuickStats,
+} from './counselingIndustryInsights';
+
+export type {
+  IndustryStatistic,
+  EngagementLevel,
+  EssayPhaseAllocation,
+} from './counselingIndustryInsights';
+
 // ============================================================================
 // V3: SOURCE REGISTRY EXPORTS (Scalable Integration)
 // ============================================================================

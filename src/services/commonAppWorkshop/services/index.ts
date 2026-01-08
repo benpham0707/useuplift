@@ -554,6 +554,8 @@ export type {
 export {
   ResearchBackedTeachingService,
   researchBackedTeachingService,
+  getIndustryContextForFeedback,
+  enhanceWhyMattersWithContext,
 } from './researchBackedTeachingService';
 export type {
   IssueType,
@@ -590,13 +592,18 @@ export {
   workshopChatModeService,
   createWorkshopContextsFromIssues,
   detectChatModeIntent,
+  // Stage 2 Integration Helpers
+  createSuggestionContextFromStage2,
+  createAllSuggestionContextsFromStage2,
+  createWorkshopHandoffPackage,
 } from './workshopChatMode';
 export type {
   ChatMode,
   WorkshopSubMode,
   WorkshopModeContext,
-  SuggestionModeContext,   // NEW: For Stage 2 suggestion implementation
+  SuggestionModeContext,   // For Stage 2 suggestion implementation
   WorkshopChatMessage,
   WorkshopChatRequest,
   WorkshopChatResponse,
+  WorkshopHandoffPackage,  // Complete handoff from Stage 2 to Workshop
 } from './workshopChatMode';

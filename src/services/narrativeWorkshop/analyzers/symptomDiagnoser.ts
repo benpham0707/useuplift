@@ -43,7 +43,22 @@ export type SymptomType =
     | 'melodramatic_opening'             // "Little did I know my life would change forever"
     | 'generic_scene_setting'            // Elaborate scene with no story connection
     | 'weak_opening'                     // General weak opening that doesn't engage
-    | 'generic_opening';                 // Could apply to anyone's essay
+    | 'generic_opening'                  // Could apply to anyone's essay
+    // Ending-specific types (based on essay endings research)
+    | 'weak_ending'                      // General weak ending that doesn't leave impact
+    | 'abrupt_ending'                    // Lacks closure, ends too suddenly
+    | 'anticlimactic_ending'             // Doesn't deliver on emotional peak
+    | 'summary_conclusion'               // Rehashes what was already said
+    | 'preachy_ending'                   // Moral lesson that hits reader over head
+    | 'generic_ending'                   // Could apply to anyone's essay
+    | 'excited_to_attend_ending'         // "I can't wait to attend X University"
+    | 'sudden_pivot_ending'              // Abrupt shift to college mention
+    | 'false_resolution_ending'          // Claims problem solved that wasn't
+    | 'career_announcement_ending'       // "That's when I decided to become a doctor"
+    | 'overexplained_ending'             // Tells reader what to think
+    | 'repetitive_ending'                // Repeats essay content unnecessarily
+    | 'abstract_ending'                  // Ends with vague abstractions
+    | 'academic_ending';                 // Thesis-conclusion style instead of narrative
 
 const DIAGNOSIS_SYSTEM_PROMPT = `You are a precise Narrative Diagnostician.
 Your job is to look at a specific sentence from a college essay and identify its NARRATIVE WEAKNESS.
@@ -86,6 +101,49 @@ OPENING-SPECIFIC WEAKNESSES (use these when analyzing essay openings):
 
 15. **generic_opening**: Opening that could apply to anyone's essay—fails the Grace Kim test: "Could you put anyone else's name on this?"
     - WHY IT FAILS: The opening should be so personal that it couldn't be true about another student.
+
+ENDING-SPECIFIC WEAKNESSES (use these when analyzing essay conclusions):
+16. **weak_ending**: General weak ending that doesn't leave impact or create lasting memory.
+    - WHY IT FAILS: Peak-end rule shows endings disproportionately shape how AOs remember essays. 85% of essays get neutral "check marks."
+
+17. **abrupt_ending**: Ends too suddenly without emotional or structural closure.
+    - WHY IT FAILS: Satisfying endings "remember where they came from" and shift scope from specific to wider reflection. Abrupt endings feel incomplete.
+
+18. **anticlimactic_ending**: Doesn't deliver on the emotional peak or promise of the essay.
+    - WHY IT FAILS: Best endings combine surprise with inevitability (Aristotle). Anticlimactic endings create disappointment, waste built tension.
+
+19. **summary_conclusion**: Rehashes what was already said ("In conclusion, I learned that...").
+    - WHY IT FAILS: AOs already read the body. Summary endings waste precious ending space, feel academic rather than narrative.
+
+20. **preachy_ending**: Moral lesson that hits reader over the head ("This taught me the importance of...").
+    - WHY IT FAILS: Shows rather than trusts. Expert axiom: "Understatement beats overstatement." Let reader draw conclusions.
+
+21. **generic_ending**: Could apply to anyone's essay, lacks the specificity that made the essay personal.
+    - WHY IT FAILS: Same test as openings—if you could paste it onto another student's essay, it's too generic.
+
+22. **excited_to_attend_ending**: "I can't wait to attend [University]!" or "This is why [University] is perfect for me!"
+    - WHY IT FAILS: "College lust" signals insecurity. Admission isn't the story's climax; your growth is.
+
+23. **sudden_pivot_ending**: Abrupt, forced mention of the college with no organic connection.
+    - WHY IT FAILS: Feels like an advertisement grafted onto personal narrative. Jarring tone shift.
+
+24. **false_resolution_ending**: Claims a problem was completely solved when it clearly wasn't.
+    - WHY IT FAILS: "I now have perfect confidence" after describing crippling anxiety. Dishonest, undermines credibility.
+
+25. **career_announcement_ending**: "That's when I decided to become a doctor/lawyer/engineer."
+    - WHY IT FAILS: Career goals aren't narrative endings. Essays reveal character, not career plans. Sounds formulaic.
+
+26. **overexplained_ending**: Tells reader exactly what to think and feel about the essay.
+    - WHY IT FAILS: "Leave space for the reader." Best endings suggest rather than state. Trust reader intelligence.
+
+27. **repetitive_ending**: Repeats content or phrases from earlier in the essay.
+    - WHY IT FAILS: Harry Bauld: "Remember where you came from, without repeating what you've already said."
+
+28. **abstract_ending**: Ends with vague abstractions instead of concrete image or moment.
+    - WHY IT FAILS: Research shows concrete endings are more memorable than abstract ones. End with image, not idea.
+
+29. **academic_ending**: Thesis-conclusion style appropriate for essays, not personal narrative.
+    - WHY IT FAILS: Wrong register. Personal essays need narrative conclusions, not argumentative wrap-ups.
 
 **CRITICAL: Identify Missing Elements**
 

@@ -20,6 +20,11 @@ import { getSourceIndexer } from './sourceIndexer';
 import { LABELED_SOURCES, getSourceById, getLabeledSourceStats } from '../data/labeledSources';
 import type { LabeledSource, EnhancedLabeledSource } from '../types/labeledSourceTypes';
 import { ALL_ENHANCED_DEEP_RESEARCH_SOURCES, getSourcesByBatch } from '../data/sourceRegistry';
+import {
+  getDeepFeedbackJustification,
+  getEssayEditingImportance,
+  getQuickStats,
+} from '../data/counselingIndustryInsights';
 
 // ============================================================================
 // TYPES
@@ -772,6 +777,51 @@ class ResearchBackedTeachingService {
     };
     return insights[collegeId]?.[issueType];
   }
+}
+
+// ============================================================================
+// INDUSTRY CONTEXT HELPERS
+// For enhancing "why this matters" messaging with research-backed justification
+// ============================================================================
+
+/**
+ * Get research-backed justification for why deep feedback matters
+ * Use this to enhance "why_matters" sections with industry context
+ */
+export function getIndustryContextForFeedback(): {
+  justification: string;
+  essayImportance: { hours: string; proportion: string; context: string };
+  quickStats: {
+    essayPhaseHours: string;
+    helpfulnessThreshold: string;
+    satisfactionDifference: string;
+    outcomeMultiplier: string;
+  };
+} {
+  return {
+    justification: getDeepFeedbackJustification(),
+    essayImportance: getEssayEditingImportance(),
+    quickStats: getQuickStats(),
+  };
+}
+
+/**
+ * Enhance a "why this matters" message with industry context
+ * Adds research-backed weight to the feedback
+ */
+export function enhanceWhyMattersWithContext(
+  baseMessage: string,
+  includeStats: boolean = false
+): string {
+  const context = getIndustryContextForFeedback();
+
+  let enhanced = baseMessage;
+
+  if (includeStats) {
+    enhanced += `\n\n**Industry Research Context:** Essay work is the most time-consuming phase of college counseling (${context.essayImportance.hours}), and it's where students first feel genuinely helped. This is why we invest in deep, comprehensive feedback rather than surface-level suggestions.`;
+  }
+
+  return enhanced;
 }
 
 // ============================================================================

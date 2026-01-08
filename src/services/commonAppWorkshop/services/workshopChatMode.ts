@@ -439,7 +439,7 @@ Remember: Your job is to make them a BETTER WRITER, not to write for them. Every
 // ============================================================================
 
 export class WorkshopChatModeService {
-  private static readonly MODE_VERSION = '1.0.0';
+  static readonly MODE_VERSION = '1.0.0';
 
   /**
    * Build workshop mode context from existing issue and teaching
@@ -1188,6 +1188,12 @@ Remember: Your job is to help them discover and articulate THEIR story, not to g
       // Vulnerability
       'strategic_vulnerability': 'strategic_vulnerability',
       'announced_vulnerability': 'strategic_vulnerability',
+      'vulnerability_without_growth': 'strategic_vulnerability',
+
+      // Generic/Research issues (Why Us essays)
+      'generic_research': 'telling_not_showing',
+      'swap_test_fail': 'telling_not_showing',
+      'generic_why_us': 'telling_not_showing',
     };
 
     return mapping[symptomType.toLowerCase()] || null;
@@ -1277,4 +1283,212 @@ export function detectChatModeIntent(userMessage: string): ChatMode {
   if (brainstormSignals.some(p => p.test(userMessage))) return 'brainstorm';
 
   return 'universal';
+}
+
+// ============================================================================
+// STAGE 2 INTEGRATION HELPERS
+// ============================================================================
+
+/**
+ * Import types for Stage 2 integration
+ */
+import type {
+  IssueSuggestion,
+  TypeSpecificSuggestionOutput,
+} from './typeSpecificSuggestionService';
+
+/**
+ * Create SuggestionModeContext from Stage 2 IssueSuggestion output
+ *
+ * This is the PRIMARY integration point for connecting high-quality
+ * Stage 2 suggestions to the Workshop Chat Mode.
+ *
+ * @param issueSuggestion - The Stage 2 suggestion output for a single issue
+ * @param criticalIssue - The original Stage 1B critical issue (for diagnosis context)
+ * @param options - Additional context (college name, essay excerpt, voice markers)
+ * @returns SuggestionModeContext ready for workshop chat
+ */
+export function createSuggestionContextFromStage2(
+  issueSuggestion: IssueSuggestion,
+  criticalIssue: CriticalIssue,
+  options?: {
+    collegeName?: string;
+    essayExcerpt?: string;
+    voiceMarkers?: string[];
+  }
+): SuggestionModeContext {
+  const { suggestions, teaching } = issueSuggestion;
+
+  return {
+    mode: 'workshop_suggestion',
+    mode_version: WorkshopChatModeService.MODE_VERSION,
+    sub_mode: 'suggestion',
+
+    issue: {
+      issue_number: criticalIssue.issue_number,
+      original_quote: issueSuggestion.issue_quote || criticalIssue.quote,
+      location: criticalIssue.location,
+      problem_summary: criticalIssue.problem,
+      diagnosis: issueSuggestion.diagnosis_summary || criticalIssue.diagnosis,
+    },
+
+    suggestions: {
+      polished_original: suggestions.polished_original ? {
+        text: suggestions.polished_original.text,
+        rationale: suggestions.polished_original.rationale,
+        what_changed: suggestions.polished_original.what_changed,
+        safety_level: suggestions.polished_original.safety_level || 'safe',
+        when_to_use: suggestions.polished_original.when_to_use ||
+          'When you want a reliable improvement with minimal risk',
+      } : undefined,
+
+      voice_amplifier: suggestions.voice_amplifier ? {
+        text: suggestions.voice_amplifier.text,
+        rationale: suggestions.voice_amplifier.rationale,
+        what_changed: suggestions.voice_amplifier.what_changed,
+        why_authentic: suggestions.voice_amplifier.why_authentic ||
+          'This version amplifies your unique voice',
+        risk_level: suggestions.voice_amplifier.risk_level || 'medium',
+        when_to_use: suggestions.voice_amplifier.when_to_use ||
+          'When you want to take a creative risk that shows more personality',
+      } : undefined,
+
+      how_to_choose: teaching.how_to_choose ? {
+        polished_when: teaching.how_to_choose.polished_when,
+        voice_when: teaching.how_to_choose.voice_when,
+        can_combine: teaching.how_to_choose.can_combine,
+      } : undefined,
+    },
+
+    student_context: {
+      essay_excerpt: options?.essayExcerpt || issueSuggestion.issue_quote || criticalIssue.quote,
+      college: options?.collegeName,
+      voice_markers: options?.voiceMarkers,
+    },
+
+    guardrails: {
+      max_response_length: 300,
+      must_reference_suggestion: true,
+      must_explain_changes: true,
+      encourage_adaptation: true,
+    },
+  };
+}
+
+/**
+ * Create all SuggestionModeContexts from complete Stage 2 output
+ *
+ * Use this to create workshop contexts for ALL issues at once,
+ * matching them with their corresponding Stage 1B critical issues.
+ *
+ * @param stage2Output - Complete Stage 2 TypeSpecificSuggestionOutput
+ * @param criticalIssues - Array of Stage 1B CriticalIssue (must match by index/issue_number)
+ * @param options - Additional context
+ * @returns Map of issue_number → SuggestionModeContext
+ */
+export function createAllSuggestionContextsFromStage2(
+  stage2Output: TypeSpecificSuggestionOutput,
+  criticalIssues: CriticalIssue[],
+  options?: {
+    collegeName?: string;
+    essayExcerpt?: string;
+    voiceMarkers?: string[];
+  }
+): Map<number, SuggestionModeContext> {
+  const contexts = new Map<number, SuggestionModeContext>();
+
+  // Use college name from Stage 2 output if not provided
+  const collegeName = options?.collegeName || stage2Output.college_name || undefined;
+
+  for (const issueSuggestion of stage2Output.issues) {
+    // Find matching critical issue by issue_id (which maps to issue_number)
+    const issueNumber = parseInt(issueSuggestion.issue_id.replace(/\D/g, ''), 10) ||
+                        stage2Output.issues.indexOf(issueSuggestion) + 1;
+
+    const criticalIssue = criticalIssues.find(ci => ci.issue_number === issueNumber) ||
+                          criticalIssues[stage2Output.issues.indexOf(issueSuggestion)];
+
+    if (criticalIssue) {
+      const context = createSuggestionContextFromStage2(
+        issueSuggestion,
+        criticalIssue,
+        { ...options, collegeName }
+      );
+      contexts.set(criticalIssue.issue_number, context);
+    }
+  }
+
+  return contexts;
+}
+
+/**
+ * Workshop handoff package - everything needed to start a workshop session
+ *
+ * This is the complete handoff from Stage 1B + Stage 2 to Workshop Chat Mode.
+ * Use this when the student clicks "Implement Suggestion" or "Learn More".
+ */
+export interface WorkshopHandoffPackage {
+  /** The suggestion mode context for workshop chat */
+  suggestionContext: SuggestionModeContext;
+
+  /** The technique mode context (for universal learning) */
+  techniqueContext: WorkshopModeContext | null;
+
+  /** The welcome message to show immediately */
+  suggestionWelcome: WorkshopChatMessage;
+
+  /** The original critical issue for reference */
+  originalIssue: CriticalIssue;
+
+  /** The Stage 2 suggestion output for reference */
+  stage2Suggestion: IssueSuggestion;
+
+  /** College name if applicable */
+  collegeName?: string;
+}
+
+/**
+ * Create complete workshop handoff package
+ *
+ * This is the MAIN integration function to use when a student wants
+ * to enter workshop mode from the feedback interface.
+ *
+ * @param issueSuggestion - Stage 2 suggestion for the specific issue
+ * @param criticalIssue - Stage 1B diagnosis for the issue
+ * @param options - Additional context
+ * @returns Complete handoff package ready for workshop chat
+ */
+export function createWorkshopHandoffPackage(
+  issueSuggestion: IssueSuggestion,
+  criticalIssue: CriticalIssue,
+  options?: {
+    collegeName?: string;
+    essayExcerpt?: string;
+    voiceMarkers?: string[];
+  }
+): WorkshopHandoffPackage {
+  // Create suggestion mode context from Stage 2 output
+  const suggestionContext = createSuggestionContextFromStage2(
+    issueSuggestion,
+    criticalIssue,
+    options
+  );
+
+  // Create technique mode context (for universal learning)
+  const techniqueContext = workshopChatModeService.buildWorkshopContext(
+    criticalIssue,
+    options?.collegeName
+  );
+
+  // Get the welcome message
+  const suggestionWelcome = workshopChatModeService.getSuggestionWelcomeMessage(suggestionContext);
+
+  return {
+    suggestionContext,
+    techniqueContext,
+    suggestionWelcome,
+    originalIssue: criticalIssue,
+    stage2Suggestion: issueSuggestion,
+    collegeName: options?.collegeName,
+  };
 }
