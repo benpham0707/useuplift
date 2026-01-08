@@ -534,16 +534,7 @@ Based on:
   },
 };
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export {
-  STANFORD_IV_PROVENANCE,
-  STANFORD_CHARACTER_PROVENANCE,
-  STANFORD_IMPACT_PROVENANCE,
-  STANFORD_VOICE_PROVENANCE,
-};
+// Constants already exported at declaration
 
 /**
  * Get all Stanford value provenances

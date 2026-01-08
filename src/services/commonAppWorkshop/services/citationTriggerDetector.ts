@@ -360,8 +360,4 @@ export function deduplicateTriggers(triggers: CitationTrigger[]): CitationTrigge
   });
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export { CitationTriggerDetector };
+// CitationTriggerDetector already exported at class declaration

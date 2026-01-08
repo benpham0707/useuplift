@@ -389,8 +389,4 @@ export function attachCitationsToFeedback(
   return attacher.attachCitations(feedback, triggers, context);
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export { CitationAttacher };
+// CitationAttacher already exported at class declaration

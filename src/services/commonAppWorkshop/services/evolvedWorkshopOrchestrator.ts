@@ -74,6 +74,17 @@ import {
 import type { CollegeResearch } from '../types/collegeResearch';
 import type { VoiceFingerprint } from '../types/stage0Types';
 import type { SupplementalType } from '../../../data/commonAppSupplementalTypes';
+import type { EssayContextPackage } from '../types';
+import { contextEnrichmentService } from './contextEnrichmentService';
+import {
+  ValueAlignmentGuidanceService,
+  type ValueAlignmentOutput,
+  type CrossCollegeInsight
+} from './valueAlignmentGuidanceService';
+import {
+  SemanticClicheAnalyzer,
+  type SemanticClicheAnalysis
+} from './semanticClicheAnalyzer';
 
 // ============================================================================
 // TYPES
@@ -101,6 +112,36 @@ export interface Stage1Output {
   priority_issues: PatternIssue[]; // Top 3 issues to address
   critical_gaps: string[]; // Critical dimensions below threshold
   quick_wins: string[]; // Easy improvements
+  // Cross-college comparison (optional - only when comparison_colleges provided)
+  cross_college_comparison?: CrossCollegeComparisonResult;
+}
+
+/**
+ * Cross-College Comparison Result
+ *
+ * Provides insight into how well the essay fits the target college
+ * compared to other schools, based on VALUE alignment (not vocabulary).
+ */
+export interface CrossCollegeComparisonResult {
+  target_college: string;
+  comparison_colleges: string[];
+  best_fit: {
+    college_name: string;
+    fit_reason: string;
+  };
+  target_fit: {
+    alignment_level: 'excellent' | 'good' | 'moderate' | 'weak';
+    key_strength: string;
+    key_gap: string;
+    adjustment_guidance: string;
+  };
+  value_alignment_scores: Array<{
+    college_name: string;
+    alignment_score: number; // 0-100
+    top_aligned_value: string;
+    missing_value: string;
+  }>;
+  cost: number;
 }
 
 /**
@@ -173,9 +214,14 @@ export interface WorkshopOptions {
 
   // Optional
   college?: CollegeResearch;
+  promptId?: string; // College-specific prompt identifier (e.g., "stanford_intellectual_vitality")
   voiceFingerprint?: VoiceFingerprint; // Skip Stage 0 if provided
   useDeepAnalysis?: boolean; // Use Sonnet for Stage 1
   maxIssues?: number; // Default 3
+
+  // Cross-college comparison (optional)
+  comparisonColleges?: CollegeResearch[]; // Compare essay fit across these colleges
+  enableCrossCollegeComparison?: boolean; // Explicitly enable comparison (auto-enabled if comparisonColleges provided)
 }
 
 // ============================================================================
@@ -187,12 +233,16 @@ export class EvolvedWorkshopOrchestrator {
   private legacyScoringService: TypeAwareScoringService; // Kept for backward compatibility
   private suggestionService: TypeSpecificSuggestionService;
   private integrationService: CollegeTypeIntegrationService;
+  private valueAlignmentService: ValueAlignmentGuidanceService;
+  private clicheAnalyzer: SemanticClicheAnalyzer;
 
   constructor(apiKey?: string) {
     this.unifiedScoringService = new UnifiedScoringService();
     this.legacyScoringService = new TypeAwareScoringService(apiKey);
     this.suggestionService = new TypeSpecificSuggestionService(apiKey);
     this.integrationService = new CollegeTypeIntegrationService();
+    this.valueAlignmentService = new ValueAlignmentGuidanceService();
+    this.clicheAnalyzer = new SemanticClicheAnalyzer();
   }
 
   /**
@@ -205,10 +255,17 @@ export class EvolvedWorkshopOrchestrator {
       essayDraft,
       essayType,
       college,
+      promptId,
       voiceFingerprint,
       useDeepAnalysis = false,
-      maxIssues = 3
+      maxIssues = 3,
+      comparisonColleges,
+      enableCrossCollegeComparison
     } = options;
+
+    // Determine if cross-college comparison should run
+    const shouldRunComparison = (enableCrossCollegeComparison === true) ||
+      (comparisonColleges && comparisonColleges.length > 0);
 
     console.log(`\n🚀 Starting Evolved Workshop for ${essayType} essay`);
     if (college) {
@@ -249,7 +306,7 @@ export class EvolvedWorkshopOrchestrator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // STAGE 1: Holistic Scoring
+    // STAGE 1: Holistic Scoring (+ optional cross-college comparison)
     // ═══════════════════════════════════════════════════════════════════════
     console.log('\n📊 Stage 1: Holistic Scoring...');
 
@@ -257,12 +314,60 @@ export class EvolvedWorkshopOrchestrator {
       essayDraft,
       essayType,
       college,
-      useDeepAnalysis
+      useDeepAnalysis,
+      shouldRunComparison ? comparisonColleges : undefined
     );
 
     costs.stage1 = stage1Output.scoring.cost.total;
+    if (stage1Output.cross_college_comparison) {
+      costs.stage1 += stage1Output.cross_college_comparison.cost;
+    }
     console.log(`   ✓ Score: ${stage1Output.scoring.total_score}/100 (${stage1Output.scoring.quality_tier})`);
     console.log(`   ✓ ${stage1Output.priority_issues.length} issues identified`);
+    if (stage1Output.cross_college_comparison) {
+      console.log(`   ✓ Cross-college comparison: Best fit is ${stage1Output.cross_college_comparison.best_fit.college_name}`);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // CLICHÉ ANALYSIS: Run semantic cliché analysis for Stage 2 context
+    // ─────────────────────────────────────────────────────────────────────────
+    console.log('   📝 Running cliché analysis...');
+    let clicheAnalysis: SemanticClicheAnalysis | undefined;
+
+    try {
+      // Use quick check first to decide if full analysis is worthwhile
+      const quickCheck = this.clicheAnalyzer.quickClicheCheck(essayDraft);
+
+      if (quickCheck.recommend_full_analysis) {
+        // Run full AI-powered cliché analysis
+        clicheAnalysis = await this.clicheAnalyzer.analyze(essayDraft, {
+          college_id: college?.collegeName?.toLowerCase().replace(/\s+/g, '_'),
+          essay_type: essayType
+        });
+        console.log(`   ✓ Cliché analysis: ${clicheAnalysis.overall_cliche_risk} risk (score: ${clicheAnalysis.cliche_risk_score})`);
+        costs.stage1 += 0.004; // Add cliché analysis cost (~$0.003-0.005)
+      } else {
+        // Use pattern-only analysis (free, no API call)
+        clicheAnalysis = await this.clicheAnalyzer.analyze(essayDraft, {
+          college_id: college?.collegeName?.toLowerCase().replace(/\s+/g, '_'),
+          essay_type: essayType,
+          pattern_only: true
+        });
+        console.log(`   ✓ Cliché check (pattern-only): ${quickCheck.ai_convergence_count} AI phrases, ${quickCheck.essay_cliche_count} clichés`);
+      }
+    } catch (error) {
+      console.error('[Stage1] Cliché analysis failed:', error);
+      // Non-fatal: continue without cliché analysis
+    }
+
+    // NEW: Extract essay context from Stage 1 for Stage 2
+    // This allows Stage 2 to build on Stage 1 insights instead of re-discovering them
+    const essayContext = contextEnrichmentService.buildContextPackage(
+      stage1Output.scoring,
+      clicheAnalysis // Now properly wired in!
+    );
+
+    console.log(`   ✓ Context extracted: ${essayContext.dimensional_context?.length || 0} dimensions, ${essayContext.holistic_context ? 'holistic' : 'no holistic'}`);
 
     // ═══════════════════════════════════════════════════════════════════════
     // STAGE 2: Surgical Suggestions
@@ -275,7 +380,9 @@ export class EvolvedWorkshopOrchestrator {
       stage1Output.priority_issues.slice(0, maxIssues),
       stage0Output.voice_fingerprint,
       college,
-      stage1Output.scoring.total_score // Pass current score for projection
+      promptId, // Pass promptId for overlay rubric guidance
+      stage1Output.scoring.total_score, // Pass current score for projection
+      essayContext // NEW: Pass essay context from Stage 1
     );
 
     costs.stage2 = stage2Output.suggestions.cost;
@@ -416,12 +523,14 @@ export class EvolvedWorkshopOrchestrator {
    * - Uses Semantic Scoring (Sonnet) as primary for 92%+ accuracy
    * - Uses Pattern Detection as secondary for cheap issue flagging
    * - Supports quick triage mode for cost optimization
+   * - Optionally includes cross-college comparison for fit analysis
    */
   private async runStage1(
     essayDraft: string,
     essayType: SupplementalType,
     college?: CollegeResearch,
-    useDeepAnalysis = false
+    useDeepAnalysis = false,
+    comparisonColleges?: CollegeResearch[]
   ): Promise<Stage1Output> {
     // Get integrated rubric if college provided
     const integratedRubric = college
@@ -480,12 +589,126 @@ export class EvolvedWorkshopOrchestrator {
       .map(i => i.problem_description)
       .slice(0, 3);
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // OPTIONAL: Cross-College Comparison
+    // ─────────────────────────────────────────────────────────────────────────
+    let crossCollegeComparison: CrossCollegeComparisonResult | undefined;
+
+    if (college && comparisonColleges && comparisonColleges.length > 0) {
+      console.log('   📊 Running cross-college comparison...');
+
+      try {
+        crossCollegeComparison = await this.runCrossCollegeComparison(
+          essayDraft,
+          college,
+          comparisonColleges
+        );
+      } catch (error) {
+        console.error('[Stage1] Cross-college comparison failed:', error);
+        // Non-fatal: continue without comparison
+      }
+    }
+
     return {
       scoring,
       integrated_rubric: integratedRubric,
       priority_issues: priorityIssues,
       critical_gaps: criticalGaps,
-      quick_wins: quickWins
+      quick_wins: quickWins,
+      cross_college_comparison: crossCollegeComparison
+    };
+  }
+
+  /**
+   * Run cross-college comparison using ValueAlignmentGuidanceService
+   *
+   * This analyzes essay fit across multiple colleges based on VALUE alignment,
+   * not vocabulary or program name-dropping.
+   */
+  private async runCrossCollegeComparison(
+    essayDraft: string,
+    targetCollege: CollegeResearch,
+    comparisonColleges: CollegeResearch[]
+  ): Promise<CrossCollegeComparisonResult> {
+    const startTime = Date.now();
+
+    // Get quick summary for target college
+    const targetSummary = await this.valueAlignmentService.generateQuickSummary(
+      essayDraft,
+      targetCollege
+    );
+
+    // Get quick summaries for comparison colleges (parallel)
+    const comparisonSummaries = await Promise.all(
+      comparisonColleges.map(async (college) => {
+        try {
+          const summary = await this.valueAlignmentService.generateQuickSummary(
+            essayDraft,
+            college
+          );
+          return { college, summary };
+        } catch (error) {
+          console.error(`[CrossCollege] Failed for ${college.collegeName}:`, error);
+          return null;
+        }
+      })
+    );
+
+    // Filter out failed comparisons
+    const validComparisons = comparisonSummaries.filter(c => c !== null) as Array<{
+      college: CollegeResearch;
+      summary: Awaited<ReturnType<typeof this.valueAlignmentService.generateQuickSummary>>;
+    }>;
+
+    // Determine alignment scores based on alignment level
+    const alignmentToScore = (alignment: string): number => {
+      switch (alignment) {
+        case 'excellent': return 90;
+        case 'good': return 75;
+        case 'moderate': return 55;
+        case 'weak': return 35;
+        default: return 50;
+      }
+    };
+
+    // Build value alignment scores
+    const valueAlignmentScores: CrossCollegeComparisonResult['value_alignment_scores'] = [
+      {
+        college_name: targetCollege.collegeName,
+        alignment_score: alignmentToScore(targetSummary.alignment),
+        top_aligned_value: targetSummary.top_strength,
+        missing_value: targetSummary.top_gap
+      },
+      ...validComparisons.map(({ college, summary }) => ({
+        college_name: college.collegeName,
+        alignment_score: alignmentToScore(summary.alignment),
+        top_aligned_value: summary.top_strength,
+        missing_value: summary.top_gap
+      }))
+    ];
+
+    // Determine best fit
+    const sortedByFit = [...valueAlignmentScores].sort((a, b) => b.alignment_score - a.alignment_score);
+    const bestFit = sortedByFit[0];
+
+    // Estimate cost (quick summaries are ~$0.003 each)
+    const cost = 0.003 * (1 + validComparisons.length);
+
+    return {
+      target_college: targetCollege.collegeName,
+      comparison_colleges: comparisonColleges.map(c => c.collegeName),
+      best_fit: {
+        college_name: bestFit.college_name,
+        fit_reason: bestFit.top_aligned_value
+      },
+      target_fit: {
+        alignment_level: targetSummary.alignment,
+        key_strength: targetSummary.top_strength,
+        key_gap: targetSummary.top_gap,
+        adjustment_guidance: targetSummary.one_action
+      },
+      value_alignment_scores: valueAlignmentScores,
+      cost
     };
   }
 
@@ -500,7 +723,9 @@ export class EvolvedWorkshopOrchestrator {
     priorityIssues: PatternIssue[],
     voiceFingerprint: VoiceFingerprint,
     college: CollegeResearch | undefined,
-    currentScore: number // Added: need current score for projection
+    promptId: string | undefined, // Added: college-specific prompt identifier
+    currentScore: number, // Added: need current score for projection
+    essayContext: EssayContextPackage // NEW: Essay context from Stage 1
   ): Promise<Stage2Output> {
     if (priorityIssues.length === 0) {
       // No issues = essay is already good, project current score
@@ -553,7 +778,7 @@ export class EvolvedWorkshopOrchestrator {
       essayDraft,
       essayType,
       issueContexts,
-      { college, voice: voiceFingerprint }
+      { college, voice: voiceFingerprint, promptId, essayContext }
     );
 
     // Estimate score improvement
@@ -747,5 +972,6 @@ export {
   Stage2Output,
   Stage3Output,
   EvolvedWorkshopOutput,
-  WorkshopOptions
+  WorkshopOptions,
+  CrossCollegeComparisonResult
 };

@@ -15,3 +15,7 @@ export {
   formatTextWithCitations,
   generateTooltipHTML,
 } from './citationFormatter';
+
+// API Retry Logic (Robust Error Handling)
+export { withRetry, withRetryDetailed, createRetryFunction } from './apiRetry';
+export type { RetryConfig, RetryResult } from './apiRetry';

@@ -11,6 +11,10 @@
  *
  * **For Students**: This ensures you see the most relevant research/quotes
  * for YOUR specific situation, not just generic advice.
+ *
+ * **OPTIMIZATION (v2)**:
+ * Now integrated with SmartSourceSelector for O(1) pre-indexed lookups.
+ * Falls back to legacy keyword matching if optimized system unavailable.
  */
 
 import type {
@@ -23,6 +27,13 @@ import type {
 
 import { getAllStanfordProvenances } from '../data/provenanceData/stanfordProvenance';
 
+// Import optimized source selection system
+import {
+  SmartSourceSelector,
+  getSmartSourceSelector,
+} from './smartSourceSelector';
+import type { CollegeId, ClicheSymptomType } from '../types/labeledSourceTypes';
+
 // ============================================================================
 // CITATION SELECTOR SERVICE
 // ============================================================================
@@ -31,9 +42,41 @@ export class CitationSelector {
   // Cache of all available citations by college
   private citationCache: Map<string, ProvenanceSource[]> = new Map();
 
+  // Optimized source selector (pre-indexed, O(1) lookups)
+  private smartSelector: SmartSourceSelector | null = null;
+
+  // Track whether optimized system is available
+  private useOptimizedSystem: boolean = false;
+
   constructor() {
-    // Pre-load Stanford citations
+    // Pre-load Stanford citations (legacy system)
     this.loadStanfordCitations();
+
+    // Initialize optimized system
+    this.initializeOptimizedSystem();
+  }
+
+  /**
+   * Initialize the optimized SmartSourceSelector
+   * Falls back to legacy if initialization fails
+   */
+  private initializeOptimizedSystem(): void {
+    try {
+      this.smartSelector = getSmartSourceSelector();
+      const stats = this.smartSelector.getStats();
+
+      // Only use optimized system if we have sufficient sources
+      if (stats.totalSources >= 5 && stats.issueTypesCovered >= 3) {
+        this.useOptimizedSystem = true;
+        console.log(`[CitationSelector] Optimized system enabled: ${stats.totalSources} sources indexed`);
+      } else {
+        console.log(`[CitationSelector] Optimized system available but limited coverage, using hybrid mode`);
+        this.useOptimizedSystem = true; // Still use for what we have
+      }
+    } catch (error) {
+      console.warn('[CitationSelector] Optimized system unavailable, using legacy:', error);
+      this.useOptimizedSystem = false;
+    }
   }
 
   /**
@@ -44,8 +87,82 @@ export class CitationSelector {
    *
    * @param context - Information about the student's issue
    * @returns Top 3-5 most relevant citations with explanations
+   *
+   * **OPTIMIZATION**: Now uses SmartSourceSelector for O(1) pre-indexed lookups
+   * when available. Falls back to legacy keyword matching otherwise.
    */
-  selectCitationsFor Issue(context: CitationContext): SelectedCitation[] {
+  selectCitationsForIssue(context: CitationContext): SelectedCitation[] {
+    // Try optimized system first
+    if (this.useOptimizedSystem && this.smartSelector) {
+      const optimizedResult = this.selectCitationsOptimized(context);
+      if (optimizedResult.length > 0) {
+        return optimizedResult;
+      }
+      // Fall through to legacy if optimized returns nothing
+    }
+
+    // Legacy path: keyword-based matching
+    return this.selectCitationsLegacy(context);
+  }
+
+  /**
+   * Optimized citation selection using pre-indexed SmartSourceSelector
+   * O(1) lookup instead of O(n) keyword matching
+   */
+  private selectCitationsOptimized(context: CitationContext): SelectedCitation[] {
+    if (!this.smartSelector) return [];
+
+    // Map issue type to ClicheSymptomType
+    const issueType = this.mapIssueToSymptomType(context.issue_detected);
+    if (!issueType) {
+      // Issue type not mapped, fall back to legacy
+      return [];
+    }
+
+    // Map college_id to CollegeId (if supported)
+    const collegeId = this.mapCollegeId(context.college_id);
+
+    // Use SmartSourceSelector for O(1) lookup
+    const bundle = this.smartSelector.selectForIssue(
+      { symptom_type: issueType },
+      collegeId,
+      {
+        max_sources: context.severity === 'critical' ? 5 : 3,
+        min_relevance_score: 40,
+        require_author_diversity: true,
+        prioritize_college_specific: true,
+      }
+    );
+
+    // Convert LabeledSource bundle to SelectedCitation format
+    const citations: SelectedCitation[] = [];
+
+    // Add primary source
+    citations.push(this.labeledSourceToSelectedCitation(
+      bundle.primary,
+      1,
+      context,
+      this.determineUseFromIssueType(issueType)
+    ));
+
+    // Add supporting sources
+    bundle.supporting.forEach((source, index) => {
+      citations.push(this.labeledSourceToSelectedCitation(
+        source,
+        index + 2,
+        context,
+        'teach_technique'
+      ));
+    });
+
+    return citations;
+  }
+
+  /**
+   * Legacy citation selection (keyword-based matching)
+   * Kept for backward compatibility and fallback
+   */
+  private selectCitationsLegacy(context: CitationContext): SelectedCitation[] {
     // Get all available citations for this college
     const allCitations = this.getAllCitations(context.college_id);
 
@@ -73,12 +190,256 @@ export class CitationSelector {
   }
 
   /**
+   * Map issue string to ClicheSymptomType for optimized lookup
+   */
+  private mapIssueToSymptomType(issue: string): ClicheSymptomType | null {
+    // Map common issue types to ClicheSymptomType
+    const mapping: Record<string, ClicheSymptomType> = {
+      // Direct mappings
+      'cliche_metaphor': 'cliche_metaphor',
+      'telling_not_showing': 'telling_not_showing',
+      'cliche_topic_framing': 'cliche_topic_framing',
+      'cliche_narrative_arc': 'cliche_narrative_arc',
+      'cliche_ai_convergence': 'cliche_ai_convergence',
+      'cliche_essay_formula': 'cliche_essay_formula',
+      'cliche_college_specific': 'cliche_college_specific',
+      'cliche_value_signaling': 'cliche_value_signaling',
+      'cliche_inspirational': 'cliche_inspirational',
+      'cliche_language': 'cliche_language',
+
+      // Legacy issue mappings
+      'CLASS_BASED_ONLY': 'telling_not_showing',
+      'GENERIC_STATEMENTS': 'cliche_language',
+      'RESUME_REPETITION': 'telling_not_showing',
+      'LACKS_VOICE': 'cliche_language',
+      'VAGUE_CLAIMS': 'telling_not_showing',
+      'GENERIC': 'cliche_language',
+    };
+
+    return mapping[issue] || null;
+  }
+
+  /**
+   * Map college_id string to CollegeId type
+   */
+  private mapCollegeId(collegeId: string): CollegeId {
+    // Direct mapping for supported colleges
+    const supportedColleges: CollegeId[] = [
+      'stanford', 'harvard', 'mit', 'uchicago', 'duke', 'yale',
+      'princeton', 'columbia', 'penn', 'brown', 'dartmouth', 'cornell',
+      'caltech', 'northwestern', 'johns_hopkins', 'uva', 'tulane',
+      'harvey_mudd', 'gmu'
+    ];
+
+    if (supportedColleges.includes(collegeId as CollegeId)) {
+      return collegeId as CollegeId;
+    }
+
+    // Default to stanford for unsupported colleges (best coverage)
+    return 'stanford';
+  }
+
+  /**
+   * Convert LabeledSource to SelectedCitation format
+   */
+  private labeledSourceToSelectedCitation(
+    source: import('../types/labeledSourceTypes').LabeledSource,
+    priority: number,
+    context: CitationContext,
+    useFor: CitationUse
+  ): SelectedCitation {
+    return {
+      citation: {
+        source_id: source.source_id,
+        type: source.type,
+        title: source.title,
+        author: source.author,
+        author_title: source.author_title,
+        publication: source.publication,
+        date: source.date,
+        quote: source.quote,
+        finding: source.finding,
+        url: source.url,
+        relevance_to_claim: source.relevance_to_claim,
+        last_verified: source.last_verified,
+        weight_in_calculation: source.weight_in_calculation,
+      },
+      relevance: {
+        score: this.calculateLabeledSourceScore(source, context.issue_detected),
+        reason: this.explainLabeledSourceRelevance(source, context),
+        use_for: useFor,
+      },
+      presentation: {
+        simplified_version: this.simplifyLabeledSource(source),
+        full_version: this.fullVersionLabeledSource(source),
+        display_priority: priority,
+      },
+    };
+  }
+
+  /**
+   * Calculate relevance score from LabeledSource pre-computed data
+   */
+  private calculateLabeledSourceScore(
+    source: import('../types/labeledSourceTypes').LabeledSource,
+    issue: string
+  ): number {
+    const symptomType = this.mapIssueToSymptomType(issue);
+    if (!symptomType || !source.issue_relevance[symptomType]) {
+      return 60; // Default score for unmapped issues
+    }
+    return source.issue_relevance[symptomType].score;
+  }
+
+  /**
+   * Explain relevance using LabeledSource taxonomy
+   */
+  private explainLabeledSourceRelevance(
+    source: import('../types/labeledSourceTypes').LabeledSource,
+    context: CitationContext
+  ): string {
+    // Use source's usage context for explanation
+    const primaryCategory = source.taxonomy.primary_category;
+
+    if (source.college_specificity.primary_college === context.college_id) {
+      return `Official ${context.college_id} guidance on ${primaryCategory}`;
+    }
+
+    if (source.type === 'dean_quote' && source.author) {
+      return `${source.author} directly addresses ${primaryCategory}`;
+    }
+
+    if (source.type === 'internal_analysis') {
+      return `Research on ${primaryCategory} patterns in elite essays`;
+    }
+
+    return `Expert perspective on ${primaryCategory}`;
+  }
+
+  /**
+   * Simplify LabeledSource for student-friendly display
+   */
+  private simplifyLabeledSource(source: import('../types/labeledSourceTypes').LabeledSource): string {
+    if (source.type === 'dean_quote' && source.quote) {
+      const author = source.author || 'An admissions dean';
+      return `${author} said: "${source.quote.substring(0, 100)}${source.quote.length > 100 ? '...' : ''}"`;
+    }
+
+    if (source.type === 'internal_analysis' && source.finding) {
+      const percentMatch = source.finding.match(/(\d+)%/);
+      if (percentMatch) {
+        return `${percentMatch[1]}% of successful essays demonstrate this quality`;
+      }
+    }
+
+    return source.relevance_to_claim || 'Expert guidance on this topic';
+  }
+
+  /**
+   * Full version of LabeledSource with all details
+   */
+  private fullVersionLabeledSource(source: import('../types/labeledSourceTypes').LabeledSource): string {
+    const parts: string[] = [];
+
+    if (source.author) {
+      let authorLine = source.author;
+      if (source.author_title) authorLine += ` (${source.author_title})`;
+      parts.push(authorLine);
+    }
+
+    if (source.quote) {
+      parts.push(`"${source.quote}"`);
+    } else if (source.finding) {
+      parts.push(source.finding);
+    }
+
+    if (source.publication && source.date) {
+      parts.push(`Source: ${source.publication}, ${source.date}`);
+    }
+
+    if (source.url) {
+      parts.push(`Link: ${source.url}`);
+    }
+
+    return parts.join('\n');
+  }
+
+  /**
+   * Determine CitationUse from symptom type
+   */
+  private determineUseFromIssueType(issueType: ClicheSymptomType): CitationUse {
+    const useMapping: Record<ClicheSymptomType, CitationUse> = {
+      'cliche_metaphor': 'explain_problem',
+      'telling_not_showing': 'teach_technique',
+      'cliche_topic_framing': 'explain_problem',
+      'cliche_narrative_arc': 'explain_problem',
+      'cliche_ai_convergence': 'justify_severity',
+      'cliche_essay_formula': 'explain_problem',
+      'cliche_college_specific': 'explain_problem',
+      'cliche_value_signaling': 'teach_technique',
+      'cliche_inspirational': 'explain_problem',
+      'cliche_language': 'teach_technique',
+    };
+    return useMapping[issueType] || 'teach_technique';
+  }
+
+  /**
    * Get citations specifically for proving a weight
    *
    * Example: Student asks "How do you know IV is 40%?"
    * Returns: Full provenance with dean quotes and methodology
+   *
+   * **OPTIMIZATION**: Now uses SmartSourceSelector for weight proofs
+   * when available.
    */
   selectWeightProof(college_id: string, value_id: string): SelectedCitation[] {
+    // Try optimized system first for weight proofs
+    if (this.useOptimizedSystem && this.smartSelector) {
+      const collegeId = this.mapCollegeId(college_id);
+      const bundle = this.smartSelector.selectForWeightProof(value_id, collegeId);
+
+      if (bundle.primary) {
+        const citations: SelectedCitation[] = [];
+
+        // Add primary source
+        citations.push({
+          citation: bundle.primary,
+          relevance: {
+            score: 95,
+            reason: `Primary source for ${value_id} weight calculation`,
+            use_for: 'prove_weight' as CitationUse,
+          },
+          presentation: {
+            simplified_version: this.simplifyLabeledSource(bundle.primary),
+            full_version: this.fullVersionLabeledSource(bundle.primary),
+            display_priority: 1,
+          },
+        });
+
+        // Add supporting sources
+        bundle.supporting.forEach((source, index) => {
+          citations.push({
+            citation: source,
+            relevance: {
+              score: 85,
+              reason: `Supporting evidence for ${value_id} weight`,
+              use_for: 'prove_weight' as CitationUse,
+            },
+            presentation: {
+              simplified_version: this.simplifyLabeledSource(source),
+              full_version: this.fullVersionLabeledSource(source),
+              display_priority: index + 2,
+            },
+          });
+        });
+
+        if (citations.length > 0) {
+          return citations;
+        }
+      }
+    }
+
+    // Legacy path
     const provenances = this.getProvenances(college_id);
     const provenance = provenances.find((p) => p.value_id === value_id);
 
@@ -476,9 +837,3 @@ export class CitationSelector {
     }
   }
 }
-
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export { CitationSelector };

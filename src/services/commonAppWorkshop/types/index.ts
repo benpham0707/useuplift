@@ -206,3 +206,156 @@ export {
   EnrichmentOptions,
   ParseOptions,
 } from './citationTypes';
+
+// Context Gathering Types (Suggestion Engine ↔ Chat Interface)
+export {
+  // Gap types
+  ContextGapType,
+  ContextGap,
+
+  // Request types
+  ContextQuestion,
+  ContextGatheringRequest,
+
+  // Gathered context types
+  GatheredContextItem,
+  GatheredContext,
+  EnrichedStudentContext,
+
+  // Integration types
+  ContextAwareIssueContext,
+  SuggestionWithContextNeeds,
+
+  // Session state
+  ContextGatheringState,
+
+  // Helper functions
+  createContextGap,
+  createContextQuestion,
+} from './contextGathering';
+
+// ===========================================================================
+// ESSAY CONTEXT CACHING TYPES (Stage 1 → Stage 2 Handoff)
+// ===========================================================================
+
+/**
+ * Holistic essay context from Stage 1 analysis
+ *
+ * Tracks themes, arc, and thread to maintain coherence in suggestions.
+ * Prevents Stage 2 from introducing disconnected content.
+ */
+export interface HolisticContext {
+  /** Themes that appear throughout essay (preserve these in suggestions) */
+  recurring_motifs: string[];
+
+  /** How emotion evolves (or doesn't) throughout essay */
+  emotional_arc: string;
+
+  /** Central throughline that ties essay together (maintain this) */
+  narrative_thread: string;
+
+  /** Arc predictability score 0-10 (from cliché analyzer) */
+  arc_predictability?: number;
+
+  /** Suggestion for making arc less predictable */
+  arc_suggested_subversion?: string;
+}
+
+/**
+ * Dimensional assessment from Stage 1 scoring
+ *
+ * Shows current state + what's working/missing per dimension.
+ * Enables suggestions to preserve strengths while fixing weaknesses.
+ */
+export interface DimensionalContext {
+  /** Dimension name (e.g., "intellectual_vitality", "authenticity") */
+  dimension: string;
+
+  /** Current score 1-10 */
+  current_score: number;
+
+  /** Target score for excellence (usually 8) */
+  target_score: number;
+
+  /** How much improvement needed */
+  gap: number;
+
+  /** Overall strength assessment */
+  strength_level: 'STRONG' | 'ADEQUATE' | 'WEAK';
+
+  /** Evidence-based assessment */
+  evidence: {
+    /** What's working (PRESERVE in suggestions) */
+    strengths: string[];
+
+    /** What's missing (FIX in suggestions) */
+    weaknesses: string[];
+  };
+}
+
+/**
+ * Score reasoning - explains WHY essay got its score
+ *
+ * Mirrors PIQ workshop dimensional explanations.
+ * Helps suggestions target the right issues and preserve what works.
+ */
+export interface ScoreReasoning {
+  /** Total score 0-100 */
+  total_score: number;
+
+  /** Quality tier (weak, needs_work, strong, excellent) */
+  quality_tier: string;
+
+  /** What makes essay work (PRESERVE this in suggestions) */
+  core_strength: string;
+
+  /** What holds essay back (ADDRESS this in suggestions) */
+  core_weakness: string;
+
+  /** How reader feels after reading (suggestions must improve this) */
+  reader_experience: string;
+
+  /** Principle-level breakdown (from semantic scoring) */
+  principle_scores: Array<{
+    principle_id: string;
+    principle_name: string;
+    score: number;           // 0-10
+    how_achieved: string;    // How essay achieves (or fails) this
+    reader_effect: string;   // What effect this has on reader
+  }>;
+
+  /** Type-specific assessment (does essay answer the prompt?) */
+  type_assessment?: {
+    reader_question_answered: boolean;
+    answer_quality: number;
+    success_principles_met: string[];
+    pitfalls_present: string[];
+  };
+}
+
+/**
+ * Complete essay context package for Stage 2
+ *
+ * Everything Stage 1 learned that Stage 2 should build on.
+ * Prevents re-analysis and enables context-aware suggestions.
+ */
+export interface EssayContextPackage {
+  /** Holistic context (motifs, arc, thread) */
+  holistic_context?: HolisticContext;
+
+  /** Dimensional assessment (what's working/missing per dimension) */
+  dimensional_context?: DimensionalContext[];
+
+  /** Score reasoning (why this score) */
+  score_reasoning?: ScoreReasoning;
+
+  /** Word count context (already exists but bundled for completeness) */
+  word_count_status?: {
+    status: 'under' | 'optimal' | 'over';
+    word_count: number;
+    limit: number;
+    delta: number;
+    severity: 'none' | 'minor' | 'moderate' | 'severe';
+    guidance: string;
+  };
+}

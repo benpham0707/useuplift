@@ -714,8 +714,4 @@ export function citePortfolioInsight(
   });
 }
 
-// ============================================================================
-// EXPORTS
-// ============================================================================
-
-export { UniversalCitationEngine };
+// UniversalCitationEngine already exported at class declaration

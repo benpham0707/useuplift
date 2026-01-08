@@ -66,7 +66,26 @@ export function parseClaudeJSON<T>(responseText: string, context?: string): T {
     // 3. Remove multi-line comments (/* ... */)
     repairedText = repairedText.replace(/\/\*[\s\S]*?\*\//g, '');
 
-    // 4. Try to close unclosed braces if truncated
+    // 4. Try to close unclosed braces/brackets if truncated
+    // First handle incomplete strings (remove last incomplete string)
+    const lastQuote = repairedText.lastIndexOf('"');
+    const quotesBeforeLast = (repairedText.substring(0, lastQuote).match(/"/g) || []).length;
+    if (quotesBeforeLast % 2 === 0 && lastQuote > 0) {
+      // Last quote opens a string that isn't closed - truncate there
+      const lastGoodChar = repairedText.lastIndexOf(',', lastQuote);
+      if (lastGoodChar > repairedText.length - 200) {
+        repairedText = repairedText.substring(0, lastGoodChar);
+      }
+    }
+
+    // Close unclosed brackets
+    const openBrackets = (repairedText.match(/\[/g) || []).length;
+    const closeBrackets = (repairedText.match(/\]/g) || []).length;
+    if (openBrackets > closeBrackets) {
+      repairedText += ']'.repeat(openBrackets - closeBrackets);
+    }
+
+    // Close unclosed braces
     const openBraces = (repairedText.match(/\{/g) || []).length;
     const closeBraces = (repairedText.match(/\}/g) || []).length;
     if (openBraces > closeBraces) {

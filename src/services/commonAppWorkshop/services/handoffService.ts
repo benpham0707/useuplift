@@ -33,6 +33,8 @@ import { Stage1ATeachingService } from './stage1ATeachingService';
 import { Stage1BDiagnosisService } from './stage1BDiagnosisService';
 import { Stage2BatchService } from './stage2BatchService';
 import { Stage3ConsolidatedService } from './stage3ConsolidatedService';
+import { semanticClicheAnalyzer } from './semanticClicheAnalyzer';
+import { generateClicheIssues, formatClicheIssuesForStage2 } from './clicheIssueIntegration';
 import type { CollegeResearch } from '../types/collegeResearch';
 import type { VoiceExcavationInput, Stage0Output } from '../types/stage0Types';
 import type { ConceptualFoundation } from './stage1ATeachingService';
@@ -69,16 +71,19 @@ export interface WorkshopInput {
 }
 
 /**
- * Combined Stage 1 output (1A Teaching + 1B Diagnosis)
+ * Combined Stage 1 output (1A Teaching + 1B Diagnosis + Cliché Analysis)
  *
  * This represents the SPLIT ARCHITECTURE where teaching and diagnosis
  * are separate API calls for full depth and rigor.
+ *
+ * **CLICHÉ INTEGRATION**: If clichés are detected (risk score >= 40),
+ * cliché issues are merged with diagnostic issues for Stage 2 processing.
  */
 export interface Stage1CombinedOutput {
   // From Stage 1A (Teaching)
   conceptual_foundation: ConceptualFoundation;
 
-  // From Stage 1B (Diagnosis)
+  // From Stage 1B (Diagnosis) + Cliché Issues (merged)
   dimensional_assessment: DimensionalAssessment[];
   top_3_critical_issues: CriticalIssue[];
 
@@ -93,6 +98,13 @@ export interface Stage1CombinedOutput {
     };
     dimensional_baseline: Record<string, number>;
     concepts_taught: string[];
+    // Cliché context for targeted coaching
+    cliche_context?: {
+      overall_risk: string;
+      risk_score: number;
+      unique_elements_to_preserve: string[];
+      coaching_priority: string;
+    };
   };
 
   // Cost tracking (combined)
@@ -100,6 +112,7 @@ export interface Stage1CombinedOutput {
   cost_breakdown: {
     teaching: number; // Stage 1A
     diagnosis: number; // Stage 1B
+    cliche_analysis?: number; // Cliché detection
   };
   tokens_used: {
     haiku_input: number;
@@ -340,10 +353,10 @@ export class HandoffService {
     input: WorkshopInput,
     stage0Output: Stage0Output
   ): Promise<Stage1CombinedOutput> {
-    console.log('📚 Stage 1: Running split architecture (1A Teaching → 1B Diagnosis)...');
+    console.log('📚 Stage 1: Running split architecture (1A Teaching → 1B Diagnosis → Cliché Analysis)...');
 
     // STEP 1: Foundation Teaching (Stage 1A)
-    console.log('  Step 1/2: Running Stage 1A (Foundation Teaching)...');
+    console.log('  Step 1/3: Running Stage 1A (Foundation Teaching)...');
     const stage1A = await this.stage1AService.generateTeaching(
       stage0Output.voiceFirstDraft.draft,
       input.essayPrompt,
@@ -351,7 +364,7 @@ export class HandoffService {
     );
 
     // STEP 2: Deep Diagnosis (Stage 1B) using Stage 1A concepts
-    console.log('  Step 2/2: Running Stage 1B (Deep Diagnosis using Stage 1A concepts)...');
+    console.log('  Step 2/3: Running Stage 1B (Deep Diagnosis using Stage 1A concepts)...');
 
     // Construct voice context for Stage 1B (with defensive defaults)
     const voiceContext = {
@@ -371,9 +384,65 @@ export class HandoffService {
       input.collegeResearch // Pass college research for citation mapping
     );
 
+    // STEP 3: Cliché Analysis (runs in parallel with validation)
+    console.log('  Step 3/3: Running Cliché Analysis...');
+    let clicheAnalysisCost = 0;
+    let clicheContext: Stage1CombinedOutput['stage2_handoff']['cliche_context'] | undefined;
+    let mergedIssues = [...stage1B.top_3_critical_issues];
+
+    try {
+      const clicheAnalysis = await semanticClicheAnalyzer.analyze(
+        stage0Output.voiceFirstDraft.draft,
+        { college_id: input.collegeId }
+      );
+      clicheAnalysisCost = clicheAnalysis.cost || 0;
+
+      // Only integrate cliché issues if risk warrants it
+      if (clicheAnalysis.cliche_risk_score >= 40) {
+        console.log(`  ⚠️  Cliché risk detected: ${clicheAnalysis.overall_cliche_risk} (${clicheAnalysis.cliche_risk_score}/100)`);
+
+        // Generate cliché-specific issues
+        const clicheIssues = generateClicheIssues(clicheAnalysis, {
+          collegeId: input.collegeId,
+          essayText: stage0Output.voiceFirstDraft.draft,
+          maxIssues: 2, // Limit cliché issues to avoid overwhelming
+          minRiskScore: 40,
+        });
+
+        if (clicheIssues.length > 0) {
+          // Merge issues: prioritize diagnostic issues, add cliché issues if they don't overlap
+          const existingSymptomTypes = new Set(stage1B.top_3_critical_issues.map(i => i.symptom_type));
+          const newClicheIssues = clicheIssues.filter(ci =>
+            !existingSymptomTypes.has(ci.symptom_type) &&
+            !existingSymptomTypes.has('telling_not_showing') // Don't duplicate telling issues
+          );
+
+          // Renumber merged issues
+          mergedIssues = [...stage1B.top_3_critical_issues, ...newClicheIssues.slice(0, 1)];
+          mergedIssues.forEach((issue, idx) => {
+            issue.issue_number = idx + 1;
+          });
+
+          // Cap at 3 issues
+          mergedIssues = mergedIssues.slice(0, 3);
+
+          console.log(`  ✓ Added ${newClicheIssues.length > 0 ? 1 : 0} cliché-specific issue(s)`);
+        }
+
+        // Format cliché context for Stage 2 handoff
+        const formattedClicheContext = formatClicheIssuesForStage2(clicheIssues, clicheAnalysis);
+        clicheContext = formattedClicheContext.cliche_context;
+      } else {
+        console.log(`  ✓ Low cliché risk (${clicheAnalysis.cliche_risk_score}/100) - no cliché issues added`);
+      }
+    } catch (clicheError) {
+      console.warn(`  ⚠️  Cliché analysis failed (non-blocking): ${clicheError}`);
+      // Continue without cliché analysis - it's enhancement, not critical
+    }
+
     // VALIDATE Stage 1B output quality
     const missingElementsWarnings: string[] = [];
-    stage1B.top_3_critical_issues.forEach((issue, idx) => {
+    mergedIssues.forEach((issue, idx) => {
       if (!issue.missing_elements ||
           (!issue.missing_elements.sensory_details?.length &&
            !issue.missing_elements.concrete_objects?.length &&
@@ -387,24 +456,29 @@ export class HandoffService {
       console.warn(`⚠️  Stage 1 warnings: ${missingElementsWarnings.join(', ')}`);
     }
 
-    // COMBINE outputs from both stages
-    const combinedCost = stage1A.cost + stage1B.cost;
+    // COMBINE outputs from all stages
+    const combinedCost = stage1A.cost + stage1B.cost + clicheAnalysisCost;
 
-    console.log(`✓ Stage 1 complete (Split Architecture)`);
+    console.log(`✓ Stage 1 complete (Split Architecture + Cliché Analysis)`);
     console.log(`  1A Teaching: $${stage1A.cost.toFixed(3)}`);
     console.log(`  1B Diagnosis: $${stage1B.cost.toFixed(3)}`);
+    console.log(`  Cliché Analysis: $${clicheAnalysisCost.toFixed(3)}`);
     console.log(`  Total: $${combinedCost.toFixed(3)}`);
-    console.log(`  Top ${stage1B.top_3_critical_issues.length} issues identified with PIQ-level depth`);
+    console.log(`  Top ${mergedIssues.length} issues identified (including cliché issues if detected)`);
 
     return {
       conceptual_foundation: stage1A.conceptual_foundation,
       dimensional_assessment: stage1B.dimensional_assessment,
-      top_3_critical_issues: stage1B.top_3_critical_issues,
-      stage2_handoff: stage1B.stage2_handoff,
+      top_3_critical_issues: mergedIssues,
+      stage2_handoff: {
+        ...stage1B.stage2_handoff,
+        cliche_context,
+      },
       cost: combinedCost,
       cost_breakdown: {
         teaching: stage1A.cost,
         diagnosis: stage1B.cost,
+        cliche_analysis: clicheAnalysisCost,
       },
       tokens_used: {
         haiku_input: stage1B.tokens_used.haiku_input,
