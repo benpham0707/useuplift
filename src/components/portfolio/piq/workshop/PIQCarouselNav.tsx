@@ -19,18 +19,28 @@ interface PIQCarouselNavProps {
   useRoutes?: boolean;
   /** Optional: map of promptId to essay status for showing completion indicators */
   essayStatus?: Record<string, 'empty' | 'draft' | 'complete'>;
+  /** Optional: callback to prefetch a PIQ essay */
+  onPrefetch?: (promptId: string) => void;
 }
 
 export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
   currentPromptId,
   onPromptChange,
   useRoutes = true,
-  essayStatus = {}
+  essayStatus = {},
+  onPrefetch,
 }) => {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const currentIndex = UC_PIQ_PROMPTS.findIndex(p => p.id === currentPromptId);
   const currentPrompt = UC_PIQ_PROMPTS[currentIndex];
+
+  // Trigger prefetch callback if provided
+  const prefetchPIQ = (promptId: string) => {
+    if (onPrefetch) {
+      onPrefetch(promptId);
+    }
+  };
 
   const handleNavigate = (prompt: typeof UC_PIQ_PROMPTS[0]) => {
     if (useRoutes) {
@@ -97,6 +107,10 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
           variant="ghost"
           size="sm"
           onClick={handlePrevious}
+          onMouseEnter={() => {
+            const prevIndex = currentIndex > 0 ? currentIndex - 1 : UC_PIQ_PROMPTS.length - 1;
+            prefetchPIQ(UC_PIQ_PROMPTS[prevIndex].id);
+          }}
           className="h-8 w-8 p-0 hover:bg-muted"
         >
           <ChevronLeft className="w-5 h-5" />
@@ -137,6 +151,7 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
                     <button
                       key={prompt.id}
                       onClick={() => handleNavigate(prompt)}
+                      onMouseEnter={() => prefetchPIQ(prompt.id)}
                       className={cn(
                         "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all",
                         isActive 
@@ -185,6 +200,10 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
           variant="ghost"
           size="sm"
           onClick={handleNext}
+          onMouseEnter={() => {
+            const nextIndex = currentIndex < UC_PIQ_PROMPTS.length - 1 ? currentIndex + 1 : 0;
+            prefetchPIQ(UC_PIQ_PROMPTS[nextIndex].id);
+          }}
           className="h-8 w-8 p-0 hover:bg-muted"
         >
           <ChevronRight className="w-5 h-5" />
@@ -203,6 +222,7 @@ export const PIQCarouselNav: React.FC<PIQCarouselNavProps> = ({
                 <TooltipTrigger asChild>
                   <button
                     onClick={() => handleDotClick(index)}
+                    onMouseEnter={() => prefetchPIQ(prompt.id)}
                     className={cn(
                       "w-2 h-2 rounded-full transition-all",
                       isActive

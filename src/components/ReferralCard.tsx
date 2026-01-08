@@ -1,83 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
 import { Share2, Copy, Check, Users, Gift, Loader2 } from 'lucide-react';
-
-interface ReferralStats {
-  code: string;
-  shareLink: string;
-  stats: {
-    totalReferrals: number;
-    signupBonuses: number;
-    purchaseBonuses: number;
-    totalCreditsEarned: number;
-  };
-}
+import { useAuth } from '@/hooks/useAuth';
+import { useReferralData } from '@/query/useReferralData';
 
 export const ReferralCard = () => {
-  const { getToken } = useClerkAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [referralData, setReferralData] = useState<ReferralStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    loadReferralData();
-  }, []);
-
-  const loadReferralData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const token = await getToken();
-      if (!token) {
-        setError('Not authenticated');
-        return;
-      }
-
-      // Use VITE_API_BASE if set (production), otherwise use relative path (development proxy)
-      const apiBase = import.meta.env.VITE_API_BASE || '';
-      const apiUrl = `${apiBase}/api/v1/referrals/me`;
-
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const contentType = response.headers.get('content-type');
-        let errorMessage = 'Failed to load referral data';
-
-        if (contentType?.includes('application/json')) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || errorMessage;
-        }
-
-        setError(errorMessage);
-        return;
-      }
-
-      const contentType = response.headers.get('content-type');
-      if (!contentType?.includes('application/json')) {
-        console.error('Expected JSON but got:', contentType);
-        setError('Server returned invalid response format');
-        return;
-      }
-
-      const data = await response.json();
-      setReferralData(data);
-    } catch (error) {
-      console.error('Failed to load referral data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load referral data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Load referral data from React Query cache
+  const {
+    data: referralData,
+    isLoading: loading,
+    error,
+    refetch,
+  } = useReferralData(user?.id || null);
 
   const copyToClipboard = async () => {
     if (!referralData) return;
@@ -129,12 +70,12 @@ export const ReferralCard = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <p className="text-sm text-muted-foreground text-center py-4">
-            {error || 'Failed to load referral data'}
+            {error ? (error as Error).message : 'Failed to load referral data'}
           </p>
           <Button
             variant="outline"
             size="sm"
-            onClick={loadReferralData}
+            onClick={() => refetch()}
             className="w-full"
           >
             Try Again

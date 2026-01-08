@@ -11,6 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, User, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { usePersonalInformation } from '@/query/usePortfolioData';
 
 // Hard coded data values as placeholders for comprehensive personal information structure
 // This represents all the personal information fields including basic info, demographics, and family context
@@ -91,6 +92,9 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   
+  // Load and save personal information with React Query
+  const { data: savedData, isLoading: isLoadingData, save: saveData, isSaving } = usePersonalInformation();
+  
   // Mock data for demonstration - comprehensive personal information structure
   const [data, setData] = useState<PersonalInformationData>({
     firstName: '',
@@ -161,69 +165,50 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
     });
   };
 
-  // Prefill from latest saved personal_information
+  // Prefill from React Query cached personal_information (instant on revisit)
   useEffect(() => {
-    (async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        if (!profile?.id) return;
+    if (!savedData) return;
+    const pi = savedData;
 
-        const { data: pi } = await supabase
-          .from('personal_information')
-          .select('*')
-          .eq('profile_id', profile.id)
-          .maybeSingle();
-        if (!pi) return;
+    const allowedPronouns = ['she-her','he-him','they-them','other','prefer-not-to-say'];
+    const allowedGender = ['female','male','non-binary','self-describe','prefer-not-to-say'];
 
-        const allowedPronouns = ['she-her','he-him','they-them','other','prefer-not-to-say'];
-        const allowedGender = ['female','male','non-binary','self-describe','prefer-not-to-say'];
-
-        setData((prev: PersonalInformationData) => ({
-          ...prev,
-          firstName: pi.first_name || '',
-          lastName: pi.last_name || '',
-          preferredName: pi.preferred_name || '',
-          dateOfBirth: pi.date_of_birth || '',
-          primaryEmail: pi.primary_email || prev.primaryEmail,
-          primaryPhone: pi.primary_phone || '',
-          secondaryPhone: pi.secondary_phone || '',
-          pronouns: allowedPronouns.includes(pi.pronouns) ? pi.pronouns : 'other',
-          genderIdentity: allowedGender.includes(pi.gender_identity) ? pi.gender_identity : 'prefer-not-to-say',
-          permanentAddress: (pi.permanent_address as any) || prev.permanentAddress,
-          alternateAddress: (pi.alternate_address as any) || prev.alternateAddress,
-          placeOfBirth: (pi.place_of_birth as any) || prev.placeOfBirth,
-          hispanicLatino: pi.hispanic_latino || '',
-          hispanicBackground: pi.hispanic_background || '',
-          raceEthnicity: ((pi.race_ethnicity || []) as any[]).map(String),
-          citizenshipStatus: pi.citizenship_status || '',
-          primaryLanguage: pi.primary_language || prev.primaryLanguage,
-          otherLanguages: (pi.other_languages || []) as any,
-          yearsInUS: pi.years_in_us ?? undefined,
-          formerNames: (pi.former_names || []) as any,
-          livingSituation: (typeof pi.living_situation === 'string' && (pi.living_situation as string).startsWith('other:')) ? 'other' : (pi.living_situation || ''),
-          householdSize: pi.household_size || '',
-          householdIncome: pi.household_income || '',
-          parentGuardians: Array.isArray(pi.parent_guardians) ? (pi.parent_guardians as any[]).slice(0,2).map(pg => ({
-            relationship: pg.relationship || '',
-            educationLevel: pg.education_level || '',
-            occupation: pg.occupation_category || '',
-            contactInfo: pg.contact_email || pg.contact_phone || ''
+    setData((prev: PersonalInformationData) => ({
+      ...prev,
+      firstName: pi.first_name || '',
+      lastName: pi.last_name || '',
+      preferredName: pi.preferred_name || '',
+      dateOfBirth: pi.date_of_birth || '',
+      primaryEmail: pi.primary_email || prev.primaryEmail,
+      primaryPhone: pi.primary_phone || '',
+      secondaryPhone: pi.secondary_phone || '',
+      pronouns: allowedPronouns.includes(pi.pronouns) ? pi.pronouns : 'other',
+      genderIdentity: allowedGender.includes(pi.gender_identity) ? pi.gender_identity : 'prefer-not-to-say',
+      permanentAddress: (pi.permanent_address as any) || prev.permanentAddress,
+      alternateAddress: (pi.alternate_address as any) || prev.alternateAddress,
+      placeOfBirth: (pi.place_of_birth as any) || prev.placeOfBirth,
+      hispanicLatino: pi.hispanic_latino || '',
+      hispanicBackground: pi.hispanic_background || '',
+      raceEthnicity: ((pi.race_ethnicity || []) as any[]).map(String),
+      citizenshipStatus: pi.citizenship_status || '',
+      primaryLanguage: pi.primary_language || prev.primaryLanguage,
+      otherLanguages: (pi.other_languages || []) as any,
+      yearsInUS: pi.years_in_us ?? undefined,
+      formerNames: (pi.former_names || []) as any,
+      livingSituation: (typeof pi.living_situation === 'string' && (pi.living_situation as string).startsWith('other:')) ? 'other' : (pi.living_situation || ''),
+      householdSize: pi.household_size || '',
+      householdIncome: pi.household_income || '',
+      parentGuardians: Array.isArray(pi.parent_guardians) ? (pi.parent_guardians as any[]).slice(0,2).map(pg => ({
+        relationship: pg.relationship || '',
+        educationLevel: pg.education_level || '',
+        occupation: pg.occupation_category || '',
+        contactInfo: pg.contact_email || pg.contact_phone || ''
           })) : prev.parentGuardians,
-          numberOfSiblings: (pi.siblings as any)?.count ?? prev.numberOfSiblings,
-          siblingsEducation: (pi.siblings as any)?.education_status || (pi.siblings as any)?.education_summary || prev.siblingsEducation,
-          firstGenStatus: pi.first_gen === true ? 'yes' : pi.first_gen === false ? 'no' : 'partial'
-        }));
-      } catch (e) {
-        // ignore
-      }
-    })();
-  }, []);
+      numberOfSiblings: (pi.siblings as any)?.count ?? prev.numberOfSiblings,
+      siblingsEducation: (pi.siblings as any)?.education_status || (pi.siblings as any)?.education_summary || prev.siblingsEducation,
+      firstGenStatus: pi.first_gen === true ? 'yes' : pi.first_gen === false ? 'no' : 'partial'
+    }));
+  }, [savedData]);
 
   const handleNext = () => {
     if (currentStep < STEPS.length) {
@@ -240,21 +225,8 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // Get user's profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('user_id', user.id)
-        .single();
-
-      if (!profile) throw new Error('Profile not found');
-
-      // Create personal information record
+      // Prepare data for save using React Query mutation
       const personalInfoData = {
-        profile_id: profile.id,
         first_name: data.firstName,
         last_name: data.lastName,
         preferred_name: data.preferredName,
@@ -286,43 +258,40 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
         first_gen: data.firstGenStatus === 'yes' ? true : data.firstGenStatus === 'no' ? false : null
       };
 
-      // Upsert without ON CONFLICT (profile_id is not unique) → select then update/insert
-      const { data: existingPI, error: piFetchErr } = await supabase
-        .from('personal_information')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .maybeSingle();
-      if (piFetchErr) throw piFetchErr;
+      // Save via React Query mutation (auto-invalidates portfolio progress)
+      await saveData(personalInfoData, {
+        onSuccess: () => {
+          // Update profile completion score
+          supabase.auth.getUser().then(({ data: { user } }) => {
+            if (user) {
+              supabase
+                .from('profiles')
+                .select('id')
+                .eq('user_id', user.id)
+                .maybeSingle()
+                .then(({ data: profile }) => {
+                  if (profile?.id) {
+                    supabase
+                      .from('profiles')
+                      .update({ completion_score: 0.6 })
+                      .eq('id', profile.id);
+                  }
+                });
+            }
+          });
 
-      if (existingPI?.id) {
-        const { error: piUpdateErr } = await supabase
-          .from('personal_information')
-          .update(personalInfoData)
-          .eq('id', existingPI.id as string);
-        if (piUpdateErr) throw piUpdateErr;
-      } else {
-        const { error: piInsertErr } = await supabase
-          .from('personal_information')
-          .insert(personalInfoData);
-        if (piInsertErr) throw piInsertErr;
-      }
+          toast({
+            title: "Personal information saved!",
+            description: "Your personal information has been successfully recorded.",
+          });
 
-      // Update profile completion score
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({ 
-          completion_score: 0.6
-        })
-        .eq('id', profile.id);
-
-      if (profileError) throw profileError;
-
-      toast({
-        title: "Personal information saved!",
-        description: "Your personal information has been successfully recorded.",
+          onProgressRefresh?.();
+          onComplete();
+        },
+        onError: () => {
+          throw new Error('Save failed');
+        }
       });
-
-      onComplete();
     } catch (error) {
       toast({
         title: "Error saving information",
@@ -476,19 +445,10 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
           <Button 
             variant="secondary"
             onClick={async () => {
-              // save draft: reuse handleSubmit's mapping but without completion toast
+              // Save draft via React Query mutation
               setIsLoading(true);
               try {
-                const { data: { user } } = await supabase.auth.getUser();
-                if (!user) throw new Error('Not authenticated');
-                const { data: profile } = await supabase
-                  .from('profiles')
-                  .select('id, completion_details, completion_score')
-                  .eq('user_id', user.id)
-                  .single();
-                if (!profile) throw new Error('Profile not found');
                 const personalInfoDataDraft = {
-                  profile_id: profile.id,
                   first_name: data.firstName || null,
                   last_name: data.lastName || null,
                   preferred_name: data.preferredName || null,
@@ -516,27 +476,44 @@ export default function BasicInformationWizard({ onComplete, onCancel, onProgres
                   siblings: { count: data.numberOfSiblings ?? null, education_status: data.siblingsEducation || null },
                   first_gen: data.firstGenStatus === 'yes' ? true : data.firstGenStatus === 'no' ? false : null
                 } as any;
-                const { data: existingPI } = await supabase
-                  .from('personal_information')
-                  .select('id')
-                  .eq('profile_id', profile.id)
-                  .maybeSingle();
-                if (existingPI?.id) {
-                  await supabase.from('personal_information').update(personalInfoDataDraft).eq('id', existingPI.id);
-                } else {
-                  await supabase.from('personal_information').insert(personalInfoDataDraft);
-                }
-                // progress bump light
-                await supabase.from('profiles').update({ completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) }).eq('id', profile.id);
-                toast({ title: 'Progress saved', description: 'You can come back anytime.' });
-                onProgressRefresh?.();
+
+                await saveData(personalInfoDataDraft, {
+                  onSuccess: () => {
+                    // Update profile completion score (light bump for draft)
+                    supabase.auth.getUser().then(({ data: { user } }) => {
+                      if (user) {
+                        supabase
+                          .from('profiles')
+                          .select('id, completion_score')
+                          .eq('user_id', user.id)
+                          .maybeSingle()
+                          .then(({ data: profile }) => {
+                            if (profile?.id) {
+                              supabase
+                                .from('profiles')
+                                .update({ 
+                                  completion_score: Math.max(Number(profile.completion_score ?? 0), 0.3) 
+                                })
+                                .eq('id', profile.id);
+                            }
+                          });
+                      }
+                    });
+
+                    toast({ title: 'Progress saved', description: 'You can come back anytime.' });
+                    onProgressRefresh?.();
+                  },
+                  onError: () => {
+                    throw new Error('Save failed');
+                  }
+                });
               } catch (e) {
                 toast({ title: 'Save failed', description: 'Try again later.', variant: 'destructive' });
               } finally {
                 setIsLoading(false);
               }
             }}
-            disabled={isLoading}
+            disabled={isLoading || isSaving}
           >
             Save & Quit
           </Button>

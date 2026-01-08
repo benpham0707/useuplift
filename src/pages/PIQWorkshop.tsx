@@ -80,6 +80,11 @@ import type { ChatMessage } from '@/services/workshop/chatService';
 import { useAuth } from '@clerk/clerk-react';
 import { useClerkUserId, useIsAuthenticated } from '@/services/auth/clerkSupabaseAdapter';
 
+// React Query for caching
+import { useQueryClient } from '@tanstack/react-query';
+import { usePIQEssay, type PIQEssayData } from '@/query/usePIQEssay';
+import { queryKeys } from '@/query/queryKeys';
+
 // Navigation
 import Navigation from '@/components/Navigation';
 
@@ -123,10 +128,25 @@ export default function PIQWorkshop() {
   const { getToken } = useAuth();
   const userId = useClerkUserId();
   const isAuthenticated = useIsAuthenticated();
+  const queryClient = useQueryClient();
 
   // ============================================================================
-  // STATE
+  // STATE (selectedPromptId must be initialized before use)
   // ============================================================================
+
+  // Initialize selectedPromptId FIRST before any usage
+  const [selectedPromptId, setSelectedPromptId] = useState<string>(getPromptIdFromUrl());
+
+  // Now we can safely use selectedPromptId
+  const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
+  
+  // Load PIQ essay from React Query cache (instant on revisit)
+  const {
+    data: piqData,
+    isLoading: isLoadingPIQData,
+  } = usePIQEssay(userId, selectedPromptId, selectedPrompt?.prompt || '');
+
+  // Other state below
 
   // Database state (NEW)
   const [currentEssayId, setCurrentEssayId] = useState<string | null>(null);
@@ -180,8 +200,7 @@ export default function PIQWorkshop() {
   // Track if essay has enough content to analyze
   const canAnalyze = currentDraft.trim().length >= MIN_ESSAY_LENGTH;
 
-  // NEW: Full Backend Integration State
-  const [selectedPromptId, setSelectedPromptId] = useState<string>(getPromptIdFromUrl()); // Based on URL param
+  // NEW: Full Backend Integration State (selectedPromptId moved up to avoid TDZ)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [narrativeOverview, setNarrativeOverview] = useState<string | null>(null);
@@ -208,6 +227,112 @@ export default function PIQWorkshop() {
   const currentScore = analysisResult?.analysis?.narrative_quality_index || 0;
   const initialScore = initialScoreRef.current;
   const hasAnalysis = analysisResult !== null && dimensions.length > 0;
+
+  // ============================================================================
+  // INSTANT PER-PROMPT HYDRATION (runs immediately on prompt switch)
+  // ============================================================================
+  
+  // Hydrate editor state immediately when prompt changes (source of truth)
+  useEffect(() => {
+    if (!userId || !selectedPromptId) return;
+
+    // Read cached essay data synchronously from React Query cache
+    const cachedData = queryClient.getQueryData<PIQEssayData>(
+      queryKeys.piqEssay(userId, selectedPromptId)
+    );
+
+    if (cachedData?.essay) {
+      // Cached essay exists - hydrate immediately for instant display
+      const { essay, analysis } = cachedData;
+      
+      setCurrentEssayId(essay.id);
+      setCurrentDraft(essay.draft_current || essay.draft_original);
+      
+      // Create initial version from loaded essay
+      const initialVersion: DraftVersion = {
+        text: essay.draft_current || essay.draft_original,
+        timestamp: new Date(essay.updated_at).getTime(),
+        score: analysis?.analysis?.narrative_quality_index || 73,
+      };
+      
+      setDraftVersions([initialVersion]);
+      setCurrentVersionIndex(0);
+      
+      // Load analysis if available
+      if (analysis) {
+        const hasTeachingData = analysis.workshopItems?.some(item => item.teaching);
+        
+        if (!hasTeachingData && analysis.workshopItems?.length > 0) {
+          setAnalysisResult({ ...analysis, needsTeachingUpgrade: true } as any);
+        } else {
+          setAnalysisResult(analysis);
+        }
+        
+        // Update initial score
+        if (analysis.analysis?.narrative_quality_index) {
+          initialScoreRef.current = analysis.analysis.narrative_quality_index;
+        }
+        
+        // Transform analysis to UI dimensions
+        if (analysis.rubricDimensionDetails && analysis.rubricDimensionDetails.length > 0) {
+          const transformedDimensions: RubricDimension[] = analysis.rubricDimensionDetails.map(dim => {
+            const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
+            
+            const issuesForDimension = (analysis.workshopItems || []).filter(
+              item => item.rubric_category === dim.dimension_name
+            );
+            
+            const transformedIssues = issuesForDimension.map(item => ({
+              id: item.id,
+              dimensionId: dim.dimension_name,
+              title: item.problem,
+              excerpt: item.quote,
+              analysis: item.why_it_matters,
+              impact: item.why_it_matters || '',
+              teaching: item.teaching,
+              suggestions: item.suggestions.map(sug => ({
+                text: sug.text,
+                rationale: sug.rationale,
+                type: 'replace' as const,
+              })),
+              status: 'not_fixed' as const,
+              currentSuggestionIndex: 0,
+              expanded: false,
+            }));
+            
+            return {
+              id: dim.dimension_name,
+              name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              score: dim.final_score,
+              maxScore: 10,
+              status,
+              weight: 10,
+              overview: dim.evidence?.justification || 'Analysis in progress',
+              issues: transformedIssues,
+            };
+          });
+          
+          setDimensions(transformedDimensions);
+        }
+      }
+      
+      setHasUnsavedChanges(false);
+      setNeedsReanalysis(false);
+    } else {
+      // No cached essay - clear immediately for this prompt
+      setCurrentDraft('');
+      setCurrentEssayId(null);
+      setDraftVersions([]);
+      setCurrentVersionIndex(0);
+      setAnalysisResult(null);
+      setDimensions([]);
+      setChatMessages([]);
+      setNeedsReanalysis(false);
+      setHasUnsavedChanges(false);
+      setNarrativeOverview(null);
+      initialScoreRef.current = 0;
+    }
+  }, [selectedPromptId, userId, queryClient]);
 
   // ============================================================================
   // REAL BACKEND ANALYSIS - Full Surgical Workshop
@@ -583,6 +708,13 @@ export default function PIQWorkshop() {
             // Clear localStorage after successful database save (both formats)
             clearAllLocalDrafts(effectiveEssayId, selectedPromptId);
             
+            // Invalidate React Query cache to reflect new analysis
+            if (userId) {
+              queryClient.invalidateQueries({
+                queryKey: queryKeys.piqEssay(userId, selectedPromptId),
+              });
+            }
+            
             setHasUnsavedChanges(false);
             setLastSaveTime(new Date());
             
@@ -652,177 +784,159 @@ export default function PIQWorkshop() {
   // AUTO-SAVE & RESUME SESSION
   // ============================================================================
 
-  // Load from database on mount (NEW)
+  // Hydrate state from React Query cache (background refetch handler)
   useEffect(() => {
-    async function loadFromDatabase() {
-      if (!userId || !selectedPromptId) {
-        return;
-      }
-
-      const selectedPrompt = UC_PIQ_PROMPTS.find(p => p.id === selectedPromptId);
-      if (!selectedPrompt) {
-        return;
-      }
-
-      // Reset all PIQ-specific state when switching prompts
-      setCurrentDraft('');
-      setAnalysisResult(null);
-      setDimensions([]);
-      setDraftVersions([]);
-      setCurrentEssayId(null);
-      setNeedsReanalysis(false);
-      setHasUnsavedChanges(false);
-      setNarrativeOverview(null);
-      setChatMessages([]); // Reset chat when switching PIQs
-
+    // Don't reset state if we're just loading - keep previous data visible
+    if (isLoadingPIQData) {
       setIsLoadingFromDatabase(true);
+      return;
+    }
 
-      try {
-        const token = await getToken({ template: 'supabase' });
-        if (!token) {
-          setIsLoadingFromDatabase(false);
-          return;
-        }
+    setIsLoadingFromDatabase(false);
 
-        const { success, essay, analysis, error } = await loadPIQEssay(
-          token,
-          userId,
-          selectedPromptId,
-          selectedPrompt.prompt
-        );
+    // If no data (new essay), this is already handled by the instant hydration effect above
+    // No need to reset here as the instant effect runs first on prompt change
+    if (!piqData?.essay) {
+      return;
+    }
 
-        if (!success) {
-          setIsLoadingFromDatabase(false);
-          return;
-        }
+    const { essay, analysis } = piqData;
 
-        if (essay) {
+    // Safety guard: Don't overwrite if user is actively typing
+    // The instant hydration effect handles initial load; this only handles background refetches
+    if (hasUnsavedChanges) {
+      // User has unsaved changes - skip applying fetched data to avoid overwriting their work
+      return;
+    }
 
-          // Update state with database data
-          setCurrentEssayId(essay.id);
-          setCurrentDraft(essay.draft_current || essay.draft_original);
+    // Update state with cached data (from background refetch)
+    setCurrentEssayId(essay.id);
+    setCurrentDraft(essay.draft_current || essay.draft_original);
 
-          // Create initial version from loaded essay
-          const initialVersion: DraftVersion = {
-            text: essay.draft_current || essay.draft_original,
-            timestamp: new Date(essay.updated_at).getTime(),
-            score: 73 // Will be updated if analysis is available
+    // Create initial version from loaded essay
+    const initialVersion: DraftVersion = {
+      text: essay.draft_current || essay.draft_original,
+      timestamp: new Date(essay.updated_at).getTime(),
+      score: 73, // Will be updated if analysis is available
+    };
+
+    setDraftVersions([initialVersion]);
+    setCurrentVersionIndex(0);
+
+    // Load analysis if available
+    if (analysis) {
+      // Check if this is pre-Phase19 analysis (no teaching data)
+      const hasTeachingData = analysis.workshopItems?.some(item => item.teaching);
+
+      if (!hasTeachingData && analysis.workshopItems?.length > 0) {
+        // Still load the analysis but flag it as needing upgrade
+        setAnalysisResult({ ...analysis, needsTeachingUpgrade: true } as any);
+      } else {
+        setAnalysisResult(analysis);
+      }
+
+      // Update initial version with actual score
+      if (analysis.analysis?.narrative_quality_index) {
+        initialVersion.score = analysis.analysis.narrative_quality_index;
+        setDraftVersions([initialVersion]);
+        initialScoreRef.current = analysis.analysis.narrative_quality_index;
+      }
+
+      // Transform analysis to UI dimensions (same logic as performFullAnalysis)
+      if (analysis.rubricDimensionDetails && analysis.rubricDimensionDetails.length > 0) {
+        const transformedDimensions: RubricDimension[] = analysis.rubricDimensionDetails.map(dim => {
+          const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
+
+          const issuesForDimension = (analysis.workshopItems || []).filter(
+            item => item.rubric_category === dim.dimension_name
+          );
+
+          const transformedIssues = issuesForDimension.map(item => ({
+            id: item.id,
+            dimensionId: dim.dimension_name,
+            title: item.problem,
+            excerpt: item.quote,
+            analysis: item.why_it_matters,
+            impact: item.why_it_matters || '',
+            teaching: item.teaching,
+            suggestions: item.suggestions.map(sug => ({
+              text: sug.text,
+              rationale: sug.rationale,
+              type:
+                sug.type === 'polished_original'
+                  ? ('replace' as const)
+                  : sug.type === 'voice_amplifier'
+                  ? ('replace' as const)
+                  : ('replace' as const),
+            })),
+            status: 'not_fixed' as const,
+            currentSuggestionIndex: 0,
+            expanded: false,
+          }));
+
+          return {
+            id: dim.dimension_name,
+            name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            score: dim.final_score,
+            maxScore: 10,
+            status,
+            weight: 10,
+            overview: dim.evidence?.justification || 'Analysis in progress',
+            issues: transformedIssues,
           };
+        });
 
-          setDraftVersions([initialVersion]);
-          setCurrentVersionIndex(0);
-
-          // Load analysis if available
-          if (analysis) {
-            
-            // Check if this is pre-Phase19 analysis (no teaching data)
-            const hasTeachingData = analysis.workshopItems?.some(item => item.teaching);
-            
-            if (!hasTeachingData && analysis.workshopItems?.length > 0) {
-              // Still load the analysis but flag it as needing upgrade
-              setAnalysisResult({ ...analysis, needsTeachingUpgrade: true } as any);
-            } else {
-              setAnalysisResult(analysis);
-            }
-
-            // Update initial version with actual score
-            if (analysis.analysis?.narrative_quality_index) {
-              initialVersion.score = analysis.analysis.narrative_quality_index;
-              setDraftVersions([initialVersion]);
-              initialScoreRef.current = analysis.analysis.narrative_quality_index;
-            }
-
-            // Transform analysis to UI dimensions (same logic as performFullAnalysis)
-            if (analysis.rubricDimensionDetails && analysis.rubricDimensionDetails.length > 0) {
-              const transformedDimensions: RubricDimension[] = analysis.rubricDimensionDetails.map((dim) => {
-                const status = dim.final_score >= 8 ? 'good' : dim.final_score >= 6 ? 'needs_work' : 'critical';
-
-                const issuesForDimension = (analysis.workshopItems || [])
-                  .filter(item => item.rubric_category === dim.dimension_name);
-
-                const transformedIssues = issuesForDimension.map((item) => ({
-                  id: item.id,
-                  dimensionId: dim.dimension_name,
-                  title: item.problem,
-                  excerpt: item.quote,
-                  analysis: item.why_it_matters,
-                  impact: item.why_it_matters || '',
-                  teaching: item.teaching,
-                  suggestions: item.suggestions.map((sug) => ({
-                    text: sug.text,
-                    rationale: sug.rationale,
-                    type: sug.type === 'polished_original' ? 'replace' as const :
-                          sug.type === 'voice_amplifier' ? 'replace' as const :
-                          'replace' as const
-                  })),
-                  status: 'not_fixed' as const,
-                  currentSuggestionIndex: 0,
-                  expanded: false,
-                }));
-
-                return {
-                  id: dim.dimension_name,
-                  name: dim.dimension_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-                  score: dim.final_score,
-                  maxScore: 10,
-                  status,
-                  weight: 10,
-                  overview: dim.evidence?.justification || 'Analysis in progress',
-                  issues: transformedIssues,
-                };
-              });
-
-              setDimensions(transformedDimensions);
-            }
-          }
-
-          // Load version history from database
-          const versionResult = await getVersionHistory(token, userId, essay.id);
-          if (versionResult.success && versionResult.versions && versionResult.versions.length > 0) {
-            // Transform database versions to UI format
-            const loadedVersions: DraftVersion[] = versionResult.versions.map(v => ({
-              text: v.draft_content,
-              timestamp: new Date(v.created_at).getTime(),
-              score: v.score, // May be undefined for 'save_draft' versions
-              // Map source to our simplified types (analyze or save_draft)
-              source: (v.source === 'analyze' || v.source === 'save_draft') 
-                ? v.source 
-                : (v.score !== undefined ? 'analyze' : 'save_draft')
-            }));
-            setDraftVersions(loadedVersions);
-            setCurrentVersionIndex(loadedVersions.length - 1);
-          } else {
-            // No version history - use current essay as single version
-          }
-
-          // Load chat messages for this essay
-          const chatResult = await loadChatMessages(token, userId, essay.id);
-          if (chatResult.success && chatResult.messages && chatResult.messages.length > 0) {
-            const loadedMessages: ChatMessage[] = chatResult.messages.map(msg => ({
-              id: msg.id,
-              role: msg.role,
-              content: msg.content,
-              timestamp: msg.message_timestamp
-            }));
-            setChatMessages(loadedMessages);
-          } else {
-          }
-
-          setLastSaveTime(new Date(essay.updated_at));
-          setHasUnsavedChanges(false);
-
-        } else {
-          // Fall through to localStorage check
-        }
-
-      } catch (error) {
-      } finally {
-        setIsLoadingFromDatabase(false);
+        setDimensions(transformedDimensions);
       }
     }
 
-    loadFromDatabase();
-  }, [userId, selectedPromptId]); // Only run when user or prompt changes
+    // Load version history + chat (still from DB for now)
+    const loadAdditionalData = async () => {
+      if (!userId || !essay.id) return;
+
+      try {
+        const token = await getToken({ template: 'supabase' });
+        if (!token) return;
+
+        // Load version history
+        const versionResult = await getVersionHistory(token, userId, essay.id);
+        if (versionResult.success && versionResult.versions && versionResult.versions.length > 0) {
+          const loadedVersions: DraftVersion[] = versionResult.versions.map(v => ({
+            text: v.draft_content,
+            timestamp: new Date(v.created_at).getTime(),
+            score: v.score,
+            source:
+              v.source === 'analyze' || v.source === 'save_draft'
+                ? v.source
+                : v.score !== undefined
+                ? 'analyze'
+                : 'save_draft',
+          }));
+          setDraftVersions(loadedVersions);
+          setCurrentVersionIndex(loadedVersions.length - 1);
+        }
+
+        // Load chat messages
+        const chatResult = await loadChatMessages(token, userId, essay.id);
+        if (chatResult.success && chatResult.messages && chatResult.messages.length > 0) {
+          const loadedMessages: ChatMessage[] = chatResult.messages.map(msg => ({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            timestamp: msg.message_timestamp,
+          }));
+          setChatMessages(loadedMessages);
+        }
+      } catch (error) {
+        console.error('Failed to load additional data:', error);
+      }
+    };
+
+    loadAdditionalData();
+
+    setLastSaveTime(new Date(essay.updated_at));
+    setHasUnsavedChanges(false);
+  }, [piqData, isLoadingPIQData, userId, getToken, hasUnsavedChanges]); // React to cache data changes
 
   // Resume session on mount (fallback to localStorage if database has nothing)
   useEffect(() => {
@@ -991,28 +1105,15 @@ export default function PIQWorkshop() {
     };
   }, [hasUnsavedChanges, currentDraft, selectedPromptId, currentScore, analysisResult, draftVersions]);
 
-  // Sync selectedPromptId when URL changes - reset all state for new prompt
+  // Sync selectedPromptId when URL changes (React Query cache handles data)
   useEffect(() => {
     const newPromptId = getPromptIdFromUrl();
     if (newPromptId !== selectedPromptId) {
       setSelectedPromptId(newPromptId);
-      setNeedsReanalysis(true);
-      
-      // Reset score state for new prompt - prevents showing wrong delta
-      initialScoreRef.current = 0;
-      
-      // Reset analysis state
-      setAnalysisResult(null);
-      setDimensions([]);
-      
-      // Reset local recovery state
-      setShowLocalRecovery(false);
-      setLocalRecoveryData(null);
-      
-      // Reset version history
-      setDbVersionHistory([]);
+      // React Query will fetch/cache new data automatically
+      // Don't reset state here - keep previous data visible until new data loads
     }
-  }, [piqNumber]);
+  }, [piqNumber, selectedPromptId]);
 
   // ============================================================================
   // HANDLERS (Same as ExtracurricularWorkshopFinal)
@@ -1284,6 +1385,29 @@ export default function PIQWorkshop() {
 
       // Clear localStorage after successful database save (both formats)
       clearAllLocalDrafts(essayId || null, selectedPromptId);
+      
+      // Update React Query cache immediately for instant prompt switching
+      if (userId && essayId) {
+        const updatedEssayData: PIQEssayData = {
+          essay: {
+            id: essayId,
+            draft_current: currentDraft,
+            draft_original: draftVersions[0]?.text || currentDraft,
+            updated_at: new Date().toISOString(),
+          },
+          analysis: analysisResult,
+        };
+        
+        queryClient.setQueryData(
+          queryKeys.piqEssay(userId, selectedPromptId),
+          updatedEssayData
+        );
+        
+        // Also invalidate to ensure eventual consistency with server timestamps
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.piqEssay(userId, selectedPromptId),
+        });
+      }
       
       setSaveStatus('saved');
       setLastSaveTime(new Date());
@@ -1653,6 +1777,27 @@ export default function PIQWorkshop() {
             <PIQCarouselNav
               currentPromptId={selectedPromptId || 'piq1'}
               onPromptChange={setSelectedPromptId}
+              onPrefetch={(promptId) => {
+                // Prefetch PIQ essay data for instant navigation
+                if (!userId) return;
+                
+                const prompt = UC_PIQ_PROMPTS.find(p => p.id === promptId);
+                if (!prompt) return;
+
+                queryClient.prefetchQuery({
+                  queryKey: queryKeys.piqEssay(userId, promptId),
+                  queryFn: async () => {
+                    const token = await getToken({ template: 'supabase' });
+                    if (!token) return { essay: null, analysis: null };
+
+                    const result = await loadPIQEssay(token, userId, promptId, prompt.prompt);
+                    return {
+                      essay: result.essay || null,
+                      analysis: result.analysis || null,
+                    };
+                  },
+                });
+              }}
             />
           </div>
 
@@ -1985,6 +2130,7 @@ export default function PIQWorkshop() {
             {/* Editor */}
             <Card className="p-6 bg-gradient-to-br from-background/95 via-background/90 to-pink-50/80 dark:from-background/95 dark:via-background/90 dark:to-pink-950/20 backdrop-blur-xl border shadow-lg">
             <EditorView
+                key={selectedPromptId}
                 currentDraft={currentDraft}
                 onDraftChange={handleDraftChange}
                 onSave={handleSave}

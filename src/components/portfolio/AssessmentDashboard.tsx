@@ -24,6 +24,7 @@ import GoalsAspirationsWizard from '@/components/portfolio/GoalsAspirationsWizar
 import SupportNetworkWizard from '@/components/portfolio/SupportNetworkWizard';
 import PersonalGrowthWizard from '@/components/portfolio/PersonalGrowthWizard';
 import { supabase } from '@/integrations/supabase/client';
+import { usePortfolioProgress } from '@/query/usePortfolioData';
 
 interface AssessmentDashboardProps {
   onProgressUpdate: (progress: number) => void;
@@ -31,6 +32,9 @@ interface AssessmentDashboardProps {
 }
 
 const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDashboardProps) => {
+  // Load portfolio progress from React Query cache (instant on revisit)
+  const { data: progressData, isLoading: progressLoading, refetch: refetchProgress } = usePortfolioProgress();
+
   const [assessmentSections, setAssessmentSections] = useState([
     {
       id: 'personal',
@@ -97,6 +101,17 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [personalItemStatuses, setPersonalItemStatuses] = useState<boolean[] | undefined>(undefined);
   const [growthStatus, setGrowthStatus] = useState<'not-started' | 'in-progress' | 'completed'>('not-started');
+
+  // Update assessment sections when progress data loads
+  useEffect(() => {
+    if (!progressData) return;
+
+    setAssessmentSections(prev => prev.map(section => {
+      const progress = progressData[section.id as keyof typeof progressData] || 0;
+      const status = progress === 0 ? 'not-started' : progress === 100 ? 'completed' : 'in-progress';
+      return { ...section, progress, status };
+    }));
+  }, [progressData]);
 
   // Load personal info progress from DB
   const refreshPersonalProgress = async () => {
@@ -178,15 +193,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
     }
   };
 
-  useEffect(() => {
-    refreshPersonalProgress();
-    refreshExperiencesProgress();
-    refreshGrowthProgress();
-    refreshAcademicProgress();
-    refreshFamilyProgress();
-    refreshGoalsProgress();
-    refreshSupportProgress();
-  }, []);
+  // Portfolio progress is now loaded via React Query hook - no need for manual refresh on mount
 
   // Load experiences progress from DB
   const refreshExperiencesProgress = async () => {
@@ -570,7 +577,7 @@ const AssessmentDashboard = ({ onProgressUpdate, currentProgress }: AssessmentDa
               refreshPersonalProgress();
             }}
             onCancel={() => setOpenSection(null)}
-            onProgressRefresh={refreshPersonalProgress}
+            onProgressRefresh={() => refetchProgress()}
           />
         </DialogContent>
       </Dialog>

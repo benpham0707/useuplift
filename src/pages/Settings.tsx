@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -32,14 +32,9 @@ import {
 import GradientZap from '@/components/ui/GradientZap';
 import Navigation from '@/components/Navigation';
 import { ReferralCard } from '@/components/ReferralCard';
-
-interface CreditTransaction {
-  id: string;
-  amount: number;
-  type: string;
-  description: string;
-  created_at: string;
-}
+import { useSettingsData, type CreditTransaction } from '@/query/useSettingsData';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/query/queryKeys';
 
 const Settings = () => {
   const { user, signOut, loading: authLoading } = useAuth();
@@ -47,84 +42,45 @@ const Settings = () => {
   const { openUserProfile } = useClerk();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   
-  const [credits, setCredits] = useState<number | null>(null);
-  const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [profileLoading, setProfileLoading] = useState(true);
+  // Load settings data from React Query cache
+  const {
+    data: settingsData,
+    isLoading: profileLoading,
+  } = useSettingsData(user?.id || null);
 
-  // Load profile data
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      navigate('/auth');
-      return;
-    }
+  const credits = settingsData?.credits ?? 0;
+  const transactions = settingsData?.transactions ?? [];
 
-    const loadProfile = async () => {
-      try {
-        setProfileLoading(true);
-        
-        // Load profile with credits
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('credits')
-          .eq('user_id', user.id)
-          .maybeSingle() as { data: any; error: any };
+  // Account deletion mutation
+  const deleteAccountMutation = useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error('No user');
 
-        if (profile) {
-          setCredits(profile.credits ?? 0);
-        }
-
-        // Load recent transactions
-        const { data: txns } = await (supabase as any)
-          .from('credit_transactions')
-          .select('id, amount, type, description, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(10) as { data: CreditTransaction[] | null; error: any };
-
-        if (txns) {
-          setTransactions(txns);
-        }
-      } catch (err) {
-      } finally {
-        setProfileLoading(false);
-      }
-    };
-
-    loadProfile();
-  }, [user, authLoading, navigate]);
-
-  // Handle account deletion
-  const handleDeleteAccount = async () => {
-    try {
-      setIsDeleting(true);
-      const token = await getToken();
-      
-      if (!token) {
-        navigate('/auth');
-        return;
-      }
-
-      // Soft-delete profile by setting deleted_at
       const { error } = await supabase
         .from('profiles')
         .update({ deleted_at: new Date().toISOString() })
-        .eq('user_id', user?.id);
+        .eq('user_id', user.id);
 
-      if (error) {
-        return;
-      }
-
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      // Clear all caches
+      queryClient.clear();
       // Sign out after deletion
       await signOut();
       navigate('/');
-    } catch (error) {
-    } finally {
-      setIsDeleting(false);
-    }
-  };
+    },
+    onError: (error) => {
+      console.error('Failed to delete account:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete account. Please try again.',
+        variant: 'destructive',
+      });
+    },
+  });
 
   // Format transaction type for display
   const formatTransactionType = (type: string) => {
@@ -151,6 +107,12 @@ const Settings = () => {
     });
   };
 
+  // Redirect if not authenticated
+  if (!authLoading && !user) {
+    navigate('/auth');
+    return null;
+  }
+
   if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -160,10 +122,6 @@ const Settings = () => {
         </div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   return (
@@ -336,11 +294,11 @@ const Settings = () => {
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={handleDeleteAccount}
-                        disabled={isDeleting}
+                        onClick={() => deleteAccountMutation.mutate()}
+                        disabled={deleteAccountMutation.isPending}
                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       >
-                        {isDeleting ? (
+                        {deleteAccountMutation.isPending ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         ) : (
                           <Trash2 className="h-4 w-4 mr-2" />
