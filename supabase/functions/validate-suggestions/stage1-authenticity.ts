@@ -466,7 +466,7 @@ Return a JSON array of validation objects, one for each suggestion.`;
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: 16384,
         temperature: 0.3,
         system: STAGE_1_PROMPT,

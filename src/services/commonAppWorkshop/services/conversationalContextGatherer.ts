@@ -1227,7 +1227,7 @@ Return JSON:
 }`;
 
     const response_ai = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-20250514', // Sonnet for nuanced quality assessment - this is critical
+      model: 'claude-sonnet-4-5-20250514', // Sonnet for nuanced quality assessment - this is critical
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
     });

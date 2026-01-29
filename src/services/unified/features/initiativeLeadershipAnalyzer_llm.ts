@@ -187,7 +187,7 @@ Provide your analysis as JSON following the exact format specified.`;
 
   try {
     const response = await callClaude<InitiativeLeadershipAnalysis>(userPrompt, {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20250514',
       temperature: 0.3,
       maxTokens: 2048,
       systemPrompt,

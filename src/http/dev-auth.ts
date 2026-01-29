@@ -1,38 +1,97 @@
 /**
  * Development-only authentication bypass
- * ONLY USE IN LOCAL DEVELOPMENT - DO NOT DEPLOY TO PRODUCTION
+ *
+ * SECURITY HARDENING:
+ * - Requires EXPLICIT opt-in via ALLOW_DEV_AUTH=true
+ * - Only works when NODE_ENV === 'development'
+ * - Logs all dev auth usage for audit
+ * - Never exposes real user data
  */
 
 import { Request, Response, NextFunction } from 'express';
+import { logSecurityEvent, isValidClerkUserId } from './security';
 
-const isDevelopment = process.env.NODE_ENV !== 'production';
+/**
+ * SECURITY: Dev mode requires BOTH conditions:
+ * 1. NODE_ENV === 'development' (explicit, not just !== 'production')
+ * 2. ALLOW_DEV_AUTH === 'true' (explicit opt-in)
+ *
+ * This prevents accidental exposure in staging, preview, or misconfigured environments.
+ */
+const isDevelopment = process.env.NODE_ENV === 'development';
+const devAuthAllowed = process.env.ALLOW_DEV_AUTH === 'true';
+const isDevModeEnabled = isDevelopment && devAuthAllowed;
+
+// Log configuration at startup
+if (isDevelopment) {
+  console.log('🔧 NODE_ENV is development');
+  console.log(`🔐 ALLOW_DEV_AUTH: ${devAuthAllowed ? 'ENABLED' : 'DISABLED (set ALLOW_DEV_AUTH=true to enable)'}`);
+}
 
 /**
  * Development-only middleware that allows testing with a fake user ID
- * Usage: Add ?dev_user_id=user_test123 to your request
+ *
+ * SECURITY:
+ * - Requires explicit ALLOW_DEV_AUTH=true
+ * - Logs all usage for audit trail
+ * - Validates user ID format
  */
 export function devAuthBypass(req: Request, res: Response, next: NextFunction) {
-  if (!isDevelopment) {
-    return res.status(403).json({ 
-      error: 'Development endpoints are disabled in production' 
+  // SECURITY: Block in any non-development environment
+  if (!isDevModeEnabled) {
+    logSecurityEvent('auth_bypass_attempt', {
+      ip: req.ip,
+      path: req.path,
+      nodeEnv: process.env.NODE_ENV,
+      devAuthAllowed,
+    });
+    return res.status(403).json({
+      error: 'Development endpoints are disabled',
+      hint: 'Set NODE_ENV=development and ALLOW_DEV_AUTH=true',
     });
   }
 
   const devUserId = req.query.dev_user_id || req.headers['x-dev-user-id'];
-  
-  if (!devUserId) {
-    return res.status(400).json({ 
+
+  if (!devUserId || typeof devUserId !== 'string') {
+    return res.status(400).json({
       error: 'Missing dev_user_id query parameter or X-Dev-User-ID header',
-      hint: 'Add ?dev_user_id=user_test123 to your request'
+      hint: 'Add ?dev_user_id=user_test123 to your request',
     });
   }
 
+  // Validate user ID format (should look like a Clerk user ID)
+  // Allow both real Clerk IDs (user_xxx) and test IDs (user_test_xxx)
+  const isValidFormat = /^user_[a-zA-Z0-9_]+$/.test(devUserId);
+  if (!isValidFormat) {
+    return res.status(400).json({
+      error: 'Invalid dev_user_id format',
+      hint: 'Use format: user_test123 or user_xxx',
+    });
+  }
+
+  // Log dev auth usage
+  logSecurityEvent('dev_auth_used', {
+    userId: devUserId,
+    path: req.path,
+    method: req.method,
+    ip: req.ip,
+  });
+
   // Set fake auth for development
-  (req as any).auth = { 
-    userId: devUserId as string 
+  req.auth = {
+    userId: devUserId,
   };
-  
+
   next();
+}
+
+/**
+ * Check if dev mode is enabled
+ * Useful for conditionally loading routes
+ */
+export function isDevModeActive(): boolean {
+  return isDevModeEnabled;
 }
 
 /**
@@ -40,6 +99,10 @@ export function devAuthBypass(req: Request, res: Response, next: NextFunction) {
  * This is just a base64-encoded JSON object for local testing
  */
 export function createDevToken(userId: string): string {
+  if (!isDevModeEnabled) {
+    throw new Error('Dev tokens can only be created in development mode with ALLOW_DEV_AUTH=true');
+  }
+
   const payload = {
     sub: userId,
     iss: 'dev-local',
@@ -53,13 +116,22 @@ export function createDevToken(userId: string): string {
  * Helper endpoint to create development test users
  */
 export const createTestUser = async (req: Request, res: Response) => {
-  if (!isDevelopment) {
-    return res.status(403).json({ error: 'Not available in production' });
+  if (!isDevModeEnabled) {
+    logSecurityEvent('auth_bypass_attempt', {
+      path: req.path,
+      nodeEnv: process.env.NODE_ENV,
+    });
+    return res.status(403).json({ error: 'Not available - requires ALLOW_DEV_AUTH=true in development' });
   }
 
   const { userId } = req.body;
   const testUserId = userId || `user_test_${Date.now()}`;
   const devToken = createDevToken(testUserId);
+
+  logSecurityEvent('dev_auth_used', {
+    action: 'create_test_user',
+    userId: testUserId,
+  });
 
   res.json({
     message: 'Test user created (development only)',
@@ -77,32 +149,33 @@ export const createTestUser = async (req: Request, res: Response) => {
 };
 
 /**
- * Get test user info
+ * Get test user info - MODIFIED for security
+ *
+ * SECURITY:
+ * - Only returns mock/sample data, never real user data
+ * - Requires explicit dev mode
  */
 export const getTestUsers = async (req: Request, res: Response) => {
-  if (!isDevelopment) {
-    return res.status(403).json({ error: 'Not available in production' });
+  if (!isDevModeEnabled) {
+    logSecurityEvent('auth_bypass_attempt', {
+      path: req.path,
+      nodeEnv: process.env.NODE_ENV,
+    });
+    return res.status(403).json({ error: 'Not available - requires ALLOW_DEV_AUTH=true in development' });
   }
 
-  const { createClient } = await import('@supabase/supabase-js');
-  const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return res.status(500).json({ error: 'Supabase not configured' });
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  // Get some test users from profiles
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('user_id, credits, referral_discount_active, referred_by')
-    .limit(5);
+  // SECURITY: Return mock data only, never expose real user data
+  // Even in dev mode, we shouldn't query real user data through dev endpoints
+  const mockUsers = [
+    { user_id: 'user_test_sample1', credits: 100, referral_discount_active: false },
+    { user_id: 'user_test_sample2', credits: 50, referral_discount_active: true },
+    { user_id: 'user_test_sample3', credits: 0, referral_discount_active: false },
+  ];
 
   res.json({
-    message: 'Available test users (development only)',
-    users: profiles || [],
-    hint: 'Use any user_id with ?dev_user_id=USER_ID to test as that user'
+    message: 'Sample test users for development',
+    users: mockUsers,
+    hint: 'Use any user_id with ?dev_user_id=USER_ID to test as that user',
+    warning: 'These are mock users. For real user testing, create test accounts through the normal flow.',
   });
 };

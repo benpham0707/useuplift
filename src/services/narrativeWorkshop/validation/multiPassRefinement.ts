@@ -374,7 +374,7 @@ NO additional commentary. Just the JSON.`;
         {
           systemPrompt: 'You are an expert college essay editor focused on incremental improvement.',
           temperature: 0.7,
-          model: 'claude-sonnet-4-5-20250929'
+          model: 'claude-sonnet-4-5-20250514'
         }
       );
 

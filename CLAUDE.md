@@ -238,9 +238,9 @@ console.log(`Total cost: $${tracker.getTotalCost().toFixed(4)}`);
 
 | Use Case | Model | Rationale |
 |----------|-------|-----------|
-| Quick diagnosis | claude-3-5-haiku-20241022 | Fast, cheap, good enough for classification |
-| Teaching/feedback | claude-sonnet-4-20250514 | Quality matters for user-facing content |
-| Complex reasoning | claude-sonnet-4-20250514 | Accuracy critical |
+| Quick diagnosis | claude-haiku-4-5-20251001 | Fast, cheap, good enough for classification |
+| Teaching/feedback | claude-sonnet-4-5-20250514 | Quality matters for user-facing content |
+| Complex reasoning | claude-sonnet-4-5-20250514 | Accuracy critical |
 
 ### Prompt Engineering
 

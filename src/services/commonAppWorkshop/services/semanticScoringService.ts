@@ -462,7 +462,7 @@ Return ONLY the JSON object, no other text.`;
 
 export class SemanticScoringService {
   private client: Anthropic;
-  private model: string = 'claude-sonnet-4-20250514';
+  private model: string = 'claude-sonnet-4-5-20250514';
 
   constructor() {
     this.client = new Anthropic();
@@ -608,7 +608,7 @@ export class SemanticScoringService {
     const wordStatus = wordCount < wordMin ? 'under' : wordCount > wordMax ? 'over' : 'optimal';
 
     const response = await this.client.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 500,
       temperature: 0.2,
       messages: [{

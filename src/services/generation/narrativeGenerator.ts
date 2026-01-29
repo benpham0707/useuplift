@@ -39,7 +39,7 @@ export class NarrativeGenerator {
     try {
       const response = await callClaude<any>(userPrompt, { // returning raw string mostly, but callClaude expects a type for JSON mode. We want text here.
         systemPrompt,
-        model: 'claude-sonnet-4-20250514', // High intelligence for creative writing
+        model: 'claude-sonnet-4-5-20250514', // High intelligence for creative writing
         temperature: 0.7, // Higher temperature for creativity
         maxTokens: 2048,
         useJsonMode: false, // We want text output

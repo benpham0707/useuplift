@@ -39,7 +39,7 @@ import type {
 // CONSTANTS
 // ============================================================================
 
-const HAIKU_MODEL = 'claude-3-5-haiku-20241022';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const HAIKU_PRICING = {
   input: 0.25 / 1_000_000,   // $0.25 per million input tokens
   output: 1.25 / 1_000_000,  // $1.25 per million output tokens

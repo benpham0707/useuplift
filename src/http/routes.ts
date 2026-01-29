@@ -12,24 +12,28 @@ import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/
 const r = Router();
 
 // Development-only routes (bypasses Clerk authentication)
-const isDevelopment = process.env.NODE_ENV !== 'production';
-console.log('🔧 Development mode:', isDevelopment ? 'ENABLED' : 'DISABLED');
-console.log('NODE_ENV:', process.env.NODE_ENV);
+// SECURITY: Requires BOTH NODE_ENV=development AND ALLOW_DEV_AUTH=true
+const isDevModeActive = DevAuth.isDevModeActive();
+console.log('🔧 Development routes:', isDevModeActive ? 'ENABLED (ALLOW_DEV_AUTH=true)' : 'DISABLED');
+console.log('   NODE_ENV:', process.env.NODE_ENV);
+console.log('   ALLOW_DEV_AUTH:', process.env.ALLOW_DEV_AUTH || 'not set');
 
-if (isDevelopment) {
-  console.log('✅ Loading development routes...');
+if (isDevModeActive) {
+  console.log('✅ Loading development routes (dev auth explicitly enabled)...');
   // Test user management
   r.post("/dev/test-user", DevAuth.createTestUser);
   r.get("/dev/test-users", DevAuth.getTestUsers);
-  
+
   // Referrals (development bypass)
   r.get("/dev/referrals/me", DevAuth.devAuthBypass, Referrals.getReferralInfo);
   r.post("/dev/referrals/claim", DevAuth.devAuthBypass, Referrals.claimReferral);
-  
+
   // Billing (development bypass)
   r.post("/dev/billing/checkout", DevAuth.devAuthBypass, Billing.createCheckoutSession);
-  
-  console.log('✅ Development routes loaded successfully');
+
+  console.log('✅ Development routes loaded');
+} else {
+  console.log('🔒 Development routes NOT loaded (requires NODE_ENV=development AND ALLOW_DEV_AUTH=true)');
 }
 
 // Webhooks (no auth required - uses signature verification)
@@ -657,6 +661,111 @@ r.post("/analyze-entry", async (req, res) => {
   } catch (err: any) {
     // eslint-disable-next-line no-console
     return res.status(500).json({ message: 'Analysis failed', error: String(err?.message || err) });
+  }
+});
+
+// ============================================================================
+// Academic History Analysis Endpoint
+// ============================================================================
+// Comprehensive academic profile evaluation using Section 6 research modules.
+// Provides:
+//   - GPA analysis with school context calibration
+//   - Course rigor assessment
+//   - Grade trajectory analysis
+//   - Red flag detection (4-tier severity system)
+//   - Testing strategy recommendations
+//   - Research-backed teaching insights
+// ============================================================================
+r.post("/analyze-academics", requireAuth, async (req, res) => {
+  try {
+    const { analyzeAcademicHistory } = await import("@/services/portfolioStrategy/services/academicHistoryAnalyzer");
+    const { detectAcademicRedFlags } = await import("@/services/portfolioStrategy/services/academicRedFlagDetector");
+    const { getAcademicTeaching } = await import("@/services/portfolioStrategy/services/academicTeachingService");
+
+    const academicInput = req.body;
+
+    if (!academicInput || !academicInput.gpa || !academicInput.courses) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required academic data. Please provide gpa and courses.",
+      });
+    }
+
+    // Run comprehensive academic analysis
+    const analysis = await analyzeAcademicHistory(academicInput);
+
+    // Run additional red flag detection
+    const redFlagReport = detectAcademicRedFlags(academicInput);
+
+    // Get relevant teaching for detected issues
+    const teachingInsights: Record<string, any> = {};
+    if (redFlagReport.flags_detected.length > 0) {
+      for (const flag of redFlagReport.flags_detected.slice(0, 3)) {
+        const teaching = getAcademicTeaching(flag.flag_id as any);
+        if (teaching) {
+          teachingInsights[flag.flag_id] = {
+            headline: teaching.why_section.headline,
+            explanation: teaching.why_section.explanation,
+            admissions_perspective: teaching.why_section.admissions_perspective,
+            guidance: teaching.guidance,
+          };
+        }
+      }
+    }
+
+    return res.json({
+      success: true,
+      analysis,
+      red_flag_report: redFlagReport,
+      teaching_insights: teachingInsights,
+      metadata: {
+        analyzed_at: new Date().toISOString(),
+        research_modules_used: [
+          "Section 6.1: Course Level Hierarchy",
+          "Section 6.2: AP Course Difficulty Tiers",
+          "Section 6.5: School Context Calibration",
+          "Section 6.6: Grade Interpretation",
+          "Section 6.9: Academic Red Flags",
+        ],
+      },
+    });
+  } catch (error: any) {
+    console.error("[analyze-academics] Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Academic analysis failed",
+    });
+  }
+});
+
+// Academic Teaching Lookup Endpoint (for individual issue explanations)
+r.get("/academic-teaching/:issueType", async (req, res) => {
+  try {
+    const { formatAcademicTeaching, getAcademicTeaching } = await import(
+      "@/services/portfolioStrategy/services/academicTeachingService"
+    );
+
+    const { issueType } = req.params;
+    const teaching = getAcademicTeaching(issueType as any);
+
+    if (!teaching) {
+      return res.status(404).json({
+        success: false,
+        error: `No teaching available for issue type: ${issueType}`,
+      });
+    }
+
+    return res.json({
+      success: true,
+      issue_type: issueType,
+      teaching,
+      formatted: formatAcademicTeaching(issueType as any),
+    });
+  } catch (error: any) {
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 

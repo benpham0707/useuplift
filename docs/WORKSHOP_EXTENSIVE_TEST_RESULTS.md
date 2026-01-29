@@ -212,11 +212,17 @@ The passage shares vulnerability but stops there. MIT doesn't want to see that y
 
 ### Example Suggestions Provided
 
+**Note:** These suggestions fix only the OPENING of the passage, contextualizing within a larger essay arc rather than cramming the entire story into one paragraph.
+
 **Version A (Polished):**
-> "I failed my first physics test—a 47. That night, I took the exam apart question by question, building a spreadsheet of my errors: conceptual gaps here, calculation mistakes there, two questions where I'd understood the concept but misread the problem entirely. The spreadsheet became my diagnostic tool. Three weeks later, I scored a 94."
+> "I failed my first physics test—a 47. That night, I printed out the exam, spread it across my desk, and started circling. Not the wrong answers, but the moment in each problem where my thinking went off track."
+
+*Why this works:* Sets up the systematic response that will develop in subsequent sentences. The specific score grounds it in reality. "Circling the moment where my thinking went off track" signals metacognition without resolving the arc yet.
 
 **Version B (Voice Amplifier):**
-> "A 47. I'd never seen a number like that next to my name. So I did what any reasonable person would do: I built a spreadsheet. Conceptual errors in Column A. Calculation mistakes in Column B. 'Understood the concept but completely misread the problem' got its own column because apparently that's a thing I do. Three weeks and seventeen practice problems later, I got a 94. The spreadsheet is still on my desktop. I pull it up whenever I need to remember that failure is just undiagnosed opportunity."
+> "A 47. I'd never seen a number like that next to my name. So I did what felt logical at the time: I printed out the test, grabbed a red pen, and started circling—not the wrong answers, but the exact moment in each problem where my brain had gone sideways."
+
+*Why this works:* Uses fragmentary opening for impact while only covering the FIRST BEAT. "Brain had gone sideways" adds personality. The essay will develop what came next—this suggestion only fixes the problematic opening.
 
 ---
 

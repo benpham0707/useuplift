@@ -41,8 +41,8 @@ import { REGISTER_PROFILES } from '../types/stage0Types';
 // CONSTANTS
 // ============================================================================
 
-const SONNET_MODEL = 'claude-sonnet-4-20250514';
-const HAIKU_MODEL = 'claude-3-5-haiku-20241022';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 
 const SONNET_PRICING = {
   input: 3.0 / 1_000_000,

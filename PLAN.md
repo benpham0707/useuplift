@@ -1,7 +1,284 @@
 # Common App Workshop - Scoring System Status
 
-**Last Updated**: December 19, 2025
-**Status**: **PIPELINE VERIFIED WORKING** | **27 Pattern Detection (Type-Aware)** | **SUGGESTION QUALITY VERIFIED**
+**Last Updated**: January 15, 2026
+**Status**: **PIPELINE VERIFIED WORKING** | **27 Pattern Detection (Type-Aware)** | **NUANCED GUIDANCE SYSTEM IN PROGRESS**
+
+---
+
+# 🎯 CURRENT FOCUS: Nuanced Essay Guidance System
+
+## Problem Statement
+
+The current grading and suggestion system is **too heavily biased toward storytelling**. While storytelling is powerful, many other techniques are equally important for college essays:
+
+- **Technical insights** - Showcasing intellectual depth and domain expertise
+- **Character through thought** - Revealing personality through reasoning, not narrative
+- **Evidence & metrics** - Quantifiable impact that demonstrates scale
+- **Unique personal insights** - Original perspectives that only this student could have
+- **Intellectual engagement** - Showing how the student thinks, not just what they did
+
+The system needs a **decision tree approach** that recommends appropriate techniques based on:
+1. Which part of the essay (opening, body, reflection, conclusion)
+2. What type of essay (why_us, intellectual, extracurricular, etc.)
+3. What's already present vs. what's missing
+4. What would genuinely strengthen this specific essay
+
+## Design Philosophy
+
+**Keep storytelling capabilities intact** - The current Show Don't Tell system is excellent and should remain the go-to for appropriate contexts.
+
+**Add nuanced alternatives** - When storytelling isn't the best fit, guide toward other equally powerful techniques.
+
+**Context-aware decisions** - The system should understand essay structure and recommend techniques based on what each section needs.
+
+---
+
+## Implementation Plan
+
+### Phase 1: Essay Element Detector (NEW FILE)
+
+**File**: `src/services/commonAppWorkshop/services/essayElementDetector.ts`
+
+Detects which structural element is being analyzed:
+
+```typescript
+export type EssayElement =
+  | 'opening_hook'        // First 1-2 sentences
+  | 'context_setup'       // Background/situation establishment
+  | 'action_body'         // Main narrative or argument
+  | 'evidence_section'    // Data, examples, proof
+  | 'reflection_moment'   // Processing/meaning-making
+  | 'insight_revelation'  // Key realization or unique perspective
+  | 'connection_bridge'   // Linking to school/major/future
+  | 'closing_synthesis'   // Final impression/callback
+  | 'transition';         // Between major sections
+
+export interface ElementAnalysis {
+  element: EssayElement;
+  position: { start: number; end: number };
+  confidence: number;
+  currentStrengths: string[];
+  gaps: string[];
+  recommendedApproach: TechniqueCategory;
+}
+```
+
+### Phase 2: Technique Category System (NEW FILE)
+
+**File**: `src/services/commonAppWorkshop/services/techniqueCategories.ts`
+
+Define non-narrative technique categories:
+
+```typescript
+export type TechniqueCategory =
+  | 'storytelling'           // Current system - scenes, dialogue, sensory details
+  | 'technical_depth'        // Domain expertise, methodology, process thinking
+  | 'evidence_impact'        // Metrics, scale, quantifiable results
+  | 'intellectual_character' // How you think, not what you did
+  | 'reflection_depth'       // Meaning-making, growth, self-awareness
+  | 'voice_authenticity'     // Personality through word choice and perspective
+  | 'complexity_showcase';   // Nuance, tensions, unresolved questions
+
+export interface TechniqueRecommendation {
+  category: TechniqueCategory;
+  priority: 'primary' | 'secondary' | 'optional';
+  rationale: string;
+  exampleApproaches: string[];
+  antiPatterns: string[];  // What NOT to do
+}
+```
+
+### Phase 3: New Issue Types (MODIFY)
+
+**File**: `src/services/commonAppWorkshop/services/researchBackedTeachingService.ts`
+
+Add new issue types to IssueType enum:
+
+```typescript
+// NEW - Non-narrative gaps
+| 'missing_technical_depth'      // Has story but no substance
+| 'missing_unique_insight'       // Generic takeaways anyone could have
+| 'missing_evidence_of_impact'   // Claims without proof
+| 'missing_intellectual_engagement' // Describes but doesn't analyze
+| 'over_narrated'                // Story where evidence would be stronger
+| 'missing_character_through_thought' // Actions but no revealed thinking
+| 'shallow_reflection'           // Surface-level meaning-making
+| 'missing_complexity'           // Oversimplified, no nuance
+```
+
+### Phase 4: Decision Tree Logic (NEW FILE)
+
+**File**: `src/services/commonAppWorkshop/services/techniqueDecisionTree.ts`
+
+The brain of the system - decides what approach to recommend:
+
+```typescript
+export interface DecisionContext {
+  essayType: SupplementalType;
+  element: EssayElement;
+  wordCount: number;
+  existingStrengths: TechniqueCategory[];
+  detectedIssues: IssueType[];
+}
+
+export function recommendTechnique(context: DecisionContext): TechniqueRecommendation {
+  // Decision logic based on context
+}
+```
+
+**Decision Rules (examples)**:
+
+| Essay Type | Element | Condition | Recommendation |
+|------------|---------|-----------|----------------|
+| intellectual | opening_hook | default | `intellectual_character` over `storytelling` |
+| why_us | connection_bridge | has story, no specifics | `evidence_impact` (specific courses, profs) |
+| extracurricular | action_body | all narrative, no metrics | `evidence_impact` + `technical_depth` |
+| challenge | reflection_moment | surface-level lesson | `reflection_depth` + `complexity_showcase` |
+| why_major | any | generic passion | `intellectual_character` + `technical_depth` |
+| diversity | any | trauma-focused | `voice_authenticity` + `reflection_depth` |
+
+### Phase 5: Technique-Specific Teaching (MODIFY)
+
+**File**: `src/services/commonAppWorkshop/services/researchBackedTeachingService.ts`
+
+Add teaching bundles for each technique category:
+
+```typescript
+const TECHNIQUE_TEACHING_BUNDLES: Record<TechniqueCategory, TeachingBundle> = {
+  technical_depth: {
+    principles: [
+      "Show intellectual process, not just results",
+      "Name specific methodologies, frameworks, or approaches",
+      "Reveal how you troubleshoot or iterate",
+      "Connect domain knowledge to broader implications"
+    ],
+    examples: [...],
+    sources: [...]
+  },
+  evidence_impact: {
+    principles: [
+      "Quantify scope: how many people, dollars, hours?",
+      "Use concrete comparisons: 'doubled from X to Y'",
+      "Show ripple effects: what changed because of this?",
+      "Avoid vanity metrics: focus on meaningful outcomes"
+    ],
+    ...
+  },
+  // ... other categories
+};
+```
+
+### Phase 6: Pattern Detection Updates (MODIFY)
+
+**File**: `src/services/commonAppWorkshop/rubrics/issueDetectionPatterns.ts`
+
+Add new patterns for non-narrative gaps:
+
+```typescript
+// OVER_NARRATED - Too much story, not enough substance
+{
+  id: 'OVER_NARRATED',
+  name: 'Over-Narrated',
+  severity: 'major',
+  detection_logic: `
+    Flags when essay has:
+    - High storytelling density (scene breaks, dialogue, sensory details)
+    - But missing: metrics, technical terms, analytical statements
+    - AND essay type would benefit from evidence (why_us, why_major, extracurricular)
+  `,
+  fix_suggestions: [
+    "Balance the narrative with concrete evidence",
+    "Add specific metrics or outcomes",
+    "Include intellectual reflection, not just experiential"
+  ]
+}
+
+// MISSING_INTELLECTUAL_ENGAGEMENT
+{
+  id: 'MISSING_INTELLECTUAL_ENGAGEMENT',
+  name: 'Missing Intellectual Engagement',
+  severity: 'major',
+  relevant_types: ['intellectual', 'why_major', 'extracurricular'],
+  detection_phrases: [
+    "I learned that", "I realized", "I discovered" // without showing HOW they think
+  ],
+  fix_suggestions: [
+    "Show your thought process, not just conclusions",
+    "Include a moment of intellectual struggle or breakthrough",
+    "Reveal how you approach problems uniquely"
+  ]
+}
+```
+
+---
+
+## Files to Create/Modify
+
+### New Files
+1. `src/services/commonAppWorkshop/services/essayElementDetector.ts`
+2. `src/services/commonAppWorkshop/services/techniqueCategories.ts`
+3. `src/services/commonAppWorkshop/services/techniqueDecisionTree.ts`
+
+### Modified Files
+1. `src/services/commonAppWorkshop/services/researchBackedTeachingService.ts`
+   - Add new IssueType values
+   - Add technique-specific teaching bundles
+
+2. `src/services/commonAppWorkshop/rubrics/issueDetectionPatterns.ts`
+   - Add OVER_NARRATED pattern
+   - Add MISSING_INTELLECTUAL_ENGAGEMENT pattern
+   - Add SHALLOW_REFLECTION pattern
+   - Add MISSING_COMPLEXITY pattern
+
+3. `src/services/commonAppWorkshop/services/researchTechniqueSelector.ts`
+   - Integrate with decision tree
+   - Select techniques based on category, not just issue type
+
+4. `src/services/commonAppWorkshop/services/workshopChatMode.ts`
+   - Update chat responses to use technique recommendations
+   - Provide context-aware guidance
+
+### Test Files
+1. `tests/test-technique-decision-tree.ts`
+2. `tests/test-essay-element-detection.ts`
+3. `tests/test-non-narrative-teaching.ts`
+
+---
+
+## Success Criteria
+
+1. **Reduced storytelling bias**: System recommends storytelling ≤50% of the time (down from ~80%)
+2. **Context-appropriate**: Different recommendations for different essay types/elements
+3. **Quality maintained**: Storytelling suggestions remain excellent when appropriate
+4. **Measurable improvement**: Essays improve equally with non-narrative techniques
+5. **Clear guidance**: Students understand WHY a technique is recommended
+
+---
+
+## Implementation Order
+
+1. ✅ **Phase 1**: Essay Element Detector - `essayElementDetector.ts`
+2. ✅ **Phase 2**: Technique Categories - `techniqueCategories.ts`
+3. ✅ **Phase 3**: New Issue Types - Added to `researchBackedTeachingService.ts`
+4. ✅ **Phase 4**: Decision Tree Logic - `techniqueDecisionTree.ts`
+5. ✅ **Phase 5**: Technique-Specific Teaching - Added bundles to `researchBackedTeachingService.ts`
+6. ✅ **Phase 6**: Pattern Detection Updates - Added to `issueDetectionPatterns.ts`
+7. ✅ **Testing & Integration** - `tests/test-nuanced-guidance-system.ts`
+
+## Implementation Complete ✅
+
+All phases implemented on January 15, 2026. The system now:
+
+- **Detects essay elements**: opening_hook, context_setup, action_body, evidence_section, reflection_moment, insight_revelation, connection_bridge, closing_synthesis
+- **Recommends 8 technique categories**: storytelling, technical_depth, evidence_impact, intellectual_character, reflection_depth, voice_authenticity, complexity_showcase, connection_specificity
+- **Identifies storytelling overuse**: Flags when storytelling > 60% of techniques
+- **Provides context-aware guidance**: Different recommendations for different essay types and elements
+- **Includes 9 new issue types**: missing_technical_depth, missing_unique_insight, missing_evidence_of_impact, missing_intellectual_engagement, over_narrated, missing_character_through_thought, shallow_reflection, missing_complexity, missing_connection_specificity
+- **Has teaching bundles**: Each new issue type has research-backed teaching with before/after examples
+
+---
+
+
 
 ---
 

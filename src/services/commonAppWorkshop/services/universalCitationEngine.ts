@@ -95,15 +95,26 @@ export interface CitedContent {
 }
 
 export interface CitationDisplayData {
+  // Citation number (for superscript)
   number: number;
-  hover_preview: string;
-  expandable: {
-    simple: string;
-    medium: string;
-    detailed: string;
+
+  // The quote/insight being cited
+  quote: string;
+
+  // Source information
+  source: {
+    author: string;
+    title: string;           // Author's title/role
+    publication: string;     // Where this came from
+    url?: string;            // Link to source if available
+    year?: string;           // Publication year
   };
+
+  // Why this citation is relevant (brief context)
+  relevance: string;
+
+  // The full citation object (for reference/backwards compatibility)
   citation: SelectedCitation;
-  confidence?: number; // Optional confidence score (0-100)
 }
 
 // ============================================================================
@@ -536,76 +547,44 @@ export class UniversalCitationEngine {
 
   /**
    * Format citation for display
+   * Simplified: Just the quote and source info
    */
   private formatCitationDisplay(
     number: number,
     citation: SelectedCitation,
-    contentType: ContentType
+    _contentType: ContentType
   ): CitationDisplayData {
+    const source = citation.citation;
+
     return {
       number,
-      hover_preview: this.formatHoverPreview(citation),
-      expandable: {
-        simple: citation.presentation.simplified_version,
-        medium: this.formatMediumExplanation(citation),
-        detailed: citation.presentation.full_version,
+      quote: source.quote || source.finding || citation.presentation.simplified_version,
+      source: {
+        author: source.author || 'Admissions Expert',
+        title: source.author_title || this.inferAuthorTitle(source),
+        publication: source.publication || 'Admissions Research',
+        url: source.url,
+        year: source.date,
       },
+      relevance: citation.relevance.reason,
       citation,
-      confidence: citation.relevance.score,
     };
   }
 
   /**
-   * Format hover preview
+   * Infer author title from source type
    */
-  private formatHoverPreview(citation: SelectedCitation): string {
-    const source = citation.citation;
-
-    if (source.type === 'dean_quote' && source.author) {
-      return `${source.author}: "${this.truncate(source.quote || '', 60)}"`;
+  private inferAuthorTitle(source: SelectedCitation['citation']): string {
+    switch (source.type) {
+      case 'dean_quote':
+        return 'Dean of Admissions';
+      case 'cds':
+        return 'Common Data Set';
+      case 'internal_analysis':
+        return 'Research Analysis';
+      default:
+        return 'Admissions Expert';
     }
-
-    if (source.type === 'cds') {
-      return `Official data: ${this.truncate(source.finding || '', 60)}`;
-    }
-
-    if (source.type === 'internal_analysis') {
-      return `Research: ${this.truncate(source.finding || '', 60)}`;
-    }
-
-    return citation.presentation.simplified_version;
-  }
-
-  /**
-   * Format medium explanation
-   */
-  private formatMediumExplanation(citation: SelectedCitation): string {
-    const source = citation.citation;
-    const parts: string[] = [];
-
-    if (source.type === 'dean_quote' && source.author) {
-      parts.push(`**${source.author}** (${source.author_title || 'Dean of Admission'})`);
-    } else if (source.type === 'cds') {
-      parts.push(`**Common Data Set** (Official University Data)`);
-    } else if (source.type === 'internal_analysis') {
-      parts.push(`**Our Research** (${source.title})`);
-    }
-
-    if (source.quote) {
-      parts.push(`"${source.quote}"`);
-    } else if (source.finding) {
-      parts.push(source.finding);
-    }
-
-    if (citation.relevance.reason) {
-      parts.push(`\n*Why this matters:* ${citation.relevance.reason}`);
-    }
-
-    if (source.publication && source.date) {
-      parts.push(`\nSource: ${source.publication}, ${source.date}`);
-    }
-
-    return parts.join('\n');
   }
 
   // ==========================================================================

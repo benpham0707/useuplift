@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { runSurgicalWorkshop } from '../src/services/narrativeWorkshop/surgicalOrchestrator';
-import { NarrativeEssayInput } from '../src/services/narrativeWorkshop/types';
+import { runSurgicalWorkshop } from './src/services/narrativeWorkshop/surgicalOrchestrator';
+import { NarrativeEssayInput } from './src/services/narrativeWorkshop/types';
 import fs from 'fs/promises';
 
 // Sample Essay: Poetic but vague, high sensory, low clarity
@@ -63,4 +63,5 @@ async function runPoeticTest() {
 }
 
 runPoeticTest().catch(console.error);
+
 

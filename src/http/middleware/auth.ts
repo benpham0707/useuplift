@@ -1,67 +1,135 @@
+/**
+ * Authentication Middleware
+ *
+ * SECURITY: This middleware properly verifies JWT signatures using the Clerk SDK.
+ * Tokens are NOT just decoded - they are cryptographically verified.
+ */
+
 import type { Request, Response, NextFunction } from "express";
-import { createClient } from "@supabase/supabase-js";
-import { jwtDecode } from 'jwt-decode';
+import { verifyClerkJWT, logSecurityEvent, isValidClerkUserId } from "../security";
 
-// Support multiple env names to match local/dev and Render dashboards
-const supabaseUrl = (process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL) as string | undefined;
-const supabaseAnon = (
-  process.env.VITE_SUPABASE_ANON_KEY ||
-  process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  process.env.SUPABASE_ANON_KEY ||
-  process.env.SUPABASE_PUBLISHABLE_KEY
-) as string | undefined;
-const supabase = supabaseUrl && supabaseAnon
-  ? createClient(supabaseUrl, supabaseAnon)
-  : null;
-
-// Helper to safely decode Clerk JWTs (which might not validate against Supabase's secret if not synced)
-// In a real Clerk backend setup, you would use @clerk/clerk-sdk-node to verify the token signature.
-// Since this is a migration and we want to trust the token for now (assuming Clerk middleware on frontend is secure):
-const getUserIdFromToken = async (token: string): Promise<string | null> => {
-  try {
-    // 1. Try decoding as Clerk JWT first (faster, no network)
-    const decoded: any = jwtDecode(token);
-    // Clerk tokens have 'sub' as the user ID (e.g., user_2q...)
-    // They also typically have an 'iss' starting with 'https://clerk'
-    if (decoded && decoded.sub && (decoded.iss?.includes('clerk') || decoded.azp?.includes('http'))) {
-      return decoded.sub;
-    }
-  } catch (e) {
-    // Token might not be a valid JWT or standard format
-  }
-
-  // 2. Fallback to Supabase verification (for legacy users or if configured to sync)
-  if (supabase) {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (!error && data.user) {
-      return data.user.id;
+// Extend Express Request type to include auth
+declare global {
+  namespace Express {
+    interface Request {
+      auth?: {
+        userId: string;
+        claims?: Record<string, unknown>;
+      };
     }
   }
+}
 
-  return null;
-};
-
-export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+/**
+ * Require authenticated user for route access
+ *
+ * SECURITY:
+ * - Properly verifies JWT signature (not just decode)
+ * - Validates token structure and claims
+ * - Logs authentication attempts for audit
+ * - Returns generic error messages
+ */
+export async function requireAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void | Response> {
   try {
-    const auth = req.headers.authorization;
-    const token = auth?.startsWith("Bearer ") ? auth.slice(7) : undefined;
-    
+    // Extract token from Authorization header
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+
     if (!token) {
-      // eslint-disable-next-line no-console
-      return res.status(401).json({ error: "Unauthorized" });
+      logSecurityEvent('jwt_verification_failed', {
+        reason: 'no_token',
+        path: req.path,
+        method: req.method,
+      });
+      return res.status(401).json({
+        error: "Unauthorized",
+        code: "AUTH_REQUIRED",
+      });
     }
 
-    const userId = await getUserIdFromToken(token);
+    // Verify JWT with proper signature verification
+    const result = await verifyClerkJWT(token);
 
-    if (!userId) {
-      // eslint-disable-next-line no-console
-      return res.status(401).json({ error: "Unauthorized" });
+    if (!result.valid || !result.userId) {
+      logSecurityEvent('jwt_verification_failed', {
+        reason: result.error || 'invalid_token',
+        path: req.path,
+        method: req.method,
+      });
+      return res.status(401).json({
+        error: "Unauthorized",
+        code: "AUTH_INVALID",
+      });
     }
 
-    (req as any).auth = { userId: userId };
+    // Validate user ID format
+    if (!isValidClerkUserId(result.userId)) {
+      logSecurityEvent('jwt_verification_failed', {
+        reason: 'invalid_user_id_format',
+        path: req.path,
+        method: req.method,
+      });
+      return res.status(401).json({
+        error: "Unauthorized",
+        code: "AUTH_INVALID",
+      });
+    }
+
+    // Attach verified auth info to request
+    req.auth = {
+      userId: result.userId,
+      claims: result.claims,
+    };
+
     next();
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    return res.status(401).json({ error: "Unauthorized" });
+  } catch (error) {
+    console.error('[Auth] Unexpected error:', error);
+    logSecurityEvent('jwt_verification_failed', {
+      reason: 'unexpected_error',
+      path: req.path,
+      method: req.method,
+    });
+    return res.status(401).json({
+      error: "Unauthorized",
+      code: "AUTH_INVALID",
+    });
   }
+}
+
+/**
+ * Optional authentication - allows both authenticated and unauthenticated requests
+ * Useful for endpoints that behave differently based on auth status
+ */
+export async function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  const authHeader = req.headers.authorization;
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : undefined;
+
+  if (!token) {
+    // No token is OK for optional auth
+    return next();
+  }
+
+  try {
+    const result = await verifyClerkJWT(token);
+
+    if (result.valid && result.userId && isValidClerkUserId(result.userId)) {
+      req.auth = {
+        userId: result.userId,
+        claims: result.claims,
+      };
+    }
+    // Invalid token is silently ignored for optional auth
+  } catch (error) {
+    // Silently continue without auth
+  }
+
+  next();
 }

@@ -43,7 +43,7 @@ export class VoiceFingerprintAnalyzer {
     try {
       const response = await callClaude<VoiceFingerprint>(userPrompt, {
         systemPrompt,
-        model: 'claude-sonnet-4-20250514', // High intelligence for nuance
+        model: 'claude-sonnet-4-5-20250514', // High intelligence for nuance
         temperature: 0.1, // Low temperature for consistent analysis
         maxTokens: 1000,
         useJsonMode: true

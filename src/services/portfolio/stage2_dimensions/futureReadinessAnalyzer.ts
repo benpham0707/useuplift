@@ -46,7 +46,7 @@ export async function analyzeFutureReadiness(
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-5-20250514',
       max_tokens: 2500,
       temperature: 0.5,
       system: systemPrompt,
@@ -63,7 +63,7 @@ export async function analyzeFutureReadiness(
 
     try {
       const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: 2500,
         temperature: 0.5,
         system: systemPrompt,

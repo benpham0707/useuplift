@@ -1,5 +1,15 @@
+/**
+ * Referrals API Handlers
+ *
+ * SECURITY HARDENING:
+ * - Error messages sanitized for client responses
+ * - Input validation on all endpoints
+ * - Audit logging for referral operations
+ */
+
 import { Request, Response } from 'express';
 import { createClient } from '@supabase/supabase-js';
+import { logSecurityEvent, sanitizeErrorForClient, ERROR_CODES, isValidClerkUserId } from './security';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -8,10 +18,12 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase configuration for referrals');
+  console.error('[Referrals] Supabase configuration missing');
 }
 
-const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 // ============================================================================
 // GET /api/v1/referrals/me
@@ -19,9 +31,31 @@ const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
 // ============================================================================
 export const getReferralInfo = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).auth?.userId;
+    if (!supabase) {
+      return res.status(503).json({
+        error: 'Service unavailable',
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+    }
+
+    const userId = req.auth?.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({
+        error: 'Authentication required',
+        code: ERROR_CODES.AUTH_REQUIRED,
+      });
+    }
+
+    // Validate user ID format
+    if (!isValidClerkUserId(userId)) {
+      logSecurityEvent('input_validation_failed', {
+        field: 'userId',
+        path: req.path,
+      });
+      return res.status(401).json({
+        error: 'Invalid authentication',
+        code: ERROR_CODES.AUTH_INVALID,
+      });
     }
 
     // Get or create referral code
@@ -34,7 +68,7 @@ export const getReferralInfo = async (req: Request, res: Response) => {
     if (!codeData) {
       // Generate new code
       const { data: newCode } = await supabase.rpc('generate_referral_code');
-      
+
       const { data: insertedCode, error: insertError } = await supabase
         .from('referral_codes')
         .insert({
@@ -51,7 +85,7 @@ export const getReferralInfo = async (req: Request, res: Response) => {
           .select('code, created_at')
           .eq('user_id', userId)
           .maybeSingle();
-        
+
         codeData = existingCode || null;
       } else {
         codeData = insertedCode;
@@ -59,7 +93,10 @@ export const getReferralInfo = async (req: Request, res: Response) => {
     }
 
     if (!codeData) {
-      return res.status(500).json({ error: 'Failed to get referral code' });
+      return res.status(500).json({
+        error: 'Unable to generate referral code',
+        code: ERROR_CODES.INTERNAL_ERROR,
+      });
     }
 
     // Get referral stats
@@ -74,8 +111,9 @@ export const getReferralInfo = async (req: Request, res: Response) => {
     // Calculate total credits earned from referrals
     const totalCreditsEarned = (signupBonuses * 25) + (purchaseBonuses * 25);
 
-    // Generate share link
-    const shareLink = `${req.headers.origin || 'https://uplift.app'}/auth?mode=sign-up&ref=${codeData.code}`;
+    // Generate share link - use a safe default if origin is missing
+    const origin = req.headers.origin || 'https://uplift.app';
+    const shareLink = `${origin}/auth?mode=sign-up&ref=${codeData.code}`;
 
     res.json({
       code: codeData.code,
@@ -88,9 +126,13 @@ export const getReferralInfo = async (req: Request, res: Response) => {
       },
       createdAt: codeData.created_at,
     });
-  } catch (error: any) {
-    console.error('Error getting referral info:', error);
-    res.status(500).json({ error: error.message || 'Failed to get referral info' });
+  } catch (error) {
+    console.error('[Referrals] Error getting referral info:', error);
+    const sanitized = sanitizeErrorForClient(error, 'getReferralInfo');
+    res.status(500).json({
+      error: sanitized.message,
+      code: sanitized.code,
+    });
   }
 };
 
@@ -100,14 +142,58 @@ export const getReferralInfo = async (req: Request, res: Response) => {
 // ============================================================================
 export const claimReferral = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).auth?.userId;
+    if (!supabase) {
+      return res.status(503).json({
+        error: 'Service unavailable',
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+    }
+
+    const userId = req.auth?.userId;
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({
+        error: 'Authentication required',
+        code: ERROR_CODES.AUTH_REQUIRED,
+      });
+    }
+
+    // Validate user ID format
+    if (!isValidClerkUserId(userId)) {
+      logSecurityEvent('input_validation_failed', {
+        field: 'userId',
+        path: req.path,
+      });
+      return res.status(401).json({
+        error: 'Invalid authentication',
+        code: ERROR_CODES.AUTH_INVALID,
+      });
     }
 
     const { code } = req.body;
+
+    // Input validation
     if (!code || typeof code !== 'string') {
-      return res.status(400).json({ error: 'Referral code is required' });
+      logSecurityEvent('input_validation_failed', {
+        field: 'code',
+        path: req.path,
+      });
+      return res.status(400).json({
+        error: 'Referral code is required',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+
+    // Validate code format (alphanumeric, reasonable length)
+    if (code.length > 20 || !/^[A-Za-z0-9]+$/.test(code)) {
+      logSecurityEvent('input_validation_failed', {
+        field: 'code',
+        reason: 'invalid_format',
+        path: req.path,
+      });
+      return res.status(400).json({
+        error: 'Invalid referral code format',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
 
     // Normalize code (uppercase, trim)
@@ -121,8 +207,9 @@ export const claimReferral = async (req: Request, res: Response) => {
       .maybeSingle();
 
     if (existingReferral) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'You have already claimed a referral code',
+        code: ERROR_CODES.VALIDATION_ERROR,
         alreadyClaimed: true
       });
     }
@@ -135,12 +222,22 @@ export const claimReferral = async (req: Request, res: Response) => {
       .maybeSingle();
 
     if (!referralCode) {
-      return res.status(404).json({ error: 'Invalid referral code' });
+      return res.status(404).json({
+        error: 'Invalid referral code',
+        code: ERROR_CODES.NOT_FOUND,
+      });
     }
 
     // Ensure user is not referring themselves
     if (referralCode.user_id === userId) {
-      return res.status(400).json({ error: 'You cannot use your own referral code' });
+      logSecurityEvent('suspicious_activity', {
+        type: 'self_referral_attempt',
+        userId,
+      });
+      return res.status(400).json({
+        error: 'You cannot use your own referral code',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
 
     const referrerId = referralCode.user_id;
@@ -162,8 +259,9 @@ export const claimReferral = async (req: Request, res: Response) => {
     if (referralError) {
       // Check if it's a duplicate (race condition)
       if (referralError.code === '23505') { // Unique violation
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Referral already claimed',
+          code: ERROR_CODES.VALIDATION_ERROR,
           alreadyClaimed: true
         });
       }
@@ -219,15 +317,23 @@ export const claimReferral = async (req: Request, res: Response) => {
         .eq('user_id', referrerId);
 
       // Log referrer signup bonus transaction
+      // SECURITY: Don't include full user ID in description
       await supabase
         .from('credit_transactions')
         .insert({
           user_id: referrerId,
           amount: 25,
           type: 'bonus',
-          description: `Referral bonus: ${userId.slice(0, 8)}... signed up (+25 credits)`,
+          description: 'Referral signup bonus (+25 credits)',
         });
     }
+
+    // Log successful referral
+    logSecurityEvent('credit_deduction', {
+      action: 'referral_claimed',
+      refereeId: userId,
+      referralCode: normalizedCode,
+    });
 
     res.json({
       success: true,
@@ -235,8 +341,12 @@ export const claimReferral = async (req: Request, res: Response) => {
       creditsReceived: 10,
       discountActive: true,
     });
-  } catch (error: any) {
-    console.error('Error claiming referral:', error);
-    res.status(500).json({ error: error.message || 'Failed to claim referral' });
+  } catch (error) {
+    console.error('[Referrals] Error claiming referral:', error);
+    const sanitized = sanitizeErrorForClient(error, 'claimReferral');
+    res.status(500).json({
+      error: sanitized.message,
+      code: sanitized.code,
+    });
   }
 };

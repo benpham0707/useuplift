@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: 1024,
         temperature: 0.8,
         system: `You are an empathetic essay coach who deeply understands student narratives. Generate a holistic, encouraging overview that shows you understand what they're trying to convey.

@@ -31,12 +31,14 @@ import type {
   IssueSymptomDiagnosis,
   VoiceFingerprint,
 } from '../types/stage0Types';
+import type { TechniqueCategory } from './techniqueCategories';
+import { TECHNIQUE_BUNDLES } from './techniqueCategories';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const SONNET_MODEL = 'claude-sonnet-4-20250514';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
 const SONNET_PRICING = {
   input: 3.0 / 1_000_000,   // $3 per million input tokens
   output: 15.0 / 1_000_000, // $15 per million output tokens
@@ -77,6 +79,15 @@ export interface IssueContextBundle {
     source: string;
     why_relevant: string;
   }>;
+  /**
+   * Selected technique for this issue (from decision tree)
+   * If not provided, system will use dynamic selection
+   */
+  selectedTechnique?: TechniqueCategory;
+  /**
+   * Reasoning for why this technique was selected
+   */
+  techniqueReasoning?: string;
 }
 
 /**
@@ -186,6 +197,83 @@ export interface BatchGenerationOutput {
 // ============================================================================
 
 /**
+ * Generate technique-specific guidance for an issue
+ * This ensures suggestions follow the selected technique, NOT default storytelling
+ */
+function getTechniqueGuidance(technique: TechniqueCategory): string {
+  const bundle = TECHNIQUE_BUNDLES[technique];
+  if (!bundle) {
+    return ''; // No specific guidance if technique unknown
+  }
+
+  return `
+═══════════════════════════════════════════════════════════
+REQUIRED TECHNIQUE: ${bundle.name.toUpperCase()}
+═══════════════════════════════════════════════════════════
+
+**Description**: ${bundle.description}
+
+**Core Principles (FOLLOW THESE)**:
+${bundle.corePrinciples.map(p => `• ${p}`).join('\n')}
+
+**Example Phrases (USE AS INSPIRATION)**:
+${bundle.examplePhrases.map(p => `• ${p}`).join('\n')}
+
+**Anti-Patterns (AVOID THESE)**:
+${bundle.antiPatterns.map(p => `• ${p}`).join('\n')}
+
+**Integration Tips**:
+${bundle.integrationTips.map(t => `• ${t}`).join('\n')}
+
+⚠️  CRITICAL: Your suggestions MUST use ${bundle.name} techniques.
+${technique !== 'storytelling' ? `Do NOT default to storytelling - this issue specifically requires ${bundle.name}.` : ''}
+`;
+}
+
+/**
+ * Get the default technique if none is specified
+ * Falls back to reflection_depth as a safe, non-storytelling default
+ */
+function getDefaultTechnique(diagnosis: IssueSymptomDiagnosis): TechniqueCategory {
+  // Analyze the diagnosis to pick an appropriate technique
+  const symptomType = diagnosis.symptom_type?.toLowerCase() || '';
+  const specificWeakness = diagnosis.specific_weakness?.toLowerCase() || '';
+
+  // Evidence-related issues
+  if (symptomType.includes('evidence') || specificWeakness.includes('quantif') || specificWeakness.includes('metric')) {
+    return 'evidence_impact';
+  }
+
+  // Reflection-related issues
+  if (symptomType.includes('reflection') || symptomType.includes('meaning') || specificWeakness.includes('shallow')) {
+    return 'reflection_depth';
+  }
+
+  // Technical depth issues
+  if (symptomType.includes('technical') || symptomType.includes('depth') || specificWeakness.includes('process')) {
+    return 'technical_depth';
+  }
+
+  // Voice issues
+  if (symptomType.includes('voice') || symptomType.includes('generic') || specificWeakness.includes('cliche')) {
+    return 'voice_authenticity';
+  }
+
+  // Connection/specificity issues
+  if (symptomType.includes('connection') || symptomType.includes('specific') || specificWeakness.includes('vague')) {
+    return 'connection_specificity';
+  }
+
+  // Intellectual character issues
+  if (symptomType.includes('intellectual') || symptomType.includes('thinking') || specificWeakness.includes('surface')) {
+    return 'intellectual_character';
+  }
+
+  // Default to reflection_depth as a versatile, non-storytelling technique
+  return 'reflection_depth';
+}
+
+/**
  * Calculate cost from token usage
  */
 function calculateCost(inputTokens: number, outputTokens: number): number {
@@ -244,13 +332,25 @@ function validateSuggestion(
 // BATCH GENERATION PROMPT
 // ============================================================================
 
-const BATCH_SURGICAL_PROMPT = `You are providing surgical teaching for 3 CRITICAL issues in a college admissions essay.
+const BATCH_SURGICAL_PROMPT = `You are providing surgical teaching for CRITICAL issues in a college admissions essay.
+
+**TECHNIQUE-AWARE SYSTEM**: Each issue has a SPECIFIC TECHNIQUE assigned (not always storytelling!).
+You MUST follow the technique guidance provided for each issue. The techniques include:
+- Storytelling & Scene-Setting (vivid moments, dialogue, sensory details)
+- Technical Depth & Domain Expertise (methodology, process thinking, domain knowledge)
+- Evidence & Impact (metrics, scale, quantifiable results)
+- Intellectual Character (how you think, not what you did)
+- Reflection Depth (meaning-making, growth, self-awareness)
+- Voice Authenticity (personality through word choice and perspective)
+- Complexity Showcase (nuance, tensions, unresolved questions)
+- Connection Specificity (concrete links to school/major/future)
 
 For EACH issue, generate 2 DISTINCT suggestions that work TOGETHER cohesively:
-1. **POLISHED ORIGINAL** - Safe, incremental improvement (maintains structure)
-2. **VOICE AMPLIFIER** - Authentic, risky alternative (amplifies personality)
+1. **POLISHED ORIGINAL** - Safe, incremental improvement using the ASSIGNED TECHNIQUE
+2. **VOICE AMPLIFIER** - Authentic, risky alternative using the ASSIGNED TECHNIQUE
 
 CRITICAL REQUIREMENTS:
+- **FOLLOW THE ASSIGNED TECHNIQUE** for each issue (see REQUIRED TECHNIQUE section)
 - All suggestions must maintain voice consistency across issues
 - Suggestions must not contradict each other
 - Create a unified strategy (not disjointed fixes)
@@ -258,6 +358,7 @@ CRITICAL REQUIREMENTS:
 - Use sophisticated but appropriate vocabulary
 - NO banned terms: {bannedTerms}
 - Show relationships between issues
+- ⚠️ Do NOT default to storytelling unless it is the assigned technique
 
 ═══════════════════════════════════════════════════════════
 HOLISTIC CONTEXT (maintain across all issues)
@@ -426,10 +527,16 @@ export class BatchGenerationService {
       throw new Error('Batch generation supports 1-5 issues (optimal: 3)');
     }
 
-    // Format issues for prompt
+    // Format issues for prompt WITH TECHNIQUE-SPECIFIC GUIDANCE
     const issuesBundlesFormatted = bundles
       .map(
-        (bundle, idx) => `
+        (bundle, idx) => {
+          // Determine the technique to use for this issue
+          const selectedTechnique = bundle.selectedTechnique || getDefaultTechnique(bundle.diagnosis);
+          const techniqueGuidance = getTechniqueGuidance(selectedTechnique);
+          const techniqueReasoning = bundle.techniqueReasoning || `Selected based on issue type: ${bundle.diagnosis.symptom_type}`;
+
+          return `
 ───────────────────────────────────────────────────────────
 ISSUE ${idx + 1}: ${bundle.diagnosis.diagnosis}
 ───────────────────────────────────────────────────────────
@@ -460,7 +567,13 @@ ${bundle.diagnosis.voice_constraints.join('\n')}
 
 COLLEGE ALIGNMENT:
 ${bundle.diagnosis.college_alignment}
-`
+
+${techniqueGuidance}
+
+TECHNIQUE SELECTION REASONING:
+${techniqueReasoning}
+`;
+        }
       )
       .join('\n\n');
 
@@ -490,10 +603,10 @@ ${bundle.diagnosis.college_alignment}
     }
 
     // Parse JSON from response
-    const parsed = parseClaudeJSON(content.text, 'BatchGenerationOutput');
+    const parsed = parseClaudeJSON(content.text, 'BatchGenerationOutput') as BatchGenerationOutput;
 
     // Validate and filter suggestions
-    const validatedIssues: IssueSurgicalTeaching[] = [];
+    let validatedIssues: IssueSurgicalTeaching[] = [];
 
     for (const issue of parsed.issues) {
       // Validate both suggestions
@@ -523,7 +636,7 @@ ${bundle.diagnosis.college_alignment}
     // This prevents the entire workshop from failing due to overly strict validation
     if (validatedIssues.length === 0) {
       console.warn('⚠️  All suggestions failed validation - using unvalidated suggestions as fallback');
-      validatedIssues = parsedIssues.map((issue, idx) => ({
+      validatedIssues = parsed.issues.map((issue) => ({
         ...issue,
         validation: {
           passed: false,
@@ -531,7 +644,7 @@ ${bundle.diagnosis.college_alignment}
           voice_valid: false,
           warnings: ['Validation failed - using as fallback']
         }
-      }));
+      })) as IssueSurgicalTeaching[];
     }
 
     // Calculate cost
@@ -582,14 +695,6 @@ ${bundle.diagnosis.college_alignment}
 // EXPORTS
 // ============================================================================
 
-export {
-  IssueContextBundle,
-  HolisticContext,
-  Suggestion,
-  PolishedOriginalSuggestion,
-  VoiceAmplifierSuggestion,
-  TeachingLayer,
-  IssueSurgicalTeaching,
-  OverallStrategy,
-  BatchGenerationOutput,
-};
+// All interfaces are already exported inline with `export interface`
+// Export the service class singleton for convenience
+export const batchGenerationService = new BatchGenerationService();

@@ -59,8 +59,8 @@ import type { SupplementalType } from '../../../data/commonAppSupplementalTypes'
 // CONSTANTS
 // ============================================================================
 
-const HAIKU_MODEL = 'claude-3-5-haiku-20241022';
-const SONNET_MODEL = 'claude-sonnet-4-20250514';
+const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
 
 const HAIKU_PRICING = {
   input: 0.25 / 1_000_000,   // $0.25 per million input tokens

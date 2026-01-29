@@ -55,7 +55,7 @@ export async function analyzeHolisticPortfolio(
   try {
     // Primary attempt with Claude Sonnet 4.5
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-5-20250514',
       max_tokens: 4000,
       temperature: 0.7, // Slight creativity for narrative synthesis
       system: systemPrompt,
@@ -79,7 +79,7 @@ export async function analyzeHolisticPortfolio(
     // Retry once before falling back to heuristic
     try {
       const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: 4000,
         temperature: 0.7,
         system: systemPrompt,

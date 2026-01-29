@@ -211,7 +211,7 @@ export class Stage0ConditionalService {
       .replace('{prompt}', prompt);
 
     const response = await (this.haikuService as any).client.messages.create({
-      model: 'claude-3-5-haiku-20241022',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 800,
       temperature: 0.2,
       messages: [{ role: 'user', content: triagePrompt }],

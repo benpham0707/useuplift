@@ -596,6 +596,10 @@ export {
   createSuggestionContextFromStage2,
   createAllSuggestionContextsFromStage2,
   createWorkshopHandoffPackage,
+  // Decision Tree Architecture (Phase Detection)
+  detectWorkshopPhase,
+  summarizeConversation,
+  selectPhasePrompt,
 } from './workshopChatMode';
 export type {
   ChatMode,
@@ -606,4 +610,113 @@ export type {
   WorkshopChatRequest,
   WorkshopChatResponse,
   WorkshopHandoffPackage,  // Complete handoff from Stage 2 to Workshop
+  // Decision Tree Types
+  WorkshopPhase,
+  PhaseDetectionResult,
+  ConversationSummary,
 } from './workshopChatMode';
+
+// Essay Context Service (Holistic essay understanding for context-aware coaching)
+export {
+  essayContextService,
+  detectSectionRole,
+  getSectionPurpose,
+  initializeEssayContext,
+  accumulateContext,
+  formatContextForPrompt,
+} from './essayContextService';
+export type {
+  SectionRole,
+  SectionPurpose,
+  DiscoveredContext,
+  EssayStrategy,
+  EssayContext,
+} from './essayContextService';
+
+// Research Technique Selector (Deep Research Integration for Workshop Coaching)
+export {
+  ResearchTechniqueSelector,
+  researchTechniqueSelector,
+  detectIssueCategory,
+} from './researchTechniqueSelector';
+export type {
+  IssueCategory,
+  ResearchTeachingApproach,
+  TechniqueSelectionResult,
+} from './researchTechniqueSelector';
+
+// ============================================================================
+// NUANCED GUIDANCE SYSTEM (Beyond Storytelling)
+// Context-aware technique recommendations based on essay element + type
+// ============================================================================
+
+// Essay Element Detector (Detect which structural element is being analyzed)
+export {
+  EssayElementDetector,
+  essayElementDetector,
+} from './essayElementDetector';
+export type {
+  EssayElement,
+  ElementPosition,
+  ElementAnalysis,
+  ElementStrength,
+  ElementGap,
+  FullEssayStructure,
+  EssayStructurePattern,
+  BalanceAnalysis,
+  StructureRecommendation,
+} from './essayElementDetector';
+
+// Technique Categories (Define non-narrative techniques beyond storytelling)
+export {
+  TECHNIQUE_BUNDLES,
+  TECHNIQUE_PRIORITIES_BY_TYPE,
+  TECHNIQUE_PREFERENCES_BY_ELEMENT,
+  getRecommendedTechnique,
+  isStorytellingOverused,
+  getMissingTechniques,
+  techniqueCategories,
+} from './techniqueCategories';
+export type {
+  TechniqueCategory,
+  TechniquePriority,
+  TechniqueRecommendation,
+  TechniqueBundle as TechniqueCategoryBundle,
+} from './techniqueCategories';
+
+// Technique Decision Tree (Context-aware technique recommendation engine)
+export {
+  TechniqueDecisionTree,
+  techniqueDecisionTree,
+} from './techniqueDecisionTree';
+export type {
+  DecisionContext,
+  DetectedIssue as TechniqueDetectedIssue,
+  TechniqueDecision,
+  DecisionReasoning,
+  ActionableGuidance,
+  ExampleTransformation,
+} from './techniqueDecisionTree';
+
+// Dynamic Technique Selector (Haiku API-based nuanced technique selection)
+// Use this for PRODUCTION - provides context-aware, dynamic routing via API calls
+export {
+  DynamicTechniqueSelector,
+  dynamicTechniqueSelector,
+  selectTechniqueForIssue,
+} from './dynamicTechniqueSelector';
+export type {
+  TechniqueSelectionContext,
+  DynamicTechniqueDecision,
+} from './dynamicTechniqueSelector';
+
+// Technique Suggestion Router (Decision Tree Architecture - INTERCHANGEABLE with batch generation)
+// Routes each issue to the most appropriate technique instead of defaulting to storytelling
+export {
+  TechniqueSuggestionRouter,
+  techniqueSuggestionRouter,
+} from './techniqueSuggestionRouter';
+export type {
+  TechniqueAwareBundle,
+  RoutedSuggestionOutput,
+} from './techniqueSuggestionRouter';

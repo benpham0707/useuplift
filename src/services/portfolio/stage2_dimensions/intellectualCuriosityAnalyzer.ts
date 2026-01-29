@@ -47,7 +47,7 @@ export async function analyzeIntellectualCuriosity(
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
+      model: 'claude-sonnet-4-5-20250514',
       max_tokens: 3000,
       temperature: 0.6,
       system: systemPrompt,
@@ -64,7 +64,7 @@ export async function analyzeIntellectualCuriosity(
 
     try {
       const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250929',
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: 3000,
         temperature: 0.6,
         system: systemPrompt,

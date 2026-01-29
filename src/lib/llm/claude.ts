@@ -13,7 +13,9 @@ import Anthropic from '@anthropic-ai/sdk';
 // Single-key policy: only use ANTHROPIC_API_KEY (paid/subscription credits).
 // CLAUDE_CODE_KEY is no longer considered.
 // Check if we're in browser (Vite) or Node.js environment
-const isBrowser = typeof import.meta !== 'undefined' && import.meta.env;
+// We need to check for actual browser indicators (window, document) to distinguish
+// from Node.js environments that may polyfill import.meta.env (like tsx)
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
 
 // Function to get API key - allows for runtime updates
 function getApiKey(): string | null {

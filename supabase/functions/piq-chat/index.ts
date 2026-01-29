@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5-20250514',
         max_tokens: requestBody.options?.maxTokens || 500,
         temperature: requestBody.options?.temperature || 0.7,
         system: [

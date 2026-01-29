@@ -1049,13 +1049,324 @@ const MINOR_ISSUES: IssuePattern[] = [
 ];
 
 // ============================================================================
+// NON-NARRATIVE GAP ISSUES (For nuanced guidance beyond storytelling)
+// These detect when essays need something OTHER than more storytelling
+// ============================================================================
+
+const NON_NARRATIVE_GAP_ISSUES: IssuePattern[] = [
+  {
+    id: 'OVER_NARRATED',
+    name: 'Over-Narrated Essay',
+    description: 'Essay has heavy storytelling but lacks evidence, metrics, or substance',
+    severity: 'major',
+    relevant_types: ['extracurricular', 'leadership', 'why_us', 'why_major'],
+    affected_dimensions: ['specificity_evidence', 'impact_growth', 'fit_demonstration'],
+    score_impact: -3,
+
+    detection_phrases: [], // Detected via structural analysis, not phrases
+    detection_patterns: [
+      // High narrative density indicators without evidence
+    ],
+    detection_logic: 'Essay has multiple scenes/dialogue/sensory details but no metrics, no specific outcomes, and limited concrete evidence. Storytelling > 60% of content, evidence < 15%.',
+
+    problem_description: 'Your essay is rich in narrative but thin on substance. Vivid scenes are engaging, but admissions officers also need to see concrete impact, specific outcomes, or genuine evidence of your claims.',
+    why_it_matters: 'Storytelling without evidence can feel like entertainment without information. Especially for extracurricular and Why Us essays, readers need proof that your involvement was meaningful and your interest is real.',
+    fix_suggestions: [
+      'After each vivid scene, add a concrete outcome or metric',
+      'Include at least 2-3 quantifiable achievements or impacts',
+      'Balance narrative engagement with evidence-based credibility',
+      'Ask: What changed because of your involvement? How much? For whom?',
+      'Consider: Is there a number that would make this claim more believable?'
+    ],
+    example_before: '[250 words of vivid scene-setting about working on a project] ...and that\'s why I love robotics.',
+    example_after: 'The broken servo whined as I tried different voltage levels [scene]. That failure led to redesigning our entire gripper mechanism—we went from dropping 40% of objects to 3%, which got us to state finals [evidence].'
+  },
+
+  {
+    id: 'SHALLOW_REFLECTION',
+    name: 'Shallow Reflection',
+    description: 'Reflection stays at surface level with generic lessons',
+    severity: 'major',
+    relevant_types: 'all',
+    affected_dimensions: ['impact_growth', 'authenticity_voice', 'narrative_clarity'],
+    score_impact: -3,
+
+    detection_phrases: [
+      'taught me the importance of',
+      'learned the value of',
+      'realized how important',
+      'showed me that',
+      'taught me to appreciate',
+      'learned that teamwork',
+      'learned that hard work',
+      'learned to never give up',
+      'taught me about perseverance',
+      'made me appreciate',
+      'opened my eyes to',
+      'helped me realize',
+      'made me a better person'
+    ],
+    detection_patterns: [
+      '(taught|showed|helped) me (the importance|value|how important)',
+      'learned (to|that|about|the).{0,30}(important|value|appreciate)',
+      'made me (realize|appreciate|understand|see) (how|that|the)',
+      'opened my eyes'
+    ],
+    detection_logic: 'Essay uses generic reflection phrases without specific or unique insights',
+
+    problem_description: 'Your reflection uses generic language that could apply to anyone with a similar experience. "I learned the importance of teamwork" doesn\'t reveal what YOU specifically realized.',
+    why_it_matters: 'Admissions officers have read thousands of essays claiming to have learned about "hard work" or "perseverance." Generic lessons signal that you haven\'t processed your experience deeply enough to articulate what YOU uniquely learned.',
+    fix_suggestions: [
+      'Ask: What would my past self NOT believe about this lesson?',
+      'What\'s the unexpected or counterintuitive part of what you learned?',
+      'Replace "I learned that X is important" with specific before/after thinking',
+      'Include what you\'re STILL processing or uncertain about',
+      'Show HOW your understanding changed, not just THAT it changed'
+    ],
+    example_before: 'This experience taught me the importance of hard work and perseverance.',
+    example_after: 'I realized the hardest part wasn\'t the practice—it was admitting I\'d been practicing wrong for three years. Improvement meant unlearning, and that was humbling in ways I\'m still processing.'
+  },
+
+  {
+    id: 'MISSING_INTELLECTUAL_ENGAGEMENT',
+    name: 'Missing Intellectual Engagement',
+    description: 'Essay describes activities without showing intellectual depth or curiosity',
+    severity: 'major',
+    relevant_types: ['intellectual', 'why_major', 'extracurricular', 'why_us'],
+    affected_dimensions: ['intellectual_vitality', 'personal_connection', 'authenticity_voice'],
+    score_impact: -3,
+
+    detection_phrases: [
+      'I participated in',
+      'I was involved in',
+      'I joined',
+      'I completed',
+      'I attended',
+      'I enjoyed',
+      'I learned about',
+      'it was interesting'
+    ],
+    detection_patterns: [
+      'I (participated|was involved|joined|completed|attended) (in|the|a)',
+      '(enjoyed|liked|loved) (the|doing|learning|being)',
+      'it was (interesting|fascinating|amazing|great)',
+      'I learned (about|a lot|so much)'
+    ],
+    detection_logic: 'Essay describes activities with passive language and lacks questions, analysis, or intellectual process',
+
+    problem_description: 'Your essay describes what you DID but not how you THINK. Intellectual engagement means showing questions you asked, analysis you performed, or ideas that challenged you—not just activities you completed.',
+    why_it_matters: 'Stanford asks for "intellectual vitality"—they want to see how you engage with ideas, not just what activities you\'ve done. Passive participation language suggests doing things to check boxes rather than genuine intellectual engagement.',
+    fix_suggestions: [
+      'Add a question you\'re still thinking about from this experience',
+      'Show a moment where your assumptions were challenged',
+      'Describe your thought process, not just your actions',
+      'Include intellectual struggle or confusion you worked through',
+      'Connect what you did to ideas you\'re still wrestling with'
+    ],
+    example_before: 'I participated in Model UN and learned about international relations. It was interesting to see how different countries negotiate.',
+    example_after: 'Representing North Korea in the disarmament committee, I had to argue positions I found repugnant. It forced me to understand the logic of deterrence from the inside—and I\'m still not sure I disagree as much as I want to.'
+  },
+
+  {
+    id: 'MISSING_EVIDENCE_OF_IMPACT',
+    name: 'Missing Evidence of Impact',
+    description: 'Claims impact without quantifiable evidence or specific outcomes',
+    severity: 'major',
+    relevant_types: ['extracurricular', 'leadership', 'community', 'additional_info'],
+    affected_dimensions: ['specificity_evidence', 'impact_growth', 'leadership_agency'],
+    score_impact: -3,
+
+    detection_phrases: [
+      'made a difference',
+      'real impact',
+      'helped the community',
+      'improved the situation',
+      'significant contribution',
+      'meaningful change',
+      'helped many',
+      'changed lives'
+    ],
+    detection_patterns: [
+      'made a (difference|impact|change)',
+      '(helped|impacted|changed).{0,20}(community|lives|students|people)',
+      '(significant|meaningful|real|important) (contribution|impact|difference)',
+      '(many|a lot of|numerous) (people|students|members)'
+    ],
+    detection_logic: 'Essay claims impact without numbers, specific outcomes, or verifiable evidence',
+
+    problem_description: 'Your essay claims impact ("made a difference," "helped the community") without evidence that would make those claims believable. Admissions officers have no way to evaluate vague assertions.',
+    why_it_matters: 'Claims without evidence are indistinguishable from exaggeration. When you say "helped many students," are we talking about 5 or 500? The difference matters, and specificity builds credibility.',
+    fix_suggestions: [
+      'Add specific numbers: How many? How much? Over what time?',
+      'Include before/after comparisons: "Grew from X to Y"',
+      'Show ripple effects: What changed because of your contribution?',
+      'Use meaningful metrics, not vanity numbers',
+      'Cite specific examples instead of general claims'
+    ],
+    example_before: 'Through my volunteer work, I made a real impact on the local community and helped many people.',
+    example_after: 'We grew from 8 volunteers to 43, partnered with 12 local businesses, and raised $4,200 for the food bank—enough for 12,600 meals, according to their per-meal cost estimate.'
+  },
+
+  {
+    id: 'MISSING_TECHNICAL_DEPTH',
+    name: 'Missing Technical Depth',
+    description: 'Essay about intellectual pursuit lacks domain knowledge or methodology',
+    severity: 'major',
+    relevant_types: ['why_major', 'intellectual', 'extracurricular'],
+    affected_dimensions: ['intellectual_vitality', 'specificity_evidence', 'personal_connection'],
+    score_impact: -3,
+
+    detection_phrases: [
+      'I love',
+      'I am passionate about',
+      'I am interested in',
+      'I want to study',
+      'I want to learn more',
+      'fascinates me',
+      'really enjoy'
+    ],
+    detection_patterns: [
+      'I (love|am passionate about|am interested in).{0,30}(science|computer|engineering|math|biology|physics|chemistry|economics)',
+      '(fascinates|interests|excites) me',
+      'want to (study|learn|explore).{0,20}(more|further|deeper)',
+      'really (enjoy|like|love)'
+    ],
+    detection_logic: 'Essay claims interest in technical field without demonstrating domain knowledge, specific methodologies, or process thinking',
+
+    problem_description: 'Your essay claims passion for a technical field but doesn\'t demonstrate any technical depth. Saying "I love computer science" is very different from showing you understand algorithms, debugging processes, or specific technologies.',
+    why_it_matters: 'Admissions officers at top schools can distinguish genuine engagement from surface familiarity. Technical depth demonstrates you\'ve actually done the work, not just read about it.',
+    fix_suggestions: [
+      'Name specific methodologies or frameworks you\'ve used',
+      'Describe a technical problem you solved and HOW you approached it',
+      'Include domain-specific vocabulary appropriately',
+      'Show your debugging/iteration process on a specific project',
+      'Connect technical details to broader implications'
+    ],
+    example_before: 'I am passionate about computer science and love programming. I want to study it further in college.',
+    example_after: 'I implemented a recursive backtracking algorithm for my Sudoku solver, but when n exceeded 16, the call stack depth became prohibitive. Switching to an iterative approach with explicit stack management cut runtime by 80%.'
+  },
+
+  {
+    id: 'MISSING_COMPLEXITY',
+    name: 'Missing Complexity/Nuance',
+    description: 'Essay presents oversimplified narrative without acknowledging tensions or complexity',
+    severity: 'minor',
+    relevant_types: ['challenge', 'values', 'diversity', 'intellectual'],
+    affected_dimensions: ['authenticity_voice', 'impact_growth', 'perspective_maturity'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'best moment of my life',
+      'worst moment of my life',
+      'changed everything',
+      'completely transformed',
+      'totally different person',
+      'everything clicked',
+      'perfect experience',
+      'life-changing moment'
+    ],
+    detection_patterns: [
+      '(best|worst) (moment|day|experience|thing)',
+      'completely (changed|transformed|different)',
+      'everything (changed|clicked|fell into place)',
+      '(totally|completely|entirely) (different|new|transformed)'
+    ],
+    detection_logic: 'Essay uses absolute language without acknowledging complexity, mixed feelings, or ongoing questions',
+
+    problem_description: 'Your essay presents an oversimplified narrative—everything was "the best" or "completely changed" you. Real experiences are messier: good things have downsides, lessons have exceptions, growth is ongoing.',
+    why_it_matters: 'Essays that tie everything in a bow feel immature. Admissions officers know that real growth involves tension, contradiction, and unanswered questions. Complexity demonstrates sophistication.',
+    fix_suggestions: [
+      'What was complicated about this experience?',
+      'What tension or contradiction are you still processing?',
+      'How might someone see this differently than you?',
+      'What did you lose while gaining something else?',
+      'What questions remain unanswered?'
+    ],
+    example_before: 'Winning the competition was the best moment of my life and completely transformed who I am.',
+    example_after: 'Winning felt strange. I\'d imagined this moment for years, but standing on stage, all I could think about was my teammate who\'d trained just as hard and hadn\'t placed. The trophy looks different when you remember who\'s not in the picture.'
+  },
+
+  {
+    id: 'MISSING_CHARACTER_THROUGH_THOUGHT',
+    name: 'Missing Character Through Thought',
+    description: 'Essay describes actions without revealing internal thought process or character',
+    severity: 'major',
+    relevant_types: 'all',
+    affected_dimensions: ['authenticity_voice', 'personal_connection', 'narrative_clarity'],
+    score_impact: -2,
+
+    detection_phrases: [], // Detected via lack of thought/internal language
+    detection_patterns: [
+      '^(I|We) (did|made|went|started|created|organized|led|built)',
+    ],
+    detection_logic: 'Essay is predominantly action-focused with minimal internal thought revelation. Many action verbs but few thinking/feeling verbs or internal deliberation.',
+
+    problem_description: 'Your essay describes what you DID but not what you THOUGHT. Admissions officers want to understand who you ARE, and that comes through revealing your internal deliberation, doubts, and decision-making process.',
+    why_it_matters: 'What you did is on your activity list. How you think is what essays uniquely convey. Showing the internal experience—the doubt, the questioning, the deliberation—reveals character in ways actions alone cannot.',
+    fix_suggestions: [
+      'Add a moment where you almost made a different choice',
+      'Reveal what you were uncertain about',
+      'Show internal conflict or self-questioning',
+      'Include what you were thinking during key moments',
+      'Describe a decision and WHY you made it'
+    ],
+    example_before: 'I organized a school-wide fundraiser and raised $5,000. I planned the event, recruited volunteers, and managed logistics.',
+    example_after: 'I almost cancelled the fundraiser twice. The first time because no one signed up. The second because I realized I was doing it to put on my resume, not to help. That honesty made me start over—and eventually raise $5,000 from people who actually cared.'
+  },
+
+  {
+    id: 'MISSING_UNIQUE_INSIGHT',
+    name: 'Missing Unique Insight',
+    description: 'Essay insights could have been written by anyone with similar experience',
+    severity: 'major',
+    relevant_types: 'all',
+    affected_dimensions: ['authenticity_voice', 'impact_growth', 'perspective_maturity'],
+    score_impact: -2,
+
+    detection_phrases: [
+      'important to help others',
+      'value of hard work',
+      'importance of teamwork',
+      'learned to be myself',
+      'believe in myself',
+      'follow my dreams',
+      'anything is possible',
+      'never give up',
+      'work together',
+      'make a difference',
+      'be the change'
+    ],
+    detection_patterns: [
+      '(importance|value) of (teamwork|hard work|perseverance|dedication|helping)',
+      '(learned|realized) (to|that).{0,20}(believe in myself|follow my|never give up)',
+      '(anything|everything) is possible',
+      'be the (change|difference)'
+    ],
+    detection_logic: 'Essay contains generic aphorisms or insights that thousands of applicants could write',
+
+    problem_description: 'Your insights could have been written by any applicant with a similar experience. "I learned the value of teamwork" doesn\'t reveal what YOU specifically realized—only that you can identify a generic lesson.',
+    why_it_matters: 'The test: could another applicant with a similar experience write this same reflection? If yes, the insight isn\'t yours yet. Unique insights reveal your specific perspective, questions, and intellectual path.',
+    fix_suggestions: [
+      'What\'s the unexpected or counterintuitive part of what you learned?',
+      'What would your past self NOT believe about this?',
+      'What question are you still wrestling with?',
+      'What did you learn that most people miss?',
+      'How does YOUR background make you see this differently?'
+    ],
+    example_before: 'Through this experience, I learned the importance of teamwork and never giving up.',
+    example_after: 'I used to think teamwork meant agreeing to avoid conflict. Now I understand that real teamwork means saying "I think you\'re wrong" and trusting the relationship to survive the disagreement. I\'m still not good at this.'
+  }
+];
+
+// ============================================================================
 // ALL PATTERNS
 // ============================================================================
 
 export const ALL_ISSUE_PATTERNS: IssuePattern[] = [
   ...CRITICAL_ISSUES,
   ...MAJOR_ISSUES,
-  ...MINOR_ISSUES
+  ...MINOR_ISSUES,
+  ...NON_NARRATIVE_GAP_ISSUES
 ];
 
 // ============================================================================

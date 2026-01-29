@@ -1,22 +1,31 @@
+/**
+ * Billing API Handlers
+ *
+ * SECURITY HARDENING:
+ * - Webhook signature verification REQUIRED in production
+ * - Error messages sanitized for client responses
+ * - Audit logging for all billing operations
+ */
+
 import { Request, Response } from 'express';
-import { stripe } from '../lib/stripe';
+import { stripe, isStripeConfigured, STRIPE_WEBHOOK_SECRET, isWebhookSecretConfigured } from '../lib/stripe';
 import { createClient } from '@supabase/supabase-js';
+import { logSecurityEvent, sanitizeErrorForClient, ERROR_CODES } from './security';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const isProduction = process.env.NODE_ENV === 'production';
 
 if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('[Billing] Supabase configuration missing');
 }
 
-const supabase = createClient(supabaseUrl!, supabaseServiceKey!);
-
-// Check if Stripe is configured
-const isStripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
-if (!isStripeConfigured) {
-}
+const supabase = supabaseUrl && supabaseServiceKey
+  ? createClient(supabaseUrl, supabaseServiceKey)
+  : null;
 
 type CreditPack = {
   name: string;
@@ -43,36 +52,52 @@ const CREDIT_PACKS: Record<string, CreditPack> = {
 
 export const createCheckoutSession = async (req: Request, res: Response) => {
   try {
-    if (!isStripeConfigured) {
-      return res.status(503).json({ error: 'Billing not configured' });
+    if (!isStripeConfigured() || !stripe) {
+      return res.status(503).json({
+        error: 'Billing service unavailable',
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
+    }
+
+    if (!supabase) {
+      return res.status(503).json({
+        error: 'Service configuration error',
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
     }
 
     const { type, successUrl, cancelUrl } = req.body;
-    const userId = (req as any).auth?.userId;
+    const userId = req.auth?.userId;
 
     if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
+      return res.status(401).json({
+        error: 'Authentication required',
+        code: ERROR_CODES.AUTH_REQUIRED,
+      });
     }
 
     let pack = CREDIT_PACKS[type as keyof typeof CREDIT_PACKS];
 
     // Handle dynamic custom packs (custom_50, custom_100, ..., custom_2000)
     // $13 per 50 credits
-    if (!pack && type.startsWith('custom_')) {
-        const credits = parseInt(type.split('_')[1]);
-        // Validate: multiple of 50, between 50 and 2000
-        if (!isNaN(credits) && credits % 50 === 0 && credits >= 50 && credits <= 2000) {
-             pack = {
-                name: `${credits} Credits (Custom Pack)`,
-                amount: (credits / 50) * 1300, // $13 per 50 credits ($1300 cents)
-                currency: 'usd',
-                credits: credits,
-             };
-        }
+    if (!pack && type && typeof type === 'string' && type.startsWith('custom_')) {
+      const credits = parseInt(type.split('_')[1]);
+      // Validate: multiple of 50, between 50 and 2000
+      if (!isNaN(credits) && credits % 50 === 0 && credits >= 50 && credits <= 2000) {
+        pack = {
+          name: `${credits} Credits (Custom Pack)`,
+          amount: (credits / 50) * 1300, // $13 per 50 credits ($1300 cents)
+          currency: 'usd',
+          credits: credits,
+        };
+      }
     }
 
     if (!pack) {
-      return res.status(400).json({ error: 'Invalid pack type' });
+      return res.status(400).json({
+        error: 'Invalid pack type',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
     }
 
     // Check if user has referral discount active (10% off)
@@ -106,7 +131,7 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
         },
       });
       customerId = customer.id;
-      
+
       // Update or upsert the profile with stripe_customer_id
       if (profile) {
         await supabase
@@ -117,10 +142,10 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
         // Create profile if it doesn't exist
         await supabase
           .from('profiles')
-          .insert({ 
-            user_id: userId, 
+          .insert({
+            user_id: userId,
             stripe_customer_id: customerId,
-            credits: 0 
+            credits: 0
           });
       }
     }
@@ -139,8 +164,8 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
             currency: pack.currency,
             product_data: {
               name: pack.name,
-              description: referralDiscountApplied 
-                ? `${pack.credits} credits (10% referral discount applied)` 
+              description: referralDiscountApplied
+                ? `${pack.credits} credits (10% referral discount applied)`
                 : `${pack.credits} credits`,
             },
             unit_amount: finalAmount,
@@ -163,34 +188,82 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 
     const session = await stripe.checkout.sessions.create(sessionConfig);
 
+    // Log billing event
+    logSecurityEvent('credit_deduction', {
+      action: 'checkout_session_created',
+      userId,
+      credits: pack.credits,
+      amount: finalAmount,
+    });
+
     res.json({ sessionId: session.id, url: session.url });
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
+  } catch (error) {
+    console.error('[Billing] Checkout error:', error);
+    const sanitized = sanitizeErrorForClient(error, 'createCheckoutSession');
+    res.status(500).json({
+      error: sanitized.message,
+      code: sanitized.code,
+    });
   }
 };
 
 export const handleWebhook = async (req: Request, res: Response) => {
-  if (!isStripeConfigured) {
-    return res.status(503).json({ error: 'Billing not configured' });
+  // SECURITY: Check if billing is configured
+  if (!isStripeConfigured() || !stripe) {
+    return res.status(503).json({
+      error: 'Billing service unavailable',
+      code: ERROR_CODES.SERVICE_UNAVAILABLE,
+    });
+  }
+
+  // SECURITY: In production, webhook secret is REQUIRED
+  if (isProduction && !isWebhookSecretConfigured()) {
+    logSecurityEvent('stripe_webhook_bypass_blocked', {
+      reason: 'webhook_secret_missing_in_production',
+    });
+    return res.status(503).json({
+      error: 'Webhook configuration error',
+      code: ERROR_CODES.SERVICE_UNAVAILABLE,
+    });
   }
 
   const sig = req.headers['stripe-signature'];
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-
   let event;
 
   try {
-    if (endpointSecret) {
+    if (STRIPE_WEBHOOK_SECRET) {
+      // Production path: verify webhook signature
       const rawBody = (req as any).rawBody;
       if (!rawBody) {
-        return res.status(400).send('Webhook Error: Missing raw body');
+        logSecurityEvent('stripe_webhook_failed', { reason: 'missing_raw_body' });
+        return res.status(400).json({
+          error: 'Invalid request',
+          code: ERROR_CODES.VALIDATION_ERROR,
+        });
       }
-      event = stripe.webhooks.constructEvent(rawBody, sig as string, endpointSecret);
+      if (!sig) {
+        logSecurityEvent('stripe_webhook_failed', { reason: 'missing_signature' });
+        return res.status(400).json({
+          error: 'Invalid request',
+          code: ERROR_CODES.VALIDATION_ERROR,
+        });
+      }
+      event = stripe.webhooks.constructEvent(rawBody, sig as string, STRIPE_WEBHOOK_SECRET);
+      logSecurityEvent('stripe_webhook_verified', { eventType: event.type });
     } else {
-      event = req.body; // For local testing without signature verification if secret is missing
+      // Development only: allow unverified webhooks with warning
+      console.warn('[Billing] ⚠️  Webhook processed WITHOUT signature verification (dev mode only)');
+      event = req.body;
     }
   } catch (err: any) {
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    logSecurityEvent('stripe_webhook_failed', {
+      reason: 'signature_verification_failed',
+      error: err.message,
+    });
+    return res.status(400).json({
+      error: 'Webhook verification failed',
+      code: ERROR_CODES.VALIDATION_ERROR,
+    });
   }
 
   try {
@@ -203,137 +276,181 @@ export const handleWebhook = async (req: Request, res: Response) => {
       // Removed subscription renewal logic - we only do one-time credit packs now
     }
   } catch (error) {
-     return res.status(500).json({ error: 'Webhook processing failed' });
+    console.error('[Billing] Webhook processing error:', error);
+    return res.status(500).json({
+      error: 'Processing failed',
+      code: ERROR_CODES.INTERNAL_ERROR,
+    });
   }
 
   res.json({ received: true });
 };
 
 export const verifySession = async (req: Request, res: Response) => {
-    try {
-        if (!isStripeConfigured) {
-          return res.status(503).json({ error: 'Billing not configured' });
-        }
-
-        const { sessionId } = req.body;
-        if (!sessionId) return res.status(400).json({ error: 'Missing sessionId' });
-
-        const session = await stripe.checkout.sessions.retrieve(sessionId);
-        if (session.payment_status === 'paid') {
-             await processCheckoutSession(session);
-             res.json({ success: true });
-        } else {
-            res.status(400).json({ error: 'Payment not successful' });
-        }
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
+  try {
+    if (!isStripeConfigured() || !stripe) {
+      return res.status(503).json({
+        error: 'Billing service unavailable',
+        code: ERROR_CODES.SERVICE_UNAVAILABLE,
+      });
     }
-}
+
+    const { sessionId } = req.body;
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({
+        error: 'Session ID required',
+        code: ERROR_CODES.VALIDATION_ERROR,
+      });
+    }
+
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    if (session.payment_status === 'paid') {
+      await processCheckoutSession(session);
+      res.json({ success: true });
+    } else {
+      res.status(400).json({
+        error: 'Payment not completed',
+        code: ERROR_CODES.BILLING_ERROR,
+      });
+    }
+  } catch (error) {
+    console.error('[Billing] Verify session error:', error);
+    const sanitized = sanitizeErrorForClient(error, 'verifySession');
+    res.status(500).json({
+      error: sanitized.message,
+      code: sanitized.code,
+    });
+  }
+};
 
 export const createPortalSession = async (req: Request, res: Response) => {
-    // No longer needed - we don't have subscriptions to manage
-    // Users can just buy more credit packs as needed
-    return res.status(404).json({ 
-        error: 'Customer portal not available. Purchase credit packs directly from the pricing page.' 
-    });
-}
+  // No longer needed - we don't have subscriptions to manage
+  // Users can just buy more credit packs as needed
+  return res.status(404).json({
+    error: 'Customer portal not available. Purchase credit packs directly from the pricing page.',
+    code: ERROR_CODES.NOT_FOUND,
+  });
+};
 
 async function processCheckoutSession(session: any) {
-    const userId = session.metadata?.userId;
-    const type = session.metadata?.type;
-    const credits = parseInt(session.metadata?.credits || '0');
-    const paymentId = session.payment_intent as string || session.id;
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
 
-    if (userId && credits > 0) {
-        await grantCredits(userId, credits, type, paymentId);
-        
-        // Check if this is the referee's first purchase and grant referrer bonus
-        await grantReferrerPurchaseBonus(userId, paymentId);
-    }
+  const userId = session.metadata?.userId;
+  const type = session.metadata?.type;
+  const credits = parseInt(session.metadata?.credits || '0');
+  const paymentId = session.payment_intent as string || session.id;
+
+  if (userId && credits > 0) {
+    await grantCredits(userId, credits, type, paymentId);
+
+    // Check if this is the referee's first purchase and grant referrer bonus
+    await grantReferrerPurchaseBonus(userId, paymentId);
+
+    logSecurityEvent('credit_deduction', {
+      action: 'credits_granted',
+      userId,
+      credits,
+      paymentId,
+    });
+  }
 }
 
 async function grantReferrerPurchaseBonus(refereeUserId: string, paymentId: string) {
-    try {
-        // Check if this user is a referee and the purchase bonus hasn't been granted
-        const { data: referral } = await supabase
-            .from('referrals')
-            .select('referrer_user_id, purchase_bonus_granted_at')
-            .eq('referee_user_id', refereeUserId)
-            .maybeSingle();
+  if (!supabase) return;
 
-        if (!referral || referral.purchase_bonus_granted_at) {
-            // Either not a referee or bonus already granted
-            return;
-        }
+  try {
+    // Check if this user is a referee and the purchase bonus hasn't been granted
+    const { data: referral } = await supabase
+      .from('referrals')
+      .select('referrer_user_id, purchase_bonus_granted_at')
+      .eq('referee_user_id', refereeUserId)
+      .maybeSingle();
 
-        const referrerId = referral.referrer_user_id;
-        const now = new Date().toISOString();
-
-        // Check for idempotency - make sure we haven't already granted this specific bonus
-        const bonusDescription = `Referral purchase bonus: ${refereeUserId.slice(0, 8)}... made first purchase (+25 credits)`;
-        const { data: existingBonus } = await supabase
-            .from('credit_transactions')
-            .select('id')
-            .eq('user_id', referrerId)
-            .eq('type', 'bonus')
-            .eq('stripe_payment_id', `referral_purchase_${paymentId}`)
-            .maybeSingle();
-
-        if (existingBonus) {
-            // Bonus already granted for this payment
-            return;
-        }
-
-        // Grant referrer +25 credits
-        const { data: referrerProfile } = await supabase
-            .from('profiles')
-            .select('credits')
-            .eq('user_id', referrerId)
-            .single();
-
-        if (referrerProfile) {
-            const newBalance = (referrerProfile.credits || 0) + 25;
-            await supabase
-                .from('profiles')
-                .update({ credits: newBalance })
-                .eq('user_id', referrerId);
-
-            // Log the bonus transaction with unique reference
-            await supabase
-                .from('credit_transactions')
-                .insert({
-                    user_id: referrerId,
-                    amount: 25,
-                    type: 'bonus',
-                    description: bonusDescription,
-                    stripe_payment_id: `referral_purchase_${paymentId}`,
-                });
-
-            // Mark purchase bonus as granted
-            await supabase
-                .from('referrals')
-                .update({ purchase_bonus_granted_at: now })
-                .eq('referee_user_id', refereeUserId);
-        }
-    } catch (error) {
-        console.error('Error granting referrer purchase bonus:', error);
-        // Don't throw - we don't want to fail the entire checkout processing
+    if (!referral || referral.purchase_bonus_granted_at) {
+      // Either not a referee or bonus already granted
+      return;
     }
+
+    const referrerId = referral.referrer_user_id;
+    const now = new Date().toISOString();
+
+    // Check for idempotency - make sure we haven't already granted this specific bonus
+    const { data: existingBonus } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('user_id', referrerId)
+      .eq('type', 'bonus')
+      .eq('stripe_payment_id', `referral_purchase_${paymentId}`)
+      .maybeSingle();
+
+    if (existingBonus) {
+      // Bonus already granted for this payment
+      return;
+    }
+
+    // Grant referrer +25 credits
+    const { data: referrerProfile } = await supabase
+      .from('profiles')
+      .select('credits')
+      .eq('user_id', referrerId)
+      .single();
+
+    if (referrerProfile) {
+      const newBalance = (referrerProfile.credits || 0) + 25;
+      await supabase
+        .from('profiles')
+        .update({ credits: newBalance })
+        .eq('user_id', referrerId);
+
+      // Log the bonus transaction with unique reference
+      // SECURITY: Don't include full user ID in description
+      await supabase
+        .from('credit_transactions')
+        .insert({
+          user_id: referrerId,
+          amount: 25,
+          type: 'bonus',
+          description: 'Referral purchase bonus (+25 credits)',
+          stripe_payment_id: `referral_purchase_${paymentId}`,
+        });
+
+      // Mark purchase bonus as granted
+      await supabase
+        .from('referrals')
+        .update({ purchase_bonus_granted_at: now })
+        .eq('referee_user_id', refereeUserId);
+
+      logSecurityEvent('credit_deduction', {
+        action: 'referral_bonus_granted',
+        referrerId,
+        credits: 25,
+      });
+    }
+  } catch (error) {
+    console.error('[Billing] Error granting referrer purchase bonus:', error);
+    // Don't throw - we don't want to fail the entire checkout processing
+  }
 }
 
 async function grantCredits(userId: string, amount: number, type: string, referenceId?: string) {
+  if (!supabase) {
+    throw new Error('Supabase not configured');
+  }
+
   // Check for idempotency
   if (referenceId) {
-      const { data: existing } = await supabase
-          .from('credit_transactions')
-          .select('id')
-          .eq('stripe_payment_id', referenceId)
-          .eq('user_id', userId)
-          .maybeSingle();
-      
-      if (existing) {
-          return;
-      }
+    const { data: existing } = await supabase
+      .from('credit_transactions')
+      .select('id')
+      .eq('stripe_payment_id', referenceId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (existing) {
+      return;
+    }
   }
 
   // 1. Get current credits
