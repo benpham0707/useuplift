@@ -1,128 +1,64 @@
 
 
-## Plan: Update Type Definitions to Match the Better Data Format
+## Plan: Clear White Screen by Fixing Build Errors
 
-### Summary
-The data files (brown.ts, etc.) use a **superior, more flexible, and more in-depth structure** that enables better teaching. The type definitions in `collegeResearch.ts` are outdated and restrictive. We will update the types to match the better data format.
+### Goal
+Fix all build errors so the app renders instead of showing a white screen. This is the minimum needed to unblock UI/UX work.
 
-### What Makes the Data Format Better
+### Strategy
+Fix 4 files. No `@ts-nocheck` needed -- we'll properly update the types.
 
-| Aspect | Old Type (Restrictive) | New Data (Better) |
-|--------|------------------------|-------------------|
-| Word count | `wordCount: { min, max }` | `wordLimit: number` (simpler) |
-| Essay purpose | None | `whatItReveals: string[]` (teaching insight!) |
-| Pattern classification | None | `essayPattern: string` (enables pattern-based teaching) |
-| Required status | None | `requiredOrOptional` (important context) |
-| Rubric format | Complex nested `RubricBand` objects | Cleaner `rubricCriteria[]` with weights |
-| Prompt-specific flags | None | `promptSpecificRedFlags[]`, `promptSpecificGreenFlags[]` |
-| Green flag strength | Only 3 values | 5 values including `'major'`, `'moderate'` |
-| Evidence | No context field | Includes `context` for richer teaching |
-| Socratic questions | Complex object required | Simple strings OR objects (flexible) |
+---
 
-### Files to Modify
+### 1. Fix `src/services/commonAppWorkshop/types/collegeResearch.ts`
 
-#### 1. `src/services/commonAppWorkshop/types/collegeResearch.ts`
+Three targeted changes to the type definitions:
 
-**CollegeEssayPrompt** - Make fields flexible to support both formats:
-```typescript
-export interface CollegeEssayPrompt {
-  promptId: string;
-  promptText: string;
-  
-  // Support BOTH word count formats
-  wordCount?: { min: number; max: number };
-  wordLimit?: number;  // ✅ ADD - simpler format
-  
-  // Make these optional (not all prompts need them)
-  promptNumber?: number;
-  promptTitle?: string;
-  
-  // ✅ ADD - Better teaching fields
-  requiredOrOptional?: 'required' | 'optional' | string;
-  essayPattern?: string;
-  whatItReveals?: string[];
-  
-  // ✅ ADD - Better rubric format
-  rubricCriteria?: Array<{
-    criterion: string;
-    weight: number;
-    excellent: string;
-    adequate: string;
-    weak: string;
-  }>;
-  
-  // ✅ ADD - Prompt-level flags
-  promptSpecificRedFlags?: string[];
-  promptSpecificGreenFlags?: string[];
-  
-  // Keep existing fields as optional
-  primaryAssessment?: string;
-  importance?: 'critical' | 'high' | 'medium';
-  importanceContext?: string;
-  rubric?: CollegeEssayRubric;
-  dimensionalCriteria?: PromptDimensionalCriteria[];
-}
-```
+**a) `CollegeEssayPrompt` (lines 109-132)** -- Make rigid fields optional and add new ones:
+- `promptNumber`, `promptTitle`, `primaryAssessment`, `importance`, `importanceContext`, `rubric`, `dimensionalCriteria` become optional
+- `wordCount` becomes optional
+- Add `wordLimit?: number`
+- Add `essayPattern?: string`, `whatItReveals?: string[]`, `requiredOrOptional?: string`
+- Add `rubricCriteria?: Array<{...}>`, `promptSpecificRedFlags?: string[]`, `promptSpecificGreenFlags?: string[]`
+- Add index signature `[key: string]: unknown`
 
-**CollegeGreenFlag.strength** - Expand to include all values used in data:
-```typescript
-strength: 'exceptional' | 'strong' | 'positive' | 'major' | 'moderate';
-```
+**b) `CollegeGreenFlag.strength` (line 249)** -- Expand from `'exceptional' | 'strong' | 'positive'` to also include `'major' | 'moderate'`
 
-**Evidence type** - Add context field:
-```typescript
-evidence: {
-  source: string;
-  quote: string;
-  explanation: string;
-  context?: string;  // ✅ ADD - optional context
-};
-```
+**c) `CollegeRedFlag.evidence` and `CollegeGreenFlag.evidence` (lines 216-220, 258-263)** -- Add `context?: string` to evidence objects
 
-**CollegeSocraticQuestion** - Allow both formats:
-```typescript
-// Allow simple strings OR full objects
-export type CollegeSocraticQuestionItem = string | CollegeSocraticQuestion;
+**d) `CollegeSocraticQuestionBank` (lines 286-301)** -- Change all `CollegeSocraticQuestion[]` to `(string | CollegeSocraticQuestion)[]` to allow simple strings. Make `byPurpose` optional.
 
-export interface CollegeSocraticQuestionBank {
-  byPurpose?: { ... };  // Make optional
-  byPrompt?: Record<string, CollegeSocraticQuestionItem[]>;
-  byDimension?: Record<string, CollegeSocraticQuestionItem[]>;  // ✅ ADD
-  byIssue?: Record<string, CollegeSocraticQuestionItem[]>;
-}
-```
+**e) `CollegeCoreValue.evidence` (lines 86-90)** -- Already has `context`, so no change needed.
 
-#### 2. `src/components/RequireTermsAccepted.tsx`
-- Use type assertions for `terms_accepted_at` since it exists in DB but not in auto-generated types
-- This is a separate issue from the college research types
+### 2. Fix `src/hooks/useAuth.tsx` (line 44)
 
-#### 3. `src/hooks/useAuth.tsx`
-- Fix the `getToken` import to use the correct Clerk API
+Replace the broken dynamic import `const { getToken } = await import('@clerk/clerk-react')` with using `useAuth` from Clerk:
+- Import `useAuth as useClerkAuth` from `@clerk/clerk-react` at top
+- Call `const { getToken } = useClerkAuth()` inside the component
+- Use `getToken({ template: 'supabase' })` in the effect
 
-#### 4. `src/query/useProfileId.ts`
-- Pass required token argument to `getAuthenticatedSupabaseClient()`
+### 3. Fix `src/query/useProfileId.ts` (line 14)
 
-### What Will NOT Change
-- **All college research content remains 100% intact**
-- **All Dean Powell quotes, rubrics, and teaching material preserved**
-- **All red flags, green flags, and Socratic questions preserved**
-- **All specific Brown/Harvard/etc data files unchanged**
+The hook calls `getAuthenticatedSupabaseClient()` with no arguments but it requires a token. Fix by:
+- Import `useAuth` from `@clerk/clerk-react`
+- Get the token and pass it to `getAuthenticatedSupabaseClient(token)`
+- Use Clerk's `user.id` instead of `supabase.auth.getUser()`
 
-### Technical Approach
+### 4. Fix `src/components/RequireTermsAccepted.tsx` (lines 80, 92, 114)
 
-The changes are purely **additive** - we're making the types more flexible to accept what the data already provides:
-- Making required fields optional
-- Adding new optional fields
-- Expanding union types to include more values
-- Adding alternative type formats
+Add type assertions (`as any`) on the 3 Supabase calls that reference `terms_accepted_at` since it exists in the DB but not in the auto-generated types:
+- `.update({ terms_accepted_at: now } as any)` 
+- `.select('terms_accepted_at' as any)`
+- Access via `(updateData as any)?.terms_accepted_at`
 
-This follows TypeScript best practices: types should describe what data CAN be, not enforce a single rigid format.
+### What This Fixes
+- All `brown.ts` errors (wordLimit, context, strength, socratic strings) -- fixed by updated types
+- All other college data files with similar patterns -- same type fixes apply
+- Auth errors in useAuth, useProfileId, RequireTermsAccepted
+- White screen caused by build failure
 
-### Order of Implementation
-1. Update `collegeResearch.ts` type definitions (fixes ~90% of errors)
-2. Fix `RequireTermsAccepted.tsx` with type assertions
-3. Fix `useAuth.tsx` with correct Clerk API usage
-4. Fix `useProfileId.ts` with token parameter
-5. Verify build succeeds
-6. Spot-check that college data loads correctly
+### Files NOT Changed
+- No college data files modified (brown.ts, stanford.ts, etc. stay exactly as-is)
+- No UI components changed
+- No routing changes
 
