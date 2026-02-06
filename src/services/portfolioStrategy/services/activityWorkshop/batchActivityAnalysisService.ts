@@ -27,6 +27,7 @@ import {
 
 import { ActivityTier, ActivityCategory, LeadershipType, RecognitionLevel, ImpactType } from '../../types';
 import { SpikeType, SpikeStrength, MajorCategory, ImpactTier } from '../../knowledge';
+import { parseClaudeJSON } from '../../../commonAppWorkshop/utils/jsonParser';
 
 // Import Research-Backed Profiler for pre-computation
 import {
@@ -75,6 +76,24 @@ Low-income: {{lowIncome}}
 - Tier 2: State/regional recognition with leadership impact (state champion, AIME, Eagle Scout)
 - Tier 3: School/local recognition with commitment (varsity, club officer, consistent volunteer)
 - Tier 4: Participation without distinction (club member, one-time events)
+
+## STANDARDIZED DESCRIPTION ISSUE TYPES:
+When identifying description issues, use ONLY these exact types:
+- vague_description: Description uses general language without specifics
+- missing_quantification: No numbers, metrics, or measurable outcomes
+- weak_role_clarity: Role/position is unclear or undefined
+- buried_leadership: Leadership role exists but isn't highlighted
+- hidden_impact: Real impact exists but isn't communicated
+- generic_contribution: Contribution sounds like anyone could do it
+- missing_progression: No evidence of growth over time
+- title_mismatch: Title implies more than description supports
+- buried_achievement: Significant achievements mentioned but not emphasized
+- weak_differentiator: Nothing distinguishes this from similar activities
+- resume_speak: Corporate jargon without substance
+- missing_context: Lacks important context (selectivity, scope, etc.)
+- shallow_depth: Surface-level involvement described
+- authenticity_gap: Claims feel exaggerated or unsupported
+- tier_misperception: Description suggests different tier than reality
 
 ## Your Task:
 Using the pre-analysis data AND your expert judgment, provide comprehensive analysis for EACH activity AND the portfolio as a whole.
@@ -126,7 +145,7 @@ Respond in this exact JSON format:
         "actionVerbs": 0-10,
         "quantification": 0-10,
         "overallScore": 0-100,
-        "issues": ["problems"],
+        "issues": [{"type": "vague_description|missing_quantification|weak_role_clarity|buried_leadership|hidden_impact|generic_contribution|missing_progression|title_mismatch|buried_achievement|weak_differentiator|resume_speak|missing_context|shallow_depth|authenticity_gap|tier_misperception", "evidence": "specific evidence from description"}],
         "strengths": ["positives"]
       },
       "narrativePotential": {
@@ -362,40 +381,6 @@ function formatBatchPrompt(
     .replace('{{activitiesList}}', formatActivitiesList(input.activities));
 }
 
-function parseJSONResponse<T>(response: string): T | null {
-  try {
-    // Try to extract JSON from the response
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    // Clean up common JSON issues from LLM output
-    let jsonStr = jsonMatch[0];
-
-    // Remove trailing commas before } or ]
-    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
-
-    // Fix missing commas between properties (common LLM error)
-    jsonStr = jsonStr.replace(/}(\s*)"([^"]+)":/g, '},$1"$2":');
-    jsonStr = jsonStr.replace(/](\s*)"([^"]+)":/g, '],$1"$2":');
-
-    return JSON.parse(jsonStr) as T;
-  } catch (error) {
-    console.error('[BatchActivityAnalysis] Failed to parse JSON:', error);
-    // Try json5-style parsing as fallback
-    try {
-      // More aggressive cleanup
-      let jsonStr = response.match(/\{[\s\S]*\}/)?.[0] || '';
-      jsonStr = jsonStr
-        .replace(/,\s*}/g, '}')
-        .replace(/,\s*]/g, ']')
-        .replace(/'/g, '"')
-        .replace(/(\w+):/g, '"$1":');
-      return JSON.parse(jsonStr) as T;
-    } catch {
-      return null;
-    }
-  }
-}
 
 // ============================================================================
 // BATCH ACTIVITY ANALYSIS SERVICE CLASS
@@ -406,13 +391,59 @@ interface BatchAnalysisResponse {
   portfolioSynthesis: Omit<PortfolioAnalysis, 'activities' | 'analysisConfidence'>;
 }
 
+/**
+ * Normalize issues from LLM response to string[] format
+ *
+ * The LLM may output issues in various formats:
+ * 1. Structured: [{type: "vague_description", evidence: "..."}]
+ * 2. Plain strings: ["vague description", "missing metrics"]
+ *
+ * This normalizes to string[] containing the standardized issue type names
+ * for direct mapping to teaching knowledge base.
+ */
+function normalizeIssues(issues: unknown): string[] {
+  if (!issues || !Array.isArray(issues)) {
+    return [];
+  }
+
+  return issues.map(issue => {
+    // Handle structured format: {type: "...", evidence: "..."}
+    if (typeof issue === 'object' && issue !== null && 'type' in issue) {
+      return (issue as { type: string }).type;
+    }
+    // Handle plain string format
+    if (typeof issue === 'string') {
+      return issue;
+    }
+    return String(issue);
+  }).filter(Boolean);
+}
+
 export class BatchActivityAnalysisService implements IActivityAnalysisService {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
   private profiler: ResearchBackedProfiler;
 
   constructor() {
-    this.anthropic = new Anthropic();
+    // Lazy initialization - don't create client until needed
+    // This allows dotenv.config() to run before first API call
     this.profiler = researchBackedProfiler;
+  }
+
+  /**
+   * Get the Anthropic client, creating it lazily if needed
+   */
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) {
+      const apiKey = process.env.ANTHROPIC_API_KEY?.split('\n')[0]?.trim();
+      if (!apiKey) {
+        throw new Error(
+          'ANTHROPIC_API_KEY not found. ' +
+          'For tests: ensure dotenv.config() is called BEFORE importing services.'
+        );
+      }
+      this._anthropic = new Anthropic({ apiKey });
+    }
+    return this._anthropic;
   }
 
   /**
@@ -461,7 +492,9 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
       });
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-      const parsed = parseJSONResponse<BatchAnalysisResponse>(responseText);
+
+      // Use robust parser - this should ALWAYS succeed for Claude JSON
+      const parsed = parseClaudeJSON<BatchAnalysisResponse>(responseText, 'BatchActivityAnalysis');
 
       if (!parsed) {
         console.error('[BatchActivityAnalysis] Failed to parse response, using profiler-based fallback');
@@ -481,9 +514,16 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
             a => a.activityId === activity.id
           );
 
+          // Normalize issues from potentially structured format to string[]
+          const normalizedIssues = normalizeIssues(analysisData.descriptionQuality?.issues);
+
           activities[activity.id] = {
             activityId: activity.id,
             ...analysisData,
+            descriptionQuality: {
+              ...analysisData.descriptionQuality,
+              issues: normalizedIssues,
+            },
             databaseMatches: this.generateDatabaseMatches(activity, profilerAssessment),
           };
         } else {
@@ -929,6 +969,201 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
     if (combined.includes('vice') || combined.includes('secretary')) return 'executive_board';
 
     return 'none';
+  }
+
+  // ============================================================================
+  // PUBLIC METHODS FOR PARALLEL SUB-BATCH PROCESSING (v4.2)
+  // ============================================================================
+
+  /**
+   * Run ONLY the profiler step on all activities (instant, no API call).
+   * Used by Stage 1 to pre-compute portfolio-level metrics before
+   * splitting into parallel sub-batches.
+   */
+  async runProfiler(input: ActivityWorkshopSessionInput): Promise<EnhancedPortfolioAssessment> {
+    const nuancedInput = convertToNuancedInput(input);
+    return this.profiler.analyzeProfile(nuancedInput);
+  }
+
+  /**
+   * Analyze a SUB-BATCH of activities (1-2) with pre-computed profiler data.
+   *
+   * Unlike analyzePortfolio() which runs the profiler + sends ALL activities,
+   * this accepts pre-computed profiler results and only sends a subset of
+   * activities to the LLM. The full profiler context is included in the prompt
+   * so each sub-batch has portfolio-level awareness.
+   *
+   * Returns per-activity analyses only (no portfolio synthesis).
+   */
+  async analyzeSubBatch(
+    subInput: ActivityWorkshopSessionInput,
+    profilerResult: EnhancedPortfolioAssessment
+  ): Promise<Record<string, ActivityAnalysis>> {
+    const activities: Record<string, ActivityAnalysis> = {};
+    const preAnalysis = formatPreAnalysis(profilerResult);
+    const prompt = formatBatchPrompt(subInput, preAnalysis);
+
+    // Scale maxTokens to sub-batch size (fewer activities = fewer tokens needed)
+    const maxTokens = Math.min(MAX_TOKENS_BATCH_ANALYSIS, subInput.activities.length * 6000 + 2000);
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: SONNET_MODEL,
+        max_tokens: maxTokens,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
+      const parsed = parseClaudeJSON<BatchAnalysisResponse>(responseText, 'SubBatchAnalysis');
+
+      if (!parsed) {
+        console.warn('[SubBatchAnalysis] Parse failed, using profiler fallback for sub-batch');
+        for (const activity of subInput.activities) {
+          activities[activity.id] = this.createFallbackActivityAnalysis(activity, profilerResult);
+        }
+        return activities;
+      }
+
+      for (const activity of subInput.activities) {
+        const analysisData = parsed.activities[activity.id];
+        if (analysisData) {
+          const profilerAssessment = profilerResult.activityAssessments.find(
+            a => a.activityId === activity.id
+          );
+          const normalizedIssues = normalizeIssues(analysisData.descriptionQuality?.issues);
+          activities[activity.id] = {
+            activityId: activity.id,
+            ...analysisData,
+            descriptionQuality: {
+              ...analysisData.descriptionQuality,
+              issues: normalizedIssues,
+            },
+            databaseMatches: this.generateDatabaseMatches(activity, profilerAssessment),
+          };
+        } else {
+          activities[activity.id] = this.createFallbackActivityAnalysis(activity, profilerResult);
+        }
+      }
+
+      return activities;
+    } catch (error) {
+      console.error('[SubBatchAnalysis] Error, using profiler fallback:', error);
+      for (const activity of subInput.activities) {
+        activities[activity.id] = this.createFallbackActivityAnalysis(activity, profilerResult);
+      }
+      return activities;
+    }
+  }
+
+  /**
+   * Build portfolio-level analysis fields from profiler data.
+   * Used by Stage 1 to construct the PortfolioAnalysis after merging
+   * per-activity results from parallel sub-batches.
+   */
+  buildPortfolioFieldsFromProfiler(
+    input: ActivityWorkshopSessionInput,
+    profilerResult: EnhancedPortfolioAssessment
+  ): Omit<PortfolioAnalysis, 'activities'> {
+    const spikeStrengthMap: Record<string, SpikeStrength> = {
+      exceptional: 'national',
+      strong: 'regional',
+      moderate: 'local',
+      weak: 'emerging',
+      none: 'none',
+    };
+
+    return {
+      tierDistribution: {
+        tier1: profilerResult.portfolioAnalysis.tierDistribution.tier1Count,
+        tier2: profilerResult.portfolioAnalysis.tierDistribution.tier2Count,
+        tier3: profilerResult.portfolioAnalysis.tierDistribution.tier3Count,
+        tier4: profilerResult.portfolioAnalysis.tierDistribution.tier4Count,
+        portfolioTier: this.calculatePortfolioTier(profilerResult.portfolioAnalysis.tierDistribution),
+        tierRationale: profilerResult.overallAssessment.admissionsOfficerPerspective,
+      },
+      spikeAnalysis: {
+        hasSpike: profilerResult.portfolioAnalysis.spikeAnalysis.hasSpike,
+        spikeStrength: spikeStrengthMap[profilerResult.portfolioAnalysis.spikeAnalysis.spikeStrength] || 'none',
+        spikeActivities: profilerResult.portfolioAnalysis.spikeAnalysis.spikeActivities,
+        spikeEvidence: [profilerResult.portfolioAnalysis.spikeAnalysis.reasoning],
+        spikeAuthenticity: 70,
+        spikeNarrative: profilerResult.portfolioAnalysis.spikeAnalysis.admissionsImplication,
+        spikeDevelopmentStage: profilerResult.portfolioAnalysis.spikeAnalysis.hasSpike ? 'developing' : 'absent',
+      },
+      coherenceAnalysis: {
+        score: profilerResult.portfolioAnalysis.narrativeCoherence.score,
+        assessment: this.mapCoherenceAssessment(profilerResult.portfolioAnalysis.narrativeCoherence.score),
+        primaryTheme: profilerResult.portfolioAnalysis.narrativeCoherence.primaryTheme,
+        secondaryThemes: profilerResult.portfolioAnalysis.narrativeCoherence.supportingThemes,
+        thematicConnections: [],
+        disconnectedActivities: profilerResult.portfolioAnalysis.narrativeCoherence.orphanActivities.map(id => ({
+          activityId: id,
+          reason: 'Not aligned with primary spike area',
+        })),
+        narrativeThread: profilerResult.portfolioAnalysis.narrativeCoherence.storyPotential,
+      },
+      majorAlignment: {
+        intendedMajor: profilerResult.studentContext.intendedMajor,
+        alignmentScore: profilerResult.portfolioAnalysis.majorAlignment.overallScore,
+        stronglyAligned: profilerResult.portfolioAnalysis.majorAlignment.coreActivities,
+        moderatelyAligned: [],
+        misaligned: [],
+        gaps: profilerResult.portfolioAnalysis.majorAlignment.gaps,
+        competitiveBenchmark: profilerResult.portfolioAnalysis.majorAlignment.competitivePosition,
+      },
+      depthBreadthProfile: {
+        profile: this.mapBreadthVsDepth(profilerResult.portfolioAnalysis.spikeAnalysis.breadthVsDepth),
+        depthScore: profilerResult.portfolioAnalysis.spikeAnalysis.hasSpike ? 75 : 40,
+        breadthScore: profilerResult.activityAssessments.length >= 6 ? 70 : 50,
+        optimalBalance: profilerResult.portfolioAnalysis.spikeAnalysis.admissionsImplication,
+      },
+      hiddenGems: {
+        undersoldActivities: [],
+        workFamilyContributions: { present: false, activities: [], value: '' },
+        constrainedExcellence: { present: false, context: '', activities: [] },
+      },
+      competitiveAssessment: {
+        overallStrength: this.mapCompetitiveLevel(profilerResult.overallAssessment.competitiveLevel),
+        strengthAreas: [profilerResult.overallAssessment.strengthSummary],
+        weaknessAreas: [profilerResult.overallAssessment.weaknessSummary],
+        differentiators: [],
+        commonalities: [],
+        competitiveEdge: profilerResult.overallAssessment.admissionsOfficerPerspective,
+      },
+      gapsIdentified: profilerResult.portfolioAnalysis.majorAlignment.gaps.map(gap => ({
+        gap,
+        severity: 'significant' as const,
+        impactOnApplication: 'May affect competitiveness for intended major',
+        affectedSchools: [],
+      })),
+      commonAppReadiness: {
+        readyForSubmission: profilerResult.activityAssessments.length >= 5,
+        activitiesCount: input.activities.length,
+        topActivitiesIdentified: profilerResult.commonAppOrdering.order.slice(0, 10),
+        orderingRecommendation: profilerResult.commonAppOrdering.order,
+        descriptionReadiness: input.activities.map(a => {
+          const assessment = profilerResult.activityAssessments.find(pa => pa.activityId === a.id);
+          return {
+            activityId: a.id,
+            ready: (assessment?.descriptionQuality.score || 0) >= 60,
+            issues: assessment?.descriptionQuality.issues || [],
+          };
+        }),
+      },
+      analysisConfidence: {
+        overallConfidence: 75,
+        dataQuality: 80,
+        classificationConfidence: 75,
+        spikeConfidence: profilerResult.analysisConfidence.overallConfidence,
+        factors: [
+          { factor: 'Parallel sub-batch LLM analysis', impact: 'positive', score: 12 },
+          { factor: 'Research-backed profiler pre-analysis', impact: 'positive', score: 15 },
+          ...(profilerResult.analysisConfidence.caveats.length > 0
+            ? [{ factor: profilerResult.analysisConfidence.caveats[0], impact: 'negative' as const, score: -10 }]
+            : []),
+        ],
+      },
+    };
   }
 }
 

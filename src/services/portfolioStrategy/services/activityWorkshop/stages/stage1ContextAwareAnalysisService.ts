@@ -25,14 +25,22 @@
 import { callClaude } from '@/lib/llm/claude';
 import {
   ActivityWorkshopSessionInput,
+  ActivityWorkshopInput,
   PortfolioAnalysis,
+  ActivityAnalysis,
   StoryContext,
   AnalysisContext,
   ActivityTier,
 } from '../types';
 
-// Import the batch analysis service for base analysis
+// Import the batch analysis service for sub-batch analysis + profiler
 import { batchActivityAnalysisService } from '../batchActivityAnalysisService';
+
+// Import expert analysis prompt for counselor-level reasoning
+import { buildExpertAnalysisPrompt } from '../expertSystemPrompts';
+
+// Import expert knowledge assembly
+import { assembleExpertContext } from '../expertCounselorKnowledgeBase';
 
 /**
  * Thresholds for teaching candidate selection
@@ -56,10 +64,18 @@ const TEACHING_THRESHOLDS = {
  * Enriches batch analysis with story context and identifies teaching candidates
  */
 export class Stage1ContextAwareAnalysisService {
-  private readonly MODEL = 'claude-sonnet-4-5-20250514';
+  private readonly MODEL = 'claude-sonnet-4-5-20250929';
+  private _lastUsage: { input_tokens: number; output_tokens: number } | undefined;
+
+  /** Maximum activities per sub-batch for parallel LLM analysis */
+  private readonly SUB_BATCH_SIZE = 2;
 
   /**
-   * Run context-aware analysis
+   * Run context-aware analysis with PARALLEL sub-batch processing (v4.2)
+   *
+   * Instead of sending all activities in one huge LLM call that times out,
+   * we split into sub-batches of 1-2 activities and process them in parallel.
+   * The profiler still runs on ALL activities first for portfolio-level context.
    *
    * @param input - Workshop session input
    * @param storyContext - Stage 0 story context output
@@ -72,12 +88,42 @@ export class Stage1ContextAwareAnalysisService {
     const startTime = Date.now();
     console.log(`[Stage1] Starting context-aware analysis for ${input.activities.length} activities`);
 
-    // Step 1: Run batch analysis (or use cached if available)
-    console.log(`[Stage1] Running batch analysis...`);
-    const baseAnalysis = await batchActivityAnalysisService.analyzePortfolio(input);
-    console.log(`[Stage1] Batch analysis complete`);
+    // Step 1a: Run profiler on ALL activities (instant, heuristic — no API call)
+    console.log(`[Stage1] Running profiler on all activities...`);
+    const profilerResult = await batchActivityAnalysisService.runProfiler(input);
+    console.log(`[Stage1] Profiler complete in ${Date.now() - startTime}ms`);
 
-    // Step 2: Get story-enriched adjustments via LLM
+    // Step 1b: Split activities into sub-batches and analyze in parallel
+    const chunks = chunkActivities(input.activities, this.SUB_BATCH_SIZE);
+    console.log(`[Stage1] Analyzing ${input.activities.length} activities in ${chunks.length} parallel sub-batches of ≤${this.SUB_BATCH_SIZE}...`);
+
+    const subBatchStartTime = Date.now();
+    const subBatchResults = await Promise.all(
+      chunks.map((chunk, i) => {
+        const subInput: ActivityWorkshopSessionInput = {
+          activities: chunk,
+          studentContext: input.studentContext,
+        };
+        console.log(`[Stage1] Sub-batch ${i + 1}/${chunks.length}: ${chunk.map(a => a.id).join(', ')}`);
+        return batchActivityAnalysisService.analyzeSubBatch(subInput, profilerResult);
+      })
+    );
+    console.log(`[Stage1] All sub-batches complete in ${Date.now() - subBatchStartTime}ms`);
+
+    // Step 1c: Merge sub-batch results into unified PortfolioAnalysis
+    const mergedActivities: Record<string, ActivityAnalysis> = {};
+    for (const subResult of subBatchResults) {
+      Object.assign(mergedActivities, subResult);
+    }
+
+    const portfolioFields = batchActivityAnalysisService.buildPortfolioFieldsFromProfiler(input, profilerResult);
+    const baseAnalysis: PortfolioAnalysis = {
+      activities: mergedActivities,
+      ...portfolioFields,
+    };
+    console.log(`[Stage1] Merged ${Object.keys(mergedActivities).length} activity analyses`);
+
+    // Step 1d: Get story-enriched adjustments via LLM
     console.log(`[Stage1] Getting story-enriched adjustments...`);
     const storyAdjustments = await this.getStoryEnrichedAdjustments(
       input,
@@ -85,7 +131,7 @@ export class Stage1ContextAwareAnalysisService {
       storyContext
     );
 
-    // Step 3: Select teaching candidates based on analysis + story
+    // Step 1e: Select teaching candidates based on analysis + story
     console.log(`[Stage1] Selecting teaching candidates...`);
     const teachingCandidates = this.selectTeachingCandidates(
       baseAnalysis,
@@ -93,7 +139,7 @@ export class Stage1ContextAwareAnalysisService {
       storyAdjustments
     );
 
-    // Step 4: Prioritize teaching order
+    // Step 1f: Prioritize teaching order
     const teachingPriorities = this.prioritizeTeaching(
       input,
       baseAnalysis,
@@ -101,7 +147,7 @@ export class Stage1ContextAwareAnalysisService {
       teachingCandidates
     );
 
-    // Step 5: Identify portfolio-level teaching needs
+    // Step 1g: Identify portfolio-level teaching needs
     const portfolioTeachingNeeds = this.identifyPortfolioTeachingNeeds(
       baseAnalysis,
       storyContext
@@ -120,8 +166,11 @@ export class Stage1ContextAwareAnalysisService {
       analysisMetadata: {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
-        tokensUsed: { input: 0, output: 0 }, // TODO: Track actual tokens
-        cost: 0, // TODO: Calculate actual cost
+        tokensUsed: {
+          input: this._lastUsage?.input_tokens || 0,
+          output: this._lastUsage?.output_tokens || 0,
+        },
+        cost: this.calculateCost(this._lastUsage),
         storyContextProvided: true,
       },
     };
@@ -142,14 +191,20 @@ export class Stage1ContextAwareAnalysisService {
   ): Promise<AnalysisContext['storyEnrichment']['storyInfluencedScores']> {
     const prompt = this.buildStoryAdjustmentPrompt(input, baseAnalysis, storyContext);
 
+    // Build expert context for counselor-level analysis
+    const expertSystemPrompt = this.buildExpertSystemPrompt(input);
+
     try {
       const response = await callClaude({
         model: this.MODEL,
-        systemPrompt: this.getSystemPrompt(),
+        systemPrompt: expertSystemPrompt,
         userPrompt: prompt,
         maxTokens: 2000,
         temperature: 0.2,
       });
+
+      // Store usage for cost tracking
+      this._lastUsage = response.usage;
 
       return this.parseStoryAdjustments(response.content, input, baseAnalysis);
     } catch (error) {
@@ -249,9 +304,47 @@ IMPORTANT:
   }
 
   /**
-   * System prompt for story adjustments
+   * Build expert system prompt with counselor-level analysis intelligence
+   *
+   * When expert context is available, uses the full expert analysis framework.
+   * Falls back to a solid baseline prompt otherwise.
    */
-  private getSystemPrompt(): string {
+  private buildExpertSystemPrompt(input: ActivityWorkshopSessionInput): string {
+    try {
+      const expertContext = assembleExpertContext({
+        activities: input.activities.map(a => ({
+          id: a.id,
+          title: a.title,
+          description: a.description,
+          role: a.role,
+          hoursPerWeek: a.hoursPerWeek,
+          weeksPerYear: a.weeksPerYear,
+          yearsInvolved: a.yearsInvolved || 1,
+          gradeLevels: a.gradeLevels?.map(g => String(g)),
+        })),
+        studentContext: input.studentContext ? {
+          intendedMajor: input.studentContext.intendedMajor,
+          targetSchools: input.studentContext.targetSchools,
+          isFirstGen: input.studentContext.firstGen,
+          hasWorkObligations: input.studentContext.hasWorkObligations,
+          workHoursPerWeek: input.studentContext.workHoursPerWeek,
+          constraintNotes: input.studentContext.constraintNotes,
+          geographicContext: input.studentContext.geographicContext,
+        } : undefined,
+      });
+
+      // Use expert analysis prompt with constraint intelligence, school archetypes, etc.
+      return buildExpertAnalysisPrompt(expertContext) + '\n\nOutput valid JSON only.';
+    } catch (error) {
+      console.warn('[Stage1] Expert context assembly failed, using baseline prompt:', error);
+      return this.getBaselineSystemPrompt();
+    }
+  }
+
+  /**
+   * Baseline system prompt (fallback when expert context unavailable)
+   */
+  private getBaselineSystemPrompt(): string {
     return `You are an expert college admissions counselor who understands that context matters.
 
 Your role is to review tier assessments in light of a student's personal story and circumstances.
@@ -608,6 +701,27 @@ Output valid JSON only.`;
       strategicGaps,
     };
   }
+
+  private calculateCost(usage: { input_tokens?: number; output_tokens?: number } | undefined): number {
+    if (!usage) return 0;
+    // Sonnet pricing: $3/M input, $15/M output
+    const inputCost = ((usage.input_tokens || 0) / 1_000_000) * 3;
+    const outputCost = ((usage.output_tokens || 0) / 1_000_000) * 15;
+    return inputCost + outputCost;
+  }
+}
+
+// ============================================================================
+// UTILITY
+// ============================================================================
+
+/** Split an array into chunks of the given size */
+function chunkActivities<T>(items: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
 }
 
 // Export singleton

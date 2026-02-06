@@ -76,10 +76,36 @@
 export * from './types';
 
 // ============================================================================
-// v4.0 PIPELINE STAGES (NEW - Primary)
+// v4.1 HOLISTIC NARRATIVE (NEW - Beginning + End Analysis)
 // ============================================================================
 
-// Stage 0: Story Detection (Haiku - understanding WHO)
+/**
+ * Portfolio Narrative Service
+ *
+ * HOLISTIC STORY ANALYSIS that replaces rigid archetype detection.
+ * - Uses SONNET for deep narrative understanding
+ * - Runs at BEGINNING and END of analysis (with caching)
+ * - Shows how activities ELEVATE each other
+ * - Creates a cohesive "spike portfolio" presentation
+ * - Updates dynamically based on improvements
+ */
+export {
+  PortfolioNarrativeService,
+  portfolioNarrativeService,
+  type NarrativeElevation,
+  type NarrativeThread,
+  type SpikePresentation,
+  type GapFraming,
+  type PortfolioNarrative,
+  type NarrativeProgression,
+} from './stages/portfolioNarrativeService';
+
+// ============================================================================
+// v4.0 PIPELINE STAGES (Legacy Stage 0 kept for backwards compatibility)
+// ============================================================================
+
+// Stage 0: Story Detection (Haiku - legacy archetype detection)
+// NOTE: Consider using PortfolioNarrativeService instead for holistic analysis
 export {
   Stage0StoryDetectionService,
   stage0StoryDetectionService,
@@ -149,3 +175,86 @@ export { ActivityTeachingService, activityTeachingService } from './activityTeac
 
 // Legacy Diagnosis Service (deprecated, use pipeline)
 export { ActivityDiagnosisService, activityDiagnosisService } from './activityDiagnosisService';
+
+// ============================================================================
+// ENHANCED TEACHING SYSTEM (v5.1 - PIQ Workshop Style)
+// ============================================================================
+
+/**
+ * Enhanced Activity Teaching Service
+ *
+ * Deep teaching following the PIQ Workshop pattern with:
+ * - THE PROBLEM: Why issues matter for admissions
+ * - WHY THIS WORKS: Psychology and research behind fixes
+ * - WHAT DETAILS TO PRIORITIZE: Critical elements to include
+ * - BEFORE/AFTER EXAMPLES: Concrete transformations
+ */
+export {
+  EnhancedActivityTeachingService,
+  enhancedActivityTeachingService,
+  type EnhancedActivityTeaching,
+  type EnhancedIssueTeaching,
+  type DetailPriority,
+  type InterviewGuidance,
+  type UpgradePathway,
+} from './enhancedActivityTeachingService';
+
+// Activity Teaching Knowledge Base (research-backed teaching content)
+export {
+  ACTIVITY_TEACHING_KNOWLEDGE_BASE,
+  getTeachingForIssue,
+  getAllIssueTypes,
+  searchTeachingBundles,
+  getTransformationsForCategory,
+  type ActivityIssueType,
+  type ActivityTeachingBundle,
+  type ActivityTransformation,
+} from './activityTeachingKnowledgeBase';
+
+// ============================================================================
+// ACTIVITY PROFILE & CHAT SYSTEM (v5.0 - Deep Profile Building)
+// ============================================================================
+
+/**
+ * Activity Profile System
+ *
+ * Conversational AI system that builds rich activity profiles through
+ * natural dialogue with students. These profiles power improved analysis
+ * across all services.
+ *
+ * Components:
+ * - Profile: Type system and lifecycle management for activity profiles
+ * - Chat: Conversational extraction with adaptive questioning
+ *
+ * Usage:
+ * ```typescript
+ * import {
+ *   activityProfileChatService,
+ *   activityProfileService,
+ *   ActivityProfile,
+ *   ConversationState,
+ * } from './activityWorkshop';
+ *
+ * // Start conversation to build profile
+ * const { state, openingMessage, firstQuestion } = await activityProfileChatService.startConversation({
+ *   activityId: 'act-123',
+ *   activityTitle: 'Science Olympiad',
+ *   trigger: 'user_initiated',
+ * });
+ *
+ * // Process responses iteratively
+ * const result = await activityProfileChatService.processUserResponse({
+ *   state,
+ *   response: 'I joined freshman year because...',
+ * });
+ *
+ * // Use enriched profile for better analysis
+ * const profile = result.state.currentProfile;
+ * ```
+ */
+
+// Profile Module (types and service for activity profiles)
+export * from './profile';
+
+// Chat Module (conversational extraction system)
+export * from './chat';

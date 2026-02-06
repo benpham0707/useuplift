@@ -331,11 +331,27 @@ Activity ${id}:
 
 function parseJSONResponse<T>(response: string): T | null {
   try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    // Remove markdown code fences if present
+    let cleanedResponse = response.replace(/```json\s*/g, '').replace(/```\s*/g, '');
+
+    const jsonMatch = cleanedResponse.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as T;
-  } catch (error) {
-    console.error('[ActivityTeaching] Failed to parse JSON:', error);
+
+    let jsonStr = jsonMatch[0];
+
+    // Fix common LLM JSON issues:
+    // 1. Remove trailing commas before } or ]
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+    // 2. Fix unquoted keys (rare but happens)
+    jsonStr = jsonStr.replace(/(\{|,)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:/g, '$1"$2":');
+    // 3. Replace unescaped newlines inside strings with escaped version
+    jsonStr = jsonStr.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match) => {
+      return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t');
+    });
+
+    return JSON.parse(jsonStr) as T;
+  } catch (error: any) {
+    console.error('[ActivityTeaching] Failed to parse JSON:', error.message);
     return null;
   }
 }
@@ -349,10 +365,21 @@ function createCitedText(text: string, citations: ReturnType<typeof activityCita
 // ============================================================================
 
 export class ActivityTeachingService implements IActivityTeachingService {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
 
   constructor() {
-    this.anthropic = new Anthropic();
+    // Lazy initialization - client created on first use
+  }
+
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) {
+      const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY not found. Ensure dotenv.config() is called before importing services.');
+      }
+      this._anthropic = new Anthropic({ apiKey });
+    }
+    return this._anthropic;
   }
 
   /**

@@ -30,6 +30,7 @@ import {
 
 import { ActivityTier, ActivityCategory, LeadershipType, RecognitionLevel, ImpactType } from '../../types';
 import { SpikeType, SpikeStrength, MajorCategory, ImpactTier } from '../../knowledge';
+import { parseClaudeJSON } from '../../../commonAppWorkshop/utils/jsonParser';
 
 // Import knowledge databases for context
 import {
@@ -394,26 +395,27 @@ Narrative Potential: ${analysis.narrativePotential.storytellingValue}
     .replace('{{activityAnalysesSummary}}', activitySummaries);
 }
 
-function parseJSONResponse<T>(response: string): T | null {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as T;
-  } catch (error) {
-    console.error('[ActivityAnalysis] Failed to parse JSON:', error);
-    return null;
-  }
-}
 
 // ============================================================================
 // ACTIVITY ANALYSIS SERVICE CLASS
 // ============================================================================
 
 export class ActivityAnalysisService implements IActivityAnalysisService {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
 
   constructor() {
-    this.anthropic = new Anthropic();
+    // Lazy initialization - client created on first use
+  }
+
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) {
+      const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY not found. Ensure dotenv.config() is called before importing services.');
+      }
+      this._anthropic = new Anthropic({ apiKey });
+    }
+    return this._anthropic;
   }
 
   /**
@@ -433,12 +435,9 @@ export class ActivityAnalysisService implements IActivityAnalysisService {
       });
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-      const parsed = parseJSONResponse<ActivityAnalysis>(responseText);
 
-      if (!parsed) {
-        console.error('[ActivityAnalysis] Failed to parse response, using fallback');
-        return this.createFallbackActivityAnalysis(activity);
-      }
+      // Use robust parser - this should ALWAYS succeed for Claude JSON
+      const parsed = parseClaudeJSON<ActivityAnalysis>(responseText, `ActivityAnalysis:${activity.title}`);
 
       // Ensure activityId is set
       return {
@@ -479,7 +478,9 @@ export class ActivityAnalysisService implements IActivityAnalysisService {
       });
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-      const parsed = parseJSONResponse<Omit<PortfolioAnalysis, 'activities'>>(responseText);
+
+      // Use robust parser - this should ALWAYS succeed for Claude JSON
+      const parsed = parseClaudeJSON<Omit<PortfolioAnalysis, 'activities'>>(responseText, 'PortfolioAnalysis');
 
       if (!parsed) {
         console.error('[ActivityAnalysis] Failed to parse portfolio response, using fallback');

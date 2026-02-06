@@ -145,3 +145,15 @@ export {
   ScoringCacheService,
   scoringCacheService,
 } from './scoringCacheService';
+
+// Profile Integration - bridges ActivityProfile with GUIDANCE (not scoring)
+// IMPORTANT: Profiles enhance teaching/guidance, NOT scores
+// Scores remain from admissions officer perspective (what they see on application)
+export {
+  ProfileIntegrationService,
+  profileIntegrationService,
+  type DescriptionGapAnalysis,
+  type MissingElement,
+  type TeachingProfileContext,
+  type ProfileEnhancedTeachingInput,
+} from './profileIntegrationService';

@@ -170,3 +170,159 @@ export type {
   ProgressionAdvice,
   CourseRecommendation,
 } from './types';
+
+// ============================================================================
+// CONVERSATIONAL CAPABILITY PROFILE SYSTEM
+// ============================================================================
+
+/**
+ * Conversational Capability Profiling
+ *
+ * A system for building qualitative academic profiles through natural conversation.
+ * Enhances the quantitative analysis with context, feelings, and student perspective.
+ *
+ * Usage:
+ * ```typescript
+ * import {
+ *   initializeCapabilityConversation,
+ *   processCapabilityConversationTurn,
+ *   finalizeCapabilityConversation,
+ * } from './capability/conversational';
+ *
+ * // Initialize conversation from quantitative analysis
+ * const { opener, state, qualitativeInsights } = await initializeCapabilityConversation(
+ *   nuancedAnalysis,
+ *   { intendedMajor: 'Computer Science' }
+ * );
+ *
+ * // Show opener to user
+ * console.log(opener.message);
+ *
+ * // Process user responses
+ * const result = await processCapabilityConversationTurn(
+ *   userMessage,
+ *   state,
+ *   qualitativeInsights,
+ *   nuancedAnalysis
+ * );
+ *
+ * // Continue until result.response.shouldContinue is false
+ *
+ * // Finalize and synthesize
+ * const synthesizedProfile = finalizeCapabilityConversation(
+ *   result.state,
+ *   result.qualitativeInsights,
+ *   nuancedAnalysis
+ * );
+ * ```
+ */
+export {
+  // Main conversation engine
+  CapabilityConversationEngine,
+  capabilityConversationEngine,
+  initializeCapabilityConversation,
+  processCapabilityConversationTurn,
+  finalizeCapabilityConversation,
+
+  // Topic detection
+  detectTopics,
+  reprioritizeTopics,
+  getNextTopic,
+
+  // Insight extraction
+  extractInsights,
+  aggregateInsights,
+  calibrateConfidence,
+
+  // Profile synthesis
+  ProfileSynthesizer,
+  profileSynthesizer,
+  synthesizeProfile,
+  adjustTeachingRecommendations,
+} from './conversational';
+
+export type {
+  // Conversation engine types
+  ConversationEngineOptions,
+  InitializeResult,
+  ProcessTurnResult,
+
+  // Conversation state
+  ConversationState,
+  ConversationPhase,
+  ConversationOpener,
+  ConversationResponse,
+  ResponseType,
+
+  // Topic types
+  ConversationTopic,
+  TopicType,
+  TargetInsight,
+
+  // Insight types
+  ExtractedInsight,
+  InsightType,
+  ExtractedValues,
+  SentimentLevel,
+  ExtractionResult,
+
+  // Course-level annotations
+  CourseAnnotation,
+  TeacherQuality,
+  ClassEnvironment,
+  ExternalCircumstance,
+  CircumstanceType,
+  ImpactLevel,
+  AnnotationFlag,
+
+  // Subject-level insights
+  SubjectInsight,
+
+  // Learning and motivation
+  LearningStyleIndicators,
+  LearningPreference,
+  SetbackResponse,
+  MotivationProfile,
+  Motivator,
+
+  // Self-awareness
+  StudentSelfAwareness,
+  BlindSpot,
+
+  // Global circumstances
+  GlobalCircumstance,
+
+  // Qualitative profile
+  QualitativeInsights,
+  ProfileCompleteness,
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW: AO Perception vs Internal Understanding (Separation of Concerns)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Core types for the separation:
+  // - AOPerception: What admissions officers see (NEVER adjusted)
+  // - InternalUnderstanding: What we know (for guidance only)
+  // - ApplicationStrategy: Actionable recommendations
+  // - PerceptionRealityGap: Where paper record differs from true capability
+  AOPerception,
+  InternalUnderstanding,
+  ApplicationStrategy,
+  SubjectAnalysisWithContext,
+  PerceptionRealityGap,
+  GlobalApplicationStrategy,
+  // Supporting types
+  ExternalFactorSummary,
+  TeacherIssue,
+  HiddenPotential,
+  AdditionalInfoItem,
+
+  // Synthesized profile (refactored with new architecture)
+  SynthesizedCapabilityProfile,
+  SourceMismatch,
+
+  // Legacy synthesis types (deprecated but maintained for backwards compatibility)
+  QualitativeAdjustment,
+  AdjustmentType,
+  SynthesizedInsight,
+  AdjustedSubjectStrength,
+} from './conversational';

@@ -14,8 +14,15 @@ import Anthropic from '@anthropic-ai/sdk';
 // CLAUDE_CODE_KEY is no longer considered.
 // Check if we're in browser (Vite) or Node.js environment
 // We need to check for actual browser indicators (window, document) to distinguish
-// from Node.js environments that may polyfill import.meta.env (like tsx)
-const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+// from Node.js environments. Note: Node.js 24+ has navigator.userAgent = "Node.js/X"
+// so we check for real browser user agents (Mozilla, Chrome, Safari, etc.)
+const isBrowser = typeof window !== 'undefined'
+  && typeof document !== 'undefined'
+  && typeof navigator !== 'undefined'
+  && typeof navigator.userAgent === 'string'
+  && navigator.userAgent.length > 0
+  && !navigator.userAgent.startsWith('Node.js')
+  && (navigator.userAgent.includes('Mozilla') || navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Safari') || navigator.userAgent.includes('AppleWebKit'));
 
 // Function to get API key - allows for runtime updates
 function getApiKey(): string | null {
@@ -24,18 +31,29 @@ function getApiKey(): string | null {
     return null;
   }
 
-  const key = process.env.ANTHROPIC_API_KEY;
+  // Sanitize: take only the first line and trim whitespace
+  // Handles .env files with duplicate keys or malformed multi-line values
+  const rawKey = process.env.ANTHROPIC_API_KEY?.split('\n')[0]?.trim();
 
-  if (!key) {
+  if (!rawKey) {
     return null;
   }
 
-  return key;
+  return rawKey;
 }
 
-// Singleton client instance
+// Singleton client instance - lazily initialized
 let clientInstance: Anthropic | null = null;
 
+/**
+ * Get or create the Anthropic client
+ *
+ * This function lazily initializes the client, which allows:
+ * 1. dotenv to be loaded before first use
+ * 2. API key to be set after module import
+ *
+ * @returns Anthropic client instance or null if no API key
+ */
 function getClient(): Anthropic | null {
   if (clientInstance) return clientInstance;
 
@@ -52,6 +70,31 @@ function getClient(): Anthropic | null {
   return clientInstance;
 }
 
+/**
+ * Get a lazily-initialized Anthropic client
+ *
+ * USE THIS INSTEAD OF `new Anthropic()` in services!
+ *
+ * Benefits:
+ * - Ensures dotenv is loaded before client creation
+ * - Centralizes API key management
+ * - Provides consistent error handling
+ *
+ * @throws Error if no API key is available
+ * @returns Anthropic client instance
+ */
+export function getAnthropicClient(): Anthropic {
+  const client = getClient();
+  if (!client) {
+    throw new Error(
+      'Anthropic API key not found. ' +
+      'For tests: ensure dotenv.config() is called BEFORE importing services. ' +
+      'Set ANTHROPIC_API_KEY in your .env file.'
+    );
+  }
+  return client;
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -63,6 +106,28 @@ export interface ClaudeCallOptions {
   systemPrompt?: string;
   useJsonMode?: boolean;
   cacheSystemPrompt?: boolean;
+  /**
+   * Optional timeout in milliseconds. If not provided, uses default based on maxTokens.
+   * Default: 45s for <2000 tokens, 90s for 2000-3000 tokens, 120s for >3000 tokens.
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * Alternative input format for Claude calls using messages array.
+ * This interface is preferred for multi-turn conversations.
+ */
+export interface ClaudeMessageInput {
+  model: string;
+  system?: string;
+  messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+  maxTokens?: number;
+  temperature?: number;
+  /**
+   * Optional timeout in milliseconds. If not provided, uses default based on maxTokens.
+   * Default: 45s for <2000 tokens, 90s for 2000-3000 tokens, 120s for >3000 tokens.
+   */
+  timeoutMs?: number;
 }
 
 export interface ClaudeResponse<T = any> {
@@ -80,121 +145,223 @@ export interface ClaudeResponse<T = any> {
 // DEFAULT OPTIONS
 // ============================================================================
 
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514';
+const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929'; // Sonnet 4.5
 const DEFAULT_MAX_TOKENS = 4096;
+
+// ============================================================================
+// TIMEOUT UTILITIES
+// ============================================================================
+
+/**
+ * Calculate appropriate timeout based on expected response size.
+ */
+function calculateTimeout(maxTokens: number, customTimeout?: number): number {
+  if (customTimeout) return customTimeout;
+  // Default timeouts based on expected response size
+  // Larger responses need more time
+  if (maxTokens >= 3000) return 120000; // 2 minutes
+  if (maxTokens >= 2000) return 90000;  // 1.5 minutes
+  if (maxTokens >= 1000) return 60000;  // 1 minute
+  return 45000; // 45 seconds for quick responses
+}
+
+/**
+ * Create a timeout promise that rejects after the specified time.
+ */
+function createTimeoutPromise(timeoutMs: number): { promise: Promise<never>; cancel: () => void } {
+  let timeoutId: NodeJS.Timeout;
+  const promise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`Claude API call timed out after ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+  });
+  return {
+    promise,
+    cancel: () => clearTimeout(timeoutId),
+  };
+}
 
 // ============================================================================
 // CLAUDE API CALL
 // ============================================================================
 
 /**
- * Make a call to Claude API with retry logic
+ * Extended input format for Claude calls with userPrompt/systemPrompt.
+ * This is a simpler alternative to the messages array format.
+ */
+interface ClaudeSimpleInput {
+  model?: string;
+  systemPrompt?: string;
+  userPrompt: string;
+  maxTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+  useJsonMode?: boolean;
+  cacheSystemPrompt?: boolean;
+}
+
+/**
+ * Make a call to Claude API with timeout handling and graceful degradation.
+ *
+ * Supports three call signatures:
+ * 1. callClaude(userPrompt, options) - Simple string prompt with options
+ * 2. callClaude({ model, system, messages, ... }) - Message-based input (multi-turn conversations)
+ * 3. callClaude({ model, systemPrompt, userPrompt, ... }) - Simple object input (single-turn)
  */
 export async function callClaude<T = any>(
-  userPrompt: string,
-  options: ClaudeCallOptions = {}
+  promptOrInput: string | ClaudeMessageInput | ClaudeSimpleInput,
+  options?: ClaudeCallOptions
 ): Promise<ClaudeResponse<T>> {
-  const {
-    model = DEFAULT_MODEL,
-    temperature = 0.7,
-    maxTokens = DEFAULT_MAX_TOKENS,
-    systemPrompt,
-    useJsonMode = false,
-    cacheSystemPrompt = false,
-  } = options;
+  // Determine which interface is being used
+  const isObject = typeof promptOrInput !== 'string';
+  const hasMessages = isObject && 'messages' in (promptOrInput as ClaudeMessageInput);
+  const hasUserPrompt = isObject && 'userPrompt' in (promptOrInput as ClaudeSimpleInput);
+
+  let model: string;
+  let temperature: number;
+  let maxTokens: number;
+  let systemParam: string | undefined;
+  let messages: Anthropic.Messages.MessageParam[];
+  let useJsonMode: boolean;
+  let customTimeout: number | undefined;
+
+  if (isObject && hasMessages) {
+    // Message-based interface: callClaude({ model, system, messages, ... })
+    const input = promptOrInput as ClaudeMessageInput;
+    model = input.model || DEFAULT_MODEL;
+    temperature = input.temperature ?? 0.7;
+    maxTokens = input.maxTokens ?? DEFAULT_MAX_TOKENS;
+    systemParam = input.system;
+    customTimeout = input.timeoutMs;
+    useJsonMode = false; // Message-based calls typically parse JSON manually
+
+    // Convert simple message format to Anthropic format
+    messages = input.messages.map(msg => ({
+      role: msg.role as 'user' | 'assistant',
+      content: [{ type: 'text' as const, text: msg.content }],
+    }));
+  } else if (isObject && hasUserPrompt) {
+    // Simple object interface: callClaude({ model, systemPrompt, userPrompt, ... })
+    const input = promptOrInput as ClaudeSimpleInput;
+    model = input.model || DEFAULT_MODEL;
+    temperature = input.temperature ?? 0.7;
+    maxTokens = input.maxTokens ?? DEFAULT_MAX_TOKENS;
+    systemParam = input.systemPrompt;
+    customTimeout = input.timeoutMs;
+    useJsonMode = input.useJsonMode ?? false;
+
+    messages = [
+      {
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: input.userPrompt }],
+      },
+    ];
+  } else {
+    // String-based interface: callClaude(userPrompt, options)
+    const opts = options ?? {};
+    model = opts.model ?? DEFAULT_MODEL;
+    temperature = opts.temperature ?? 0.7;
+    maxTokens = opts.maxTokens ?? DEFAULT_MAX_TOKENS;
+    systemParam = opts.systemPrompt;
+    useJsonMode = opts.useJsonMode ?? false;
+    customTimeout = opts.timeoutMs;
+
+    messages = [
+      {
+        role: 'user' as const,
+        content: [{ type: 'text' as const, text: promptOrInput as string }],
+      },
+    ];
+  }
 
   try {
-    // Build system prompt (SDK accepts a plain string)
-    const systemParam = systemPrompt ? String(systemPrompt) : undefined;
-
     // Build request parameters
     const requestParams: Anthropic.Messages.MessageCreateParams = {
       model,
       max_tokens: maxTokens,
       temperature,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: userPrompt,
-            },
-          ],
-        },
-      ],
+      messages,
       ...(systemParam ? { system: systemParam } : {}),
     };
 
     // Get client
     const client = getClient();
     if (!client) {
-      throw new Error('Claude API not available in browser context. Use edge functions for AI operations.');
+      // More helpful error message that explains the actual issue
+      const apiKey = process.env.ANTHROPIC_API_KEY;
+      if (!apiKey) {
+        throw new Error(
+          'ANTHROPIC_API_KEY not found in environment. ' +
+          'For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. ' +
+          'For production: ensure the environment variable is set.'
+        );
+      }
+      throw new Error('Claude API client initialization failed. Check API key validity.');
     }
 
-    // Make API call with timeout (30 seconds for chat, 120 seconds for deep analysis)
-    const timeoutMs = maxTokens >= 3000 ? 120000 : maxTokens >= 2000 ? 90000 : 45000; // Increased for reliability
-    let timeoutId: NodeJS.Timeout;
+    // Make API call with explicit timeout
+    const timeoutMs = calculateTimeout(maxTokens, customTimeout);
+    const timeout = createTimeoutPromise(timeoutMs);
 
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutId = setTimeout(() => {
-        reject(new Error(`Claude API call timed out after ${timeoutMs/1000} seconds`));
-      }, timeoutMs);
-    });
+    try {
+      const response = await Promise.race([
+        client.messages.create(requestParams).then(res => {
+          timeout.cancel();
+          return res;
+        }),
+        timeout.promise,
+      ]) as Anthropic.Messages.Message;
 
-    const response = await Promise.race([
-      client.messages.create(requestParams).then(res => {
-        clearTimeout(timeoutId);
-        return res;
-      }),
-      timeoutPromise
-    ]) as Anthropic.Messages.Message;
+      // Extract content
+      let content: any;
+      if (response.content[0].type === 'text') {
+        const textContent = response.content[0].text;
 
-    // Extract content
-    let content: any;
-    if (response.content[0].type === 'text') {
-      const textContent = response.content[0].text;
+        if (useJsonMode) {
+          // Parse JSON from response
+          try {
+            let jsonString = textContent.trim();
 
-      if (useJsonMode) {
-        // Parse JSON from response
-        try {
-          let jsonString = textContent.trim();
-          
-          // 1. Try extracting from code blocks
-          const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-          if (jsonMatch) {
-            jsonString = jsonMatch[1].trim();
-          } else {
-            // 2. Fallback: Find first '{' and last '}'
-            const firstBrace = jsonString.indexOf('{');
-            const lastBrace = jsonString.lastIndexOf('}');
-            if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-              jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+            // 1. Try extracting from code blocks
+            const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (jsonMatch) {
+              jsonString = jsonMatch[1].trim();
+            } else {
+              // 2. Fallback: Find first '{' and last '}'
+              const firstBrace = jsonString.indexOf('{');
+              const lastBrace = jsonString.lastIndexOf('}');
+              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                jsonString = jsonString.substring(firstBrace, lastBrace + 1);
+              }
             }
-          }
 
-          content = JSON.parse(jsonString);
-        } catch (parseError) {
-          throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            content = JSON.parse(jsonString);
+          } catch (parseError) {
+            throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          }
+        } else {
+          content = textContent;
         }
       } else {
-        content = textContent;
+        throw new Error(`Unexpected content type: ${response.content[0].type}`);
       }
-    } else {
-      throw new Error(`Unexpected content type: ${response.content[0].type}`);
-    }
 
-    // Return structured response
-    return {
-      content,
-      usage: {
-        input_tokens: response.usage.input_tokens,
-        output_tokens: response.usage.output_tokens,
-        cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
-        cache_read_input_tokens: response.usage.cache_read_input_tokens,
-      },
-      stopReason: response.stop_reason || 'unknown',
-    };
+      // Return structured response
+      return {
+        content,
+        usage: {
+          input_tokens: response.usage.input_tokens,
+          output_tokens: response.usage.output_tokens,
+          cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
+          cache_read_input_tokens: response.usage.cache_read_input_tokens,
+        },
+        stopReason: response.stop_reason || 'unknown',
+      };
+    } catch (error) {
+      // Ensure timeout is cancelled even on error
+      timeout.cancel();
+      throw error;
+    }
 
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
@@ -264,6 +431,45 @@ export async function batchCallClaude<T = any>(
 
   await Promise.all(executing);
   return results;
+}
+
+/**
+ * Call Claude with graceful degradation on timeout or error.
+ * Returns the LLM response if successful, or null if it fails,
+ * allowing the caller to fall back to heuristics.
+ *
+ * This is preferred for conversation flows where LLM is optional
+ * and heuristic fallback is acceptable.
+ */
+export async function callClaudeWithFallback<T = any>(
+  input: ClaudeMessageInput,
+  options: {
+    timeoutMs?: number;
+    onTimeout?: () => void;
+    onError?: (error: Error) => void;
+  } = {}
+): Promise<ClaudeResponse<T> | null> {
+  const { timeoutMs, onTimeout, onError } = options;
+
+  try {
+    return await callClaude<T>({
+      ...input,
+      timeoutMs: timeoutMs ?? input.timeoutMs,
+    });
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+
+    // Check if it's a timeout
+    if (err.message.includes('timed out')) {
+      console.warn('[Claude] LLM call timed out, falling back to heuristics');
+      onTimeout?.();
+    } else {
+      console.warn('[Claude] LLM call failed, falling back to heuristics:', err.message);
+      onError?.(err);
+    }
+
+    return null;
+  }
 }
 
 /**

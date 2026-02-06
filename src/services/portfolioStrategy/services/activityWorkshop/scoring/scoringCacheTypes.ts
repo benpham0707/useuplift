@@ -38,7 +38,7 @@ export const SCORING_MODEL_VERSIONS = {
   descriptionScoring: 'claude-haiku-4-5-20251001',
   activityScoring: 'claude-haiku-4-5-20251001',
   portfolioScoring: 'claude-haiku-4-5-20251001',
-  teaching: 'claude-sonnet-4-5-20250514',
+  teaching: 'claude-sonnet-4-5-20250929',
 } as const;
 
 // ============================================================================

@@ -30,6 +30,7 @@ import {
 import { ActivityTier } from '../../types';
 import { SpikeType, SpikeStrength } from '../../knowledge';
 import { activityCitationService } from './activityCitationService';
+import { parseClaudeJSON } from '../../../commonAppWorkshop/utils/jsonParser';
 
 // ============================================================================
 // CONSTANTS
@@ -208,23 +209,6 @@ ${activitySummaries}
     .replace('{{portfolioAnalysisJson}}', portfolioSummary);
 }
 
-function parseJSONResponse<T>(response: string): T | null {
-  try {
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-
-    // Clean up common JSON issues
-    let jsonStr = jsonMatch[0];
-    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
-    jsonStr = jsonStr.replace(/}(\s*)"([^"]+)":/g, '},$1"$2":');
-    jsonStr = jsonStr.replace(/](\s*)"([^"]+)":/g, '],$1"$2":');
-
-    return JSON.parse(jsonStr) as T;
-  } catch (error) {
-    console.error('[BatchActivityTeaching] Failed to parse JSON:', error);
-    return null;
-  }
-}
 
 function createCitedText(text: string, citations: ReturnType<typeof activityCitationService.getCitationsForTier> = []): CitedText {
   return activityCitationService.attachCitations(text, citations);
@@ -326,10 +310,21 @@ interface BatchTeachingResponse {
 }
 
 export class BatchActivityTeachingService implements IActivityTeachingService {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
 
   constructor() {
-    this.anthropic = new Anthropic();
+    // Lazy initialization - client created on first use
+  }
+
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) {
+      const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY not found. Ensure dotenv.config() is called before importing services.');
+      }
+      this._anthropic = new Anthropic({ apiKey });
+    }
+    return this._anthropic;
   }
 
   /**
@@ -376,7 +371,9 @@ export class BatchActivityTeachingService implements IActivityTeachingService {
       });
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
-      const parsed = parseJSONResponse<BatchTeachingResponse>(responseText);
+
+      // Use robust parser - this should ALWAYS succeed for Claude JSON
+      const parsed = parseClaudeJSON<BatchTeachingResponse>(responseText, 'BatchActivityTeaching');
 
       if (!parsed) {
         console.error('[BatchActivityTeaching] Failed to parse response, using fallback');

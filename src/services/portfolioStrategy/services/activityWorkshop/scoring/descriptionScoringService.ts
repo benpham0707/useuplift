@@ -414,7 +414,7 @@ export class DescriptionScoringService {
       const response = await callClaude(
         buildDescriptionScoringPrompt(input),
         {
-          model: 'claude-sonnet-4-5-20250514', // Sonnet for nuanced description assessment
+          model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for nuanced description assessment
           systemPrompt: DESCRIPTION_SCORING_SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 1500,
@@ -477,7 +477,7 @@ export class DescriptionScoringService {
       const response = await callClaude(
         buildBatchDescriptionScoringPrompt(input.activities),
         {
-          model: 'claude-sonnet-4-5-20250514', // Sonnet for nuanced description assessment
+          model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for nuanced description assessment
           systemPrompt: DESCRIPTION_SCORING_SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 6000, // More tokens for batch

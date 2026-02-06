@@ -28,6 +28,7 @@ import {
 import { ActivityTier, ActivityCategory, LeadershipType, RecognitionLevel, ImpactType } from '../../types';
 
 import { SpikeType, SpikeStrength, MajorCategory, ImpactTier } from '../../knowledge';
+import { parseClaudeJSON } from '../../../commonAppWorkshop/utils/jsonParser';
 
 // Import knowledge databases for matching
 import {
@@ -237,27 +238,27 @@ Hours/week: ${a.hoursPerWeek}
     .replace('{{activitiesSummary}}', activitiesSummary);
 }
 
-function parseJSONResponse<T>(response: string): T | null {
-  try {
-    // Extract JSON from response (in case there's extra text)
-    const jsonMatch = response.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return null;
-    return JSON.parse(jsonMatch[0]) as T;
-  } catch (error) {
-    console.error('[ActivityDiagnosis] Failed to parse JSON response:', error);
-    return null;
-  }
-}
 
 // ============================================================================
 // ACTIVITY DIAGNOSIS SERVICE CLASS
 // ============================================================================
 
 export class ActivityDiagnosisService implements IActivityDiagnosisService {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
 
   constructor() {
-    this.anthropic = new Anthropic();
+    // Lazy initialization - client created on first use
+  }
+
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) {
+      const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error('ANTHROPIC_API_KEY not found. Ensure dotenv.config() is called before importing services.');
+      }
+      this._anthropic = new Anthropic({ apiKey });
+    }
+    return this._anthropic;
   }
 
   /**
@@ -280,7 +281,8 @@ export class ActivityDiagnosisService implements IActivityDiagnosisService {
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
 
-      const parsed = parseJSONResponse<{
+      // Use robust parser - this should ALWAYS succeed for Claude JSON
+      const parsed = parseClaudeJSON<{
         preliminaryTier: number;
         tierConfidence: string;
         tierReasoning: string;
@@ -301,12 +303,7 @@ export class ActivityDiagnosisService implements IActivityDiagnosisService {
           issues: string[];
         };
         matchedBenchmarks: { database: string; match: string; tier: number; relevance: number }[];
-      }>(responseText);
-
-      if (!parsed) {
-        // Return fallback diagnosis
-        return this.createFallbackDiagnosis(activity);
-      }
+      }>(responseText, `ActivityDiagnosis:${activity.title}`);
 
       return {
         activityId: activity.id,
@@ -392,7 +389,8 @@ export class ActivityDiagnosisService implements IActivityDiagnosisService {
 
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
 
-      const parsed = parseJSONResponse<{
+      // Use robust parser - this should ALWAYS succeed for Claude JSON
+      const parsed = parseClaudeJSON<{
         tierDistribution: { tier1: number; tier2: number; tier3: number; tier4: number };
         spikeDetection: {
           hasSpike: boolean;
@@ -419,11 +417,7 @@ export class ActivityDiagnosisService implements IActivityDiagnosisService {
           affectedActivities: string[];
           recommendation: string;
         }[];
-      }>(responseText);
-
-      if (!parsed) {
-        return this.createFallbackPortfolioDiagnosis(input, activityDiagnoses);
-      }
+      }>(responseText, 'PortfolioDiagnosis');
 
       // Calculate tier distribution from individual diagnoses if not provided
       const tierDistribution = parsed.tierDistribution || this.calculateTierDistribution(activityDiagnoses);

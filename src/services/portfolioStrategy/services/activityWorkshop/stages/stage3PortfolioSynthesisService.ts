@@ -19,6 +19,7 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
+import { parseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
 import {
   ActivityWorkshopSessionInput,
   StoryContext,
@@ -109,8 +110,8 @@ export class Stage3PortfolioSynthesisService {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
         tokensUsed: {
-          input: response.usage?.inputTokens || 0,
-          output: response.usage?.outputTokens || 0,
+          input: response.usage?.input_tokens || 0,
+          output: response.usage?.output_tokens || 0,
         },
         cost: stage3Cost,
       };
@@ -294,13 +295,8 @@ Output valid JSON only.`;
     teachingContext: TeachingContext
   ): SynthesisContext {
     try {
-      let jsonStr = response;
-      const jsonMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-      if (jsonMatch) {
-        jsonStr = jsonMatch[1];
-      }
-
-      const parsed = JSON.parse(jsonStr);
+      const parsed = parseClaudeJSON<Record<string, unknown>>(response, 'Stage3Synthesis');
+      console.log('[Stage3] JSON parsed successfully');
 
       return {
         finalAssessment: {
@@ -409,25 +405,97 @@ Output valid JSON only.`;
   }
 
   /**
-   * Normalize action plan
+   * Normalize a single action plan item from LLM output.
+   * Handles: plain strings, objects with standard keys, objects with alternate keys.
+   */
+  private normalizeActionItem(
+    item: unknown
+  ): { action: string; activityId?: string; impact: string; deadline?: string } | null {
+    if (!item) return null;
+
+    // Handle plain string items
+    if (typeof item === 'string') {
+      return { action: item, impact: '' };
+    }
+
+    if (typeof item !== 'object') return null;
+
+    const obj = item as Record<string, unknown>;
+
+    // Extract action from multiple possible key names
+    const action = (obj.action as string)
+      || (obj.action_item as string)
+      || (obj.task as string)
+      || (obj.recommendation as string)
+      || (obj.step as string)
+      || (obj.description as string)
+      || '';
+
+    if (!action) {
+      // Last resort: stringify the object values
+      const firstStringValue = Object.values(obj).find(v => typeof v === 'string' && (v as string).length > 5);
+      if (firstStringValue) {
+        return { action: firstStringValue as string, impact: '' };
+      }
+      return null;
+    }
+
+    const activityId = (obj.activityId as string)
+      || (obj.activity_id as string)
+      || (obj.activityID as string)
+      || undefined;
+
+    const impact = (obj.impact as string)
+      || (obj.why as string)
+      || (obj.reason as string)
+      || (obj.rationale as string)
+      || '';
+
+    const deadline = (obj.deadline as string)
+      || (obj.timeframe as string)
+      || (obj.timeline as string)
+      || undefined;
+
+    return { action, activityId, impact, deadline };
+  }
+
+  /**
+   * Normalize action plan — robust against all LLM format variations
    */
   private normalizeActionPlan(
-    plan: {
-      immediate?: Array<{ action: string; activityId?: string; impact: string }>;
-      shortTerm?: Array<{ action: string; activityId?: string; impact: string; deadline?: string }>;
-      longTerm?: Array<{ action: string; activityId?: string; impact: string }>;
-    } | undefined
+    plan: Record<string, unknown> | undefined
   ): SynthesisContext['actionPlan'] {
+    const normalizeList = (
+      items: unknown,
+      fallback: { action: string; impact: string }
+    ) => {
+      if (!Array.isArray(items) || items.length === 0) {
+        return [fallback];
+      }
+      const normalized = items
+        .map(item => this.normalizeActionItem(item))
+        .filter((item): item is NonNullable<typeof item> => item !== null && item.action.length > 0);
+      return normalized.length > 0 ? normalized : [fallback];
+    };
+
+    // Handle alternative key names for the plan categories
+    const immediate = plan?.immediate || plan?.immediate_actions || plan?.immediateActions || plan?.now;
+    const shortTerm = plan?.shortTerm || plan?.short_term || plan?.shortTermActions || plan?.upcoming;
+    const longTerm = plan?.longTerm || plan?.long_term || plan?.longTermActions || plan?.future;
+
     return {
-      immediate: plan?.immediate || [
-        { action: 'Review and update activity descriptions', impact: 'Ensures accurate representation' },
-      ],
-      shortTerm: plan?.shortTerm || [
-        { action: 'Finalize Common App activity order', impact: 'Presents strongest profile first' },
-      ],
-      longTerm: plan?.longTerm || [
-        { action: 'Continue deepening primary activities', impact: 'Strengthens spike development' },
-      ],
+      immediate: normalizeList(immediate, {
+        action: 'Review and update activity descriptions',
+        impact: 'Ensures accurate representation',
+      }),
+      shortTerm: normalizeList(shortTerm, {
+        action: 'Finalize Common App activity order',
+        impact: 'Presents strongest profile first',
+      }),
+      longTerm: normalizeList(longTerm, {
+        action: 'Continue deepening primary activities',
+        impact: 'Strengthens spike development',
+      }),
     };
   }
 
@@ -499,11 +567,11 @@ Output valid JSON only.`;
   /**
    * Calculate cost from token usage
    */
-  private calculateCost(usage: { inputTokens?: number; outputTokens?: number } | undefined): number {
+  private calculateCost(usage: { input_tokens?: number; output_tokens?: number } | undefined): number {
     if (!usage) return 0;
     // Haiku pricing: $0.25/M input, $1.25/M output
-    const inputCost = ((usage.inputTokens || 0) / 1_000_000) * 0.25;
-    const outputCost = ((usage.outputTokens || 0) / 1_000_000) * 1.25;
+    const inputCost = ((usage.input_tokens || 0) / 1_000_000) * 0.25;
+    const outputCost = ((usage.output_tokens || 0) / 1_000_000) * 1.25;
     return inputCost + outputCost;
   }
 }

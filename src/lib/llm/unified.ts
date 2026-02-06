@@ -71,7 +71,7 @@ const openaiClient = OPENAI_KEY ? new OpenAI({
 // ============================================================================
 
 const DEFAULT_MODELS = {
-  claude: 'claude-sonnet-4-5-20250514',
+  claude: 'claude-sonnet-4-5-20250929', // Sonnet 4.5
   gpt5: 'gpt-4o'  // Using GPT-4o as the best available model
 };
 

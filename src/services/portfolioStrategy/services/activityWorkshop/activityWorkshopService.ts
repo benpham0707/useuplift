@@ -1,7 +1,7 @@
 /**
- * Activity Workshop Service (Orchestrator) - v4.0 PIPELINE
+ * Activity Workshop Service (Orchestrator) - v4.2 PIPELINE
  *
- * 4-STAGE LLM-POWERED PIPELINE (Replaces rigid heuristics with nuanced analysis)
+ * PARALLEL PROCESSING PIPELINE
  *
  * ARCHITECTURE EVOLUTION:
  * ======================
@@ -9,40 +9,31 @@
  * v2.0 - Batch processing: $0.35-0.55 (75-80% reduction)
  * v3.0 - Research-Backed Profiler integration
  * v4.0 - 4-STAGE PIPELINE with story context & conditional teaching
+ * v4.1 - Holistic narrative at beginning AND end
+ * v4.2 - PARALLEL sub-batch analysis + parallel individual teaching
  *
- * NEW 4-STAGE PIPELINE:
- * ====================
- * Stage 0: Story Detection (Haiku, ~$0.02)
- *   - Identifies WHO the student is before analyzing WHAT they do
- *   - Detects narrative threads, contextual factors, activity story roles
- *   - Output: StoryContext
+ * v4.2 PIPELINE:
+ * ==============
  *
- * Stage 1: Context-Aware Analysis (Sonnet, ~$0.15-0.20)
- *   - Enriches batch analysis with story context
- *   - Selects teaching candidates based on thresholds
- *   - Output: AnalysisContext (with teaching candidates)
+ * Stage 0: Story Detection (Haiku, ~$0.005)
+ *   - Quick archetype classification
  *
- * Stage 2: Conditional Teaching (Sonnet, ~$0.10-0.15)
- *   - DEEP teaching for activities that need it (max 5)
- *   - QUICK encouragement for already-strong activities
- *   - Matches Common App Workshop quality standards
- *   - Output: TeachingContext
+ * Stage 1: Parallel Analysis (~45s wall clock)
+ *   - Profiler on ALL activities (instant, heuristic)
+ *   - Parallel LLM sub-batches of 2 (Sonnet)
+ *   - Merge + story-enriched adjustments + teaching candidate selection
  *
- * Stage 3: Portfolio Synthesis (Haiku, ~$0.02-0.03)
+ * Stage 2: Parallel Individual Teaching (~120s wall clock)
+ *   - Each activity: individual LLM call in parallel
+ *   - Quick encouragements + portfolio teaching
+ *
+ * Stage 3: Portfolio Synthesis (Haiku, ~$0.005)
  *   - Final Harvard 1-6 assessment
- *   - Ordered activity list with optimized descriptions
- *   - Actionable plan (immediate, short-term, long-term)
- *   - Output: SynthesisContext
  *
- * TOTAL COST: ~$0.28-0.40 (maintains 80%+ cost reduction)
+ * Final Narrative (Sonnet, ~$0.07)
+ *   - Single narrative pass at end of pipeline
  *
- * KEY IMPROVEMENTS OVER v3.0:
- * ==========================
- * 1. Story detection BEFORE analysis (understand WHO before WHAT)
- * 2. Conditional teaching (only teach activities that need it)
- * 3. Stage-to-stage context passing (deeper comprehension)
- * 4. LLM-powered profiling (replaces rigid heuristics)
- * 5. Teaching quality matching Common App Workshop standards
+ * TOTAL COST: ~$0.35-0.40, TIME: ~5 min (was ~29 min in v4.1)
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -59,6 +50,7 @@ import {
   AnalysisContext,
   TeachingContext,
   SynthesisContext,
+  PortfolioNarrative,
 } from './types';
 
 // Import 4-stage pipeline services
@@ -69,6 +61,9 @@ import {
   stage3PortfolioSynthesisService,
 } from './stages';
 
+// Import holistic portfolio narrative service (v4.1)
+import { portfolioNarrativeService } from './stages/portfolioNarrativeService';
+
 // Legacy batch services (for v3.0 compatibility/fallback)
 import { batchActivityAnalysisService } from './batchActivityAnalysisService';
 import { batchActivityTeachingService } from './batchActivityTeachingService';
@@ -77,7 +72,7 @@ import { batchActivityTeachingService } from './batchActivityTeachingService';
 // CONSTANTS
 // ============================================================================
 
-const VERSION = '4.0.0'; // Major version bump for 4-stage pipeline
+const VERSION = '4.2.0'; // v4.2: Parallel sub-batch analysis + parallel individual teaching
 
 // Feature flags
 const USE_4_STAGE_PIPELINE = true; // Set to false to use v3.0 batch services
@@ -370,24 +365,23 @@ function convertToLegacyTeaching(
 
 export class ActivityWorkshopService implements IActivityWorkshopService {
   /**
-   * Run full 4-stage pipeline
+   * Run full v4.2 pipeline with parallel processing
    *
-   * This is the NEW main entry point for comprehensive activity analysis.
-   *
-   * STAGE 0: STORY DETECTION
-   * STAGE 1: CONTEXT-AWARE ANALYSIS
-   * STAGE 2: CONDITIONAL TEACHING
-   * STAGE 3: PORTFOLIO SYNTHESIS
+   * STAGE 0: Story Detection (Haiku)
+   * STAGE 1: Parallel Analysis (Sonnet sub-batches of 2)
+   * STAGE 2: Parallel Individual Teaching (Sonnet)
+   * STAGE 3: Portfolio Synthesis (Haiku)
+   * FINAL NARRATIVE (Sonnet — single pass)
    */
   async runPipeline(input: ActivityWorkshopSessionInput): Promise<ActivityWorkshopPipelineResult> {
     const sessionId = uuidv4();
     const startTime = Date.now();
 
-    console.log(`\n[ActivityWorkshop v4.0] ══════════════════════════════════════`);
-    console.log(`[ActivityWorkshop v4.0] Starting 4-STAGE PIPELINE`);
-    console.log(`[ActivityWorkshop v4.0] Session: ${sessionId}`);
-    console.log(`[ActivityWorkshop v4.0] Activities: ${input.activities.length}`);
-    console.log(`[ActivityWorkshop v4.0] ══════════════════════════════════════\n`);
+    console.log(`\n[ActivityWorkshop v4.2] ══════════════════════════════════════`);
+    console.log(`[ActivityWorkshop v4.2] Starting PARALLEL PIPELINE`);
+    console.log(`[ActivityWorkshop v4.2] Session: ${sessionId}`);
+    console.log(`[ActivityWorkshop v4.2] Activities: ${input.activities.length}`);
+    console.log(`[ActivityWorkshop v4.2] ══════════════════════════════════════\n`);
 
     // Validate input
     const validation = validateInput(input);
@@ -395,14 +389,14 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       throw new Error(`Invalid input: ${validation.errors.join(', ')}`);
     }
     if (validation.warnings.length > 0) {
-      console.log(`[ActivityWorkshop v4.0] Warnings: ${validation.warnings.join(', ')}`);
+      console.log(`[ActivityWorkshop v4.2] Warnings: ${validation.warnings.join(', ')}`);
     }
 
     // ========================================================================
-    // STAGE 0: STORY DETECTION (Haiku, ~$0.02)
+    // STAGE 0: STORY DETECTION (Haiku, ~$0.005)
     // ========================================================================
     console.log(`[Stage 0] ─────────────────────────────────────────`);
-    console.log(`[Stage 0] STORY DETECTION (Understanding WHO)`);
+    console.log(`[Stage 0] STORY DETECTION`);
     console.log(`[Stage 0] ─────────────────────────────────────────`);
 
     const stage0StartTime = Date.now();
@@ -414,10 +408,10 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 0] Spike Hypothesis: ${storyContext.spikeHypothesis.likelySpike ? storyContext.spikeHypothesis.spikeArea : 'None'}\n`);
 
     // ========================================================================
-    // STAGE 1: CONTEXT-AWARE ANALYSIS (Sonnet, ~$0.15-0.20)
+    // STAGE 1: PARALLEL ANALYSIS (Sonnet sub-batches of 2)
     // ========================================================================
     console.log(`[Stage 1] ─────────────────────────────────────────`);
-    console.log(`[Stage 1] CONTEXT-AWARE ANALYSIS (Understanding WHAT)`);
+    console.log(`[Stage 1] PARALLEL CONTEXT-AWARE ANALYSIS`);
     console.log(`[Stage 1] ─────────────────────────────────────────`);
 
     const stage1StartTime = Date.now();
@@ -429,10 +423,10 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 1] Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}\n`);
 
     // ========================================================================
-    // STAGE 2: CONDITIONAL TEACHING (Sonnet, ~$0.10-0.15)
+    // STAGE 2: PARALLEL INDIVIDUAL TEACHING (Sonnet)
     // ========================================================================
     console.log(`[Stage 2] ─────────────────────────────────────────`);
-    console.log(`[Stage 2] CONDITIONAL TEACHING (Teaching WHAT NEEDS IT)`);
+    console.log(`[Stage 2] PARALLEL INDIVIDUAL TEACHING`);
     console.log(`[Stage 2] ─────────────────────────────────────────`);
 
     const stage2StartTime = Date.now();
@@ -444,7 +438,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 2] Skipped: ${teachingContext.skippedActivities.length}\n`);
 
     // ========================================================================
-    // STAGE 3: PORTFOLIO SYNTHESIS (Haiku, ~$0.02-0.03)
+    // STAGE 3: PORTFOLIO SYNTHESIS (Haiku, ~$0.005)
     // ========================================================================
     console.log(`[Stage 3] ─────────────────────────────────────────`);
     console.log(`[Stage 3] PORTFOLIO SYNTHESIS (Actionable Strategy)`);
@@ -463,15 +457,51 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 3] Overall Strength: ${synthesisContext.finalAssessment.overallStrength}\n`);
 
     // ========================================================================
+    // FINAL NARRATIVE (Sonnet, ~$0.07 — single pass at end)
+    // ========================================================================
+    console.log(`[Narrative] ─────────────────────────────────────────`);
+    console.log(`[Narrative] PORTFOLIO NARRATIVE (Final Analysis)`);
+    console.log(`[Narrative] ─────────────────────────────────────────`);
+
+    const narrativeStartTime = Date.now();
+    let finalNarrative: PortfolioNarrative | undefined;
+
+    try {
+      // Call analyzeImprovedNarrative with analysis context for richer narrative.
+      // No cached initial exists, so it returns a plain PortfolioNarrative.
+      const narrativeResult = await portfolioNarrativeService.analyzeImprovedNarrative(
+        input,
+        sessionId,
+        analysisContext
+      );
+      finalNarrative = narrativeResult as PortfolioNarrative;
+      console.log(`[Narrative] Complete in ${Date.now() - narrativeStartTime}ms`);
+      console.log(`[Narrative] Story: ${finalNarrative.story.pitch.substring(0, 100)}...`);
+      console.log(`[Narrative] Coherence: ${finalNarrative.coherence.assessment} (${finalNarrative.coherence.score}/100)`);
+    } catch (error) {
+      console.error(`[Narrative] Final analysis failed:`, error);
+      finalNarrative = undefined;
+    }
+
+    // ========================================================================
     // PIPELINE COMPLETE
     // ========================================================================
     const totalTime = Date.now() - startTime;
 
-    console.log(`[ActivityWorkshop v4.0] ══════════════════════════════════════`);
-    console.log(`[ActivityWorkshop v4.0] PIPELINE COMPLETE`);
-    console.log(`[ActivityWorkshop v4.0] Total time: ${totalTime}ms`);
-    console.log(`[ActivityWorkshop v4.0] Total cost: $${synthesisContext.pipelineCost.total.toFixed(4)}`);
-    console.log(`[ActivityWorkshop v4.0] ══════════════════════════════════════\n`);
+    // Calculate total cost
+    const narrativeCost = finalNarrative?.metadata.cost || 0;
+    const totalCost = synthesisContext.pipelineCost.total + narrativeCost;
+
+    console.log(`\n[ActivityWorkshop v4.2] ══════════════════════════════════════`);
+    console.log(`[ActivityWorkshop v4.2] PIPELINE COMPLETE`);
+    console.log(`[ActivityWorkshop v4.2] Total time: ${totalTime}ms`);
+    console.log(`[ActivityWorkshop v4.2] Total cost: $${totalCost.toFixed(4)}`);
+    console.log(`[ActivityWorkshop v4.2] ──────────────────────────────────────`);
+    console.log(`[ActivityWorkshop v4.2] NARRATIVE SUMMARY:`);
+    console.log(`[ActivityWorkshop v4.2]   Story: ${finalNarrative?.story.pitch.substring(0, 80) || 'N/A'}...`);
+    console.log(`[ActivityWorkshop v4.2]   Coherence: ${finalNarrative?.coherence.assessment || 'N/A'} (${finalNarrative?.coherence.score || 'N/A'}/100)`);
+    console.log(`[ActivityWorkshop v4.2]   Spike: ${finalNarrative?.spike.primarySpike.area || 'Developing'}`);
+    console.log(`[ActivityWorkshop v4.2] ══════════════════════════════════════\n`);
 
     // Convert to legacy formats for backward compatibility
     const legacyAnalysis = convertToLegacyAnalysis(analysisContext);
@@ -479,15 +509,23 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
 
     return {
       sessionId,
-      version: '4.0.0',
+      version: '4.2.0',
       completedAt: new Date().toISOString(),
+
+      // Single narrative pass (v4.2)
+      finalNarrative,
+
+      // Stage outputs
       stage0: storyContext,
       stage1: analysisContext,
       stage2: teachingContext,
       stage3: synthesisContext,
+
+      // Legacy compatibility
       analysis: legacyAnalysis,
       teaching: legacyTeaching,
-      totalCost: synthesisContext.pipelineCost.total,
+
+      totalCost,
     };
   }
 

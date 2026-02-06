@@ -120,6 +120,11 @@ export interface ActivityWorkshopSessionInput {
     lowIncome?: boolean;
     rural?: boolean;
     internationalStudent?: boolean;
+    // Extended context for expert counselor intelligence
+    hasWorkObligations?: boolean;
+    workHoursPerWeek?: number;
+    constraintNotes?: string;
+    geographicContext?: string;
   };
 }
 
@@ -374,9 +379,19 @@ export interface PortfolioAnalysis {
 
 /**
  * Teaching for a single activity - powered by analysis
+ *
+ * ENHANCED: Now includes celebration section and deeper improvement teaching
+ * following the PIQ Workshop pattern: CELEBRATE → TEACH → TRANSFORM
  */
 export interface ActivityTeaching {
   activityId: string;
+
+  // === CELEBRATION (FIRST!) ===
+  // This MUST come first in teaching - make students feel seen before critique
+  celebration?: {
+    headline: string; // One powerful sentence celebrating their strongest aspect
+    strengths: string[]; // 2-3 specific things working well
+  };
 
   // === TIER EXPLANATION ===
   tierExplanation: {
@@ -387,7 +402,8 @@ export interface ActivityTeaching {
       benchmark: string;
       source: string;
       studentMeets: boolean;
-      gap?: string;
+      gap?: string | null;
+      evidence?: string; // NEW: Quote from their description proving they meet/miss
     }[];
     whatMakesThisTier: CitedText;
     whatWouldChangeIt: CitedText;
@@ -396,18 +412,32 @@ export interface ActivityTeaching {
   // === STRENGTH TEACHING ===
   strengthTeaching: {
     strength: string;
-    whyItMatters: CitedText;
+    theProblem?: string; // NEW: What would be lost if they didn't highlight this
+    whyItMatters: CitedText & {
+      // Enhanced with psychology/research backing
+      psychology?: string;
+      research?: string;
+      quote?: string;
+      quoteSource?: string;
+    };
     howToLeverage: string;
     inApplications: string;
   }[];
 
-  // === IMPROVEMENT TEACHING ===
+  // === IMPROVEMENT TEACHING (Enhanced with deep structure) ===
   improvementTeaching: {
     issue: string;
-    whyItMatters: CitedText;
+    whyItMatters: CitedText & {
+      // Enhanced: Include the psychology and research backing
+      psychology?: string;
+      research?: string;
+      quote?: string;
+      quoteSource?: string;
+    };
     howToFix: string;
     exampleBefore: string;
     exampleAfter: string;
+    transformationAnalysis?: string; // NEW: Why the transformation works
     priority: 'high' | 'medium' | 'low';
   }[];
 
@@ -893,6 +923,13 @@ export interface TeachingContext {
     examplesIncluded: number;
     /** Average teaching depth score */
     averageDepth: number;
+    // === EXTENDED KNOWLEDGE APPLICATION METRICS ===
+    /** Score indicating how well the LLM applied provided knowledge */
+    knowledgeApplicationScore?: number;
+    /** Count of transformations with "why it works" analysis */
+    transformationsWithAnalysis?: number;
+    /** Count of improvements referencing psychology/research */
+    psychologyReferencesCount?: number;
   };
 
   // === STAGE METADATA ===
@@ -1009,13 +1046,187 @@ export interface SynthesisContext {
   };
 }
 
+// ============================================================================
+// HOLISTIC PORTFOLIO NARRATIVE TYPES (v4.1)
+// ============================================================================
+// These types support the new holistic narrative analysis that:
+// - Runs at BEGINNING and END of analysis (with caching)
+// - Shows how activities ELEVATE each other
+// - Creates a cohesive "spike portfolio" presentation
+// - Updates dynamically based on improvements
+
 /**
- * Complete 4-Stage Pipeline Result
+ * How one activity elevates another in the narrative
+ */
+export interface NarrativeElevation {
+  /** The activity being elevated */
+  elevatedActivityId: string;
+  /** The activity providing the elevation */
+  elevatingActivityId: string;
+  /** How the elevation works */
+  mechanism: string;
+  /** The combined impression created */
+  combinedImpression: string;
+  /** Strength of this elevation effect */
+  strength: 'transformative' | 'strong' | 'moderate' | 'subtle';
+}
+
+/**
+ * A narrative thread running through multiple activities
+ */
+export interface NarrativeThread {
+  /** Thread name */
+  name: string;
+  /** Activities that contribute to this thread */
+  activityIds: string[];
+  /** How this thread manifests */
+  manifestation: string;
+  /** Why this thread is compelling to admissions */
+  admissionsValue: string;
+  /** How the activities together tell this story better than individually */
+  synergy: string;
+}
+
+/**
+ * The portfolio's spike presentation
+ */
+export interface SpikePresentation {
+  /** Primary area of exceptional depth */
+  primarySpike: {
+    area: string;
+    activities: string[];
+    depth: string;
+    distinctiveness: string;
+  };
+  /** How other activities support/complement the spike */
+  supportingElements: {
+    activityId: string;
+    howItSupports: string;
+    elevationEffect: string;
+  }[];
+  /** The "T-shape" - breadth that complements depth */
+  complementaryBreadth: {
+    area: string;
+    activities: string[];
+    whyItMatters: string;
+  }[];
+}
+
+/**
+ * Identified gaps and how to frame them
+ */
+export interface GapFraming {
+  /** The gap identified */
+  gap: string;
+  /** How existing activities partially fill this */
+  existingMitigation: string;
+  /** How to frame this gap positively */
+  positiveFraming: string;
+  /** Whether this gap can be addressed through description */
+  addressableThroughDescription: boolean;
+}
+
+/**
+ * Complete portfolio narrative analysis (holistic, not archetype-based)
+ */
+export interface PortfolioNarrative {
+  // === THE STORY ===
+  story: {
+    /** The compelling 2-3 sentence pitch for this candidate */
+    pitch: string;
+    /** The unique angle that makes this student memorable */
+    uniqueAngle: string;
+    /** The "so what" - why should colleges care? */
+    whyItMatters: string;
+    /** Character traits that emerge from the portfolio */
+    emergentTraits: string[];
+  };
+
+  // === NARRATIVE THREADS ===
+  threads: NarrativeThread[];
+
+  // === ELEVATION ANALYSIS ===
+  elevations: NarrativeElevation[];
+
+  // === SPIKE PRESENTATION ===
+  spike: SpikePresentation;
+
+  // === GAP FRAMING ===
+  gaps: GapFraming[];
+
+  // === COHERENCE ===
+  coherence: {
+    /** Overall coherence score */
+    score: number; // 0-100
+    /** Qualitative assessment */
+    assessment: 'exceptional' | 'strong' | 'moderate' | 'developing' | 'scattered';
+    /** What ties everything together */
+    unifyingElement: string;
+    /** Activities that don't fit and how to address */
+    outliers: {
+      activityId: string;
+      howToIntegrate: string;
+    }[];
+  };
+
+  // === COMPETITIVE POSITIONING ===
+  positioning: {
+    /** Where this student stands out */
+    strengths: string[];
+    /** What makes them different from similar applicants */
+    differentiators: string[];
+    /** The story admissions officers will remember */
+    memorableElement: string;
+    /** School types this portfolio fits well */
+    schoolFit: string[];
+  };
+
+  // === METADATA ===
+  metadata: {
+    generatedAt: string;
+    modelUsed: string;
+    tokensUsed: { input: number; output: number };
+    cost: number;
+    analysisType: 'initial' | 'post_improvement';
+  };
+}
+
+/**
+ * Comparison between initial and improved narrative
+ */
+export interface NarrativeProgression {
+  /** The initial narrative */
+  initial: PortfolioNarrative;
+  /** The improved narrative */
+  improved: PortfolioNarrative;
+  /** What changed */
+  changes: {
+    /** New threads that emerged */
+    newThreads: string[];
+    /** Strengthened elevations */
+    strengthenedElevations: string[];
+    /** Improved coherence */
+    coherenceImprovement: number;
+    /** New differentiators */
+    newDifferentiators: string[];
+    /** Summary of narrative transformation */
+    transformationSummary: string;
+  };
+  /** Celebration of progress */
+  celebration: string;
+}
+
+/**
+ * Complete Pipeline Result (v4.2 — parallel processing, single narrative pass)
  */
 export interface ActivityWorkshopPipelineResult {
   sessionId: string;
-  version: '4.0.0';
+  version: '4.2.0';
   completedAt: string;
+
+  // === NARRATIVE (single pass at end of pipeline) ===
+  /** Final narrative understanding (the only narrative analysis) */
+  finalNarrative?: PortfolioNarrative;
 
   // All stage outputs
   stage0: StoryContext;

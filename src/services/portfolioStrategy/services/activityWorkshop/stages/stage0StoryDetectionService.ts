@@ -72,8 +72,8 @@ export class Stage0StoryDetectionService {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
         tokensUsed: {
-          input: response.usage?.inputTokens || 0,
-          output: response.usage?.outputTokens || 0,
+          input: response.usage?.input_tokens || 0,
+          output: response.usage?.output_tokens || 0,
         },
         cost: this.calculateCost(response.usage),
       };
@@ -443,11 +443,11 @@ Output ONLY valid JSON. No explanations outside the JSON structure.`;
   /**
    * Calculate cost from token usage
    */
-  private calculateCost(usage: { inputTokens?: number; outputTokens?: number } | undefined): number {
+  private calculateCost(usage: { input_tokens?: number; output_tokens?: number } | undefined): number {
     if (!usage) return 0;
     // Haiku pricing: $0.25/M input, $1.25/M output
-    const inputCost = ((usage.inputTokens || 0) / 1_000_000) * 0.25;
-    const outputCost = ((usage.outputTokens || 0) / 1_000_000) * 1.25;
+    const inputCost = ((usage.input_tokens || 0) / 1_000_000) * 0.25;
+    const outputCost = ((usage.output_tokens || 0) / 1_000_000) * 1.25;
     return inputCost + outputCost;
   }
 }
