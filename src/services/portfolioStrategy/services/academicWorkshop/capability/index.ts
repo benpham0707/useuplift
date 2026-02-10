@@ -344,14 +344,18 @@ export type {
 
   // Sections
   AcademicIdentitySection,
-  StrengthDeepDive,
-  ChallengeDeepDive,
-  AdmissionsOfficerLensSection,
+  NotableStrength,
+  NotableWeakness,
+  CollegeTierPosition,
+  UpliftRating,
+  UpliftGrade,
+  UpliftGradeDescriptor,
+  ChallengesAndRealitySection,
+  ChallengeWithAOContext,
   StrategicRoadmapSection,
   ResearchContextSection,
 
   // Supporting types
-  BlindSpot,
   StrategicPriority,
   CourseStrategyItem,
   CourseAvoidItem,
@@ -359,3 +363,5 @@ export type {
   ReportMetadata,
   AssembledReportContext,
 } from './deepAcademicReportTypes';
+
+export { UPLIFT_SCALE_DATABASE } from './deepAcademicReportTypes';

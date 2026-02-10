@@ -41,7 +41,7 @@ import {
   CraftTeaching,
 } from './teachingLayerTypes';
 import { PortfolioScoreRubric, ActivityScoreRubric } from './types';
-import { ActivityWorkshopInput } from '../types';
+import { ActivityWorkshopInput, ApplicationPlatform, getDescriptionCharLimit, getPlatformName } from '../types';
 
 // Import knowledge databases for research backing
 import {
@@ -173,14 +173,15 @@ export class ActivityTeachingLayerService {
         activities,
         activitiesToTransform,
         studentContext,
-        options
+        options,
+        input.targetPlatform
       );
 
       // Call Claude Sonnet for quality teaching
       const response = await callClaude(
         prompt,
         {
-          systemPrompt: this.getSystemPrompt(studentContext?.currentGrade),
+          systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform),
           model: 'claude-sonnet-4-20250514',
           maxTokens: 8000,
           temperature: 0.3,
@@ -199,7 +200,8 @@ export class ActivityTeachingLayerService {
         response.content,
         scoringRubric,
         activitiesToTransform,
-        response.usage
+        response.usage,
+        input.targetPlatform
       );
 
       const timing = { totalMs: Date.now() - startTime };
@@ -273,8 +275,10 @@ export class ActivityTeachingLayerService {
   /**
    * Build the system prompt for teaching generation
    */
-  private getSystemPrompt(currentGrade?: number): string {
-    const gradeContext = this.getGradeContext(currentGrade);
+  private getSystemPrompt(currentGrade?: number, targetPlatform?: ApplicationPlatform): string {
+    const gradeContext = this.getGradeContext(currentGrade, targetPlatform);
+    const charLimit = getDescriptionCharLimit(targetPlatform);
+    const platformName = getPlatformName(targetPlatform);
 
     return `You are an elite college admissions essay coach with 20+ years of experience helping students get into Harvard, Stanford, MIT, and other top schools.
 
@@ -292,12 +296,98 @@ IMPORTANT:
 ${gradeContext}
 
 ## DESCRIPTION REWRITE PRINCIPLES:
-1. Every rewrite must be EXACTLY 150 characters or fewer (Common App hard limit)
+1. Every rewrite must be EXACTLY ${charLimit} characters or fewer (${platformName} hard limit)
 2. Use active verbs: created, led, built, developed, launched (never: participated, helped, assisted)
 3. Include specific numbers whenever possible
 4. Answer the "so what?" - what was the outcome/impact?
 5. Connect to your spike narrative when possible
 6. Maintain authentic student voice (not consultant-polished)
+
+## WRITING FORMAT — MATCH FORMAT TO ACTIVITY TYPE:
+Identify the activity category FIRST, then apply its specific format guidance when rewriting.
+
+### 1. STEM/RESEARCH (lab research, independent projects, science fairs, coding, engineering, competitions):
+→ Technical specificity + output. AOs at STEM schools know the hierarchy cold.
+  FORMULA: [YOUR method/technique]; [scope]; [output — paper, award, product]; [validation + selectivity denominator]
+
+  **Lab/Mentored Research:**
+  GOOD: "Under Dr. Chen, optimized CRISPR protocols for zebrafish gene editing; 50+ microinjections; results inform Parkinson's study"
+  GOOD: "Performed LC-MS on tumor samples; identified 3 dysregulated pathways; data contributed to 2 published studies"
+
+  **Independent Research:**
+  GOOD: "Designed survey (n=300) on teen social media anxiety; self-taught stats in Python; published in peer-reviewed journal"
+
+  **Science Competitions** (STS > ISEF Grand > ISEF Category > STS Semi > State > Regional):
+  GOOD: "Regeneron STS Scholar (top 40 of 1,949); developed protein-folding algorithm; presented at Natl Academy of Sciences"
+
+  **Math/CS Competitions** (USAMO/IMO > AIME > AMC; USACO Platinum > Gold > Silver):
+  GOOD: "USAMO Qualifier (top 500 of 300K); AIME 12/15; invited to Math Olympiad Summer Program"
+
+  **Coding/Engineering Projects:**
+  GOOD: "Developed iOS mental health app (CBT + mood tracking); 2,500+ downloads, 4.8★; adopted by school wellness program"
+
+  **Publications:** "published in [Journal]" > "co-authored in [Journal]" > "under review at [Journal]" > "submitted to [Journal]"
+
+  TEACH: Title in position field; description = what you actually DID. "Assisted in lab" = Tier 4; "Designed PCR protocol reducing false positives 30%" = Tier 2. ALWAYS add selectivity denominators for competitions ("top 40 of 1,949"). Max 1-2 technical terms, rest accessible. Tool lists without output = red flag. For coding projects: translate to impact AOs understand (users, downloads, adoption).
+
+### 2. LEADERSHIP/GOVERNMENT (student council, club president, team captain, org head):
+→ What you CHANGED, not what you held. Title is in position field — description adds the delta.
+  FORMULA: [How selected]; [what changed]; [quantified result]
+  GOOD: "SC President: created anonymous feedback app (400+ monthly submissions); first successful policy change in 3 yrs"
+  GOOD: "Founded Environmental Action Club (60 members); led campus plastic ban adopted by administration"
+  TEACH: "Elected by peers" > "appointed." Progression arrows show growth: "member → VP → President." Duty lists without outcomes = worst pattern ("organized events, led meetings").
+
+### 3. COMMUNITY SERVICE (volunteering, tutoring, mentoring, nonprofit):
+→ Impact on OTHERS first. What changed for people served, not what student learned.
+  FORMULA: [Who served + specificity]; [quantified outcome]; [sustainability]
+  GOOD: "Tutor 8 middle schoolers weekly; avg grades C+ → B+; created study guides now used schoolwide"
+  GOOD: "Founded free SAT prep for low-income students; 45 students/yr; avg score +120 pts; program in 3 schools"
+  TEACH: Sustained 3+ yrs >> one-time events. Local impact >> voluntourism. Specific beneficiary details (age, number, context) >> "the community." Mission trips without follow-up = red flag.
+
+### 4. WORK/EMPLOYMENT (paid jobs, family business, freelancing, entrepreneurship):
+→ Scope + progression + one ownership detail. The "failed simulation effect" (Shemmassian): specifics AOs can't easily imagine.
+  FORMULA: [Scope/volume]; [progression]; [one initiative YOU owned]
+  GOOD: "Processed 300+ transactions/shift; trained 5 new cashiers; created closing checklist reducing errors 40%"
+  GOOD: "Built lawn care business from scratch; 20 regular clients; hired 2 seasonal employees; $12K annual revenue"
+  TEACH: Let hours fields handle time commitment. Description handles WHAT you did. Promotions = high-value signals. Never apologize for working — frame with business language. Entrepreneurial activities use startup vocabulary (revenue, clients, growth).
+
+### 5. FAMILY RESPONSIBILITIES (caregiving, sibling care, translation, household management):
+→ Specificity = competence, not pity. State facts with same confident fragment format as any activity.
+  FORMULA: [Specific responsibilities]; [scope/frequency]; [skills demonstrated]
+  GOOD: "Primary caregiver for 3 siblings (ages 4-9); manage routines, meals, homework; coordinate medical appointments"
+  GOOD: "Family interpreter (Spanish/English) for medical, legal & school; navigate insurance systems; translate documents"
+  TEACH: Frame as SKILLS, not sacrifice. The hours fields (25 hrs/wk, 52 wk/yr) communicate necessity — description communicates competence. Never use victimhood framing ("had to" / "forced to").
+
+### 6. ARTS/CREATIVE (music, visual arts, theater, film, dance, creative writing):
+→ Verifiable credentials + body of work. AOs can't evaluate art quality from text — external validation critical.
+  FORMULA: [Medium + years]; [highest recognition + selectivity]; [output volume/audience]; [teaching if applicable]
+  GOOD: "Cello (10 yrs); All-State principal (selected from 2,400); solo recitals 3/yr; teach 5 students"
+  GOOD: "Oil painting; Scholastic Gold Key (Regional); exhibited 3 juried galleries; 40+ works; $2K commissions"
+  TEACH: Selectivity context transforms claims — "All-State (selected from 2,400)" >> "All-State" alone. Juried exhibitions >> open shows. Teaching = mastery signal. Keep emotion for essays — description is the fact sheet.
+
+### 7. ATHLETICS (team sports, individual sports, club/recreational):
+→ Non-recruited: character + growth trajectory. Recruited: stats + rankings.
+  FORMULA (non-recruited): [Position + years]; [progression]; [leadership]; [team impact]
+  FORMULA (recruited): [Stats/times/rankings]; [selection context]; [records]
+  GOOD: "Starting midfielder (3 yrs); 12 assists/season (team lead); captain (elected by teammates); team 8th → 2nd"
+  GOOD: "JV (soph) → Varsity starter (jr) → Captain (sr); created offseason conditioning; cut injuries 60%"
+  TEACH: Growth arcs show character. Stats need denominators ("3rd of 180" >> "3rd place"). "Captain" without evidence of what changed = discounted. Practice hours establish commitment parity.
+
+### UNIVERSAL RULES (all categories):
+
+BAD (always avoid):
+  "I founded the first computer science club at my school and taught 25 students Python and web development."
+  → Fails the "1,000 student test" (PrepScholar): could 1,000 students write this? If yes, rewrite.
+
+CHARACTER EFFICIENCY:
+- Abbreviations: hrs/wk, yr, avg, dept, natl, regl, govt, dev, mgmt, org
+- Symbols: & (not "and"), / (not "or"), + (not "more than"), → (for progression)
+- Parentheses for context: (60 participants), ($3K raised), (3 yrs), (selected from 2,400)
+- Drop articles (the/a/an) and pronouns (I/my/we) — start with verbs or context
+- Numbers not words: "8" not "eight", "$3K" not "$3,000"
+- DON'T repeat position/org fields — description adds NEW info only
+- Semicolons to chain distinct claims efficiently
+- A brief "why" clause can be worth the characters: "after realizing zero STEM options existed" shows initiative
 
 ## STRATEGIC PHILOSOPHY: DEEPEN THE SPIKE, SHOWCASE EVERYTHING
 - List ALL your activities — every Common App slot is valuable real estate.
@@ -320,7 +410,10 @@ Respond in valid JSON matching the requested structure exactly.`;
   /**
    * Get grade-appropriate context for timeline guidance
    */
-  private getGradeContext(grade?: number): string {
+  private getGradeContext(grade?: number, targetPlatform?: ApplicationPlatform): string {
+    const limit = getDescriptionCharLimit(targetPlatform);
+    const platform = getPlatformName(targetPlatform);
+
     if (!grade) {
       return `Grade level not specified. Provide general guidance, but note that recommendations should be adjusted based on when the student is applying.`;
     }
@@ -352,7 +445,7 @@ Respond in valid JSON matching the requested structure exactly.`;
 - Activity changes are essentially done — work with what you have.
 - ALL recommendations should be about description craft and framing.
 - Don't suggest new activities or achievements — there's no time.
-- Help each activity shine in 150 characters.`,
+- Help each activity shine in ${limit} characters (${platform}).`,
     };
 
     return contexts[grade] || contexts[11]; // Default to junior if unusual grade
@@ -418,8 +511,11 @@ Respond in valid JSON matching the requested structure exactly.`;
     activities: ActivityWorkshopInput[],
     activitiesToTransform: ActivityScoreRubric[],
     studentContext?: TeachingLayerInput['studentContext'],
-    options?: TeachingLayerInput['options']
+    options?: TeachingLayerInput['options'],
+    targetPlatform?: ApplicationPlatform
   ): string {
+    const charLimit = getDescriptionCharLimit(targetPlatform);
+    const platformName = getPlatformName(targetPlatform);
     // Build activity context
     const activityContext = activitiesToTransform.map((score) => {
       const activity = activities.find((a) => a.id === score.activityId);
@@ -485,15 +581,20 @@ ${studentContext?.currentGrade === 12 ? '⚠️ SENIOR YEAR: Focus ONLY on descr
 - Explain how it applies to THIS specific activity
 
 2. **CONCRETE REWRITE**
-- Provide the EXACT improved description (MUST be ≤150 characters)
+- Provide the EXACT improved description (MUST be ≤${charLimit} characters)
+- FORMAT: Use semicolon-separated fragments, NOT flowing sentences
+  Example: "Founded school's first CS club; taught 25 students Python/web dev; led 4-school hackathon (60 participants)"
+  NOT: "Founded the first computer science club at my school and taught 25 students Python and web development."
+- Use abbreviations (hrs/wk, yr, avg, &, /, +, →) to maximize info density
+- Drop articles (the/a/an), pronouns (I/my), unnecessary prepositions
 - Break down each change made:
-  - Element changed (verb_choice, quantification, impact_clarity, specificity, voice, narrative_connection)
+  - Element changed (verb_choice, quantification, impact_clarity, specificity, voice, narrative_connection, character_efficiency)
   - Original text
   - Transformed text
   - Why this specific change improves the description
 
 3. **ALTERNATIVE ANGLE** (if applicable)
-- A different approach to the same activity
+- A different approach to the same activity (also in fragment format, ≤${charLimit} chars)
 - When to use this version instead
 
 4. **EXPECTED IMPACT**
@@ -512,10 +613,11 @@ ${this.getTimelinePriorityGuidance(studentContext?.currentGrade)}
 - Key phrases to weave across descriptions
 - One concrete action to deepen your spike
 
-7. **CRAFT TEACHING** (for 2-3 elements)
+7. **CRAFT TEACHING** (for 2-3 elements from: verb_choice, quantification, impact_clarity, voice_consistency, specificity, character_efficiency)
 - Principle explanation
 - Before/after examples from YOUR portfolio
 - General tips to apply
+- ALWAYS include character_efficiency as one element (abbreviations, fragments, dropping articles)
 
 NOTE: Skip "connectionStrategies" as a separate section — fold connection guidance into the activity transformations and strategic priorities to avoid repetition.
 
@@ -535,11 +637,11 @@ Respond in this JSON structure:
       },
       "rewrite": {
         "original": "string (current description)",
-        "suggested": "string (MUST be ≤150 chars)",
+        "suggested": "string (MUST be ≤${charLimit} chars, fragment format with semicolons, use abbreviations)",
         "characterCount": number,
         "changesApplied": [
           {
-            "element": "verb_choice" | "quantification" | "impact_clarity" | "specificity" | "voice" | "narrative_connection",
+            "element": "verb_choice" | "quantification" | "impact_clarity" | "specificity" | "voice" | "narrative_connection" | "character_efficiency",
             "original": "string",
             "transformed": "string",
             "rationale": "string"
@@ -549,7 +651,7 @@ Respond in this JSON structure:
       "alternatives": [
         {
           "angle": "string",
-          "rewrite": "string (≤150 chars)",
+          "rewrite": "string (≤${charLimit} chars, fragment format)",
           "whenToUse": "string"
         }
       ],
@@ -587,7 +689,7 @@ Respond in this JSON structure:
   },
   "craftTeaching": [
     {
-      "element": "verb_choice" | "quantification" | "impact_clarity" | "voice_consistency" | "specificity",
+      "element": "verb_choice" | "quantification" | "impact_clarity" | "voice_consistency" | "specificity" | "character_efficiency",
       "principle": "string",
       "whyItMatters": "string",
       "examples": [
@@ -618,7 +720,8 @@ Respond in this JSON structure:
     content: string,
     rubric: PortfolioScoreRubric,
     activitiesToTransform: ActivityScoreRubric[],
-    usage?: { input_tokens: number; output_tokens: number }
+    usage?: { input_tokens: number; output_tokens: number },
+    targetPlatform?: ApplicationPlatform
   ): TeachingLayerOutput {
     try {
       // Extract JSON from response
@@ -662,7 +765,7 @@ Respond in this JSON structure:
       };
 
       // Validate character counts
-      this.validateRewrites(teaching);
+      this.validateRewrites(teaching, targetPlatform);
 
       return teaching;
     } catch (error) {
@@ -729,15 +832,16 @@ Respond in this JSON structure:
   }
 
   /**
-   * Validate that all rewrites are under 150 characters
+   * Validate that all rewrites are under the character limit
    */
-  private validateRewrites(teaching: TeachingLayerOutput): void {
+  private validateRewrites(teaching: TeachingLayerOutput, targetPlatform?: ApplicationPlatform): void {
+    const charLimit = getDescriptionCharLimit(targetPlatform);
     for (const transformation of teaching.activityTransformations) {
-      if (transformation.rewrite.suggested.length > 150) {
-        console.warn(`[TeachingLayer] Rewrite for ${transformation.activityName} exceeds 150 chars (${transformation.rewrite.suggested.length})`);
+      if (transformation.rewrite.suggested.length > charLimit) {
+        console.warn(`[TeachingLayer] Rewrite for ${transformation.activityName} exceeds ${charLimit} chars (${transformation.rewrite.suggested.length})`);
         // Truncate if necessary
-        transformation.rewrite.suggested = transformation.rewrite.suggested.substring(0, 147) + '...';
-        transformation.rewrite.characterCount = 150;
+        transformation.rewrite.suggested = transformation.rewrite.suggested.substring(0, charLimit - 3) + '...';
+        transformation.rewrite.characterCount = charLimit;
       }
     }
   }

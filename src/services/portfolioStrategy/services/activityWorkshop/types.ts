@@ -115,10 +115,60 @@ export interface ActivityWorkshopInput {
 }
 
 /**
+ * Target application platform — determines character limits
+ */
+export type ApplicationPlatform = 'common_app' | 'uc' | 'coalition';
+
+/**
+ * Character limits by platform for activity descriptions
+ */
+export const PLATFORM_CHAR_LIMITS: Record<ApplicationPlatform, {
+  description: number;
+  position: number;
+  organization: number;
+  platformName: string;
+  maxActivities: number;
+}> = {
+  common_app: {
+    description: 150,
+    position: 50,
+    organization: 100,
+    platformName: 'Common App',
+    maxActivities: 10,
+  },
+  uc: {
+    description: 350,
+    position: 60,
+    organization: 0, // UC doesn't have a separate org field
+    platformName: 'UC Application',
+    maxActivities: 20,
+  },
+  coalition: {
+    description: 255,
+    position: 50,
+    organization: 100,
+    platformName: 'Coalition App',
+    maxActivities: 10,
+  },
+};
+
+/** Get description character limit for a platform (defaults to Common App) */
+export function getDescriptionCharLimit(platform?: ApplicationPlatform): number {
+  return PLATFORM_CHAR_LIMITS[platform || 'common_app'].description;
+}
+
+/** Get platform display name */
+export function getPlatformName(platform?: ApplicationPlatform): string {
+  return PLATFORM_CHAR_LIMITS[platform || 'common_app'].platformName;
+}
+
+/**
  * Complete workshop input
  */
 export interface ActivityWorkshopSessionInput {
   activities: ActivityWorkshopInput[];
+  /** Target application platform (Common App, UC, Coalition) — affects character limits */
+  targetPlatform?: ApplicationPlatform;
   studentContext?: {
     intendedMajor?: string;
     targetSchools?: string[];

@@ -197,7 +197,7 @@ async function runTests() {
 
   // ===== Generate Report =====
   section('Generating Deep Academic Report');
-  console.log('  (This makes 5 LLM calls — may take 15-30 seconds...)');
+  console.log('  (This makes 3 LLM calls — may take 15-30 seconds...)');
 
   const startTime = Date.now();
   let report: DeepAcademicReport;
@@ -219,70 +219,67 @@ async function runTests() {
   section('Section 1: Academic Identity');
   const id = report.academicIdentity;
   assert(id.narrativeIdentity.length > 200, `Narrative identity should be substantial (got ${id.narrativeIdentity.length} chars)`);
-  assert(id.harvardScaleRating.rating >= 1 && id.harvardScaleRating.rating <= 6, `Harvard scale rating should be 1-6 (got ${id.harvardScaleRating.rating})`);
-  assert(id.harvardScaleRating.explanation.length > 50, `Harvard explanation should be detailed (got ${id.harvardScaleRating.explanation.length} chars)`);
-  assert(id.aoFirstImpression.length > 50, `AO first impression should be detailed (got ${id.aoFirstImpression.length} chars)`);
+  assert(id.notableStrengths.length >= 2, `Should have at least 2 notable strengths (got ${id.notableStrengths.length})`);
+  for (const ns of id.notableStrengths) {
+    assert(ns.subject.length > 0, `Notable strength subject should not be empty`);
+    assert(ns.insight.length > 20, `Notable strength insight should be non-trivial (got ${ns.insight.length} chars)`);
+    assert(ns.majorRelevance.length > 10, `Major relevance should exist (got ${ns.majorRelevance.length} chars)`);
+    console.log(`  Strength: "${ns.subject}" — insight: ${ns.insight.length}c, relevance: ${ns.majorRelevance.length}c`);
+  }
+  // Weakness highlights
+  assert(id.notableWeaknesses.length >= 1, `Should have at least 1 notable weakness (got ${id.notableWeaknesses.length})`);
+  for (const nw of id.notableWeaknesses) {
+    assert(nw.area.length > 0, `Weakness area should not be empty`);
+    assert(nw.gap.length > 15, `Weakness gap description should be meaningful (got ${nw.gap.length} chars)`);
+    assert(nw.consequence.length > 10, `Weakness consequence should exist (got ${nw.consequence.length} chars)`);
+    console.log(`  Weakness: "${nw.area}" — gap: ${nw.gap.length}c, consequence: ${nw.consequence.length}c`);
+  }
+
+  // Tier Position
+  assert(id.tierPosition.currentTier.length > 5, `Tier should be specified (got "${id.tierPosition.currentTier}")`);
+  assert(id.tierPosition.tierExamples.length >= 2, `Should have tier examples (got ${id.tierPosition.tierExamples.length})`);
+  assert(id.tierPosition.gpaPosition.length > 10, `GPA position should be specified`);
+  assert(id.tierPosition.tierGap.length > 10, `Tier gap should be specified`);
+  console.log(`  Tier: ${id.tierPosition.currentTier}`);
+  console.log(`  Examples: ${id.tierPosition.tierExamples.join(', ')}`);
+  if (id.tierPosition.strengthTier) console.log(`  Strength tier: ${id.tierPosition.strengthTier}`);
+  if (id.tierPosition.weaknessTier) console.log(`  Weakness tier: ${id.tierPosition.weaknessTier}`);
+
+  // Uplift Scale Rating
+  const validGrades = ['A+','A','A-','B+','B','B-','C+','C','C-','D+','D','D-','F'];
+  assert(validGrades.includes(id.upliftRating.grade), `Uplift grade should be valid letter grade (got "${id.upliftRating.grade}")`);
+  assert(id.upliftRating.explanation.length > 50, `Uplift explanation should be detailed (got ${id.upliftRating.explanation.length} chars)`);
+
   assert(id.trajectoryMeaning.length > 50, `Trajectory meaning should be detailed (got ${id.trajectoryMeaning.length} chars)`);
   assert(id.definingPattern.length > 30, `Defining pattern should be specific (got ${id.definingPattern.length} chars)`);
   console.log(`  Narrative: ${id.narrativeIdentity.length} chars`);
-  console.log(`  Harvard scale: ${id.harvardScaleRating.rating} — ${id.harvardScaleRating.label}`);
+  console.log(`  Notable strengths: ${id.notableStrengths.length}`);
+  console.log(`  Notable weaknesses: ${id.notableWeaknesses.length}`);
+  console.log(`  Uplift Rating: ${id.upliftRating.grade}`);
   console.log(`  Source: ${report.metadata.sectionSources.academicIdentity}`);
 
-  // ===== Section 2: Strength Deep Dives =====
-  section('Section 2: Strength Deep Dives');
-  const strengths = report.strengthDeepDives;
-  assert(strengths.length >= 2, `Should have at least 2 strength dives (got ${strengths.length})`);
+  // ===== Section 2: Challenges & Admissions Reality =====
+  section('Section 2: Challenges & Admissions Reality');
+  const car = report.challengesAndReality;
+  assert(car.firstGlance.length > 50, `First glance should be candid (got ${car.firstGlance.length} chars)`);
+  assert(car.challenges.length >= 1, `Should have at least 1 challenge (got ${car.challenges.length})`);
+  assert(car.unintendedNarrative.length > 30, `Unintended narrative should be specific (got ${car.unintendedNarrative.length} chars)`);
+  assert(car.narrativeControlStrategy.length > 30, `Control strategy should be actionable (got ${car.narrativeControlStrategy.length} chars)`);
 
-  for (const s of strengths) {
-    assert(s.title.length > 0, `Strength title should not be empty`);
-    assert(s.hook.length > 30, `Hook should be attention-grabbing (got ${s.hook.length} chars)`);
-    assert(s.whyItMatters.forAdmissionsOfficers.length > 50, `AO perspective should be detailed`);
-    assert(s.whyItMatters.forYourMajor.length > 30, `Major perspective should exist`);
-    assert(s.whyItMatters.forYourNarrative.length > 30, `Narrative perspective should exist`);
-    assert(s.blindSpotInsight.length > 50, `Blind spot should be substantial (got ${s.blindSpotInsight.length} chars)`);
-    assert(s.actionableGuidance.leverageStrategy.length > 30, `Leverage strategy should be specific`);
-    assert(s.actionableGuidance.courseRecommendation.length > 20, `Course recommendation should exist`);
-    console.log(`  "${s.title}": hook ${s.hook.length}c, blind spot ${s.blindSpotInsight.length}c, ${s.researchBacking.length} citations`);
-  }
-  console.log(`  Source: ${report.metadata.sectionSources.strengthDeepDives}`);
-
-  // ===== Section 3: Challenge Deep Dives =====
-  section('Section 3: Challenge Deep Dives');
-  const challenges = report.challengeDeepDives;
-  assert(challenges.length >= 1, `Should have at least 1 challenge dive (got ${challenges.length})`);
-
-  for (const c of challenges) {
+  for (const c of car.challenges) {
     assert(c.title.length > 0, `Challenge title should not be empty`);
-    assert(c.hook.length > 20, `Hook should reframe (got ${c.hook.length} chars)`);
-    assert(c.whyItMatters.whatAOsSee.length > 30, `AO view should be specific`);
-    assert(c.whyItMatters.whatItActuallyMeans.length > 30, `Reality should be specific`);
-    assert(c.teaching.rootCauseDiagnosis.length > 30, `Root cause should be diagnostic`);
-    assert(c.teaching.stepByStepFix.length >= 1, `Should have at least 1 fix step`);
-    assert(c.teaching.timeframe.length > 10, `Timeframe should be specified`);
-    assert(c.teaching.beforeAfterExample.length > 30, `Before/after should be concrete`);
-    console.log(`  "${c.title}": ${c.teaching.stepByStepFix.length} fix steps, ${c.researchBacking.length} citations`);
+    assert(c.issue.length > 20, `Issue should be meaningful (got ${c.issue.length} chars)`);
+    assert(c.aoImpact.length > 20, `AO impact should be specific (got ${c.aoImpact.length} chars)`);
+    assert(c.tierImpact.length > 10, `Tier impact should be specified (got ${c.tierImpact.length} chars)`);
+    assert(c.roadmapConnection.length > 10, `Roadmap connection should exist (got ${c.roadmapConnection.length} chars)`);
+    console.log(`  "${c.title}": issue ${c.issue.length}c, aoImpact ${c.aoImpact.length}c, tierImpact ${c.tierImpact.length}c, ${c.researchBacking.length} citations`);
   }
-  console.log(`  Source: ${report.metadata.sectionSources.challengeDeepDives}`);
+  console.log(`  First glance: ${car.firstGlance.length} chars`);
+  console.log(`  Challenges: ${car.challenges.length}`);
+  console.log(`  Source: ${report.metadata.sectionSources.challengesAndReality}`);
 
-  // ===== Section 4: Admissions Officer Lens =====
-  section('Section 4: Admissions Officer Lens');
-  const ao = report.admissionsOfficerLens;
-  assert(ao.firstGlance.length > 100, `First glance should be candid and detailed (got ${ao.firstGlance.length} chars)`);
-  assert(ao.blindSpots.length >= 2, `Should have at least 2 blind spots (got ${ao.blindSpots.length})`);
-  assert(ao.unintendedNarrative.length > 50, `Unintended narrative should be specific (got ${ao.unintendedNarrative.length} chars)`);
-  assert(ao.narrativeControlStrategy.length > 50, `Control strategy should be actionable (got ${ao.narrativeControlStrategy.length} chars)`);
-
-  for (const bs of ao.blindSpots) {
-    assert(bs.studentPerception.length > 20, `Student perception should be specific`);
-    assert(bs.aoReality.length > 20, `AO reality should be specific`);
-    assert(bs.howToFix.length > 20, `Fix should be actionable`);
-  }
-  console.log(`  First glance: ${ao.firstGlance.length} chars`);
-  console.log(`  Blind spots: ${ao.blindSpots.length}`);
-  console.log(`  Source: ${report.metadata.sectionSources.admissionsOfficerLens}`);
-
-  // ===== Section 5: Strategic Roadmap =====
-  section('Section 5: Strategic Roadmap');
+  // ===== Section 3: Strategic Roadmap =====
+  section('Section 3: Strategic Roadmap');
   const road = report.strategicRoadmap;
   assert(road.priorities.length >= 2, `Should have at least 2 priorities (got ${road.priorities.length})`);
   assert(road.courseStrategy.recommended.length >= 2, `Should have at least 2 recommended courses (got ${road.courseStrategy.recommended.length})`);
@@ -299,8 +296,8 @@ async function runTests() {
   console.log(`  Major alignment: ${road.majorAlignment.score}/100`);
   console.log(`  Source: ${report.metadata.sectionSources.strategicRoadmap}`);
 
-  // ===== Section 6: Research Context =====
-  section('Section 6: Research Context (Template)');
+  // ===== Section 4: Research Context =====
+  section('Section 4: Research Context (Template)');
   const rc = report.researchContext;
   assert(rc.apStatistics.length >= 1, `Should have AP statistics (got ${rc.apStatistics.length})`);
   assert(rc.collegeTierExpectations.length === 4, `Should have 4 tier expectations (got ${rc.collegeTierExpectations.length})`);
@@ -331,16 +328,16 @@ async function runTests() {
   section('Depth Verification');
   const totalChars = [
     report.academicIdentity.narrativeIdentity,
-    ...report.strengthDeepDives.map(s => s.hook + s.blindSpotInsight + s.whyItMatters.forAdmissionsOfficers),
-    ...report.challengeDeepDives.map(c => c.hook + c.teaching.rootCauseDiagnosis + c.whyItMatters.whatAOsSee),
-    report.admissionsOfficerLens.firstGlance + report.admissionsOfficerLens.unintendedNarrative,
+    ...report.academicIdentity.notableStrengths.map(ns => ns.insight + ns.majorRelevance),
+    ...report.challengesAndReality.challenges.map(c => c.issue + c.aoImpact + c.tierImpact),
+    report.challengesAndReality.firstGlance + report.challengesAndReality.unintendedNarrative,
     report.strategicRoadmap.trajectoryOptimization,
   ].reduce((sum, text) => sum + text.length, 0);
 
-  assert(totalChars > 5000, `Total teaching content should be >5000 chars (got ${totalChars})`);
+  assert(totalChars > 3000, `Total teaching content should be >3000 chars (got ${totalChars})`);
   console.log(`  Total teaching content: ${totalChars} characters`);
-  console.log(`  Average per strength dive: ${Math.round(report.strengthDeepDives.reduce((s, d) => s + JSON.stringify(d).length, 0) / Math.max(1, report.strengthDeepDives.length))} chars`);
-  console.log(`  Average per challenge dive: ${Math.round(report.challengeDeepDives.reduce((s, d) => s + JSON.stringify(d).length, 0) / Math.max(1, report.challengeDeepDives.length))} chars`);
+  console.log(`  Identity section: ${JSON.stringify(report.academicIdentity).length} chars`);
+  console.log(`  Challenges section: ${JSON.stringify(report.challengesAndReality).length} chars`);
 
   // ===== SUMMARY =====
   console.log('\n=================================================================');

@@ -339,9 +339,11 @@ export type Database = {
           narrative_summary: string | null
           search_vector: unknown | null
           status: Database["public"]["Enums"]["profile_status"]
+          terms_accepted_at: string | null
           updated_at: string
           user_context: Database["public"]["Enums"]["user_context"]
           user_id: string
+          credits: number
         }
         Insert: {
           archived_at?: string | null
@@ -349,6 +351,7 @@ export type Database = {
           completion_score?: number
           constraints?: Json
           created_at?: string
+          credits?: number
           deleted_at?: string | null
           demographics?: Json
           enrichment_priorities?: Json
@@ -361,6 +364,7 @@ export type Database = {
           narrative_summary?: string | null
           search_vector?: unknown | null
           status?: Database["public"]["Enums"]["profile_status"]
+          terms_accepted_at?: string | null
           updated_at?: string
           user_context: Database["public"]["Enums"]["user_context"]
           user_id: string
@@ -371,6 +375,7 @@ export type Database = {
           completion_score?: number
           constraints?: Json
           created_at?: string
+          credits?: number
           deleted_at?: string | null
           demographics?: Json
           enrichment_priorities?: Json
@@ -383,6 +388,7 @@ export type Database = {
           narrative_summary?: string | null
           search_vector?: unknown | null
           status?: Database["public"]["Enums"]["profile_status"]
+          terms_accepted_at?: string | null
           updated_at?: string
           user_context?: Database["public"]["Enums"]["user_context"]
           user_id?: string

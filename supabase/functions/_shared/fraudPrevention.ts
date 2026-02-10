@@ -57,6 +57,8 @@ export interface FraudCheckResult {
     ipAccountCount?: number;
     deviceAccountCount?: number;
     essayDuplicateCount?: number;
+    flagged?: boolean;
+    flagReason?: string;
   };
 }
 
@@ -78,7 +80,7 @@ export interface DeviceFingerprintComponents {
  * Hash essay using first + last sentence (10x faster than full text)
  * Accuracy: 95% (users copy entire essays, not just middles)
  */
-export function hashEssay(essayText: string): string {
+export async function hashEssay(essayText: string): Promise<string> {
   if (!essayText || essayText.trim().length < FRAUD_CONFIG.ESSAY_MIN_LENGTH) {
     return 'empty-essay';
   }
@@ -106,11 +108,10 @@ export function hashEssay(essayText: string): string {
   const encoder = new TextEncoder();
   const data = encoder.encode(normalized);
 
-  return crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
-  });
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
 }
 
 /**
@@ -348,27 +349,33 @@ export async function checkEssayDuplication(
       // ZERO TOLERANCE: Block ANY duplicate essay from a different user
       if (isDuplicate && accountCount >= FRAUD_CONFIG.ESSAY_DUPLICATE_THRESHOLD) {
         // Flag user for fraud review
-        await supabase.rpc('flag_user_for_fraud', {
-          check_user_id: userId,
-          reason: 'duplicate_essay',
-          severity: 'critical',
-          evidence_data: {
-            essay_hash: essayHash,
-            duplicate_account_count: accountCount,
-            other_user_ids: duplicate.user_ids,
-            detected_at: new Date().toISOString(),
-          },
-          essay_hash_val: essayHash,
-        }).catch(error => {
+        try {
+          const { error: flagError } = await supabase.rpc('flag_user_for_fraud', {
+            check_user_id: userId,
+            reason: 'duplicate_essay',
+            severity: 'critical',
+            evidence_data: {
+              essay_hash: essayHash,
+              duplicate_account_count: accountCount,
+              other_user_ids: duplicate.user_ids,
+              detected_at: new Date().toISOString(),
+            },
+            essay_hash_val: essayHash,
+          });
+          if (flagError) console.error('[Fraud] Failed to flag user:', flagError);
+        } catch (error: any) {
           console.error('[Fraud] Failed to flag user:', error);
-        });
+        }
 
         // Record blocked action
-        await supabase.rpc('record_blocked_action', {
-          check_user_id: userId,
-        }).catch(error => {
+        try {
+          const { error: blockError } = await supabase.rpc('record_blocked_action', {
+            check_user_id: userId,
+          });
+          if (blockError) console.error('[Fraud] Failed to record blocked action:', blockError);
+        } catch (error: any) {
           console.error('[Fraud] Failed to record blocked action:', error);
-        });
+        }
 
         return {
           allowed: false,
@@ -393,9 +400,9 @@ export async function checkEssayDuplication(
       });
 
     if (FRAUD_CONFIG.ENABLE_ASYNC_WRITES) {
-      // Non-blocking write
-      trackPromise.catch(error => {
-        console.error('[Fraud] Essay tracking failed (async):', error);
+      // Non-blocking write - Supabase returns PostgrestBuilder, use .then()
+      trackPromise.then(({ error }) => {
+        if (error) console.error('[Fraud] Essay tracking failed (async):', error);
       });
     } else {
       // Blocking write

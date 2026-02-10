@@ -88,6 +88,8 @@ import { ActivityWorkshopInput, ActivityWorkshopSessionInput } from '../types';
 export interface ScoringOrchestratorInput {
   /** Activities to score */
   activities: ActivityWorkshopInput[];
+  /** Target application platform — affects character limits for description scoring */
+  targetPlatform?: import('../types').ApplicationPlatform;
   /** Student context for portfolio scoring */
   studentContext?: {
     intendedMajor?: string;
@@ -302,6 +304,7 @@ export class ScoringOrchestrator {
 
         const descResult = await descriptionScoringService.scoreDescriptionsBatch({
           activities: descToScore.map((d) => d.input),
+          targetPlatform: input.targetPlatform,
         });
 
         if (!descResult.success || !descResult.scores) {
@@ -456,6 +459,7 @@ export class ScoringOrchestrator {
         const teachingInput: TeachingLayerInput = {
           scoringRubric: portResult.rubric,
           activities: input.activities,
+          targetPlatform: input.targetPlatform,
           studentContext: {
             intendedMajor: input.studentContext?.intendedMajor,
             targetSchools: input.studentContext?.targetSchools,

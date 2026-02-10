@@ -145,20 +145,57 @@ async function main() {
   md.push('---');
   md.push('');
 
-  // Section 1
+  // Section 1: Academic Identity
   md.push('## Section 1: Academic Identity');
   md.push('');
   md.push(report.academicIdentity.narrativeIdentity);
   md.push('');
-  md.push(`### Harvard Scale Rating: ${report.academicIdentity.harvardScaleRating.rating}/6 — ${report.academicIdentity.harvardScaleRating.label}`);
+
+  // Notable Strengths
+  if (report.academicIdentity.notableStrengths.length > 0) {
+    md.push('### Notable Strengths');
+    md.push('');
+    for (const ns of report.academicIdentity.notableStrengths) {
+      md.push(`**${ns.subject}:** ${ns.insight}`);
+      md.push(`*${ns.majorRelevance}*`);
+      md.push('');
+    }
+  }
+
+  // Notable Weaknesses
+  if (report.academicIdentity.notableWeaknesses.length > 0) {
+    md.push('### Areas to Improve');
+    md.push('');
+    for (const nw of report.academicIdentity.notableWeaknesses) {
+      md.push(`**${nw.area}:** ${nw.gap}`);
+      md.push(`*${nw.consequence}*`);
+      md.push('');
+    }
+  }
+
+  // College Tier Position
+  const tp = report.academicIdentity.tierPosition;
+  md.push('### College Tier Position');
   md.push('');
-  md.push(report.academicIdentity.harvardScaleRating.explanation);
+  md.push(`**Current Tier:** ${tp.currentTier} (${tp.tierExamples.join(', ')})`);
   md.push('');
-  md.push(`**Biggest lever:** ${report.academicIdentity.harvardScaleRating.biggestLever}`);
+  md.push(tp.gpaPosition);
   md.push('');
-  md.push('### Admissions Officer First Impression');
+  if (tp.strengthTier) {
+    md.push(`**Strength pull:** ${tp.strengthTier}`);
+    md.push('');
+  }
+  if (tp.weaknessTier) {
+    md.push(`**Weakness drag:** ${tp.weaknessTier}`);
+    md.push('');
+  }
+  md.push(`**Next tier:** ${tp.tierGap}`);
   md.push('');
-  md.push(report.academicIdentity.aoFirstImpression);
+
+  // Uplift Scale Rating
+  md.push(`### Uplift Rating: ${report.academicIdentity.upliftRating.grade}`);
+  md.push('');
+  md.push(report.academicIdentity.upliftRating.explanation);
   md.push('');
   md.push('### What Your Trajectory Means');
   md.push('');
@@ -171,68 +208,23 @@ async function main() {
   md.push('---');
   md.push('');
 
-  // Section 2
-  md.push('## Section 2: Strength Deep Dives');
+  // Section 2: Challenges & Admissions Reality (merged)
+  md.push('## Section 2: Challenges & Admissions Reality');
   md.push('');
-  for (const s of report.strengthDeepDives) {
-    md.push(`### ${s.title}`);
-    md.push('');
-    md.push(`> ${s.hook}`);
-    md.push('');
-    md.push('**Why This Matters:**');
-    md.push('');
-    md.push(`- **For Admissions Officers:** ${s.whyItMatters.forAdmissionsOfficers}`);
-    md.push(`- **For Your Major:** ${s.whyItMatters.forYourMajor}`);
-    md.push(`- **For Your Narrative:** ${s.whyItMatters.forYourNarrative}`);
-    md.push('');
-    md.push('**Blind Spot Insight** (what you can\'t see from your own transcript):');
-    md.push('');
-    md.push(s.blindSpotInsight);
-    md.push('');
-    md.push('**Actionable Guidance:**');
-    md.push('');
-    md.push(`- **Leverage Strategy:** ${s.actionableGuidance.leverageStrategy}`);
-    md.push(`- **Course Recommendation:** ${s.actionableGuidance.courseRecommendation}`);
-    md.push(`- **Narrative Angle:** ${s.actionableGuidance.narrativeAngle}`);
-    md.push('');
-    if (s.researchBacking.length > 0) {
-      md.push('**Research Backing:**');
-      md.push('');
-      for (const r of s.researchBacking) {
-        md.push(`- ${r.claim}: ${r.value} (${r.source})`);
-      }
-      md.push('');
-    }
-    md.push('---');
-    md.push('');
-  }
-
-  // Section 3
-  md.push('## Section 3: Challenge Deep Dives');
+  md.push('### What Admissions Officers See First');
   md.push('');
-  for (const c of report.challengeDeepDives) {
+  md.push(report.challengesAndReality.firstGlance);
+  md.push('');
+  for (const c of report.challengesAndReality.challenges) {
     md.push(`### ${c.title}`);
     md.push('');
-    md.push(`> ${c.hook}`);
+    md.push(c.issue);
     md.push('');
-    md.push('**Why This Matters:**');
+    md.push(`**AO Impact:** ${c.aoImpact}`);
     md.push('');
-    md.push(`- **What AOs See:** ${c.whyItMatters.whatAOsSee}`);
-    md.push(`- **What It Actually Means:** ${c.whyItMatters.whatItActuallyMeans}`);
-    md.push(`- **Consequence of Ignoring:** ${c.whyItMatters.consequenceOfIgnoring}`);
+    md.push(`**Tier Impact:** ${c.tierImpact}`);
     md.push('');
-    md.push('**Teaching:**');
-    md.push('');
-    md.push(`**Root Cause:** ${c.teaching.rootCauseDiagnosis}`);
-    md.push('');
-    md.push('**Step-by-Step Fix:**');
-    for (const step of c.teaching.stepByStepFix) {
-      md.push(`1. ${step}`);
-    }
-    md.push('');
-    md.push(`**Timeframe:** ${c.teaching.timeframe}`);
-    md.push('');
-    md.push(`**Before/After:** ${c.teaching.beforeAfterExample}`);
+    md.push(`**Roadmap:** ${c.roadmapConnection}`);
     md.push('');
     if (c.researchBacking.length > 0) {
       md.push('**Research Backing:**');
@@ -245,35 +237,19 @@ async function main() {
     md.push('');
   }
 
-  // Section 4
-  md.push('## Section 4: Admissions Officer Lens');
-  md.push('');
-  md.push('### What AOs See First');
-  md.push('');
-  md.push(report.admissionsOfficerLens.firstGlance);
-  md.push('');
-  md.push('### Blind Spots');
-  md.push('');
-  for (const bs of report.admissionsOfficerLens.blindSpots) {
-    md.push(`| **What You Think** | ${bs.studentPerception} |`);
-    md.push(`|---|---|`);
-    md.push(`| **What AOs See** | ${bs.aoReality} |`);
-    md.push(`| **How to Fix** | ${bs.howToFix} |`);
-    md.push('');
-  }
   md.push('### The Unintended Narrative');
   md.push('');
-  md.push(report.admissionsOfficerLens.unintendedNarrative);
+  md.push(report.challengesAndReality.unintendedNarrative);
   md.push('');
   md.push('### Taking Control of the Narrative');
   md.push('');
-  md.push(report.admissionsOfficerLens.narrativeControlStrategy);
+  md.push(report.challengesAndReality.narrativeControlStrategy);
   md.push('');
   md.push('---');
   md.push('');
 
-  // Section 5
-  md.push('## Section 5: Strategic Roadmap');
+  // Section 3: Strategic Roadmap
+  md.push('## Section 3: Strategic Roadmap');
   md.push('');
   md.push('### Top Priorities');
   md.push('');
@@ -331,10 +307,10 @@ async function main() {
   md.push('---');
   md.push('');
 
-  // Section 6
-  md.push('## Section 6: Research Context');
+  // Section 4: Research Context
+  md.push('## Section 4: Research Context');
   md.push('');
-  md.push('### AP Statistics (Verified)');
+  md.push('### AP Course Statistics (Verified)');
   md.push('');
   md.push('| Course | Pass Rate | Five Rate | Source |');
   md.push('|--------|-----------|-----------|--------|');

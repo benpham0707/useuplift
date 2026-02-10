@@ -174,11 +174,36 @@ export class Stage1ContextAwareAnalysisService {
       teachingPriorities,
       portfolioTeachingNeeds,
       // Populate scoring if available (v4.3)
-      scoring: scoringResult ? {
-        portfolioRubric: scoringResult.rubric!,
-        activityScoresById: Object.fromEntries(scoringResult.scoresByActivityId || new Map()),
-        scoringComplete: true,
-      } : undefined,
+      // Reconcile tier assessments: when scoring and analysis disagree, annotate the scoring rationale
+      scoring: scoringResult ? (() => {
+        const rubric = scoringResult.rubric!;
+        const scoresById = Object.fromEntries(scoringResult.scoresByActivityId || new Map());
+
+        // Reconcile tiers: scoring runs in parallel with analysis, so may evaluate tiers independently
+        for (const actScore of rubric.activityScores) {
+          const analysisActivity = baseAnalysis.activities[actScore.activityId];
+          if (!analysisActivity) continue;
+
+          const analysisTier = analysisActivity.tier;
+          const scoringTierText = actScore.activityScore.breakdown.tierAssessment.rationale || '';
+          // Extract the tier number the scoring system assigned (look for T1/T2/T3/T4 pattern)
+          const scoringTierMatch = scoringTierText.match(/T(\d)/);
+          const scoringTier = scoringTierMatch ? parseInt(scoringTierMatch[1]) : null;
+
+          if (analysisTier && scoringTier && analysisTier !== scoringTier) {
+            // Tiers disagree — annotate the scoring rationale to acknowledge the discrepancy
+            actScore.activityScore.breakdown.tierAssessment.rationale =
+              `[Analysis: Tier ${analysisTier}] ${actScore.activityScore.breakdown.tierAssessment.rationale} ` +
+              `Note: The contextual analysis (which factors in story arc and constraint adjustments) assigned Tier ${analysisTier} to this activity.`;
+          }
+        }
+
+        return {
+          portfolioRubric: rubric,
+          activityScoresById: scoresById,
+          scoringComplete: true,
+        };
+      })() : undefined,
       analysisMetadata: {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
@@ -214,6 +239,7 @@ export class Stage1ContextAwareAnalysisService {
       console.log(`[Stage1] Scoring orchestrator starting...`);
       const result = await scoringOrchestrator.scorePortfolio({
         activities: input.activities,
+        targetPlatform: input.targetPlatform,
         studentContext: {
           intendedMajor: input.studentContext?.intendedMajor,
           gradeLevel: input.studentContext?.gradeLevel,

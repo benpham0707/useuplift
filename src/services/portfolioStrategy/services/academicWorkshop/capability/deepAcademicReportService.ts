@@ -2,7 +2,7 @@
  * Deep Academic Report Service
  *
  * Orchestrates existing analysis services and adds LLM-powered narrative depth
- * to produce a 6-section report with PIQ-workshop-level teaching quality.
+ * to produce a 5-section report with teaching-quality analysis.
  *
  * Architecture:
  * 1. Assembles all context from existing services (zero LLM, ~5ms):
@@ -10,15 +10,17 @@
  *    - assembleResearchForStudent() → verified research data
  *    - generateAcademicPlanningAdvice() → course/workload/major advice
  *
- * 2. Generates 6 report sections (5 LLM calls + 1 template, ~$0.07):
- *    - Academic Identity (LLM)
- *    - Strength Deep Dives (LLM)
- *    - Challenge Deep Dives (LLM)
+ * 2. Generates 5 report sections (4 LLM calls + 1 template):
+ *    - Academic Identity + Notable Strengths (LLM)
+ *    - Challenge Analysis (LLM) — concise, roadmap-aligned
  *    - Admissions Officer Lens (LLM)
  *    - Strategic Roadmap (LLM)
  *    - Research Context (template only)
  *
  * 3. Falls back gracefully to template-only output when LLM unavailable
+ *
+ * Note: Root cause diagnosis and "why you struggled" analysis is NOT here —
+ * that feeds into the conversational advisor for deeper profiling through dialogue.
  *
  * MODEL: Sonnet for all LLM calls (quality matters for teaching)
  * PATTERN: Follows stage2ConditionalTeachingService.ts
@@ -62,18 +64,23 @@ import type {
   DeepAcademicReportInput,
   AssembledReportContext,
   AcademicIdentitySection,
-  StrengthDeepDive,
-  ChallengeDeepDive,
-  AdmissionsOfficerLensSection,
+  NotableStrength,
+  NotableWeakness,
+  CollegeTierPosition,
+  UpliftRating,
+  UpliftGrade,
+  ChallengesAndRealitySection,
+  ChallengeWithAOContext,
   StrategicRoadmapSection,
   ResearchContextSection,
   ReportMetadata,
   ResearchCitation,
-  BlindSpot,
   StrategicPriority,
   CourseStrategyItem,
   CourseAvoidItem,
 } from './deepAcademicReportTypes';
+
+import { UPLIFT_SCALE_DATABASE } from './deepAcademicReportTypes';
 
 // ============================================================================
 // CONSTANTS
@@ -120,6 +127,68 @@ function formatSubject(subject: string): string {
 }
 
 // ============================================================================
+// HELPER: Map GPA to College Tier
+// ============================================================================
+
+interface TierInfo {
+  name: string;
+  examples: string[];
+  gpaRange: string;
+  median: number;
+}
+
+const COLLEGE_TIER_BENCHMARKS: TierInfo[] = [
+  { name: 'Ivy/Elite (Top 5-10)', examples: ['Harvard', 'Stanford', 'MIT', 'Princeton', 'Yale'], gpaRange: '3.85-4.0', median: 3.95 },
+  { name: 'Highly Selective (Top 10-30)', examples: ['Northwestern', 'UCLA', 'Georgetown', 'Carnegie Mellon', 'UC Berkeley'], gpaRange: '3.70-3.89', median: 3.85 },
+  { name: 'Selective (Top 30-80)', examples: ['Boston University', 'Ohio State', 'UT Austin', 'Purdue', 'UMass Amherst'], gpaRange: '3.40-3.69', median: 3.65 },
+  { name: 'Competitive', examples: ['Most state universities', 'Regional private colleges'], gpaRange: '3.00-3.39', median: 3.4 },
+  { name: 'Accessible', examples: ['Community colleges', 'Open admission institutions'], gpaRange: '2.00-2.99', median: 2.8 },
+];
+
+function getTierForGPA(gpa: number): TierInfo {
+  if (gpa >= 3.85) return COLLEGE_TIER_BENCHMARKS[0];
+  if (gpa >= 3.70) return COLLEGE_TIER_BENCHMARKS[1];
+  if (gpa >= 3.40) return COLLEGE_TIER_BENCHMARKS[2];
+  if (gpa >= 3.00) return COLLEGE_TIER_BENCHMARKS[3];
+  return COLLEGE_TIER_BENCHMARKS[4];
+}
+
+function calculateTierPosition(analysis: NuancedCapabilityAnalysis): CollegeTierPosition {
+  const overallGPA = calculateOverallGPA(analysis);
+  const currentTierInfo = getTierForGPA(overallGPA);
+
+  // Find strongest and weakest subject GPAs
+  const subjectGPAs = Object.entries(analysis.subjectPatterns)
+    .map(([subj, p]) => ({ subject: formatSubject(subj), gpa: p.performanceHistory.avgGPA }))
+    .sort((a, b) => b.gpa - a.gpa);
+
+  const strongest = subjectGPAs[0];
+  const weakest = subjectGPAs[subjectGPAs.length - 1];
+
+  const strengthTierInfo = strongest ? getTierForGPA(strongest.gpa) : undefined;
+  const weaknessTierInfo = weakest ? getTierForGPA(weakest.gpa) : undefined;
+
+  // Calculate what GPA they'd need for the next tier up
+  const currentTierIndex = COLLEGE_TIER_BENCHMARKS.indexOf(currentTierInfo);
+  const nextTierUp = currentTierIndex > 0 ? COLLEGE_TIER_BENCHMARKS[currentTierIndex - 1] : null;
+
+  return {
+    currentTier: currentTierInfo.name,
+    tierExamples: currentTierInfo.examples,
+    gpaPosition: `Your ${overallGPA.toFixed(2)} GPA places you in ${currentTierInfo.name} range (${currentTierInfo.gpaRange})`,
+    strengthTier: strongest && strengthTierInfo && strengthTierInfo !== currentTierInfo
+      ? `Your ${strongest.subject} GPA (${strongest.gpa.toFixed(2)}) would place you in ${strengthTierInfo.name} range (${strengthTierInfo.examples.slice(0, 3).join(', ')})`
+      : undefined,
+    weaknessTier: weakest && weaknessTierInfo && weaknessTierInfo !== currentTierInfo
+      ? `Your ${weakest.subject} GPA (${weakest.gpa.toFixed(2)}) pulls you toward ${weaknessTierInfo.name} range`
+      : undefined,
+    tierGap: nextTierUp
+      ? `To reach ${nextTierUp.name}, you need ${parseFloat(nextTierUp.gpaRange.split('-')[0]).toFixed(2)}+ overall GPA (currently ${(parseFloat(nextTierUp.gpaRange.split('-')[0]) - overallGPA).toFixed(2)} points away)`
+      : `You are in the top tier — maintain or improve your current performance`,
+  };
+}
+
+// ============================================================================
 // DEEP ACADEMIC REPORT SERVICE
 // ============================================================================
 
@@ -150,7 +219,7 @@ export class DeepAcademicReportService {
     const context = this.assembleContext(input);
 
     // Step 2: Generate sections
-    // Section 6 (Research Context) is template-only, always works
+    // Research Context is template-only, always works
     const researchContext = this.generateResearchContext(context);
 
     const sectionSources: Record<string, 'llm' | 'template'> = {
@@ -158,39 +227,24 @@ export class DeepAcademicReportService {
     };
 
     let academicIdentity: AcademicIdentitySection;
-    let strengthDeepDives: StrengthDeepDive[];
-    let challengeDeepDives: ChallengeDeepDive[];
-    let admissionsOfficerLens: AdmissionsOfficerLensSection;
+    let challengesAndReality: ChallengesAndRealitySection;
     let strategicRoadmap: StrategicRoadmapSection;
     let usedFallback = false;
 
     try {
-      // Parallel batch 1: Identity + Strengths + Challenges (independent)
-      const [identityResult, strengthsResult, challengesResult] = await Promise.all([
+      // Parallel batch: Identity + Challenges&Reality + Roadmap (all independent)
+      const [identityResult, challengesResult, roadmapResult] = await Promise.all([
         this.generateAcademicIdentity(context),
-        this.generateStrengthDeepDives(context),
-        this.generateChallengeDeepDives(context),
-      ]);
-
-      academicIdentity = identityResult;
-      strengthDeepDives = strengthsResult;
-      challengeDeepDives = challengesResult;
-
-      sectionSources.academicIdentity = 'llm';
-      sectionSources.strengthDeepDives = 'llm';
-      sectionSources.challengeDeepDives = 'llm';
-
-      // Parallel batch 2: AO Lens + Roadmap (can reference earlier sections conceptually
-      // but don't need their output — they read the same assembled context)
-      const [aoLensResult, roadmapResult] = await Promise.all([
-        this.generateAOLens(context),
+        this.generateChallengesAndReality(context),
         this.generateStrategicRoadmap(context),
       ]);
 
-      admissionsOfficerLens = aoLensResult;
+      academicIdentity = identityResult;
+      challengesAndReality = challengesResult;
       strategicRoadmap = roadmapResult;
 
-      sectionSources.admissionsOfficerLens = 'llm';
+      sectionSources.academicIdentity = 'llm';
+      sectionSources.challengesAndReality = 'llm';
       sectionSources.strategicRoadmap = 'llm';
 
     } catch (error) {
@@ -199,15 +253,11 @@ export class DeepAcademicReportService {
 
       const fallback = this.generateTemplateFallback(context);
       academicIdentity = fallback.academicIdentity;
-      strengthDeepDives = fallback.strengthDeepDives;
-      challengeDeepDives = fallback.challengeDeepDives;
-      admissionsOfficerLens = fallback.admissionsOfficerLens;
+      challengesAndReality = fallback.challengesAndReality;
       strategicRoadmap = fallback.strategicRoadmap;
 
       sectionSources.academicIdentity = 'template';
-      sectionSources.strengthDeepDives = 'template';
-      sectionSources.challengeDeepDives = 'template';
-      sectionSources.admissionsOfficerLens = 'template';
+      sectionSources.challengesAndReality = 'template';
       sectionSources.strategicRoadmap = 'template';
     }
 
@@ -221,9 +271,7 @@ export class DeepAcademicReportService {
 
     return {
       academicIdentity,
-      strengthDeepDives,
-      challengeDeepDives,
-      admissionsOfficerLens,
+      challengesAndReality,
       strategicRoadmap,
       researchContext,
       metadata,
@@ -291,21 +339,71 @@ export class DeepAcademicReportService {
     const trajectory = quant.progressionTrajectory;
     const fingerprint = quant.performanceFingerprint;
 
-    const systemPrompt = `You are an expert college admissions consultant writing a deep academic identity analysis for a student. Your output must be teaching-quality — explain WHY things matter, not just WHAT they are. Write in second person ("you"). Be specific with data but natural in voice. Never be generic.
+    const systemPrompt = `You are an expert college admissions consultant writing a deep academic identity analysis. Write in second person ("you"). Be specific with data and natural in voice.
 
-Output valid JSON matching this structure exactly:
+CRITICAL RULES:
+1. Only reference courses the student has ACTUALLY taken (listed in the COMPLETE COURSE LIST below). Do NOT claim they are "missing" a course they already have.
+2. NO rhetorical questions. NO vague observations like "the question is whether..." or "it remains to be seen." Every sentence must contain specific data, a concrete insight, or an actionable observation.
+3. When discussing GPA changes, ALWAYS frame them in terms of COLLEGE TIER IMPACT using the benchmarks provided. Don't just say "0.70 GPA drop" — say "this drops you from Highly Selective to Selective range."
+
+The "notableStrengths" should highlight NON-OBVIOUS insights about their top 2-3 strengths. Don't restate "you're good at Math." Explain what their performance SIGNALS and how it connects to their path. 1-2 sentences each.
+
+The "notableWeaknesses" should preview key gaps — concise and honest. The Challenges section covers these in depth, so stay brief. Tone calibration:
+- Strong students: gently point out opportunities.
+- Struggling students: direct and honest reality check.
+
+The "tierPosition" maps their GPA to concrete school tiers. Use the COLLEGE TIER BENCHMARKS provided. Show where their strengths could take them vs where weaknesses drag them. Use SCHOOL NAMES for impact.
+
+The "upliftRating" is a HOLISTIC letter grade (A+ through F) considering rigor, major alignment, trends, difficulty sensitivity, school context. The explanation must reference specific factors.
+
+SCOPE: This section is IDENTITY. The Challenges section handles detailed breakdowns. The Roadmap handles course recommendations. Don't overlap.
+
+Output valid JSON:
 {
-  "narrativeIdentity": "2-3 paragraphs: who they are academically. Not a summary of grades — a narrative about their academic character, patterns, and potential. What drives them? Where do they thrive? What's their academic story?",
-  "harvardScaleRating": {
-    "rating": <1-6 number>,
-    "label": "<rating label>",
-    "explanation": "What this rating means specifically for this student. Not a generic definition — what it means for THEIR profile.",
-    "biggestLever": "The single most impactful thing they could do to move up."
+  "narrativeIdentity": "2-3 paragraphs: who they are academically. Use tier benchmarks when discussing GPA impact. NO rhetorical questions.",
+  "notableStrengths": [
+    {
+      "subject": "Subject or pattern name",
+      "insight": "Non-obvious insight. 1-2 sentences.",
+      "majorRelevance": "Connection to major/path. 1 sentence."
+    }
+  ],
+  "notableWeaknesses": [
+    {
+      "area": "Subject or pattern name",
+      "gap": "The gap with tier impact. 1-2 sentences.",
+      "consequence": "Why it matters for their path. 1 sentence."
+    }
+  ],
+  "tierPosition": {
+    "currentTier": "e.g. Selective (Top 30-80)",
+    "tierExamples": ["School 1", "School 2", "School 3"],
+    "gpaPosition": "Where their GPA sits in this tier",
+    "strengthTier": "Where their best subject GPA would place them (if different tier) or null",
+    "weaknessTier": "Where their worst subject GPA drags them (if different tier) or null",
+    "tierGap": "What it takes to reach next tier — specific GPA target"
   },
-  "aoFirstImpression": "What an admissions officer sees in the first 30 seconds of reading this transcript. Be honest — what's the gut reaction?",
-  "trajectoryMeaning": "What their GPA trajectory means in admissions context. Is it a story of growth, resilience, plateau, or something else?",
-  "definingPattern": "The single most important pattern in their academic record that defines their candidacy."
+  "upliftRating": {
+    "grade": "<A+|A|A-|B+|B|B-|C+|C|C-|D+|D|D-|F>",
+    "explanation": "What this grade means for THIS student with tier context. 2-3 sentences."
+  },
+  "trajectoryMeaning": "2-3 sentences: What their trajectory means in TIER terms — are they moving up or down between tiers?",
+  "definingPattern": "1-2 sentences: The single most important pattern."
 }`;
+
+    // Build Uplift Scale reference for the LLM
+    const upliftScaleRef = UPLIFT_SCALE_DATABASE
+      .filter(d => ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-'].includes(d.grade))
+      .map(d => `${d.grade} (${d.label}): ${d.description}`)
+      .join('\n');
+
+    // Pre-calculate tier position for the LLM
+    const tierPosition = calculateTierPosition(quant);
+
+    // Build tier benchmarks reference
+    const tierBenchmarksRef = COLLEGE_TIER_BENCHMARKS
+      .map(t => `${t.name}: GPA ${t.gpaRange} (e.g. ${t.examples.slice(0, 3).join(', ')})`)
+      .join('\n');
 
     const userPrompt = `Analyze this student's academic identity:
 
@@ -317,11 +415,32 @@ CONSISTENCY: ${fingerprint.consistencyScore}%
 DIFFICULTY SENSITIVITY: ${fingerprint.difficultySensitivity}
 TRAJECTORY: ${trajectory.historical.overallTrend} (strength: ${trajectory.historical.trendStrength}%)
 
-SUBJECT STRENGTHS:
+COLLEGE TIER BENCHMARKS (use these to frame ALL GPA discussions — say "this moves you from X tier to Y tier" instead of just stating GPA numbers):
+${tierBenchmarksRef}
+
+PRE-CALCULATED TIER POSITION:
+- Current: ${tierPosition.currentTier} (${tierPosition.tierExamples.join(', ')})
+- GPA Position: ${tierPosition.gpaPosition}
+${tierPosition.strengthTier ? `- Strength Tier: ${tierPosition.strengthTier}` : ''}
+${tierPosition.weaknessTier ? `- Weakness Tier: ${tierPosition.weaknessTier}` : ''}
+- To Next Tier: ${tierPosition.tierGap}
+
+COMPLETE COURSE LIST (every course they have actually taken — do NOT claim they are missing any of these):
 ${Object.entries(quant.subjectPatterns)
   .sort((a, b) => b[1].relativeStrength - a[1].relativeStrength)
-  .map(([subj, p]) => `- ${formatSubject(subj)}: ${p.performanceHistory.avgGPA.toFixed(2)} avg, ${p.relativeStrength > 0 ? '+' : ''}${Math.round(p.relativeStrength * 100)}% relative, trend: ${p.performanceHistory.trend}`)
-  .join('\n')}
+  .map(([subj, p]) => {
+    const courses = p.performanceHistory.courses
+      .map(c => `${c.name} (${c.level}): ${c.grade.toFixed(2)}`)
+      .join(', ');
+    return `${formatSubject(subj)} [${p.performanceHistory.avgGPA.toFixed(2)} avg, ${p.relativeStrength > 0 ? '+' : ''}${Math.round(p.relativeStrength * 100)}% relative, trend: ${p.performanceHistory.trend}]:
+  ${courses}`;
+  }).join('\n')}
+
+CHALLENGE PATTERNS FROM SYNTHESIS:
+${synthesis.challenges.map(c => `- ${c.insight}: ${c.evidence} → ${c.implication}`).join('\n')}
+
+STRENGTH PATTERNS FROM SYNTHESIS:
+${synthesis.strengths.map(s => `- ${s.insight}: ${s.evidence} → ${s.implication}`).join('\n')}
 
 KEY INSIGHTS FROM ANALYSIS:
 ${ctx.profileInsights.map(i => `- ${i.observation}`).join('\n')}
@@ -330,9 +449,10 @@ INTENDED MAJOR: ${ctx.input.intendedMajor || 'Undecided'}
 GRADE: ${ctx.input.currentGrade}
 SCHOOL TYPE: ${ctx.input.schoolContext.type.replace(/_/g, ' ')}
 PERFORMANCE ENVELOPE: Floor ${quant.performanceEnvelope.floor.gpa.toFixed(2)}, Ceiling ${quant.performanceEnvelope.ceiling.gpa.toFixed(2)}, Typical ${quant.performanceEnvelope.comfortableRange.typicalGPA.toFixed(2)}
+DIFFICULTY IMPACT: Typical ${quant.challengeResponse.transitionAnalysis.typicalImpact.toFixed(2)} GPA drop when increasing level
 
-HARVARD SCALE REFERENCE:
-1 = Summa potential (top 1%), 2 = Magna potential (top 5%), 3 = Cum Laude potential (top 15%), 4 = Strong academic (top 30%), 5 = Adequate preparation, 6 = Below expectations`;
+UPLIFT SCALE REFERENCE (assign holistically, considering ALL factors — rigor, major alignment, trends, sensitivity — not just GPA):
+${upliftScaleRef}`;
 
     const response = await callClaude<string>({
       model: MODEL,
@@ -347,179 +467,121 @@ HARVARD SCALE REFERENCE:
   }
 
   // ==========================================================================
-  // SECTION 2: STRENGTH DEEP DIVES (LLM)
+  // SECTION 2: CHALLENGES & ADMISSIONS REALITY (merged — single LLM call)
   // ==========================================================================
 
-  private async generateStrengthDeepDives(ctx: AssembledReportContext): Promise<StrengthDeepDive[]> {
+  private async generateChallengesAndReality(ctx: AssembledReportContext): Promise<ChallengesAndRealitySection> {
     const quant = ctx.quantitativeAnalysis;
-    const strengths = quant.synthesis.strengths;
-    const research = ctx.assembledResearch;
-
-    // Identify top strength subjects (relative strength > 0)
-    const strengthSubjects = Object.entries(quant.subjectPatterns)
-      .filter(([_, p]) => p.relativeStrength > 0.05)
-      .sort((a, b) => b[1].relativeStrength - a[1].relativeStrength)
-      .slice(0, 4);
-
-    // Also include non-subject strengths from synthesis (like consistency, trajectory)
-    const synthesisStrengths = strengths
-      .filter(s => !strengthSubjects.some(([subj]) => s.insight.toLowerCase().includes(subj.replace(/_/g, ' '))))
-      .slice(0, 2);
-
-    const relevantStats = research.verifiedStatistics.slice(0, 8);
-
-    const systemPrompt = `You are an expert admissions consultant writing deep-dive analysis of a student's academic strengths. Each strength gets PIQ-workshop-level depth.
-
-For each strength, provide teaching that explains:
-1. WHY this matters (not just that it exists)
-2. What the student CANNOT see about their own strength
-3. SPECIFIC actions to leverage it
-
-Output valid JSON as an object wrapping an array:
-{
-  "items": [
-    {
-      "title": "Subject or pattern name",
-      "hook": "Attention-grabbing opening observation. Make them think 'I never realized that.' 1-2 sentences.",
-      "whyItMatters": {
-        "forAdmissionsOfficers": "What AOs see when they read this strength. Be specific about how it affects their evaluation.",
-        "forYourMajor": "How this strength connects to their intended major or future academic path.",
-        "forYourNarrative": "How this strength shapes the story their application tells."
-      },
-      "blindSpotInsight": "The thing they absolutely cannot see from reading their own transcript. This is the expert insight — what a $500/hr consultant would tell them.",
-      "actionableGuidance": {
-        "leverageStrategy": "How to maximize this strength's impact on their application.",
-        "courseRecommendation": "Specific course(s) to take to build on this strength, with rationale.",
-        "narrativeAngle": "How to weave this strength into their application narrative."
-      },
-      "researchBacking": [
-        { "claim": "Specific claim", "value": "Data point", "source": "Verified source" }
-      ]
-    }
-  ]
-}`;
-
-    const userPrompt = `Analyze these academic strengths in depth:
-
-SUBJECT STRENGTHS:
-${strengthSubjects.map(([subj, p]) => {
-  const courses = p.performanceHistory.courses.map(c => `${c.name} (${c.level}): ${c.grade.toFixed(1)}`).join(', ');
-  return `- ${formatSubject(subj)}: ${p.performanceHistory.avgGPA.toFixed(2)} avg GPA, +${Math.round(p.relativeStrength * 100)}% relative strength, trend: ${p.performanceHistory.trend}
-    Courses: ${courses}
-    Recommended level: ${p.recommendedLevel} (${p.levelReasoning})
-    Projected: ${p.projectedOutcome.expectedGrade} (${Math.round(p.projectedOutcome.confidence * 100)}% confidence)`;
-}).join('\n\n')}
-
-OTHER PATTERN STRENGTHS:
-${synthesisStrengths.map(s => `- ${s.insight}: ${s.evidence} → ${s.implication}`).join('\n')}
-
-PROFILE INSIGHTS (for blind spot material):
-${ctx.profileInsights.map(i => `- Observation: ${i.observation}\n  Interpretation: ${i.interpretation}\n  Strategic: ${i.strategicImplication}`).join('\n\n')}
-
-INTENDED MAJOR: ${ctx.input.intendedMajor || 'Undecided'}
-
-VERIFIED STATISTICS (cite these, don't invent):
-${relevantStats.map(s => `- ${s.claim}: ${s.value} (${s.citation})`).join('\n')}
-
-MAJOR ALIGNMENT: ${ctx.planningAdvice.majorAlignment?.major || 'Not specified'}, alignment score: ${ctx.planningAdvice.majorAlignment?.alignmentScore || 'N/A'}`;
-
-    const response = await callClaude<string>({
-      model: MODEL,
-      systemPrompt,
-      userPrompt,
-      maxTokens: MAX_TOKENS_PER_SECTION,
-      temperature: 0.3,
-      // useJsonMode off: parseClaudeJSON handles robust JSON extraction
-    });
-
-    this.trackUsage(response.usage);
-    const parsed = parseClaudeJSON<unknown>(response.content, 'strengthDeepDives');
-    return extractArray<StrengthDeepDive>(parsed);
-  }
-
-  // ==========================================================================
-  // SECTION 3: CHALLENGE DEEP DIVES (LLM)
-  // ==========================================================================
-
-  private async generateChallengeDeepDives(ctx: AssembledReportContext): Promise<ChallengeDeepDive[]> {
-    const quant = ctx.quantitativeAnalysis;
+    const overallGPA = calculateOverallGPA(quant);
     const challenges = quant.synthesis.challenges;
     const research = ctx.assembledResearch;
 
-    // Identify challenge subjects (relative strength < 0)
+    // Identify challenge subjects
     const challengeSubjects = Object.entries(quant.subjectPatterns)
       .filter(([_, p]) => p.relativeStrength < -0.05)
       .sort((a, b) => a[1].relativeStrength - b[1].relativeStrength)
       .slice(0, 3);
 
-    // Include challenge patterns from synthesis
     const challengePatterns = challenges.slice(0, 3);
-
-    // Red flags from planning advice
     const redFlags = ctx.planningAdvice.redFlags || [];
+    const courseRecs = ctx.planningAdvice.courseRecommendations || [];
+    const relevantStats = research.verifiedStatistics.slice(0, 6);
 
-    const relevantStats = research.verifiedStatistics.slice(0, 8);
+    // Build tier benchmarks reference
+    const tierBenchmarksRef = COLLEGE_TIER_BENCHMARKS
+      .map(t => `${t.name}: GPA ${t.gpaRange} (e.g. ${t.examples.slice(0, 3).join(', ')})`)
+      .join('\n');
 
-    const systemPrompt = `You are an expert admissions consultant writing deep-dive analysis of a student's academic challenges. Your job is to TEACH, not alarm. Reframe challenges constructively while being honest.
+    // Pre-calculate tier position
+    const tierPosition = calculateTierPosition(quant);
 
-For each challenge, provide diagnostic teaching:
-1. What it actually means (often less scary than the student thinks)
-2. What admissions officers see vs what's really happening
-3. SPECIFIC step-by-step plan to address it
+    const systemPrompt = `You are a former admissions officer writing about academic challenges — what they are, how AOs interpret them, and how they affect a student's college positioning.
 
-Output valid JSON as an object wrapping an array:
+CRITICAL RULES:
+1. Only reference courses the student has ACTUALLY taken (listed below). Do NOT claim they are missing a course they already have.
+2. NO rhetorical questions. NO filler like "the question is whether..." or "it remains to be seen." Every sentence must contain data, a concrete insight, or an actionable observation.
+3. NO "What You Think" or "You probably think" framing — do NOT assume the student's thoughts. Just state the issue and the AO reality directly.
+4. When discussing GPA impact, ALWAYS use COLLEGE TIER BENCHMARKS: say "this pulls you from Highly Selective (UCLA) to Selective (Boston U) range" instead of just "0.70 GPA drop."
+5. Do NOT give root cause analysis or study advice — that happens in conversation later.
+
+Focus on 2-3 DISTINCT challenges. Each should cover a different concern.
+
+SCOPE: This section covers challenges + AO perspective. The Academic Identity already previewed weaknesses briefly. The Roadmap has detailed course recommendations — just point to it.
+
+Output valid JSON:
 {
-  "items": [
+  "firstGlance": "2-3 sentences: What an AO notices in the first 30 seconds. Be candid and specific. Use tier language.",
+  "challenges": [
     {
-      "title": "Challenge name",
-      "hook": "Reframing observation that changes how they think about this challenge. 1-2 sentences.",
-      "whyItMatters": {
-        "whatAOsSee": "Exactly what admissions officers see when they encounter this in the transcript.",
-        "whatItActuallyMeans": "The honest diagnosis — is this truly a problem, or is it being blown out of proportion?",
-        "consequenceOfIgnoring": "What happens if they do nothing about this. Be specific."
-      },
-      "teaching": {
-        "rootCauseDiagnosis": "Why this challenge exists. Not 'you got a B' but WHY the B happened and what it tells us.",
-        "stepByStepFix": ["Step 1...", "Step 2...", "Step 3..."],
-        "timeframe": "How long the fix takes and when results will show.",
-        "beforeAfterExample": "Concrete before/after: what their profile looks like now vs what it could look like after implementing the fix."
-      },
+      "title": "Challenge name (short, distinct)",
+      "issue": "What the issue is — factual, specific. 2-3 sentences. Use tier benchmarks for context.",
+      "aoImpact": "How AOs specifically interpret this. 2-3 sentences. What does it signal about college readiness?",
+      "tierImpact": "How this shifts their school positioning — use school names. 1-2 sentences.",
+      "roadmapConnection": "Brief pointer to roadmap action. 1-2 sentences.",
       "researchBacking": [
         { "claim": "Specific claim", "value": "Data point", "source": "Verified source" }
       ]
     }
-  ]
+  ],
+  "unintendedNarrative": "2-3 sentences: The accidental story this transcript tells. Be direct.",
+  "narrativeControlStrategy": "2-3 sentences: How to reshape the story. Actionable, specific."
 }`;
 
-    const userPrompt = `Analyze these academic challenges in depth:
+    // Build complete course list for grounding
+    const allCoursesList = Object.entries(quant.subjectPatterns)
+      .map(([subj, p]) => {
+        const courses = p.performanceHistory.courses
+          .map(c => `${c.name} (${c.level}): ${c.grade.toFixed(2)}`)
+          .join(', ');
+        return `${formatSubject(subj)}: ${courses}`;
+      }).join('\n');
 
-CHALLENGE SUBJECTS:
+    const userPrompt = `Analyze challenges and admissions reality for this student:
+
+COLLEGE TIER BENCHMARKS (use these to frame ALL GPA discussions):
+${tierBenchmarksRef}
+
+STUDENT'S CURRENT TIER: ${tierPosition.currentTier} (${tierPosition.tierExamples.join(', ')})
+${tierPosition.strengthTier ? `STRENGTH TIER: ${tierPosition.strengthTier}` : ''}
+${tierPosition.weaknessTier ? `WEAKNESS TIER: ${tierPosition.weaknessTier}` : ''}
+
+OVERALL GPA: ${overallGPA.toFixed(2)}
+SCHOOL TYPE: ${ctx.input.schoolContext.type.replace(/_/g, ' ')}
+INTENDED MAJOR: ${ctx.input.intendedMajor || 'Undecided'}
+
+COMPLETE COURSE LIST (courses they have ACTUALLY taken — do NOT claim they are missing any of these):
+${allCoursesList}
+
+CHALLENGE SUBJECTS (relative weakness areas):
 ${challengeSubjects.map(([subj, p]) => {
   const courses = p.performanceHistory.courses.map(c => `${c.name} (${c.level}): ${c.grade.toFixed(1)}`).join(', ');
-  return `- ${formatSubject(subj)}: ${p.performanceHistory.avgGPA.toFixed(2)} avg GPA, ${Math.round(p.relativeStrength * 100)}% relative (below average), trend: ${p.performanceHistory.trend}
+  return `- ${formatSubject(subj)}: ${p.performanceHistory.avgGPA.toFixed(2)} avg GPA, ${Math.round(p.relativeStrength * 100)}% relative, trend: ${p.performanceHistory.trend}
     Courses: ${courses}`;
 }).join('\n\n')}
 
-CHALLENGE PATTERNS FROM ANALYSIS:
+CHALLENGE PATTERNS:
 ${challengePatterns.map(c => `- ${c.insight}: ${c.evidence} → ${c.implication}`).join('\n')}
 
 RED FLAGS:
-${redFlags.map(r => `- [${r.severity}] ${r.description} — How to address: ${r.howToAddress}`).join('\n')}
+${redFlags.map(r => `- [${r.severity}] ${r.description}`).join('\n')}
 
 CHALLENGE RESPONSE DATA:
-- Typical impact when stepping up difficulty: ${quant.challengeResponse.transitionAnalysis.typicalImpact.toFixed(2)} GPA points
-- Adaptation speed: ${quant.challengeResponse.transitionAnalysis.adaptationSpeed}
-- Recovery pattern: ${quant.challengeResponse.transitionAnalysis.recoveryPattern}
+- Typical difficulty impact: ${quant.challengeResponse.transitionAnalysis.typicalImpact.toFixed(2)} GPA drop
 - Risk level: ${quant.challengeResponse.challengeRiskProfile.riskLevel}/100
-- Risk factors: ${quant.challengeResponse.challengeRiskProfile.riskFactors.join('; ')}
-- Protective factors: ${quant.challengeResponse.challengeRiskProfile.protectiveFactors.join('; ')}
 
-PERFORMANCE ENVELOPE:
-- Floor: ${quant.performanceEnvelope.floor.gpa.toFixed(2)} (${quant.performanceEnvelope.floor.conditions})
-- How to avoid floor: ${quant.performanceEnvelope.floor.howToAvoid}
+TRAJECTORY: ${quant.progressionTrajectory.historical.overallTrend}
+GPA TREND: ${quant.progressionTrajectory.historical.gpaByYear.map(y => `${y.year}: ${y.gpa.toFixed(2)} (rigor: ${y.rigorLevel.toFixed(1)})`).join(' → ')}
 
-INTENDED MAJOR: ${ctx.input.intendedMajor || 'Undecided'}
-GRADE: ${ctx.input.currentGrade}
+RIGOR CONTEXT:
+- Sweet spot: ${quant.performanceFingerprint.sweetSpot.level}
+- Difficulty sensitivity: ${quant.performanceFingerprint.difficultySensitivity}
+- Consistency: ${quant.performanceFingerprint.consistencyScore}%
+
+ROADMAP CONTEXT (briefly connect challenges to these actions):
+${courseRecs.map(r => `- ${formatSubject(r.subject)}: ${r.recommendedLevel}${r.specificCourse ? ` (${r.specificCourse})` : ''} — ${r.rationale}`).join('\n')}
+
+COLLEGE EXPECTATIONS:
+${research.collegeExpectations ? `Tier: ${research.collegeExpectations.tier}, GPA range: ${research.collegeExpectations.gpaRange}, AP range: ${research.collegeExpectations.apCourseRange}` : 'Not specified'}
 
 VERIFIED STATISTICS (cite these, don't invent):
 ${relevantStats.map(s => `- ${s.claim}: ${s.value} (${s.citation})`).join('\n')}`;
@@ -530,84 +592,10 @@ ${relevantStats.map(s => `- ${s.claim}: ${s.value} (${s.citation})`).join('\n')}
       userPrompt,
       maxTokens: MAX_TOKENS_PER_SECTION,
       temperature: 0.3,
-      // useJsonMode off: parseClaudeJSON handles robust JSON extraction
     });
 
     this.trackUsage(response.usage);
-    const parsed = parseClaudeJSON<unknown>(response.content, 'challengeDeepDives');
-    return extractArray<ChallengeDeepDive>(parsed);
-  }
-
-  // ==========================================================================
-  // SECTION 4: ADMISSIONS OFFICER LENS (LLM)
-  // ==========================================================================
-
-  private async generateAOLens(ctx: AssembledReportContext): Promise<AdmissionsOfficerLensSection> {
-    const quant = ctx.quantitativeAnalysis;
-    const overallGPA = calculateOverallGPA(quant);
-    const research = ctx.assembledResearch;
-
-    const systemPrompt = `You are a former admissions officer at a top-20 university writing an honest assessment of a student's transcript. Your job is to show the student things they CANNOT see themselves — the gap between their perception and the admissions reality.
-
-Output valid JSON:
-{
-  "firstGlance": "3-4 sentences: What catches your eye in the first 30 seconds of reading this transcript. Be candid — what's the gut reaction? What questions immediately form?",
-  "blindSpots": [
-    {
-      "studentPerception": "What the student probably thinks about this aspect of their profile.",
-      "aoReality": "What admissions officers actually think when they see it.",
-      "howToFix": "Specific action to align perception with reality."
-    }
-  ],
-  "unintendedNarrative": "2-3 sentences: The accidental story this transcript tells. Course choices, grade patterns, and rigor levels combine to tell a story the student may not intend. What story is their transcript accidentally telling?",
-  "narrativeControlStrategy": "2-3 sentences: How to take control of the narrative. What changes in senior year scheduling, essay framing, or additional context would reshape the story?"
-}
-
-Include 2-4 blind spots. Focus on things that genuinely surprise students.`;
-
-    const userPrompt = `Assess this transcript through an admissions officer's eyes:
-
-OVERALL GPA: ${overallGPA.toFixed(2)}
-WEIGHTED ESTIMATE: ~${(overallGPA + 0.3).toFixed(2)}
-SCHOOL TYPE: ${ctx.input.schoolContext.type.replace(/_/g, ' ')}
-
-SUBJECT PERFORMANCE (what you see on the transcript):
-${Object.entries(quant.subjectPatterns)
-  .map(([subj, p]) => {
-    const courses = p.performanceHistory.courses
-      .map(c => `${c.name}: ${c.grade >= 3.7 ? 'A-/A' : c.grade >= 3.3 ? 'B+' : c.grade >= 3.0 ? 'B' : 'B-/C+'}`)
-      .join(', ');
-    return `${formatSubject(subj)}: ${courses}`;
-  }).join('\n')}
-
-TRAJECTORY: ${quant.progressionTrajectory.historical.overallTrend}
-GPA TREND: ${quant.progressionTrajectory.historical.gpaByYear.map(y => `${y.year}: ${y.gpa.toFixed(2)} (rigor: ${y.rigorLevel.toFixed(1)})`).join(' → ')}
-
-INTENDED MAJOR: ${ctx.input.intendedMajor || 'Undecided'}
-GRADE: ${ctx.input.currentGrade}
-
-RIGOR CONTEXT:
-- Sweet spot: ${quant.performanceFingerprint.sweetSpot.level}
-- Difficulty sensitivity: ${quant.performanceFingerprint.difficultySensitivity}
-- Consistency: ${quant.performanceFingerprint.consistencyScore}%
-
-COLLEGE EXPECTATIONS:
-${research.collegeExpectations ? `Tier: ${research.collegeExpectations.tier}, GPA range: ${research.collegeExpectations.gpaRange}, AP range: ${research.collegeExpectations.apCourseRange}` : 'Not specified'}
-
-STRENGTHS FROM ANALYSIS: ${quant.synthesis.strengths.map(s => s.insight).join('; ')}
-CHALLENGES FROM ANALYSIS: ${quant.synthesis.challenges.map(s => s.insight).join('; ')}`;
-
-    const response = await callClaude<string>({
-      model: MODEL,
-      systemPrompt,
-      userPrompt,
-      maxTokens: MAX_TOKENS_PER_SECTION,
-      temperature: 0.3,
-      // useJsonMode off: parseClaudeJSON handles robust JSON extraction
-    });
-
-    this.trackUsage(response.usage);
-    return parseClaudeJSON<AdmissionsOfficerLensSection>(response.content, 'aoLens');
+    return parseClaudeJSON<ChallengesAndRealitySection>(response.content, 'challengesAndReality');
   }
 
   // ==========================================================================
@@ -620,6 +608,10 @@ CHALLENGES FROM ANALYSIS: ${quant.synthesis.challenges.map(s => s.insight).join(
     const research = ctx.assembledResearch;
 
     const systemPrompt = `You are an expert academic advisor writing a strategic roadmap for a student's remaining high school career. Prioritize ruthlessly — give them the 3 most impactful actions, not a laundry list.
+
+CRITICAL: Only reference courses the student has ACTUALLY taken (listed in the COMPLETE COURSE LIST below). Do NOT claim they are missing a course they already have. Do NOT say "You're taking X now" unless that course actually appears in the list. Read the course list carefully before writing.
+
+SCOPE: This is the ACTION section — specific courses, priorities, and strategy. Other sections already cover identity, challenges, and AO perceptions. Don't repeat those analyses — focus on WHAT TO DO.
 
 Output valid JSON:
 {
@@ -661,7 +653,19 @@ Include exactly 3 priorities, 3-5 recommended courses, and 1-2 courses to avoid.
     const opportunities = planning.opportunities || [];
     const workload = planning.workloadAdvice;
 
+    // Build complete course list for grounding
+    const allCoursesList = Object.entries(quant.subjectPatterns)
+      .map(([subj, p]) => {
+        const courses = p.performanceHistory.courses
+          .map(c => `${c.name} (${c.level}): ${c.grade.toFixed(2)}`)
+          .join(', ');
+        return `${formatSubject(subj)}: ${courses}`;
+      }).join('\n');
+
     const userPrompt = `Create a strategic roadmap for this student:
+
+COMPLETE COURSE LIST (courses they have ACTUALLY taken — do NOT claim they are missing any of these, and do NOT say they are "currently taking" a course unless it appears here):
+${allCoursesList}
 
 CURRENT TRAJECTORY: ${planning.trajectoryAssessment?.pattern || 'unknown'}
 AO INTERPRETATION: ${planning.trajectoryAssessment?.aoInterpretation || 'N/A'}
@@ -775,16 +779,50 @@ ${research.verifiedStatistics.slice(0, 6).map(s => `- ${s.claim}: ${s.value} (${
     const synthesis = quant.synthesis;
     const planning = ctx.planningAdvice;
 
-    // Section 1: Academic Identity from templates
+    // Section 1: Academic Identity with notable strengths, weaknesses, and tier position
+    const strengthSubjects = Object.entries(quant.subjectPatterns)
+      .filter(([_, p]) => p.relativeStrength > 0.05)
+      .sort((a, b) => b[1].relativeStrength - a[1].relativeStrength)
+      .slice(0, 3);
+
+    const weaknessSubjects = Object.entries(quant.subjectPatterns)
+      .filter(([_, p]) => p.relativeStrength < -0.05)
+      .sort((a, b) => a[1].relativeStrength - b[1].relativeStrength)
+      .slice(0, 2);
+
+    // Determine Uplift grade from GPA + rigor heuristic
+    const rigorBonus = quant.performanceFingerprint.sweetSpot.level === 'ap_ib' ? 0.15 : 0;
+    const trendBonus = quant.progressionTrajectory.historical.overallTrend === 'improving' ? 0.05 : quant.progressionTrajectory.historical.overallTrend === 'declining' ? -0.1 : 0;
+    const adjustedScore = overallGPA + rigorBonus + trendBonus;
+    const fallbackGrade: UpliftGrade = adjustedScore >= 3.9 ? 'A' : adjustedScore >= 3.75 ? 'A-' : adjustedScore >= 3.6 ? 'B+' : adjustedScore >= 3.4 ? 'B' : adjustedScore >= 3.2 ? 'B-' : adjustedScore >= 3.0 ? 'C+' : 'C';
+    const gradeDescriptor = UPLIFT_SCALE_DATABASE.find(d => d.grade === fallbackGrade);
+
+    // Calculate tier position
+    const tierPosition = calculateTierPosition(quant);
+
     const academicIdentity: AcademicIdentitySection = {
       narrativeIdentity: `${synthesis.profileSummary}\n\n${synthesis.coreInsight} ${synthesis.uniquePattern}`,
-      harvardScaleRating: {
-        rating: overallGPA >= 3.85 ? 2 : overallGPA >= 3.6 ? 3 : overallGPA >= 3.3 ? 4 : 5,
-        label: overallGPA >= 3.85 ? 'Magna Potential' : overallGPA >= 3.6 ? 'Cum Laude Potential' : overallGPA >= 3.3 ? 'Strong Academic' : 'Adequate Preparation',
-        explanation: `Your ${overallGPA.toFixed(2)} GPA with ${quant.performanceFingerprint.difficultySensitivity} difficulty sensitivity places you in this range.`,
-        biggestLever: planning.trajectoryAssessment?.recommendation || 'Increase course rigor in your strongest subjects.',
+      notableStrengths: strengthSubjects.map(([subj, p]) => ({
+        subject: formatSubject(subj),
+        insight: `Your ${p.performanceHistory.avgGPA.toFixed(2)} average with +${Math.round(p.relativeStrength * 100)}% relative strength signals genuine aptitude beyond what most students demonstrate at this level.`,
+        majorRelevance: ctx.input.intendedMajor
+          ? `This connects directly to your interest in ${ctx.input.intendedMajor}.`
+          : 'This strength opens doors across multiple fields.',
+      })),
+      notableWeaknesses: weaknessSubjects.map(([subj, p]) => ({
+        area: formatSubject(subj),
+        gap: `Your ${p.performanceHistory.avgGPA.toFixed(2)} average is ${Math.abs(Math.round(p.relativeStrength * 100))}% below your overall performance, indicating this is a relative challenge area.`,
+        consequence: ctx.input.intendedMajor
+          ? `If ${formatSubject(subj).toLowerCase()} is relevant to ${ctx.input.intendedMajor}, this gap could weaken your application.`
+          : 'Admissions officers may notice this relative weakness in your transcript.',
+      })),
+      tierPosition,
+      upliftRating: {
+        grade: fallbackGrade,
+        explanation: gradeDescriptor
+          ? `${gradeDescriptor.description} ${gradeDescriptor.schoolFit}`
+          : `Your ${overallGPA.toFixed(2)} GPA with ${quant.performanceFingerprint.difficultySensitivity} difficulty sensitivity places you in this range.`,
       },
-      aoFirstImpression: `A ${overallGPA.toFixed(2)} GPA student with a ${quant.progressionTrajectory.historical.overallTrend} trajectory and ${quant.performanceFingerprint.consistencyScore}% consistency.`,
       trajectoryMeaning: `Your ${quant.progressionTrajectory.historical.overallTrend} trajectory ${
         quant.progressionTrajectory.historical.overallTrend === 'improving' || quant.progressionTrajectory.historical.overallTrend === 'accelerating'
           ? 'is a positive signal that admissions officers value highly.'
@@ -795,61 +833,24 @@ ${research.verifiedStatistics.slice(0, 6).map(s => `- ${s.claim}: ${s.value} (${
       definingPattern: synthesis.uniquePattern,
     };
 
-    // Section 2: Strength Deep Dives from ProfileInsights
-    const strengthDeepDives: StrengthDeepDive[] = synthesis.strengths.map(s => ({
-      title: s.insight,
-      hook: s.evidence,
-      whyItMatters: {
-        forAdmissionsOfficers: s.implication,
-        forYourMajor: ctx.input.intendedMajor ? `This connects to your interest in ${ctx.input.intendedMajor}.` : 'This strength opens doors across multiple fields.',
-        forYourNarrative: 'This pattern can become a central thread in your application narrative.',
-      },
-      blindSpotInsight: ctx.profileInsights.find(pi =>
-        pi.observation.toLowerCase().includes(s.insight.toLowerCase().split(' ')[0])
-      )?.interpretation || 'An admissions consultant would note this as a distinguishing factor.',
-      actionableGuidance: {
-        leverageStrategy: s.implication,
-        courseRecommendation: 'Continue at AP level in this area to validate this strength with coursework evidence.',
-        narrativeAngle: 'Feature this strength in your application essays and activity descriptions.',
-      },
-      researchBacking: [],
-    }));
-
-    // Section 3: Challenge Deep Dives from ProfileInsights
-    const challengeDeepDives: ChallengeDeepDive[] = synthesis.challenges.map(c => ({
-      title: c.insight,
-      hook: `This is less of a weakness and more of an opportunity — here's why.`,
-      whyItMatters: {
-        whatAOsSee: c.evidence,
-        whatItActuallyMeans: c.implication,
-        consequenceOfIgnoring: 'If unaddressed, this pattern may raise questions in your application.',
-      },
-      teaching: {
-        rootCauseDiagnosis: ctx.profileInsights.find(pi =>
-          pi.observation.toLowerCase().includes(c.insight.toLowerCase().split(' ')[0])
-        )?.interpretation || 'This likely stems from a mismatch between course demands and your preparation.',
-        stepByStepFix: [c.implication],
-        timeframe: 'This can be addressed over the next semester with focused effort.',
-        beforeAfterExample: `Current: ${c.evidence}. After: With targeted action, this could become a non-issue.`,
-      },
-      researchBacking: [],
-    }));
-
-    // Section 4: AO Lens from templates
-    const admissionsOfficerLens: AdmissionsOfficerLensSection = {
-      firstGlance: `An admissions officer would first notice your ${overallGPA.toFixed(2)} GPA and ${quant.progressionTrajectory.historical.overallTrend} trajectory. Your course rigor and subject balance would be evaluated next.`,
-      blindSpots: [{
-        studentPerception: 'My grades tell the full story of my academic ability.',
-        aoReality: 'Grades are context-dependent. AOs evaluate rigor, trajectory, and school context alongside raw GPA.',
-        howToFix: 'Ensure your course selection demonstrates appropriate challenge in your areas of strength.',
-      }],
+    // Section 2: Challenges & Admissions Reality (merged)
+    const challengesAndReality: ChallengesAndRealitySection = {
+      firstGlance: `An admissions officer would first notice your ${overallGPA.toFixed(2)} GPA (${tierPosition.currentTier} range) and ${quant.progressionTrajectory.historical.overallTrend} trajectory.`,
+      challenges: synthesis.challenges.slice(0, 3).map(c => ({
+        title: c.insight,
+        issue: c.evidence,
+        aoImpact: c.implication,
+        tierImpact: `This affects your positioning within the ${tierPosition.currentTier} range.`,
+        roadmapConnection: 'See the Strategic Roadmap for specific course recommendations.',
+        researchBacking: [],
+      })),
       unintendedNarrative: `Your current course selections and grade patterns tell a story of ${
         quant.progressionTrajectory.historical.overallTrend === 'improving' ? 'growth and increasing engagement' : 'steady performance'
-      }. Make sure this aligns with the narrative you want to present.`,
-      narrativeControlStrategy: 'Take control of your academic narrative by aligning senior year course choices with your intended major and addressing any identified gaps.',
+      }.`,
+      narrativeControlStrategy: 'Align senior year course choices with your intended major and address identified gaps to reshape this narrative.',
     };
 
-    // Section 5: Strategic Roadmap from planning advice
+    // Section 3: Strategic Roadmap from planning advice
     const strategicRoadmap: StrategicRoadmapSection = {
       priorities: [
         {
@@ -894,9 +895,7 @@ ${research.verifiedStatistics.slice(0, 6).map(s => `- ${s.claim}: ${s.value} (${
 
     return {
       academicIdentity,
-      strengthDeepDives,
-      challengeDeepDives,
-      admissionsOfficerLens,
+      challengesAndReality,
       strategicRoadmap,
     };
   }
