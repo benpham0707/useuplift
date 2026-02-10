@@ -326,3 +326,36 @@ export type {
   SynthesizedInsight,
   AdjustedSubjectStrength,
 } from './conversational';
+
+// ============================================================================
+// DEEP ACADEMIC REPORT (Teaching-depth analysis)
+// ============================================================================
+
+export {
+  DeepAcademicReportService,
+  deepAcademicReportService,
+  generateDeepAcademicReport,
+} from './deepAcademicReportService';
+
+export type {
+  // Input/Output
+  DeepAcademicReportInput,
+  DeepAcademicReport,
+
+  // Sections
+  AcademicIdentitySection,
+  StrengthDeepDive,
+  ChallengeDeepDive,
+  AdmissionsOfficerLensSection,
+  StrategicRoadmapSection,
+  ResearchContextSection,
+
+  // Supporting types
+  BlindSpot,
+  StrategicPriority,
+  CourseStrategyItem,
+  CourseAvoidItem,
+  ResearchCitation,
+  ReportMetadata,
+  AssembledReportContext,
+} from './deepAcademicReportTypes';

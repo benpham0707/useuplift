@@ -377,11 +377,11 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     const sessionId = uuidv4();
     const startTime = Date.now();
 
-    console.log(`\n[ActivityWorkshop v4.2] ══════════════════════════════════════`);
-    console.log(`[ActivityWorkshop v4.2] Starting PARALLEL PIPELINE`);
-    console.log(`[ActivityWorkshop v4.2] Session: ${sessionId}`);
-    console.log(`[ActivityWorkshop v4.2] Activities: ${input.activities.length}`);
-    console.log(`[ActivityWorkshop v4.2] ══════════════════════════════════════\n`);
+    console.log(`\n[ActivityWorkshop v4.3] ══════════════════════════════════════`);
+    console.log(`[ActivityWorkshop v4.3] Starting PARALLEL PIPELINE`);
+    console.log(`[ActivityWorkshop v4.3] Session: ${sessionId}`);
+    console.log(`[ActivityWorkshop v4.3] Activities: ${input.activities.length}`);
+    console.log(`[ActivityWorkshop v4.3] ══════════════════════════════════════\n`);
 
     // Validate input
     const validation = validateInput(input);
@@ -389,7 +389,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       throw new Error(`Invalid input: ${validation.errors.join(', ')}`);
     }
     if (validation.warnings.length > 0) {
-      console.log(`[ActivityWorkshop v4.2] Warnings: ${validation.warnings.join(', ')}`);
+      console.log(`[ActivityWorkshop v4.3] Warnings: ${validation.warnings.join(', ')}`);
     }
 
     // ========================================================================
@@ -420,7 +420,11 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 1] Complete in ${Date.now() - stage1StartTime}ms`);
     console.log(`[Stage 1] Tier Distribution: T1=${analysisContext.tierDistribution.tier1}, T2=${analysisContext.tierDistribution.tier2}, T3=${analysisContext.tierDistribution.tier3}, T4=${analysisContext.tierDistribution.tier4}`);
     console.log(`[Stage 1] Teaching Candidates: ${analysisContext.teachingCandidates.deepTeachingIds.length} deep, ${analysisContext.teachingCandidates.mediumTeachingIds.length} medium`);
-    console.log(`[Stage 1] Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}\n`);
+    console.log(`[Stage 1] Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}`);
+    if (analysisContext.scoring?.scoringComplete) {
+      console.log(`[Stage 1] Scoring: Portfolio ${analysisContext.scoring.portfolioRubric.overallScore.total}/10, Harvard ${analysisContext.scoring.portfolioRubric.harvardScale.rating}/6`);
+    }
+    console.log('');
 
     // ========================================================================
     // STAGE 2: PARALLEL INDIVIDUAL TEACHING (Sonnet)
@@ -492,16 +496,25 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     const narrativeCost = finalNarrative?.metadata.cost || 0;
     const totalCost = synthesisContext.pipelineCost.total + narrativeCost;
 
-    console.log(`\n[ActivityWorkshop v4.2] ══════════════════════════════════════`);
-    console.log(`[ActivityWorkshop v4.2] PIPELINE COMPLETE`);
-    console.log(`[ActivityWorkshop v4.2] Total time: ${totalTime}ms`);
-    console.log(`[ActivityWorkshop v4.2] Total cost: $${totalCost.toFixed(4)}`);
-    console.log(`[ActivityWorkshop v4.2] ──────────────────────────────────────`);
-    console.log(`[ActivityWorkshop v4.2] NARRATIVE SUMMARY:`);
-    console.log(`[ActivityWorkshop v4.2]   Story: ${finalNarrative?.story.pitch.substring(0, 80) || 'N/A'}...`);
-    console.log(`[ActivityWorkshop v4.2]   Coherence: ${finalNarrative?.coherence.assessment || 'N/A'} (${finalNarrative?.coherence.score || 'N/A'}/100)`);
-    console.log(`[ActivityWorkshop v4.2]   Spike: ${finalNarrative?.spike.primarySpike.area || 'Developing'}`);
-    console.log(`[ActivityWorkshop v4.2] ══════════════════════════════════════\n`);
+    console.log(`\n[ActivityWorkshop v4.3] ══════════════════════════════════════`);
+    console.log(`[ActivityWorkshop v4.3] PIPELINE COMPLETE`);
+    console.log(`[ActivityWorkshop v4.3] Total time: ${totalTime}ms`);
+    console.log(`[ActivityWorkshop v4.3] Total cost: $${totalCost.toFixed(4)}`);
+    console.log(`[ActivityWorkshop v4.3] ──────────────────────────────────────`);
+    console.log(`[ActivityWorkshop v4.3] NARRATIVE SUMMARY:`);
+    console.log(`[ActivityWorkshop v4.3]   Story: ${finalNarrative?.story.pitch.substring(0, 80) || 'N/A'}...`);
+    console.log(`[ActivityWorkshop v4.3]   Coherence: ${finalNarrative?.coherence.assessment || 'N/A'} (${finalNarrative?.coherence.score || 'N/A'}/100)`);
+    console.log(`[ActivityWorkshop v4.3]   Spike: ${finalNarrative?.spike.primarySpike.area || 'Developing'}`);
+    if (analysisContext.scoring?.scoringComplete) {
+      console.log(`[ActivityWorkshop v4.3] ──────────────────────────────────────`);
+      console.log(`[ActivityWorkshop v4.3] SCORING:`);
+      console.log(`[ActivityWorkshop v4.3]   Portfolio: ${analysisContext.scoring.portfolioRubric.overallScore.total}/10`);
+      console.log(`[ActivityWorkshop v4.3]   Harvard: ${analysisContext.scoring.portfolioRubric.harvardScale.rating}/6`);
+      if (teachingContext.scoringTeaching) {
+        console.log(`[ActivityWorkshop v4.3]   Transformations: ${teachingContext.scoringTeaching.activityTransformations.length}`);
+      }
+    }
+    console.log(`[ActivityWorkshop v4.3] ══════════════════════════════════════\n`);
 
     // Convert to legacy formats for backward compatibility
     const legacyAnalysis = convertToLegacyAnalysis(analysisContext);
@@ -509,11 +522,18 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
 
     return {
       sessionId,
-      version: '4.2.0',
+      version: '4.3.0',
       completedAt: new Date().toISOString(),
 
-      // Single narrative pass (v4.2)
+      // Single narrative pass
       finalNarrative,
+
+      // Scoring data (v4.3 — deep activity analysis)
+      scoring: analysisContext.scoring?.scoringComplete ? {
+        portfolioRubric: analysisContext.scoring.portfolioRubric,
+        activityScores: analysisContext.scoring.portfolioRubric.activityScores,
+        scoringTeaching: teachingContext.scoringTeaching?.fullOutput,
+      } : undefined,
 
       // Stage outputs
       stage0: storyContext,

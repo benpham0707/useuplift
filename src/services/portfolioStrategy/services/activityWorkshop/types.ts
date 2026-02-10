@@ -34,6 +34,13 @@ import { MajorCategory, SpikeType, ImpactTier } from '../../knowledge';
 
 // Import scoring types
 import type { PortfolioScoreRubric, ActivityScoreRubric } from './scoring/types';
+import type {
+  TeachingLayerOutput,
+  ActivityTransformation,
+  ConnectionStrategy,
+  StrategicPriority,
+  CraftTeaching,
+} from './scoring/teachingLayerTypes';
 
 // ============================================================================
 // CITATION TYPES
@@ -932,6 +939,20 @@ export interface TeachingContext {
     psychologyReferencesCount?: number;
   };
 
+  // === SCORING-BASED TEACHING (deep transformations from scoring layer) ===
+  scoringTeaching?: {
+    /** Activity-level transformation guidance with concrete rewrites */
+    activityTransformations: ActivityTransformation[];
+    /** Cross-activity connection strategies */
+    connectionStrategies: ConnectionStrategy[];
+    /** Strategic priorities for portfolio improvement */
+    strategicPriorities: StrategicPriority[];
+    /** Description craft teaching (writing principles with examples) */
+    craftTeaching?: CraftTeaching[];
+    /** Full teaching layer output (for metadata/timing) */
+    fullOutput?: TeachingLayerOutput;
+  };
+
   // === STAGE METADATA ===
   teachingMetadata: {
     generatedAt: string;
@@ -1221,12 +1242,23 @@ export interface NarrativeProgression {
  */
 export interface ActivityWorkshopPipelineResult {
   sessionId: string;
-  version: '4.2.0';
+  version: '4.3.0';
   completedAt: string;
 
   // === NARRATIVE (single pass at end of pipeline) ===
   /** Final narrative understanding (the only narrative analysis) */
   finalNarrative?: PortfolioNarrative;
+
+  // === SCORING DATA (v4.3 — deep activity analysis) ===
+  /** Comprehensive scoring rubric with per-activity deep dives */
+  scoring?: {
+    /** Full portfolio scoring rubric (overall score, Harvard scale, breakdowns) */
+    portfolioRubric: PortfolioScoreRubric;
+    /** Individual activity scores with combined scores and rationales */
+    activityScores: ActivityScoreRubric[];
+    /** Deep teaching layer with transformations, rewrites, citations */
+    scoringTeaching?: TeachingLayerOutput;
+  };
 
   // All stage outputs
   stage0: StoryContext;

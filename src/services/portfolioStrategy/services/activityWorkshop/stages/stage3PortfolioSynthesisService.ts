@@ -167,6 +167,25 @@ Competitive Level: ${analysisContext.competitiveAssessment.overallStrength}
 Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}
 `;
 
+    // Scoring data (v4.3) — gives Haiku real scores for better synthesis
+    let scoringSummary = '';
+    if (analysisContext.scoring?.scoringComplete) {
+      const rubric = analysisContext.scoring.portfolioRubric;
+      const activityScoreLines = rubric.activityScores.map(s =>
+        `- ${s.activityTitle}: ${s.combinedScore.total.toFixed(1)}/10 (Activity: ${s.activityScore.total.toFixed(1)}, Description: ${s.descriptionScore.total.toFixed(1)})`
+      ).join('\n');
+      scoringSummary = `
+## SCORING DATA (1-10 Scale):
+Portfolio Score: ${rubric.overallScore.total.toFixed(1)}/10
+Harvard Scale: ${rubric.harvardScale.rating}/6 — ${rubric.harvardScale.description}
+Key Strengths: ${rubric.keyStrengths.slice(0, 3).join('; ')}
+Key Gaps: ${rubric.keyGaps.slice(0, 3).join('; ')}
+
+Per-Activity Scores:
+${activityScoreLines}
+`;
+    }
+
     // Summarize teaching delivered
     const teachingSummary = `
 ## TEACHING DELIVERED:
@@ -176,15 +195,21 @@ Quick Encouragement: ${teachingContext.quickEncouragements.length} activities
 Skipped: ${teachingContext.skippedActivities.length} activities
 `;
 
-    // List activities with optimized descriptions
+    // List activities with optimized descriptions and scores
     const activitiesList = input.activities.map(a => {
       const analysis = analysisContext.activities[a.id];
       const teaching = teachingContext.teachingDelivered.find(t => t.activityId === a.id);
       const optimizedDesc = teaching?.teaching.descriptionOptimization.optimizedDescription || a.description;
+      const activityScore = analysisContext.scoring?.activityScoresById[a.id];
+
+      const scoreLine = activityScore
+        ? `- Score: ${activityScore.combinedScore.total.toFixed(1)}/10 (Activity: ${activityScore.activityScore.total.toFixed(1)}, Description: ${activityScore.descriptionScore.total.toFixed(1)})`
+        : '';
 
       return `
 ${a.id}: ${a.title}
 - Tier: ${analysis?.classification?.tier || 4}
+${scoreLine}
 - Original (${a.description.length} chars): "${a.description.substring(0, 100)}..."
 - Optimized (${optimizedDesc.length} chars): "${optimizedDesc.substring(0, 100)}..."
 `;
@@ -199,6 +224,7 @@ ${a.id}: ${a.title}
 
 ${storySummary}
 ${analysisSummary}
+${scoringSummary}
 ${teachingSummary}
 ${schoolsSection}
 

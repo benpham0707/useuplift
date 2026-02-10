@@ -382,12 +382,159 @@ async function runTest() {
     }
 
     // ──────────────────────────────────────────
+    // SCORING DEEP DIVE (v4.3)
+    // ──────────────────────────────────────────
+    if (result.scoring) {
+      divider('SCORING RUBRIC (1-10 Scale)');
+      const rubric = result.scoring.portfolioRubric;
+      log(`Portfolio Score: ${rubric.overallScore.total}/10 (confidence: ${rubric.overallScore.confidence})`);
+      log(`Harvard Scale: ${rubric.harvardScale.rating}/6 — ${rubric.harvardScale.description}`);
+      log(`Harvard Rationale: ${rubric.harvardScale.rationale}`);
+      log('');
+      log('Portfolio Breakdown:');
+      log(`  Tier Distribution:     ${rubric.breakdown.tierDistribution.score}/10 — ${rubric.breakdown.tierDistribution.rationale}`);
+      log(`  Spike Detection:       ${rubric.breakdown.spikeDetection.score}/10 — ${rubric.breakdown.spikeDetection.rationale}`);
+      log(`  Coherence:             ${rubric.breakdown.coherence.score}/10 — ${rubric.breakdown.coherence.rationale}`);
+      log(`  Major Alignment:       ${rubric.breakdown.majorAlignment.score}/10 — ${rubric.breakdown.majorAlignment.rationale}`);
+      log(`  Presentation Quality:  ${rubric.breakdown.presentationQuality.score}/10 — ${rubric.breakdown.presentationQuality.rationale}`);
+      log('');
+      log('Key Strengths:');
+      for (const s of rubric.keyStrengths) log(`  + ${s}`);
+      log('Key Gaps:');
+      for (const g of rubric.keyGaps) log(`  - ${g}`);
+      log('');
+      log('Prioritized Recommendations:');
+      for (const r of rubric.prioritizedRecommendations) {
+        log(`  [P${r.priority}] ${r.recommendation} (impact: ${r.impact}, effort: ${r.effort})`);
+      }
+      log('');
+
+      // Per-activity scoring deep dives
+      for (const actScore of result.scoring.activityScores) {
+        divider();
+        log(`ACTIVITY SCORE: ${actScore.activityTitle}`);
+        log(`  Combined: ${actScore.combinedScore.total.toFixed(1)}/10 — ${actScore.combinedScore.rationale}`);
+        log(`  Formula: ${actScore.combinedScore.formula}`);
+        log('');
+        log(`  DESCRIPTION SCORE: ${actScore.descriptionScore.total.toFixed(1)}/10`);
+        log(`    ${actScore.descriptionScore.overallRationale}`);
+        const db = actScore.descriptionScore.breakdown;
+        log(`    Role Ownership:      ${db.specificity.score}/${db.specificity.maxScore} — ${db.specificity.rationale}`);
+        log(`    Evidence of Impact:   ${db.impactClarity.score}/${db.impactClarity.maxScore} — ${db.impactClarity.rationale}`);
+        log(`    Action Precision:     ${db.actionLanguage.score}/${db.actionLanguage.maxScore} — ${db.actionLanguage.rationale}`);
+        log(`    Quantification:       ${db.quantification.score}/${db.quantification.maxScore} — ${db.quantification.rationale}`);
+        log(`    Differentiation:      ${db.authenticityVoice.score}/${db.authenticityVoice.maxScore} — ${db.authenticityVoice.rationale}`);
+        log(`    Strengths: ${actScore.descriptionScore.strengths.join('; ')}`);
+        log(`    Improvements: ${actScore.descriptionScore.improvements.join('; ')}`);
+        if (actScore.descriptionScore.suggestedRewrite) {
+          log(`    Suggested Rewrite: "${actScore.descriptionScore.suggestedRewrite}"`);
+        }
+        log('');
+        log(`  ACTIVITY SCORE: ${actScore.activityScore.total.toFixed(1)}/10`);
+        log(`    ${actScore.activityScore.overallRationale}`);
+        const ab = actScore.activityScore.breakdown;
+        log(`    Tier Assessment:     ${ab.tierAssessment.score}/10 (w=${(ab.tierAssessment.weight * 100).toFixed(0)}%) T${ab.tierAssessment.tier} — ${ab.tierAssessment.rationale}`);
+        log(`    Recognition:         ${ab.recognitionLevel.score}/10 (w=${(ab.recognitionLevel.weight * 100).toFixed(0)}%) [${ab.recognitionLevel.level}] — ${ab.recognitionLevel.rationale}`);
+        log(`    Leadership/Impact:   ${ab.leadershipImpact.score}/10 (w=${(ab.leadershipImpact.weight * 100).toFixed(0)}%) [${ab.leadershipImpact.role}/${ab.leadershipImpact.impactScope}] — ${ab.leadershipImpact.rationale}`);
+        log(`    Community/Character: ${ab.communityCharacter.score}/10 (w=${(ab.communityCharacter.weight * 100).toFixed(0)}%) [${ab.communityCharacter.primaryTrait}/${ab.communityCharacter.authenticitySignal}] — ${ab.communityCharacter.rationale}`);
+        log(`    Commitment:          ${ab.commitmentProgression.score}/10 (w=${(ab.commitmentProgression.weight * 100).toFixed(0)}%) ${ab.commitmentProgression.years}yr ${ab.commitmentProgression.showsProgression ? '↗' : '→'} — ${ab.commitmentProgression.rationale}`);
+        log(`    Tier Justification: ${actScore.activityScore.tierJustification}`);
+        log(`    Benchmarks: Similar to: ${actScore.activityScore.comparisonBenchmarks.similarTo}`);
+        log(`    Improvement Paths: ${actScore.activityScore.improvementPaths.join('; ')}`);
+        log('');
+        log(`  SUMMARY: ${actScore.summary.oneLiner}`);
+        log(`    Top Strength: ${actScore.summary.topStrength}`);
+        log(`    Top Improvement: ${actScore.summary.topImprovement}`);
+        log('');
+      }
+
+      // Scoring teaching transformations
+      if (result.scoring.scoringTeaching) {
+        divider('DESCRIPTION TRANSFORMATIONS (Score-Based)');
+        const st = result.scoring.scoringTeaching;
+        log(`Focus: ${st.teachingFocus.primaryFocus}`);
+        log(`Activities Needing Work: ${st.teachingFocus.activitiesNeedingWork}`);
+        log(`Approach: ${st.teachingFocus.approach}`);
+        log('');
+
+        for (const t of st.activityTransformations) {
+          log(`TRANSFORMATION: ${t.activityName} (current: ${t.currentScore}/10, level: ${t.revisionLevel})`);
+          log(`  Principle: ${t.principle.name}`);
+          log(`    Why: ${t.principle.whyItMatters}`);
+          log(`    Application: ${t.principle.applicationToActivity}`);
+          log('');
+          log(`  BEFORE: "${t.rewrite.original}"`);
+          log(`  AFTER:  "${t.rewrite.suggested}" (${t.rewrite.characterCount} chars)`);
+          log('');
+          log('  Changes Applied:');
+          for (const change of t.rewrite.changesApplied) {
+            log(`    [${change.element}] "${change.original}" → "${change.transformed}"`);
+            log(`      Rationale: ${change.rationale}`);
+          }
+          if (t.alternatives?.length) {
+            log('');
+            log('  Alternative Approaches:');
+            for (const alt of t.alternatives) {
+              log(`    Angle: ${alt.angle}`);
+              log(`    Rewrite: "${alt.rewrite}"`);
+              log(`    When to use: ${alt.whenToUse}`);
+            }
+          }
+          if (t.citations.length > 0) {
+            log('');
+            log('  Research Backing:');
+            for (const c of t.citations) {
+              log(`    [${c.source}] ${c.sourceName}: "${c.insight}"`);
+              log(`      Application: ${c.application}`);
+            }
+          }
+          log(`  Expected Improvement: → ${t.expectedScoreImprovement.projectedScore}/10 (${t.expectedScoreImprovement.improvingComponents.join(', ')})`);
+          log(`    ${t.expectedScoreImprovement.rationale}`);
+          log('');
+        }
+
+        if (st.strategicPriorities.length > 0) {
+          log('Strategic Priorities:');
+          for (const p of st.strategicPriorities) {
+            log(`  [P${p.priority}] ${p.target} (${p.category}): ${p.action}`);
+            log(`    Why: ${p.rationale}`);
+            log(`    Impact: ${p.expectedImpact}`);
+          }
+          log('');
+        }
+
+        if (st.craftTeaching.length > 0) {
+          log('Craft Teaching:');
+          for (const ct of st.craftTeaching) {
+            log(`  ${ct.element}: ${ct.principle}`);
+            log(`    Why: ${ct.whyItMatters}`);
+            for (const ex of ct.examples) {
+              log(`    Example (${ex.context}):`);
+              log(`      Weak: "${ex.weak}"`);
+              log(`      Strong: "${ex.strong}"`);
+              log(`      ${ex.explanation}`);
+            }
+          }
+          log('');
+        }
+      }
+    } else {
+      divider('SCORING');
+      log('Scoring data not available (scoring orchestrator may have failed)');
+      log('');
+    }
+
+    // ──────────────────────────────────────────
     // SUMMARY
     // ──────────────────────────────────────────
     divider('SUMMARY');
     log(`Version: ${result.version}`);
     log(`Duration: ${(duration / 1000).toFixed(1)}s`);
     log(`Cost: $${result.totalCost.toFixed(4)}`);
+    if (result.scoring) {
+      log(`Portfolio Score: ${result.scoring.portfolioRubric.overallScore.total}/10`);
+      log(`Harvard Scale: ${result.scoring.portfolioRubric.harvardScale.rating}/6`);
+    }
     log('');
 
   } catch (error) {

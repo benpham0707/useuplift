@@ -42,6 +42,9 @@ import { buildExpertAnalysisPrompt } from '../expertSystemPrompts';
 // Import expert knowledge assembly
 import { assembleExpertContext } from '../expertCounselorKnowledgeBase';
 
+// Import scoring orchestrator for parallel scoring
+import { scoringOrchestrator, type ScoringOrchestratorResult } from '../scoring';
+
 /**
  * Thresholds for teaching candidate selection
  */
@@ -93,22 +96,29 @@ export class Stage1ContextAwareAnalysisService {
     const profilerResult = await batchActivityAnalysisService.runProfiler(input);
     console.log(`[Stage1] Profiler complete in ${Date.now() - startTime}ms`);
 
-    // Step 1b: Split activities into sub-batches and analyze in parallel
+    // Step 1b-1f: Run sub-batch analysis AND scoring IN PARALLEL
+    // Scoring orchestrator makes 3 batch API calls while sub-batch analysis makes its own calls
     const chunks = chunkActivities(input.activities, this.SUB_BATCH_SIZE);
     console.log(`[Stage1] Analyzing ${input.activities.length} activities in ${chunks.length} parallel sub-batches of ≤${this.SUB_BATCH_SIZE}...`);
+    console.log(`[Stage1] Running scoring orchestrator in parallel...`);
 
-    const subBatchStartTime = Date.now();
-    const subBatchResults = await Promise.all(
-      chunks.map((chunk, i) => {
-        const subInput: ActivityWorkshopSessionInput = {
-          activities: chunk,
-          studentContext: input.studentContext,
-        };
-        console.log(`[Stage1] Sub-batch ${i + 1}/${chunks.length}: ${chunk.map(a => a.id).join(', ')}`);
-        return batchActivityAnalysisService.analyzeSubBatch(subInput, profilerResult);
-      })
-    );
-    console.log(`[Stage1] All sub-batches complete in ${Date.now() - subBatchStartTime}ms`);
+    const parallelStartTime = Date.now();
+    const [subBatchResults, scoringResult] = await Promise.all([
+      // Sub-batch analysis (existing)
+      Promise.all(
+        chunks.map((chunk, i) => {
+          const subInput: ActivityWorkshopSessionInput = {
+            activities: chunk,
+            studentContext: input.studentContext,
+          };
+          console.log(`[Stage1] Sub-batch ${i + 1}/${chunks.length}: ${chunk.map(a => a.id).join(', ')}`);
+          return batchActivityAnalysisService.analyzeSubBatch(subInput, profilerResult);
+        })
+      ),
+      // Scoring orchestrator (NEW — runs in parallel)
+      this.runScoring(input),
+    ]);
+    console.log(`[Stage1] Parallel analysis + scoring complete in ${Date.now() - parallelStartTime}ms`);
 
     // Step 1c: Merge sub-batch results into unified PortfolioAnalysis
     const mergedActivities: Record<string, ActivityAnalysis> = {};
@@ -163,6 +173,12 @@ export class Stage1ContextAwareAnalysisService {
       teachingCandidates,
       teachingPriorities,
       portfolioTeachingNeeds,
+      // Populate scoring if available (v4.3)
+      scoring: scoringResult ? {
+        portfolioRubric: scoringResult.rubric!,
+        activityScoresById: Object.fromEntries(scoringResult.scoresByActivityId || new Map()),
+        scoringComplete: true,
+      } : undefined,
       analysisMetadata: {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
@@ -177,8 +193,40 @@ export class Stage1ContextAwareAnalysisService {
 
     console.log(`[Stage1] Analysis complete in ${Date.now() - startTime}ms`);
     console.log(`[Stage1] Teaching candidates: ${teachingCandidates.deepTeachingIds.length} deep, ${teachingCandidates.mediumTeachingIds.length} medium, ${teachingCandidates.quickEncouragementIds.length} quick`);
+    if (scoringResult?.success) {
+      console.log(`[Stage1] Scoring: Portfolio ${scoringResult.rubric?.overallScore.total}/10, Harvard ${scoringResult.rubric?.harvardScale.rating}/6`);
+    } else {
+      console.log(`[Stage1] Scoring: Not available (non-fatal)`);
+    }
 
     return analysisContext;
+  }
+
+  /**
+   * Run the scoring orchestrator (non-fatal — pipeline continues if this fails)
+   *
+   * Makes 3 batch API calls: descriptions, activities, portfolio
+   * Runs in parallel with sub-batch analysis for zero additional wall-clock time
+   */
+  private async runScoring(input: ActivityWorkshopSessionInput): Promise<ScoringOrchestratorResult | null> {
+    const scoringStart = Date.now();
+    try {
+      console.log(`[Stage1] Scoring orchestrator starting...`);
+      const result = await scoringOrchestrator.scorePortfolio({
+        activities: input.activities,
+        studentContext: {
+          intendedMajor: input.studentContext?.intendedMajor,
+          gradeLevel: input.studentContext?.gradeLevel,
+          targetSchools: input.studentContext?.targetSchools,
+        },
+        teachingOptions: { includeTeaching: false }, // Teaching happens in Stage 2
+      });
+      console.log(`[Stage1] Scoring complete in ${Date.now() - scoringStart}ms (success=${result.success})`);
+      return result.success ? result : null;
+    } catch (error) {
+      console.error(`[Stage1] Scoring failed in ${Date.now() - scoringStart}ms (non-fatal):`, error);
+      return null;
+    }
   }
 
   /**

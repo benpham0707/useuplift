@@ -58,6 +58,12 @@ import {
   ExpertKnowledgeContext,
 } from '../expertCounselorKnowledgeBase';
 
+// Import scoring teaching layer for deep transformation guidance
+import {
+  activityTeachingLayerService,
+} from '../scoring';
+import type { TeachingLayerOutput } from '../scoring/teachingLayerTypes';
+
 /**
  * Teaching depth configuration
  */
@@ -262,7 +268,48 @@ export class Stage2ConditionalTeachingService {
       analysisContext
     );
 
-    // Step 6: Calculate quality metrics
+    // Step 6: Run scoring teaching layer (deep transformations with rewrites + citations)
+    let scoringTeaching: TeachingContext['scoringTeaching'] | undefined;
+    if (analysisContext.scoring?.scoringComplete) {
+      console.log(`[Stage2] Running scoring teaching layer for deep transformations...`);
+      const scoringTeachingStart = Date.now();
+      try {
+        const teachingResult = await activityTeachingLayerService.generateTeaching({
+          scoringRubric: analysisContext.scoring.portfolioRubric,
+          activities: input.activities,
+          studentContext: {
+            intendedMajor: input.studentContext?.intendedMajor,
+            targetSchools: input.studentContext?.targetSchools,
+            currentGrade: input.studentContext?.gradeLevel,
+          },
+          options: {
+            maxTransformations: Math.min(input.activities.length, 5),
+            includeAlternatives: true,
+            includeCraftTeaching: true,
+          },
+        });
+
+        if (teachingResult.success && teachingResult.teaching) {
+          scoringTeaching = {
+            activityTransformations: teachingResult.teaching.activityTransformations,
+            connectionStrategies: teachingResult.teaching.connectionStrategies,
+            strategicPriorities: teachingResult.teaching.strategicPriorities,
+            craftTeaching: teachingResult.teaching.craftTeaching,
+            fullOutput: teachingResult.teaching,
+          };
+          console.log(`[Stage2] Scoring teaching complete in ${Date.now() - scoringTeachingStart}ms`);
+          console.log(`[Stage2] Transformations: ${scoringTeaching.activityTransformations.length}, Priorities: ${scoringTeaching.strategicPriorities.length}`);
+        } else {
+          console.log(`[Stage2] Scoring teaching returned no results (success=${teachingResult.success})`);
+        }
+      } catch (error) {
+        console.error(`[Stage2] Scoring teaching failed in ${Date.now() - scoringTeachingStart}ms (non-fatal):`, error);
+      }
+    } else {
+      console.log(`[Stage2] Scoring data not available, skipping scoring teaching layer`);
+    }
+
+    // Step 7: Calculate quality metrics
     const qualityMetrics = this.calculateQualityMetrics(teachingDelivered, quickEncouragements);
 
     const result: TeachingContext = {
@@ -270,6 +317,7 @@ export class Stage2ConditionalTeachingService {
       quickEncouragements,
       skippedActivities,
       portfolioTeaching,
+      scoringTeaching,
       qualityMetrics,
       teachingMetadata: {
         generatedAt: new Date().toISOString(),
@@ -283,6 +331,9 @@ export class Stage2ConditionalTeachingService {
 
     console.log(`[Stage2] Teaching complete in ${Date.now() - startTime}ms`);
     console.log(`[Stage2] Delivered: ${teachingDelivered.length} teachings, ${quickEncouragements.length} encouragements`);
+    if (scoringTeaching) {
+      console.log(`[Stage2] Scoring teaching: ${scoringTeaching.activityTransformations.length} transformations, ${scoringTeaching.craftTeaching?.length || 0} craft elements`);
+    }
 
     return result;
   }

@@ -172,55 +172,47 @@ The LLM has no way to distinguish reliable from unreliable input, so it treats a
 
 ### What we tell the LLM to do and be
 
-### 4A. EXPERT IMPERSONATION [CRITICAL]
+### 4A. EXPERT PERSONA FRAMING [OK — KEEP]
 
 **File**: `expertSystemPrompts.ts:34`
 
-```
-"You are a world-class college admissions expert with 20 years of
-experience reading applications at the most selective schools...
-You have personally reviewed 50,000+ applications and have sat on
-admissions committees at Harvard, MIT, and Stanford."
-```
+The system prompt tells Claude to act as a world-class admissions expert with 20 years of experience. This is **standard prompt engineering** — it gets Claude to generate higher quality, more authoritative advice. The user never sees this system prompt framing. **This is fine and should be kept.**
 
-And line 137:
-```
-"You don't guess what admissions officers think — you KNOW.
-You've sat in those rooms. You've heard the discussions."
-```
+### 4B. FABRICATED RESEARCH CITATIONS THAT REACH USERS [CRITICAL]
 
-**Issue**: This is factually false. Claude is an AI, not a human expert. This framing:
-1. Makes Claude generate advice with unearned confidence
-2. Users who learn it's AI may lose trust in all advice
-3. There's no disclosure anywhere that advice is AI-generated
+These are specific fake statistics embedded in prompts/knowledge that Claude will repeat to users as facts:
 
-### 4B. INSTRUCTIONS TO CITE UNVERIFIED RESEARCH [HIGH]
+| Fabricated Claim | File | Line | User-Facing? |
+|-----------------|------|------|--------------|
+| "MIT research shows specific descriptions are 2.4x more memorable" | expertSystemPrompts.ts | 158 | YES — teaching example |
+| "MIT research shows specific descriptions are 2.4x more memorable" | activityTeachingKnowledgeBase.ts | 108 | YES — in `why_this_works.research` |
+| "Stanford admissions research shows 34% more favorable rating" | expertCounselorKnowledgeBase.ts | 708 | YES — advanced teaching bundle |
+| "Duke University admissions research: 28% more likely to receive positive reader notes" | expertCounselorKnowledgeBase.ts | 747 | YES — growth arc teaching bundle |
+| "MIT admissions data: 72% of admitted held leadership, 23% described with impact" | expertCounselorKnowledgeBase.ts | 825 | YES — leadership teaching bundle |
 
-**File**: `expertSystemPrompts.ts:158`
+**How these reach users**: These claims are in teaching bundles and knowledge base entries with `whyThisWorks.research` fields. Claude is instructed to cite them when teaching students. A student reads "MIT research shows..." and treats it as verified fact.
 
-```
-"GOOD education: MIT research shows that specific descriptions
-are rated 2.4x more memorable by admissions readers."
-```
+**Fix**: Remove all fabricated statistics. Replace with general truths:
+- REMOVE: "MIT research shows specific descriptions are 2.4x more memorable"
+- REPLACE: "Specific descriptions are more memorable and credible than vague ones"
 
-And:
-```
-"ALWAYS cite research or insider knowledge. Don't say 'this is
-important.' Say 'MIT AOs specifically look for this because...'"
-```
+### 4C. UNVERIFIABLE ATTRIBUTED QUOTES [MEDIUM]
 
-**Issue**: The system tells Claude to cite research that may not exist, teaching it to present editorial opinions as research-backed claims.
+The system includes quotes attributed to unnamed admissions officers. These are useful for tone/framing and may or may not be real:
 
-### 4C. SCHOOL-SPECIFIC CLAIMS WITHOUT EVIDENCE [HIGH]
+| Quote | Attribution | File |
+|-------|-----------|------|
+| "One obviously inflated number makes me skeptical of every other number" | "Former Yale AO" | expertCounselorKnowledgeBase.ts:698 |
+| "I'd rather read 'taught 12 students, 8 improved by one letter grade'..." | "Former MIT Senior Interviewer" | expertCounselorKnowledgeBase.ts:710 |
+| Various interview/podcast references | "Stanford Admissions Interview, 2023", "Harvard Admissions Podcast, 2023" | activityTeachingKnowledgeBase.ts:252, 394, 536 |
+
+**Assessment**: These are less harmful than fabricated statistics — they communicate real principles even if the exact attribution is fuzzy. However, they should either be sourced (episode number, date, person) or reframed as general admissions wisdom without false attribution.
+
+### 4D. SCHOOL-SPECIFIC VALUE CLAIMS [OK — KEEP WITH MINOR FIX]
 
 **File**: `expertCounselorKnowledgeBase.ts:269-421`
 
-The system tells Claude as definitive fact:
-- "MIT values: technical depth and genuine building"
-- "Harvard values: leadership that creates tangible community impact"
-- "Stanford values: intellectual vitality and genuine passion"
-
-These are reasonable inferences from official statements but are presented as insider knowledge ("What Different Schools *Actually* Value"), not as editorial interpretation.
+Claims like "MIT values technical depth" and "Stanford values intellectual vitality" are well-grounded in official admissions statements from those schools. These are reasonable and should be kept. The only issue is the framing "What Schools *Actually* Value" implies insider access — could be softened to "Based on published admissions criteria."
 
 ### 4D. FALSE PRECISION IN CONSTRAINT ADJUSTMENTS [MEDIUM]
 
@@ -250,14 +242,9 @@ The LLM receives knowledge via prompt injection but nothing prevents it from:
 
 **No detection mechanism exists for any of these.**
 
-### 5B. AUTHORITY ESCALATION [MEDIUM]
+### 5B. AUTHORITY IN TONE [OK — BY DESIGN]
 
-Because the system prompt says "you KNOW" and "you've sat in those rooms," Claude generates advice with absolute certainty:
-- "This IS what makes an AO stop scrolling"
-- "This IS what separates Tier 2 from Tier 1"
-- No hedging, no "in our assessment," no uncertainty markers
-
-Students receive this as expert certainty, not AI-generated guidance.
+The system prompt's confident framing ("you KNOW") produces authoritative teaching tone. This is intentional — students benefit from confident, clear advice rather than hedged "maybe" language. The concern is not the confidence level but whether the CONTENT being delivered confidently is accurate. Fix the data (Phase 1), and the confident delivery becomes a strength.
 
 ### 5C. SCORING TEMPERATURE ALLOWS DRIFT [MEDIUM]
 
@@ -390,12 +377,9 @@ The system regularly produces language that implies admission predictions:
 
 Nowhere does the system add disclaimers like: "This assessment is for activity improvement purposes, not an admission prediction. Admission outcomes depend on many factors."
 
-### 8B. NO DISCLOSURE THAT ADVICE IS AI-GENERATED [HIGH]
+### 8B. AI DISCLOSURE [OUT OF SCOPE — FRONTEND CONCERN]
 
-Users receive advice framed as if from an expert who "reviewed 50,000+ applications." No disclosure that:
-- This is AI-generated guidance
-- Claims are editorial interpretations, not verified facts
-- Admission outcomes are inherently unpredictable
+Whether to disclose AI-generated advice is a product/frontend decision, not a backend data integrity issue. The backend's job is to ensure the advice CONTENT is accurate. Frontend can add appropriate disclosure as needed.
 
 ### 8C. CONSTRAINT DETECTION IS FRAGILE [MEDIUM]
 
@@ -416,30 +400,29 @@ The portfolio synthesis uses "Harvard 1-6 scale" naming, implying this is Harvar
 
 ## 9. Complete Issue Registry
 
-### CRITICAL (Must fix before serving real users)
+### CRITICAL (Fabricated facts that reach users)
 
 | # | Issue | Location | Category |
 |---|-------|----------|----------|
 | C1 | Fabricated acceptance rates (95%, 89%, 85%, 70%, 90%, 80%, 86%) | extracurricularDatabase.ts:388-402, 121, 134-135, 657 | Data Accuracy |
 | C2 | Fabricated admission multipliers (18x, 12x, 6x, 3x, 2x, 1.5x) | extracurricularDatabase.ts:912-937 | Data Accuracy |
-| C3 | Expert impersonation ("20 years, 50K apps, Harvard/MIT/Stanford committees") | expertSystemPrompts.ts:34, 137 | User Safety |
-| C4 | No output accuracy validation (only format checked) | stage2ConditionalTeachingService.ts:1746-1797 | Architecture |
-| C5 | Fabricated context multipliers (1.8x, 1.6x, 1.3x) applied multiplicatively | contextAdjustmentDatabase.ts | Data Accuracy |
+| C3 | Fabricated "MIT research shows 2.4x more memorable" (user-facing) | expertSystemPrompts.ts:158, activityTeachingKnowledgeBase.ts:108 | Data Accuracy |
+| C4 | Fabricated "Stanford research shows 34% more favorable" (user-facing) | expertCounselorKnowledgeBase.ts:708 | Data Accuracy |
+| C5 | Fabricated "Duke research: 28% more likely positive notes" (user-facing) | expertCounselorKnowledgeBase.ts:747 | Data Accuracy |
+| C6 | Fabricated "MIT data: 72% leadership, 23% measurable impact" (user-facing) | expertCounselorKnowledgeBase.ts:825 | Data Accuracy |
+| C7 | Fabricated context multipliers (1.8x, 1.6x, 1.3x) applied multiplicatively | contextAdjustmentDatabase.ts | Data Accuracy |
 
-### HIGH (Should fix in next development cycle)
+### HIGH (Inaccurate data or architecture gaps)
 
 | # | Issue | Location | Category |
 |---|-------|----------|----------|
-| H1 | Unverified "research" cited in prompts ("MIT 2.4x", "72% leadership") | expertSystemPrompts.ts:158, expertCounselorKnowledgeBase.ts:825 | Data Accuracy |
-| H2 | No contradiction detection between knowledge base and LLM output | Pipeline-wide | Architecture |
-| H3 | No admission outcome guardrails or disclaimers | expertSystemPrompts.ts, stage3 | User Safety |
-| H4 | Unverified AO quotes ("Former Yale AO", "Former MIT Interviewer") | expertCounselorKnowledgeBase.ts | Data Accuracy |
-| H5 | Inaccurate selectivity numbers in benchmarks | comparisonBenchmarksLibrary.ts:52-54, knowledgeAssemblyService.ts:245-246 | Data Accuracy |
-| H6 | School-specific claims presented as insider knowledge | expertCounselorKnowledgeBase.ts:269-421 | Data Accuracy |
-| H7 | Citation service hardcodes instead of looking up database | activityCitationService.ts:119 | Architecture |
-| H8 | Knowledge injected without verification level metadata | knowledgeAssemblyService.ts:1181-1316 | Architecture |
-| H9 | LLM hallucination beyond injected knowledge (no detection) | Pipeline-wide | Architecture |
-| H10 | No disclosure that advice is AI-generated | Pipeline-wide | User Safety |
+| H1 | Inaccurate selectivity numbers in benchmarks (USAMO, STS, etc.) | comparisonBenchmarksLibrary.ts:52-54, knowledgeAssemblyService.ts:245-246 | Data Accuracy |
+| H2 | Citation service hardcodes numbers instead of looking up database | activityCitationService.ts:119 | Architecture |
+| H3 | Knowledge injected to LLM without verification level metadata | knowledgeAssemblyService.ts:1181-1316 | Architecture |
+| H4 | No output accuracy validation (only format checked) | stage2ConditionalTeachingService.ts:1746-1797 | Architecture |
+| H5 | Unverifiable AO quotes ("Former Yale AO", "Former MIT Interviewer") | expertCounselorKnowledgeBase.ts:698, 710 | Data Accuracy |
+| H6 | No contradiction detection between knowledge base and LLM output | Pipeline-wide | Architecture |
+| H7 | "Harvard Scale" naming implies official Harvard methodology | stage3, synthesis | User Safety |
 
 ### MEDIUM (Improve for production quality)
 
@@ -451,12 +434,12 @@ The portfolio synthesis uses "Harvard 1-6 scale" naming, implying this is Harvar
 | M4 | Recognition-inflation bias (awards > impact) | Scoring rubric | Scoring |
 | M5 | Batch vs. single scoring context bias | activityScoringService.ts:357 | Scoring |
 | M6 | Model version divergence across scoring services | Multiple files | Scoring |
-| M7 | "Harvard Scale" naming implies official Harvard methodology | stage3, synthesis | User Safety |
-| M8 | Constraint detection uses fragile string matching | expertCounselorKnowledgeBase.ts:1269-1304 | Architecture |
-| M9 | No data freshness tracking (statistics may be stale) | All knowledge bases | Data Accuracy |
-| M10 | False precision in constraint tier adjustments (0.5, 1, 1.5) | expertCounselorKnowledgeBase.ts:142-256 | Data Accuracy |
-| M11 | Sara Harberson attribution without source link | expertCounselorKnowledgeBase.ts:14 | Data Accuracy |
-| M12 | Leadership weight redistribution lacks justification | activityScoringService.ts:105-111 | Scoring |
+| M7 | Constraint detection uses fragile string matching | expertCounselorKnowledgeBase.ts:1269-1304 | Architecture |
+| M8 | No data freshness tracking (statistics may be stale) | All knowledge bases | Data Accuracy |
+| M9 | Constraint tier adjustments (0.5, 1, 1.5) — editorial, should be documented | expertCounselorKnowledgeBase.ts:142-256 | Data Accuracy |
+| M10 | Sara Harberson attribution without source link | expertCounselorKnowledgeBase.ts:14 | Data Accuracy |
+| M11 | Leadership weight redistribution lacks justification | activityScoringService.ts:105-111 | Scoring |
+| M12 | Unverifiable AO quotes should be sourced or reframed | expertCounselorKnowledgeBase.ts | Data Accuracy |
 
 ### LOW (Nice-to-have improvements)
 
@@ -470,89 +453,94 @@ The portfolio synthesis uses "Harvard 1-6 scale" naming, implying this is Harvar
 
 ## 10. Implementation Priorities
 
-### Phase 1: Data Accuracy (Immediate)
+### Phase 1: Remove Fabricated Claims (Immediate)
 
-**Goal**: Remove fabricated claims, fix inaccurate numbers
+**Goal**: No fabricated facts reach users
 
-1. **Remove all fabricated acceptance rates** from `extracurricularDatabase.ts`
+1. **Remove fabricated research citations** (C3-C6)
+   - `expertSystemPrompts.ts:158` — Delete "MIT research shows 2.4x more memorable"
+   - `activityTeachingKnowledgeBase.ts:108` — Delete same claim in knowledge base
+   - `expertCounselorKnowledgeBase.ts:708` — Delete "Stanford research shows 34% more favorable"
+   - `expertCounselorKnowledgeBase.ts:747` — Delete "Duke research: 28% more likely positive notes"
+   - `expertCounselorKnowledgeBase.ts:825` — Delete "MIT data: 72% leadership, 23% measurable impact"
+   - **Replace all with general truths**: "Specific descriptions are more credible than vague ones"
+
+2. **Remove fabricated acceptance rates** from `extracurricularDatabase.ts` (C1)
    - Replace `acceptance_rate: 0.95` with qualitative signal: `admissionSignal: 'exceptional'`
-   - Replace multipliers (18x, 12x, etc.) with descriptive tiers
-   - Delete race-based context adjustments
+   - Remove `mit_acceptance_estimate` fields
+   - Keep program selectivity data (acceptance rate of the PROGRAM, like RSI 3%) — that's verifiable
 
-2. **Fix selectivity numbers** in `comparisonBenchmarksLibrary.ts`
+3. **Remove fabricated admission multipliers** from `extracurricularDatabase.ts` (C2)
+   - Replace `multiplier: 18` with descriptive signal tiers
+   - Keep the tier classification (near_guarantee, exceptional, etc.) as editorial labels
+   - Remove all numeric multiplier claims
+
+4. **Fix fabricated context multipliers** in `contextAdjustmentDatabase.ts` (C7)
+   - Replace multiplicative boosts (1.8x, 1.6x) with additive context points
+   - Delete race-based adjustment factors
+   - Cap total context adjustment at +15 points on 100-point scale
+
+### Phase 2: Fix Inaccurate Data (Same Sprint)
+
+**Goal**: All numbers we cite are correct
+
+5. **Fix selectivity numbers** in `comparisonBenchmarksLibrary.ts` (H1)
    - USAMO: ~250 from ~100K (not "~500 from 300K+")
    - STS: 40 from ~2,500 (not "1,900")
-   - Add source citations to each benchmark entry
+   - Verify and correct all benchmark context strings
 
-3. **Remove unverified research claims** from prompts
-   - Delete "MIT research shows 2.4x more memorable"
-   - Delete or source "72% held leadership"
-   - Replace with honest framing: "Admissions best practices suggest..."
+6. **Fix selectivity numbers** in `knowledgeAssemblyService.ts` (H1)
+   - STS: 2,500 entrants (not 2,000)
+   - Cross-reference all hardcoded numbers with official sources
 
-4. **Rename "Harvard Scale"** to "Uplift Portfolio Rating"
+7. **Source or remove AO quotes** (H5)
+   - Either add real attribution (name, date, episode) or reframe as general wisdom
+   - "Former Yale AO" → "Admissions professionals advise..."
 
-### Phase 2: Architecture Hardening (Next Sprint)
+8. **Rename "Harvard Scale"** to "Uplift Portfolio Rating" (H7)
 
-**Goal**: Prevent unreliable information from reaching users
+### Phase 3: Architecture Hardening (Next Sprint)
 
-5. **Add verification levels** to all knowledge base entries
-   ```typescript
-   type VerificationLevel = 'official' | 'published' | 'industry' | 'editorial';
-   ```
+**Goal**: Prevent unreliable information from reaching users in the future
 
-6. **Replace expert impersonation** with honest framing
-   - "You are an AI assistant trained on college admissions research and best practices"
-   - NOT "You have 20 years of experience at Harvard/MIT/Stanford"
-
-7. **Add output validation layer**
-   - Check LLM output claims against knowledge base
-   - Flag statistics that don't match injected data
-   - Detect admission outcome predictions and add disclaimers
-
-8. **Add JSON parsing retry/fallback**
-   - Retry with temperature 0.0 on parse failure
-   - Heuristic fallback if retry fails
-   - Never crash the entire pipeline on malformed JSON
-
-9. **Make citation service look up databases** instead of hardcoding
+9. **Make citation service look up databases** instead of hardcoding (H2)
    - Single source of truth for all numbers
    - If database updates, citations update automatically
 
-### Phase 3: Scoring Reliability (Following Sprint)
+10. **Add verification levels** to knowledge base entries (H3)
+    ```typescript
+    type VerificationLevel = 'official' | 'published' | 'industry' | 'editorial';
+    ```
+
+11. **Add output validation layer** (H4)
+    - Check LLM output claims against knowledge base
+    - Flag statistics that don't match injected data
+
+12. **Add JSON parsing retry/fallback** (M2)
+    - Retry with temperature 0.0 on parse failure
+    - Heuristic fallback if retry fails
+
+### Phase 3 continues above with items 9-12.
+
+### Phase 4: Scoring & Calibration (Following Sprint)
 
 **Goal**: Consistent, calibrated, fair scores
 
-10. **Synchronize model versions** across all scoring services
+13. **Synchronize model versions** across all scoring services (M6)
 
-11. **Add score stability check**
-    - Flag if rescore differs by >0.2 from cached score
-    - Add version metadata to all scores
-
-12. **Add missing benchmark categories**
+14. **Add missing benchmark categories** (M3)
     - Esports, religious activities, solo creative work, career exploration
 
-13. **Add comparative anchoring control** to batch prompts
+15. **Add comparative anchoring control** to batch prompts (M5)
     - "Rate each activity independently; do not adjust based on other activities"
 
-14. **Improve constraint detection**
+16. **Improve constraint detection** (M8)
     - Use semantic matching instead of exact string matching
     - Broader coverage of constraint language
 
-### Phase 4: User Safety (Ongoing)
-
-**Goal**: Honest, helpful, non-harmful advice
-
-15. **Add disclaimer system** to all user-facing output
-    - "This guidance is AI-generated, not from human admissions experts"
-    - "Activity assessments are for improvement purposes, not admission predictions"
-
-16. **Add harmful advice detection**
-    - Scan for: "quit this activity", "guaranteed admission", "will get you in"
-    - Replace with hedged language
-
-17. **Document all knowledge sources** with verification status
+17. **Document all knowledge sources** with verification status (M9)
     - Every benchmark, every claim, every "what schools value" assertion
-    - Annual verification schedule
+    - Annual verification schedule for data freshness
 
 ---
 
