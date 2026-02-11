@@ -362,7 +362,7 @@ async function runTests() {
   }
 
   // T3: Check for excessive repetition of tier names across sections
-  const tierRegex = /(ivy|elite|highly selective|selective|competitive|accessible)/gi;
+  const tierRegex = /(ivy|elite|highly selective|very selective|selective|competitive|accessible)/gi;
   const allReportText = JSON.stringify(report);
   const tierMentions: string[] = [];
   let tierMatch;
@@ -429,7 +429,7 @@ async function runTests() {
   section('Section 4: Research Context (Template)');
   const rc = report.researchContext;
   assert(rc.apStatistics.length >= 1, `Should have AP statistics (got ${rc.apStatistics.length})`);
-  assert(rc.collegeTierExpectations.length === 4, `Should have 4 tier expectations (got ${rc.collegeTierExpectations.length})`);
+  assert(rc.collegeTierExpectations.length === 5, `Should have 5 tier expectations (got ${rc.collegeTierExpectations.length})`);
   assert(rc.majorRequirements !== undefined, `CS student should have major requirements`);
   assert(rc.admissionsFactors.length >= 3, `Should have admissions factors (got ${rc.admissionsFactors.length})`);
 

@@ -208,86 +208,86 @@ export interface UpliftGradeDescriptor {
  * Uplift Scale because they're not challenging themselves. A student with B+'s in all
  * AP courses might be an A- because they're pushing at the highest level available.
  */
-// C3: Recalibrated with contiguous, non-overlapping percentile bands (0-100% coverage)
-// Percentile-to-school mapping grounded in freshman enrollment capacity data
+// Each Uplift grade maps directly to a school tier — the grade IS the tier indicator.
+// Students should understand: "My grade is B → I'm competitive at these specific schools."
 export const UPLIFT_SCALE_DATABASE: UpliftGradeDescriptor[] = [
   {
     grade: 'A+',
-    label: 'Exceptional Scholar',
-    description: 'Top 1-3% academic profile nationally. Maximum rigor with near-perfect performance. Strong upward trajectory or sustained excellence. Deep alignment with intended major. Admissions officers would flag this transcript as a standout.',
-    schoolFit: 'Highly competitive for Ivy League, Stanford, MIT, Caltech, and top 5-10 programs in any field.',
+    label: 'Exceptional',
+    description: 'You are among the strongest academic profiles nationally. Maximum rigor with near-perfect performance, clear major alignment, and a transcript that stands out to any admissions officer.',
+    schoolFit: 'Highly competitive for Harvard, Stanford, MIT, Princeton, Yale, and similar Ivy/Elite schools.',
   },
   {
     grade: 'A',
     label: 'Outstanding',
-    description: 'Top 3-6% academic profile. High rigor with consistent A-range performance. Clear academic identity with strong major alignment. Transcript tells a compelling story of intellectual curiosity and capability.',
-    schoolFit: 'Strong contender at top 10-20 universities, highly selective liberal arts colleges, and flagship state university honors programs.',
+    description: 'Your academic profile is excellent. High rigor with consistent strong performance, a clear academic identity, and strong alignment with your intended major.',
+    schoolFit: 'Strong contender at Northwestern, UCLA, UC Berkeley, Georgetown, Carnegie Mellon, and similar Highly Selective schools.',
   },
   {
     grade: 'A-',
     label: 'Excellent',
-    description: 'Top 6-10% academic profile. Meaningful rigor with mostly strong grades. Minor inconsistencies offset by clear strengths. Solid trajectory and identifiable academic direction.',
-    schoolFit: 'Competitive at top 20-30 universities, strong match for top-40 schools, and excellent position at selective state universities.',
+    description: 'Your profile is very strong with meaningful rigor and mostly excellent grades. You have clear academic strengths and a solid direction, with only minor inconsistencies.',
+    schoolFit: 'Competitive at NYU, Boston College, UW-Madison, UCSB, Tulane, and similar Very Selective schools.',
   },
   {
     grade: 'B+',
     label: 'Very Good',
-    description: 'Top 10-17% academic profile. Good rigor with some grade variation. Strengths are visible but so are gaps. May have one area that needs attention or rigor that could be stronger.',
-    schoolFit: 'Competitive at top 30-50 schools (NYU, Tulane, Wisconsin, UCSB). Strong match for top-80. May need strong extracurriculars for reach schools.',
+    description: 'You have a good academic profile with solid rigor. Your strengths are visible, though there are some gaps or areas where you could push harder. You\'re on the right track.',
+    schoolFit: 'Well-positioned for Boston University, UT Austin, Ohio State, Purdue, and similar Selective schools. Stretch for Very Selective with strong senior year.',
   },
   {
     grade: 'B',
     label: 'Solid',
-    description: 'Top 17-24% academic profile. Adequate rigor with average performance at that level. Academic story is developing but not yet distinctive. Some strengths but also noticeable areas needing improvement.',
-    schoolFit: 'Competitive at top 50-80 schools, large state flagships, and mid-tier private colleges. Top-50 schools are realistic reaches with strong supplementary profile.',
+    description: 'Your profile shows real capability, but your academic story isn\'t fully developed yet. You have clear strengths alongside areas that need work. There\'s meaningful room to grow.',
+    schoolFit: 'Competitive at schools like Purdue, UMass Amherst, Rutgers, and similar Selective schools. Boston University and UT Austin are realistic reaches.',
   },
   {
     grade: 'B-',
     label: 'Developing',
-    description: 'Top 24-30% academic profile. Either rigor is present but grades suffer, or grades are fine but rigor is too low. An imbalance exists between challenge and performance that needs addressing.',
-    schoolFit: 'Solid at top 80-120 schools, state universities, and regional private colleges. More selective schools require significant improvement or exceptional non-academic strengths.',
+    description: 'Your profile has potential but shows an imbalance — either you\'re taking hard courses with mixed results, or getting decent grades without enough challenge. Something needs to shift.',
+    schoolFit: 'Solid position at Arizona State, Iowa State, University of Oregon, Temple, and similar Competitive schools. Selective schools need a clear improvement narrative.',
   },
   {
     grade: 'C+',
     label: 'Below Potential',
-    description: 'Top 30-45% academic profile. The transcript signals underperformance. Either the student is capable of more challenge, or capable of better grades at their current level. There is a visible gap between what is and what could be.',
-    schoolFit: 'Less selective state and private universities are strong matches. More selective schools require a clear narrative of improvement.',
+    description: 'Your transcript suggests you\'re capable of more than what you\'re showing. There\'s a gap between your potential and your current performance that needs attention.',
+    schoolFit: 'Less selective state and private universities are strong matches. More selective schools need to see a clear turnaround.',
   },
   {
     grade: 'C',
     label: 'Needs Significant Improvement',
-    description: 'Top 45-62% academic profile. Multiple areas need attention. Low rigor, inconsistent grades, weak major alignment, or declining trajectory. The transcript does not yet tell a story that admissions officers want to champion.',
-    schoolFit: 'Open-admission and less selective institutions. Improvement over remaining semesters could open doors to more selective options.',
+    description: 'Multiple areas of your academic profile need attention — rigor, grades, or both. Your transcript doesn\'t yet tell the story that will get you into the schools you probably want.',
+    schoolFit: 'Open-admission and less selective institutions are your strongest matches right now. Improvement over the next semesters can expand your options.',
   },
   {
     grade: 'C-',
     label: 'At Risk',
-    description: 'Top 62-80% academic profile. Significant academic challenges across multiple dimensions. May include declining trajectory, very low rigor, or grades that don\'t meet basic expectations. Immediate course correction needed.',
-    schoolFit: 'Community college to university transfer pathway may offer the best long-term strategy. Focus on building a recovery narrative.',
+    description: 'Your academic profile has significant challenges that need immediate attention. This isn\'t permanent, but it requires a serious course correction starting now.',
+    schoolFit: 'Consider a community college to university transfer pathway — it\'s a proven strategy that many successful students use.',
   },
   {
     grade: 'D+',
     label: 'Struggling',
-    description: 'Top 80-88% academic profile. Serious academic concerns. Performance is well below what most four-year colleges expect. However, this is not permanent — students who turn things around in their remaining time can still build a compelling narrative.',
-    schoolFit: 'Community college is the strongest immediate path. Strong performance there opens transfer opportunities to excellent universities.',
+    description: 'Your performance is well below what most four-year colleges expect. This is not permanent — students who turn things around can still build a compelling story.',
+    schoolFit: 'Community college is your strongest immediate path. Strong performance there opens transfer opportunities to excellent universities.',
   },
   {
     grade: 'D',
     label: 'Critical',
-    description: 'Top 88-94% academic profile. The academic record currently presents major barriers to traditional admissions pathways. A complete strategic reset is needed — but turnaround stories are some of the most powerful narratives in admissions.',
-    schoolFit: 'Community college with intentional transfer planning. Gap year programs with academic enrichment may also help reset the trajectory.',
+    description: 'Your academic record currently presents major barriers. A strategic reset is needed — but turnaround stories are some of the most powerful narratives in admissions.',
+    schoolFit: 'Community college with intentional transfer planning. Gap year programs may also help reset your trajectory.',
   },
   {
     grade: 'D-',
     label: 'Emergency',
-    description: 'Top 94-98% academic profile. Academic performance is at crisis level. Immediate intervention needed — academic support, tutoring, and possibly a conversation about learning differences or personal circumstances affecting performance.',
-    schoolFit: 'Focus on stabilization first, college planning second. Community college remains an excellent pathway once academic fundamentals are strengthened.',
+    description: 'Your academic performance needs immediate intervention — academic support, tutoring, and possibly a conversation about what\'s affecting your schoolwork.',
+    schoolFit: 'Focus on stabilization first, college planning second. Community college is an excellent pathway once fundamentals are strengthened.',
   },
   {
     grade: 'F',
     label: 'Requires Immediate Intervention',
-    description: 'Bottom 2% academic profile. Academic profile is in freefall or essentially non-functional. This is not about college admissions — this is about getting the right support system in place. Academic counseling, mental health support, and family involvement are priorities.',
-    schoolFit: 'College planning is secondary to addressing root causes. With proper support and time, every student can build a viable academic path forward.',
+    description: 'This isn\'t about college right now — it\'s about getting the right support in place. Academic counseling, mental health support, and family involvement come first.',
+    schoolFit: 'College planning comes after addressing root causes. With support and time, every student can build a viable academic path.',
   },
 ];
 

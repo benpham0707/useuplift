@@ -9,7 +9,7 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
-import { parseClaudeJSON } from '../../../../../commonAppWorkshop/utils/jsonParser';
+import { parseClaudeJSON } from '../../../../../../commonAppWorkshop/utils/jsonParser';
 import type { EnrichedReportContext } from '../types';
 import type { StrategicRoadmapSection } from '../types';
 import { formatSubject } from '../context/tierCalibration';
@@ -32,12 +32,20 @@ export async function generateStrategicRoadmap(
   const planning = ctx.forRoadmap.planningAdvice;
   const quant = ctx.quantitativeAnalysis;
 
-  const systemPrompt = `You are an expert academic advisor writing a strategic roadmap for a student's remaining high school career. Prioritize ruthlessly — give them the 3 most impactful actions, not a laundry list.
+  const systemPrompt = `You MUST output valid JSON only — no markdown, no headers, no explanation text outside the JSON object.
+
+You are an expert academic advisor writing a strategic roadmap for a HIGH SCHOOL STUDENT. Write in second person ("you"). Be practical and encouraging.
 
 CRITICAL RULES:
-1. Only reference courses the student has ACTUALLY taken (listed in the COMPLETE COURSE LIST below). Do NOT claim they are missing a course they already have, and do NOT say "You're taking X now" unless it appears in the list.
-2. Every recommendation must be grounded in the student's actual performance data. When recommending a course, reference a specific data point from their transcript that supports the recommendation.
-3. Course recommendations must be internally consistent — if you recommend limiting total course load, don't then list 6 courses. If you recommend a specific course in priorities, the course strategy table must match.
+1. RESPOND ONLY WITH A SINGLE JSON OBJECT. No markdown formatting, no preamble, no explanation outside the JSON.
+2. Only reference courses the student has ACTUALLY taken (listed in the COMPLETE COURSE LIST below).
+3. STUDENT-FRIENDLY LANGUAGE: Write for a high schooler.
+   - Use actual GPAs and course names (students understand these)
+   - AVOID raw statistical jargon: no "38% risk level", "-0.37 typical impact", "73% consistency"
+   - INSTEAD use plain English: "your grades suggest you can handle this", "expect about a B+ based on your similar coursework"
+   - For trajectory projections, describe the OUTCOME: "With strong senior year performance, your GPA could climb to around 3.70" instead of "0.22 GPA delta between scenarios"
+4. Every recommendation must reference the student's actual past performance.
+5. Course recommendations must be internally consistent — if you limit total course load, don't list more courses than the cap allows.
 
 COURSE RECOMMENDATION QUALITY:
 - Recommended courses should represent PROGRESSION, not regression. If a student earned a 4.0 in AP Computer Science A, recommending AP Computer Science Principles (an intro-level breadth course) is a step backward. Instead, recommend courses that demonstrate deeper engagement: data structures, algorithms, college CS courses, or independent projects.
@@ -53,6 +61,9 @@ SCOPE — this section OWNS:
 DO NOT duplicate:
 - Challenge analysis or AO interpretations (Section 2 owns that)
 - Identity or tier framing (Section 1 owns that)
+- Reference earlier sections instead of restating their conclusions. Say "As identified in Section 2, your STEM foundation gaps..." rather than re-explaining the gap.
+- Each priority description should explain WHY this action is prioritized (the strategic logic) — not re-analyze the underlying challenge. Section 2 already did that analysis.
+- When a recommended course relates to a Section 2 challenge, briefly name the challenge: "This addresses the STEM Foundation Inconsistency identified in your Challenges analysis."
 
 Output valid JSON:
 {
@@ -69,9 +80,9 @@ Output valid JSON:
     "recommended": [
       {
         "course": "Specific course name",
-        "rationale": "Why this course specifically, tied to their profile data.",
+        "rationale": "MAX 2 sentences. Why this course, tied to 1-2 specific data points from their profile.",
         "risk": "low" | "medium" | "high",
-        "expectedOutcome": "Grounded projection referencing their past performance in similar courses."
+        "expectedOutcome": "MAX 1 sentence. Grade projection with ONE specific reference: 'Based on your [X] in [similar course], expect [Y] range.'"
       }
     ],
     "avoid": [
@@ -85,7 +96,7 @@ Output valid JSON:
     "missingPieces": ["What's missing for their major"],
     "strengthsToLeverage": ["What they already have going for them"]
   },
-  "trajectoryOptimization": "2-3 sentences: The single biggest GPA lever and how to use it."
+  "trajectoryOptimization": "4-5 sentences. First, name the biggest GPA lever. Then provide TWO scenarios using the recommended courses and their expected outcomes:\n- BEST CASE: If they earn [expected high] in each recommended course → projected senior year GPA [X], cumulative [Y], major alignment moves to [Z].\n- REALISTIC CASE: If they earn their typical performance → projected senior GPA [X], cumulative [Y].\nUse the student's performance envelope (floor/ceiling/typical) and the expected outcomes from your own course strategy to make these projections specific and grounded."
 }
 
 CONSTRAINT: EXACTLY 1 priority may be 'critical'. The other 2 MUST be 'high' or 'moderate'. If everything is critical, nothing is — force yourself to identify the SINGLE most impactful action. // Q10: Constrain Priority Impact Levels
@@ -160,6 +171,7 @@ DIFFICULTY TRANSITION BENCHMARKS (use these to calibrate expectedOutcome): // Q8
 Calibrate the student's specific expectedOutcome using THEIR observed difficulty sensitivity pattern AND these benchmarks.
 
 GRADE: ${ctx.input.currentGrade}
+${ctx.input.currentGrade === 11 ? `URGENCY: Senior year is your LAST transcript data point. Every course choice carries disproportionate weight because AOs will see whether your upward trajectory continued or stalled. Frame all recommendations with this urgency — these aren't "nice to have" improvements, they're the final chapter of your academic story.` : ctx.input.currentGrade === 10 ? `URGENCY: You have two more years to shape your transcript. This is the ideal time for strategic course additions and trajectory building — mistakes are recoverable.` : ctx.input.currentGrade === 9 ? `URGENCY: You have three years ahead. Focus on building foundations and exploring interests — the transcript story is just beginning.` : `URGENCY: Factor in the student's remaining time to shape their transcript.`}
 SCHOOL TYPE: ${ctx.input.schoolContext.type.replace(/_/g, ' ')}
 
 VERIFIED STATISTICS (cite these):

@@ -9,27 +9,27 @@
  * They can't change what they did, but they CAN change how they present it.
  * A Tier 4 activity with a 10/10 description beats a Tier 2 activity with a 3/10 description.
  *
- * SCORING DIMENSIONS (10 total points, variable weighting):
+ * SCORING DIMENSIONS (0-10 each, weighted average → total 0-10):
  *
- * 1. ROLE OWNERSHIP (0-2.5 points) - Does the reader know exactly what THIS student did?
- *    - The fundamental question: "Could you describe this student's specific contribution?"
- *    - Separates individual from team/org, makes ownership unmistakable
+ * 1. ROLE OWNERSHIP (0-10, weight: 25%) - Does the reader know exactly what THIS student did?
+ *    - Foundation dimension — without role clarity, AOs can't evaluate anything else
+ *    - Sara Harberson: "clear evidence of individual contribution" required for Tier 2+
  *
- * 2. ACTION PRECISION (0-2.0 points) - How specific and powerful is the language?
- *    - Verb hierarchy: Elite (designed, engineered) > Good (led, managed) > Weak (helped, participated)
- *    - Active voice, precise language that conveys exact nature of work
+ * 2. EVIDENCE OF IMPACT (0-10, weight: 25%) - Is there clear cause-and-effect?
+ *    - The tier differentiator. Harvard CDS: "demonstrated impact" rated Very Important
+ *    - Separates "did stuff" from "made a difference"
  *
- * 3. EVIDENCE OF IMPACT (0-2.0 points) - Is there clear cause-and-effect?
- *    - Shows what student did → what resulted (not just claims, but evidence)
- *    - "So what?" is answered with specifics, not generics
+ * 3. DIFFERENTIATION SIGNAL (0-10, weight: 20%) - What makes THIS student stand out?
+ *    - The 1,000-student test: uniqueness survives committee discussion
+ *    - Unique details recalled 3-5x more than generic descriptions
  *
- * 4. STRATEGIC QUANTIFICATION (0-1.5 points) - Are numbers used meaningfully?
- *    - Quality over quantity: meaningful metrics that demonstrate scale
- *    - Flags vanity metrics and context-free numbers
+ * 4. ACTION PRECISION (0-10, weight: 15%) - How specific and powerful is the language?
+ *    - Craft dimension — strong verbs shape first impressions in the 6-second scan
+ *    - "Founded" vs "started" vs "helped start" creates different mental models
  *
- * 5. DIFFERENTIATION SIGNAL (0-2.0 points) - What makes THIS student stand out?
- *    - The 1,000-student test: "If 1,000 others did this activity, what did YOU do differently?"
- *    - Unique contribution, not generic active-member description
+ * 5. STRATEGIC QUANTIFICATION (0-10, weight: 15%) - Are numbers used meaningfully?
+ *    - Supporting dimension — numbers add credibility and specificity
+ *    - MIT research: specific numbers 2.4x more memorable than vague claims
  *
  * MODEL: Sonnet - This is where nuance matters most. Description quality requires
  * understanding context, detecting subtle issues (overclaiming, vague language),
@@ -113,19 +113,20 @@ THE 6-SECOND TEST (How Admissions Officers Read):
 Great descriptions make the reader STOP and want to learn more. Weak descriptions get skipped.
 
 ═══════════════════════════════════════════════════════════════════════════════
-SCORING RUBRIC (10 points total)
+SCORING RUBRIC (Each dimension 0-10, weighted average → total 0-10)
 ═══════════════════════════════════════════════════════════════════════════════
 
-## DIMENSION 1: ROLE OWNERSHIP (0-2.5 points)
+## DIMENSION 1: ROLE OWNERSHIP (0-10, WEIGHT: 25%)
 **Core Question: Does the reader know exactly what THIS student did?**
+**Why 25%:** Foundation dimension. Sara Harberson (former UPenn AO): "clear evidence of individual contribution" required for Tier 2+. Without role clarity, AOs can't evaluate anything else — it's the prerequisite for all other dimensions scoring well.
 
 | Score | Criteria |
 |-------|----------|
-| 2.5   | Unmistakably clear ownership; reader can describe student's exact contribution in one sentence |
-| 2.0   | Clear role with minor ambiguity; predominantly student-focused |
-| 1.5   | Role discernible but mixed with organizational description |
-| 1.0   | Vague role; hard to distinguish individual from team/org contribution |
-| 0.5   | Almost entirely org-focused; student appears passive |
+| 9-10  | Unmistakably clear ownership; reader can describe student's exact contribution in one sentence |
+| 7-8   | Clear role with minor ambiguity; predominantly student-focused |
+| 5-6   | Role discernible but mixed with organizational description |
+| 3-4   | Vague role; hard to distinguish individual from team/org contribution |
+| 1-2   | Almost entirely org-focused; student appears passive |
 | 0     | No discernible individual contribution |
 
 Diagnostic questions:
@@ -135,15 +136,54 @@ Diagnostic questions:
 
 Red flags: "We worked on...", "The team achieved...", "Our organization..."
 
-## DIMENSION 2: ACTION PRECISION (0-2.0 points)
-**Core Question: How specific and powerful is the language?**
+## DIMENSION 2: EVIDENCE OF IMPACT (0-10, WEIGHT: 25%)
+**Core Question: Is there clear cause-and-effect showing meaningful outcomes?**
+**Why 25%:** The tier differentiator. Harvard CDS rates "demonstrated impact" as Very Important. This separates "did stuff" (Tier 4) from "made a difference" (Tier 2+). Without impact evidence, even great activities read as resume padding.
 
 | Score | Criteria |
 |-------|----------|
-| 2.0   | Precise, vivid verbs conveying exact nature of work |
-| 1.5   | Strong but somewhat generic action verbs |
-| 1.0   | Acceptable but weak verbs |
-| 0.5   | Passive or vague |
+| 9-10  | Clear causal chain: specific action → measurable/observable outcome with external validation |
+| 7-8   | Strong cause-effect with measurable outcome but less external validation |
+| 5-6   | Impact claimed with some evidence but causation not airtight |
+| 3-4   | Generic impact claims without specifics ("improved", "helped", "made difference") |
+| 1-2   | Activity-focused with implied but unstated impact |
+| 0     | No impact mentioned; purely describes what the activity is |
+
+Red flags: "made a positive impact", "helped the community", "learned valuable skills"
+
+## DIMENSION 3: DIFFERENTIATION SIGNAL (0-10, WEIGHT: 20%)
+**Core Question: What did THIS student do that 1,000 others in the same activity didn't?**
+**Why 20%:** Memorability factor. Research on recall in committee settings shows unique details are recalled 3-5x more than generic descriptions. This is what makes an application "stick" during deliberation.
+
+| Score | Criteria |
+|-------|----------|
+| 9-10  | Uses language that could ONLY describe THIS person. Contains a "fingerprint moment" — a detail so specific no other applicant could write it |
+| 7-8   | Mostly specific but 1-2 phrases could apply to anyone in this role |
+| 5-6   | Mix of specific and generic. Shows knowledge but not personality |
+| 3-4   | Mostly generic. Could be any club president / team member / volunteer |
+| 1-2   | Completely interchangeable. Zero unique details |
+| 0     | Template-like; indistinguishable from thousands of similar descriptions |
+
+Differentiation signals:
+- Created something new (methodology, program, resource, product)
+- Achieved external recognition (publication, award, adoption by others)
+- Solved a specific problem in a unique way
+- Shows intellectual curiosity/initiative beyond assigned duties
+
+EXAMPLE OF "FINGERPRINT MOMENT":
+Instead of "Managed team of 15 volunteers" → "Recruited 15 volunteers from 3 different churches by personally pitching at Sunday services, then tracked retention through a spreadsheet I built after losing 5 volunteers in week 2"
+
+## DIMENSION 4: ACTION PRECISION (0-10, WEIGHT: 15%)
+**Core Question: How specific and powerful is the language?**
+**Why 15%:** Craft dimension. Strong verbs shape first impressions in the 6-second AO scan. "Founded" vs "started" vs "helped start" creates fundamentally different mental models. Important but subordinate to substance (what you did and what resulted).
+
+| Score | Criteria |
+|-------|----------|
+| 9-10  | Precise, vivid verbs conveying exact nature of work; every word earns its place |
+| 7-8   | Strong action verbs with minor room for sharper language |
+| 5-6   | Acceptable but somewhat generic verbs |
+| 3-4   | Weak or passive language predominates |
+| 1-2   | Passive or vague throughout |
 | 0     | No action language; entirely passive/descriptive |
 
 Verb hierarchy (highest to lowest):
@@ -153,60 +193,23 @@ Verb hierarchy (highest to lowest):
 - WEAK: worked on, handled, ran, supported
 - POOR: participated, involved, assisted, helped, member of, part of
 
-## DIMENSION 3: EVIDENCE OF IMPACT (0-2.0 points)
-**Core Question: Is there clear cause-and-effect showing meaningful outcomes?**
-
-| Score | Criteria |
-|-------|----------|
-| 2.0   | Clear causal chain: specific action → measurable/observable outcome |
-| 1.5   | Impact claimed with some evidence but causation not airtight |
-| 1.0   | Generic impact claims without specifics ("improved", "helped", "made difference") |
-| 0.5   | Activity-focused with implied but unstated impact |
-| 0     | No impact mentioned; purely describes what the activity is |
-
-Red flags: "made a positive impact", "helped the community", "learned valuable skills"
-
-## DIMENSION 4: STRATEGIC QUANTIFICATION (0-1.5 points)
+## DIMENSION 5: STRATEGIC QUANTIFICATION (0-10, WEIGHT: 15%)
 **Core Question: Are numbers used meaningfully to demonstrate scale and significance?**
+**Why 15%:** Supporting dimension. MIT research shows specific numbers are 2.4x more memorable than vague claims. Numbers add credibility but only matter when paired with context. A description can score high without numbers if other dimensions are exceptional.
 
 | Score | Criteria |
 |-------|----------|
-| 1.5   | Meaningful metrics demonstrating scale and significance |
-| 1.0   | Numbers present but context unclear or significance modest |
-| 0.5   | Numbers exist but trivial or potentially misleading |
-| 0     | No quantification |
+| 9-10  | Multiple meaningful metrics with context demonstrating clear scale and significance |
+| 7-8   | Strong quantification with good context; 1-2 metrics that clearly demonstrate impact |
+| 5-6   | Numbers present but context unclear or significance modest |
+| 3-4   | Numbers exist but trivial, potentially misleading, or vanity metrics |
+| 1-2   | Minimal quantification; one throwaway number |
+| 0     | No quantification at all |
 
 Meaningful metrics: "$12K raised", "200 students served", "40% improvement", "3 publications"
 Vanity metrics: "attended 10 meetings", "participated in 5 events", "team of 3"
 
 Red flags: Numbers without context, inflated-sounding but small numbers
-
-## DIMENSION 5: DIFFERENTIATION SIGNAL (0-2.0 points)
-**Core Question: What did THIS student do that 1,000 others in the same activity didn't?**
-
-| Score | Criteria |
-|-------|----------|
-| 2.0   | Clear unique contribution; something only this student did or created |
-| 1.5   | Notable differentiation; went beyond typical member contribution |
-| 1.0   | Some individual flavor but largely typical active-member description |
-| 0.5   | Generic; could describe any engaged participant |
-| 0     | Template-like; indistinguishable from thousands of similar descriptions |
-
-Differentiation signals:
-- Created something new (methodology, program, resource, product)
-- Achieved external recognition (publication, award, adoption by others)
-- Solved a specific problem in a unique way
-- Shows intellectual curiosity/initiative beyond assigned duties
-
-DIFFERENTIATION SIGNAL — CALIBRATION:
-- 9-10: Uses language that could ONLY describe THIS person's experience. Contains a "fingerprint moment" — a detail so specific no other applicant could write it.
-- 7-8: Mostly specific but 1-2 phrases could apply to anyone in this role.
-- 5-6: Mix of specific and generic. The description shows knowledge but not personality.
-- 3-4: Mostly generic. Could be any club president / team member / volunteer.
-- 1-2: Completely interchangeable. Zero unique details.
-
-EXAMPLE OF "FINGERPRINT MOMENT":
-Instead of "Managed team of 15 volunteers" → "Recruited 15 volunteers from 3 different churches by personally pitching at Sunday services, then tracked retention through a spreadsheet I built after losing 5 volunteers in week 2"
 
 ═══════════════════════════════════════════════════════════════════════════════
 CALIBRATION EXAMPLES
@@ -217,66 +220,66 @@ CALIBRATION EXAMPLES
 **Score: 2/10 (Poor)**
 "Tutored students in math after school. Helped them with homework and prepared for tests. Made a positive impact on their grades."
 
-- Role Ownership: 0.5 (vague, anyone could write this)
-- Action Precision: 0.5 ("tutored", "helped", "prepared" all weak)
-- Evidence of Impact: 0.5 ("positive impact" is meaningless)
-- Quantification: 0 (none)
-- Differentiation: 0 (could describe any tutor ever)
-**Total: 1.5 → 2**
+- Role Ownership: 2/10 (vague, anyone could write this)
+- Evidence of Impact: 2/10 ("positive impact" is meaningless)
+- Differentiation: 1/10 (could describe any tutor ever)
+- Action Precision: 2/10 ("tutored", "helped", "prepared" all weak)
+- Quantification: 0/10 (none)
+**Weighted Total: 2*0.25 + 2*0.25 + 1*0.20 + 2*0.15 + 0*0.15 = 1.5 → 2**
 
 **Score: 5/10 (Average)**
 "Tutored 15 students weekly in Algebra II and Pre-Calculus. Created practice problems and study guides. Students improved an average of one letter grade."
 
-- Role Ownership: 1.5 (clear role but mixed with outcomes)
-- Action Precision: 1.0 ("tutored", "created" acceptable)
-- Evidence of Impact: 1.0 (outcome mentioned but generic)
-- Quantification: 1.0 (15 students, one letter grade)
-- Differentiation: 0.5 (slightly more specific but still generic)
-**Total: 5**
+- Role Ownership: 6/10 (clear role but mixed with outcomes)
+- Evidence of Impact: 4/10 (outcome mentioned but generic)
+- Differentiation: 3/10 (slightly more specific but still generic)
+- Action Precision: 5/10 ("tutored", "created" acceptable)
+- Quantification: 5/10 (15 students, one letter grade — modest context)
+**Weighted Total: 6*0.25 + 4*0.25 + 3*0.20 + 5*0.15 + 5*0.15 = 4.6 → 5**
 
 **Score: 9/10 (Excellent)**
 "Developed 'Visual Calculus' method for ADHD learners after noticing pattern confusion. Created 47 YouTube tutorials (23K views); approach adopted by 3 schools. 93% of my students now self-report math confidence."
 
-- Role Ownership: 2.5 (unmistakably clear what THEY did)
-- Action Precision: 2.0 ("developed", "created", "adopted")
-- Evidence of Impact: 2.0 (clear cause-effect, external validation)
-- Quantification: 1.5 (47 tutorials, 23K views, 3 schools, 93%)
-- Differentiation: 2.0 (unique methodology, external adoption)
-**Total: 10 → 9** (slightly docked for minor polish room)
+- Role Ownership: 10/10 (unmistakably clear what THEY did)
+- Evidence of Impact: 9/10 (clear cause-effect, external validation — adopted by schools)
+- Differentiation: 10/10 (unique methodology, "fingerprint moment")
+- Action Precision: 8/10 ("developed", "created" — strong but room for more vivid verbs)
+- Quantification: 9/10 (47 tutorials, 23K views, 3 schools, 93% — meaningful with context)
+**Weighted Total: 10*0.25 + 9*0.25 + 10*0.20 + 8*0.15 + 9*0.15 = 9.3 → 9**
 
 ### EXAMPLE 2: Hospital Volunteering
 
 **Score: 1/10 (Very Poor)**
 "Volunteered at local hospital helping patients and staff. Gained valuable experience in healthcare. Committed to serving others."
 
-- Role Ownership: 0 (what did they actually DO?)
-- Action Precision: 0.5 ("volunteered", "helping" passive)
-- Evidence of Impact: 0 (no outcomes)
-- Quantification: 0 (none)
-- Differentiation: 0 (completely generic)
-**Total: 0.5 → 1**
+- Role Ownership: 1/10 (what did they actually DO?)
+- Evidence of Impact: 0/10 (no outcomes at all)
+- Differentiation: 0/10 (completely generic)
+- Action Precision: 2/10 ("volunteered", "helping" passive)
+- Quantification: 0/10 (none)
+**Weighted Total: 1*0.25 + 0*0.25 + 0*0.20 + 2*0.15 + 0*0.15 = 0.6 → 1**
 
 **Score: 8/10 (Very Good)**
 "Redesigned patient check-in workflow after observing 40+ wait time complaints. Proposed new triage questionnaire—piloted program reduced average wait 22%. Presented findings to hospital board."
 
-- Role Ownership: 2.5 (crystal clear individual contribution)
-- Action Precision: 2.0 ("redesigned", "proposed", "piloted", "presented")
-- Evidence of Impact: 2.0 (clear causation, measured outcome)
-- Quantification: 1.0 (40+ complaints, 22% reduction)
-- Differentiation: 1.5 (unique initiative, external validation)
-**Total: 9 → 8** (minor room for stronger quantification)
+- Role Ownership: 10/10 (crystal clear individual contribution)
+- Evidence of Impact: 9/10 (clear causation, measured outcome)
+- Differentiation: 8/10 (unique initiative, external validation)
+- Action Precision: 9/10 ("redesigned", "proposed", "piloted", "presented")
+- Quantification: 6/10 (40+ complaints, 22% reduction — good but could add scale)
+**Weighted Total: 10*0.25 + 9*0.25 + 8*0.20 + 9*0.15 + 6*0.15 = 8.6 → 8** (rounded down: minor room for stronger quantification)
 
 ### EXAMPLE 3: Student Government (Middle Ground)
 
 **Score: 5/10 (Average)**
 "Junior Class President. Organized homecoming, prom, and class events. Led meetings and managed budget of $3,000. Represented class at school board meetings."
 
-- Role Ownership: 2.0 (clear role via title, but description is duty list)
-- Action Precision: 1.0 ("organized", "led", "managed" acceptable but generic)
-- Evidence of Impact: 0.5 (events happened, but what was outcome?)
-- Quantification: 1.0 ($3,000 provides some scale)
-- Differentiation: 0.5 (sounds like any class president)
-**Total: 5**
+- Role Ownership: 7/10 (clear role via title, but description is duty list)
+- Evidence of Impact: 2/10 (events happened, but what was the outcome?)
+- Differentiation: 2/10 (sounds like any class president)
+- Action Precision: 5/10 ("organized", "led", "managed" acceptable but generic)
+- Quantification: 5/10 ($3,000 provides some scale, but only one number)
+**Weighted Total: 7*0.25 + 2*0.25 + 2*0.20 + 5*0.15 + 5*0.15 = 4.2 → 5** (rounded up: title gives credit)
 
 ═══════════════════════════════════════════════════════════════════════════════
 ADDITIONAL DIAGNOSTIC CHECKS
@@ -425,31 +428,31 @@ OUTPUT FORMAT (JSON)
 ═══════════════════════════════════════════════════════════════════════════════
 
 {
-  "total": <1-10, calculated from dimensions>,
+  "total": <1-10, weighted average of dimensions: specificity*0.25 + impactClarity*0.25 + authenticityVoice*0.20 + actionLanguage*0.15 + quantification*0.15>,
   "breakdown": {
     "specificity": {
-      "score": <0-2.5 for roleOwnership>,
-      "maxScore": 2.5,
+      "score": <0-10 for roleOwnership>,
+      "maxScore": 10,
       "rationale": "<specific observation about role clarity>"
     },
     "impactClarity": {
-      "score": <0-2>,
-      "maxScore": 2,
+      "score": <0-10>,
+      "maxScore": 10,
       "rationale": "<specific observation about impact evidence>"
     },
     "actionLanguage": {
-      "score": <0-2>,
-      "maxScore": 2,
+      "score": <0-10>,
+      "maxScore": 10,
       "rationale": "<verbs identified and assessment>"
     },
     "quantification": {
-      "score": <0-1.5>,
-      "maxScore": 1.5,
+      "score": <0-10>,
+      "maxScore": 10,
       "rationale": "<numbers identified and whether meaningful>"
     },
     "authenticityVoice": {
-      "score": <0-2>,
-      "maxScore": 2,
+      "score": <0-10>,
+      "maxScore": 10,
       "rationale": "<differentiation assessment>"
     }
   },
@@ -505,18 +508,18 @@ Description (${input.description.length} chars): "${input.description}"`;
 
 ${activitiesText}
 
-Apply the rubric precisely to EACH activity. Provide your scoring for ALL activities in this JSON format:
+Apply the rubric precisely to EACH activity. Each dimension is 0-10. Total = weighted average (specificity*0.25 + impactClarity*0.25 + authenticityVoice*0.20 + actionLanguage*0.15 + quantification*0.15). Provide your scoring for ALL activities in this JSON format:
 {
   "scores": [
     {
       "activityIndex": 1,
-      "total": <1-10>,
+      "total": <1-10, weighted average>,
       "breakdown": {
-        "specificity": { "score": <0-2.5>, "maxScore": 2.5, "rationale": "..." },
-        "impactClarity": { "score": <0-2>, "maxScore": 2, "rationale": "..." },
-        "actionLanguage": { "score": <0-2>, "maxScore": 2, "rationale": "..." },
-        "quantification": { "score": <0-1.5>, "maxScore": 1.5, "rationale": "..." },
-        "authenticityVoice": { "score": <0-2>, "maxScore": 2, "rationale": "..." }
+        "specificity": { "score": <0-10>, "maxScore": 10, "rationale": "..." },
+        "impactClarity": { "score": <0-10>, "maxScore": 10, "rationale": "..." },
+        "actionLanguage": { "score": <0-10>, "maxScore": 10, "rationale": "..." },
+        "quantification": { "score": <0-10>, "maxScore": 10, "rationale": "..." },
+        "authenticityVoice": { "score": <0-10>, "maxScore": 10, "rationale": "..." }
       },
       "strengths": ["..."],
       "improvements": ["..."],
@@ -717,7 +720,7 @@ export class DescriptionScoringService {
 
     const breakdown = d.breakdown as Record<string, unknown>;
 
-    // Helper to normalize a component with variable max scores
+    // Helper to normalize a component — all dimensions now 0-10
     const normalizeComponent = (comp: unknown, maxScore: number): DescriptionScoreComponent => {
       if (!comp || typeof comp !== 'object') {
         return { score: 0, maxScore, rationale: 'Unable to assess' };
@@ -730,24 +733,23 @@ export class DescriptionScoringService {
       };
     };
 
-    // Build normalized breakdown with correct max scores
-    // Note: Using new weights but mapping to legacy field names
+    // Build normalized breakdown — all dimensions 0-10
     const normalizedBreakdown: DescriptionScoreBreakdown = {
-      specificity: normalizeComponent(breakdown.specificity, 2.5), // Role Ownership
-      impactClarity: normalizeComponent(breakdown.impactClarity, 2), // Evidence of Impact
-      actionLanguage: normalizeComponent(breakdown.actionLanguage, 2), // Action Precision
-      quantification: normalizeComponent(breakdown.quantification, 1.5), // Strategic Quantification
-      authenticityVoice: normalizeComponent(breakdown.authenticityVoice, 2), // Differentiation Signal
+      specificity: normalizeComponent(breakdown.specificity, 10),        // Role Ownership (25%)
+      impactClarity: normalizeComponent(breakdown.impactClarity, 10),    // Evidence of Impact (25%)
+      actionLanguage: normalizeComponent(breakdown.actionLanguage, 10),  // Action Precision (15%)
+      quantification: normalizeComponent(breakdown.quantification, 10),  // Strategic Quantification (15%)
+      authenticityVoice: normalizeComponent(breakdown.authenticityVoice, 10), // Differentiation Signal (20%)
     };
 
-    // Calculate total from components to ensure consistency
-    // New weights: 2.5 + 2 + 2 + 1.5 + 2 = 10
+    // Calculate weighted total from components
+    // Weights: Role Ownership 25% + Evidence of Impact 25% + Differentiation 20% + Action Precision 15% + Quantification 15% = 100%
     const calculatedTotal =
-      normalizedBreakdown.specificity.score +
-      normalizedBreakdown.impactClarity.score +
-      normalizedBreakdown.actionLanguage.score +
-      normalizedBreakdown.quantification.score +
-      normalizedBreakdown.authenticityVoice.score;
+      normalizedBreakdown.specificity.score * 0.25 +        // Role Ownership
+      normalizedBreakdown.impactClarity.score * 0.25 +      // Evidence of Impact
+      normalizedBreakdown.authenticityVoice.score * 0.20 +  // Differentiation Signal
+      normalizedBreakdown.actionLanguage.score * 0.15 +     // Action Precision
+      normalizedBreakdown.quantification.score * 0.15;      // Strategic Quantification
 
     // Use calculated total
     const total = Math.round(calculatedTotal * 10) / 10; // Round to 1 decimal

@@ -8,54 +8,53 @@
 
 ## The Bottom Line
 
-- **Uplift Rating: B+ — Very Good**
-- **Position:** Selective (Top 30-80) (Boston University, Ohio State, UT Austin). To reach Highly Selective tier (Northwestern, UCLA, Georgetown), you need 3.70+ overall GPA—practically, this means earning 3.85+ across your next 6-8 courses to pull your cumulative average above the threshold, which requires avoiding Science courses where you've shown 0.55 GPA drops and doubling down on CS/Math/English where you consistently hit 3.70-4.00.
-- **Biggest Strength:** Computer Science excellence with Math foundation: Your 3.90 CS GPA (4.00 in AP CSA) paired with 3.77 Math average signals you're not just coding—you're thinking algorithmically. The 40% performance lift in CS and 35% lift in Math, both well above your 3.66 baseline, tells admissions officers you have the quantitative reasoning that separates students who complete CS programs from those who struggle.
-- **Biggest Risk:** STEM Breadth Weakness in Core CS Prerequisites: This STEM unevenness pulls you from Highly Selective CS programs (UCLA, Georgia Tech — where admitted CS students typically show 3.7+ across all STEM) down to Selective tier CS programs (Purdue, UMass Amherst — where a 3.66 overall with strong CS focus is competitive). Your CS GPA alone would position you for Ivy/Elite consideration, but the supporting STEM grades limit your ceiling.
-- **#1 Priority: Bridge the Physics Gap for CS Major Credibility — Enroll in AP Physics C: Electricity & Magnetism for senior year**
+- **B+ — You're a solid candidate for selective schools like Boston University and Purdue, but not yet ready for very selective schools like NYU or Boston College.**
+- **Position:** Boston University, Purdue, UT Austin. To level up: take Physics C: E&M and earn mostly A's senior year.
+- **Biggest Strength:** Computer Science skills: Your 4.0 in AP CS A proves you can excel in your major and stand out to admissions.
+- **Biggest Risk:** Incomplete physics foundation: Stopping at Mechanics without E&M signals you didn't finish the sequence CS programs expect.
+- **#1: Enroll in AP Physics C: E&M — it completes your STEM story and shows mathematical rigor colleges demand.**
 
 ---
 
-## Section 1: Academic Identity
+## Your Academic Profile
 
-You sit at the upper edge of Selective tier (3.66 GPA, 78th percentile), just 0.04 points from breaking into Highly Selective range where schools like Northwestern and UCLA compete. What makes your profile distinctive is the 0.50 GPA spread between your Computer Science performance (3.90—Ivy/Elite tier) and your Science struggles (3.43—mid-Selective tier). You're a specialist, not a generalist: your transcript screams Computer Science major with Math as your second language (3.77, 35% above baseline), while your Science courses reveal strategic vulnerability in the credential subjects CS programs scrutinize most.
+**Your Uplift Grade: B+** — Selective Schools
+> Schools like Boston University, UT Austin, Purdue, Ohio State
 
-Your trajectory is stable with 65% strength signal and 73% consistency—you're not climbing between tiers, but you're holding position in a competitive range while taking meaningful AP/IB rigor. The 0.55 GPA drop from Chemistry Honors (3.70) to AP Chemistry (3.00) exposes moderate difficulty sensitivity in Science that hasn't appeared in your other subjects: you handled AP Calculus BC, AP Statistics, AP English Language, and AP Computer Science A without falling below 3.30. This pattern suggests you can sustain Highly Selective-tier performance in your strength areas (CS, Math, English) while Science remains your Achilles heel for the most competitive CS programs.
+You've earned a B+ Uplift rating — a solid academic profile with visible strengths and clear room to grow. Your 3.66 GPA places you in the Selective tier, alongside schools like Boston University, UT Austin, and Purdue. What makes your profile distinctive is your Computer Science performance: a 3.90 GPA in CS courses, significantly stronger than your overall average. You're proving you can excel in your intended major, which is exactly what admissions officers want to see.
 
-### Notable Strengths
+Your biggest strength is the alignment between your abilities and your goals. Computer Science is your strongest subject (3.90), and Math is close behind (3.77) — these are the two subjects that matter most for CS admissions. You're not just interested in CS; you're demonstrating real capability. Your grades are highly consistent, which means admissions officers can trust your transcript as a reliable signal of what you'll deliver in college. And here's what's impressive: your GPA barely changed (3.60 → 3.58) despite taking much harder courses junior year. That stability under increased challenge shows you can handle rigor without your grades suffering.
 
-**Computer Science excellence with Math foundation:** Your 3.90 CS GPA (4.00 in AP CSA) paired with 3.77 Math average signals you're not just coding—you're thinking algorithmically. The 40% performance lift in CS and 35% lift in Math, both well above your 3.66 baseline, tells admissions officers you have the quantitative reasoning that separates students who complete CS programs from those who struggle.
-*This dual-strength pattern is exactly what CS programs want to see: you're not a one-trick coder, you're a problem-solver who can handle the theoretical math that underpins upper-division CS coursework.*
+But here's the gap: you have the capability without the full validation. For Computer Science — one of the most competitive majors — you're missing the credential courses that prove you're ready for the hardest programs: AP Physics C (both Mechanics and E&M) and additional advanced STEM. Your current rigor level is concerning for CS admissions at selective schools, where 64% of colleges rate curriculum rigor as considerably important. If your entire transcript matched your CS performance (3.90), you'd be in Ivy/Elite range — schools like Harvard, Stanford, MIT. To move up to Very Selective schools (NYU, Boston College), you'll need a 3.70+ GPA and the rigorous coursework to back it up. You're on the right track, but your academic story isn't fully developed yet.
 
-**Difficulty resilience in non-Science subjects:** You absorbed only a 0.20 GPA drop moving to AP English Language (3.70) and maintained 3.30+ in AP Calculus BC and AP Statistics despite their reputation as GPA killers. Your 73% consistency score means you're predictable under pressure—when you take rigorous courses outside Science, you deliver B+/A- range performance reliably.
-*This proves you can handle a demanding CS curriculum's non-technical requirements (writing-intensive courses, humanities distribution) without your GPA collapsing, which matters for schools that care about well-rounded CS graduates.*
+### What Makes Your Profile Stand Out
 
-**Strategic positioning at tier boundary:** Your 3.66 GPA places you 0.04 points from Highly Selective tier (3.70+), meaning a single strong semester could vault you into Northwestern/UCLA range. You're not stuck mid-pack—you're at the ceiling of your current tier with visible upside if you optimize your remaining schedule.
-*For CS admissions, this positioning means you're competitive for strong state flagships (UT Austin, Purdue, UMass Amherst) while still having a realistic path to crack into more selective CS programs if you execute strategically in junior/senior year.*
+**Computer Science Performance:** Your 3.90 GPA in Computer Science — significantly stronger than your overall average — signals to admissions officers that you're not just interested in CS, you're genuinely capable in it. A 4.00 in AP Computer Science A is your highest AP grade, and it's in the subject that matters most for your intended major.
+*This is the ideal position for a CS applicant: your strongest subject aligns perfectly with your intended major. Admissions officers look for demonstrated capability in the subjects that matter for your chosen field, and you're delivering exactly that. It tells them you're not exploring CS casually — you're proving you can think like a computer scientist.*
 
-### Areas to Improve
+**Math Foundation:** Your 3.77 Math GPA — 35% above your overall average — shows you have the quantitative foundation CS programs require. You've taken AP Calculus BC and AP Statistics, and your performance has been consistently strong across all three math courses.
+*Math is the language of computer science. Strong math performance signals to admissions officers that you can handle the theoretical side of CS — algorithms, data structures, computational complexity. Your math strength means you're not just a coder; you have the analytical foundation to understand why code works, not just how to write it.*
 
-**Science credential gap for CS programs:** Your 3.43 Science GPA (with 3.00 in AP Chemistry and 3.30 in AP Physics C: Mechanics) sits in mid-Selective tier while your CS/Math performance reaches Ivy/Elite tier—a 0.47 GPA gap that signals you're avoiding or struggling with the Physics/Chemistry rigor top CS programs expect.
-*Highly Selective CS programs (Northwestern, UCLA, Georgia Tech) will notice you're missing the AP Physics C: E&M or additional advanced Science that demonstrates you can handle hardware, systems, or interdisciplinary CS work.*
+**Stability Under Increased Challenge:** Your GPA barely changed (3.60 → 3.58) despite taking much harder courses junior year. This stability under increased rigor is unusual and valuable — most students' GPAs drop when they add AP courses.
+*This pattern tells admissions officers you can handle the jump from high school to college-level work without your performance suffering. It's evidence that you're ready for the pace and difficulty of a rigorous CS program, where the workload is relentless and the concepts build on each other quickly.*
 
-**Moderate difficulty sensitivity in Science transitions:** The 0.55 GPA drop from Chemistry Honors (3.70) to AP Chemistry (3.00) reveals you struggle when Science courses add AP-level abstraction, a pattern that didn't appear in your Math or English AP transitions.
-*This sensitivity means adding more AP Science courses carries real GPA risk—you can't assume you'll replicate your AP Calculus BC or AP English Language resilience in AP Biology or AP Physics C: E&M.*
+### Where You Need to Grow
 
-### College Tier Position
+**STEM Credential Gap:** You're missing the advanced STEM courses (AP Physics C, additional rigorous science) that validate CS readiness at selective schools.
+*This limits your competitiveness for top CS programs. See the Challenges section for the full analysis.*
 
-**Current Tier:** Selective (Top 30-80) (Boston University, Ohio State, UT Austin, Purdue, UMass Amherst)
+**Science Performance Identity:** Your Science GPA (3.43) is noticeably weaker than your Math and CS performance, creating an incomplete STEM narrative.
+*Admissions officers may question your readiness for STEM rigor. See the Challenges section for details.*
 
-Your 3.66 GPA sits at the upper boundary of Selective range (3.40-3.69), just 0.04 points below the 3.70 threshold for Highly Selective tier—you're positioned for a potential tier jump with one strong semester.
+### Moving to the Next Level
 
-**Strength pull:** Ivy/Elite (Top 5-10): Your Computer Science GPA (3.90) would place you in Harvard/Stanford/MIT range if evaluated in isolation
+To move up to Very Selective (schools like NYU, Boston College), you'll need a 3.70+ GPA — that means mostly A's and A-'s in your remaining courses, plus the rigorous STEM coursework to validate your CS readiness.
 
-**Weakness drag:** Mid-Selective: Your Science GPA (3.43) anchors you in the middle of your current tier, preventing the tier jump your CS/Math performance could otherwise support
+*If your entire transcript matched your Computer Science performance (3.90), you'd be in Ivy/Elite range — schools like Harvard, Stanford, MIT would be within reach.*
 
-**Next tier:** To reach Highly Selective tier (Northwestern, UCLA, Georgetown), you need 3.70+ overall GPA—practically, this means earning 3.85+ across your next 6-8 courses to pull your cumulative average above the threshold, which requires avoiding Science courses where you've shown 0.55 GPA drops and doubling down on CS/Math/English where you consistently hit 3.70-4.00.
+*If your entire transcript matched your Science performance (3.43), you'd drop to Competitive range — this shows the gap between your best and weakest areas.*
 
-### Uplift Rating: B+
-
-Your profile sits in the top 15-20% nationally: you're taking meaningful AP rigor (7 AP courses through junior year) with a clear academic identity (CS specialist with Math strength), but the 0.50 GPA gap between your peak performance (CS 3.90, Math 3.77) and your Science struggles (3.43, with AP Chemistry at 3.00) creates the imbalance typical of B+ profiles. You're 0.04 points from a tier jump, which signals strong potential, but your moderate difficulty sensitivity in Science (0.55 drop in Chemistry transition) and the missing Physics C: E&M credential mean you're not yet the 'no-questions-asked' admit that A-range profiles represent. Your stable trajectory with 65% strength signal shows you're holding position rather than climbing, and your 73% consistency means you're predictable—admissions officers see a solid CS applicant for Selective/upper-Selective programs (UT Austin, Purdue, Ohio State) who would need to address the Science gap and execute a flawless senior year to compete for Highly Selective CS programs (UCLA, Georgia Tech, Northwestern).
+You have a solid academic profile with visible strengths — your CS and Math performance prove you can excel in your intended major. But your rigor level is concerning for CS admissions at selective schools, and your Science performance creates an incomplete STEM narrative. You're on the right track, but your academic story isn't fully developed yet. With the right courses senior year, you can close these gaps and strengthen your position significantly.
 
 ---
 
@@ -63,64 +62,61 @@ Your profile sits in the top 15-20% nationally: you're taking meaningful AP rigo
 
 ### What Admissions Officers See First
 
-Strong CS specialist (4.00 in AP CS A) with solid math foundation (3.70 in BC Calc), but uneven STEM execution raises questions about readiness for competitive CS programs. The 3.00 in AP Chemistry and 3.30 in AP Physics C Mechanics — both critical for engineering-track CS — signal struggle with advanced STEM rigor despite attending a well-resourced school. AOs see a student who excels in their comfort zone but hasn't proven they can handle the full breadth of technical coursework required at selective CS programs.
+First thing: a 3.66 overall with only 5 APs by junior year. For a CS applicant to selective schools, this is below the curve — most admitted students at Boston University or UT Austin have 6-8 APs by this point. Second thing: a visible drop in Science grades (3.00 in AP Chem, 3.30 in AP Physics C) that stands out against a 4.00 in AP CS. The transcript reads as 'strong in CS, shaky in supporting STEM foundation.'
 
-### STEM Breadth Weakness in Core CS Prerequisites
+### Weak STEM Foundation for CS Major
 
-For Computer Science admissions, AP Physics C and AP Chemistry are viewed as foundational — they demonstrate you can handle the math-heavy, conceptual rigor of university CS/engineering curricula. Your 3.30 in AP Physics C Mechanics and 3.00 in AP Chemistry fall significantly below your 3.90 CS GPA, creating a 0.90-0.60 performance gap in courses that directly predict college CS success. At well-resourced suburban schools, AOs expect CS applicants to show strength across all STEM disciplines, not just programming.
+You earned a 3.00 in AP Chemistry and a 3.30 in AP Physics C: Mechanics — both B-range grades in core STEM courses. For Computer Science, these aren't just electives; they're the foundation that signals whether you can handle the math-heavy, problem-solving rigor of a CS degree. Your Science average (3.43) is a full half-letter grade below your overall GPA.
 
-**AO Impact:** Admissions officers at selective CS programs (Carnegie Mellon, Georgia Tech, UIUC) interpret this pattern as 'strong coder, weak fundamentals' — a student who may struggle when CS coursework requires deep physics (computational modeling, graphics, robotics) or chemistry (materials science, quantum computing). The 3.00 in AP Chem is particularly concerning because 62% of AP Statistics test-takers nationwide score 3+ on the exam, yet you earned a 3.30 in that class — suggesting the AP Chem grade reflects genuine difficulty with chemistry concepts, not just a tough grading environment. This raises questions about whether you can handle the interdisciplinary STEM demands of competitive CS programs.
+**AO Impact:** Admissions officers at CS programs see Science grades as a proxy for quantitative reasoning and persistence through difficult problem sets. When your Science performance lags behind your CS grade (4.00), it raises a question: can you handle the full STEM load of a CS major, or are you strong in one narrow area? At competitive CS programs, this pattern suggests risk.
 
-**Tier Impact:** This STEM unevenness pulls you from Highly Selective CS programs (UCLA, Georgia Tech — where admitted CS students typically show 3.7+ across all STEM) down to Selective tier CS programs (Purdue, UMass Amherst — where a 3.66 overall with strong CS focus is competitive). Your CS GPA alone would position you for Ivy/Elite consideration, but the supporting STEM grades limit your ceiling.
+**Tier Impact:** This drops you from the Very Selective range (NYU, Boston College) to mid-Selective range (Boston University, Purdue) for CS programs specifically. CS admissions are more competitive than general admission at the same school — so while your overall GPA fits BU's range, your Science grades make you a borderline candidate for their CS program.
 
-**Roadmap:** The roadmap recommends continuing AP-level Science to demonstrate you can recover and build consistency in STEM fundamentals — critical for proving CS readiness to selective programs.
+**Roadmap:** See Priority 2: Continue AP-level Science to demonstrate you can sustain strong performance in foundational STEM courses.
 
 **Research Backing:**
-- Curriculum rigor is a top admissions factor: 64% of colleges rate rigor as 'considerably important' (NACAC (National Association for College Admission Counseling) Factors in College Admission)
-- AP Physics C Mechanics has high pass rates, making lower grades more visible: 76% of test-takers score 3+ on the AP exam (College Board 2024 AP Score Distributions by Subject)
-- Grades in college prep courses are the most important admissions factor: 77% of colleges rate grades as 'considerably important' (NACAC (National Association for College Admission Counseling) Factors in College Admission)
+- AP Physics C: Mechanics has a 76% pass rate on the exam, indicating it's accessible for prepared students — yet your 3.30 class grade suggests you struggled with the material: 76% pass rate, 28% score 5 (College Board 2024 AP Score Distributions by Subject)
 
 ---
 
-### Difficulty Sensitivity Pattern in Science Transitions
+### Shallow CS Course Depth
 
-Your transcript shows a clear pattern: 3.70 in Chemistry Honors → 3.00 in AP Chemistry (0.70 drop) and 3.30 in AP Physics C Mechanics (first AP Physics course). This 0.55-0.70 GPA drop when moving from honors to AP in science is significantly larger than your typical difficulty impact of 0.37 across all subjects. The pattern suggests you struggle specifically when science courses add calculus-based rigor and abstract problem-solving — exactly the skills required in university CS coursework (algorithms, data structures, systems programming).
+You've taken exactly one CS course: AP Computer Science A. That's the baseline expectation for a CS applicant — not a distinguishing factor. At well-resourced suburban schools, competitive CS applicants typically have AP CS A plus AP CS Principles, or AP CS A plus a post-AP elective (Data Structures, AI, etc.). You're missing the second layer that shows sustained interest and advanced skill.
 
-**AO Impact:** AOs see this as a 'ceiling effect' — you perform well at honors level but hit a wall when courses require integrating multiple STEM skills simultaneously (e.g., calculus + physics concepts in Physics C, or quantitative reasoning + abstract chemistry in AP Chem). For CS admissions, this is a yellow flag because competitive programs assume you'll take courses like Linear Algebra, Discrete Math, and Computer Architecture that demand exactly this kind of multi-layered STEM thinking. The fact that you maintained 4.00 in AP CS A while struggling in AP Physics/Chem suggests strong coding skills but potential gaps in mathematical maturity and problem-solving transfer.
+**AO Impact:** Admissions officers evaluate CS applicants against a pool where many students have 2-3 CS courses, independent projects, or competition experience. A single AP CS course signals 'I tried CS and liked it' — not 'I'm committed to this field.' For a student declaring CS as their intended major, this looks like surface-level exploration rather than deep engagement.
 
-**Tier Impact:** This pattern reinforces the Selective tier positioning (Boston University, Ohio State, UT Austin) rather than Highly Selective (Northwestern, UCLA, Georgetown), where admitted CS students typically show <0.30 GPA drops in AP STEM transitions. It signals you may need more support in foundational STEM courses at the college level.
+**Tier Impact:** This keeps you at the Selective range (Boston University, Purdue) instead of moving up to Highly Selective CS programs (UCLA, Georgia Tech). At schools like Georgia Tech, the median admitted CS student has multiple CS courses or significant outside-the-classroom CS work. Your transcript doesn't show that depth.
 
-**Roadmap:** The roadmap flags this explicitly ('Be strategic about AP Science' and 'Don't add AP Bio') — recommending you focus on depth in physics/math rather than adding more AP sciences where the transition pattern could repeat.
+**Roadmap:** See Priority 5: Continue AP-level Computer Science and consider adding a second CS course or independent study to demonstrate depth beyond the baseline.
 
 **Research Backing:**
-- Rigor importance has increased significantly in recent years: 51% (2017) → 64% (2023) rate rigor as 'considerably important' (NACAC (National Association for College Admission Counseling))
-- AP Physics 1 has notably lower pass rates than Physics C: 47% pass rate (vs 76% for Physics C Mechanics) (College Board 2024 AP Score Distributions by Subject)
+- Curriculum rigor is rated 'considerably important' by 64% of admissions officers — and for competitive majors like CS, course depth in the intended field is a key rigor signal: 64% rate as considerably important (NACAC (National Association for College Admission Counseling) Factors in College Admission)
+- The importance of curriculum rigor has increased significantly in recent years, rising from 51% to 64% of admissions officers rating it as considerably important: 51% (2017) → 64% (2023) (NACAC (National Association for College Admission Counseling))
 
 ---
 
-### Social Studies Consistency Gap Creates Narrative Confusion
+### Inconsistent Performance Under Rigor
 
-Your Social Studies performance (3.50 avg, -10% relative to overall GPA) is your weakest academic area, with AP US History at 3.30 — the same grade as AP Physics C and below your 3.66 overall. While Social Studies isn't directly relevant to CS admissions, the consistency of 3.30 grades across APUSH, AP Stats, and AP Physics C creates an unintended pattern: it looks like you struggle specifically with AP-level rigor across multiple disciplines, not just STEM. This dilutes the 'strong CS specialist' narrative because it suggests general difficulty with advanced coursework rather than targeted STEM challenges.
+Your grades drop an average of 0.4 points when you move from Honors to AP — and in Science, that drop is even steeper (0.55 points from Chem Honors to AP Chem). This creates a visible pattern: you perform well in Honors courses (3.90 in Precalc Honors, 3.90 in English 10 Honors, 3.70 in Chem Honors), but struggle when the difficulty increases. AP Statistics (3.30) and AP Chemistry (3.00) are both significantly below your Honors baseline.
 
-**AO Impact:** AOs at selective schools distinguish between 'STEM-focused students with humanities weaknesses' (common, acceptable for CS applicants) and 'students who struggle with AP rigor broadly' (concerning for competitive programs). Your 3.30 in APUSH — a reading/writing-heavy course — combined with 3.30 in AP Physics C and AP Stats makes it harder to argue that your lower STEM grades are due to specific content gaps rather than general AP difficulty. This is especially visible because 62% of AP Statistics test-takers nationwide score 3+ on the exam, yet you earned a 3.30 in the class — suggesting the grading environment may not fully explain the pattern.
+**AO Impact:** Admissions officers interpret this as difficulty sensitivity — you can handle moderate rigor, but you haven't yet proven you can sustain high performance at the highest level. For CS programs at selective schools, this is a concern: college CS courses are AP-level difficulty or harder, and if you're already dropping to B-range grades in AP courses, it suggests you may struggle with the pace and depth of a university CS curriculum.
 
-**Tier Impact:** This broad AP struggle pattern (rather than isolated STEM weakness) reinforces Selective tier positioning and makes it harder to break into Highly Selective CS programs, where admitted students typically show 3.7+ in at least 70-80% of AP courses. It shifts the narrative from 'STEM specialist' to 'solid student with AP challenges.'
+**Tier Impact:** This pattern reinforces your positioning in the Selective range (Boston University, Purdue) rather than allowing you to compete for Very Selective programs (NYU, Boston College). Schools in the Very Selective tier expect students to maintain strong grades even as rigor increases — your transcript shows the opposite trend.
 
-**Roadmap:** The roadmap recommends continuing AP-level Social Studies to show you can improve consistency across disciplines — important for demonstrating general college readiness alongside CS strength.
+**Roadmap:** The Strategic Roadmap recommends continuing at AP level in Math and Science to prove you can sustain performance under rigor — but you'll need to actively address the grade drops to make this strategy work.
 
 **Research Backing:**
-- AP Statistics has moderate pass rates: 62% of test-takers score 3+ on the AP exam (College Board 2024 AP Score Distributions by Subject)
-- Curriculum rigor is increasingly important in admissions: 64% of colleges rate rigor as 'considerably important' (NACAC (National Association for College Admission Counseling) Factors in College Admission)
+- Grades in college prep courses are rated 'considerably important' by 77% of admissions officers — and grade trends (up or down) are a key part of that evaluation: 77% rate as considerably important (NACAC (National Association for College Admission Counseling) Factors in College Admission)
 
 ---
 
 ### The Unintended Narrative
 
-Your transcript accidentally tells the story of a 'one-dimensional CS student who can't handle the full STEM rigor of competitive programs.' The 4.00 in AP CS A is impressive, but the 3.00-3.30 grades in AP Chemistry, AP Physics C, AP Statistics, and AP US History create a pattern that looks like AP-level struggle rather than strategic focus. AOs see a student who excels in their comfort zone (programming) but hasn't proven they can succeed in the math-heavy, interdisciplinary coursework that defines university CS — especially at selective programs where CS majors are expected to handle physics, advanced math, and systems thinking simultaneously.
+Your transcript accidentally tells this story: 'I'm a CS student who excels in CS but struggles with the broader STEM foundation required for the major.' The 4.00 in AP CS looks great in isolation, but the 3.00 in AP Chem and 3.30 in AP Physics C suggest you're strong in one narrow area and weak in the supporting disciplines. For AOs, this raises a red flag: can you handle a full CS curriculum, or will you struggle once you hit the math-heavy, theory-heavy courses that require the same problem-solving skills as Physics and Chemistry?
 
 ### Taking Control of the Narrative
 
-Reframe from 'CS specialist with STEM gaps' to 'CS-focused student building interdisciplinary STEM foundation.' Senior year needs to show recovery and consistency: strong performance in AP-level Math and Science (per roadmap) demonstrates you've addressed the transition struggles and can handle calculus-based rigor. Pair this with strategic course selection (depth in physics/math rather than breadth in AP Bio) to show you're building the specific technical foundation CS programs value. The goal is to prove the 3.00-3.30 grades were early learning curve, not a ceiling — and that your CS strength is supported by improving STEM fundamentals, not isolated from them.
+You need to prove breadth and consistency. First, continue AP-level Science and Math senior year — and aim for grades that match your CS performance (3.70+). This shows you can sustain rigor across STEM, not just in CS. Second, add depth to your CS profile: a second CS course, an independent project, or a competition result. This shifts the narrative from 'one-course wonder' to 'committed CS student with a strong foundation.' The goal is to make your Science and Math grades look like temporary dips, not a permanent ceiling.
 
 ---
 
@@ -128,63 +124,63 @@ Reframe from 'CS specialist with STEM gaps' to 'CS-focused student building inte
 
 ### Top Priorities
 
-**Priority 1: Bridge the Physics Gap for CS Major Credibility** [critical]
+**Priority 1: Complete Your CS Major Story with Physics C: E&M** [critical]
 
-You've completed AP Physics C: Mechanics with a 3.30, but competitive CS programs expect to see E&M as well — it demonstrates sustained commitment to physics fundamentals critical for systems-level CS work. The red flag analysis explicitly identifies missing AP Physics C: E&M as a gap for your major. Without it, AOs may question depth of STEM preparation despite your strong 4.00 in AP CS A. Adding E&M in senior year closes this gap and signals you can handle the physics requirements in CS curricula.
+You've already taken AP Physics C: Mechanics (3.30), but top CS programs expect BOTH Mechanics and E&M to demonstrate full calculus-based physics depth. Without E&M, your physics foundation looks incomplete — you started the sequence but didn't finish. Adding E&M senior year closes this gap and shows you can handle the mathematical rigor CS programs require. If you don't take it, admissions officers will wonder why you stopped halfway through a critical sequence for your major.
 
 Action items:
 - Enroll in AP Physics C: Electricity & Magnetism for senior year
-- If E&M conflicts with schedule, prioritize it over additional social studies/humanities APs
-- Connect with your Mechanics teacher now to preview E&M content over summer
+- Review vector calculus concepts over summer to prepare for E&M's heavier math demands
+- Connect with your Mechanics teacher for E&M study strategies — students who earned 3.3 in Mechanics typically need stronger calculus fluency for E&M
 
-**Priority 2: Advance Beyond AP CS A to Demonstrate Technical Depth** [high]
+**Priority 2: Push Your Math Ceiling with Multivariable Calculus or Linear Algebra** [high]
 
-Your 4.00 in AP CS A is your strongest performance, but it's an intro-level course. To differentiate in CS admissions (where many applicants have perfect AP CS A scores), you need progression: data structures, algorithms, or college-level CS. This is especially important given your school's resources — AOs expect well-resourced suburban students to pursue advanced opportunities. Without progression, your CS profile plateaus at 'competent beginner' rather than 'emerging specialist.'
-
-Action items:
-- Pursue dual enrollment in Data Structures/Algorithms at local college, or
-- Enroll in post-AP CS course if your school offers one (e.g., Mobile App Development, AI/ML), or
-- Develop substantial independent project (GitHub portfolio with 500+ lines, documentation) to demonstrate applied skills beyond AP curriculum
-
-**Priority 3: Stabilize Math Performance to Protect GPA Trajectory** [high]
-
-Your math grades show volatility: 3.90 (Precalc Honors) → 3.70 (AP Calc BC) → 3.30 (AP Stats). The 3.30 in Stats is your joint-lowest grade and suggests struggle with proof-based/conceptual math versus computational. For CS, you'll need discrete math and linear algebra — closer to Stats' reasoning style than Calc's procedures. If senior math continues this downward trend, it undermines your 'steady_strong' trajectory and raises questions about readiness for CS theory courses.
+Your 3.70 in AP Calculus BC shows you can handle advanced math, and CS programs value students who go beyond the standard sequence. Multivariable Calculus or Linear Algebra (especially Linear Algebra, which is foundational for machine learning and graphics) demonstrates you're serious about the mathematical side of CS. This also gives you a senior year math course that keeps your quantitative skills sharp — stopping at BC Calculus in junior year means no math on your senior transcript, which weakens your CS profile.
 
 Action items:
-- Choose senior math carefully: if available, take AP Calculus AB/BC review or Multivariable Calc (computational) over AP Stats-like courses
-- If discrete math or linear algebra is offered, take it — but get tutoring support given Stats performance
-- Aim for 3.50+ in senior math to demonstrate you've arrested the decline
+- Research dual enrollment options at local colleges for Multivariable Calculus or Linear Algebra
+- If dual enrollment isn't available, explore online options through accredited programs (e.g., Johns Hopkins CTY, Stanford OHS)
+- Aim for 3.5-3.7 range based on your BC Calculus performance — these courses are harder but you've shown you can handle the challenge
+
+**Priority 3: Demonstrate CS Depth Beyond AP CSA** [high]
+
+Your 4.00 in AP Computer Science A is your strongest academic signal, but one AP CS course isn't enough to stand out for competitive CS programs. You need to show progression: data structures, algorithms, or a college-level CS course. This addresses the major alignment gap identified in your profile — you have the foundation, but not the advanced coursework that separates strong applicants from exceptional ones.
+
+Action items:
+- Enroll in a college-level Data Structures or Algorithms course (dual enrollment or online through accredited university)
+- If formal coursework isn't available, complete a substantial independent project (e.g., contribute to open-source, build a full-stack application) and document it thoroughly
+- Consider competitive programming (USACO) to demonstrate algorithmic thinking — your 4.0 in CSA suggests you could reach Silver or Gold division with focused practice
 
 ### Course Strategy
 
-Prioritize closing the Physics C gap (critical for CS major credibility), demonstrating CS progression beyond AP (differentiation), and stabilizing math performance (protecting 'steady_strong' trajectory). Total load: 5 rigorous courses aligns with workload advice and your 3.55 typical performance.
+Your course strategy prioritizes completing critical sequences (Physics C, advanced math) and demonstrating CS depth beyond AP CSA. This addresses your major alignment gaps while staying within your proven performance envelope.
 
 **Recommended:**
 
 | Course | Rationale | Risk | Expected Outcome |
 |--------|-----------|------|-----------------|
-| AP Physics C: Electricity & Magnetism | You earned 3.30 in Mechanics, demonstrating capability in calculus-based physics. E&M completes the Physics C sequence that CS programs expect. The red flag analysis explicitly identifies this as a missing critical course for your major. | medium | Based on your 3.30 in Mechanics, expect 3.0-3.3 range — E&M is typically considered harder by students, and the 76% pass rate (28% score 5) on Mechanics suggests you're in the capable-but-not-effortless zone. Budget extra study time. |
-| Data Structures or Algorithms (college/post-AP) | Your 4.00 in AP CS A is your ceiling performance and shows strong aptitude. Progression beyond AP is essential to differentiate in CS admissions. This demonstrates you're pursuing depth, not just collecting AP credits. | low | Given your 4.00 in AP CS A, you have the foundation to excel. Expect 3.5-4.0 range if you maintain consistent effort. This becomes your strongest major-aligned signal. |
-| Multivariable Calculus or Computational Math | After AP Calc BC (3.70), you need senior math that plays to your computational strengths rather than proof-based reasoning (where Stats' 3.30 suggests vulnerability). Multivariable is procedural like BC and directly relevant to CS graphics/ML. | low | Your 3.70 in BC suggests 3.5-3.8 range in Multivariable — it's more of the same computational calculus you've handled well, unlike the conceptual shift Stats represented. |
-| AP English Literature (if not yet taken) | You earned 3.70 in AP Lang, showing solid humanities capability. Completing both AP English courses demonstrates well-roundedness that balances your STEM focus, and 77% of AOs rate grades in college prep as 'considerably important.' | low | Based on 3.70 in AP Lang and 3.90 in English 10 Honors, expect 3.6-3.8 range. Literature is typically graded similarly to Language at most schools. |
-| AP Government or AP Economics (one semester each, if available) | You earned 3.30 in APUSH and 3.70 in World History Honors. A senior-year social studies AP completes four years of core subjects. Gov/Econ are typically less reading-intensive than APUSH, reducing risk while maintaining rigor. | low | Given your 3.30 in APUSH (a reading-heavy course) and 3.70 in World History Honors, expect 3.4-3.6 range in Gov/Econ — they're more concept-focused and less essay-dependent. |
+| AP Physics C: Electricity & Magnetism | Completes the calculus-based physics sequence you started with Mechanics. CS programs expect both halves. | medium | Based on your 3.30 in Mechanics, expect 3.0-3.3 range — E&M is typically considered harder due to heavier vector calculus demands. |
+| Multivariable Calculus or Linear Algebra (dual enrollment) | Your 3.70 in BC Calculus shows readiness. Linear Algebra is especially valuable for CS (machine learning, graphics). | medium | Based on your 3.70 in BC Calculus, expect 3.5-3.7 range — college pacing is faster but content difficulty is comparable. |
+| Data Structures or Algorithms (dual enrollment or college-level) | Your 4.00 in AP CSA demonstrates strong foundation. This is the natural next step to show CS depth. | low | Based on your 4.00 in AP CSA, expect 3.7-4.0 range — you've proven you can excel in structured CS coursework. |
+| AP English Literature | Your 3.70 in AP Lang shows you can handle AP English. Lit completes the English sequence and maintains humanities rigor. | low | Based on your 3.70 in AP Lang, expect 3.5-3.7 range — Lit emphasizes analysis over argument but similar difficulty. |
+| AP Government or AP Economics | Your 3.30 in AP US History shows you can handle AP social studies. Completes your humanities breadth. | low | Based on your 3.30 in APUSH, expect 3.3-3.5 range — Government and Economics are typically considered slightly less reading-intensive. |
 
 **Avoid:**
 
-- **AP Computer Science Principles**: You earned 4.00 in AP CS A, the advanced course. Taking CSP (the intro breadth course) after CS A is regression, not progression. It signals you're padding your transcript rather than pursuing depth. AOs will notice.
-- **Additional AP Statistics or statistics-heavy math**: Your 3.30 in AP Stats is your joint-lowest grade and suggests struggle with proof-based/conceptual reasoning. Doubling down on this style (e.g., AP Stats retake, probability theory) risks further GPA damage without major-alignment benefit.
+- **AP Computer Science Principles**: You earned 4.00 in AP CSA — CSP is a step backward (intro breadth course vs. CSA's depth). Take college-level CS instead.
+- **AP Physics 1 or 2**: You've already taken AP Physics C: Mechanics (calculus-based). Physics 1/2 are algebra-based and would be regression, not progression.
 
-### Major Alignment: 65/100
+### Major Alignment: 50/100
 
-Your 4.00 in AP CS A and 3.70 in AP Calc BC provide a solid foundation, but the profile lacks depth beyond intro-level CS and has the explicit gap of missing AP Physics C: E&M. Competitive CS programs expect to see both Physics C courses, progression beyond AP CS A, and stronger math consistency (your 3.30 in Stats raises questions about readiness for discrete math/theory).
+Developing alignment (30-55 band) — you have a strong foundation (4.0 in AP CSA, 3.70 in BC Calculus, 3.30 in Physics C: Mechanics), but significant gaps remain. You're missing the second half of Physics C (E&M), advanced math beyond BC Calculus, and CS coursework beyond AP CSA. These aren't optional for competitive CS programs — they're expected. Your profile shows you CAN do the work (your grades prove it), but you haven't yet built the complete story top programs look for.
 
-**Missing:** AP Physics C: Electricity & Magnetism (explicitly flagged as critical gap), Post-AP CS coursework or substantial independent project demonstrating applied skills, Discrete math or linear algebra (if available) to show readiness for CS theory
+**Missing:** AP Physics C: Electricity & Magnetism (you took Mechanics but not E&M — incomplete sequence), Advanced math beyond BC Calculus (Multivariable Calculus or Linear Algebra), CS coursework beyond AP CSA (Data Structures, Algorithms, or college-level CS), Demonstrated CS depth through projects, research, or competition (USACO, hackathons, open-source contributions)
 
-**Strengths to leverage:** 4.00 in AP CS A is your ceiling performance — use it to justify pursuing advanced CS opportunities, 3.70 in AP Calc BC shows calculus competency needed for physics and algorithms coursework, Well-resourced suburban school provides access to dual enrollment/advanced courses — AOs expect you to use these resources
+**Strengths to leverage:** 4.00 in AP Computer Science A — your strongest academic signal, proves you excel in structured CS learning, 3.70 in AP Calculus BC — shows mathematical readiness for advanced CS topics, 3.30 in AP Physics C: Mechanics — demonstrates you can handle calculus-based STEM, just need to complete the sequence, Steady upward trajectory in STEM courses — your performance is consistent and reliable, which matters for rigorous CS programs
 
 ### Trajectory Optimization
 
-Your biggest GPA lever is **senior year math choice**. Your math trajectory (3.90 → 3.70 → 3.30) shows decline, with Stats' 3.30 pulling down your STEM average. Choose computational math (Multivariable Calc) over conceptual/proof-based courses to play to your strengths, arrest the decline, and protect your 'steady_strong' narrative. A 3.50+ in senior math keeps your overall GPA in the 3.60-3.65 range; another 3.30 drops you to 3.50-3.55 and undermines CS major readiness signals.
+Your biggest GPA lever is senior year STEM performance — Physics C: E&M, advanced math, and college-level CS will carry the most weight because they directly address your major alignment gaps. BEST CASE: If you earn 3.5-3.7 in advanced math, 3.3 in E&M, and 3.7-4.0 in college CS → projected senior year GPA around 3.65-3.75, cumulative climbs to 3.60-3.65, and major alignment jumps to 75-80 (strong alignment). This scenario shows you completed every critical sequence and demonstrated CS depth. REALISTIC CASE: If you earn your typical performance (3.5 in advanced math, 3.0-3.3 in E&M, 3.7 in college CS) → projected senior year GPA around 3.55-3.60, cumulative stays near 3.55-3.60, major alignment reaches 65-70 (moderate alignment). Even the realistic case significantly strengthens your CS story by closing the Physics C gap and adding advanced coursework. The key is COMPLETING sequences — an incomplete Physics C or stopping at BC Calculus signals you didn't push yourself when it mattered most.
 
 ---
 
@@ -200,11 +196,19 @@ Your biggest GPA lever is **senior year math choice**. Your math trajectory (3.9
 | AP Physics C: Mechanics | 76% | 28% | 3.30 | College Board 2024 AP Score Distributions by Subject |
 | AP Statistics | 62% | 18% | 3.30 | College Board 2024 AP Score Distributions by Subject |
 | AP English Literature and Composition | 72% | 14% | — | College Board 2024 |
+| AP Chemistry | 76% | 18% | 3.00 | College Board 2024 AP Score Distributions by Subject |
+| AP English Language | 55% | 10% | 3.70 | College Board 2024 AP Score Distributions by Subject |
+| AP US History | 72% | 13% | 3.30 | College Board 2024 AP Score Distributions by Subject |
 
-> **AP Calculus BC:** You earned 3.70 — strong performance in a course where 81% of test-takers score 3+.
-> **AP Computer Science A:** You earned 4.00 — strong performance in a course where 67% of test-takers score 3+.
-> **AP Physics C: Mechanics:** You earned 3.30 — solid performance, tracking with the 76% national pass rate.
-> **AP Statistics:** You earned 3.30 — solid performance, tracking with the 62% national pass rate.
+> **AP Calculus AB:** Recommended for your profile — you haven't taken this course yet.
+> **AP Calculus BC:** You earned 3.70 in AP Calculus BC. This AP exam has a 81% pass rate and 48% score-5 rate — one of the more accessible AP courses.
+> **AP Computer Science A:** You earned 4.00 in AP Computer Science A. This AP exam has a 67% pass rate and 26% score-5 rate — a moderately challenging AP course.
+> **AP Physics C: Mechanics:** You earned 3.30 in AP Physics C: Mechanics. With a 76% exam pass rate, this is a moderately challenging AP course — your result reflects solid capability at this level.
+> **AP Statistics:** You earned 3.30 in AP Statistics. With a 62% exam pass rate, this is a moderately challenging AP course — your result reflects solid capability at this level.
+> **AP English Literature and Composition:** Recommended for your profile — you haven't taken this course yet.
+> **AP Chemistry:** You earned 3.00 in AP Chemistry. The 76% exam pass rate indicates moderate course difficulty. See the Challenges section for strategic context.
+> **AP English Language:** You earned 3.70 in AP English Language. This AP exam has a 55% pass rate and 10% score-5 rate — among the most challenging AP courses.
+> **AP US History:** You earned 3.30 in AP US History. With a 72% exam pass rate, this is a moderately challenging AP course — your result reflects solid capability at this level.
 
 ### Major Requirements: Computer Science
 
@@ -218,13 +222,13 @@ Your biggest GPA lever is **senior year math choice**. Your math trajectory (3.9
 
 | Factor | Importance | Source |
 |--------|------------|--------|
+| Grades in college prep courses | Very Important (77% of colleges) | NACAC 2023 |
+| Academic GPA | Very Important (74% of colleges) | NACAC 2023 |
 | Rigor of secondary school record | Very Important (64% of colleges) | NACAC 2023 |
-| Academic GPA | Very Important (77% of colleges) | NACAC 2023 |
-| Grades in college prep courses | Very Important (69% of colleges) | NACAC 2023 |
 | Standardized test scores | Moderately Important (varies by school) | NACAC 2023 |
 
 ---
 
 *Generated by DeepAcademicReportService (Claude Sonnet 4.5)*
-*Cost: $0.1145 | Time: 54.2s | Tokens: 6491 in, 6333 out*
+*Cost: $0.1132 | Time: 51.8s | Tokens: 10727 in, 5679 out*
 *All statistics from College Board 2024, NACAC 2023, and institutional Common Data Sets.*

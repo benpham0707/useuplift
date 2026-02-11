@@ -27,7 +27,7 @@ import { generateChallengesAndReality } from './generators/challengesGenerator';
 import { generateStrategicRoadmap } from './generators/roadmapGenerator';
 import { generateResearchContext } from './generators/researchGenerator';
 import { generateBottomLine } from './generators/bottomLineGenerator';
-import { validateReportOutput } from './validation/postProcessing';
+import { validateReportOutput, fixRoadmapPostProcessing } from './validation/postProcessing';
 import { generateTemplateFallback } from './fallback/templateFallback';
 
 // ============================================================================
@@ -167,11 +167,15 @@ export async function generateDeepAcademicReport(
   // R18: Pass roadmap for stat dedup validation
   const validation = validateReportOutput(identity, challenges, input.intendedMajor, roadmap);
 
+  // H2 + C2: Roadmap post-processing (score band fix + recommend/avoid contradictions)
+  const roadmapFix = fixRoadmapPostProcessing(roadmap);
+  roadmap = roadmapFix.roadmap;
+
   // V4: Cross-section consistency check
   const crossSectionIssues = validateCrossSectionConsistency(
     validation.cleaned.identity, validation.cleaned.challenges, roadmap
   );
-  const allIssues = [...validation.issues, ...crossSectionIssues];
+  const allIssues = [...validation.issues, ...roadmapFix.issues, ...crossSectionIssues];
 
   if (allIssues.length > 0) {
     console.warn(`[DeepAcademicReport] Post-processing found ${allIssues.length} issues:`,

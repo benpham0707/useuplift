@@ -11,7 +11,7 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
-import { parseClaudeJSON } from '../../../../../commonAppWorkshop/utils/jsonParser';
+import { parseClaudeJSON } from '../../../../../../commonAppWorkshop/utils/jsonParser';
 import type { EnrichedReportContext } from '../types';
 import type { ChallengesAndRealitySection } from '../types';
 // R20: Removed dead import of calculateTierPosition
@@ -56,15 +56,21 @@ export async function generateChallengesAndReality(
     .map(t => `${t.name}: GPA ${t.gpaRange} (e.g. ${t.examples.slice(0, 3).join(', ')})`)
     .join('\n');
 
-  const systemPrompt = `You are a former admissions officer writing about academic challenges — what they are, how AOs interpret them, and how they affect a student's college positioning.
+  const systemPrompt = `You MUST output valid JSON only — no markdown, no headers, no explanation text outside the JSON object.
+
+You are a former admissions officer writing about academic challenges for a HIGH SCHOOL STUDENT. Write in second person ("you"). Be honest but approachable — not clinical.
 
 CRITICAL RULES:
-1. Only reference courses the student has ACTUALLY taken (listed below). Do NOT claim they are missing a course they already have.
-2. Every sentence must contain data, a concrete insight, or an actionable observation. If a sentence could be deleted without losing information, delete it.
-3. Do NOT assume the student's thoughts. Just state the issue and the AO reality directly.
-4. When discussing GPA impact, ALWAYS use COLLEGE TIER BENCHMARKS: say "this pulls you from Highly Selective (UCLA) to Selective (Boston U) range" instead of just "0.70 GPA drop."
-5. Do NOT give root cause analysis or study advice — that happens in conversation later.
-6. Each statistic from VERIFIED STATISTICS may be cited in AT MOST ONE challenge. Do not reuse the same data point across challenges.
+1. Only reference courses the student has ACTUALLY taken (listed below).
+2. STUDENT-FRIENDLY LANGUAGE: Write for a high schooler, not a data scientist.
+   - Use actual GPAs and grades (students understand 3.30, B+, etc.)
+   - Use school names to anchor tier discussions ("this keeps you at Boston University level instead of UCLA level")
+   - AVOID raw statistical jargon: no "0.70 GPA spread", "38% risk level", "-0.37 typical impact"
+   - INSTEAD use plain English: "a full letter grade difference", "there's a real gap between your best and weakest subjects"
+3. Do NOT assume the student's thoughts. State the issue and the AO reality directly.
+4. When discussing positioning impact, use school names: "this keeps you in the range of schools like Boston University instead of moving up to UCLA's level."
+5. Do NOT give root cause analysis or study advice — that happens later.
+6. Each statistic from VERIFIED STATISTICS may be cited in AT MOST ONE challenge.
 
 DATA ACCURACY — HARD RULES (violations make the report factually incorrect):
 - AP pass rates measure AP EXAM performance (scores 1-5, where 3+ = passing). Class GPA is on a 4.0 scale. These are COMPLETELY UNRELATED metrics.
@@ -81,6 +87,9 @@ DO NOT duplicate:
 - Overall tier positioning (Section 1 owns that)
 - Course recommendations (Section 3 owns that — just briefly point to it)
 - General strengths or identity framing (Section 1 owns that)
+- Reference Section 1's established identity: "As your identity profile shows, you're a [tier] student with..." — do NOT re-explain their tier, GPA, or consistency score.
+- When pointing to the roadmap, be SPECIFIC: "Your Strategic Roadmap addresses this with [action name]" — do NOT say generic things like "Your roadmap recommends continuing at AP level."
+- Each challenge should cite data that was NOT already featured in Section 1's narrative or strengths. If Section 1 highlighted the CS/Math convergence, the challenges should focus on the OTHER side of that data.
 
 Focus on 2-3 DISTINCT challenges. PRIORITIZE challenges that matter most for the student's intended major (${ctx.input.intendedMajor || 'Undecided'}). For a CS applicant, focus on STEM readiness, CS progression depth, and math/science foundation — not Social Studies. Only include non-major-relevant challenges if they represent a truly alarming systemic pattern (e.g., failing across multiple areas). Each challenge must cover a genuinely different concern.
 
@@ -93,7 +102,7 @@ Output valid JSON:
       "issue": "What the issue is — factual, data-specific. 2-3 sentences.",
       "aoImpact": "How AOs specifically interpret this — what it signals about college readiness. 2-3 sentences.",
       "tierImpact": "How this shifts their school positioning — MUST show FROM→TO movement with specific school names. Example: 'This drops you from the Highly Selective range (UCLA, Georgetown) to mid-Selective range (Boston U, Purdue).' NEVER just say 'This affects your positioning at X level' — always show the directional shift. 1-2 sentences.", // Q6: Add tierImpact FROM→TO requirement
-      "roadmapConnection": "Brief pointer to the roadmap action that addresses this. 1 sentence.",
+      "roadmapConnection": "Name the SPECIFIC roadmap action: 'See Priority [N]: [title]' or 'The Strategic Roadmap recommends [specific course/action].' Do NOT write generic pointers like 'Your roadmap addresses this.' If you don't know the exact priority number, name the specific action: 'The roadmap recommends AP Physics C: E&M to address this.'",
       "researchBacking": [
         { "claim": "Specific claim", "value": "Data point", "source": "Verified source" }
       ]
@@ -131,10 +140,10 @@ INTENDED MAJOR: ${ctx.input.intendedMajor || 'Undecided'}
 COMPLETE COURSE LIST (courses they have ACTUALLY taken — do NOT claim they are missing any of these):
 ${allCoursesList}
 
-CHALLENGE SUBJECTS (relative weakness areas):
+CHALLENGE SUBJECTS (weaker areas):
 ${challengeSubjects.map(([subj, p]) => {
   const courses = p.performanceHistory.courses.map(c => `${c.name} (${c.level}): ${c.grade.toFixed(1)}`).join(', ');
-  return `- ${formatSubject(subj)}: ${p.performanceHistory.avgGPA.toFixed(2)} avg GPA, ${Math.round(p.relativeStrength * 100)}% relative, trend: ${p.performanceHistory.trend}
+  return `- ${formatSubject(subj)}: ${p.performanceHistory.avgGPA.toFixed(2)} avg GPA (weaker than their other subjects), trend: ${p.performanceHistory.trend}
     Courses: ${courses}`;
 }).join('\n\n')}
 
@@ -144,17 +153,12 @@ ${challengePatterns.map(c => `- ${c.insight}: ${c.evidence} → ${c.implication}
 RED FLAGS:
 ${redFlags.map(r => `- [${r.severity}] ${r.description}`).join('\n')}
 
-CHALLENGE RESPONSE DATA:
-- Typical difficulty impact: ${quant.challengeResponse.transitionAnalysis.typicalImpact.toFixed(2)} GPA drop
-- Risk level: ${quant.challengeResponse.challengeRiskProfile.riskLevel}/100
+HOW THEY HANDLE CHALLENGE:
+- When they move from Honors to AP, grades typically drop about ${Math.abs(quant.challengeResponse.transitionAnalysis.typicalImpact).toFixed(1)} points
+- Their grades are ${quant.performanceFingerprint.consistencyScore >= 70 ? 'reliably consistent' : quant.performanceFingerprint.consistencyScore >= 50 ? 'moderately consistent' : 'somewhat inconsistent'} across courses
 
-TRAJECTORY: ${quant.progressionTrajectory.historical.overallTrend}
-GPA TREND: ${quant.progressionTrajectory.historical.gpaByYear.map(y => `${y.year}: ${y.gpa.toFixed(2)} (rigor: ${y.rigorLevel.toFixed(1)})`).join(' → ')}
-
-RIGOR CONTEXT:
-- Sweet spot: ${quant.performanceFingerprint.sweetSpot.level}
-- Difficulty sensitivity: ${quant.performanceFingerprint.difficultySensitivity}
-- Consistency: ${quant.performanceFingerprint.consistencyScore}%
+TRAJECTORY:
+GPA by year: ${quant.progressionTrajectory.historical.gpaByYear.map(y => `${y.year}: ${y.gpa.toFixed(2)}`).join(' → ')}
 
 ROADMAP CONTEXT (when pointing to roadmap actions, align with these recommendations — do NOT recommend different courses than what the roadmap will suggest):
 ${courseRecs.map(r => `- ${formatSubject(r.subject)}: ${r.recommendedLevel}${r.specificCourse ? ` (${r.specificCourse})` : ''} — ${r.rationale}`).join('\n')}
@@ -162,15 +166,20 @@ ${courseRecs.map(r => `- ${formatSubject(r.subject)}: ${r.recommendedLevel}${r.s
 COLLEGE EXPECTATIONS:
 ${ctx.assembledResearch.collegeExpectations ? `Tier: ${ctx.assembledResearch.collegeExpectations.tier}, GPA range: ${ctx.assembledResearch.collegeExpectations.gpaRange}, AP range: ${ctx.assembledResearch.collegeExpectations.apCourseRange}` : 'Not specified'}
 
-VERIFIED STATISTICS (cite these, don't invent):
-${relevantStats.map(s => `- ${s.claim}: ${s.value} (${s.citation})`).join('\n')}
-
 COMMON MISTAKES FOR ${ctx.input.intendedMajor || 'applicants'} (from admissions research):
 ${ctx.forChallenges.commonMistakes.length > 0
   ? ctx.forChallenges.commonMistakes.map(m =>
       `- MISTAKE: ${m.mistake}\n  WHY IT HURTS: ${m.whyItHurts}\n  HOW TO FIX: ${m.howToFix}`
     ).join('\n')
-  : 'No major-specific common mistakes available.'}`;
+  : 'No major-specific common mistakes available.'}
+
+═══════════════════════════════════════════════════════════════
+THE FOLLOWING SECTION CONTAINS AP EXAM STATISTICS — COMPLETELY SEPARATE METRICS FROM THE STUDENT'S CLASS GRADES ABOVE.
+AP exam scores (1-5) ≠ class GPA (4.0 scale). NEVER compare them in the same sentence.
+═══════════════════════════════════════════════════════════════
+
+VERIFIED STATISTICS (cite these, don't invent):
+${relevantStats.map(s => `- ${s.claim}: ${s.value} (${s.citation})`).join('\n')}`;
 
   const response = await callClaude<string>({
     model: MODEL,

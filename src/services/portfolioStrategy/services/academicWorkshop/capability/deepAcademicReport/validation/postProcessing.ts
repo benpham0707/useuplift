@@ -122,6 +122,11 @@ export function validateReportOutput(
           description: `Conflated AP exam rate with class GPA in challenge "${challenge.title}": "${original.slice(0, 120)}..."`,
           action: 'stripped',
         });
+        // C3: If stripping left only the generic placeholder, add specificity
+        const placeholder = '[This analysis contained a statistical comparison error and was simplified. See Research Context for verified data.]';
+        if (challenge[field] === placeholder) {
+          challenge[field] = `[The ${field} analysis for "${challenge.title}" contained a statistical comparison error. See Research Context for verified AP data.]`;
+        }
       }
     }
   }
@@ -199,6 +204,30 @@ export function validateReportOutput(
     }
   }
 
+  // =========================================================================
+  // C3: Enhanced conflation detection — also check roadmapConnection field
+  // =========================================================================
+
+  for (let i = 0; i < cleanedChallenges.challenges.length; i++) {
+    const challenge = cleanedChallenges.challenges[i];
+    if (hasAPGPAConflation(challenge.roadmapConnection)) {
+      const original = challenge.roadmapConnection;
+      challenge.roadmapConnection = stripConflatedSentences(original);
+      issues.push({
+        type: 'ap_gpa_conflation',
+        severity: 'error',
+        section: `challenges[${i}].roadmapConnection`,
+        description: `Conflated AP exam rate with class GPA in challenge "${challenge.title}" roadmapConnection: "${original.slice(0, 120)}..."`,
+        action: 'stripped',
+      });
+      // C3: If stripping left only the placeholder, add specificity
+      const placeholder = '[This analysis contained a statistical comparison error and was simplified. See Research Context for verified data.]';
+      if (challenge.roadmapConnection === placeholder) {
+        challenge.roadmapConnection = `[The roadmap connection for "${challenge.title}" contained a statistical comparison error. See Research Context for verified AP data and the Roadmap for strategic guidance.]`;
+      }
+    }
+  }
+
   return {
     issues,
     cleaned: {
@@ -206,4 +235,113 @@ export function validateReportOutput(
       identity: cleanedIdentity,
     },
   };
+}
+
+// ============================================================================
+// H2 + C2: ROADMAP POST-PROCESSING
+// ============================================================================
+
+/** Score band definitions for deterministic mapping (C2) */
+const SCORE_BANDS: Array<{ min: number; max: number; label: string }> = [
+  { min: 0, max: 30, label: 'Major misalignment' },
+  { min: 30, max: 55, label: 'Developing alignment' },
+  { min: 55, max: 75, label: 'Moderate alignment' },
+  { min: 75, max: 90, label: 'Strong alignment' },
+  { min: 90, max: 100, label: 'Exceptional alignment' },
+];
+
+function getCorrectBandLabel(score: number): string {
+  for (const band of SCORE_BANDS) {
+    if (score >= band.min && score < band.max) return band.label;
+  }
+  // score === 100
+  return 'Exceptional alignment';
+}
+
+/**
+ * Post-process roadmap section: fix score band labels (C2) and detect
+ * recommend/avoid contradictions (H2).
+ */
+export function fixRoadmapPostProcessing(roadmap: StrategicRoadmapSection): {
+  roadmap: StrategicRoadmapSection;
+  issues: ValidationIssue[];
+} {
+  const issues: ValidationIssue[] = [];
+  const cleaned = structuredClone(roadmap);
+
+  // =========================================================================
+  // C2: Deterministic score band mapping
+  // =========================================================================
+
+  const score = cleaned.majorAlignment.score;
+  const correctLabel = getCorrectBandLabel(score);
+  const assessment = cleaned.majorAlignment.assessment;
+
+  // Check if the LLM stated a different band label
+  const allLabels = SCORE_BANDS.map(b => b.label);
+  const statedLabel = allLabels.find(label =>
+    assessment.toLowerCase().includes(label.toLowerCase())
+  );
+
+  if (statedLabel && statedLabel !== correctLabel) {
+    // Override the first sentence to use the correct band
+    const sentences = assessment.split(/(?<=[.!?])\s+/);
+    if (sentences.length > 0) {
+      sentences[0] = sentences[0].replace(
+        new RegExp(statedLabel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+        correctLabel
+      );
+      cleaned.majorAlignment.assessment = sentences.join(' ');
+    }
+    issues.push({
+      type: 'cross_section_contradiction',
+      severity: 'warning',
+      section: 'roadmap.majorAlignment',
+      description: `Score ${score} maps to "${correctLabel}" but LLM stated "${statedLabel}" — overridden`,
+      action: 'stripped',
+    });
+  }
+
+  // =========================================================================
+  // H2: Detect courses in both recommended AND avoid lists
+  // =========================================================================
+
+  const avoidedCourses = new Set(
+    cleaned.courseStrategy.avoid.map(a => a.course.toLowerCase())
+  );
+
+  // Check recommended list for contradictions
+  for (const rec of cleaned.courseStrategy.recommended) {
+    if (avoidedCourses.has(rec.course.toLowerCase())) {
+      issues.push({
+        type: 'cross_section_contradiction',
+        severity: 'warning',
+        section: `roadmap.courseStrategy.recommended: ${rec.course}`,
+        description: `"${rec.course}" appears in both recommended and avoid lists — contradiction`,
+        action: 'stripped',
+      });
+      // Auto-fix: remove "consider" language from the rationale
+      rec.rationale = rec.rationale.replace(/\bconsider\b/gi, 'evaluate carefully whether to');
+    }
+  }
+
+  // Check priority actionItems for mentions of avoided courses
+  for (let i = 0; i < cleaned.priorities.length; i++) {
+    for (let j = 0; j < cleaned.priorities[i].actionItems.length; j++) {
+      const item = cleaned.priorities[i].actionItems[j];
+      for (const avoidCourse of avoidedCourses) {
+        if (item.toLowerCase().includes(avoidCourse)) {
+          issues.push({
+            type: 'cross_section_contradiction',
+            severity: 'warning',
+            section: `roadmap.priorities[${i}].actionItems[${j}]`,
+            description: `Action item mentions avoided course "${avoidCourse}" — flagged`,
+            action: 'flagged',
+          });
+        }
+      }
+    }
+  }
+
+  return { roadmap: cleaned, issues };
 }

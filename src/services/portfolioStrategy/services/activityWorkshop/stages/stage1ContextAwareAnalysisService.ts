@@ -582,8 +582,16 @@ Output valid JSON only.`;
       // Calculate improvement potential
       const improvementPotential = this.calculateImprovementPotential(analysis, tier);
 
-      // Decision logic
-      if (tier === 1 && !isCoreToStory) {
+      // Check if this activity is part of the student's spike
+      const isInSpike = storyContext.spikeHypothesis.spikeActivityIds.includes(activityId);
+
+      // Decision logic — strategic importance overrides tier-based defaults
+      // Spike and core activities get deep teaching because they differentiate
+      // the student at target schools and need the most polish
+      if ((isCoreToStory || isInSpike) && tier >= 2) {
+        // Spike/core identity/passion pursuit activities with room to improve → deep teaching
+        deepTeachingIds.push(activityId);
+      } else if (tier === 1 && !isCoreToStory) {
         // Tier 1 non-core: skip teaching (already excellent)
         skipTeachingIds.push(activityId);
       } else if (tier === 1 && isCoreToStory) {

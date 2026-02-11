@@ -373,13 +373,13 @@ async function runTest() {
 
       // Per-activity scoring breakdown
       if (actScore) {
-        log('  DESCRIPTION SCORING (5-dimension breakdown):');
+        log('  DESCRIPTION SCORING (5-dimension weighted breakdown):');
         const db = actScore.descriptionScore.breakdown;
-        log(`    Role Ownership:      ${db.specificity.score}/${db.specificity.maxScore} — ${db.specificity.rationale}`);
-        log(`    Evidence of Impact:   ${db.impactClarity.score}/${db.impactClarity.maxScore} — ${db.impactClarity.rationale}`);
-        log(`    Action Precision:     ${db.actionLanguage.score}/${db.actionLanguage.maxScore} — ${db.actionLanguage.rationale}`);
-        log(`    Quantification:       ${db.quantification.score}/${db.quantification.maxScore} — ${db.quantification.rationale}`);
-        log(`    Differentiation:      ${db.authenticityVoice.score}/${db.authenticityVoice.maxScore} — ${db.authenticityVoice.rationale}`);
+        log(`    Role Ownership:      ${db.specificity.score}/${db.specificity.maxScore} (25%) — ${db.specificity.rationale}`);
+        log(`    Evidence of Impact:   ${db.impactClarity.score}/${db.impactClarity.maxScore} (25%) — ${db.impactClarity.rationale}`);
+        log(`    Differentiation:      ${db.authenticityVoice.score}/${db.authenticityVoice.maxScore} (20%) — ${db.authenticityVoice.rationale}`);
+        log(`    Action Precision:     ${db.actionLanguage.score}/${db.actionLanguage.maxScore} (15%) — ${db.actionLanguage.rationale}`);
+        log(`    Quantification:       ${db.quantification.score}/${db.quantification.maxScore} (15%) — ${db.quantification.rationale}`);
         log('');
 
         log('  ACTIVITY SCORING (5-component breakdown):');
@@ -676,57 +676,6 @@ async function runTest() {
     } else {
       divider('SCORING');
       log('Scoring data not available (scoring orchestrator may have failed)');
-      log('');
-    }
-
-    // ──────────────────────────────────────────
-    // RECOMMENDED DESCRIPTIONS — Final copy-pasteable view
-    // ──────────────────────────────────────────
-    divider('RECOMMENDED DESCRIPTIONS');
-    log('Your optimized activity descriptions, in recommended order.');
-    log('IMPORTANT: Some descriptions include suggested metrics (grade improvements,');
-    log('team sizes, retention rates) based on your profile. Verify all specific');
-    log('numbers and replace with your actual figures before submitting.');
-    log('');
-
-    // Use Stage 3 ordering if available, otherwise follow teaching order
-    const orderedIds: string[] = result.stage3.orderedActivities
-      ? result.stage3.orderedActivities.map((oa: any) => oa.activityId)
-      : testInput.activities.map(a => a.id);
-
-    for (let i = 0; i < orderedIds.length; i++) {
-      const actId = orderedIds[i];
-      const activity = testInput.activities.find(a => a.id === actId);
-      if (!activity) continue;
-
-      // Find the best description: scoring rewrite > Stage 2 optimized > original
-      const td = result.stage2.teachingDelivered.find((t: any) => t.activityId === actId);
-      const stage2Desc = td?.teaching?.descriptionOptimization?.optimizedDescription;
-      const scoringRewrite = transformationsMap.get(actId)?.rewrite?.suggested
-        || transformationsMap.get(activity.title)?.rewrite?.suggested;
-      const originalDesc = activity.description;
-
-      // Pick the best available description within char limit
-      const charLimit = 150; // Common App default
-      let bestDesc = originalDesc;
-      let source = 'original';
-
-      if (stage2Desc && stage2Desc.length <= charLimit) {
-        bestDesc = stage2Desc;
-        source = 'optimized';
-      }
-      if (scoringRewrite && scoringRewrite.length <= charLimit) {
-        bestDesc = scoringRewrite;
-        source = 'expert rewrite';
-      }
-
-      // Get score if available
-      const actScore = activityScoresMap.get(actId) || activityScoresMap.get(activity.title);
-      const scoreText = actScore ? ` [${actScore.combinedScore.total.toFixed(1)}/10]` : '';
-
-      log(`  ${i + 1}. ${activity.title}${scoreText}`);
-      log(`     "${bestDesc}"`);
-      log(`     (${bestDesc.length} chars, ${source})`);
       log('');
     }
 

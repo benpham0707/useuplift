@@ -471,6 +471,7 @@ export class ActivityScoringService {
           systemPrompt: ACTIVITY_SCORING_SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 8000,
+          timeoutMs: 240000, // 4 min — batch scoring 5+ activities with Sonnet 4.5 needs more time
         }
       );
 

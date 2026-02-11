@@ -157,15 +157,23 @@ async function main() {
   md.push('---');
   md.push('');
 
-  // Section 1: Academic Identity
-  md.push('## Section 1: Academic Identity');
+  // Section 1: Your Academic Profile (unified — grade + tier + identity + strengths + weaknesses)
+  const tp = report.academicIdentity.tierPosition;
+  const grade = report.academicIdentity.upliftRating.grade;
+
+  md.push(`## Your Academic Profile`);
   md.push('');
+  md.push(`**Your Uplift Grade: ${grade}** — ${tp.currentTier} Schools`);
+  md.push(`> Schools like ${tp.tierExamples.slice(0, 4).join(', ')}`);
+  md.push('');
+
+  // Unified narrative (now includes tier and rating context woven in)
   md.push(report.academicIdentity.narrativeIdentity);
   md.push('');
 
   // Notable Strengths
   if (report.academicIdentity.notableStrengths.length > 0) {
-    md.push('### Notable Strengths');
+    md.push('### What Makes Your Profile Stand Out');
     md.push('');
     for (const ns of report.academicIdentity.notableStrengths) {
       md.push(`**${ns.subject}:** ${ns.insight}`);
@@ -176,7 +184,7 @@ async function main() {
 
   // Notable Weaknesses
   if (report.academicIdentity.notableWeaknesses.length > 0) {
-    md.push('### Areas to Improve');
+    md.push('### Where You Need to Grow');
     md.push('');
     for (const nw of report.academicIdentity.notableWeaknesses) {
       md.push(`**${nw.area}:** ${nw.gap}`);
@@ -185,27 +193,28 @@ async function main() {
     }
   }
 
-  // College Tier Position
-  const tp = report.academicIdentity.tierPosition;
-  md.push('### College Tier Position');
+  // Your College Tier Position (detailed tier analysis)
+  md.push('### Your College Tier Position');
   md.push('');
-  md.push(`**Current Tier:** ${tp.currentTier} (${tp.tierExamples.join(', ')})`);
+  md.push(`**Current Tier: ${tp.currentTier}** — ${tp.tierExamples.join(', ')}`);
   md.push('');
   md.push(tp.gpaPosition);
   md.push('');
   if (tp.strengthTier) {
-    md.push(`**Strength pull:** ${tp.strengthTier}`);
+    md.push(`**Your Peak:** ${tp.strengthTier}`);
     md.push('');
   }
   if (tp.weaknessTier) {
-    md.push(`**Weakness drag:** ${tp.weaknessTier}`);
+    md.push(`**Your Floor:** ${tp.weaknessTier}`);
     md.push('');
   }
-  md.push(`**Next tier:** ${tp.tierGap}`);
+  md.push(`**Path to the Next Level:** ${tp.tierGap}`);
   md.push('');
 
-  // Uplift Scale Rating
-  md.push(`### Uplift Rating: ${report.academicIdentity.upliftRating.grade}`);
+  // Uplift Rating (detailed holistic assessment)
+  md.push('### Your Uplift Rating');
+  md.push('');
+  md.push(`**Grade: ${grade}**`);
   md.push('');
   md.push(report.academicIdentity.upliftRating.explanation);
   md.push('');

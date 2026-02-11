@@ -185,6 +185,7 @@ export class ActivityTeachingLayerService {
           model: 'claude-sonnet-4-5-20250929',
           maxTokens: 8000,
           temperature: 0.3,
+          timeoutMs: 180000, // 3 min — teaching layer with 8K output needs more than default 120s
         }
       );
 

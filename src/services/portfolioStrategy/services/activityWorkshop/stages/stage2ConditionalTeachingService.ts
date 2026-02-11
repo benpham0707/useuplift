@@ -446,12 +446,9 @@ ACTIVITY: ${activity.title}
 - Green Flags: ${analysis.greenFlags.map(f => f.flag).join('; ') || 'None'}
 - Red Flags: ${analysis.redFlags.map(f => f.flag).join('; ') || 'None'}
 
-${knowledge ? `KNOWLEDGE CONTEXT:
-- Tier Criteria: ${knowledge.saraHarbersonCriteria.definition}
-- Category: ${knowledge.categoryInsights.categoryName} — ${knowledge.categoryInsights.competitiveContext}
-- Top Issues to Address:
-${knowledge.issueTeaching.slice(0, 3).map(i => `  * ${i.theProblem.headline}: ${i.theProblem.explanation} Fix: ${i.whatToDo.principle}${i.examples[0] ? ` Example: "${i.examples[0].before}" → "${i.examples[0].after}"` : ''}`).join('\n')}
-${knowledge.citations.length > 0 ? `- Research Citations: ${knowledge.citations.slice(0, 3).map(c => `[${c.source.name}] ${c.evidence.statistic || c.evidence.quote || c.relevance}`).join('; ')}` : ''}` : ''}
+${knowledge ? `RESEARCH-BACKED KNOWLEDGE CONTEXT:
+
+${knowledgeAssemblyService.formatForPrompt(knowledge)}` : ''}
 
 ${activityExpertSection ? `EXPERT COUNSELOR INTELLIGENCE:
 ${activityExpertSection}` : ''}
@@ -519,9 +516,9 @@ Respond with JSON for ONE activity:
       model: this.MODEL,
       systemPrompt,
       userPrompt: prompt,
-      maxTokens: depth === 'deep' ? 4000 : 2500,
+      maxTokens: depth === 'deep' ? 5000 : 4000,
       temperature: 0.3,
-      timeoutMs: 120000, // 2 minutes per activity - reliability over speed
+      timeoutMs: depth === 'deep' ? 180000 : 120000, // Deep teaching gets 3 min for full knowledge context
     });
 
     this.trackUsage(response.usage, localCost, localTokens);
@@ -1151,7 +1148,7 @@ Remember: Students are counting on you to transform their applications. The know
       tierExplanation: {
         assignedTier: tier,
         explanation: {
-          text: `This activity is classified as ${knowledge.saraHarbersonCriteria.tierName}. ${knowledge.saraHarbersonCriteria.definition} Based on the ${knowledge.categoryInsights.categoryName} category, ${knowledge.categoryInsights.competitiveContext}`,
+          text: `Your ${activity?.title || 'activity'} is classified as ${knowledge.saraHarbersonCriteria.tierName}. ${knowledge.saraHarbersonCriteria.definition} ${knowledge.categoryInsights.competitiveContext}`,
           citations: knowledge.citations.filter(c => c.type === 'tier_justification').slice(0, 2),
         },
         benchmarksUsed: knowledge.saraHarbersonCriteria.evidence.slice(0, 3).map((ev, i) => ({
@@ -1174,9 +1171,11 @@ Remember: Students are counting on you to transform their applications. The know
       },
       // R2-9: Improved fallback strength teaching with student-specific framing
       strengthTeaching: analysis?.greenFlags?.slice(0, 2).map(f => ({
-        strength: f.flag,
+        strength: f.admissionsValue || f.flag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         whyItMatters: {
-          text: f.admissionsValue || `In the context of ${knowledge.categoryInsights.categoryName} activities, this signal stands out to admissions officers.`,
+          text: f.admissionsValue
+            ? `Your ${activity?.title || 'activity'} demonstrates ${f.admissionsValue.toLowerCase()}, which admissions officers value because it shows genuine engagement beyond surface participation.`
+            : `In the context of ${knowledge.categoryInsights.categoryName} activities, your ${activity?.title || 'activity'} shows qualities that stand out to admissions officers.`,
           citations: knowledge.citations.filter(c => c.type === 'green_flag').slice(0, 1),
         },
         howToLeverage: `In your ${activity?.title || 'activity'} description, lead with this strength. Frame it using active language: what you specifically did, not what the organization achieved.`,
@@ -1205,13 +1204,15 @@ Remember: Students are counting on you to transform their applications. The know
       },
       narrativeGuidance: {
         howToTalkAboutThis: {
-          text: `Frame this ${knowledge.categoryInsights.categoryName} activity by focusing on ${knowledge.categoryInsights.topAchievements[0] || 'your unique contribution'}.`,
+          text: `When discussing your ${activity?.title || 'activity'}, focus on ${knowledge.categoryInsights.topAchievements[0] || 'your unique contribution'}. Lead with what makes YOUR experience specific, not the general category.`,
           citations: [],
         },
         uniqueAngle: knowledge.fieldExpectations?.relevanceAssessment?.alignmentReason ||
-          'Focus on what makes your experience distinctive.',
-        connectionToStory: `This activity connects to your broader narrative through ${knowledge.fieldExpectations?.majorName || 'your academic interests'}.`,
-        interviewTips: knowledge.categoryInsights.commonMistakes.slice(0, 2).map(m => `Avoid: ${m}`),
+          `What sets your ${activity?.title || 'activity'} apart is the specific context — emphasize what only YOU experienced.`,
+        connectionToStory: knowledge.fieldExpectations?.majorName
+          ? `Your ${activity?.title || 'activity'} strengthens your ${knowledge.fieldExpectations.majorName} narrative by demonstrating hands-on engagement beyond academics.`
+          : `This activity adds dimension to your story — it shows who you are beyond test scores and grades.`,
+        interviewTips: knowledge.categoryInsights.commonMistakes.slice(0, 1).map(m => `When discussing ${activity?.title || 'this activity'} in interviews, avoid: ${m}`),
       },
     };
   }
@@ -1901,17 +1902,17 @@ Remember: Students are counting on you to transform their applications. The know
       activityId,
       tierExplanation: this.normalizeTierExplanation(undefined, analysis),
       strengthTeaching: analysis?.greenFlags?.map(f => ({
-        strength: f.flag,
-        whyItMatters: { text: f.admissionsValue, citations: [] },
-        howToLeverage: 'Highlight this in your application',
-        inApplications: 'Essays, interviews, and additional information',
+        strength: f.admissionsValue || f.flag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        whyItMatters: { text: f.admissionsValue || `Your ${activity?.title || 'activity'} shows this quality, which admissions officers look for.`, citations: [] },
+        howToLeverage: `In your ${activity?.title || 'activity'} description, highlight this strength with specific evidence.`,
+        inApplications: 'Reference in essays, interviews, and additional information sections.',
       })) || [],
       improvementTeaching: analysis?.descriptionQuality?.issues?.map(issue => ({
         issue,
-        whyItMatters: { text: 'This affects how admissions officers perceive your involvement', citations: [] },
-        howToFix: 'Add specific details and quantifiable outcomes',
-        exampleBefore: activity?.description?.substring(0, 50) || '',
-        exampleAfter: 'Consider adding specific metrics and outcomes',
+        whyItMatters: { text: `In your ${activity?.title || 'activity'} description, this affects how admissions officers perceive your involvement.`, citations: [] },
+        howToFix: 'Add specific details and quantifiable outcomes from your actual experience.',
+        exampleBefore: activity?.description?.substring(0, 80) || '',
+        exampleAfter: 'Add specific metrics: numbers of people impacted, hours invested, measurable outcomes.',
         priority: 'medium' as const,
       })) || [],
       descriptionOptimization: {

@@ -9,7 +9,7 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
-import { parseClaudeJSON } from '../../../../../commonAppWorkshop/utils/jsonParser';
+import { parseClaudeJSON } from '../../../../../../commonAppWorkshop/utils/jsonParser';
 import type {
   BottomLineSummary,
   AcademicIdentitySection,
@@ -33,24 +33,27 @@ export async function generateBottomLine(
   roadmap: StrategicRoadmapSection,
   trackUsage: (usage: { input_tokens?: number; output_tokens?: number } | undefined) => void
 ): Promise<BottomLineSummary> {
-  const systemPrompt = `You are writing an executive summary for a student's academic report. Write 5 concise bullets that a student can read INDEPENDENTLY of the full report. Each bullet must be self-contained.
+  const systemPrompt = `You MUST output valid JSON only — no markdown, no headers, no explanation text outside the JSON object.
+
+You are writing an executive summary for a HIGH SCHOOL STUDENT's academic report. Write 5 concise bullets they can read INDEPENDENTLY of the full report. Each bullet must be self-contained and written in plain language.
 
 RULES:
-1. SYNTHESIZE across sections — do NOT copy phrases or sentences from the input.
-2. Each bullet: MAX 50 words. Be punchy and specific.
-3. The "rating" bullet states the grade and one sentence of what it means.
-4. The "positioning" bullet names the tier and 2-3 example schools, plus what it takes to move up.
-5. The "biggestStrength" bullet names the strength and what it signals in 1 sentence.
-6. The "biggestRisk" bullet names the risk and its consequence in 1 sentence.
-7. The "topAction" bullet names the #1 action and why it's #1.
+1. SYNTHESIZE across sections — do NOT copy phrases from the input.
+2. Each bullet: HARD LIMIT 40 words. Punchy over thorough — the full report has details.
+3. STUDENT-FRIENDLY: No raw percentages, metrics, or jargon. Use school names to anchor positioning. Write like you're talking to a smart 17-year-old.
+4. The "rating" bullet states the Uplift grade and school tier in plain language.
+5. The "positioning" bullet names 2-3 example schools and what it takes to level up.
+6. The "biggestStrength" bullet names the strength and what it means for their goals.
+7. The "biggestRisk" bullet names the risk and what happens if they don't address it.
+8. The "topAction" bullet names the #1 action and why it matters most.
 
 Output valid JSON:
 {
-  "rating": "Uplift Rating: [grade] — [label]. Names the corresponding tier and states the ONE thing that would change the grade. Example: 'B+ (Very Good) — Selective tier. Moving to A- requires stronger AP STEM performance, where you currently average 3.2.' NEVER just restate the grade description.", // Q12: Make rating bullet actionable
-  "positioning": "[tier] ([2-3 schools]). [what it takes to reach next tier — max 15 words].",
-  "biggestStrength": "[strength]: [what it signals — max 20 words].",
-  "biggestRisk": "[risk]: [consequence — max 20 words].",
-  "topAction": "#1: [action] — [why — max 15 words]."
+  "rating": "[grade] — [what this means in plain language, mentioning school tier].",
+  "positioning": "[2-3 school examples]. To level up: [specific action, max 12 words].",
+  "biggestStrength": "[strength]: [what it means for their goals — max 20 words].",
+  "biggestRisk": "[risk]: [what happens if not addressed — max 20 words].",
+  "topAction": "#1: [action] — [why it matters — max 15 words]."
 }`;
 
   const userPrompt = `Synthesize this academic report into 5 executive summary bullets:
