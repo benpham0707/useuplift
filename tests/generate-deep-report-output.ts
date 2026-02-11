@@ -6,7 +6,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import { generateDeepAcademicReport } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReportService';
+import { generateDeepAcademicReport } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReport';
 import type { DeepAcademicReportInput } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReportTypes';
 import type { NuancedCapabilityAnalysis } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/nuancedCapabilityAnalyzer';
 
@@ -145,6 +145,18 @@ async function main() {
   md.push('---');
   md.push('');
 
+  // Bottom Line Summary
+  md.push('## The Bottom Line');
+  md.push('');
+  md.push(`- **${report.bottomLine.rating}**`);
+  md.push(`- **Position:** ${report.bottomLine.positioning}`);
+  md.push(`- **Biggest Strength:** ${report.bottomLine.biggestStrength}`);
+  md.push(`- **Biggest Risk:** ${report.bottomLine.biggestRisk}`);
+  md.push(`- **${report.bottomLine.topAction}**`);
+  md.push('');
+  md.push('---');
+  md.push('');
+
   // Section 1: Academic Identity
   md.push('## Section 1: Academic Identity');
   md.push('');
@@ -196,14 +208,6 @@ async function main() {
   md.push(`### Uplift Rating: ${report.academicIdentity.upliftRating.grade}`);
   md.push('');
   md.push(report.academicIdentity.upliftRating.explanation);
-  md.push('');
-  md.push('### What Your Trajectory Means');
-  md.push('');
-  md.push(report.academicIdentity.trajectoryMeaning);
-  md.push('');
-  md.push('### Defining Pattern');
-  md.push('');
-  md.push(report.academicIdentity.definingPattern);
   md.push('');
   md.push('---');
   md.push('');
@@ -312,12 +316,20 @@ async function main() {
   md.push('');
   md.push('### AP Course Statistics (Verified)');
   md.push('');
-  md.push('| Course | Pass Rate | Five Rate | Source |');
-  md.push('|--------|-----------|-----------|--------|');
+  md.push('| Course | Pass Rate | Five Rate | Your Grade | Source |');
+  md.push('|--------|-----------|-----------|------------|--------|');
   for (const s of report.researchContext.apStatistics) {
-    md.push(`| ${s.course} | ${s.passRate} | ${s.fiveRate} | ${s.citation} |`);
+    md.push(`| ${s.course} | ${s.passRate} | ${s.fiveRate} | ${s.studentGrade || '—'} | ${s.citation} |`);
   }
   md.push('');
+  // Add student context notes
+  const coursesWithContext = report.researchContext.apStatistics.filter(s => s.studentContext);
+  if (coursesWithContext.length > 0) {
+    for (const s of coursesWithContext) {
+      md.push(`> **${s.course}:** ${s.studentContext}`);
+    }
+    md.push('');
+  }
 
   if (report.researchContext.majorRequirements) {
     const mr = report.researchContext.majorRequirements;

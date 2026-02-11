@@ -259,7 +259,7 @@ Output ONLY valid JSON. No explanations outside the JSON structure.`;
           primaryTheme: parsed.narrativeIdentity?.primaryTheme || 'Not identified',
           secondaryThemes: parsed.narrativeIdentity?.secondaryThemes || [],
           storyEssence: parsed.narrativeIdentity?.storyEssence || 'Student story pending analysis',
-          archetype: this.validateArchetype(parsed.narrativeIdentity?.archetype),
+          archetype: this.validateArchetype(parsed.narrativeIdentity?.archetype, input.activities),
           archetypeConfidence: parsed.narrativeIdentity?.archetypeConfidence || 50,
         },
         narrativeThreads: parsed.narrativeThreads || [],
@@ -299,7 +299,8 @@ Output ONLY valid JSON. No explanations outside the JSON structure.`;
    * Validate archetype value
    */
   private validateArchetype(
-    archetype: string | undefined
+    archetype: string | undefined,
+    activities?: ActivityWorkshopInput[]
   ): StoryContext['narrativeIdentity']['archetype'] {
     const validArchetypes = [
       'innovator', 'leader', 'scholar', 'creative', 'advocate',
@@ -309,7 +310,18 @@ Output ONLY valid JSON. No explanations outside the JSON structure.`;
     if (archetype && validArchetypes.includes(archetype as typeof validArchetypes[number])) {
       return archetype as typeof validArchetypes[number];
     }
-    return 'explorer'; // Default to explorer if unknown
+
+    // R4: Fix field names to match ActivityWorkshopInput type (.role not .position, use .title for scholar detection)
+    const defaultArchetype = activities?.some(a =>
+      a.role?.toLowerCase().includes('founder') || a.role?.toLowerCase().includes('president')
+    ) ? 'leader'
+      : activities?.some(a =>
+        a.role?.toLowerCase().includes('research') || a.role?.toLowerCase().includes('academic') ||
+        a.title?.toLowerCase().includes('research') || a.title?.toLowerCase().includes('academic'))
+      ? 'scholar'
+      : 'explorer';
+
+    return defaultArchetype;
   }
 
   /**

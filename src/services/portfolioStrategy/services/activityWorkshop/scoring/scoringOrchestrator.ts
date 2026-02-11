@@ -4,9 +4,9 @@
  * Orchestrates the complete scoring pipeline with intelligent caching.
  *
  * API CALL STRUCTURE (BATCH-BASED):
- * 1. Description batch (Haiku) - All descriptions in ONE call
- * 2. Activity batch (Haiku) - All activities in ONE call
- * 3. Portfolio scoring (Haiku) - Holistic analysis, always fresh
+ * 1. Description batch (Sonnet) - All descriptions in ONE call
+ * 2. Activity batch (Sonnet) - All activities in ONE call  [PARALLEL with step 1]
+ * 3. Portfolio scoring (Sonnet) - Holistic analysis, always fresh
  * 4. Teaching layer (Sonnet) - Optional, always fresh
  *
  * Total: 3-4 API calls regardless of activity count.
@@ -271,132 +271,42 @@ export class ScoringOrchestrator {
         : undefined;
 
       // ========================================================================
-      // Step 1: Score descriptions (with caching)
+      // Steps 1 & 2: Score descriptions and activities in PARALLEL (with caching)
       // ========================================================================
-      const descStart = Date.now();
-      console.log(`[ScoringOrchestrator] Scoring descriptions...`);
+      const parallelStart = Date.now();
+      console.log(`[ScoringOrchestrator] Starting parallel description + activity scoring...`);
 
-      const descriptionScores: DescriptionScore[] = [];
-      const descToScore: { index: number; input: DescriptionScoringInput }[] = [];
+      const [descHelperResult, actHelperResult] = await Promise.all([
+        this.scoreDescriptionsWithCache(
+          descriptionInputs, enableCache, forceFresh, sessionId,
+          input.targetPlatform, descriptionCacheResults
+        ),
+        this.scoreActivitiesWithCache(
+          activityInputs, enableCache, forceFresh, sessionId,
+          input.studentContext, activityCacheResults
+        ),
+      ]);
 
-      // Check cache for each description
-      for (let i = 0; i < descriptionInputs.length; i++) {
-        const { id, input: descInput } = descriptionInputs[i];
+      console.log(`[ScoringOrchestrator] Parallel scoring complete in ${Date.now() - parallelStart}ms`);
 
-        if (enableCache && !forceFresh) {
-          const cacheResult = this.cacheService.getDescriptionScore(sessionId, id, descInput);
-          if (cacheResult.hit && cacheResult.value) {
-            descriptionScores[i] = cacheResult.value;
-            descriptionCacheResults.set(id, true);
-            console.log(`[ScoringOrchestrator] Description ${i + 1}: CACHE HIT`);
-            continue;
-          }
-        }
-
-        // Cache miss - need to score
-        descToScore.push({ index: i, input: descInput });
-        descriptionCacheResults.set(id, false);
+      if (!descHelperResult.success) {
+        return { success: false, error: descHelperResult.error };
+      }
+      if (!actHelperResult.success) {
+        return { success: false, error: actHelperResult.error };
       }
 
-      // Score descriptions that had cache misses
-      if (descToScore.length > 0) {
-        console.log(`[ScoringOrchestrator] Scoring ${descToScore.length} descriptions (${descriptionInputs.length - descToScore.length} cached)`);
+      const descriptionScores = descHelperResult.scores!;
+      const activityScores = actHelperResult.scores!;
+      timing.descriptionScoringMs = descHelperResult.timingMs!;
+      timing.activityScoringMs = actHelperResult.timingMs!;
 
-        const descResult = await descriptionScoringService.scoreDescriptionsBatch({
-          activities: descToScore.map((d) => d.input),
-          targetPlatform: input.targetPlatform,
-        });
-
-        if (!descResult.success || !descResult.scores) {
-          return {
-            success: false,
-            error: `Description scoring failed: ${descResult.error}`,
-          };
-        }
-
-        // Place results in correct positions and cache them
-        for (let j = 0; j < descToScore.length; j++) {
-          const { index, input: descInput } = descToScore[j];
-          const score = descResult.scores[j];
-          descriptionScores[index] = score;
-
-          // Cache the result
-          if (enableCache && !forceFresh) {
-            this.cacheService.setDescriptionScore(sessionId, descriptionInputs[index].id, descInput, score);
-          }
-        }
-
-        if (descResult.tokensUsed) {
-          tokensUsed.descriptionScoring = descResult.tokensUsed;
-        }
+      if (descHelperResult.tokensUsed) {
+        tokensUsed.descriptionScoring = descHelperResult.tokensUsed;
       }
-
-      timing.descriptionScoringMs = Date.now() - descStart;
-      console.log(`[ScoringOrchestrator] Descriptions scored in ${timing.descriptionScoringMs}ms (${descToScore.length} fresh, ${descriptionInputs.length - descToScore.length} cached)`);
-
-      // ========================================================================
-      // Step 2: Score activities (with caching)
-      // ========================================================================
-      const actStart = Date.now();
-      console.log(`[ScoringOrchestrator] Scoring activities...`);
-
-      const activityScores: ActivityScore[] = [];
-      const actToScore: { index: number; input: ActivityScoringInput }[] = [];
-
-      // Check cache for each activity
-      for (let i = 0; i < activityInputs.length; i++) {
-        const { id, input: actInput } = activityInputs[i];
-
-        if (enableCache && !forceFresh) {
-          const cacheResult = this.cacheService.getActivityScore(sessionId, id, actInput);
-          if (cacheResult.hit && cacheResult.value) {
-            activityScores[i] = cacheResult.value;
-            activityCacheResults.set(id, true);
-            console.log(`[ScoringOrchestrator] Activity ${i + 1}: CACHE HIT`);
-            continue;
-          }
-        }
-
-        // Cache miss - need to score
-        actToScore.push({ index: i, input: actInput });
-        activityCacheResults.set(id, false);
+      if (actHelperResult.tokensUsed) {
+        tokensUsed.activityScoring = actHelperResult.tokensUsed;
       }
-
-      // Score activities that had cache misses
-      if (actToScore.length > 0) {
-        console.log(`[ScoringOrchestrator] Scoring ${actToScore.length} activities (${activityInputs.length - actToScore.length} cached)`);
-
-        const actResult = await activityScoringService.scoreActivitiesBatch({
-          activities: actToScore.map((a) => a.input),
-          studentContext: input.studentContext,
-        });
-
-        if (!actResult.success || !actResult.scores) {
-          return {
-            success: false,
-            error: `Activity scoring failed: ${actResult.error}`,
-          };
-        }
-
-        // Place results in correct positions and cache them
-        for (let j = 0; j < actToScore.length; j++) {
-          const { index, input: actInput } = actToScore[j];
-          const score = actResult.scores[j];
-          activityScores[index] = score;
-
-          // Cache the result
-          if (enableCache && !forceFresh) {
-            this.cacheService.setActivityScore(sessionId, activityInputs[index].id, actInput, score);
-          }
-        }
-
-        if (actResult.tokensUsed) {
-          tokensUsed.activityScoring = actResult.tokensUsed;
-        }
-      }
-
-      timing.activityScoringMs = Date.now() - actStart;
-      console.log(`[ScoringOrchestrator] Activities scored in ${timing.activityScoringMs}ms (${actToScore.length} fresh, ${activityInputs.length - actToScore.length} cached)`);
 
       // Update session with current activity IDs for next comparison
       if (enableCache && !forceFresh) {
@@ -541,6 +451,196 @@ export class ScoringOrchestrator {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  // ========================================================================
+  // Private helpers for parallel scoring
+  // ========================================================================
+
+  /**
+   * Score descriptions with caching (called in parallel with activity scoring)
+   */
+  private async scoreDescriptionsWithCache(
+    descriptionInputs: { id: string; input: DescriptionScoringInput }[],
+    enableCache: boolean,
+    forceFresh: boolean,
+    sessionId: string,
+    targetPlatform: ScoringOrchestratorInput['targetPlatform'],
+    cacheResults: Map<string, boolean>
+  ): Promise<{
+    success: boolean;
+    scores?: DescriptionScore[];
+    tokensUsed?: { input: number; output: number };
+    timingMs?: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+    console.log(`[ScoringOrchestrator] Scoring descriptions...`);
+
+    const descriptionScores: DescriptionScore[] = [];
+    const descToScore: { index: number; input: DescriptionScoringInput }[] = [];
+
+    // Check cache for each description
+    for (let i = 0; i < descriptionInputs.length; i++) {
+      const { id, input: descInput } = descriptionInputs[i];
+
+      if (enableCache && !forceFresh) {
+        const cacheResult = this.cacheService.getDescriptionScore(sessionId, id, descInput);
+        if (cacheResult.hit && cacheResult.value) {
+          descriptionScores[i] = cacheResult.value;
+          cacheResults.set(id, true);
+          console.log(`[ScoringOrchestrator] Description ${i + 1}: CACHE HIT`);
+          continue;
+        }
+      }
+
+      // Cache miss - need to score
+      descToScore.push({ index: i, input: descInput });
+      cacheResults.set(id, false);
+    }
+
+    let tokensUsed: { input: number; output: number } | undefined;
+
+    // Score descriptions that had cache misses
+    if (descToScore.length > 0) {
+      console.log(`[ScoringOrchestrator] Scoring ${descToScore.length} descriptions (${descriptionInputs.length - descToScore.length} cached)`);
+
+      const descResult = await descriptionScoringService.scoreDescriptionsBatch({
+        activities: descToScore.map((d) => d.input),
+        targetPlatform,
+      });
+
+      if (!descResult.success || !descResult.scores) {
+        return {
+          success: false,
+          error: `Description scoring failed: ${descResult.error}`,
+        };
+      }
+
+      // Place results in correct positions and cache them
+      for (let j = 0; j < descToScore.length; j++) {
+        const { index, input: descInput } = descToScore[j];
+        const score = descResult.scores[j];
+        descriptionScores[index] = score;
+
+        // Cache the result
+        if (enableCache && !forceFresh) {
+          this.cacheService.setDescriptionScore(sessionId, descriptionInputs[index].id, descInput, score);
+        }
+      }
+
+      // Validate no missing scores after batch mapping (C2)
+      const missingDescs = descToScore.filter(d => !descriptionScores[d.index]);
+      if (missingDescs.length > 0) {
+        console.error(`[ScoringOrchestrator] ${missingDescs.length}/${descToScore.length} description scores missing after batch`);
+        return {
+          success: false,
+          error: `Description scoring returned incomplete results: ${descResult.scores?.length || 0}/${descToScore.length} scores`,
+        };
+      }
+
+      if (descResult.tokensUsed) {
+        tokensUsed = descResult.tokensUsed;
+      }
+    }
+
+    const timingMs = Date.now() - startTime;
+    console.log(`[ScoringOrchestrator] Descriptions scored in ${timingMs}ms (${descToScore.length} fresh, ${descriptionInputs.length - descToScore.length} cached)`);
+
+    return { success: true, scores: descriptionScores, tokensUsed, timingMs };
+  }
+
+  /**
+   * Score activities with caching (called in parallel with description scoring)
+   */
+  private async scoreActivitiesWithCache(
+    activityInputs: { id: string; input: ActivityScoringInput }[],
+    enableCache: boolean,
+    forceFresh: boolean,
+    sessionId: string,
+    studentContext: ScoringOrchestratorInput['studentContext'],
+    cacheResults: Map<string, boolean>
+  ): Promise<{
+    success: boolean;
+    scores?: ActivityScore[];
+    tokensUsed?: { input: number; output: number };
+    timingMs?: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+    console.log(`[ScoringOrchestrator] Scoring activities...`);
+
+    const activityScores: ActivityScore[] = [];
+    const actToScore: { index: number; input: ActivityScoringInput }[] = [];
+
+    // Check cache for each activity
+    for (let i = 0; i < activityInputs.length; i++) {
+      const { id, input: actInput } = activityInputs[i];
+
+      if (enableCache && !forceFresh) {
+        const cacheResult = this.cacheService.getActivityScore(sessionId, id, actInput);
+        if (cacheResult.hit && cacheResult.value) {
+          activityScores[i] = cacheResult.value;
+          cacheResults.set(id, true);
+          console.log(`[ScoringOrchestrator] Activity ${i + 1}: CACHE HIT`);
+          continue;
+        }
+      }
+
+      // Cache miss - need to score
+      actToScore.push({ index: i, input: actInput });
+      cacheResults.set(id, false);
+    }
+
+    let tokensUsed: { input: number; output: number } | undefined;
+
+    // Score activities that had cache misses
+    if (actToScore.length > 0) {
+      console.log(`[ScoringOrchestrator] Scoring ${actToScore.length} activities (${activityInputs.length - actToScore.length} cached)`);
+
+      const actResult = await activityScoringService.scoreActivitiesBatch({
+        activities: actToScore.map((a) => a.input),
+        studentContext,
+      });
+
+      if (!actResult.success || !actResult.scores) {
+        return {
+          success: false,
+          error: `Activity scoring failed: ${actResult.error}`,
+        };
+      }
+
+      // Place results in correct positions and cache them
+      for (let j = 0; j < actToScore.length; j++) {
+        const { index, input: actInput } = actToScore[j];
+        const score = actResult.scores[j];
+        activityScores[index] = score;
+
+        // Cache the result
+        if (enableCache && !forceFresh) {
+          this.cacheService.setActivityScore(sessionId, activityInputs[index].id, actInput, score);
+        }
+      }
+
+      // Validate no missing scores after batch mapping (C2)
+      const missingActs = actToScore.filter(a => !activityScores[a.index]);
+      if (missingActs.length > 0) {
+        console.error(`[ScoringOrchestrator] ${missingActs.length}/${actToScore.length} activity scores missing after batch`);
+        return {
+          success: false,
+          error: `Activity scoring returned incomplete results: ${actResult.scores?.length || 0}/${actToScore.length} scores`,
+        };
+      }
+
+      if (actResult.tokensUsed) {
+        tokensUsed = actResult.tokensUsed;
+      }
+    }
+
+    const timingMs = Date.now() - startTime;
+    console.log(`[ScoringOrchestrator] Activities scored in ${timingMs}ms (${actToScore.length} fresh, ${activityInputs.length - actToScore.length} cached)`);
+
+    return { success: true, scores: activityScores, tokensUsed, timingMs };
   }
 
   /**

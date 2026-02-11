@@ -182,7 +182,7 @@ export class ActivityTeachingLayerService {
         prompt,
         {
           systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform),
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           maxTokens: 8000,
           temperature: 0.3,
         }
@@ -724,8 +724,22 @@ Respond in this JSON structure:
     targetPlatform?: ApplicationPlatform
   ): TeachingLayerOutput {
     try {
-      // Extract JSON from response
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      // Extract JSON from response using brace-depth matching (not greedy regex)
+      let depth = 0;
+      let start = -1;
+      let lastValidJson = '';
+      for (let i = 0; i < content.length; i++) {
+        if (content[i] === '{') {
+          if (depth === 0) start = i;
+          depth++;
+        } else if (content[i] === '}') {
+          depth--;
+          if (depth === 0 && start >= 0) {
+            lastValidJson = content.substring(start, i + 1);
+          }
+        }
+      }
+      const jsonMatch = lastValidJson ? [lastValidJson] : null;
       if (!jsonMatch) {
         throw new Error('No JSON found in response');
       }
@@ -753,7 +767,7 @@ Respond in this JSON structure:
         rewriteQuickReference: this.buildQuickReference(parsed.activityTransformations || []),
         metadata: {
           generatedAt: new Date().toISOString(),
-          modelUsed: 'claude-sonnet-4-20250514',
+          modelUsed: 'claude-sonnet-4-5-20250929',
           tokensUsed: {
             input: usage?.input_tokens || 0,
             output: usage?.output_tokens || 0,
@@ -839,9 +853,23 @@ Respond in this JSON structure:
     for (const transformation of teaching.activityTransformations) {
       if (transformation.rewrite.suggested.length > charLimit) {
         console.warn(`[TeachingLayer] Rewrite for ${transformation.activityName} exceeds ${charLimit} chars (${transformation.rewrite.suggested.length})`);
-        // Truncate if necessary
-        transformation.rewrite.suggested = transformation.rewrite.suggested.substring(0, charLimit - 3) + '...';
-        transformation.rewrite.characterCount = charLimit;
+        // Truncate at sentence or word boundary instead of hard cut
+        const text = transformation.rewrite.suggested;
+        const truncated = text.substring(0, charLimit);
+        const lastSentenceEnd = Math.max(
+          truncated.lastIndexOf('. '),
+          truncated.lastIndexOf('! '),
+          truncated.lastIndexOf('; ')
+        );
+        if (lastSentenceEnd > charLimit * 0.6) {
+          transformation.rewrite.suggested = truncated.substring(0, lastSentenceEnd + 1);
+        } else {
+          const lastSpace = truncated.lastIndexOf(' ');
+          transformation.rewrite.suggested = lastSpace > charLimit * 0.5
+            ? truncated.substring(0, lastSpace)
+            : truncated.substring(0, charLimit - 3) + '...';
+        }
+        transformation.rewrite.characterCount = transformation.rewrite.suggested.length;
       }
     }
   }
@@ -958,7 +986,7 @@ Respond in this JSON structure:
       rewriteQuickReference: [],
       metadata: {
         generatedAt: new Date().toISOString(),
-        modelUsed: 'claude-sonnet-4-20250514',
+        modelUsed: 'claude-sonnet-4-5-20250929',
         tokensUsed: { input: 0, output: 0 },
         cost: 0,
         activitiesAnalyzed: rubric.activityScores.length,

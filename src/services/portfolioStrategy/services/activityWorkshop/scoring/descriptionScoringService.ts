@@ -42,6 +42,8 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
+// R7: Use robust parseClaudeJSON with jsonrepair fallback
+import { tryParseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
 import {
   DescriptionScore,
   DescriptionScoreBreakdown,
@@ -195,6 +197,16 @@ Differentiation signals:
 - Achieved external recognition (publication, award, adoption by others)
 - Solved a specific problem in a unique way
 - Shows intellectual curiosity/initiative beyond assigned duties
+
+DIFFERENTIATION SIGNAL — CALIBRATION:
+- 9-10: Uses language that could ONLY describe THIS person's experience. Contains a "fingerprint moment" — a detail so specific no other applicant could write it.
+- 7-8: Mostly specific but 1-2 phrases could apply to anyone in this role.
+- 5-6: Mix of specific and generic. The description shows knowledge but not personality.
+- 3-4: Mostly generic. Could be any club president / team member / volunteer.
+- 1-2: Completely interchangeable. Zero unique details.
+
+EXAMPLE OF "FINGERPRINT MOMENT":
+Instead of "Managed team of 15 volunteers" → "Recruited 15 volunteers from 3 different churches by personally pitching at Sunday services, then tracked retention through a spreadsheet I built after losing 5 volunteers in week 2"
 
 ═══════════════════════════════════════════════════════════════════════════════
 CALIBRATION EXAMPLES
@@ -640,11 +652,9 @@ export class DescriptionScoringService {
    */
   private parseScoreResponse(content: string): DescriptionScore | null {
     try {
-      // Extract JSON from response (handle markdown code blocks)
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-
-      const data = JSON.parse(jsonStr);
+      // R7: Use robust parseClaudeJSON with jsonrepair fallback
+      const data = tryParseClaudeJSON<Record<string, unknown>>(content, 'DescriptionScoringService');
+      if (!data) return null;
 
       // Validate and normalize the response
       return this.normalizeScoreData(data);
@@ -659,11 +669,9 @@ export class DescriptionScoringService {
    */
   private parseBatchScoreResponse(content: string, expectedCount: number): DescriptionScore[] | null {
     try {
-      // Extract JSON from response
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-
-      const data = JSON.parse(jsonStr);
+      // R7: Use robust parseClaudeJSON with jsonrepair fallback
+      const data = tryParseClaudeJSON<Record<string, unknown>>(content, 'DescriptionScoringService.batch');
+      if (!data) return null;
 
       if (!data.scores || !Array.isArray(data.scores)) {
         console.error('[DescriptionScoringService] Invalid batch response structure');

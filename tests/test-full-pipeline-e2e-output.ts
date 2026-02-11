@@ -11,6 +11,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import assert from 'assert'; // R22: Enable pass/fail assertions
 import { activityWorkshopService } from '../src/services/portfolioStrategy/services/activityWorkshop';
 import { ActivityWorkshopSessionInput } from '../src/services/portfolioStrategy/services/activityWorkshop/types';
 
@@ -136,14 +137,46 @@ async function runTest() {
     // STAGE 0: Story Detection
     // ──────────────────────────────────────────
     divider('STAGE 0: STORY DETECTION');
-    log(`Archetype: ${result.stage0.narrativeIdentity.archetype}`);
+    log(`Archetype: ${result.stage0.narrativeIdentity.archetype} (confidence: ${result.stage0.narrativeIdentity.archetypeConfidence}%)`);
     log(`Story Essence: ${result.stage0.narrativeIdentity.storyEssence}`);
-    log(`Theme: ${result.stage0.narrativeIdentity.centralTheme || 'N/A'}`);
-    log(`Strengths: ${result.stage0.narrativeIdentity.coreStrengths?.join(', ') || 'N/A'}`);
-    log(`Context Signals: ${result.stage0.contextSignals?.length || 0}`);
-    if (result.stage0.contextSignals) {
-      for (const signal of result.stage0.contextSignals) {
-        log(`  - [${signal.type}] ${signal.signal} (weight: ${signal.weight})`);
+    log(`Primary Theme: ${result.stage0.narrativeIdentity.primaryTheme}`);
+    log(`Secondary Themes: ${result.stage0.narrativeIdentity.secondaryThemes?.join(', ') || 'None'}`);
+    log(`Spike Hypothesis: ${result.stage0.spikeHypothesis.likelySpike ? `${result.stage0.spikeHypothesis.spikeArea} (${result.stage0.spikeHypothesis.maturity})` : 'None yet'}`);
+    log('');
+
+    // Contextual factors
+    const cf = result.stage0.contextualFactors;
+    const factors: string[] = [];
+    if (cf.hasWorkFamilyObligations) factors.push(`Work/Family: ${cf.workFamilyContext || 'Yes'}`);
+    if (cf.hasResourceConstraints) factors.push(`Resource Constraints: ${cf.constraintsContext || 'Yes'}`);
+    if (cf.hasGeographicLimitations) factors.push(`Geographic: ${cf.geographicContext || 'Yes'}`);
+    if (cf.firstGenIndicators) factors.push('First-Generation');
+    if (cf.internationalIndicators) factors.push('International');
+    if (factors.length > 0) {
+      log('Contextual Factors:');
+      for (const f of factors) log(`  - ${f}`);
+    } else {
+      log('Contextual Factors: Standard context');
+    }
+
+    // Narrative threads
+    if (result.stage0.narrativeThreads?.length > 0) {
+      log('');
+      log('Narrative Threads:');
+      for (const thread of result.stage0.narrativeThreads) {
+        log(`  - ${thread.thread} [${thread.strength}]: ${thread.activityIds.join(', ')}`);
+        log(`    ${thread.evidence}`);
+      }
+    }
+
+    // Activity story roles
+    if (result.stage0.activityStoryRoles?.length > 0) {
+      log('');
+      log('Activity Story Roles:');
+      for (const role of result.stage0.activityStoryRoles) {
+        const activity = testInput.activities.find(a => a.id === role.activityId);
+        log(`  - ${activity?.title || role.activityId}: ${role.storyRole} (centrality: ${role.centralityScore})`);
+        log(`    ${role.roleExplanation}`);
       }
     }
 
@@ -152,8 +185,23 @@ async function runTest() {
     // ──────────────────────────────────────────
     divider('STAGE 1: CONTEXT-AWARE ANALYSIS');
     log(`Tier Distribution: T1=${result.stage1.tierDistribution.tier1}, T2=${result.stage1.tierDistribution.tier2}, T3=${result.stage1.tierDistribution.tier3}, T4=${result.stage1.tierDistribution.tier4}`);
-    log(`Spike: ${result.stage1.spikeAnalysis.hasSpike ? result.stage1.spikeAnalysis.spikeArea : 'None detected'}`);
-    log(`Coherence: ${result.stage1.coherenceAnalysis.score}/100`);
+    // Spike: use final narrative's assessment if available (more accurate than initial profiler)
+    const spikeText = result.stage1.spikeAnalysis.hasSpike
+      ? result.stage1.spikeAnalysis.spikeArea
+      : result.finalNarrative?.spike?.primarySpike?.area
+        ? `${result.finalNarrative.spike.primarySpike.area} (emerging — identified after full analysis)`
+        : result.stage0?.narrativeIdentity?.spikeHypothesis
+          ? `${result.stage0.narrativeIdentity.spikeHypothesis} (hypothesis — needs development)`
+          : 'None detected';
+    log(`Spike: ${spikeText}`);
+    // Coherence: show both initial and post-improvement if they differ significantly
+    const initialCoherence = result.stage1.coherenceAnalysis.score;
+    const finalCoherence = result.finalNarrative?.coherence?.score;
+    if (finalCoherence && Math.abs(finalCoherence - initialCoherence) >= 10) {
+      log(`Coherence: ${initialCoherence}/100 (initial) → ${finalCoherence}/100 (after optimization)`);
+    } else {
+      log(`Coherence: ${initialCoherence}/100`);
+    }
     log('');
 
     for (const [activityId, analysis] of Object.entries(result.stage1.activities)) {
@@ -266,20 +314,64 @@ async function runTest() {
         }
       }
 
-      // Description Optimization + Scoring Breakdown (merged)
+      // Description: show RECOMMENDED version (resolves Stage 2 vs Expert Rewrite confusion)
+      const transformation = transformationsMap.get(td.activityId) || transformationsMap.get(activityTitle);
+      const stage2Desc = t.descriptionOptimization?.optimizedDescription;
+      const expertDesc = transformation?.rewrite?.suggested;
+      // The merge step already picked the best description for descriptionOptimization,
+      // so use that as the primary. Show expert rewrite only as alternative when different.
       if (t.descriptionOptimization) {
-        log('  DESCRIPTION:');
+        log('  RECOMMENDED DESCRIPTION:');
         log(`  Original (${t.descriptionOptimization.originalDescription?.length || 0} chars): "${t.descriptionOptimization.originalDescription}"`);
-        log(`  Improved (${t.descriptionOptimization.characterCount} chars): "${t.descriptionOptimization.optimizedDescription}"`);
+        log(`  Recommended (${t.descriptionOptimization.characterCount} chars): "${t.descriptionOptimization.optimizedDescription}"`);
         if (t.descriptionOptimization.changesExplained) {
           for (const c of t.descriptionOptimization.changesExplained) {
             log(`    - ${c.change}: ${c.reason}`);
           }
         }
+        // Show expert rewrite as alternative ONLY if it's different from the recommended version
+        if (expertDesc && stage2Desc && expertDesc !== stage2Desc && expertDesc.length <= 150) {
+          log(`  Alternative (${expertDesc.length} chars): "${expertDesc}"`);
+        }
+        log('');
+      } else if (transformation) {
+        // No Stage 2 optimization, but scoring produced a rewrite
+        log('  RECOMMENDED DESCRIPTION:');
+        log(`  Original: "${transformation.rewrite.original}"`);
+        log(`  Recommended (${transformation.rewrite.characterCount} chars): "${transformation.rewrite.suggested}"`);
         log('');
       }
 
-      // Per-activity scoring breakdown (integrated here instead of standalone section)
+      // Expert rewrite teaching (principle, element changes, citations) — educational content
+      if (transformation) {
+        log('  WRITING PRINCIPLE:');
+        log(`  ${transformation.principle.name}: ${transformation.principle.whyItMatters}`);
+        log(`    Application: ${transformation.principle.applicationToActivity}`);
+        if (transformation.rewrite.changesApplied?.length) {
+          log('  Element-by-element changes:');
+          for (const change of transformation.rewrite.changesApplied) {
+            log(`    [${change.element}] "${change.original}" -> "${change.transformed}"`);
+            log(`      ${change.rationale}`);
+          }
+        }
+        if (transformation.alternatives?.length) {
+          log('  Other approaches:');
+          for (const alt of transformation.alternatives) {
+            log(`    ${alt.angle}: "${alt.rewrite}"`);
+            log(`      When: ${alt.whenToUse}`);
+          }
+        }
+        if (transformation.citations?.length > 0) {
+          log('  Research:');
+          for (const c of transformation.citations) {
+            log(`    [${c.source}] ${c.sourceName}: "${c.insight}"`);
+          }
+        }
+        log(`  Expected: ${transformation.currentScore}/10 -> ${transformation.expectedScoreImprovement.projectedScore}/10`);
+        log('');
+      }
+
+      // Per-activity scoring breakdown
       if (actScore) {
         log('  DESCRIPTION SCORING (5-dimension breakdown):');
         const db = actScore.descriptionScore.breakdown;
@@ -300,36 +392,6 @@ async function runTest() {
         log('');
       }
 
-      // Scoring transformation for this activity (integrated here instead of standalone section)
-      const transformation = transformationsMap.get(td.activityId) || transformationsMap.get(activityTitle);
-      if (transformation) {
-        log('  EXPERT REWRITE:');
-        log(`  Principle: ${transformation.principle.name}`);
-        log(`    Why: ${transformation.principle.whyItMatters}`);
-        log(`    Application: ${transformation.principle.applicationToActivity}`);
-        log(`  Before: "${transformation.rewrite.original}"`);
-        log(`  After:  "${transformation.rewrite.suggested}" (${transformation.rewrite.characterCount} chars)`);
-        for (const change of transformation.rewrite.changesApplied) {
-          log(`    [${change.element}] "${change.original}" -> "${change.transformed}"`);
-          log(`      ${change.rationale}`);
-        }
-        if (transformation.alternatives?.length) {
-          log('  Alternatives:');
-          for (const alt of transformation.alternatives) {
-            log(`    ${alt.angle}: "${alt.rewrite}"`);
-            log(`      When: ${alt.whenToUse}`);
-          }
-        }
-        if (transformation.citations?.length > 0) {
-          log('  Research:');
-          for (const c of transformation.citations) {
-            log(`    [${c.source}] ${c.sourceName}: "${c.insight}"`);
-          }
-        }
-        log(`  Expected: ${transformation.currentScore}/10 -> ${transformation.expectedScoreImprovement.projectedScore}/10`);
-        log('');
-      }
-
       // Narrative Guidance
       if (t.narrativeGuidance) {
         log('  NARRATIVE GUIDANCE:');
@@ -343,6 +405,43 @@ async function runTest() {
           }
         }
         log('');
+      }
+    }
+
+    // T5: Teaching quality — no generic celebrations or improvements
+    const genericPhrases = ['great job', 'well done', 'impressive', 'consider adding more detail', 'shows your dedication', 'think about how you can', 'this is a strong activity'];
+    for (const td of result.stage2.teachingDelivered) {
+      const activity = testInput.activities.find(a => a.id === td.activityId);
+      const activityTitle = activity?.title || td.activityId;
+      const t = td.teaching;
+
+      // Check celebration for generic phrases
+      if (t.celebration) {
+        const celebrationText = [
+          t.celebration.headline || '',
+          ...(t.celebration.strengths || []),
+        ].join(' ').toLowerCase();
+        for (const phrase of genericPhrases) {
+          if (celebrationText.includes(phrase)) {
+            log(`  [T5 QUALITY WARNING] "${activityTitle}" celebration contains generic phrase "${phrase}" — should be specific to activity`);
+          }
+        }
+      }
+
+      // Check improvements for generic phrases
+      if (t.improvementTeaching) {
+        for (const imp of t.improvementTeaching) {
+          const improvementText = [
+            imp.issue || '',
+            imp.whyItMatters?.text || '',
+            imp.howToFix || '',
+          ].join(' ').toLowerCase();
+          for (const phrase of genericPhrases) {
+            if (improvementText.includes(phrase)) {
+              log(`  [T5 QUALITY WARNING] "${activityTitle}" improvement "${imp.issue}" contains generic phrase "${phrase}" — should be specific`);
+            }
+          }
+        }
       }
     }
 
@@ -513,6 +612,67 @@ async function runTest() {
           log('');
         }
       }
+      // Projected portfolio improvement summary
+      if (result.scoring.scoringTeaching?.activityTransformations?.length > 0) {
+        log('Projected Score Improvement:');
+        const currentTotal = rubric.overallScore.total;
+        let projectedSum = 0;
+        let projectedCount = 0;
+        for (const t of result.scoring.scoringTeaching.activityTransformations) {
+          const currentScore = t.currentScore;
+          const projectedScore = t.expectedScoreImprovement?.projectedScore;
+          if (currentScore && projectedScore) {
+            log(`  ${t.activityName}: ${currentScore.toFixed(1)} → ${projectedScore.toFixed(1)} (+${(projectedScore - currentScore).toFixed(1)})`);
+            projectedSum += (projectedScore - currentScore);
+            projectedCount++;
+          }
+        }
+        if (projectedCount > 0) {
+          // Estimate portfolio improvement: description scores are 30% of combined, and activities contribute proportionally
+          const avgImprovement = projectedSum / projectedCount;
+          const totalActivities = result.scoring.activityScores.length || projectedCount;
+          // Scale: each activity's improvement affects portfolio proportionally
+          const portfolioLift = (avgImprovement * projectedCount) / totalActivities;
+          const projectedPortfolio = Math.min(10, currentTotal + portfolioLift * 0.7); // Conservative estimate
+          log(`  ─────────────────────────`);
+          log(`  Portfolio: ${currentTotal.toFixed(1)}/10 → ~${projectedPortfolio.toFixed(1)}/10 (estimated with all improvements applied)`);
+        }
+        log('');
+      }
+      // T6: Scoring calibration — Harvard scale should be consistent with overall score
+      const harvardRating = rubric.harvardScale.rating;
+      const overallScore = rubric.overallScore.total;
+
+      // Harvard scale mapping: 1=Outstanding(9-10), 2=Very Strong(7.5-9), 3=Strong(6-7.5), 4=Average(4.5-6), 5=Below Avg(3-4.5), 6=Weak(0-3)
+      const expectedHarvardRanges: Record<number, [number, number]> = {
+        1: [8, 10], 2: [6.5, 9.5], 3: [5, 8], 4: [3.5, 6.5], 5: [2, 5], 6: [0, 3.5],
+      };
+      const expectedRange = expectedHarvardRanges[harvardRating];
+      if (expectedRange) {
+        const [low, high] = expectedRange;
+        if (overallScore < low || overallScore > high) {
+          log(`  [T6 CALIBRATION WARNING] Harvard scale ${harvardRating}/6 but overall score ${overallScore.toFixed(1)}/10 — expected range ${low}-${high} for this Harvard rating`);
+        } else {
+          log(`  [T6 OK] Harvard scale ${harvardRating}/6 consistent with overall score ${overallScore.toFixed(1)}/10 (expected ${low}-${high})`);
+        }
+      }
+
+      // T6: Verify weighted breakdown components sum reasonably close to overall
+      const bd = rubric.breakdown;
+      const components = [
+        bd.tierDistribution.score,
+        bd.spikeDetection.score,
+        bd.coherence.score,
+        bd.majorAlignment.score,
+        bd.presentationQuality.score,
+      ];
+      const componentAvg = components.reduce((sum, s) => sum + s, 0) / components.length;
+      const scoreDelta = Math.abs(overallScore - componentAvg);
+      if (scoreDelta > 2.0) {
+        log(`  [T6 CALIBRATION WARNING] Overall score ${overallScore.toFixed(1)} differs from component average ${componentAvg.toFixed(1)} by ${scoreDelta.toFixed(1)} — possible weighting issue`);
+      } else {
+        log(`  [T6 OK] Overall score ${overallScore.toFixed(1)} within ${scoreDelta.toFixed(1)} of component average ${componentAvg.toFixed(1)}`);
+      }
     } else {
       divider('SCORING');
       log('Scoring data not available (scoring orchestrator may have failed)');
@@ -522,8 +682,11 @@ async function runTest() {
     // ──────────────────────────────────────────
     // RECOMMENDED DESCRIPTIONS — Final copy-pasteable view
     // ──────────────────────────────────────────
-    divider('RECOMMENDED DESCRIPTIONS (Ready to Submit)');
-    log('Your optimized activity descriptions, in recommended order:');
+    divider('RECOMMENDED DESCRIPTIONS');
+    log('Your optimized activity descriptions, in recommended order.');
+    log('IMPORTANT: Some descriptions include suggested metrics (grade improvements,');
+    log('team sizes, retention rates) based on your profile. Verify all specific');
+    log('numbers and replace with your actual figures before submitting.');
     log('');
 
     // Use Stage 3 ordering if available, otherwise follow teaching order
@@ -579,6 +742,71 @@ async function runTest() {
       log(`Harvard Scale: ${result.scoring.portfolioRubric.harvardScale.rating}/6`);
     }
     log('');
+
+    // ============================================================
+    // R22: Structural assertions (test must actually fail on regressions)
+    // ============================================================
+    divider('R22: STRUCTURAL ASSERTIONS');
+
+    // Stage 1 assertions
+    assert(result.stage1, 'R22: Stage 1 must produce results');
+    assert(result.stage1.tierDistribution, 'R22: Tier distribution must exist');
+
+    // Verify tier distribution sums to activity count
+    const r22ActivityCount = Object.keys(result.stage1.activities || {}).length;
+    const r22TierSum = (result.stage1.tierDistribution.tier1 || 0) +
+      (result.stage1.tierDistribution.tier2 || 0) +
+      (result.stage1.tierDistribution.tier3 || 0) +
+      (result.stage1.tierDistribution.tier4 || 0);
+    assert.strictEqual(r22TierSum, r22ActivityCount,
+      `R22: Tier distribution sum ${r22TierSum} must equal activity count ${r22ActivityCount}`);
+
+    // Scoring assertions
+    if (result.scoring?.portfolioRubric) {
+      const r22Total = result.scoring.portfolioRubric.overallScore?.total;
+      assert(typeof r22Total === 'number' && r22Total >= 0 && r22Total <= 10,
+        `R22: Portfolio score ${r22Total} must be number in [0, 10]`);
+
+      const r22Harvard = result.scoring.portfolioRubric.harvardScale?.rating;
+      if (r22Harvard !== undefined) {
+        assert(r22Harvard >= 1 && r22Harvard <= 6,
+          `R22: Harvard scale ${r22Harvard} must be in [1, 6]`);
+      }
+    }
+
+    // Stage 2 teaching assertions
+    if (result.stage2?.teachingDelivered) {
+      assert(result.stage2.teachingDelivered.length > 0,
+        'R22: Stage 2 must deliver teaching to at least one activity');
+      for (const td of result.stage2.teachingDelivered) {
+        assert(td.activityId, `R22: Teaching delivery must have activityId`);
+        assert(td.teaching, `R22: Teaching for ${td.activityId} must have content`);
+      }
+    }
+
+    // Narrative assertions
+    if (result.finalNarrative) {
+      assert(result.finalNarrative.story?.pitch?.length > 10,
+        'R22: Narrative pitch must have meaningful content');
+    }
+
+    log('  PASS: All R22 structural assertions passed');
+
+    // ============================================================
+    // R23: P1 regression — verify detectedCategory exists on classifications
+    // ============================================================
+    divider('R23: P1 REGRESSION CHECK');
+    for (const [actId, analysis] of Object.entries(result.stage1?.activities || {})) {
+      const typedAnalysis = analysis as any;
+      if (typedAnalysis.classification) {
+        assert(typedAnalysis.classification.detectedCategory !== undefined,
+          `R23: Activity ${actId} missing detectedCategory — P1 regression risk`);
+        assert(typeof typedAnalysis.classification.detectedCategory === 'string' &&
+          typedAnalysis.classification.detectedCategory.length > 0,
+          `R23: Activity ${actId} detectedCategory is empty — P1 regression`);
+      }
+    }
+    log('  PASS: P1 regression check passed (all activities have detectedCategory)');
 
   } catch (error) {
     log('');

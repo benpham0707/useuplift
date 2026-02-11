@@ -18,6 +18,8 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
+// R7: Use robust parseClaudeJSON with jsonrepair fallback
+import { tryParseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
 import {
   ActivityScore,
   ActivityScoreBreakdown,
@@ -154,6 +156,14 @@ NOTE: Commitment & Progression is weighted 17.5%, Leadership & Impact 12.5%. Sus
 **Tier 4 (Score 1-3)**: Participation without distinction
 - Club member, occasional volunteer, one-time events
 - For context: This describes ~70% of applicants' activities
+
+TIER CALIBRATION EXAMPLES (use these to anchor your assessments):
+- Tier 1 Example: "Founded coding bootcamp that trained 200+ underserved students, featured in local news, invited to present at state education conference" → National/regional impact, sustained commitment, recognized externally
+- Tier 2 Example: "Captain of varsity debate team, won 3 regional tournaments, mentored JV debaters" → Clear spike in one area with external recognition at regional level
+- Tier 3 Example: "President of Science Club, organized monthly speaker events, member for 3 years" → School-level leadership and commitment but no external recognition
+- Tier 4 Example: "Member of Spanish Club, participated in cultural events" → Participation without distinction or progression
+
+COMMON MISCALIBRATION: Activities involving disadvantaged backgrounds or overcoming hardship get inflated tiers. Evaluate the ACHIEVEMENT, not the circumstances. Context matters for teaching, but tier assessment must be based on demonstrated impact and recognition.
 
 ### 2. RECOGNITION LEVEL (25% weight)
 
@@ -363,6 +373,12 @@ For EACH activity:
 3. Apply appropriate weights based on leadership applicability
 4. Use the comparison benchmarks above to calibrate scores and populate comparisonBenchmarks fields
 
+SCORE SPREAD CALIBRATION (R2-5):
+- Scores MUST spread across the full 1-10 range based on actual quality differences.
+- If two activities are both Tier 3, they may still differ by 2-3 points based on recognition level and commitment depth.
+- Do NOT cluster all scores around 5-6. A portfolio with genuine variation should have scores ranging across at least 4 points (e.g., 3 to 7, or 5 to 9).
+- Each component score MUST be justified by the rubric criteria — not approximated from the overall impression.
+
 Provide scores for ALL activities in this JSON format:
 {
   "scores": [
@@ -393,7 +409,7 @@ export class ActivityScoringService {
       const response = await callClaude(
         buildActivityScoringPrompt(input),
         {
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           systemPrompt: ACTIVITY_SCORING_SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 2000,
@@ -451,7 +467,7 @@ export class ActivityScoringService {
       const response = await callClaude(
         buildBatchActivityScoringPrompt(input),
         {
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           systemPrompt: ACTIVITY_SCORING_SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 8000,
@@ -492,9 +508,9 @@ export class ActivityScoringService {
    */
   private parseScoreResponse(content: string): ActivityScore | null {
     try {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      const data = JSON.parse(jsonStr);
+      // R7: Use robust parseClaudeJSON with jsonrepair fallback
+      const data = tryParseClaudeJSON<Record<string, unknown>>(content, 'ActivityScoringService');
+      if (!data) return null;
       return this.normalizeScoreData(data);
     } catch (error) {
       console.error('[ActivityScoringService] Parse error:', error);
@@ -507,9 +523,9 @@ export class ActivityScoringService {
    */
   private parseBatchScoreResponse(content: string, expectedCount: number): ActivityScore[] | null {
     try {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      const data = JSON.parse(jsonStr);
+      // R7: Use robust parseClaudeJSON with jsonrepair fallback
+      const data = tryParseClaudeJSON<Record<string, unknown>>(content, 'ActivityScoringService.batch');
+      if (!data) return null;
 
       if (!data.scores || !Array.isArray(data.scores)) {
         console.error('[ActivityScoringService] Invalid batch response structure');

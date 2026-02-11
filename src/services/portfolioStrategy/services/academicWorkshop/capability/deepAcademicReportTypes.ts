@@ -54,6 +54,10 @@ export interface DeepAcademicReportInput {
 // ============================================================================
 
 export interface DeepAcademicReport {
+  /** Top-of-report summary: 3-5 bullets capturing the essential takeaways.
+   *  Generated from all sections after they're complete — the "if you read nothing else" section. */
+  bottomLine: BottomLineSummary;
+
   /** Section 1: Who you are academically + strengths/weaknesses + tier + Uplift rating */
   academicIdentity: AcademicIdentitySection;
 
@@ -68,6 +72,26 @@ export interface DeepAcademicReport {
 
   /** Report metadata */
   metadata: ReportMetadata;
+}
+
+/** Top-of-report summary generated AFTER all sections are complete.
+ *  Synthesizes the 3-5 most important takeaways from the entire report.
+ *  This is what gets read first — every bullet must be self-contained and impactful. */
+export interface BottomLineSummary {
+  /** Uplift letter grade + one-line explanation */
+  rating: string;
+
+  /** Current tier positioning with school examples */
+  positioning: string;
+
+  /** The single biggest strength and what it means */
+  biggestStrength: string;
+
+  /** The single biggest risk and what it costs them */
+  biggestRisk: string;
+
+  /** The #1 action that would most improve their position */
+  topAction: string;
 }
 
 // ============================================================================
@@ -97,12 +121,6 @@ export interface AcademicIdentitySection {
    *  Considers rigor, major alignment, trends, difficulty sensitivity — not just GPA.
    *  Includes what the grade means and what kind of schools fit. */
   upliftRating: UpliftRating;
-
-  /** What their trajectory means in admissions context — use tier benchmarks */
-  trajectoryMeaning: string;
-
-  /** The defining pattern in their academic record */
-  definingPattern: string;
 }
 
 /** Where the student sits in the college tier landscape.
@@ -190,83 +208,85 @@ export interface UpliftGradeDescriptor {
  * Uplift Scale because they're not challenging themselves. A student with B+'s in all
  * AP courses might be an A- because they're pushing at the highest level available.
  */
+// C3: Recalibrated with contiguous, non-overlapping percentile bands (0-100% coverage)
+// Percentile-to-school mapping grounded in freshman enrollment capacity data
 export const UPLIFT_SCALE_DATABASE: UpliftGradeDescriptor[] = [
   {
     grade: 'A+',
     label: 'Exceptional Scholar',
-    description: 'Top 1-2% academic profile nationally. Maximum rigor with near-perfect performance. Strong upward trajectory or sustained excellence. Deep alignment with intended major. Admissions officers would flag this transcript as a standout.',
-    schoolFit: 'Highly competitive for Ivy League, Stanford, MIT, Caltech, and top-5 programs in any field.',
+    description: 'Top 1-3% academic profile nationally. Maximum rigor with near-perfect performance. Strong upward trajectory or sustained excellence. Deep alignment with intended major. Admissions officers would flag this transcript as a standout.',
+    schoolFit: 'Highly competitive for Ivy League, Stanford, MIT, Caltech, and top 5-10 programs in any field.',
   },
   {
     grade: 'A',
     label: 'Outstanding',
-    description: 'Top 5% academic profile. High rigor with consistent A-range performance. Clear academic identity with strong major alignment. Transcript tells a compelling story of intellectual curiosity and capability.',
-    schoolFit: 'Strong contender at top-20 universities, highly selective liberal arts colleges, and flagship state university honors programs.',
+    description: 'Top 3-6% academic profile. High rigor with consistent A-range performance. Clear academic identity with strong major alignment. Transcript tells a compelling story of intellectual curiosity and capability.',
+    schoolFit: 'Strong contender at top 10-20 universities, highly selective liberal arts colleges, and flagship state university honors programs.',
   },
   {
     grade: 'A-',
     label: 'Excellent',
-    description: 'Top 10% academic profile. Meaningful rigor with mostly strong grades. Minor inconsistencies offset by clear strengths. Solid trajectory and identifiable academic direction.',
-    schoolFit: 'Competitive at top-30 universities, strong match for top-50 schools, and excellent position at selective state universities.',
+    description: 'Top 6-10% academic profile. Meaningful rigor with mostly strong grades. Minor inconsistencies offset by clear strengths. Solid trajectory and identifiable academic direction.',
+    schoolFit: 'Competitive at top 20-30 universities, strong match for top-40 schools, and excellent position at selective state universities.',
   },
   {
     grade: 'B+',
     label: 'Very Good',
-    description: 'Top 15-20% academic profile. Good rigor with some grade variation. Strengths are visible but so are gaps. May have one area that needs attention or rigor that could be stronger.',
-    schoolFit: 'Competitive at top-50 universities, strong match for top-80 schools. May need strong extracurriculars for reach schools.',
+    description: 'Top 10-17% academic profile. Good rigor with some grade variation. Strengths are visible but so are gaps. May have one area that needs attention or rigor that could be stronger.',
+    schoolFit: 'Competitive at top 30-50 schools (NYU, Tulane, Wisconsin, UCSB). Strong match for top-80. May need strong extracurriculars for reach schools.',
   },
   {
     grade: 'B',
     label: 'Solid',
-    description: 'Top 25-30% academic profile. Adequate rigor with average performance at that level. Academic story is developing but not yet distinctive. Some strengths but also noticeable areas needing improvement.',
-    schoolFit: 'Good fit for large state universities and mid-tier private colleges. Top-50 schools are realistic reaches with strong supplementary profile.',
+    description: 'Top 17-24% academic profile. Adequate rigor with average performance at that level. Academic story is developing but not yet distinctive. Some strengths but also noticeable areas needing improvement.',
+    schoolFit: 'Competitive at top 50-80 schools, large state flagships, and mid-tier private colleges. Top-50 schools are realistic reaches with strong supplementary profile.',
   },
   {
     grade: 'B-',
     label: 'Developing',
-    description: 'Top 35-40% academic profile. Either rigor is present but grades suffer, or grades are fine but rigor is too low. An imbalance exists between challenge and performance that needs addressing.',
-    schoolFit: 'Solid at state universities and regional private colleges. Selective schools require significant improvement or exceptional non-academic strengths.',
+    description: 'Top 24-30% academic profile. Either rigor is present but grades suffer, or grades are fine but rigor is too low. An imbalance exists between challenge and performance that needs addressing.',
+    schoolFit: 'Solid at top 80-120 schools, state universities, and regional private colleges. More selective schools require significant improvement or exceptional non-academic strengths.',
   },
   {
     grade: 'C+',
     label: 'Below Potential',
-    description: 'The transcript signals underperformance. Either the student is capable of more challenge, or capable of better grades at their current level. There is a visible gap between what is and what could be.',
-    schoolFit: 'State universities and less selective private colleges are strong matches. More selective schools require a clear narrative of improvement.',
+    description: 'Top 30-45% academic profile. The transcript signals underperformance. Either the student is capable of more challenge, or capable of better grades at their current level. There is a visible gap between what is and what could be.',
+    schoolFit: 'Less selective state and private universities are strong matches. More selective schools require a clear narrative of improvement.',
   },
   {
     grade: 'C',
     label: 'Needs Significant Improvement',
-    description: 'Multiple areas need attention. Low rigor, inconsistent grades, weak major alignment, or declining trajectory. The transcript does not yet tell a story that admissions officers want to champion.',
+    description: 'Top 45-62% academic profile. Multiple areas need attention. Low rigor, inconsistent grades, weak major alignment, or declining trajectory. The transcript does not yet tell a story that admissions officers want to champion.',
     schoolFit: 'Open-admission and less selective institutions. Improvement over remaining semesters could open doors to more selective options.',
   },
   {
     grade: 'C-',
     label: 'At Risk',
-    description: 'Significant academic challenges across multiple dimensions. May include declining trajectory, very low rigor, or grades that don\'t meet basic expectations. Immediate course correction needed.',
+    description: 'Top 62-80% academic profile. Significant academic challenges across multiple dimensions. May include declining trajectory, very low rigor, or grades that don\'t meet basic expectations. Immediate course correction needed.',
     schoolFit: 'Community college to university transfer pathway may offer the best long-term strategy. Focus on building a recovery narrative.',
   },
   {
     grade: 'D+',
     label: 'Struggling',
-    description: 'Serious academic concerns. Performance is well below what most four-year colleges expect. However, this is not permanent — students who turn things around in their remaining time can still build a compelling narrative.',
+    description: 'Top 80-88% academic profile. Serious academic concerns. Performance is well below what most four-year colleges expect. However, this is not permanent — students who turn things around in their remaining time can still build a compelling narrative.',
     schoolFit: 'Community college is the strongest immediate path. Strong performance there opens transfer opportunities to excellent universities.',
   },
   {
     grade: 'D',
     label: 'Critical',
-    description: 'The academic record currently presents major barriers to traditional admissions pathways. A complete strategic reset is needed — but turnaround stories are some of the most powerful narratives in admissions.',
+    description: 'Top 88-94% academic profile. The academic record currently presents major barriers to traditional admissions pathways. A complete strategic reset is needed — but turnaround stories are some of the most powerful narratives in admissions.',
     schoolFit: 'Community college with intentional transfer planning. Gap year programs with academic enrichment may also help reset the trajectory.',
   },
   {
     grade: 'D-',
     label: 'Emergency',
-    description: 'Academic performance is at crisis level. Immediate intervention needed — academic support, tutoring, and possibly a conversation about learning differences or personal circumstances affecting performance.',
+    description: 'Top 94-98% academic profile. Academic performance is at crisis level. Immediate intervention needed — academic support, tutoring, and possibly a conversation about learning differences or personal circumstances affecting performance.',
     schoolFit: 'Focus on stabilization first, college planning second. Community college remains an excellent pathway once academic fundamentals are strengthened.',
   },
   {
     grade: 'F',
     label: 'Requires Immediate Intervention',
-    description: 'Academic profile is in freefall or essentially non-functional. This is not about college admissions — this is about getting the right support system in place. Academic counseling, mental health support, and family involvement are priorities.',
+    description: 'Bottom 2% academic profile. Academic profile is in freefall or essentially non-functional. This is not about college admissions — this is about getting the right support system in place. Academic counseling, mental health support, and family involvement are priorities.',
     schoolFit: 'College planning is secondary to addressing root causes. With proper support and time, every student can build a viable academic path forward.',
   },
 ];
@@ -367,12 +387,16 @@ export interface CourseAvoidItem {
 // ============================================================================
 
 export interface ResearchContextSection {
-  /** Verified AP statistics for relevant courses */
+  /** Verified AP statistics for relevant courses, with student performance context */
   apStatistics: Array<{
     course: string;
     passRate: string;
     fiveRate: string;
     citation: string;
+    /** Student's class grade if they took this course (null if not taken) */
+    studentGrade?: string;
+    /** Brief context connecting this stat to the student's performance */
+    studentContext?: string;
   }>;
 
   /** College tier expectations */

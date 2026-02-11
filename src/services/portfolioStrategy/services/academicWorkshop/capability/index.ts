@@ -332,15 +332,19 @@ export type {
 // ============================================================================
 
 export {
-  DeepAcademicReportService,
-  deepAcademicReportService,
   generateDeepAcademicReport,
-} from './deepAcademicReportService';
+} from './deepAcademicReport';
+
+export {
+  UPLIFT_SCALE_DATABASE,
+  COLLEGE_TIER_BENCHMARKS,
+} from './deepAcademicReport';
 
 export type {
   // Input/Output
   DeepAcademicReportInput,
   DeepAcademicReport,
+  BottomLineSummary,
 
   // Sections
   AcademicIdentitySection,
@@ -363,5 +367,3 @@ export type {
   ReportMetadata,
   AssembledReportContext,
 } from './deepAcademicReportTypes';
-
-export { UPLIFT_SCALE_DATABASE } from './deepAcademicReportTypes';

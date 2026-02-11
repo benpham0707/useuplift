@@ -63,6 +63,9 @@ import {
   type StudentContext as ResearchStudentContext,
 } from './unifiedResearchAssemblyService';
 
+// R8: Import verified AP statistics for dynamic lookups
+import { AP_EXAM_STATISTICS } from './academicResearchFoundation';
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -77,6 +80,12 @@ function calculateOverallGPA(quant: NuancedCapabilityAnalysis): number {
 
   const totalGPA = patterns.reduce((sum, p) => sum + p.performanceHistory.avgGPA, 0);
   return totalGPA / patterns.length;
+}
+
+// R8: Dynamic AP stat lookups from verified data source
+function getAPPassRate(examKey: string): string {
+  const stat = AP_EXAM_STATISTICS[examKey];
+  return stat ? `${Math.round(stat.passRate.value * 100)}%` : 'N/A';
 }
 
 // ============================================================================
@@ -221,30 +230,30 @@ function getSpecificAPRecommendation(
       ? {
           course: 'AP Calculus BC',
           reason: 'BC covers single-variable calculus in full—the same content as Calc I and II in college. Stopping at AB means retaking Calc I in college while your peers who took BC skip directly to Calc III or Linear Algebra.',
-          peerData: 'VERIFIED: BC has an 81% pass rate vs AB\'s 61% (College Board 2024). NACAC research shows 64% of colleges rate curriculum rigor as "considerably important." For CS/Engineering, BC is the expected baseline—it\'s what rigorous programs assume you\'ve taken.'
+          peerData: `VERIFIED: BC has a ${getAPPassRate('AP Calculus BC')} pass rate vs AB's ${getAPPassRate('AP Calculus AB')} (College Board 2024). NACAC research shows 64% of colleges rate curriculum rigor as "considerably important." For CS/Engineering, BC is the expected baseline—it's what rigorous programs assume you've taken.`
         }
       : isBusiness
         ? {
             course: 'AP Calculus AB + AP Statistics',
             reason: 'Business schools value both. AB shows you can handle quantitative rigor; Stats shows you understand data-driven decision making—which is what modern business actually runs on.',
-            peerData: 'VERIFIED: AP Statistics has a 60% pass rate; AP Calc AB has 61% (College Board 2024). The combination demonstrates both theoretical mathematical thinking and applied data analysis—both essential for quantitative business fields.'
+            peerData: `VERIFIED: AP Statistics has a ${getAPPassRate('AP Statistics')} pass rate; AP Calc AB has ${getAPPassRate('AP Calculus AB')} (College Board 2024). The combination demonstrates both theoretical mathematical thinking and applied data analysis—both essential for quantitative business fields.`
           }
         : {
             course: 'AP Calculus AB',
             reason: 'Calculus is the universal signal of mathematical maturity. Even humanities majors at selective schools benefit from proving they can handle rigorous abstract thinking.',
-            peerData: 'VERIFIED: AP Calculus AB has a 61% pass rate (College Board 2024). NACAC data shows curriculum rigor is increasingly important—up from 51% in 2017 to 64% in 2023. Taking calculus when available signals college readiness.'
+            peerData: `VERIFIED: AP Calculus AB has a ${getAPPassRate('AP Calculus AB')} pass rate (College Board 2024). NACAC data shows curriculum rigor is increasingly important—up from 51% in 2017 to 64% in 2023. Taking calculus when available signals college readiness.`
           },
     science: isPreMed
       ? {
           course: 'AP Biology + AP Chemistry',
           reason: 'Pre-med requires both. Taking only one suggests incomplete preparation. Both together signal serious pre-med commitment—you know what medical school requires.',
-          peerData: 'VERIFIED: AP Biology has a 64% pass rate; AP Chemistry has 56% (College Board 2024). Medical schools require biology and chemistry coursework. Taking both APs in high school demonstrates you understand and are preparing for pre-med prerequisites.'
+          peerData: `VERIFIED: AP Biology has a ${getAPPassRate('AP Biology')} pass rate; AP Chemistry has ${getAPPassRate('AP Chemistry')} (College Board 2024). Medical schools require biology and chemistry coursework. Taking both APs in high school demonstrates you understand and are preparing for pre-med prerequisites.`
         }
       : isSTEM
         ? {
             course: 'AP Physics C: Mechanics',
             reason: 'Physics C uses calculus, which makes many problems MORE straightforward, not harder. The problems become elegant when you have calculus as a tool. Plus, it\'s the version that earns credit at selective schools.',
-            peerData: 'VERIFIED: Physics C: Mechanics has a 73% pass rate vs Physics 1\'s 46% (College Board 2024). The higher pass rate reflects both self-selection AND that calculus simplifies physics problem-solving. For engineering applicants, Physics C demonstrates serious STEM preparation.'
+            peerData: `VERIFIED: Physics C: Mechanics has a ${getAPPassRate('AP Physics C: Mechanics')} pass rate vs Physics 1's ${getAPPassRate('AP Physics 1')} (College Board 2024). The higher pass rate reflects both self-selection AND that calculus simplifies physics problem-solving. For engineering applicants, Physics C demonstrates serious STEM preparation.`
           }
         : {
             course: 'AP Environmental Science or AP Psychology',
@@ -254,13 +263,13 @@ function getSpecificAPRecommendation(
     english: {
       course: 'AP English Literature',
       reason: 'Lit requires genuine engagement with complex texts and sophisticated literary analysis. It signals intellectual depth beyond formulaic essay writing.',
-      peerData: 'VERIFIED: AP English Literature has a 78% pass rate (College Board 2024). The course builds college-level analytical reading and writing skills valued across all fields—law, policy, business, and humanities.'
+      peerData: `VERIFIED: AP English Literature has a ${getAPPassRate('AP English Literature')} pass rate (College Board 2024). The course builds college-level analytical reading and writing skills valued across all fields—law, policy, business, and humanities.`
     },
     social_studies: isBusiness || majorLower.includes('politic') || majorLower.includes('history')
       ? {
           course: 'AP US History + AP Government',
           reason: 'APUSH is content-heavy with demanding writing requirements. Taking it proves you can handle college-level reading loads and historical analysis. Government adds contemporary policy relevance.',
-          peerData: 'VERIFIED: AP US History has a 48% pass rate—one of the more challenging APs (College Board 2024). Success here demonstrates serious academic capability and preparation for humanities/social science fields.'
+          peerData: `VERIFIED: AP US History has a ${getAPPassRate('AP US History')} pass rate (College Board 2024). The content-heavy nature of APUSH means success here demonstrates serious academic capability and preparation for humanities/social science fields.`
         }
       : {
           course: 'AP Psychology or AP Human Geography',
@@ -275,7 +284,7 @@ function getSpecificAPRecommendation(
     computer_science: {
       course: 'AP Computer Science A',
       reason: 'CS A covers object-oriented programming in Java—real software engineering concepts, not just coding. It\'s the difference between "I like coding" and "I can think like a computer scientist."',
-      peerData: 'VERIFIED: AP Computer Science A has a 68% pass rate (College Board 2024). For CS applicants, formal coursework validates self-taught skills. Personal projects show passion; AP CS A shows you can handle structured computer science curriculum.'
+      peerData: `VERIFIED: AP Computer Science A has a ${getAPPassRate('AP Computer Science A')} pass rate (College Board 2024). For CS applicants, formal coursework validates self-taught skills. Personal projects show passion; AP CS A shows you can handle structured computer science curriculum.`
     },
   };
 
@@ -444,7 +453,8 @@ export function extractProfileInsights(profile: StudentProfile): ProfileInsight[
   // INSIGHT 2: Trajectory Patterns
   // -------------------------------------------------------------------------
   const trajectory = quant.progressionTrajectory.historical.overallTrend;
-  const yearlyGPAs = quant.progressionTrajectory.historical.yearlyGPAs;
+  // B2 fix: correct property is gpaByYear (not yearlyGPAs which doesn't exist)
+  const yearlyGPAs = quant.progressionTrajectory.historical.gpaByYear.map(y => y.gpa);
 
   if (trajectory === 'declining' && yearlyGPAs.length >= 2) {
     const drop = yearlyGPAs[0] - yearlyGPAs[yearlyGPAs.length - 1];
@@ -518,7 +528,7 @@ export function extractProfileInsights(profile: StudentProfile): ProfileInsight[
           : majorLower.includes('business') || majorLower.includes('econ')
             ? 'NACAC: 64% of colleges rate curriculum rigor as considerably important. Quantitative business programs expect strong math preparation—calculus and statistics demonstrate data-driven thinking.'
             : majorLower.includes('med') || majorLower.includes('bio')
-              ? 'Medical schools require biology AND chemistry. Taking both AP Bio (64% pass rate) and AP Chemistry (56% pass rate) in high school demonstrates you understand the pre-med prerequisites.'
+              ? `Medical schools require biology AND chemistry. Taking both AP Bio (${getAPPassRate('AP Biology')} pass rate) and AP Chemistry (${getAPPassRate('AP Chemistry')} pass rate) in high school demonstrates you understand the pre-med prerequisites.`
               : `NACAC: 64% of colleges rate curriculum rigor as considerably important. For ${profile.intendedMajor}, this means: ${requirements.required_signals.slice(0, 3).join(', ')}.`;
 
         if (weakInAligned) {
@@ -536,7 +546,7 @@ export function extractProfileInsights(profile: StudentProfile): ProfileInsight[
           insights.push({
             observation: `Strong foundation for ${profile.intendedMajor} (${alignedSubjects.filter(s => quant.subjectPatterns[s]?.performanceHistory.avgGPA >= 3.5).map(formatSubject).join(', ')}), but missing credential courses: ${missingRequired.slice(0, 2).join(', ')}`,
             interpretation: `You have the capability—your grades prove it. But capability alone doesn't get you admitted; demonstrated coursework does. ${peerData} Right now, you have the foundation without the validation.`,
-            strategicImplication: `**Specific schedule for next year:** Add ${missingRequired[0]}${missingRequired[1] ? ` and ${missingRequired[1]}` : ''}. Your ${alignedSubjects[0]} strength means you can handle these—in fact, students with your profile typically find these APs MORE engaging because they finally match your capability level. BC has an 81% pass rate (College Board 2024), and strong math students often exceed this.`,
+            strategicImplication: `**Specific schedule for next year:** Add ${missingRequired[0]}${missingRequired[1] ? ` and ${missingRequired[1]}` : ''}. Your ${alignedSubjects[0]} strength means you can handle these—in fact, students with your profile typically find these APs MORE engaging because they finally match your capability level. BC has a ${getAPPassRate('AP Calculus BC')} pass rate (College Board 2024), and strong math students often exceed this.`,
               evidence: [
               `Strong in: ${alignedSubjects.filter(s => quant.subjectPatterns[s]?.performanceHistory.avgGPA >= 3.5).map(formatSubject).join(', ')}`,
               `Missing credentials: ${missingRequired.join(', ')}`,

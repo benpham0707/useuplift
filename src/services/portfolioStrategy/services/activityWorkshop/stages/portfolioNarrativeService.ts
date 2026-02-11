@@ -55,173 +55,24 @@ import { parseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser'
 import {
   ActivityWorkshopSessionInput,
   ActivityWorkshopInput,
-  StoryContext,
   PortfolioAnalysis,
+  NarrativeElevation,
+  NarrativeThread,
+  SpikePresentation,
+  GapFraming,
+  PortfolioNarrative,
+  NarrativeProgression,
 } from '../types';
 
-// ============================================================================
-// ENHANCED TYPES FOR HOLISTIC NARRATIVE
-// ============================================================================
-
-/**
- * How one activity elevates another
- */
-export interface NarrativeElevation {
-  /** The activity being elevated */
-  elevatedActivityId: string;
-  /** The activity providing the elevation */
-  elevatingActivityId: string;
-  /** How the elevation works */
-  mechanism: string;
-  /** The combined impression created */
-  combinedImpression: string;
-  /** Strength of this elevation effect */
-  strength: 'transformative' | 'strong' | 'moderate' | 'subtle';
-}
-
-/**
- * A narrative thread that runs through multiple activities
- */
-export interface NarrativeThread {
-  /** Thread name */
-  name: string;
-  /** Activities that contribute to this thread */
-  activityIds: string[];
-  /** How this thread manifests */
-  manifestation: string;
-  /** Why this thread is compelling to admissions */
-  admissionsValue: string;
-  /** How the activities together tell this story better than individually */
-  synergy: string;
-}
-
-/**
- * The portfolio's spike presentation
- */
-export interface SpikePresentation {
-  /** Primary area of exceptional depth */
-  primarySpike: {
-    area: string;
-    activities: string[];
-    depth: string;
-    distinctiveness: string;
-  };
-  /** How other activities support/complement the spike */
-  supportingElements: {
-    activityId: string;
-    howItSupports: string;
-    elevationEffect: string;
-  }[];
-  /** The "T-shape" - breadth that complements depth */
-  complementaryBreadth: {
-    area: string;
-    activities: string[];
-    whyItMatters: string;
-  }[];
-}
-
-/**
- * Identified gaps and how to frame them */
-export interface GapFraming {
-  /** The gap identified */
-  gap: string;
-  /** How existing activities partially fill this */
-  existingMitigation: string;
-  /** How to frame this gap positively */
-  positiveFraming: string;
-  /** Whether this gap can be addressed through description */
-  addressableThroughDescription: boolean;
-}
-
-/**
- * Complete portfolio narrative analysis
- */
-export interface PortfolioNarrative {
-  // === THE STORY ===
-  story: {
-    /** The compelling 2-3 sentence pitch for this candidate */
-    pitch: string;
-    /** The unique angle that makes this student memorable */
-    uniqueAngle: string;
-    /** The "so what" - why should colleges care? */
-    whyItMatters: string;
-    /** Character traits that emerge from the portfolio */
-    emergentTraits: string[];
-  };
-
-  // === NARRATIVE THREADS ===
-  threads: NarrativeThread[];
-
-  // === ELEVATION ANALYSIS ===
-  elevations: NarrativeElevation[];
-
-  // === SPIKE PRESENTATION ===
-  spike: SpikePresentation;
-
-  // === GAP FRAMING ===
-  gaps: GapFraming[];
-
-  // === COHERENCE ===
-  coherence: {
-    /** Overall coherence score */
-    score: number; // 0-100
-    /** Qualitative assessment */
-    assessment: 'exceptional' | 'strong' | 'moderate' | 'developing' | 'scattered';
-    /** What ties everything together */
-    unifyingElement: string;
-    /** Activities that don't fit and how to address */
-    outliers: {
-      activityId: string;
-      howToIntegrate: string;
-    }[];
-  };
-
-  // === COMPETITIVE POSITIONING ===
-  positioning: {
-    /** Where this student stands out */
-    strengths: string[];
-    /** What makes them different from similar applicants */
-    differentiators: string[];
-    /** The story admissions officers will remember */
-    memorableElement: string;
-    /** School types this portfolio fits well */
-    schoolFit: string[];
-  };
-
-  // === METADATA ===
-  metadata: {
-    generatedAt: string;
-    modelUsed: string;
-    tokensUsed: { input: number; output: number };
-    cost: number;
-    analysisType: 'initial' | 'post_improvement';
-  };
-}
-
-/**
- * Comparison between initial and improved narrative
- */
-export interface NarrativeProgression {
-  /** The initial narrative */
-  initial: PortfolioNarrative;
-  /** The improved narrative */
-  improved: PortfolioNarrative;
-  /** What changed */
-  changes: {
-    /** New threads that emerged */
-    newThreads: string[];
-    /** Strengthened elevations */
-    strengthenedElevations: string[];
-    /** Improved coherence */
-    coherenceImprovement: number;
-    /** New differentiators */
-    newDifferentiators: string[];
-    /** Summary of narrative transformation */
-    transformationSummary: string;
-  };
-  /** Celebration of progress */
-  celebration: string;
-}
+// Re-export narrative types for backward compatibility (index.ts imports from here)
+export type {
+  NarrativeElevation,
+  NarrativeThread,
+  SpikePresentation,
+  GapFraming,
+  PortfolioNarrative,
+  NarrativeProgression,
+};
 
 // ============================================================================
 // PORTFOLIO NARRATIVE SERVICE
@@ -230,8 +81,10 @@ export interface NarrativeProgression {
 export class PortfolioNarrativeService {
   private readonly MODEL = 'claude-sonnet-4-5-20250929'; // Sonnet 4.5 - latest
 
-  // Cache for storing initial narrative (for comparison with final)
-  private narrativeCache: Map<string, PortfolioNarrative> = new Map();
+  // R1: Cache with timestamps and bounded size to prevent memory leaks
+  private static readonly CACHE_MAX_SIZE = 50;
+  private static readonly CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+  private narrativeCache: Map<string, { narrative: PortfolioNarrative; timestamp: number }> = new Map();
 
   /**
    * Analyze portfolio narrative at the BEGINNING of analysis
@@ -246,8 +99,9 @@ export class PortfolioNarrativeService {
 
     const narrative = await this.analyzeNarrative(input, 'initial');
 
-    // Cache for later comparison
-    this.narrativeCache.set(sessionId, narrative);
+    // R1: Evict stale entries before caching to prevent unbounded growth
+    this.evictStaleCache();
+    this.narrativeCache.set(sessionId, { narrative, timestamp: Date.now() });
 
     console.log(`[PortfolioNarrative] Initial analysis complete in ${Date.now() - startTime}ms`);
     console.log(`[PortfolioNarrative] Story pitch: ${narrative.story.pitch.substring(0, 100)}...`);
@@ -270,8 +124,8 @@ export class PortfolioNarrativeService {
 
     const improved = await this.analyzeNarrative(input, 'post_improvement', analysis);
 
-    // Check if we have a cached initial narrative to compare
-    const initial = this.narrativeCache.get(sessionId);
+    // R1: Check if we have a cached initial narrative to compare (extract .narrative from cache entry)
+    const initial = this.narrativeCache.get(sessionId)?.narrative;
 
     if (initial) {
       // Return full progression showing the improvement
@@ -289,8 +143,9 @@ export class PortfolioNarrativeService {
   /**
    * Get cached initial narrative for a session
    */
+  // R1: Return .narrative from cache entry
   getCachedNarrative(sessionId: string): PortfolioNarrative | undefined {
-    return this.narrativeCache.get(sessionId);
+    return this.narrativeCache.get(sessionId)?.narrative;
   }
 
   /**
@@ -303,6 +158,30 @@ export class PortfolioNarrativeService {
   // ============================================================================
   // PRIVATE METHODS
   // ============================================================================
+
+  /**
+   * R1: Evict stale cache entries to prevent unbounded memory growth.
+   * Removes entries older than CACHE_TTL_MS, then evicts oldest if still over CACHE_MAX_SIZE.
+   */
+  private evictStaleCache(): void {
+    const now = Date.now();
+
+    // Remove entries older than TTL
+    for (const [key, entry] of this.narrativeCache) {
+      if (now - entry.timestamp > PortfolioNarrativeService.CACHE_TTL_MS) {
+        this.narrativeCache.delete(key);
+      }
+    }
+
+    // If still over limit, evict oldest entries
+    if (this.narrativeCache.size >= PortfolioNarrativeService.CACHE_MAX_SIZE) {
+      const entries = [...this.narrativeCache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+      const toRemove = entries.slice(0, this.narrativeCache.size - PortfolioNarrativeService.CACHE_MAX_SIZE + 1);
+      for (const [key] of toRemove) {
+        this.narrativeCache.delete(key);
+      }
+    }
+  }
 
   /**
    * Core narrative analysis method
@@ -535,7 +414,13 @@ REMEMBER:
 - Find HIDDEN CONNECTIONS that create narrative threads
 - Identify the SPIKE even if not obvious
 - Frame GAPS positively - what CAN they emphasize?
-- Focus on what makes this student MEMORABLE`;
+- Focus on what makes this student MEMORABLE
+
+ANTI-ARCHETYPE RULE (for the story pitch):
+- WRONG: "Sarah is a natural leader and community builder."
+- RIGHT: "Sarah built a tutoring program from 3 students to 47 by converting her family's restaurant storage room into a study space — leadership born from necessity, not ambition."
+- The pitch must include at least ONE specific detail that could only be true of THIS student.
+- NEVER use archetype labels (leader, innovator, scholar) as the pitch — use them as underlying structure only.`;
   }
 
   /**
@@ -722,7 +607,8 @@ ${activity.achievements?.length ? `**Notable Achievements:** ${activity.achievem
   }
 
   /**
-   * Generate a celebration message for progress
+   * R2-8: Generate a PERSONALIZED celebration message for progress
+   * References specific improvements rather than using canned templates.
    */
   private generateCelebration(
     initial: PortfolioNarrative,
@@ -730,15 +616,59 @@ ${activity.achievements?.length ? `**Notable Achievements:** ${activity.achievem
     coherenceImprovement: number,
     newThreadCount: number
   ): string {
-    if (coherenceImprovement >= 15 || newThreadCount >= 2) {
-      return `🎉 Remarkable transformation! Your portfolio now tells a compelling story where your activities truly elevate each other. Admissions officers will see not just what you've done, but WHO YOU ARE.`;
+    const specificImprovements: string[] = [];
+
+    // Detect spike emergence/improvement
+    if (improved.spike.primarySpike.area !== initial.spike.primarySpike.area ||
+        improved.spike.primarySpike.depth !== initial.spike.primarySpike.depth) {
+      specificImprovements.push(
+        `Your spike in ${improved.spike.primarySpike.area} is now more defined — ${improved.spike.primarySpike.distinctiveness}`
+      );
     }
 
-    if (coherenceImprovement >= 5 || newThreadCount >= 1) {
-      return `✨ Great progress! Your narrative is coming together beautifully. The connections between your activities are becoming clearer and more powerful.`;
+    // Detect new narrative threads
+    if (newThreadCount > 0) {
+      const initialThreadNames = new Set(initial.threads.map(t => t.name));
+      const newThreadNames = improved.threads
+        .filter(t => !initialThreadNames.has(t.name))
+        .slice(0, 2)
+        .map(t => `"${t.name}"`);
+      if (newThreadNames.length > 0) {
+        specificImprovements.push(
+          `New narrative thread${newThreadNames.length > 1 ? 's' : ''} emerged: ${newThreadNames.join(' and ')}`
+        );
+      }
     }
 
-    return `👏 Solid improvements! Your portfolio's story is strengthening. Keep building on these foundations.`;
+    // Detect new elevations
+    const newElevationCount = improved.elevations.length - initial.elevations.length;
+    if (newElevationCount > 0) {
+      const strongElevation = improved.elevations.find(e => e.strength === 'transformative' || e.strength === 'strong');
+      if (strongElevation) {
+        specificImprovements.push(
+          `Your activities now elevate each other — ${strongElevation.mechanism}`
+        );
+      }
+    }
+
+    // Detect coherence improvement
+    if (coherenceImprovement >= 10) {
+      specificImprovements.push(
+        `Coherence jumped from ${initial.coherence.score} to ${improved.coherence.score} — your story reads as a unified narrative now`
+      );
+    }
+
+    // Build personalized message
+    if (specificImprovements.length >= 2) {
+      return `Remarkable progress: ${specificImprovements.join('. ')}. Admissions officers will see not just what you've done, but WHO YOU ARE.`;
+    }
+
+    if (specificImprovements.length === 1) {
+      return `Real progress: ${specificImprovements[0]}. Your portfolio's narrative is becoming clearer and more compelling.`;
+    }
+
+    // Fallback: still personalized with actual data
+    return `Your portfolio's story around "${improved.spike.primarySpike.area}" is strengthening. The coherence at ${improved.coherence.score}/100 gives you a solid foundation to build on.`;
   }
 
   /**

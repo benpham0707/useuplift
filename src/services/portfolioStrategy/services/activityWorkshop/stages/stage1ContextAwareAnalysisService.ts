@@ -68,7 +68,7 @@ const TEACHING_THRESHOLDS = {
  */
 export class Stage1ContextAwareAnalysisService {
   private readonly MODEL = 'claude-sonnet-4-5-20250929';
-  private _lastUsage: { input_tokens: number; output_tokens: number } | undefined;
+  // R2: Removed instance-level _accumulatedUsage to prevent race conditions on concurrent calls
 
   /** Maximum activities per sub-batch for parallel LLM analysis */
   private readonly SUB_BATCH_SIZE = 2;
@@ -89,6 +89,8 @@ export class Stage1ContextAwareAnalysisService {
     storyContext: StoryContext
   ): Promise<AnalysisContext> {
     const startTime = Date.now();
+    // R2: Use local accumulator instead of instance-level to prevent race conditions
+    const localUsage = { input_tokens: 0, output_tokens: 0 };
     console.log(`[Stage1] Starting context-aware analysis for ${input.activities.length} activities`);
 
     // Step 1a: Run profiler on ALL activities (instant, heuristic — no API call)
@@ -103,9 +105,9 @@ export class Stage1ContextAwareAnalysisService {
     console.log(`[Stage1] Running scoring orchestrator in parallel...`);
 
     const parallelStartTime = Date.now();
-    const [subBatchResults, scoringResult] = await Promise.all([
-      // Sub-batch analysis (existing)
-      Promise.all(
+    const [subBatchSettled, scoringResult] = await Promise.all([
+      // Sub-batch analysis — use allSettled so partial results survive individual failures
+      Promise.allSettled(
         chunks.map((chunk, i) => {
           const subInput: ActivityWorkshopSessionInput = {
             activities: chunk,
@@ -118,12 +120,41 @@ export class Stage1ContextAwareAnalysisService {
       // Scoring orchestrator (NEW — runs in parallel)
       this.runScoring(input),
     ]);
-    console.log(`[Stage1] Parallel analysis + scoring complete in ${Date.now() - parallelStartTime}ms`);
+
+    // R5: Extract successful sub-batch results with usage info, log failures
+    const subBatchResults = subBatchSettled
+      .filter((r): r is PromiseFulfilledResult<{ activities: Record<string, ActivityAnalysis>; usage?: { input_tokens: number; output_tokens: number } }> => r.status === 'fulfilled')
+      .map(r => r.value);
+
+    const failedBatches = subBatchSettled.filter(r => r.status === 'rejected');
+    if (failedBatches.length > 0) {
+      console.warn(`[Stage1] ${failedBatches.length}/${chunks.length} sub-batches failed`);
+      for (const failed of failedBatches) {
+        if (failed.status === 'rejected') {
+          console.error('[Stage1] Sub-batch failure:', failed.reason);
+        }
+      }
+    }
+
+    if (subBatchResults.length === 0) {
+      throw new Error(`All ${chunks.length} sub-batches failed`);
+    }
+
+    console.log(`[Stage1] Parallel analysis + scoring complete in ${Date.now() - parallelStartTime}ms (${subBatchResults.length}/${chunks.length} sub-batches succeeded)`);
+
+    // R5: Accumulate sub-batch token usage (the most expensive part of the pipeline)
+    for (const result of subBatchResults) {
+      if (result.usage) {
+        localUsage.input_tokens += result.usage.input_tokens;
+        localUsage.output_tokens += result.usage.output_tokens;
+      }
+    }
 
     // Step 1c: Merge sub-batch results into unified PortfolioAnalysis
     const mergedActivities: Record<string, ActivityAnalysis> = {};
+    // R5: Use .activities from the new return shape
     for (const subResult of subBatchResults) {
-      Object.assign(mergedActivities, subResult);
+      Object.assign(mergedActivities, subResult.activities);
     }
 
     const portfolioFields = batchActivityAnalysisService.buildPortfolioFieldsFromProfiler(input, profilerResult);
@@ -131,14 +162,32 @@ export class Stage1ContextAwareAnalysisService {
       activities: mergedActivities,
       ...portfolioFields,
     };
+
+    // Recompute tier distribution from actual per-activity tiers (not the profiler's independent count)
+    // The profiler and sub-batch analysis may assign different tiers since they're separate LLM calls
+    const recomputedTiers = { tier1: 0, tier2: 0, tier3: 0, tier4: 0 };
+    for (const analysis of Object.values(mergedActivities)) {
+      const tier = analysis.classification?.tier;
+      if (tier === 1) recomputedTiers.tier1++;
+      else if (tier === 2) recomputedTiers.tier2++;
+      else if (tier === 3) recomputedTiers.tier3++;
+      else recomputedTiers.tier4++;
+    }
+    baseAnalysis.tierDistribution.tier1 = recomputedTiers.tier1;
+    baseAnalysis.tierDistribution.tier2 = recomputedTiers.tier2;
+    baseAnalysis.tierDistribution.tier3 = recomputedTiers.tier3;
+    baseAnalysis.tierDistribution.tier4 = recomputedTiers.tier4;
     console.log(`[Stage1] Merged ${Object.keys(mergedActivities).length} activity analyses`);
+    console.log(`[Stage1] Tier distribution (recomputed): T1=${recomputedTiers.tier1}, T2=${recomputedTiers.tier2}, T3=${recomputedTiers.tier3}, T4=${recomputedTiers.tier4}`);
 
     // Step 1d: Get story-enriched adjustments via LLM
     console.log(`[Stage1] Getting story-enriched adjustments...`);
+    // R2: Pass localUsage to track story adjustment API cost
     const storyAdjustments = await this.getStoryEnrichedAdjustments(
       input,
       baseAnalysis,
-      storyContext
+      storyContext,
+      localUsage
     );
 
     // Step 1e: Select teaching candidates based on analysis + story
@@ -163,6 +212,12 @@ export class Stage1ContextAwareAnalysisService {
       storyContext
     );
 
+    // R2: Accumulate scoring token usage into local accumulator
+    if (scoringResult?.tokensUsed?.total) {
+      localUsage.input_tokens += scoringResult.tokensUsed.total.input || 0;
+      localUsage.output_tokens += scoringResult.tokensUsed.total.output || 0;
+    }
+
     // Assemble the AnalysisContext
     const analysisContext: AnalysisContext = {
       ...baseAnalysis,
@@ -184,16 +239,14 @@ export class Stage1ContextAwareAnalysisService {
           const analysisActivity = baseAnalysis.activities[actScore.activityId];
           if (!analysisActivity) continue;
 
-          const analysisTier = analysisActivity.tier;
-          const scoringTierText = actScore.activityScore.breakdown.tierAssessment.rationale || '';
-          // Extract the tier number the scoring system assigned (look for T1/T2/T3/T4 pattern)
-          const scoringTierMatch = scoringTierText.match(/T(\d)/);
-          const scoringTier = scoringTierMatch ? parseInt(scoringTierMatch[1]) : null;
+          const analysisTier = analysisActivity.classification?.tier;
+          // Use the tier field directly from the scoring breakdown (more reliable than regex on rationale)
+          const scoringTier = actScore.activityScore.breakdown.tierAssessment.tier;
 
           if (analysisTier && scoringTier && analysisTier !== scoringTier) {
             // Tiers disagree — annotate the scoring rationale to acknowledge the discrepancy
             actScore.activityScore.breakdown.tierAssessment.rationale =
-              `[Analysis: Tier ${analysisTier}] ${actScore.activityScore.breakdown.tierAssessment.rationale} ` +
+              `[Context: Tier ${analysisTier}] ${actScore.activityScore.breakdown.tierAssessment.rationale} ` +
               `Note: The contextual analysis (which factors in story arc and constraint adjustments) assigned Tier ${analysisTier} to this activity.`;
           }
         }
@@ -204,14 +257,15 @@ export class Stage1ContextAwareAnalysisService {
           scoringComplete: true,
         };
       })() : undefined,
+      // R2: Use local accumulator for thread-safe metadata
       analysisMetadata: {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
         tokensUsed: {
-          input: this._lastUsage?.input_tokens || 0,
-          output: this._lastUsage?.output_tokens || 0,
+          input: localUsage.input_tokens,
+          output: localUsage.output_tokens,
         },
-        cost: this.calculateCost(this._lastUsage),
+        cost: this.calculateCost(localUsage),
         storyContextProvided: true,
       },
     };
@@ -258,10 +312,12 @@ export class Stage1ContextAwareAnalysisService {
   /**
    * Get story-enriched tier adjustments via LLM
    */
+  // R2: Accept localUsage parameter for thread-safe token tracking
   private async getStoryEnrichedAdjustments(
     input: ActivityWorkshopSessionInput,
     baseAnalysis: PortfolioAnalysis,
-    storyContext: StoryContext
+    storyContext: StoryContext,
+    localUsage: { input_tokens: number; output_tokens: number }
   ): Promise<AnalysisContext['storyEnrichment']['storyInfluencedScores']> {
     const prompt = this.buildStoryAdjustmentPrompt(input, baseAnalysis, storyContext);
 
@@ -277,8 +333,11 @@ export class Stage1ContextAwareAnalysisService {
         temperature: 0.2,
       });
 
-      // Store usage for cost tracking
-      this._lastUsage = response.usage;
+      // R2: Accumulate usage into local accumulator for cost tracking
+      if (response.usage) {
+        localUsage.input_tokens += response.usage.input_tokens || 0;
+        localUsage.output_tokens += response.usage.output_tokens || 0;
+      }
 
       return this.parseStoryAdjustments(response.content, input, baseAnalysis);
     } catch (error) {
@@ -374,7 +433,15 @@ IMPORTANT:
 - Only adjust tiers where story context CLEARLY warrants it
 - Don't inflate tiers without strong justification
 - Maximum 1-tier adjustment in either direction
-- Provide specific evidence for each adjustment`;
+- Provide specific evidence for each adjustment
+
+CALIBRATION RULES:
+- A tier adjustment is a BIG deal. Only adjust when the story context provides CLEAR, SPECIFIC evidence that the standard tier doesn't capture the full picture.
+- Work obligations (20+ hours/week) justify +1 tier adjustment for PARTICIPATION activities, but NOT for quality of output.
+- First-generation status justifies +1 for ACCESS to resources, but NOT for the quality of work done with those resources.
+- Geographic constraints justify +1 for limited OPPORTUNITY, but the student's actual achievements must still be evaluated on merit.
+- NEVER adjust more than 1 tier. NEVER adjust a Tier 1 activity up (it's already the top).
+- When in doubt, DO NOT adjust. The scoring system handles nuance better than a blunt tier bump.`;
   }
 
   /**
@@ -776,11 +843,10 @@ Output valid JSON only.`;
     };
   }
 
-  private calculateCost(usage: { input_tokens?: number; output_tokens?: number } | undefined): number {
-    if (!usage) return 0;
+  private calculateCost(usage: { input_tokens: number; output_tokens: number }): number {
     // Sonnet pricing: $3/M input, $15/M output
-    const inputCost = ((usage.input_tokens || 0) / 1_000_000) * 3;
-    const outputCost = ((usage.output_tokens || 0) / 1_000_000) * 15;
+    const inputCost = (usage.input_tokens / 1_000_000) * 3;
+    const outputCost = (usage.output_tokens / 1_000_000) * 15;
     return inputCost + outputCost;
   }
 }

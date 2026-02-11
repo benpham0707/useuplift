@@ -28,6 +28,8 @@
  */
 
 import { callClaude } from '@/lib/llm/claude';
+// R7: Use robust parseClaudeJSON with jsonrepair fallback
+import { tryParseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
 import {
   PortfolioScoreRubric,
   PortfolioScoreBreakdown,
@@ -203,7 +205,7 @@ Remember: Use second person ("you/your") throughout. This is diagnostic analysis
   },
   "narrative": {
     "archetype": "<innovator|leader|scholar|artist|athlete|community_builder|mixed>",
-    "storyLine": "<2-3 sentence story your portfolio tells — 'Your activities show...' or 'You come across as...'>"
+    "storyLine": "<2-3 sentence story your portfolio tells — 'Your activities show...' or 'You come across as...'>",
     "twoSentencePitch": "<how an admissions officer would describe you to the committee>",
     "differentiators": ["<what makes you unique>"],
     "commonalities": ["<what's expected/common given your profile>"]
@@ -337,7 +339,7 @@ export class PortfolioScoringService {
       const response = await callClaude(
         buildPortfolioScoringPrompt(input),
         {
-          model: 'claude-sonnet-4-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           systemPrompt: PORTFOLIO_SCORING_SYSTEM_PROMPT,
           temperature: 0.3,
           maxTokens: 3000,
@@ -381,9 +383,9 @@ export class PortfolioScoringService {
     input: PortfolioScoringInput
   ): PortfolioScoreRubric | null {
     try {
-      const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-      const data = JSON.parse(jsonStr);
+      // R7: Use robust parseClaudeJSON with jsonrepair fallback
+      const data = tryParseClaudeJSON<Record<string, unknown>>(content, 'PortfolioScoringService');
+      if (!data) return null;
 
       return this.normalizePortfolioData(data, input);
     } catch (error) {
@@ -577,7 +579,7 @@ export class PortfolioScoringService {
       activityScores,
       metadata: {
         scoredAt: new Date().toISOString(),
-        modelUsed: 'claude-sonnet-4-20250514',
+        modelUsed: 'claude-sonnet-4-5-20250929',
         totalActivities: input.activities.length,
         averageDescriptionScore: Math.round(avgDescScore * 10) / 10,
         averageActivityScore: Math.round(avgActivityScore * 10) / 10,
