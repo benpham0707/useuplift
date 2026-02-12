@@ -550,17 +550,24 @@ function collectVerifiedStatistics(context: StudentContext): AssembledResearch['
  */
 function getCollegeExpectationsForStudent(context: StudentContext): AssembledResearch['collegeExpectations'] | undefined {
   // Determine target tier based on GPA and schools
-  const overallGPA = context.quantitativeAnalysis.overallGPA || 3.5;
+  // B1 fix: NuancedCapabilityAnalysis has no overallGPA property — calculate from subjectPatterns
+  const patterns = Object.values(context.quantitativeAnalysis.subjectPatterns);
+  const overallGPA = patterns.length > 0
+    ? patterns.reduce((sum, p) => sum + p.performanceHistory.avgGPA, 0) / patterns.length
+    : 3.5;
   let tier: string;
 
+  // C1: Recalibrated tier thresholds (CDS 2024-2025 verified)
   if (overallGPA >= 3.9 || context.targetSchools?.some((s) => s.toLowerCase().includes('harvard') || s.toLowerCase().includes('stanford'))) {
     tier = 'ivy_elite';
-  } else if (overallGPA >= 3.7) {
+  } else if (overallGPA >= 3.8) {
     tier = 'highly_selective';
-  } else if (overallGPA >= 3.3) {
+  } else if (overallGPA >= 3.6) {
     tier = 'selective';
-  } else {
+  } else if (overallGPA >= 3.2) {
     tier = 'competitive';
+  } else {
+    tier = 'accessible';
   }
 
   // Get major-specific expectations using smart resolution

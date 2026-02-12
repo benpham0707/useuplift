@@ -33,7 +33,7 @@ export interface TeachingCitation {
  */
 export interface RewriteChange {
   /** What was changed (e.g., "Verb choice") */
-  element: 'verb_choice' | 'quantification' | 'impact_clarity' | 'specificity' | 'voice' | 'structure' | 'narrative_connection';
+  element: 'verb_choice' | 'quantification' | 'impact_clarity' | 'specificity' | 'voice' | 'structure' | 'narrative_connection' | 'character_efficiency';
   /** Original text/approach */
   original: string;
   /** Transformed text/approach */
@@ -227,7 +227,7 @@ export interface SpikeReinforcement {
  */
 export interface CraftTeaching {
   /** Element being taught */
-  element: 'verb_choice' | 'quantification' | 'impact_clarity' | 'voice_consistency' | 'specificity';
+  element: 'verb_choice' | 'quantification' | 'impact_clarity' | 'voice_consistency' | 'specificity' | 'character_efficiency';
   /** The principle */
   principle: string;
   /** Why it matters */
@@ -322,6 +322,8 @@ export interface TeachingLayerInput {
   scoringRubric: import('./types').PortfolioScoreRubric;
   /** Original activities for reference */
   activities: import('../types').ActivityWorkshopInput[];
+  /** Target application platform — determines character limits for rewrites */
+  targetPlatform?: import('../types').ApplicationPlatform;
   /** Student context for personalization */
   studentContext?: {
     intendedMajor?: string;

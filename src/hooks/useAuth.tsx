@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode, useEffect } from 'react';
-import { useUser, useClerk } from '@clerk/clerk-react';
+import { useUser, useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 
 interface AuthContextType {
   user: any | null;
@@ -19,6 +19,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { user: clerkUser, isLoaded } = useUser();
   const { signOut: clerkSignOut, openSignIn, openSignUp } = useClerk();
+  const { getToken } = useClerkAuth();
 
   // Map Clerk user to a shape compatible with existing code (Supabase-like)
   const user = clerkUser ? {
@@ -41,7 +42,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       try {
         // Get Clerk token for authentication
-        const { getToken } = await import('@clerk/clerk-react');
         const token = await getToken();
 
         if (!token) return;

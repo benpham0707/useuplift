@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { useAuth as useClerkAuth } from '@clerk/clerk-react';
 import { getAuthenticatedSupabaseClient } from '@/services/auth/getAuthenticatedSupabaseClient';
+import { useAuth } from '@/hooks/useAuth';
 import { queryKeys } from './queryKeys';
 
 /**
@@ -8,30 +10,37 @@ import { queryKeys } from './queryKeys';
  * Returns null if user is not authenticated or profile doesn't exist.
  */
 export function useProfileId() {
+  const { user } = useAuth();
+  const { getToken } = useClerkAuth();
+
   return useQuery({
-    queryKey: queryKeys.profileId('current'), // 'current' since we don't have userId yet
+    queryKey: queryKeys.profileId('current'),
     queryFn: async () => {
-      const supabase = await getAuthenticatedSupabaseClient();
-      
-      // Get current user
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
+      if (!user) {
         throw new Error('User not authenticated');
       }
-      
-      // Get profile ID
+
+      const token = await getToken({ template: 'supabase' });
+      if (!token) {
+        throw new Error('Failed to get auth token');
+      }
+
+      const supabase = getAuthenticatedSupabaseClient(token);
+
+      // Get profile ID using Clerk user ID
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id')
-        .eq('id', user.id)
+        .eq('user_id', user.id)
         .single();
-      
+
       if (profileError || !profile) {
         throw new Error('Profile not found');
       }
-      
+
       return profile.id as string;
     },
+    enabled: !!user,
     staleTime: Infinity, // Profile ID never changes for a user session
     retry: 2,
   });

@@ -758,7 +758,8 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
         type: 'skill_development',
         evidence: [],
         quantifiableMetrics: [],
-        impactScore: Math.min(100, profilerAssessment.harbersonScore.totalPoints * 9),
+        // R2-10: Fixed formula — maps 11-point Harberson scale to 0-100 proportionally
+        impactScore: Math.min(100, Math.max(10, Math.round((profilerAssessment.harbersonScore.totalPoints / 11) * 100))),
         impactNarrative: profilerAssessment.reasoning.admissionsOfficerPerspective,
       },
       timeInvestment: {
@@ -995,10 +996,11 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
    *
    * Returns per-activity analyses only (no portfolio synthesis).
    */
+  // R5: Return type includes usage so Stage 1 can track sub-batch token costs
   async analyzeSubBatch(
     subInput: ActivityWorkshopSessionInput,
     profilerResult: EnhancedPortfolioAssessment
-  ): Promise<Record<string, ActivityAnalysis>> {
+  ): Promise<{ activities: Record<string, ActivityAnalysis>; usage?: { input_tokens: number; output_tokens: number } }> {
     const activities: Record<string, ActivityAnalysis> = {};
     const preAnalysis = formatPreAnalysis(profilerResult);
     const prompt = formatBatchPrompt(subInput, preAnalysis);
@@ -1013,6 +1015,9 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
         messages: [{ role: 'user', content: prompt }],
       });
 
+      // R5: Capture usage from sub-batch API call
+      const usage = response.usage ? { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens } : undefined;
+
       const responseText = response.content[0].type === 'text' ? response.content[0].text : '';
       const parsed = parseClaudeJSON<BatchAnalysisResponse>(responseText, 'SubBatchAnalysis');
 
@@ -1021,7 +1026,7 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
         for (const activity of subInput.activities) {
           activities[activity.id] = this.createFallbackActivityAnalysis(activity, profilerResult);
         }
-        return activities;
+        return { activities, usage };
       }
 
       for (const activity of subInput.activities) {
@@ -1045,13 +1050,14 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
         }
       }
 
-      return activities;
+      return { activities, usage };
     } catch (error) {
       console.error('[SubBatchAnalysis] Error, using profiler fallback:', error);
       for (const activity of subInput.activities) {
         activities[activity.id] = this.createFallbackActivityAnalysis(activity, profilerResult);
       }
-      return activities;
+      // R5: Return undefined usage on error
+      return { activities, usage: undefined };
     }
   }
 

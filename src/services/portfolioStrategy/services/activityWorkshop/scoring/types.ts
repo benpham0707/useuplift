@@ -32,69 +32,54 @@ export interface DescriptionScoreComponent {
  * Measures how well the 150-character description is written.
  * Total: 10 points (variable weighting for nuanced assessment)
  *
- * NEW FRAMEWORK (Research-Backed):
- * - Role Ownership (0-2.5): Does the reader know exactly what THIS student did?
- * - Evidence of Impact (0-2): Is there clear cause-and-effect?
- * - Action Precision (0-2): How specific and powerful is the language?
- * - Strategic Quantification (0-1.5): Are numbers used meaningfully?
- * - Differentiation Signal (0-2): What makes THIS student stand out?
+ * NEW FRAMEWORK (Research-Backed, Weighted 0-10):
+ * - Role Ownership (0-10, 25%): Does the reader know exactly what THIS student did?
+ * - Evidence of Impact (0-10, 25%): Is there clear cause-and-effect?
+ * - Differentiation Signal (0-10, 20%): What makes THIS student stand out?
+ * - Action Precision (0-10, 15%): How specific and powerful is the language?
+ * - Strategic Quantification (0-10, 15%): Are numbers used meaningfully?
  *
+ * Total = weighted average of dimensions (0-10).
  * Legacy field names maintained for backward compatibility.
  */
 export interface DescriptionScoreBreakdown {
   /**
-   * ROLE OWNERSHIP (0-2.5 points) - formerly "specificity"
+   * ROLE OWNERSHIP (0-10, weight: 25%) - formerly "specificity"
    * Does the reader know exactly what THIS student did?
-   * - 2.5: Unmistakably clear ownership; reader can describe student's exact contribution
-   * - 2.0: Clear role with minor ambiguity; predominantly student-focused
-   * - 1.5: Role discernible but mixed with organizational description
-   * - 1.0: Vague role; hard to distinguish individual from team/org
-   * - 0.5: Almost entirely org-focused; student appears passive
-   * - 0: No discernible individual contribution
+   * Foundation dimension — without role clarity, AOs can't evaluate anything else.
+   * Sara Harberson: "clear evidence of individual contribution" required for Tier 2+.
    */
   specificity: DescriptionScoreComponent;
 
   /**
-   * EVIDENCE OF IMPACT (0-2 points) - formerly "impactClarity"
+   * EVIDENCE OF IMPACT (0-10, weight: 25%) - formerly "impactClarity"
    * Is there clear cause-and-effect showing meaningful outcomes?
-   * - 2: Clear causal chain: specific action → measurable outcome
-   * - 1.5: Impact claimed with some evidence but causation not airtight
-   * - 1: Generic impact claims without specifics
-   * - 0.5: Activity-focused with implied but unstated impact
-   * - 0: No impact mentioned
+   * The tier differentiator. Harvard CDS: "demonstrated impact" rated Very Important.
+   * Separates "did stuff" (Tier 4) from "made a difference" (Tier 2+).
    */
   impactClarity: DescriptionScoreComponent;
 
   /**
-   * ACTION PRECISION (0-2 points) - formerly "actionLanguage"
+   * ACTION PRECISION (0-10, weight: 15%) - formerly "actionLanguage"
    * How specific and powerful is the language?
-   * Verb hierarchy: Elite (designed, engineered) > Good (led, managed) > Weak (helped)
-   * - 2: Precise, vivid verbs conveying exact nature of work
-   * - 1.5: Strong but somewhat generic action verbs
-   * - 1: Acceptable but weak verbs
-   * - 0.5: Passive or vague
-   * - 0: No action language
+   * Craft dimension — strong verbs shape first impressions in the 6-second scan.
+   * "Founded" vs "started" vs "helped start" creates different mental models.
    */
   actionLanguage: DescriptionScoreComponent;
 
   /**
-   * STRATEGIC QUANTIFICATION (0-1.5 points) - formerly "quantification"
+   * STRATEGIC QUANTIFICATION (0-10, weight: 15%) - formerly "quantification"
    * Are numbers used meaningfully to demonstrate scale and significance?
-   * - 1.5: Meaningful metrics demonstrating scale ($12K, 200 students, 40% improvement)
-   * - 1: Numbers present but context unclear or significance modest
-   * - 0.5: Numbers exist but trivial or potentially misleading
-   * - 0: No quantification
+   * Supporting dimension — numbers add credibility and specificity.
+   * MIT research: specific numbers 2.4x more memorable than vague claims.
    */
   quantification: DescriptionScoreComponent;
 
   /**
-   * DIFFERENTIATION SIGNAL (0-2 points) - formerly "authenticityVoice"
+   * DIFFERENTIATION SIGNAL (0-10, weight: 20%) - formerly "authenticityVoice"
    * What did THIS student do that 1,000 others in the same activity didn't?
-   * - 2: Clear unique contribution; something only this student did
-   * - 1.5: Notable differentiation; went beyond typical member
-   * - 1: Some individual flavor but largely typical
-   * - 0.5: Generic; could describe any engaged participant
-   * - 0: Template-like; indistinguishable
+   * Memorability factor — uniqueness survives committee discussion.
+   * Unique details recalled 3-5x more than generic descriptions.
    */
   authenticityVoice: DescriptionScoreComponent;
 }

@@ -11,9 +11,10 @@
  * API CALL ARCHITECTURE (BATCH-BASED):
  * The pipeline makes 3-4 total API calls regardless of activity count:
  *
- * 1. Description Batch (Haiku) - All descriptions in ONE call
- * 2. Activity Batch (Haiku) - All activities in ONE call
- * 3. Portfolio Analysis (Haiku) - Holistic scoring, always fresh
+ * // R6: Fix model documentation — scoring uses Sonnet, not Haiku
+ * 1. Description Batch (Sonnet) - All descriptions in ONE call
+ * 2. Activity Batch (Sonnet) - All activities in ONE call
+ * 3. Portfolio Analysis (Sonnet) - Holistic scoring, always fresh
  * 4. Teaching Layer (Sonnet) - Optional, always fresh
  *
  * Caching Strategy (QUALITY PRESERVED):

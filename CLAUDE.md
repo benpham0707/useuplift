@@ -239,8 +239,8 @@ console.log(`Total cost: $${tracker.getTotalCost().toFixed(4)}`);
 | Use Case | Model | Rationale |
 |----------|-------|-----------|
 | Quick diagnosis | claude-haiku-4-5-20251001 | Fast, cheap, good enough for classification |
-| Teaching/feedback | claude-sonnet-4-5-20250514 | Quality matters for user-facing content |
-| Complex reasoning | claude-sonnet-4-5-20250514 | Accuracy critical |
+| Teaching/feedback | claude-sonnet-4-5-20250929 | Quality matters for user-facing content |
+| Complex reasoning | claude-sonnet-4-5-20250929 | Accuracy critical |
 
 ### Prompt Engineering
 
@@ -359,6 +359,148 @@ CLERK_SECRET_KEY     # Authentication
 STRIPE_SECRET_KEY    # Payments
 PORT                 # Server port (default 8789)
 ```
+
+---
+
+## REMEMBER
+
+> **The goal is not to write code fast. The goal is to build a system that works reliably, is maintainable over time, and delivers real value to users.**
+
+Every shortcut taken today becomes technical debt tomorrow. Every untested edge case becomes a production bug. Every unclear piece of code becomes a maintenance burden.
+
+Take the time to do it right. Tue is counting on you to be the technical excellence that makes Uplift successful.
+
+---
+
+## AGENT TEAMS / SWARM MODE
+
+> **This section governs multi-agent collaborative development.** When agent teams are active, a Lead agent coordinates specialized Teammates that work in parallel across independent Git worktrees.
+
+### Swarm Philosophy
+
+Agent teams exist to **multiply quality, not just speed**. Every teammate must uphold the same standards defined above. A swarm that moves fast but produces sloppy code is worse than a single agent that moves carefully.
+
+**Principles:**
+- Each teammate is a **domain expert**, not a code monkey
+- Teammates **read before writing** — the same "Understand Before Changing" rule applies
+- The Lead coordinates and reviews — it does NOT blindly merge
+- File ownership is strict — **never have two teammates editing the same file**
+- When in doubt, a teammate should ask the Lead rather than guess
+
+### Team Composition for Uplift
+
+When spawning teams for this project, use these specialized roles:
+
+| Role | Domain | Key Files |
+|------|--------|-----------|
+| **Frontend** | React components, UI/UX, Tailwind, shadcn/ui | `src/components/`, `src/pages/`, `src/hooks/`, `src/App.tsx` |
+| **Backend** | Express routes, middleware, API endpoints | `src/http/`, `src/services/credits/`, `src/services/api/` |
+| **AI/Services** | Claude integration, prompts, analysis engines | `src/services/orchestrator/`, `src/core/analysis/`, `src/lib/llm/`, `src/services/portfolioStrategy/` |
+| **Workshop** | Multi-stage workshops (Common App, Narrative, PIQ, Activity, Academic) | `src/services/commonAppWorkshop/`, `src/services/narrativeWorkshop/`, `src/services/piqWorkshop/`, `src/services/portfolioStrategy/services/` |
+| **Data/Research** | Academic data, course knowledge, college expectations, major resolution | `src/services/portfolioStrategy/data/`, `src/services/portfolioStrategy/services/academicWorkshop/capability/conversational/` |
+| **Testing** | E2E tests, integration tests, verification | `tests/`, test infrastructure |
+| **Database** | Supabase schema, migrations, RLS policies | `supabase/migrations/`, `src/integrations/supabase/` |
+
+### Critical Context for All Teammates
+
+Every teammate working on Uplift MUST understand:
+
+1. **This is an AI-powered college application platform** — quality directly impacts students' futures
+2. **TypeScript strict mode** — no `any` types, no shortcuts
+3. **Service pattern** — services export both class and singleton instance
+4. **AI model strategy** — Haiku (`claude-haiku-4-5-20251001`) for speed, Sonnet (`claude-sonnet-4-5-20250929`) for quality
+5. **Zero-tolerance fraud** — never weaken fraud detection
+6. **Credits are money** — atomic deduction, no race conditions
+7. **Full data preservation** — never compress or truncate research/analysis data
+8. **Error handling is mandatory** — every function that can fail MUST handle failure gracefully
+
+### Service Architecture Map (for teammate orientation)
+
+```
+User Request
+    │
+    ├─► src/http/routes.ts          (API entry point)
+    │       │
+    │       ├─► src/services/orchestrator/     (Essay analysis pipeline)
+    │       │       └─► src/core/analysis/engine.ts  (11-dimension rubric)
+    │       │
+    │       ├─► src/services/commonAppWorkshop/  (Multi-stage essay workshop)
+    │       │       └─► stages/ (Stage 1-5 with teaching focus)
+    │       │
+    │       ├─► src/services/narrativeWorkshop/  (Deep narrative analysis)
+    │       │       └─► stage2-5 (Deep dive → Grammar → Synthesis → Sentence)
+    │       │
+    │       ├─► src/services/portfolioStrategy/  (Portfolio + Academic analysis)
+    │       │       ├─► services/academicWorkshop/   (Academic history)
+    │       │       │       ├─► capability/conversational/  (AI advisor)
+    │       │       │       │       ├─► academicResearchFoundation.ts (40 AP courses, verified stats)
+    │       │       │       │       ├─► academicCourseKnowledgeBase.ts (course profiles)
+    │       │       │       │       ├─► collegeExpectationsDatabase.ts (42 majors)
+    │       │       │       │       └─► majorResolutionService.ts (229 name variants, O(1) lookup)
+    │       │       │       └─► capability/deepAcademicReportService.ts
+    │       │       └─► services/activityWorkshop/   (Activity profile)
+    │       │               └─► stages/ (3-stage analysis pipeline)
+    │       │
+    │       ├─► src/services/piq/              (Personal Insight Questions)
+    │       ├─► src/services/portfolio/         (Portfolio strength)
+    │       └─► src/services/credits/           (Billing, atomic deduction)
+    │
+    └─► src/integrations/supabase/     (Database layer with RLS)
+```
+
+### Teammate Coordination Rules
+
+1. **File Ownership**: Before starting work, teammates MUST declare which files they will modify. No two teammates touch the same file.
+2. **Type Contracts First**: When teammates need to share interfaces, define types FIRST in `types.ts` files, then implement in parallel.
+3. **Integration Points**: When work crosses boundaries (e.g., frontend needs a new API endpoint), the Lead coordinates the handoff — define the contract, then both sides build to it.
+4. **Testing Responsibility**: Each teammate writes tests for their own domain. The Testing specialist runs cross-cutting E2E tests after integration.
+5. **Communication**: Teammates report blockers to the Lead immediately rather than working around them with hacks.
+
+### Swarm Task Patterns
+
+**Pattern 1: Cross-Layer Feature** (e.g., new workshop type)
+```
+Lead: Plan architecture, define types, assign ownership
+├── Backend teammate: API routes + service skeleton
+├── AI/Services teammate: Claude prompts + analysis logic
+├── Frontend teammate: UI components + state management
+└── Testing teammate: E2E test suite
+```
+
+**Pattern 2: Parallel Investigation** (e.g., debugging a complex issue)
+```
+Lead: Define hypotheses, assign investigation areas
+├── Teammate A: Investigate frontend rendering path
+├── Teammate B: Investigate API/service layer
+└── Teammate C: Investigate database queries + data integrity
+```
+
+**Pattern 3: Data + Logic Build** (e.g., expanding academic data)
+```
+Lead: Define scope and verification criteria
+├── Data teammate: Add/verify data entries (stats, courses, majors)
+├── Logic teammate: Update resolution service + knowledge base integration
+└── Testing teammate: Verification scripts + regression tests
+```
+
+### Quality Gates for Swarm Work
+
+Before the Lead considers a swarm task complete:
+
+- [ ] All teammates have reported completion
+- [ ] No file conflicts between worktrees
+- [ ] Type check passes across the combined changes (`npx tsc --noEmit`)
+- [ ] All teammate tests pass
+- [ ] E2E integration test passes
+- [ ] Lead has reviewed the combined diff for consistency
+- [ ] No regressions in existing functionality
+
+### Cost Awareness
+
+Agent teams consume **4-15x more tokens** than single-agent work. Use swarm mode strategically:
+
+**Good for swarms:** Multi-file features, cross-layer changes, parallel investigations, large refactors
+**Bad for swarms:** Single-file bug fixes, simple additions, quick questions, small tweaks
 
 ---
 

@@ -326,3 +326,44 @@ export type {
   SynthesizedInsight,
   AdjustedSubjectStrength,
 } from './conversational';
+
+// ============================================================================
+// DEEP ACADEMIC REPORT (Teaching-depth analysis)
+// ============================================================================
+
+export {
+  generateDeepAcademicReport,
+} from './deepAcademicReport';
+
+export {
+  UPLIFT_SCALE_DATABASE,
+  COLLEGE_TIER_BENCHMARKS,
+} from './deepAcademicReport';
+
+export type {
+  // Input/Output
+  DeepAcademicReportInput,
+  DeepAcademicReport,
+  BottomLineSummary,
+
+  // Sections
+  AcademicIdentitySection,
+  NotableStrength,
+  NotableWeakness,
+  CollegeTierPosition,
+  UpliftRating,
+  UpliftGrade,
+  UpliftGradeDescriptor,
+  ChallengesAndRealitySection,
+  ChallengeWithAOContext,
+  StrategicRoadmapSection,
+  ResearchContextSection,
+
+  // Supporting types
+  StrategicPriority,
+  CourseStrategyItem,
+  CourseAvoidItem,
+  ResearchCitation,
+  ReportMetadata,
+  AssembledReportContext,
+} from './deepAcademicReportTypes';

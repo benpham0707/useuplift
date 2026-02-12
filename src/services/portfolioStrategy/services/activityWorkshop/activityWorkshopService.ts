@@ -1,5 +1,5 @@
 /**
- * Activity Workshop Service (Orchestrator) - v4.2 PIPELINE
+ * Activity Workshop Service (Orchestrator) - v4.3 PIPELINE
  *
  * PARALLEL PROCESSING PIPELINE
  *
@@ -11,8 +11,9 @@
  * v4.0 - 4-STAGE PIPELINE with story context & conditional teaching
  * v4.1 - Holistic narrative at beginning AND end
  * v4.2 - PARALLEL sub-batch analysis + parallel individual teaching
+ * v4.3 - Dead code removal, parallel Stage 3 + Narrative, actual cost tracking
  *
- * v4.2 PIPELINE:
+ * v4.3 PIPELINE:
  * ==============
  *
  * Stage 0: Story Detection (Haiku, ~$0.005)
@@ -64,18 +65,11 @@ import {
 // Import holistic portfolio narrative service (v4.1)
 import { portfolioNarrativeService } from './stages/portfolioNarrativeService';
 
-// Legacy batch services (for v3.0 compatibility/fallback)
-import { batchActivityAnalysisService } from './batchActivityAnalysisService';
-import { batchActivityTeachingService } from './batchActivityTeachingService';
-
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const VERSION = '4.2.0'; // v4.2: Parallel sub-batch analysis + parallel individual teaching
-
-// Feature flags
-const USE_4_STAGE_PIPELINE = true; // Set to false to use v3.0 batch services
+const VERSION = '4.3.0'; // v4.3: Dead code removal, parallel Stage 3 + Narrative, actual cost tracking
 
 // Simple in-memory session storage
 const sessionStorage = new Map<string, ActivityWorkshopSession>();
@@ -365,7 +359,7 @@ function convertToLegacyTeaching(
 
 export class ActivityWorkshopService implements IActivityWorkshopService {
   /**
-   * Run full v4.2 pipeline with parallel processing
+   * Run full v4.3 pipeline with parallel processing
    *
    * STAGE 0: Story Detection (Haiku)
    * STAGE 1: Parallel Analysis (Sonnet sub-batches of 2)
@@ -377,11 +371,11 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     const sessionId = uuidv4();
     const startTime = Date.now();
 
-    console.log(`\n[ActivityWorkshop v4.2] ══════════════════════════════════════`);
-    console.log(`[ActivityWorkshop v4.2] Starting PARALLEL PIPELINE`);
-    console.log(`[ActivityWorkshop v4.2] Session: ${sessionId}`);
-    console.log(`[ActivityWorkshop v4.2] Activities: ${input.activities.length}`);
-    console.log(`[ActivityWorkshop v4.2] ══════════════════════════════════════\n`);
+    console.log(`\n[ActivityWorkshop v4.3] ══════════════════════════════════════`);
+    console.log(`[ActivityWorkshop v4.3] Starting PARALLEL PIPELINE`);
+    console.log(`[ActivityWorkshop v4.3] Session: ${sessionId}`);
+    console.log(`[ActivityWorkshop v4.3] Activities: ${input.activities.length}`);
+    console.log(`[ActivityWorkshop v4.3] ══════════════════════════════════════\n`);
 
     // Validate input
     const validation = validateInput(input);
@@ -389,7 +383,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       throw new Error(`Invalid input: ${validation.errors.join(', ')}`);
     }
     if (validation.warnings.length > 0) {
-      console.log(`[ActivityWorkshop v4.2] Warnings: ${validation.warnings.join(', ')}`);
+      console.log(`[ActivityWorkshop v4.3] Warnings: ${validation.warnings.join(', ')}`);
     }
 
     // ========================================================================
@@ -420,7 +414,11 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 1] Complete in ${Date.now() - stage1StartTime}ms`);
     console.log(`[Stage 1] Tier Distribution: T1=${analysisContext.tierDistribution.tier1}, T2=${analysisContext.tierDistribution.tier2}, T3=${analysisContext.tierDistribution.tier3}, T4=${analysisContext.tierDistribution.tier4}`);
     console.log(`[Stage 1] Teaching Candidates: ${analysisContext.teachingCandidates.deepTeachingIds.length} deep, ${analysisContext.teachingCandidates.mediumTeachingIds.length} medium`);
-    console.log(`[Stage 1] Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}\n`);
+    console.log(`[Stage 1] Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}`);
+    if (analysisContext.scoring?.scoringComplete) {
+      console.log(`[Stage 1] Scoring: Portfolio ${analysisContext.scoring.portfolioRubric.overallScore.total}/10, Harvard ${analysisContext.scoring.portfolioRubric.harvardScale.rating}/6`);
+    }
+    console.log('');
 
     // ========================================================================
     // STAGE 2: PARALLEL INDIVIDUAL TEACHING (Sonnet)
@@ -438,50 +436,69 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 2] Skipped: ${teachingContext.skippedActivities.length}\n`);
 
     // ========================================================================
-    // STAGE 3: PORTFOLIO SYNTHESIS (Haiku, ~$0.005)
+    // STAGE 3 + NARRATIVE (Parallel — independent outputs)
     // ========================================================================
-    console.log(`[Stage 3] ─────────────────────────────────────────`);
-    console.log(`[Stage 3] PORTFOLIO SYNTHESIS (Actionable Strategy)`);
-    console.log(`[Stage 3] ─────────────────────────────────────────`);
+    console.log(`[Stage 3 + Narrative] ─────────────────────────────────────────`);
+    console.log(`[Stage 3 + Narrative] PARALLEL: Synthesis + Narrative`);
+    console.log(`[Stage 3 + Narrative] ─────────────────────────────────────────`);
 
-    const stage3StartTime = Date.now();
-    const synthesisContext = await stage3PortfolioSynthesisService.synthesize(
-      input,
-      storyContext,
-      analysisContext,
-      teachingContext
-    );
+    const parallelStart = Date.now();
 
-    console.log(`[Stage 3] Complete in ${Date.now() - stage3StartTime}ms`);
-    console.log(`[Stage 3] Harvard Scale: ${synthesisContext.finalAssessment.harvardScale}/6`);
-    console.log(`[Stage 3] Overall Strength: ${synthesisContext.finalAssessment.overallStrength}\n`);
+    const [synthesisOutcome, narrativeOutcome] = await Promise.all([
+      (async () => {
+        try {
+          const stage3StartTime = Date.now();
+          const result = await stage3PortfolioSynthesisService.synthesize(
+            input,
+            storyContext,
+            analysisContext,
+            teachingContext
+          );
+          console.log(`[Stage 3] Complete in ${Date.now() - stage3StartTime}ms`);
+          console.log(`[Stage 3] Harvard Scale: ${result.finalAssessment.harvardScale}/6`);
+          console.log(`[Stage 3] Overall Strength: ${result.finalAssessment.overallStrength}`);
+          return { success: true as const, result };
+        } catch (error) {
+          console.error('[Pipeline] Stage 3 failed:', error);
+          return { success: false as const, result: null, error };
+        }
+      })(),
+      (async () => {
+        try {
+          const narrativeStartTime = Date.now();
+          // Call analyzeImprovedNarrative with analysis context for richer narrative.
+          // No cached initial exists, so it returns a plain PortfolioNarrative.
+          const narrativeResult = await portfolioNarrativeService.analyzeImprovedNarrative(
+            input,
+            sessionId,
+            analysisContext
+          );
+          const narrative = narrativeResult as PortfolioNarrative;
+          console.log(`[Narrative] Complete in ${Date.now() - narrativeStartTime}ms`);
+          console.log(`[Narrative] Story: ${narrative.story.pitch.substring(0, 100)}...`);
+          console.log(`[Narrative] Coherence: ${narrative.coherence.assessment} (${narrative.coherence.score}/100)`);
+          return { success: true as const, result: narrative };
+        } catch (error) {
+          console.error('[Pipeline] Narrative failed:', error);
+          return { success: false as const, result: null, error };
+        }
+      })(),
+    ]);
 
-    // ========================================================================
-    // FINAL NARRATIVE (Sonnet, ~$0.07 — single pass at end)
-    // ========================================================================
-    console.log(`[Narrative] ─────────────────────────────────────────`);
-    console.log(`[Narrative] PORTFOLIO NARRATIVE (Final Analysis)`);
-    console.log(`[Narrative] ─────────────────────────────────────────`);
+    console.log(`[Pipeline] Stage 3 + Narrative parallel complete in ${Date.now() - parallelStart}ms\n`);
 
-    const narrativeStartTime = Date.now();
-    let finalNarrative: PortfolioNarrative | undefined;
-
-    try {
-      // Call analyzeImprovedNarrative with analysis context for richer narrative.
-      // No cached initial exists, so it returns a plain PortfolioNarrative.
-      const narrativeResult = await portfolioNarrativeService.analyzeImprovedNarrative(
-        input,
-        sessionId,
-        analysisContext
-      );
-      finalNarrative = narrativeResult as PortfolioNarrative;
-      console.log(`[Narrative] Complete in ${Date.now() - narrativeStartTime}ms`);
-      console.log(`[Narrative] Story: ${finalNarrative.story.pitch.substring(0, 100)}...`);
-      console.log(`[Narrative] Coherence: ${finalNarrative.coherence.assessment} (${finalNarrative.coherence.score}/100)`);
-    } catch (error) {
-      console.error(`[Narrative] Final analysis failed:`, error);
-      finalNarrative = undefined;
+    // Stage 3 is critical — if it fails, rethrow
+    if (!synthesisOutcome.success) {
+      throw synthesisOutcome.error instanceof Error
+        ? synthesisOutcome.error
+        : new Error('Stage 3 synthesis failed');
     }
+    const synthesisContext = synthesisOutcome.result;
+
+    // Narrative is optional — graceful degradation
+    const finalNarrative: PortfolioNarrative | undefined = narrativeOutcome.success
+      ? narrativeOutcome.result
+      : undefined;
 
     // ========================================================================
     // PIPELINE COMPLETE
@@ -492,16 +509,25 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     const narrativeCost = finalNarrative?.metadata.cost || 0;
     const totalCost = synthesisContext.pipelineCost.total + narrativeCost;
 
-    console.log(`\n[ActivityWorkshop v4.2] ══════════════════════════════════════`);
-    console.log(`[ActivityWorkshop v4.2] PIPELINE COMPLETE`);
-    console.log(`[ActivityWorkshop v4.2] Total time: ${totalTime}ms`);
-    console.log(`[ActivityWorkshop v4.2] Total cost: $${totalCost.toFixed(4)}`);
-    console.log(`[ActivityWorkshop v4.2] ──────────────────────────────────────`);
-    console.log(`[ActivityWorkshop v4.2] NARRATIVE SUMMARY:`);
-    console.log(`[ActivityWorkshop v4.2]   Story: ${finalNarrative?.story.pitch.substring(0, 80) || 'N/A'}...`);
-    console.log(`[ActivityWorkshop v4.2]   Coherence: ${finalNarrative?.coherence.assessment || 'N/A'} (${finalNarrative?.coherence.score || 'N/A'}/100)`);
-    console.log(`[ActivityWorkshop v4.2]   Spike: ${finalNarrative?.spike.primarySpike.area || 'Developing'}`);
-    console.log(`[ActivityWorkshop v4.2] ══════════════════════════════════════\n`);
+    console.log(`\n[ActivityWorkshop v4.3] ══════════════════════════════════════`);
+    console.log(`[ActivityWorkshop v4.3] PIPELINE COMPLETE`);
+    console.log(`[ActivityWorkshop v4.3] Total time: ${totalTime}ms`);
+    console.log(`[ActivityWorkshop v4.3] Total cost: $${totalCost.toFixed(4)}`);
+    console.log(`[ActivityWorkshop v4.3] ──────────────────────────────────────`);
+    console.log(`[ActivityWorkshop v4.3] NARRATIVE SUMMARY:`);
+    console.log(`[ActivityWorkshop v4.3]   Story: ${finalNarrative?.story.pitch.substring(0, 80) || 'N/A'}...`);
+    console.log(`[ActivityWorkshop v4.3]   Coherence: ${finalNarrative?.coherence.assessment || 'N/A'} (${finalNarrative?.coherence.score || 'N/A'}/100)`);
+    console.log(`[ActivityWorkshop v4.3]   Spike: ${finalNarrative?.spike.primarySpike.area || 'Developing'}`);
+    if (analysisContext.scoring?.scoringComplete) {
+      console.log(`[ActivityWorkshop v4.3] ──────────────────────────────────────`);
+      console.log(`[ActivityWorkshop v4.3] SCORING:`);
+      console.log(`[ActivityWorkshop v4.3]   Portfolio: ${analysisContext.scoring.portfolioRubric.overallScore.total}/10`);
+      console.log(`[ActivityWorkshop v4.3]   Harvard: ${analysisContext.scoring.portfolioRubric.harvardScale.rating}/6`);
+      if (teachingContext.scoringTeaching) {
+        console.log(`[ActivityWorkshop v4.3]   Transformations: ${teachingContext.scoringTeaching.activityTransformations.length}`);
+      }
+    }
+    console.log(`[ActivityWorkshop v4.3] ══════════════════════════════════════\n`);
 
     // Convert to legacy formats for backward compatibility
     const legacyAnalysis = convertToLegacyAnalysis(analysisContext);
@@ -509,11 +535,18 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
 
     return {
       sessionId,
-      version: '4.2.0',
+      version: VERSION,
       completedAt: new Date().toISOString(),
 
-      // Single narrative pass (v4.2)
+      // Single narrative pass
       finalNarrative,
+
+      // Scoring data (v4.3 — deep activity analysis)
+      scoring: analysisContext.scoring?.scoringComplete ? {
+        portfolioRubric: analysisContext.scoring.portfolioRubric,
+        activityScores: analysisContext.scoring.portfolioRubric.activityScores,
+        scoringTeaching: teachingContext.scoringTeaching?.fullOutput,
+      } : undefined,
 
       // Stage outputs
       stage0: storyContext,
@@ -533,13 +566,13 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
    * Analyze a complete portfolio (LEGACY COMPATIBLE ENTRY POINT)
    *
    * This maintains backward compatibility with v3.0 consumers.
-   * Internally uses the 4-stage pipeline when USE_4_STAGE_PIPELINE is true.
+   * Internally uses the 4-stage pipeline.
    */
   async analyzePortfolio(input: ActivityWorkshopSessionInput): Promise<ActivityWorkshopResult> {
     const sessionId = uuidv4();
 
     console.log(`[ActivityWorkshop] Starting analysis for session ${sessionId}`);
-    console.log(`[ActivityWorkshop] Mode: ${USE_4_STAGE_PIPELINE ? 'v4.0 (4-stage pipeline)' : 'v3.0 (batch)'}`);
+    console.log(`[ActivityWorkshop] Mode: v4.3 (4-stage pipeline)`);
 
     // Validate input
     const validation = validateInput(input);
@@ -561,49 +594,51 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     sessionStorage.set(sessionId, session);
 
     try {
-      if (USE_4_STAGE_PIPELINE) {
-        // Run new 4-stage pipeline
-        const pipelineResult = await this.runPipeline(input);
+      const pipelineResult = await this.runPipeline(input);
 
-        // Update session
-        session.analysis = pipelineResult.analysis;
-        session.teaching = pipelineResult.teaching;
-        session.context.analysisComplete = true;
-        session.context.teachingComplete = true;
-        session.updatedAt = new Date().toISOString();
-        sessionStorage.set(sessionId, session);
+      // Update session
+      session.analysis = pipelineResult.analysis;
+      session.teaching = pipelineResult.teaching;
+      session.context.analysisComplete = true;
+      session.context.teachingComplete = true;
+      session.updatedAt = new Date().toISOString();
+      sessionStorage.set(sessionId, session);
 
-        // Convert to legacy result format
-        return {
-          sessionId,
-          analyzedAt: pipelineResult.completedAt,
-          version: VERSION,
-          analysis: pipelineResult.analysis,
-          teaching: pipelineResult.teaching,
-          costTracking: createCostTracking(input.activities.length),
-        };
-      } else {
-        // Use v3.0 batch services (legacy fallback)
-        const analysis = await batchActivityAnalysisService.analyzePortfolio(input);
-        session.analysis = analysis;
-        session.context.analysisComplete = true;
+      // Wire actual costs from pipeline stages
+      const stage0Cost = pipelineResult.stage0.metadata.cost;
+      const stage1Cost = pipelineResult.stage1.analysisMetadata.cost;
+      const stage2Cost = pipelineResult.stage2.teachingMetadata.cost;
+      const stage3Cost = pipelineResult.stage3.synthesisMetadata.cost;
+      const narrativeCost = pipelineResult.finalNarrative?.metadata.cost || 0;
+      const actualTotalCost = stage0Cost + stage1Cost + stage2Cost + stage3Cost + narrativeCost;
 
-        const teaching = await batchActivityTeachingService.teachPortfolio(input, analysis);
-        session.teaching = teaching;
-        session.context.teachingComplete = true;
+      // Use actual costs when available, fall back to estimates
+      const costTracking: CostTracking = actualTotalCost > 0
+        ? {
+            analysisCost: stage0Cost + stage1Cost,
+            teachingCost: stage2Cost + stage3Cost + narrativeCost,
+            totalCost: actualTotalCost,
+            tokensUsed: {
+              analysis: {
+                input: pipelineResult.stage0.metadata.tokensUsed.input + pipelineResult.stage1.analysisMetadata.tokensUsed.input,
+                output: pipelineResult.stage0.metadata.tokensUsed.output + pipelineResult.stage1.analysisMetadata.tokensUsed.output,
+              },
+              teaching: {
+                input: pipelineResult.stage2.teachingMetadata.tokensUsed.input + pipelineResult.stage3.synthesisMetadata.tokensUsed.input,
+                output: pipelineResult.stage2.teachingMetadata.tokensUsed.output + pipelineResult.stage3.synthesisMetadata.tokensUsed.output,
+              },
+            },
+          }
+        : createCostTracking(input.activities.length);
 
-        session.updatedAt = new Date().toISOString();
-        sessionStorage.set(sessionId, session);
-
-        return {
-          sessionId,
-          analyzedAt: new Date().toISOString(),
-          version: '3.0.0', // Legacy version
-          analysis,
-          teaching,
-          costTracking: createCostTracking(input.activities.length),
-        };
-      }
+      return {
+        sessionId,
+        analyzedAt: pipelineResult.completedAt,
+        version: VERSION,
+        analysis: pipelineResult.analysis,
+        teaching: pipelineResult.teaching,
+        costTracking,
+      };
     } catch (error) {
       session.context.lastError = error instanceof Error ? error.message : 'Unknown error';
       session.updatedAt = new Date().toISOString();
@@ -623,14 +658,10 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       throw new Error(`Invalid input: ${validation.errors.join(', ')}`);
     }
 
-    if (USE_4_STAGE_PIPELINE) {
-      // Run stages 0 and 1
-      const storyContext = await stage0StoryDetectionService.detectStory(input);
-      const analysisContext = await stage1ContextAwareAnalysisService.analyze(input, storyContext);
-      return convertToLegacyAnalysis(analysisContext);
-    } else {
-      return batchActivityAnalysisService.analyzePortfolio(input);
-    }
+    // Run stages 0 and 1
+    const storyContext = await stage0StoryDetectionService.detectStory(input);
+    const analysisContext = await stage1ContextAwareAnalysisService.analyze(input, storyContext);
+    return convertToLegacyAnalysis(analysisContext);
   }
 
   /**
@@ -645,57 +676,53 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       throw new Error(`Invalid input: ${validation.errors.join(', ')}`);
     }
 
-    if (USE_4_STAGE_PIPELINE) {
-      // Need story context for teaching, so run stage 0
-      const storyContext = await stage0StoryDetectionService.detectStory(input);
+    // Need story context for teaching, so run stage 0
+    const storyContext = await stage0StoryDetectionService.detectStory(input);
 
-      // Create mock AnalysisContext from legacy analysis
-      const analysisContext: AnalysisContext = {
-        ...analysis,
-        storyEnrichment: {
-          storyContextUsed: false,
-          storyInfluencedScores: [],
-        },
-        teachingCandidates: {
-          deepTeachingIds: Object.keys(analysis.activities).filter(
-            id => analysis.activities[id].classification.tier >= 3
-          ),
-          mediumTeachingIds: Object.keys(analysis.activities).filter(
-            id => analysis.activities[id].classification.tier === 2
-          ),
-          quickEncouragementIds: Object.keys(analysis.activities).filter(
-            id => analysis.activities[id].classification.tier === 1
-          ),
-          skipTeachingIds: [],
-          selectionCriteria: { deepThreshold: 3, mediumThreshold: 2, skipThreshold: 1 },
-        },
-        teachingPriorities: [],
-        portfolioTeachingNeeds: {
-          primaryIssue: 'General optimization',
-          primaryIssueSeverity: 'moderate',
-          secondaryIssues: [],
-          strengthsToHighlight: [],
-          strategicGaps: [],
-        },
-        analysisMetadata: {
-          generatedAt: new Date().toISOString(),
-          modelUsed: 'legacy',
-          tokensUsed: { input: 0, output: 0 },
-          cost: 0,
-          storyContextProvided: false,
-        },
-      };
+    // Create mock AnalysisContext from legacy analysis
+    const analysisContext: AnalysisContext = {
+      ...analysis,
+      storyEnrichment: {
+        storyContextUsed: false,
+        storyInfluencedScores: [],
+      },
+      teachingCandidates: {
+        deepTeachingIds: Object.keys(analysis.activities).filter(
+          id => analysis.activities[id].classification.tier >= 3
+        ),
+        mediumTeachingIds: Object.keys(analysis.activities).filter(
+          id => analysis.activities[id].classification.tier === 2
+        ),
+        quickEncouragementIds: Object.keys(analysis.activities).filter(
+          id => analysis.activities[id].classification.tier === 1
+        ),
+        skipTeachingIds: [],
+        selectionCriteria: { deepThreshold: 3, mediumThreshold: 2, skipThreshold: 1 },
+      },
+      teachingPriorities: [],
+      portfolioTeachingNeeds: {
+        primaryIssue: 'General optimization',
+        primaryIssueSeverity: 'moderate',
+        secondaryIssues: [],
+        strengthsToHighlight: [],
+        strategicGaps: [],
+      },
+      analysisMetadata: {
+        generatedAt: new Date().toISOString(),
+        modelUsed: 'legacy',
+        tokensUsed: { input: 0, output: 0 },
+        cost: 0,
+        storyContextProvided: false,
+      },
+    };
 
-      const teachingContext = await stage2ConditionalTeachingService.teach(
-        input,
-        storyContext,
-        analysisContext
-      );
+    const teachingContext = await stage2ConditionalTeachingService.teach(
+      input,
+      storyContext,
+      analysisContext
+    );
 
-      return convertToLegacyTeaching(teachingContext, storyContext, analysisContext);
-    } else {
-      return batchActivityTeachingService.teachPortfolio(input, analysis);
-    }
+    return convertToLegacyTeaching(teachingContext, storyContext, analysisContext);
   }
 
   /**

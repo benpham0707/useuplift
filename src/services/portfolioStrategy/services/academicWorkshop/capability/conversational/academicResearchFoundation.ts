@@ -1088,6 +1088,15 @@ export const VERIFIED_GUIDANCE = {
       'For environmental science or sustainability majors, this course demonstrates interdisciplinary thinking. However, for competitive science programs, AP Biology or Chemistry may be weighted more heavily.',
   },
 
+  // R13: Add biology/pre-med specific guidance (referenced by R10 keyword mappings)
+  biologyRecommendation: {
+    statement:
+      'AP Biology has a 68.3% pass rate with 17.0% earning 5s. AP Chemistry has a 75.6% pass rate with 13.7% earning 5s (College Board 2024). Medical schools require both biology and chemistry coursework.',
+    citation: CITATIONS.collegeBoard2024,
+    implication:
+      'For pre-med students, taking both AP Biology and AP Chemistry demonstrates serious preparation for medical school prerequisites. Pairing with AP Statistics provides the quantitative skills needed for medical research and evidence-based medicine.',
+  },
+
   // ========== COMPUTER SCIENCE GUIDANCE ==========
   csComparison: {
     statement:

@@ -32,6 +32,8 @@ import {
   TeachingContext,
   ActivityTeaching,
   ActivityTier,
+  getDescriptionCharLimit,
+  getPlatformName,
 } from '../types';
 
 // Import citation service for research-backed teaching
@@ -58,6 +60,12 @@ import {
   ExpertKnowledgeContext,
 } from '../expertCounselorKnowledgeBase';
 
+// Import scoring teaching layer for deep transformation guidance
+import {
+  activityTeachingLayerService,
+} from '../scoring';
+import type { TeachingLayerOutput } from '../scoring/teachingLayerTypes';
+
 /**
  * Teaching depth configuration
  */
@@ -79,17 +87,23 @@ const TEACHING_CONFIG = {
  */
 export class Stage2ConditionalTeachingService {
   private readonly MODEL = 'claude-sonnet-4-5-20250929';
-  private _accumulatedCost = 0;
-  private _accumulatedTokens = { input: 0, output: 0 };
+  // R3: Removed instance-level _accumulatedCost and _accumulatedTokens to prevent concurrent call corruption
 
-  private trackUsage(usage: { input_tokens?: number; output_tokens?: number } | undefined): void {
+  // R3: trackUsage only writes to local accumulators (no instance state)
+  private trackUsage(
+    usage: { input_tokens?: number; output_tokens?: number } | undefined,
+    localCost?: { value: number },
+    localTokens?: { input: number; output: number }
+  ): void {
     if (!usage) return;
     const inputTokens = usage.input_tokens || 0;
     const outputTokens = usage.output_tokens || 0;
-    this._accumulatedTokens.input += inputTokens;
-    this._accumulatedTokens.output += outputTokens;
-    // Sonnet pricing: $3/M input, $15/M output
-    this._accumulatedCost += (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15;
+    const cost = (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15;
+    if (localCost) localCost.value += cost;
+    if (localTokens) {
+      localTokens.input += inputTokens;
+      localTokens.output += outputTokens;
+    }
   }
 
   /**
@@ -106,9 +120,9 @@ export class Stage2ConditionalTeachingService {
     analysisContext: AnalysisContext
   ): Promise<TeachingContext> {
     const startTime = Date.now();
-    // Reset cost accumulator for this run
-    this._accumulatedCost = 0;
-    this._accumulatedTokens = { input: 0, output: 0 };
+    // R3: Local accumulators for thread-safe concurrent teach() calls (no instance state)
+    const localCost = { value: 0 };
+    const localTokens = { input: 0, output: 0 };
 
     const deepTeachingIds = analysisContext.teachingCandidates.deepTeachingIds;
     const mediumTeachingIds = analysisContext.teachingCandidates.mediumTeachingIds;
@@ -189,7 +203,7 @@ export class Stage2ConditionalTeachingService {
           depth: 'deep' as const,
           promise: this.processSingleActivity(
             input, storyContext, analysisContext, id,
-            knowledgeContexts.get(id), 'deep', expertContext
+            knowledgeContexts.get(id), 'deep', expertContext, localCost, localTokens
           ).catch(error => {
             console.error(`[Stage2] Failed to process ${id}, using knowledge fallback:`, error);
             return this.createKnowledgeBasedFallback(id, input, analysisContext, knowledgeContexts.get(id));
@@ -200,7 +214,7 @@ export class Stage2ConditionalTeachingService {
           depth: 'medium' as const,
           promise: this.processSingleActivity(
             input, storyContext, analysisContext, id,
-            knowledgeContexts.get(id), 'medium', expertContext
+            knowledgeContexts.get(id), 'medium', expertContext, localCost, localTokens
           ).catch(error => {
             console.error(`[Stage2] Failed to process ${id}, using knowledge fallback:`, error);
             return this.createKnowledgeBasedFallback(id, input, analysisContext, knowledgeContexts.get(id));
@@ -239,7 +253,9 @@ export class Stage2ConditionalTeachingService {
         input,
         storyContext,
         analysisContext,
-        analysisContext.teachingCandidates.quickEncouragementIds
+        analysisContext.teachingCandidates.quickEncouragementIds,
+        localCost,
+        localTokens
       );
       quickEncouragements.push(...encouragements);
     }
@@ -262,7 +278,100 @@ export class Stage2ConditionalTeachingService {
       analysisContext
     );
 
-    // Step 6: Calculate quality metrics
+    // Step 6: Run scoring teaching layer (deep transformations with rewrites + citations)
+    let scoringTeaching: TeachingContext['scoringTeaching'] | undefined;
+    if (analysisContext.scoring?.scoringComplete) {
+      console.log(`[Stage2] Running scoring teaching layer for deep transformations...`);
+      const scoringTeachingStart = Date.now();
+      try {
+        const teachingResult = await activityTeachingLayerService.generateTeaching({
+          scoringRubric: analysisContext.scoring.portfolioRubric,
+          activities: input.activities,
+          targetPlatform: input.targetPlatform,
+          studentContext: {
+            intendedMajor: input.studentContext?.intendedMajor,
+            targetSchools: input.studentContext?.targetSchools,
+            currentGrade: input.studentContext?.gradeLevel,
+          },
+          options: {
+            maxTransformations: Math.min(input.activities.length, 5),
+            includeAlternatives: true,
+            includeCraftTeaching: true,
+          },
+        });
+
+        if (teachingResult.success && teachingResult.teaching) {
+          scoringTeaching = {
+            activityTransformations: teachingResult.teaching.activityTransformations,
+            connectionStrategies: teachingResult.teaching.connectionStrategies,
+            strategicPriorities: teachingResult.teaching.strategicPriorities,
+            craftTeaching: teachingResult.teaching.craftTeaching,
+            fullOutput: teachingResult.teaching,
+          };
+          console.log(`[Stage2] Scoring teaching complete in ${Date.now() - scoringTeachingStart}ms`);
+          console.log(`[Stage2] Transformations: ${scoringTeaching.activityTransformations.length}, Priorities: ${scoringTeaching.strategicPriorities.length}`);
+        } else {
+          console.log(`[Stage2] Scoring teaching returned no results (success=${teachingResult.success})`);
+        }
+      } catch (error) {
+        console.error(`[Stage2] Scoring teaching failed in ${Date.now() - scoringTeachingStart}ms (non-fatal):`, error);
+      }
+    } else {
+      console.log(`[Stage2] Scoring data not available, skipping scoring teaching layer`);
+    }
+
+    // Step 7: Upgrade Stage 2 description optimizations with scoring teaching rewrites
+    // The scoring teaching layer produces strictly char-constrained, principled rewrites.
+    // When available and better, prefer those over Stage 2's own (often over-limit) rewrites.
+    if (scoringTeaching?.activityTransformations?.length) {
+      const charLimit = getDescriptionCharLimit(input.targetPlatform);
+      console.log(`[Stage2] Checking ${scoringTeaching.activityTransformations.length} scoring rewrites against ${teachingDelivered.length} Stage 2 teachings (limit: ${charLimit})`);
+
+      for (const transformation of scoringTeaching.activityTransformations) {
+        // Match by activityId first, then by activityName as fallback
+        // teachingDelivered items are { activityId, teachingDepth, teaching: ActivityTeaching }
+        let td = teachingDelivered.find(t => t.activityId === transformation.activityId);
+        if (!td) {
+          // LLM may have used title as activityId — try matching by looking up the activity
+          const matchingActivity = input.activities.find(a =>
+            a.title === transformation.activityName || a.id === transformation.activityId
+          );
+          if (matchingActivity) {
+            td = teachingDelivered.find(t => t.activityId === matchingActivity.id);
+          }
+        }
+
+        if (!td?.teaching?.descriptionOptimization) {
+          console.log(`[Stage2] No teaching match for "${transformation.activityName}" (id: ${transformation.activityId})`);
+          continue;
+        }
+
+        const descOpt = td.teaching.descriptionOptimization;
+        const scoringRewrite = transformation.rewrite?.suggested;
+        const currentRewrite = descOpt.optimizedDescription;
+
+        // Prefer scoring rewrite if: (a) within char limit, (b) different from original, (c) Stage 2's rewrite exceeds limit
+        if (scoringRewrite
+          && scoringRewrite.length <= charLimit
+          && scoringRewrite !== descOpt.originalDescription
+          && currentRewrite.length > charLimit) {
+          console.log(`[Stage2] Upgrading "${transformation.activityName}" rewrite: ${currentRewrite.length}→${scoringRewrite.length} chars (scoring teaching preferred)`);
+          descOpt.optimizedDescription = scoringRewrite;
+          descOpt.characterCount = scoringRewrite.length;
+          // Merge changes from scoring transformation
+          if (transformation.rewrite?.changesApplied?.length) {
+            descOpt.changesExplained = transformation.rewrite.changesApplied.map(c => ({
+              change: c.element,
+              reason: c.rationale,
+            }));
+          }
+        } else if (scoringRewrite) {
+          console.log(`[Stage2] Keeping Stage 2 rewrite for "${transformation.activityName}" (scoring: ${scoringRewrite.length}, stage2: ${currentRewrite.length}, limit: ${charLimit})`);
+        }
+      }
+    }
+
+    // Step 8: Calculate quality metrics
     const qualityMetrics = this.calculateQualityMetrics(teachingDelivered, quickEncouragements);
 
     const result: TeachingContext = {
@@ -270,12 +379,13 @@ export class Stage2ConditionalTeachingService {
       quickEncouragements,
       skippedActivities,
       portfolioTeaching,
+      scoringTeaching,
       qualityMetrics,
       teachingMetadata: {
         generatedAt: new Date().toISOString(),
         modelUsed: this.MODEL,
-        tokensUsed: { ...this._accumulatedTokens },
-        cost: this._accumulatedCost,
+        tokensUsed: { ...localTokens },
+        cost: localCost.value,
         activitiesTaught: teachingDelivered.length,
         activitiesSkipped: skippedActivities.length,
       },
@@ -283,298 +393,11 @@ export class Stage2ConditionalTeachingService {
 
     console.log(`[Stage2] Teaching complete in ${Date.now() - startTime}ms`);
     console.log(`[Stage2] Delivered: ${teachingDelivered.length} teachings, ${quickEncouragements.length} encouragements`);
+    if (scoringTeaching) {
+      console.log(`[Stage2] Scoring teaching: ${scoringTeaching.activityTransformations.length} transformations, ${scoringTeaching.craftTeaching?.length || 0} craft elements`);
+    }
 
     return result;
-  }
-
-  /**
-   * Generate batch teaching for multiple activities
-   *
-   * KNOWLEDGE-DRIVEN APPROACH:
-   * 1. Assemble knowledge context for each activity
-   * 2. Inject knowledge into prompt (tier benchmarks, teaching bundles, citations)
-   * 3. LLM applies knowledge (doesn't invent it)
-   * 4. Post-process with citation attachment
-   */
-  private async generateBatchTeaching(
-    input: ActivityWorkshopSessionInput,
-    storyContext: StoryContext,
-    analysisContext: AnalysisContext,
-    activityIds: string[],
-    depth: 'deep' | 'medium'
-  ): Promise<ActivityTeaching[]> {
-    if (activityIds.length === 0) return [];
-
-    // STEP 1: Assemble ENRICHED knowledge context for each activity
-    // Uses expert counselor intelligence for deeper analysis
-    console.log(`[Stage2] Assembling enriched knowledge context for ${activityIds.length} activities...`);
-    const knowledgeContexts: Map<string, ActivityKnowledgeContext> = new Map();
-
-    // Build portfolio-level expert context once (shared across all activities)
-    const expertContext = assembleExpertContext({
-      activities: input.activities.map(a => ({
-        id: a.id,
-        title: a.title,
-        description: a.description,
-        role: a.role,
-        hoursPerWeek: a.hoursPerWeek,
-        weeksPerYear: a.weeksPerYear,
-        yearsInvolved: a.yearsInvolved || 1,
-        gradeLevels: a.gradeLevels?.map(g => String(g)),
-      })),
-      studentContext: input.studentContext ? {
-        intendedMajor: input.studentContext.intendedMajor,
-        targetSchools: input.studentContext.targetSchools,
-        isFirstGen: input.studentContext.firstGen,
-        hasWorkObligations: input.studentContext.hasWorkObligations,
-        workHoursPerWeek: input.studentContext.workHoursPerWeek,
-        constraintNotes: input.studentContext.constraintNotes,
-        geographicContext: input.studentContext.geographicContext,
-      } : undefined,
-    });
-
-    if (expertContext.constraintLevel) {
-      console.log(`[Stage2] Constraint level detected: ${expertContext.constraintLevel.name} (Level ${expertContext.constraintLevel.level})`);
-    }
-    if (expertContext.narrativeArc) {
-      console.log(`[Stage2] Narrative arc detected: ${expertContext.narrativeArc.name}`);
-    }
-    console.log(`[Stage2] Character traits: demonstrated=${expertContext.characterTraits.demonstrated.length}, missing=${expertContext.characterTraits.missing.length}`);
-
-    for (const activityId of activityIds) {
-      const activity = input.activities.find(a => a.id === activityId);
-      const analysis = analysisContext.activities[activityId];
-
-      if (activity && analysis) {
-        // Use enriched knowledge context — pass pre-built expert context to avoid redundant assembly
-        const knowledgeContext = knowledgeAssemblyService.assembleEnrichedKnowledgeContext(
-          activity,
-          analysis,
-          expertContext,
-          input.studentContext
-        );
-        knowledgeContexts.set(activityId, knowledgeContext);
-
-        console.log(`[Stage2] Enriched knowledge assembled for "${activity.title}": ${knowledgeContext.issueTeaching.length} issues, ${knowledgeContext.citations.length} citations`);
-      }
-    }
-
-    // STEP 2: Build knowledge-enriched prompt
-    const prompt = this.buildKnowledgeEnrichedPrompt(
-      input,
-      storyContext,
-      analysisContext,
-      activityIds,
-      knowledgeContexts,
-      depth
-    );
-
-    // Calculate timeout based on complexity - knowledge-enriched prompts need more time
-    // Base: 180 seconds, plus 60 seconds per activity for deep teaching
-    const timeoutMs = depth === 'deep'
-      ? 180000 + (activityIds.length * 60000) // 3 min base + 1 min per activity
-      : 120000 + (activityIds.length * 30000); // 2 min base + 30 sec per activity
-
-    console.log(`[Stage2] Calling LLM with timeout: ${timeoutMs / 1000}s for ${activityIds.length} activities (${depth})`);
-
-    // Calculate token limit based on activity count - need enough space for full JSON
-    // Each activity needs ~3000-4000 tokens for deep teaching, ~1500-2000 for medium
-    const tokensPerActivity = depth === 'deep' ? 4000 : 2000;
-    const maxTokens = Math.min(16000, activityIds.length * tokensPerActivity + 1000); // Cap at 16k
-
-    console.log(`[Stage2] Using maxTokens: ${maxTokens} for ${activityIds.length} activities (${depth})`);
-
-    // Select system prompt: use expert prompt when expert context available
-    const systemPrompt = expertContext
-      ? buildExpertTeachingPrompt(expertContext, depth)
-      : this.getKnowledgeDrivenSystemPrompt(depth);
-
-    console.log(`[Stage2] Using ${expertContext ? 'EXPERT' : 'standard'} system prompt`);
-
-    try {
-      const response = await callClaude({
-        model: this.MODEL,
-        systemPrompt,
-        userPrompt: prompt,
-        maxTokens,
-        temperature: 0.3, // Lower temperature for more consistent application of knowledge
-        timeoutMs, // Pass explicit timeout
-      });
-
-      this.trackUsage(response.usage);
-      console.log(`[Stage2] LLM response received (${response.usage?.output_tokens || 0} tokens)`);
-
-      // STEP 3: Parse and enrich with citations
-      const teachings = this.parseTeachingResponse(response.content, activityIds, input, analysisContext, storyContext, expertContext);
-
-      // Validate we got teachings for all activities
-      if (teachings.length < activityIds.length) {
-        console.log(`[Stage2] Partial response: got ${teachings.length}/${activityIds.length} activities, processing missing individually`);
-
-        // Process missing activities individually
-        const receivedIds = new Set(teachings.map(t => t.activityId));
-        const missingIds = activityIds.filter(id => !receivedIds.has(id));
-
-        if (missingIds.length > 0) {
-          const additionalTeachings = await this.processActivitiesIndividually(
-            input, storyContext, analysisContext, missingIds, knowledgeContexts, depth, expertContext
-          );
-          teachings.push(...additionalTeachings);
-        }
-      }
-
-      // STEP 4: Post-process with citation attachment from knowledge contexts
-      return this.enrichTeachingsWithCitations(teachings, knowledgeContexts);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[Stage2] Batch teaching failed:`, errorMessage);
-
-      // Check if it's a JSON parsing error - if so, try processing individually
-      if (errorMessage.includes('JSON') || errorMessage.includes('parse') || errorMessage.includes('Colon expected')) {
-        console.log(`[Stage2] JSON parsing failed, processing activities individually...`);
-        return this.processActivitiesIndividually(input, storyContext, analysisContext, activityIds, knowledgeContexts, depth, expertContext);
-      }
-
-      // Check if it's a timeout - if so, try with a simpler prompt
-      if (errorMessage.includes('timed out')) {
-        console.log(`[Stage2] Timeout detected, processing activities individually...`);
-        return this.processActivitiesIndividually(input, storyContext, analysisContext, activityIds, knowledgeContexts, depth, expertContext);
-      }
-
-      // For other errors, use knowledge-based fallback
-      console.log(`[Stage2] Using knowledge-based fallback`);
-      return activityIds.map(id => this.createKnowledgeBasedFallback(id, input, analysisContext, knowledgeContexts.get(id)));
-    }
-  }
-
-  /**
-   * Generate simplified teaching as retry mechanism
-   * Uses a more compact prompt that's less likely to timeout
-   */
-  private async generateSimplifiedTeaching(
-    input: ActivityWorkshopSessionInput,
-    storyContext: StoryContext,
-    analysisContext: AnalysisContext,
-    activityIds: string[],
-    knowledgeContexts: Map<string, ActivityKnowledgeContext>,
-    depth: 'deep' | 'medium'
-  ): Promise<ActivityTeaching[]> {
-    console.log(`[Stage2] Generating simplified teaching for ${activityIds.length} activities...`);
-
-    // Build a more compact prompt without the full knowledge context
-    const activities = activityIds.map(id => {
-      const activity = input.activities.find(a => a.id === id);
-      const analysis = analysisContext.activities[id];
-      if (!activity || !analysis) return null;
-
-      return {
-        id,
-        title: activity.title,
-        description: activity.description,
-        role: activity.role,
-        tier: analysis.classification.tier,
-        issues: analysis.descriptionQuality.issues.slice(0, 3), // Top 3 issues only
-        strengths: analysis.descriptionQuality.strengths.slice(0, 2),
-        redFlags: analysis.redFlags.slice(0, 2).map(f => f.flag),
-        greenFlags: analysis.greenFlags.slice(0, 2).map(f => f.flag),
-      };
-    }).filter(Boolean);
-
-    const simplifiedPrompt = `Provide teaching for these activities. Be concise but helpful.
-
-STUDENT: ${storyContext.narrativeIdentity.storyEssence}
-
-ACTIVITIES:
-${activities.map(a => `
-- ${a!.title} (ID: ${a!.id})
-  Description: "${a!.description}"
-  Tier: ${a!.tier}
-  Issues: ${a!.issues.join(', ') || 'None'}
-  Strengths: ${a!.strengths.join(', ') || 'General'}
-`).join('\n')}
-
-For each activity, provide JSON:
-{
-  "teachings": [
-    {
-      "activityId": "id",
-      "celebration": { "headline": "What's great about this", "strengths": ["strength1", "strength2"] },
-      "tierExplanation": {
-        "assignedTier": 1-4,
-        "explanation": { "text": "Why this tier", "citations": [] },
-        "benchmarksUsed": [],
-        "whatMakesThisTier": { "text": "Evidence", "citations": [] },
-        "whatWouldChangeIt": { "text": "How to improve", "citations": [] }
-      },
-      "strengthTeaching": [{ "strength": "main strength", "whyItMatters": { "text": "why", "citations": [] }, "howToLeverage": "how", "inApplications": "where" }],
-      "improvementTeaching": [{ "issue": "main issue", "whyItMatters": { "text": "why", "citations": [] }, "howToFix": "steps", "exampleBefore": "before", "exampleAfter": "after", "priority": "high" }],
-      "descriptionOptimization": { "originalDescription": "original", "optimizedDescription": "improved (≤150 chars)", "characterCount": 145, "changesExplained": [{ "change": "what", "reason": "why" }] },
-      "narrativeGuidance": { "howToTalkAboutThis": { "text": "framing", "citations": [] }, "uniqueAngle": "angle", "connectionToStory": "connection", "interviewTips": ["tip1"] }
-    }
-  ]
-}`;
-
-    try {
-      const response = await callClaude({
-        model: this.MODEL,
-        systemPrompt: `You are a warm, encouraging college essay coach. Provide helpful teaching that celebrates strengths first, then offers specific improvements with before/after examples.`,
-        userPrompt: simplifiedPrompt,
-        maxTokens: 4000,
-        temperature: 0.3,
-        timeoutMs: 120000, // 2 minutes for simplified prompt
-      });
-
-      this.trackUsage(response.usage);
-      console.log(`[Stage2] Simplified response received`);
-      const teachings = this.parseTeachingResponse(response.content, activityIds, input, analysisContext, storyContext, expertContext);
-      return this.enrichTeachingsWithCitations(teachings, knowledgeContexts);
-    } catch (retryError) {
-      console.error(`[Stage2] Simplified teaching also failed:`, retryError);
-      // Final fallback to knowledge-based teaching
-      return activityIds.map(id => this.createKnowledgeBasedFallback(id, input, analysisContext, knowledgeContexts.get(id)));
-    }
-  }
-
-  /**
-   * Process activities individually when batch processing fails
-   *
-   * This is the RELIABILITY FALLBACK - ensures we always get LLM-quality teaching
-   * by processing one activity at a time if batch processing has JSON issues
-   */
-  private async processActivitiesIndividually(
-    input: ActivityWorkshopSessionInput,
-    storyContext: StoryContext,
-    analysisContext: AnalysisContext,
-    activityIds: string[],
-    knowledgeContexts: Map<string, ActivityKnowledgeContext>,
-    depth: 'deep' | 'medium',
-    expertContext?: ExpertKnowledgeContext
-  ): Promise<ActivityTeaching[]> {
-    console.log(`[Stage2] Processing ${activityIds.length} activities individually IN PARALLEL for reliability`);
-
-    // Process all activities in parallel for speed
-    const results = await Promise.all(
-      activityIds.map(async (activityId) => {
-        try {
-          console.log(`[Stage2] Processing activity: ${activityId}`);
-          const teaching = await this.processSingleActivity(
-            input,
-            storyContext,
-            analysisContext,
-            activityId,
-            knowledgeContexts.get(activityId),
-            depth,
-            expertContext
-          );
-          return teaching;
-        } catch (error) {
-          console.error(`[Stage2] Failed to process ${activityId}, using knowledge fallback:`, error);
-          return this.createKnowledgeBasedFallback(activityId, input, analysisContext, knowledgeContexts.get(activityId));
-        }
-      })
-    );
-
-    return results;
   }
 
   /**
@@ -589,7 +412,9 @@ For each activity, provide JSON:
     activityId: string,
     knowledge: ActivityKnowledgeContext | undefined,
     depth: 'deep' | 'medium',
-    expertContext?: ExpertKnowledgeContext
+    expertContext?: ExpertKnowledgeContext,
+    localCost?: { value: number },
+    localTokens?: { input: number; output: number }
   ): Promise<ActivityTeaching> {
     const activity = input.activities.find(a => a.id === activityId);
     const analysis = analysisContext.activities[activityId];
@@ -621,26 +446,31 @@ ACTIVITY: ${activity.title}
 - Green Flags: ${analysis.greenFlags.map(f => f.flag).join('; ') || 'None'}
 - Red Flags: ${analysis.redFlags.map(f => f.flag).join('; ') || 'None'}
 
-${knowledge ? `KNOWLEDGE CONTEXT:
-- Tier Criteria: ${knowledge.saraHarbersonCriteria.definition}
-- Category: ${knowledge.categoryInsights.categoryName}
-- Top Issues to Address: ${knowledge.issueTeaching.slice(0, 2).map(i => i.theProblem.headline).join('; ')}` : ''}
+${knowledge ? `RESEARCH-BACKED KNOWLEDGE CONTEXT:
+
+${knowledgeAssemblyService.formatForPrompt(knowledge)}` : ''}
 
 ${activityExpertSection ? `EXPERT COUNSELOR INTELLIGENCE:
 ${activityExpertSection}` : ''}
 
 TEACHING PROTOCOL:
-1. CELEBRATE FIRST — Acknowledge what's genuinely working. Be specific.
+1. CELEBRATE FIRST — Acknowledge what's genuinely working. Reference a SPECIFIC detail from their description (quote it).
 2. EDUCATE — Explain WHY this matters using admissions psychology (the 8-minute read, committee pitch test).
-3. TRANSFORM — Show concrete before/after. Quote their text, then show the improved version.
+3. TRANSFORM — Show concrete before/after. QUOTE their actual text, then show the improved version. NEVER skip this.
 4. CONNECT — Link to their broader narrative and how this activity fits their story.
+
+CRITICAL QUALITY RULES:
+- Every celebration headline MUST quote or reference a specific word/phrase from the student's description.
+- Every improvementTeaching entry MUST have non-empty exampleBefore (quoted from their description) AND exampleAfter (your rewrite).
+- If you cannot produce a real before/after, explain in howToFix what the student should write instead.
+- NEVER output generic phrases like "shows dedication" or "demonstrates leadership" without citing what specifically shows it.
 
 Respond with JSON for ONE activity:
 {
   "activityId": "${activityId}",
   "celebration": {
-    "headline": "One celebratory sentence about what's great",
-    "strengths": ["strength1", "strength2"]
+    "headline": "One celebratory sentence that QUOTES a specific phrase from their description. E.g.: 'Your phrase \"designed curriculum for 30+ students\" instantly signals ownership — AOs see YOU did this, not the club.'",
+    "strengths": ["Specific strength citing evidence from description", "Second specific strength"]
   },
   "tierExplanation": {
     "assignedTier": ${analysis.classification.tier},
@@ -665,15 +495,15 @@ Respond with JSON for ONE activity:
   }],
   "descriptionOptimization": {
     "originalDescription": "${activity.description.replace(/"/g, '\\"').substring(0, 200)}",
-    "optimizedDescription": "your improved version (max 150 chars)",
-    "characterCount": 145,
+    "optimizedDescription": "your improved version (max ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})",
+    "characterCount": ${Math.round(getDescriptionCharLimit(input.targetPlatform) * 0.95)},
     "changesExplained": [{ "change": "what changed", "reason": "why" }]
   },
   "narrativeGuidance": {
-    "howToTalkAboutThis": { "text": "how to discuss in interviews", "citations": [] },
-    "uniqueAngle": "what makes this distinctive",
-    "connectionToStory": "how it fits their narrative",
-    "interviewTips": ["tip 1", "tip 2"]
+    "howToTalkAboutThis": { "text": "SPECIFIC framing advice: exactly how to discuss this in interviews and essays. E.g., 'When discussing your CS club, lead with the 3-school hackathon — it shows you can scale impact beyond your immediate community. Frame it as: I didn't just learn CS, I built CS infrastructure for my region.'", "citations": [] },
+    "uniqueAngle": "ONE specific thing that makes THIS student's version of this activity different from 1000 other students doing the same thing. Be concrete, not generic.",
+    "connectionToStory": "How this SPECIFIC activity connects to and strengthens their overall narrative arc. Reference their other activities by name.",
+    "interviewTips": ["Specific prep tip referencing THIS activity's details", "A concrete question they might get and how to answer it"]
   }
 }`;
 
@@ -686,12 +516,12 @@ Respond with JSON for ONE activity:
       model: this.MODEL,
       systemPrompt,
       userPrompt: prompt,
-      maxTokens: depth === 'deep' ? 4000 : 2500,
+      maxTokens: depth === 'deep' ? 5000 : 4000,
       temperature: 0.3,
-      timeoutMs: 120000, // 2 minutes per activity - reliability over speed
+      timeoutMs: depth === 'deep' ? 180000 : 120000, // Deep teaching gets 3 min for full knowledge context
     });
 
-    this.trackUsage(response.usage);
+    this.trackUsage(response.usage, localCost, localTokens);
 
     // Parse the single activity response
     const parsed = parseClaudeJSON<ActivityTeaching>(response.content, 'SingleActivityTeaching');
@@ -700,9 +530,10 @@ Respond with JSON for ONE activity:
     parsed.activityId = activityId;
 
     // Normalize the parsed response — improvements first so we can synthesize optimization
+    // Filter out useless/placeholder improvements that the LLM failed to generate properly
     const normalizedImprovements = (parsed.improvementTeaching || []).map(i =>
       this.normalizeImprovementTeaching(i as unknown as Record<string, unknown>, activity)
-    );
+    ).filter(imp => !(imp as Record<string, unknown>)._empty);
 
     return {
       activityId,
@@ -715,7 +546,8 @@ Respond with JSON for ONE activity:
       descriptionOptimization: this.normalizeDescriptionOptimization(
         parsed.descriptionOptimization as unknown as Record<string, unknown>,
         activity,
-        normalizedImprovements
+        normalizedImprovements,
+        input.targetPlatform
       ),
       narrativeGuidance: this.normalizeNarrativeGuidance(
         parsed.narrativeGuidance as unknown as Record<string, unknown>,
@@ -724,6 +556,9 @@ Respond with JSON for ONE activity:
           narrativeArc: expertContext?.narrativeArc?.name,
           constraintLevel: expertContext?.constraintLevel?.name,
           activityTitle: activity?.title,
+          strengths: analysis?.greenFlags?.map(f => f.flag),
+          category: analysis?.classification?.detectedCategory,
+          tier: analysis?.classification?.tier,
         }
       ),
     };
@@ -839,15 +674,15 @@ Respond with JSON:
       ],
       "descriptionOptimization": {
         "originalDescription": "Their current description",
-        "optimizedDescription": "Your improved version (150 chars max)",
-        "characterCount": 145,
+        "optimizedDescription": "Your improved version (${getDescriptionCharLimit(input.targetPlatform)} chars max for ${getPlatformName(input.targetPlatform)})",
+        "characterCount": ${Math.round(getDescriptionCharLimit(input.targetPlatform) * 0.95)},
         "changesExplained": [{ "change": "What changed", "reason": "Why" }]
       },
       "narrativeGuidance": {
-        "howToTalkAboutThis": { "text": "Framing advice", "citations": [] },
-        "uniqueAngle": "What makes this special",
-        "connectionToStory": "How it fits their narrative",
-        "interviewTips": ["Tip 1", "Tip 2"]
+        "howToTalkAboutThis": { "text": "SPECIFIC framing: exactly how to present this in interviews/essays. Give a concrete example sentence they could use.", "citations": [] },
+        "uniqueAngle": "ONE concrete thing that makes THIS student's version different from 1000 others doing the same activity",
+        "connectionToStory": "How this activity connects to their other activities by name and strengthens the overall narrative",
+        "interviewTips": ["Specific prep tip for THIS activity", "Concrete question they might get and how to answer"]
       }
     }
   ]
@@ -899,6 +734,19 @@ ${depth === 'deep' ? `
 - Address top 2-3 issues
 - Keep recommendations actionable
 `}
+
+ANTI-GENERIC CHECKLIST (apply to every piece of teaching you write):
+1. Could this feedback apply to ANY student? If yes, rewrite with THIS student's specific data.
+2. Does the improvement suggestion include a concrete BEFORE/AFTER example using THEIR actual description text? If not, add one.
+3. Does the celebration reference a SPECIFIC detail from their activity, not just "great leadership"?
+4. Is the tier explanation grounded in what SPECIFICALLY makes this a Tier [N] activity vs Tier [N±1]?
+
+BANNED PHRASES (never use these — they are meaningless filler):
+- "Great job!" / "Well done!" / "Impressive!"
+- "Consider adding more detail"
+- "This shows your dedication"
+- "Think about how you can..."
+- "This is a strong activity" (without saying WHY)
 
 Output valid JSON only.`;
   }
@@ -1100,8 +948,8 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
 
       "descriptionOptimization": {
         "originalDescription": "Their COMPLETE current description (exact copy)",
-        "optimizedDescription": "Your COMPLETE improved version (must be ≤150 characters for Common App)",
-        "characterCount": 145,
+        "optimizedDescription": "Your COMPLETE improved version (must be ≤${getDescriptionCharLimit(input.targetPlatform)} characters for ${getPlatformName(input.targetPlatform)})",
+        "characterCount": ${Math.round(getDescriptionCharLimit(input.targetPlatform) * 0.95)},
         "transformationBreakdown": [
           {
             "originalPhrase": "Exact phrase from original",
@@ -1114,15 +962,15 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
 
       "narrativeGuidance": {
         "howToTalkAboutThis": {
-          "text": "Framing advice: how to discuss this activity in interviews and essays",
+          "text": "SPECIFIC framing: Give a concrete example sentence they could use in an interview or essay. E.g., 'When they ask about your research, say: I built the data pipeline that made the entire analysis possible — 50,000 records that no one else in the lab could process.'",
           "citations": []
         },
-        "uniqueAngle": "What makes THEIR version of this activity distinctive",
-        "connectionToStory": "How this activity fits their ${storyContext.narrativeIdentity.archetype} narrative",
-        "essayPotential": "Specific essay angle or moment that could come from this activity",
+        "uniqueAngle": "ONE concrete, specific thing that makes THIS student's version different from 1000 other students doing the same activity. Reference specific details from their description.",
+        "connectionToStory": "How this activity connects to their ${storyContext.narrativeIdentity.archetype} narrative — reference their OTHER activities by name and explain the synergy",
+        "essayPotential": "A specific essay angle or moment from this activity — name the exact scene, challenge, or realization that would make a compelling essay",
         "interviewTips": [
-          "Specific tip 1 based on common mistakes from category insights",
-          "Specific tip 2 about what to emphasize"
+          "A concrete question they might get about this activity and exactly how to answer it using their specific details",
+          "A common mistake to avoid when discussing this type of activity, with an alternative approach"
         ],
         "commonMistakesToAvoid": ["From the category insights common_mistakes section"]
       }
@@ -1300,7 +1148,7 @@ Remember: Students are counting on you to transform their applications. The know
       tierExplanation: {
         assignedTier: tier,
         explanation: {
-          text: `This activity is classified as ${knowledge.saraHarbersonCriteria.tierName}. ${knowledge.saraHarbersonCriteria.definition} Based on the ${knowledge.categoryInsights.categoryName} category, ${knowledge.categoryInsights.competitiveContext}`,
+          text: `Your ${activity?.title || 'activity'} is classified as ${knowledge.saraHarbersonCriteria.tierName}. ${knowledge.saraHarbersonCriteria.definition} ${knowledge.categoryInsights.competitiveContext}`,
           citations: knowledge.citations.filter(c => c.type === 'tier_justification').slice(0, 2),
         },
         benchmarksUsed: knowledge.saraHarbersonCriteria.evidence.slice(0, 3).map((ev, i) => ({
@@ -1321,14 +1169,19 @@ Remember: Students are counting on you to transform their applications. The know
           citations: [],
         },
       },
+      // R2-9: Improved fallback strength teaching with student-specific framing
       strengthTeaching: analysis?.greenFlags?.slice(0, 2).map(f => ({
-        strength: f.flag,
+        strength: f.admissionsValue || f.flag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
         whyItMatters: {
-          text: f.admissionsValue || 'This demonstrates authentic engagement.',
+          text: f.admissionsValue
+            ? `Your ${activity?.title || 'activity'} demonstrates ${f.admissionsValue.toLowerCase()}, which admissions officers value because it shows genuine engagement beyond surface participation.`
+            : `In the context of ${knowledge.categoryInsights.categoryName} activities, your ${activity?.title || 'activity'} shows qualities that stand out to admissions officers.`,
           citations: knowledge.citations.filter(c => c.type === 'green_flag').slice(0, 1),
         },
-        howToLeverage: 'Highlight this in your application materials.',
-        inApplications: 'Essays, interviews, and additional information section.',
+        howToLeverage: `In your ${activity?.title || 'activity'} description, lead with this strength. Frame it using active language: what you specifically did, not what the organization achieved.`,
+        inApplications: knowledge.fieldExpectations?.majorName
+          ? `Especially relevant for ${knowledge.fieldExpectations.majorName} applications — mention in essays about why this major.`
+          : 'Reference in your personal statement and any "additional information" sections.',
       })) || [],
       improvementTeaching: knowledge.issueTeaching.slice(0, 3).map(issue => ({
         issue: issue.theProblem.headline,
@@ -1351,13 +1204,15 @@ Remember: Students are counting on you to transform their applications. The know
       },
       narrativeGuidance: {
         howToTalkAboutThis: {
-          text: `Frame this ${knowledge.categoryInsights.categoryName} activity by focusing on ${knowledge.categoryInsights.topAchievements[0] || 'your unique contribution'}.`,
+          text: `When discussing your ${activity?.title || 'activity'}, focus on ${knowledge.categoryInsights.topAchievements[0] || 'your unique contribution'}. Lead with what makes YOUR experience specific, not the general category.`,
           citations: [],
         },
         uniqueAngle: knowledge.fieldExpectations?.relevanceAssessment?.alignmentReason ||
-          'Focus on what makes your experience distinctive.',
-        connectionToStory: `This activity connects to your broader narrative through ${knowledge.fieldExpectations?.majorName || 'your academic interests'}.`,
-        interviewTips: knowledge.categoryInsights.commonMistakes.slice(0, 2).map(m => `Avoid: ${m}`),
+          `What sets your ${activity?.title || 'activity'} apart is the specific context — emphasize what only YOU experienced.`,
+        connectionToStory: knowledge.fieldExpectations?.majorName
+          ? `Your ${activity?.title || 'activity'} strengthens your ${knowledge.fieldExpectations.majorName} narrative by demonstrating hands-on engagement beyond academics.`
+          : `This activity adds dimension to your story — it shows who you are beyond test scores and grades.`,
+        interviewTips: knowledge.categoryInsights.commonMistakes.slice(0, 1).map(m => `When discussing ${activity?.title || 'this activity'} in interviews, avoid: ${m}`),
       },
     };
   }
@@ -1419,10 +1274,11 @@ Remember: Students are counting on you to transform their applications. The know
         const celebration = t.celebration as Record<string, unknown> | undefined;
 
         // Normalize improvement teaching with deeper structure
+        // Filter out useless/placeholder improvements that the LLM failed to generate properly
         const rawImprovementTeaching = (t.improvementTeaching || []) as Array<Record<string, unknown>>;
         const normalizedImprovementTeaching = rawImprovementTeaching.map(imp =>
           this.normalizeImprovementTeaching(imp, activity)
-        );
+        ).filter(imp => !(imp as Record<string, unknown>)._empty);
 
         // Normalize strength teaching with deeper structure
         const rawStrengthTeaching = (t.strengthTeaching || []) as Array<Record<string, unknown>>;
@@ -1444,7 +1300,8 @@ Remember: Students are counting on you to transform their applications. The know
           descriptionOptimization: this.normalizeDescriptionOptimization(
             t.descriptionOptimization,
             activity,
-            normalizedImprovementTeaching
+            normalizedImprovementTeaching,
+            input.targetPlatform
           ),
           narrativeGuidance: this.normalizeNarrativeGuidance(
             t.narrativeGuidance,
@@ -1453,6 +1310,9 @@ Remember: Students are counting on you to transform their applications. The know
               narrativeArc: expertContext?.narrativeArc?.name,
               constraintLevel: expertContext?.constraintLevel?.name,
               activityTitle: activity?.title,
+              strengths: analysis?.greenFlags?.map(f => f.flag),
+              category: analysis?.classification?.detectedCategory,
+              tier: analysis?.classification?.tier,
             }
           ),
         } as ActivityTeaching;
@@ -1502,16 +1362,53 @@ Remember: Students are counting on you to transform their applications. The know
         howToFix += ` Steps: ${steps.join('; ')}`;
       }
     } else {
-      howToFix = (imp.howToFix as string) || 'Apply the teaching principles to strengthen this section.';
+      howToFix = (imp.howToFix as string) || '';
     }
 
-    // Get before/after from transformation or directly
-    const exampleBefore = (transformation?.before as string) ||
-                          (imp.exampleBefore as string) ||
-                          activity?.description?.substring(0, 50) || '';
-    const exampleAfter = (transformation?.after as string) ||
-                         (imp.exampleAfter as string) ||
-                         'Improved version with specific metrics and outcomes';
+    // R2-6: Expanded placeholder/lazy output detection
+    const isPlaceholder = (text: string): boolean => {
+      if (!text || text.length < 10) return true;
+      const lower = text.toLowerCase();
+      const placeholders = [
+        // Original patterns
+        'improved version with specific',
+        'apply the teaching principles',
+        'improved version with metrics',
+        'specific metrics and outcomes',
+        'apply teaching guidance',
+        // R2-6: New patterns for common LLM shortcuts
+        'add more specific',
+        'consider adding more detail',
+        'you could try adding',
+        'you might want to',
+        'it would be better if',
+        'think about including',
+        'your improved version',
+        'insert specific',
+        'include relevant details',
+        'add quantifiable metrics here',
+        'replace with your actual',
+        '[your',
+        '[insert',
+        '[add',
+      ];
+      return placeholders.some(p => lower.includes(p));
+    };
+
+    // Get before/after from transformation or directly — reject placeholders
+    const rawExampleBefore = (transformation?.before as string) || (imp.exampleBefore as string) || '';
+    const rawExampleAfter = (transformation?.after as string) || (imp.exampleAfter as string) || '';
+
+    const exampleBefore = isPlaceholder(rawExampleBefore) ? '' : rawExampleBefore;
+    const exampleAfter = isPlaceholder(rawExampleAfter) ? '' : rawExampleAfter;
+
+    // If howToFix is a placeholder, clear it so we don't output useless text
+    if (isPlaceholder(howToFix)) {
+      howToFix = '';
+    }
+
+    // If both before/after and howToFix are empty, this improvement is garbage — return null marker
+    const isUselessImprovement = !exampleAfter && !howToFix && !whyItMattersText;
 
     return {
       issue,
@@ -1533,7 +1430,9 @@ Remember: Students are counting on you to transform their applications. The know
       ...(transformation?.whyItWorks && {
         transformationAnalysis: transformation.whyItWorks as string,
       }),
-      priority: (imp.priority as 'high' | 'medium' | 'low') || 'medium',
+      priority: isUselessImprovement ? 'low' as const : ((imp.priority as 'high' | 'medium' | 'low') || 'medium'),
+      // Mark as useless so the caller can filter it out
+      ...(isUselessImprovement && { _empty: true }),
     };
   }
 
@@ -1599,11 +1498,19 @@ Remember: Students are counting on you to transform their applications. The know
   private normalizeDescriptionOptimization(
     optimization: Record<string, unknown> | undefined,
     activity: ActivityWorkshopInput | undefined,
-    normalizedImprovements?: ActivityTeaching['improvementTeaching']
+    normalizedImprovements?: ActivityTeaching['improvementTeaching'],
+    targetPlatform?: import('../types').ApplicationPlatform
   ): ActivityTeaching['descriptionOptimization'] {
+    const charLimit = getDescriptionCharLimit(targetPlatform);
     const originalDescription = (optimization?.originalDescription as string) || activity?.description || '';
     let optimizedDescription = (optimization?.optimizedDescription as string) || '';
     let changesExplained = (optimization?.changesExplained as ActivityTeaching['descriptionOptimization']['changesExplained']) || [];
+
+    // Sanitize LLM-provided changesExplained — truncate long reasons to concise summaries
+    changesExplained = changesExplained.map(c => ({
+      change: c.change,
+      reason: this.conciseChangeReason(c.reason),
+    }));
 
     // Check if the LLM actually provided a different optimized description
     const hasRealOptimization = optimizedDescription.length > 0
@@ -1617,7 +1524,6 @@ Remember: Students are counting on you to transform their applications. The know
         .filter(imp =>
           imp.exampleAfter
           && imp.exampleAfter.length > 10
-          && imp.exampleAfter !== 'Improved version with specific metrics and outcomes'
           && imp.exampleAfter !== activity?.description?.substring(0, 50)
         )
         .sort((a, b) => {
@@ -1627,14 +1533,14 @@ Remember: Students are counting on you to transform their applications. The know
 
       if (bestImprovement?.exampleAfter) {
         optimizedDescription = bestImprovement.exampleAfter;
-        // Build changesExplained from improvements if not already populated
+        // Build concise changesExplained from improvements if not already populated
         if (changesExplained.length === 0) {
           changesExplained = normalizedImprovements
-            .filter(imp => imp.issue && imp.howToFix)
+            .filter(imp => imp.issue && (imp.howToFix || imp.exampleAfter))
             .slice(0, 3)
             .map(imp => ({
               change: imp.issue,
-              reason: typeof imp.howToFix === 'string' ? imp.howToFix.substring(0, 200) : 'Apply teaching guidance',
+              reason: this.conciseChangeReason(imp.howToFix || ''),
             }));
         }
       }
@@ -1645,12 +1551,144 @@ Remember: Students are counting on you to transform their applications. The know
       optimizedDescription = originalDescription;
     }
 
+    // Validate character limit — flag if over limit but don't truncate (student needs to see the full suggestion)
+    const isOverLimit = optimizedDescription.length > charLimit;
+    if (isOverLimit && optimizedDescription !== originalDescription) {
+      console.warn(`[Stage2] Description optimization for "${activity?.title}" is ${optimizedDescription.length} chars (limit: ${charLimit}). Adding warning.`);
+      changesExplained = [
+        ...changesExplained,
+        {
+          change: `Character count: ${optimizedDescription.length}/${charLimit}`,
+          reason: `This suggestion exceeds the ${getPlatformName(targetPlatform)} ${charLimit}-character limit by ${optimizedDescription.length - charLimit} characters. You'll need to trim it down — focus on keeping the strongest metrics and cutting filler words.`,
+        },
+      ];
+    }
+
     return {
       originalDescription,
       optimizedDescription,
       characterCount: optimizedDescription.length,
       changesExplained,
     };
+  }
+
+  /**
+   * Convert a long howToFix paragraph into a concise change summary.
+   * Extracts the first actionable sentence instead of truncating mid-word.
+   */
+  private conciseChangeReason(text: string): string {
+    if (!text || text.length <= 120) return text;
+
+    // If it starts with "Step 1:" style, extract just the core action
+    const stepMatch = text.match(/^(?:Step \d+:\s*)?(.+?)(?:\.\s*Step \d+|$)/s);
+    if (stepMatch && stepMatch[1].length <= 150) {
+      const sentence = stepMatch[1].trim();
+      return sentence.endsWith('.') ? sentence : sentence + '.';
+    }
+
+    // Extract first complete sentence (ending in . ! or ?)
+    const sentenceMatch = text.match(/^(.+?[.!?])\s/);
+    if (sentenceMatch && sentenceMatch[1].length <= 150) {
+      return sentenceMatch[1];
+    }
+
+    // Truncate at a word boundary + ellipsis
+    const truncated = text.substring(0, 117);
+    const lastSpace = truncated.lastIndexOf(' ');
+    return (lastSpace > 60 ? truncated.substring(0, lastSpace) : truncated) + '...';
+  }
+
+  /**
+   * Generate category-specific framing advice for narrative guidance.
+   * Each activity type gets fundamentally different framing — no shared template.
+   */
+  private getCategorySpecificFraming(category: string, title: string, tier?: number): string {
+    const cat = category.toLowerCase();
+
+    if (cat.includes('research') || cat.includes('stem') || cat.includes('academic')) {
+      return `When discussing ${title}, lead with YOUR specific contribution and methodology — not the lab or professor. AOs want to hear what YOU designed, built, or discovered. Describe one specific technical challenge you solved and why the problem matters.`;
+    }
+    // Check family/farm BEFORE work — "work_family_responsibility" contains both
+    if (cat.includes('family') || cat.includes('caregiv') || cat.includes('farm')) {
+      return `When discussing ${title}, state facts with confidence — no victimhood framing. Frame your responsibilities as skills: management, logistics, problem-solving. Let the hours/commitment speak to the sacrifice; your description should speak to your competence.`;
+    }
+    if (cat.includes('work') || cat.includes('employ') || cat.includes('job')) {
+      return `When discussing ${title}, don't apologize or minimize — frame your work experience using business language. Lead with your promotion or biggest responsibility, then explain what skills it built that transfer to your academic goals. AOs respect work ethic; give them concrete evidence of it.`;
+    }
+    if (cat.includes('service') || cat.includes('volunteer') || cat.includes('tutor') || cat.includes('community') || cat.includes('education')) {
+      return `When discussing ${title}, lead with impact on OTHERS, not what you learned. Specific outcomes (grade improvements, retention rates, program growth) matter more than hours served. Show that you built something sustainable, not just showed up.`;
+    }
+    if (cat.includes('leader') || cat.includes('government') || cat.includes('council') || cat.includes('club')) {
+      return `When discussing ${title}, focus on what CHANGED because of your leadership — not that you held a position. AOs see thousands of 'president' titles; they remember the ones who can say 'I changed X, and here's the proof.'`;
+    }
+    if (cat.includes('art') || cat.includes('music') || cat.includes('creative') || cat.includes('perform') || cat.includes('theater') || cat.includes('film')) {
+      return `When discussing ${title}, lead with your highest-selectivity credential and body of work. AOs can't evaluate artistic quality from text, so external validation (awards, exhibitions, audiences) and output volume are your proof points.`;
+    }
+    if (cat.includes('athlet') || cat.includes('sport') || cat.includes('team')) {
+      return `When discussing ${title}, focus on your growth arc and leadership contribution rather than just stats. Show what changed on the team because of you — that's what AOs remember.`;
+    }
+
+    // Generic fallback for uncategorized activities
+    return `When discussing ${title}, lead with your most concrete, specific achievement — the detail that makes an admissions officer stop scanning and actually read. Avoid generic descriptions; specificity is what makes you memorable.`;
+  }
+
+  /**
+   * Generate category-specific interview tips.
+   * Each activity type gets different preparation questions.
+   */
+  private getCategorySpecificInterviewTips(category: string, title: string, strengths?: string[]): string[] {
+    const cat = category.toLowerCase();
+    const strengthNote = strengths?.length ? ` Your key differentiators: ${strengths.slice(0, 2).join(', ')}.` : '';
+
+    if (cat.includes('research') || cat.includes('stem') || cat.includes('academic')) {
+      return [
+        `Prepare to explain your research methodology in 2 minutes to someone without a technical background — AOs may not have STEM expertise.${strengthNote}`,
+        `Have a clear answer for: "What did YOU specifically contribute?" vs. what the lab/professor did. Distinguish your intellectual contribution from execution tasks.`,
+      ];
+    }
+    // Check family/farm BEFORE work — "work_family_responsibility" contains both
+    if (cat.includes('family') || cat.includes('caregiv') || cat.includes('farm')) {
+      return [
+        `If asked about family responsibilities, be matter-of-fact. State what you do, the scale, and the skills it built. Let the interviewer draw the "impressive" conclusion themselves.${strengthNote}`,
+        `Prepare to connect your family work to your academic interests: "Managing [farm/household/caregiving] taught me to think in systems — which is exactly what drew me to [your major]."`,
+      ];
+    }
+    if (cat.includes('work') || cat.includes('employ') || cat.includes('job')) {
+      return [
+        `When asked about challenges, have ONE specific story ready: a shift that went wrong, a difficult customer, a problem you solved. Be concrete, not general.${strengthNote}`,
+        `Prepare to answer: "What did this job teach you that you couldn't learn in school?" — connect your work skills to your academic or career goals.`,
+      ];
+    }
+    if (cat.includes('service') || cat.includes('volunteer') || cat.includes('tutor') || cat.includes('community') || cat.includes('education')) {
+      return [
+        `Have a specific student/person story ready — not "I helped many students" but "There was one student, Maria, who..." Personal stories are 10x more memorable than statistics.${strengthNote}`,
+        `Be ready to answer: "Why do you keep doing this?" — show sustained motivation beyond a requirement. What pulls you back each week?`,
+      ];
+    }
+    if (cat.includes('leader') || cat.includes('government') || cat.includes('council') || cat.includes('club')) {
+      return [
+        `Prepare your "what I changed" story: Before you led, X was true. After, Y was true. Use specific numbers if possible.${strengthNote}`,
+        `Have a ready answer for: "What was your biggest failure as a leader?" — AOs test for self-awareness and growth. Pick a real failure and what you learned.`,
+      ];
+    }
+    if (cat.includes('art') || cat.includes('music') || cat.includes('creative') || cat.includes('perform') || cat.includes('theater') || cat.includes('film')) {
+      return [
+        `Prepare to discuss your creative process, not just your achievements. AOs want to understand HOW you think creatively and what drives your artistic choices.${strengthNote}`,
+        `Have your "most meaningful piece/performance" story ready — not your biggest award, but the work that best represents who you are as an artist.`,
+      ];
+    }
+    if (cat.includes('athlet') || cat.includes('sport') || cat.includes('team')) {
+      return [
+        `Prepare a story about a setback or loss and how you responded — AOs use athletics to assess resilience and character, not just talent.${strengthNote}`,
+        `Be ready to discuss your role beyond your position: Did you mentor younger players? Change team culture? Create a training system?`,
+      ];
+    }
+
+    // Generic fallback
+    return [
+      `Prepare ONE specific story from ${title} that reveals your character — not your resume. AOs remember stories, not bullet points.${strengthNote}`,
+      `Have a clear answer for: "What would you miss most about ${title} if you had to stop?" — this reveals genuine passion vs. resume-building.`,
+    ];
   }
 
   /**
@@ -1663,6 +1701,44 @@ Remember: Students are counting on you to transform their applications. The know
    *
    * When context is available, synthesizes meaningful guidance instead of generic defaults.
    */
+  /**
+   * Detect if LLM-provided text is a generic template that could apply to ANY activity.
+   * These are signs the LLM used a fill-in-the-blank pattern instead of genuine analysis.
+   */
+  private isGenericGuidance(text: string): boolean {
+    if (!text || text.length < 20) return true;
+    const genericPatterns = [
+      'lead with your most concrete, specific achievement',
+      'the detail that makes an admissions officer stop scanning',
+      'avoid generic descriptions; specificity is what makes you memorable',
+      'frame this activity in terms of growth and impact',
+      'focus on what makes your experience distinctive',
+      'prepare one specific story from',
+      'what would you miss most about',
+      'reveals genuine passion vs. resume-building',
+      'reveals your character — not your resume',
+      'aos remember stories, not bullet points',
+    ];
+    const lower = text.toLowerCase();
+    return genericPatterns.filter(p => lower.includes(p)).length >= 2;
+  }
+
+  /**
+   * Detect if interview tips are templated mad-libs (same template with activity title swapped in).
+   */
+  private isTemplatedInterviewTips(tips: string[]): boolean {
+    if (!tips || tips.length === 0) return true;
+    const templateSignals = [
+      'prepare one specific story from',
+      'what would you miss most about',
+      'reveals genuine passion vs. resume-building',
+      'reveals your character — not your resume',
+      'aos remember stories, not bullet points',
+    ];
+    const lower = tips.join(' ').toLowerCase();
+    return templateSignals.filter(s => lower.includes(s)).length >= 2;
+  }
+
   private normalizeNarrativeGuidance(
     guidance: Record<string, unknown> | undefined,
     context?: {
@@ -1670,40 +1746,76 @@ Remember: Students are counting on you to transform their applications. The know
       narrativeArc?: string;
       constraintLevel?: string;
       activityTitle?: string;
+      /** Activity strengths from analysis (green flags) */
+      strengths?: string[];
+      /** Activity category (e.g., 'stem_project', 'work_paid_employment') */
+      category?: string;
+      /** Activity tier from analysis */
+      tier?: number;
     }
   ): ActivityTeaching['narrativeGuidance'] {
+    const title = context?.activityTitle || 'this activity';
+    const arc = context?.narrativeArc;
+    const constraint = context?.constraintLevel;
+    const cat = context?.category || '';
+
     // Extract howToTalkAboutThis — handle string or object format
     let howToTalkAboutThis: ActivityTeaching['narrativeGuidance']['howToTalkAboutThis'];
 
     const rawHow = guidance?.howToTalkAboutThis || guidance?.howToFrame || guidance?.framingAdvice;
+    let rawHowText = '';
     if (rawHow && typeof rawHow === 'object') {
-      const howObj = rawHow as Record<string, unknown>;
-      howToTalkAboutThis = {
-        text: (howObj.text as string) || 'Frame this activity in terms of growth and impact',
-        citations: (howObj.citations as Array<{ source: string; text: string }>) || [],
-      };
+      rawHowText = ((rawHow as Record<string, unknown>).text as string) || '';
     } else if (rawHow && typeof rawHow === 'string') {
-      howToTalkAboutThis = { text: rawHow, citations: [] };
+      rawHowText = rawHow;
+    }
+
+    // Use LLM text ONLY if it's genuinely specific (not a generic template)
+    if (rawHowText && !this.isGenericGuidance(rawHowText)) {
+      const citations = (rawHow && typeof rawHow === 'object')
+        ? ((rawHow as Record<string, unknown>).citations as Array<{ source: string; text: string }>) || []
+        : [];
+      howToTalkAboutThis = { text: rawHowText, citations };
     } else {
-      // Synthesize from context instead of using generic text
-      const contextText = context?.narrativeArc
-        ? `Frame this within your ${context.narrativeArc} — show how it connects to your broader pattern of growth and impact`
-        : context?.storyEssence
-        ? `Connect this to your story: ${context.storyEssence.substring(0, 100)}`
-        : 'Frame this activity in terms of growth and impact';
+      // Use category-specific framing — fundamentally different per activity type
+      const categoryFraming = this.getCategorySpecificFraming(cat, title, context?.tier);
+
+      let contextText: string;
+      if (arc && constraint) {
+        contextText = `${categoryFraming} Given your ${constraint} background, emphasize what this reveals about your resourcefulness — not just what you accomplished, but what it took to accomplish it alongside your other commitments.`;
+      } else if (arc) {
+        contextText = `${categoryFraming} Connect it to your ${arc} by showing how the skills from this experience feed into your other activities.`;
+      } else if (context?.storyEssence) {
+        contextText = `${categoryFraming} Tie it back to your broader story: ${context.storyEssence}.`;
+      } else {
+        contextText = categoryFraming;
+      }
       howToTalkAboutThis = { text: contextText, citations: [] };
     }
+
+    // Filter out template placeholder values the LLM may have parroted back
+    const isTemplateValue = (val: string | undefined): boolean => {
+      if (!val || val.length < 20) return true;
+      const templates = ['angle', 'what makes this distinctive', 'what makes this special', 'one concrete thing',
+        'focus on what makes your experience distinctive'];
+      return templates.some(t => val.toLowerCase().trim() === t || val.toLowerCase().includes('what makes your') && val.toLowerCase().includes('distinctive from other'));
+    };
 
     // Extract uniqueAngle — handle alternative keys
     const rawAngle = (guidance?.uniqueAngle as string)
       || (guidance?.unique_angle as string)
       || (guidance?.distinctiveElement as string);
 
-    const uniqueAngle = rawAngle || (
-      context?.activityTitle
-        ? `What makes your ${context.activityTitle} experience distinctive from other applicants`
-        : 'Focus on what makes your experience distinctive'
-    );
+    let uniqueAngle: string;
+    if (rawAngle && !isTemplateValue(rawAngle)) {
+      uniqueAngle = rawAngle;
+    } else if (context?.strengths?.length && context?.activityTitle) {
+      uniqueAngle = `Your ${context.activityTitle} stands out because of: ${context.strengths.slice(0, 2).join('; ')}. In interviews, lead with these concrete differentiators.`;
+    } else if (context?.activityTitle) {
+      uniqueAngle = `Think about what makes YOUR version of ${context.activityTitle} different from every other applicant doing the same thing. The answer is usually in the specific details, not the title.`;
+    } else {
+      uniqueAngle = 'Focus on what makes your experience distinctive — the specific details, not the title or role.';
+    }
 
     // Extract connectionToStory — handle alternative keys
     const rawConnection = (guidance?.connectionToStory as string)
@@ -1711,24 +1823,68 @@ Remember: Students are counting on you to transform their applications. The know
       || (guidance?.storyConnection as string)
       || (guidance?.narrativeConnection as string);
 
-    const connectionToStory = rawConnection || (
-      context?.storyEssence
-        ? `This activity reinforces your narrative: ${context.storyEssence.substring(0, 120)}`
-        : 'This activity connects to your broader narrative'
-    );
+    // Only use LLM connection if it's genuinely activity-specific (not just the story essence repeated)
+    let connectionToStory: string;
+    const isJustStoryEssenceRepeated = rawConnection && context?.storyEssence
+      && rawConnection.includes(context.storyEssence.substring(0, 40));
+    if (rawConnection && !isJustStoryEssenceRepeated) {
+      connectionToStory = rawConnection;
+    } else {
+      // Generate activity-specific connection based on category
+      connectionToStory = this.getCategorySpecificStoryConnection(cat, title, context?.storyEssence, context?.narrativeArc);
+    }
 
     // Extract interviewTips — handle string or array
     const rawTips = guidance?.interviewTips || guidance?.interview_tips;
     let interviewTips: string[];
-    if (Array.isArray(rawTips)) {
+    if (Array.isArray(rawTips) && !this.isTemplatedInterviewTips(rawTips.map(t => typeof t === 'string' ? t : String(t)))) {
       interviewTips = rawTips.map(t => typeof t === 'string' ? t : String(t));
-    } else if (typeof rawTips === 'string') {
+    } else if (typeof rawTips === 'string' && !this.isGenericGuidance(rawTips)) {
       interviewTips = [rawTips];
     } else {
-      interviewTips = ['Be prepared to discuss specific examples of your contributions'];
+      // Generate category-specific interview tips — NOT the same template for every activity
+      interviewTips = this.getCategorySpecificInterviewTips(cat, title, context?.strengths);
     }
 
     return { howToTalkAboutThis, uniqueAngle, connectionToStory, interviewTips };
+  }
+
+  /**
+   * Generate activity-specific story connection based on category.
+   * Each activity type connects to the narrative differently.
+   */
+  private getCategorySpecificStoryConnection(category: string, title: string, storyEssence?: string, arc?: string): string {
+    const cat = category.toLowerCase();
+    const arcName = arc || 'your narrative';
+
+    if (cat.includes('research') || cat.includes('stem') || cat.includes('academic')) {
+      return `${title} is the technical proof point of ${arcName} — it validates that your intellectual curiosity has real-world depth, not just classroom interest.`;
+    }
+    // Check family/farm BEFORE work — "work_family_responsibility" contains both
+    if (cat.includes('family') || cat.includes('caregiv') || cat.includes('farm')) {
+      return `${title} is the foundation of your story — the responsibility that shaped your time management, work ethic, and perspective. Every other activity was accomplished AROUND this obligation.`;
+    }
+    if (cat.includes('work') || cat.includes('employ') || cat.includes('job')) {
+      return `${title} provides the constraint context that makes every other achievement more impressive — it shows you built your profile while carrying adult responsibilities.`;
+    }
+    if (cat.includes('service') || cat.includes('volunteer') || cat.includes('tutor') || cat.includes('community') || cat.includes('education')) {
+      return `${title} demonstrates that your skills serve others, not just yourself — it transforms your profile from "talented individual" to "community multiplier."`;
+    }
+    if (cat.includes('leader') || cat.includes('government') || cat.includes('council') || cat.includes('club')) {
+      return `${title} shows you don't just participate — you build. The initiative to create or lead something connects directly to ${arcName}.`;
+    }
+    if (cat.includes('art') || cat.includes('music') || cat.includes('creative') || cat.includes('perform') || cat.includes('theater') || cat.includes('film')) {
+      return `${title} reveals the creative dimension of your profile — it shows intellectual range beyond your primary academic focus.`;
+    }
+    if (cat.includes('athlet') || cat.includes('sport') || cat.includes('team')) {
+      return `${title} provides evidence of discipline, resilience, and teamwork that complements your academic profile.`;
+    }
+
+    // Generic with some story essence context
+    if (storyEssence && storyEssence.length <= 100) {
+      return `${title} reinforces your narrative: ${storyEssence}`;
+    }
+    return `${title} adds a distinct dimension to your overall story and strengthens your profile's coherence.`;
   }
 
   /**
@@ -1746,17 +1902,17 @@ Remember: Students are counting on you to transform their applications. The know
       activityId,
       tierExplanation: this.normalizeTierExplanation(undefined, analysis),
       strengthTeaching: analysis?.greenFlags?.map(f => ({
-        strength: f.flag,
-        whyItMatters: { text: f.admissionsValue, citations: [] },
-        howToLeverage: 'Highlight this in your application',
-        inApplications: 'Essays, interviews, and additional information',
+        strength: f.admissionsValue || f.flag.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        whyItMatters: { text: f.admissionsValue || `Your ${activity?.title || 'activity'} shows this quality, which admissions officers look for.`, citations: [] },
+        howToLeverage: `In your ${activity?.title || 'activity'} description, highlight this strength with specific evidence.`,
+        inApplications: 'Reference in essays, interviews, and additional information sections.',
       })) || [],
       improvementTeaching: analysis?.descriptionQuality?.issues?.map(issue => ({
         issue,
-        whyItMatters: { text: 'This affects how admissions officers perceive your involvement', citations: [] },
-        howToFix: 'Add specific details and quantifiable outcomes',
-        exampleBefore: activity?.description?.substring(0, 50) || '',
-        exampleAfter: 'Consider adding specific metrics and outcomes',
+        whyItMatters: { text: `In your ${activity?.title || 'activity'} description, this affects how admissions officers perceive your involvement.`, citations: [] },
+        howToFix: 'Add specific details and quantifiable outcomes from your actual experience.',
+        exampleBefore: activity?.description?.substring(0, 80) || '',
+        exampleAfter: 'Add specific metrics: numbers of people impacted, hours invested, measurable outcomes.',
         priority: 'medium' as const,
       })) || [],
       descriptionOptimization: {
@@ -1776,7 +1932,9 @@ Remember: Students are counting on you to transform their applications. The know
     input: ActivityWorkshopSessionInput,
     storyContext: StoryContext,
     analysisContext: AnalysisContext,
-    activityIds: string[]
+    activityIds: string[],
+    localCost?: { value: number },
+    localTokens?: { input: number; output: number }
   ): Promise<TeachingContext['quickEncouragements']> {
     if (activityIds.length === 0) return [];
 
@@ -1785,21 +1943,42 @@ Remember: Students are counting on you to transform their applications. The know
     try {
       const response = await callClaude({
         model: this.MODEL,
-        systemPrompt: `You are a warm, encouraging college counselor. Provide brief, genuine celebrations of strong activities. Be specific about what makes each activity excellent.`,
+        // R2-2: Enhanced system prompt requiring specific evidence-based encouragements
+        systemPrompt: `You are a warm, encouraging college counselor. Provide brief, genuine celebrations of strong activities.
+
+CRITICAL: Every celebration MUST:
+1. Quote or reference a SPECIFIC phrase from the student's description
+2. Explain WHY this specific detail impresses admissions officers
+3. Connect to their story role (how it fits their narrative)
+
+BANNED: "shows dedication", "demonstrates commitment", "strong activity", "impressive" without citing WHAT specifically.
+
+Example of GOOD celebration:
+"Your phrase 'designed peer-review system adopted by 3 departments' is the kind of concrete, scalable impact that makes AOs take note — most club presidents describe 'organizing events' but you've built infrastructure that outlasts you."
+
+Example of BAD celebration:
+"This is a strong activity that shows your commitment to education."`,
         userPrompt: prompt,
         maxTokens: 2000,
         temperature: 0.5,
       });
 
-      this.trackUsage(response.usage);
+      this.trackUsage(response.usage, localCost, localTokens);
       return this.parseEncouragementResponse(response.content, activityIds);
     } catch (error) {
       console.error('[Stage2] Encouragement generation failed:', error);
-      return activityIds.map(id => ({
-        activityId: id,
-        celebration: 'This is a strong activity that showcases your commitment.',
-        strengthReason: 'Demonstrates sustained engagement and impact.',
-      }));
+      // R2-2: Improved fallback with activity-specific data instead of generic praise
+      return activityIds.map(id => {
+        const activity = input.activities.find(a => a.id === id);
+        const analysis = analysisContext.activities[id];
+        const tier = analysis?.classification?.tier || 3;
+        const topFlag = analysis?.greenFlags?.[0]?.flag || 'sustained engagement';
+        return {
+          activityId: id,
+          celebration: `Your ${activity?.title || 'activity'} is performing at Tier ${tier} — ${topFlag} is exactly what admissions officers look for.`,
+          strengthReason: `This strengthens your ${storyContext.narrativeIdentity.archetype} narrative.`,
+        };
+      });
     }
   }
 
@@ -1827,6 +2006,9 @@ Remember: Students are counting on you to transform their applications. The know
 
     return `Provide brief, warm encouragements for these STRONG activities (no critique needed):
 
+Student Story: ${storyContext.narrativeIdentity.storyEssence}
+Archetype: ${storyContext.narrativeIdentity.archetype}
+
 ${activities}
 
 IMPORTANT: Use the EXACT activity IDs provided above (e.g., "${activityIds[0]}").
@@ -1836,9 +2018,9 @@ Respond with JSON:
   "encouragements": [
     {
       "activityId": "exact-id-from-above",
-      "celebration": "2-3 sentences celebrating what's exceptional about this",
-      "strengthReason": "1 sentence on why this works well",
-      "quickTip": "Optional: one sentence if there's a tiny enhancement (not required)"
+      "celebration": "2-3 sentences. MUST quote a specific phrase from their description and explain why it works. E.g.: 'Your line about \"converting 3 classrooms into study spaces\" is exactly the kind of tangible, measurable initiative that stands out in the 8-minute read.'",
+      "strengthReason": "1 sentence connecting this activity to their story. E.g.: 'This anchors your builder archetype — it shows you don't just participate, you create infrastructure.'",
+      "quickTip": "Optional: one SPECIFIC enhancement. E.g.: 'Add the student count if possible — \"study spaces serving 40+ students\" turns good into great.' NOT generic advice like 'add more details'."
     }
   ]
 }`;
@@ -1887,10 +2069,11 @@ Respond with JSON:
       });
     } catch (error) {
       console.error('[Stage2] Encouragement parse failed, using fallback:', error);
+      // R2-2: Slightly better fallback — at least acknowledges it's a strong activity by tier
       return activityIds.map(id => ({
         activityId: id,
-        celebration: 'This is a strong activity that showcases your commitment.',
-        strengthReason: 'Demonstrates sustained engagement and impact.',
+        celebration: 'This activity earned a strong tier assessment, reflecting genuine quality in your engagement.',
+        strengthReason: 'Activities at this level contribute meaningfully to your application narrative.',
       }));
     }
   }
@@ -1903,23 +2086,83 @@ Respond with JSON:
     storyContext: StoryContext,
     analysisContext: AnalysisContext
   ): Promise<TeachingContext['portfolioTeaching']> {
-    // Build a quick synthesis from existing analysis
+    // Build substantive portfolio-level teaching from analysis data
+    const fullTheme = storyContext.narrativeIdentity.primaryTheme;
+    // Truncate theme for inline use in sentences (use first clause if too long)
+    const theme = fullTheme.length > 50
+      ? fullTheme.split(/[—,;]/)[0].trim()
+      : fullTheme;
+    const archetype = storyContext.narrativeIdentity.archetype;
+    const essence = storyContext.narrativeIdentity.storyEssence;
+    const strengths = analysisContext.portfolioTeachingNeeds.strengthsToHighlight;
+
+    // Build archetype-aware narrative quality description
+    const archetypeNarrative = archetype === 'builder' ? 'creation and initiative'
+      : archetype === 'caretaker' ? 'service and responsibility'
+      : archetype === 'scholar' ? 'intellectual curiosity and rigor'
+      : archetype === 'innovator' ? 'innovation and problem-solving'
+      : archetype === 'leader' ? 'leadership and community impact'
+      : archetype === 'advocate' ? 'advocacy and social change'
+      : 'authentic engagement';
+
+    // Build a genuine two-sentence pitch
+    const essenceClean = essence.endsWith('.') ? essence : `${essence}.`;
+    const twoSentencePitch = `${essenceClean} Your focus on ${theme.toLowerCase()} ties your activities into a compelling narrative of ${archetypeNarrative}.`;
+
+    // Build meaningful recommendation from strengths
+    let recommendation: string;
+    if (strengths.length >= 2) {
+      recommendation = `Your strongest portfolio signals are ${strengths.slice(0, 2).join(' and ')}. Lean into these across your essays and interview — they differentiate you from applicants with similar activities but less depth.`;
+    } else if (strengths.length === 1) {
+      recommendation = `Your strongest portfolio signal is ${strengths[0]}. Make sure this comes through in your essays and interview, not just your activity list.`;
+    } else {
+      recommendation = 'Focus on strengthening the connections between your activities so admissions readers can see a clear narrative thread.';
+    }
+
+    // Build substantive coherence improvements
+    const coherenceImprovements: string[] = [];
+    const disconnected = analysisContext.coherenceAnalysis.disconnectedActivities;
+    if (disconnected.length > 0) {
+      for (const d of disconnected.slice(0, 3)) {
+        const activity = input.activities.find(a => a.id === d.activityId);
+        if (activity) {
+          coherenceImprovements.push(
+            `${activity.title} feels disconnected from your ${theme} narrative. In your essays, show how this experience shaped your perspective or skills in a way that connects to your other work.`
+          );
+        }
+      }
+    }
+    if (analysisContext.coherenceAnalysis.score >= 70 && coherenceImprovements.length === 0) {
+      coherenceImprovements.push(`Your activities show strong coherence around ${theme}. In your essays, explicitly reference how different activities informed each other.`);
+    } else if (coherenceImprovements.length === 0) {
+      coherenceImprovements.push('Your activity list covers diverse areas. Use your personal statement to draw a connecting thread — what do ALL these experiences reveal about who you are?');
+    }
+
+    // Build strategic direction with specifics
+    let strategicDirection: string;
+    if (analysisContext.spikeAnalysis.hasSpike) {
+      const spikeArea = analysisContext.spikeAnalysis.spikeType || theme;
+      strategicDirection = `Your ${spikeArea} spike is your competitive advantage. Continue deepening it — admissions readers at schools like ${input.studentContext?.targetSchools?.[0] || 'selective universities'} look for applicants who show genuine depth over manufactured breadth.`;
+    } else {
+      const bestTier = Object.entries(analysisContext.activities)
+        .sort(([, a], [, b]) => (a.classification?.tier || 4) - (b.classification?.tier || 4))[0];
+      const bestActivity = bestTier ? input.activities.find(a => a.id === bestTier[0]) : null;
+      strategicDirection = bestActivity
+        ? `You don't have a clear spike yet, but ${bestActivity.title} shows the most promise. Deepening your impact there — taking on more leadership, seeking external recognition, or publishing results — could develop it into a genuine differentiator.`
+        : `Consider deepening your involvement in ${theme} to develop a clearer spike. Selective schools value depth over breadth.`;
+    }
+
     return {
       narrativeTeaching: {
         currentState: analysisContext.portfolioTeachingNeeds.primaryIssue,
-        recommendation: analysisContext.portfolioTeachingNeeds.strengthsToHighlight.join('. ') ||
-          'Focus on strengthening the connections between your activities.',
-        twoSentencePitch: `${storyContext.narrativeIdentity.storyEssence} Through ${storyContext.narrativeIdentity.primaryTheme}, they demonstrate authentic passion and impact.`,
+        recommendation,
+        twoSentencePitch,
       },
       coherenceTeaching: {
         currentScore: analysisContext.coherenceAnalysis.score,
-        improvements: analysisContext.coherenceAnalysis.disconnectedActivities.length > 0
-          ? [`Connect ${analysisContext.coherenceAnalysis.disconnectedActivities.map(d => d.activityId).join(', ')} to your main narrative`]
-          : ['Your activities show good coherence - maintain this thread in your essays'],
+        improvements: coherenceImprovements,
       },
-      strategicDirection: analysisContext.spikeAnalysis.hasSpike
-        ? `Continue developing your ${analysisContext.spikeAnalysis.spikeType || 'specialized'} spike - this differentiates you.`
-        : `Consider deepening your involvement in ${storyContext.narrativeIdentity.primaryTheme} to develop a clearer spike.`,
+      strategicDirection,
     };
   }
 

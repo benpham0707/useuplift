@@ -19,7 +19,8 @@
 export interface APCourseProfile {
   name: string;
   shortName: string;
-  category: 'math' | 'science' | 'english' | 'history' | 'social_science' | 'language' | 'arts' | 'cs';
+  // R9: Add 'world_language' and 'interdisciplinary' to match actual course data
+  category: 'math' | 'science' | 'english' | 'history' | 'social_science' | 'world_language' | 'interdisciplinary' | 'arts' | 'cs';
 
   // Difficulty metrics
   difficultyTier: 1 | 2 | 3 | 4 | 5; // 5 = hardest

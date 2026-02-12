@@ -31,13 +31,14 @@ import {
 /**
  * Harvard 1-6 scale descriptions
  */
+// A4: Expanded Harvard scale with concrete examples for each tier
 const HARVARD_SCALE = {
-  1: 'Exceptional (top 1%): National/international distinction',
-  2: 'Outstanding (top 5%): Strong regional/state impact',
-  3: 'Good (top 15%): Meaningful local/school impact',
-  4: 'Average (top 40%): Solid participation with some distinction',
-  5: 'Below Average: Limited engagement or impact',
-  6: 'Weak: Minimal meaningful activity',
+  1: 'Exceptional (top 1%): National/international distinction. Examples: Intel Science Talent Search finalist, nationally ranked debater, published researcher, recruited Division I athlete, professional-level musician.',
+  2: 'Outstanding (top 5%): Strong regional/state impact with clear spike. Examples: State science fair winner, regional debate champion, founded nonprofit with measurable community impact, varsity captain with all-state recognition.',
+  3: 'Good (top 15%): Meaningful local/school impact with developing focus. Examples: Student body president, editor-in-chief of school paper, Eagle Scout, varsity starter with team leadership, club founder with sustained growth.',
+  4: 'Average (top 40%): Solid participation with some distinction. Examples: Active club member with one leadership role, JV athlete, volunteer with 100+ hours, academic team participant.',
+  5: 'Below Average: Limited engagement or impact. Examples: 2-3 activities with minimal involvement, no leadership, sporadic attendance.',
+  6: 'Weak: Minimal meaningful activity. Examples: Only required activities, no voluntary engagement, possible padding.',
 };
 
 /**
@@ -167,6 +168,25 @@ Competitive Level: ${analysisContext.competitiveAssessment.overallStrength}
 Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}
 `;
 
+    // Scoring data (v4.3) — gives Haiku real scores for better synthesis
+    let scoringSummary = '';
+    if (analysisContext.scoring?.scoringComplete) {
+      const rubric = analysisContext.scoring.portfolioRubric;
+      const activityScoreLines = rubric.activityScores.map(s =>
+        `- ${s.activityTitle}: ${s.combinedScore.total.toFixed(1)}/10 (Activity: ${s.activityScore.total.toFixed(1)}, Description: ${s.descriptionScore.total.toFixed(1)})`
+      ).join('\n');
+      scoringSummary = `
+## SCORING DATA (1-10 Scale):
+Portfolio Score: ${rubric.overallScore.total.toFixed(1)}/10
+Harvard Scale: ${rubric.harvardScale.rating}/6 — ${rubric.harvardScale.description}
+Key Strengths: ${rubric.keyStrengths.slice(0, 3).join('; ')}
+Key Gaps: ${rubric.keyGaps.slice(0, 3).join('; ')}
+
+Per-Activity Scores:
+${activityScoreLines}
+`;
+    }
+
     // Summarize teaching delivered
     const teachingSummary = `
 ## TEACHING DELIVERED:
@@ -176,15 +196,21 @@ Quick Encouragement: ${teachingContext.quickEncouragements.length} activities
 Skipped: ${teachingContext.skippedActivities.length} activities
 `;
 
-    // List activities with optimized descriptions
+    // List activities with optimized descriptions and scores
     const activitiesList = input.activities.map(a => {
       const analysis = analysisContext.activities[a.id];
       const teaching = teachingContext.teachingDelivered.find(t => t.activityId === a.id);
       const optimizedDesc = teaching?.teaching.descriptionOptimization.optimizedDescription || a.description;
+      const activityScore = analysisContext.scoring?.activityScoresById[a.id];
+
+      const scoreLine = activityScore
+        ? `- Score: ${activityScore.combinedScore.total.toFixed(1)}/10 (Activity: ${activityScore.activityScore.total.toFixed(1)}, Description: ${activityScore.descriptionScore.total.toFixed(1)})`
+        : '';
 
       return `
 ${a.id}: ${a.title}
 - Tier: ${analysis?.classification?.tier || 4}
+${scoreLine}
 - Original (${a.description.length} chars): "${a.description.substring(0, 100)}..."
 - Optimized (${optimizedDesc.length} chars): "${optimizedDesc.substring(0, 100)}..."
 `;
@@ -199,6 +225,7 @@ ${a.id}: ${a.title}
 
 ${storySummary}
 ${analysisSummary}
+${scoringSummary}
 ${teachingSummary}
 ${schoolsSection}
 
@@ -254,9 +281,11 @@ Respond with JSON:
 
 IMPORTANT:
 - Order activities by impact (strongest first)
-- Make action plan SPECIFIC and actionable
+- Make action plan SPECIFIC and actionable — reference actual activities and roles by name
 - Celebration should be genuine and warm
-- Harvard scale should be honest but encouraging`;
+- Harvard scale should be honest but encouraging
+- For finalDescription fields: Include vivid, specific suggested metrics and details (like "trained 12+ new employees" or "organized fundraiser raising $3,200") even if the student didn't mention exact numbers. These serve as EXAMPLES that inspire students to fill in their own real figures. The goal is to show WHAT KIND of details make descriptions compelling.
+- For action plan items: Keep advice forward-looking and actionable. Suggest what the student SHOULD DO (e.g., "quantify your tutoring impact with grade improvements"), not retrospective claims about what was achieved.`;
   }
 
   /**
@@ -267,17 +296,27 @@ IMPORTANT:
 
 Your role is to:
 1. Provide an honest Harvard 1-6 assessment
-2. Order activities optimally for Common App
+2. Order activities optimally for Common App (strongest impact first)
 3. Create an actionable plan they can execute
 4. End on an encouraging, celebratory note
 
-Harvard 1-6 Scale Reference:
-- 1: Exceptional (top 1%) - National/international distinction
-- 2: Outstanding (top 5%) - Strong regional/state impact
-- 3: Good (top 15%) - Meaningful local/school impact
-- 4: Average (top 40%) - Solid participation
-- 5: Below Average - Limited engagement
-- 6: Weak - Minimal activity
+## R2-3: HARVARD SCALE CALIBRATION (use scoring data to anchor your rating)
+
+When a Portfolio Score is provided, use these calibration bands:
+- Score 8.5-10.0 → Harvard 1: Multiple Tier 1 activities OR national/international distinction
+- Score 7.0-8.4  → Harvard 2: At least 1 Tier 1 OR multiple strong Tier 2 with state/regional recognition
+- Score 5.5-6.9  → Harvard 3: Strong Tier 2 activities OR multiple Tier 3 with school leadership + clear spike
+- Score 4.0-5.4  → Harvard 4: Tier 3 activities dominate, some participation, moderate coherence
+- Score 2.5-3.9  → Harvard 5: Mostly Tier 3-4, limited engagement, weak coherence
+- Score 1.0-2.4  → Harvard 6: Minimal meaningful activity
+
+OVERRIDE RULES:
+- If tier distribution shows 2+ Tier 1 activities, Harvard rating MUST be 1 or 2 regardless of score.
+- If spike is "mature" with clear evidence, add +0.5 to effective score for calibration.
+- When in doubt between two ratings, choose LOWER (slightly conservative is honest).
+
+Harvard 1-6 Full Scale:
+${Object.entries(HARVARD_SCALE).map(([k, v]) => `- ${k}: ${v}`).join('\n')}
 
 Be honest but kind. Students deserve truthful feedback delivered warmly.
 
@@ -311,7 +350,7 @@ Output valid JSON only.`;
           analysisContext,
           teachingContext
         ),
-        actionPlan: this.normalizeActionPlan(parsed.actionPlan),
+        actionPlan: this.normalizeActionPlan(parsed.actionPlan, input),
         schoolFitSummary: parsed.schoolFitSummary || undefined,
         finalMessage: this.normalizeFinalMessage(parsed.finalMessage, storyContext),
         pipelineCost: { stage0: 0, stage1: 0, stage2: 0, stage3: 0, total: 0 },
@@ -382,13 +421,21 @@ Output valid JSON only.`;
       }));
     }
 
-    // Fallback: order by tier and create from input
+    // R2-4: Fallback ordering — tier primary, combined score tiebreaker, input order last
     const ordered = input.activities
       .map(a => ({
         activity: a,
         tier: analysisContext.activities[a.id]?.classification?.tier || 4,
+        combinedScore: analysisContext.scoring?.activityScoresById[a.id]?.combinedScore?.total ?? 0,
       }))
-      .sort((a, b) => a.tier - b.tier);
+      .sort((a, b) => {
+        // Primary: tier ascending (Tier 1 first)
+        if (a.tier !== b.tier) return a.tier - b.tier;
+        // Tiebreaker: combined score descending (higher score first)
+        if (a.combinedScore !== b.combinedScore) return b.combinedScore - a.combinedScore;
+        // Final tiebreaker: preserve input order
+        return input.activities.indexOf(a.activity) - input.activities.indexOf(b.activity);
+      });
 
     return ordered.map((item, index) => {
       const teaching = teachingContext.teachingDelivered.find(t => t.activityId === item.activity.id);
@@ -460,11 +507,69 @@ Output valid JSON only.`;
   }
 
   /**
+   * Build a set of numbers/metrics the student actually mentioned,
+   * so we can detect when the LLM invents specifics.
+   */
+  private buildStudentFactSet(input: ActivityWorkshopSessionInput): Set<string> {
+    const facts = new Set<string>();
+    // Collect all text the student actually provided
+    const allText = input.activities.map(a => {
+      const parts = [
+        a.description,
+        a.title,
+        a.role,
+        String(a.hoursPerWeek),
+        String(a.weeksPerYear),
+        String(a.yearsInvolved || ''),
+        ...(a.achievements?.map(ach => ach.title) || []),
+      ];
+      return parts.join(' ');
+    }).join(' ') + ' ' + (input.studentContext?.constraintNotes || '');
+
+    // Extract all numbers the student mentioned
+    const numbers = allText.match(/\d+/g) || [];
+    for (const n of numbers) facts.add(n);
+    return facts;
+  }
+
+  /**
+   * Detect if an action plan item contains fabricated specifics
+   * (numbers/percentages not present in student input).
+   */
+  private flagHallucinatedSpecifics(
+    action: string,
+    impact: string,
+    studentFacts: Set<string>
+  ): string | undefined {
+    const fullText = `${action} ${impact}`;
+    // Find percentage claims like "8% improvement", "15% increase"
+    const percentClaims = fullText.match(/(\d+(?:\.\d+)?)\s*%/g) || [];
+    // Find specific number claims like "200-acre", "$5,000 revenue"
+    const specificClaims = fullText.match(/\b(\d{2,})\s*[-]?\s*(?:acre|student|member|hour|dollar|participant|attendee)/gi) || [];
+
+    const fabricated: string[] = [];
+    for (const claim of [...percentClaims, ...specificClaims]) {
+      const num = claim.match(/(\d+)/)?.[1];
+      if (num && !studentFacts.has(num)) {
+        fabricated.push(claim.trim());
+      }
+    }
+
+    if (fabricated.length > 0) {
+      return `[Verify: ${fabricated.join(', ')} — not from your input]`;
+    }
+    return undefined;
+  }
+
+  /**
    * Normalize action plan — robust against all LLM format variations
    */
   private normalizeActionPlan(
-    plan: Record<string, unknown> | undefined
+    plan: Record<string, unknown> | undefined,
+    input: ActivityWorkshopSessionInput
   ): SynthesisContext['actionPlan'] {
+    const studentFacts = this.buildStudentFactSet(input);
+
     const normalizeList = (
       items: unknown,
       fallback: { action: string; impact: string }
@@ -474,7 +579,15 @@ Output valid JSON only.`;
       }
       const normalized = items
         .map(item => this.normalizeActionItem(item))
-        .filter((item): item is NonNullable<typeof item> => item !== null && item.action.length > 0);
+        .filter((item): item is NonNullable<typeof item> => item !== null && item.action.length > 0)
+        .map(item => {
+          // Check for hallucinated specifics
+          const flag = this.flagHallucinatedSpecifics(item.action, item.impact, studentFacts);
+          if (flag) {
+            item.impact = item.impact ? `${item.impact} ${flag}` : flag;
+          }
+          return item;
+        });
       return normalized.length > 0 ? normalized : [fallback];
     };
 
@@ -552,7 +665,7 @@ Output valid JSON only.`;
         analysisContext,
         teachingContext
       ),
-      actionPlan: this.normalizeActionPlan(undefined),
+      actionPlan: this.normalizeActionPlan(undefined, input),
       finalMessage: this.normalizeFinalMessage(undefined, storyContext),
       pipelineCost,
       synthesisMetadata: {
