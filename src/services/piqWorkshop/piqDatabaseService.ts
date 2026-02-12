@@ -17,7 +17,7 @@
 
 import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import { assertAuthenticated } from '../auth/clerkSupabaseAdapter';
-import { getAuthenticatedSupabaseClient, verifyClerkToken } from '../auth/getAuthenticatedSupabaseClient';
+import { getAuthenticatedSupabaseClient, verifyClerkTokenStructureStructure } from '../auth/getAuthenticatedSupabaseClient';
 
 // =============================================================================
 // TYPES
@@ -264,7 +264,7 @@ export async function saveOrUpdatePIQEssay(
     assertAuthenticated(userId);
 
     // Verify token
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -356,7 +356,7 @@ export async function saveAnalysisReport(
     assertAuthenticated(userId);
 
     // Verify token
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -425,7 +425,7 @@ export async function loadPIQEssay(
     assertAuthenticated(userId);
 
     // Verify token
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -499,7 +499,7 @@ export async function getVersionHistory(
     assertAuthenticated(userId);
 
     // Verify token
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -571,7 +571,7 @@ export async function getLatestVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -621,7 +621,7 @@ export async function saveVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -696,7 +696,7 @@ export async function saveAutosaveVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -765,7 +765,7 @@ export async function saveMilestoneVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -820,7 +820,7 @@ export async function saveAnalysisVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -873,7 +873,7 @@ export async function restoreVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -936,7 +936,7 @@ export async function softDeleteVersion(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
@@ -984,7 +984,7 @@ export async function hasAnyPIQEssays(
   userId: string
 ): Promise<boolean> {
   try {
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return false;
     }
 
@@ -1016,7 +1016,7 @@ export async function getAllPIQEssaySummaries(
   try {
     assertAuthenticated(userId);
 
-    if (!verifyClerkToken(clerkToken)) {
+    if (!verifyClerkTokenStructure(clerkToken)) {
       return { success: false, error: 'Invalid authentication token' };
     }
 
