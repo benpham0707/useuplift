@@ -196,7 +196,10 @@ DIFFICULTY TRANSITIONS (what happens when they move to harder courses — use th
   Adaptation pattern: ${transitions.adaptationSpeed} / ${transitions.recoveryPattern}
 
 GPA BY YEAR (use ONLY these numbers — do NOT invent values):
-${gpaYears.map(y => `${y.year}: ${y.gpa.toFixed(2)} GPA (rigor: ${y.rigorLevel.toFixed(1)} AP courses)`).join(' → ')}
+${gpaYears.map(y => {
+    const rigorDesc = y.rigorLevel >= 2.5 ? 'heavy AP/Honors load' : y.rigorLevel >= 1.5 ? 'moderate AP/Honors load' : y.rigorLevel >= 0.5 ? 'light AP/Honors mix' : 'mostly regular courses';
+    return `${y.year}: ${y.gpa.toFixed(2)} GPA (${rigorDesc})`;
+  }).join(' → ')}
 ${trajectory.projected ? `Projected next year: ${trajectory.projected.nextYearGPA.expected.toFixed(2)} (range: ${trajectory.projected.nextYearGPA.range.low.toFixed(2)}-${trajectory.projected.nextYearGPA.range.high.toFixed(2)}). Ceiling estimate: ${trajectory.projected.ceilingEstimate.toFixed(2)}.` : ''}
 
 COLLEGE TIER BENCHMARKS (use school names to frame GPA discussions):

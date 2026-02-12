@@ -92,7 +92,7 @@ Output valid JSON:
   },
   "majorAlignment": {
     "score": "<0-100>",
-    "assessment": "2-3 sentences on how well their current profile aligns with their intended major. Score interpretation bands (MUST state which band applies in your assessment): 0-30: Major misalignment — seriously consider alternatives or radical curriculum change. 30-55: Developing alignment — significant gaps to address, but salvageable. 55-75: Moderate alignment — on track but missing key pieces. 75-90: Strong alignment — minor gaps, strong foundation. 90-100: Exceptional alignment — profile tells a clear major story.", // Q9: Add majorAlignment score interpretation
+    "assessment": "2-3 sentences. Start by stating the alignment LEVEL in terms of college competitiveness: 90-100 = 'Exceptional — your coursework tells a clear [major] story competitive at Ivy/Elite schools.' 75-89 = 'Strong — your foundation is solid for Highly Selective [major] programs (UCLA, Georgetown), with minor gaps.' 55-74 = 'Moderate — you have the basics for Selective [major] programs (Boston U, UT Austin), but missing key pieces that would make you competitive at Very Selective programs.' 30-54 = 'Developing — significant gaps for competitive [major] programs.' Below 30 = 'Major misalignment.' Then explain specifically what's present and what's missing.",
     "missingPieces": ["What's missing for their major"],
     "strengthsToLeverage": ["What they already have going for them"]
   },

@@ -27,7 +27,9 @@ import type {
   SubjectArea,
   ConversationState,
   PersonalDisclosure,
+  TopicType,
 } from './types';
+import type { DeepAcademicReport } from '../deepAcademicReportTypes';
 import { formatSubject } from './topicDetector';
 
 // ============================================================================
@@ -1034,6 +1036,8 @@ export interface GenerateResponseInput {
    * This allows acknowledgments, questions, and disclosures to persist across turns.
    */
   conversationState?: ConversationState;
+  /** Deep academic report for grounded coaching context */
+  deepAcademicReport?: DeepAcademicReport;
 }
 
 export interface GeneratedResponse {
@@ -1394,6 +1398,128 @@ function shouldStayOnTopic(
 }
 
 /**
+ * Build a topic-relevant digest from the deep academic report.
+ * Extracts only the sections relevant to the current conversation topic
+ * (~200-400 tokens) rather than injecting the full ~3000 token report.
+ */
+function buildReportContextDigest(
+  report: DeepAcademicReport,
+  currentTopic: ConversationTopic | null
+): string {
+  if (!currentTopic) {
+    // No active topic — return a brief overview
+    const bl = report.bottomLine;
+    return `Uplift Rating: ${bl.rating}\nPositioning: ${bl.positioning}\nBiggest Strength: ${bl.biggestStrength}\nBiggest Risk: ${bl.biggestRisk}\nTop Action: ${bl.topAction}`;
+  }
+
+  const parts: string[] = [];
+  const topicType: TopicType = currentTopic.type;
+
+  // Always include rating context for grounding
+  parts.push(`Uplift Rating: ${report.bottomLine.rating}`);
+  parts.push(`Tier Position: ${report.academicIdentity.tierPosition.currentTier} (${report.academicIdentity.tierPosition.tierExamples.slice(0, 3).join(', ')})`);
+
+  switch (topicType) {
+    case 'grade_anomaly':
+    case 'subject_inconsistency': {
+      // Find the relevant challenge from the report
+      const scopeSubject = (currentTopic.scope.subject || '').toLowerCase();
+      const scopeCourse = (currentTopic.scope.course || '').toLowerCase();
+      const relevantChallenge = report.challengesAndReality.challenges.find(c => {
+        const titleLower = c.title.toLowerCase();
+        const issueLower = c.issue.toLowerCase();
+        return (scopeSubject && (titleLower.includes(scopeSubject) || issueLower.includes(scopeSubject))) ||
+               (scopeCourse && (titleLower.includes(scopeCourse) || issueLower.includes(scopeCourse)));
+      });
+      if (relevantChallenge) {
+        parts.push(`\nRelevant Challenge: "${relevantChallenge.title}"`);
+        parts.push(`Issue: ${relevantChallenge.issue}`);
+        parts.push(`AO Interpretation: ${relevantChallenge.aoImpact}`);
+        parts.push(`Tier Impact: ${relevantChallenge.tierImpact}`);
+      }
+      break;
+    }
+
+    case 'difficulty_transition':
+    case 'high_stakes_course': {
+      // Extract course strategy recommendations
+      const scopeCourse = (currentTopic.scope.course || '').toLowerCase();
+      const relevantRec = report.strategicRoadmap.courseStrategy.recommended.find(r =>
+        r.course.toLowerCase().includes(scopeCourse) || scopeCourse.includes(r.course.toLowerCase())
+      );
+      if (relevantRec) {
+        parts.push(`\nCourse Recommendation: ${relevantRec.course}`);
+        parts.push(`Rationale: ${relevantRec.rationale}`);
+        parts.push(`Risk Level: ${relevantRec.risk}`);
+        parts.push(`Expected Outcome: ${relevantRec.expectedOutcome}`);
+      }
+      // Also check for relevant challenge
+      const relevantChallenge = report.challengesAndReality.challenges.find(c =>
+        c.title.toLowerCase().includes(scopeCourse) || c.issue.toLowerCase().includes(scopeCourse)
+      );
+      if (relevantChallenge) {
+        parts.push(`\nRelated Challenge: ${relevantChallenge.title} — ${relevantChallenge.issue}`);
+      }
+      break;
+    }
+
+    case 'future_planning': {
+      // Full roadmap priorities + major alignment
+      parts.push(`\nRoadmap Priorities:`);
+      for (const p of report.strategicRoadmap.priorities) {
+        parts.push(`  ${p.priority}. [${p.impact}] ${p.title}: ${p.description}`);
+      }
+      const ma = report.strategicRoadmap.majorAlignment;
+      parts.push(`\nMajor Alignment: ${ma.score}/100 — ${ma.assessment}`);
+      if (ma.missingPieces.length > 0) {
+        parts.push(`Missing: ${ma.missingPieces.join(', ')}`);
+      }
+      break;
+    }
+
+    case 'trend_exploration': {
+      // Identity tier position + trajectory optimization
+      const id = report.academicIdentity;
+      parts.push(`\nNarrative Identity: ${id.narrativeIdentity.substring(0, 200)}...`);
+      if (id.tierPosition.tierGap) {
+        parts.push(`Tier Gap: ${id.tierPosition.tierGap}`);
+      }
+      parts.push(`Trajectory: ${report.strategicRoadmap.trajectoryOptimization}`);
+      break;
+    }
+
+    case 'subject_overview': {
+      // Relevant strength/weakness from identity
+      const scopeSubject = (currentTopic.scope.subject || '').toLowerCase();
+      const relevantStrength = report.academicIdentity.notableStrengths.find(s =>
+        s.subject.toLowerCase().includes(scopeSubject)
+      );
+      const relevantWeakness = report.academicIdentity.notableWeaknesses.find(w =>
+        w.area.toLowerCase().includes(scopeSubject)
+      );
+      if (relevantStrength) {
+        parts.push(`\nStrength: ${relevantStrength.subject} — ${relevantStrength.insight}`);
+        parts.push(`Major Relevance: ${relevantStrength.majorRelevance}`);
+      }
+      if (relevantWeakness) {
+        parts.push(`\nWeakness: ${relevantWeakness.area} — ${relevantWeakness.gap}`);
+        parts.push(`Consequence: ${relevantWeakness.consequence}`);
+      }
+      break;
+    }
+
+    default: {
+      // For other topic types, provide a brief overview
+      parts.push(`\nBiggest Strength: ${report.bottomLine.biggestStrength}`);
+      parts.push(`Biggest Risk: ${report.bottomLine.biggestRisk}`);
+      break;
+    }
+  }
+
+  return parts.join('\n');
+}
+
+/**
  * Build cross-subject pattern insights for the LLM to weave into responses.
  */
 function buildCrossSubjectContext(memory: ConversationMemory): string {
@@ -1478,6 +1604,11 @@ async function generateResponseWithLLM(
   // Build cross-subject patterns
   const crossSubjectContext = buildCrossSubjectContext(memory);
 
+  // Build report context digest (topic-relevant extract from deep academic report)
+  const reportDigest = input.deepAcademicReport
+    ? buildReportContextDigest(input.deepAcademicReport, currentTopic)
+    : '';
+
   // Meaningful quotes to potentially reference (with turn context)
   const quotesToReference = memory.memorableQuotes
     .slice(-5)
@@ -1535,6 +1666,11 @@ ${crossSubjectContext ? `══════════════════�
 PATTERNS & INSIGHTS:
 ═══════════════════════════════════════════════════════════════════
 ${crossSubjectContext}
+` : ''}
+${reportDigest ? `═══════════════════════════════════════════════════════════════════
+ACADEMIC REPORT INSIGHTS (reference these to ground your coaching):
+═══════════════════════════════════════════════════════════════════
+${reportDigest}
 ` : ''}
 ${quotesToReference ? `═══════════════════════════════════════════════════════════════════
 MEMORABLE QUOTES (reference to show you're listening):

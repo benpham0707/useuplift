@@ -274,6 +274,12 @@ async function runTest() {
             log(`  + ${s}`);
           }
         }
+        if ((t.celebration as any).references?.length) {
+          for (const ref of (t.celebration as any).references) {
+            const found = activity?.description?.includes(ref.quotedText);
+            log(`    REF: "${ref.quotedText}" [${ref.type}] ${ref.label} ${found ? '(MATCH)' : '(NO MATCH)'}`);
+          }
+        }
         log('');
       }
 
@@ -297,6 +303,12 @@ async function runTest() {
           log(`  ${st.strength}`);
           log(`    Why: ${st.whyItMatters?.text || ''}`);
           log(`    Leverage: ${st.howToLeverage || ''}`);
+          if ((st as any).references?.length) {
+            for (const ref of (st as any).references) {
+              const found = activity?.description?.includes(ref.quotedText);
+              log(`    REF: "${ref.quotedText}" [${ref.type}] ${ref.label} ${found ? '(MATCH)' : '(NO MATCH)'}`);
+            }
+          }
           log('');
         }
       }
@@ -310,6 +322,12 @@ async function runTest() {
           log(`    Fix: ${imp.howToFix || ''}`);
           if (imp.exampleBefore) log(`    Before: "${imp.exampleBefore}"`);
           if (imp.exampleAfter) log(`    After:  "${imp.exampleAfter}"`);
+          if ((imp as any).references?.length) {
+            for (const ref of (imp as any).references) {
+              const found = activity?.description?.includes(ref.quotedText);
+              log(`    REF: "${ref.quotedText}" [${ref.type}] ${ref.label} ${found ? '(MATCH)' : '(NO MATCH)'}`);
+            }
+          }
           log('');
         }
       }
@@ -756,6 +774,42 @@ async function runTest() {
       }
     }
     log('  PASS: P1 regression check passed (all activities have detectedCategory)');
+
+    // ============================================================
+    // T7: Text reference quality — verify references match description text
+    // ============================================================
+    divider('T7: TEXT REFERENCE QUALITY');
+    let t7TotalRefs = 0;
+    let t7MatchedRefs = 0;
+    for (const td of result.stage2?.teachingDelivered || []) {
+      const activity = testInput.activities.find(a => a.id === td.activityId);
+      const desc = activity?.description || '';
+      const t = td.teaching;
+
+      const checkRefs = (refs: any[] | undefined) => {
+        if (!refs) return;
+        for (const ref of refs) {
+          t7TotalRefs++;
+          if (desc.includes(ref.quotedText)) t7MatchedRefs++;
+        }
+      };
+
+      checkRefs(t.celebration?.references);
+      for (const st of t.strengthTeaching || []) checkRefs((st as any).references);
+      for (const imp of t.improvementTeaching || []) checkRefs((imp as any).references);
+    }
+
+    if (t7TotalRefs > 0) {
+      const matchRate = (t7MatchedRefs / t7TotalRefs * 100).toFixed(1);
+      log(`  References: ${t7MatchedRefs}/${t7TotalRefs} matched actual description text (${matchRate}%)`);
+      if (t7MatchedRefs / t7TotalRefs < 0.5) {
+        log(`  [T7 WARNING] Less than 50% match rate — LLM may be fabricating quotes`);
+      } else {
+        log(`  PASS: Text reference quality acceptable (${matchRate}% match rate)`);
+      }
+    } else {
+      log('  INFO: No text references produced (references are optional)');
+    }
 
   } catch (error) {
     log('');

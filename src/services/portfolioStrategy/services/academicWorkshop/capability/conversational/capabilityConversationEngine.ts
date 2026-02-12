@@ -22,6 +22,7 @@ import { callClaude } from '../../../../../../lib/llm/claude';
 import type { NuancedCapabilityAnalysis } from '../nuancedCapabilityAnalyzer';
 import type { SubjectArea } from '../types';
 import { GPA_TO_GRADE } from '../types';
+import type { DeepAcademicReport } from '../deepAcademicReportTypes';
 
 import {
   detectTopics,
@@ -32,6 +33,8 @@ import {
   // Cross-subject pattern detection
   detectCrossSubjectPatterns,
   crossSubjectPatternsToTopics,
+  // Report-derived topics
+  generateReportTopics,
 } from './topicDetector';
 
 import {
@@ -84,6 +87,7 @@ import type {
   StudentSelfAwareness,
   ProfileCompleteness,
   QualitativeAdjustment,
+  RoadmapAdjustment,
   // NEW: Dynamic conversation types
   EngagementAssessment,
   ConversationFlowState,
@@ -176,6 +180,8 @@ export interface ConversationEngineOptions {
   useLLMEngagement?: boolean;
   /** NEW: Enable cross-subject pattern detection */
   detectCrossSubjectPatterns?: boolean;
+  /** Pre-generated deep academic report for context-rich coaching */
+  deepAcademicReport?: DeepAcademicReport;
 }
 
 export interface ProcessTurnResult {
@@ -207,14 +213,17 @@ export interface InitializeResult {
  * Now with dynamic engagement-based conversation flow.
  */
 export class CapabilityConversationEngine {
-  private options: Required<ConversationEngineOptions>;
+  private options: Required<Omit<ConversationEngineOptions, 'deepAcademicReport'>> & { deepAcademicReport?: DeepAcademicReport };
   private engagementHistory: EngagementAssessment[] = [];
   private progress: ConversationProgress;
   private studentPreferences: StudentConversationPreferences;
   /** NEW: Track consecutive brief responses to avoid over-reacting to single brief answers */
   private consecutiveBriefResponses: number = 0;
+  /** Pre-generated deep academic report for context-rich coaching */
+  private deepAcademicReport?: DeepAcademicReport;
 
   constructor(options: ConversationEngineOptions = {}) {
+    this.deepAcademicReport = options.deepAcademicReport;
     this.options = {
       maxTopics: options.maxTopics ?? 15,
       intendedMajor: options.intendedMajor ?? '',
@@ -223,6 +232,7 @@ export class CapabilityConversationEngine {
       enableDynamicFlow: options.enableDynamicFlow ?? true, // Default to dynamic
       useLLMEngagement: options.useLLMEngagement ?? false, // Heuristic by default for speed
       detectCrossSubjectPatterns: options.detectCrossSubjectPatterns ?? true,
+      deepAcademicReport: options.deepAcademicReport,
     };
 
     // Initialize progress tracking
@@ -269,6 +279,16 @@ export class CapabilityConversationEngine {
         }
       }
 
+      // Generate topics from deep academic report (if available)
+      if (this.deepAcademicReport) {
+        let reportTopicId = topics.length + 1;
+        const makeReportTopicId = () => `topic_report_${reportTopicId++}`;
+        const reportTopics = generateReportTopics(this.deepAcademicReport, makeReportTopicId);
+        if (reportTopics.length > 0) {
+          topics = this.interleaveTopics(topics, reportTopics);
+        }
+      }
+
       // Create initial state with persisted fields initialized
       const state: ConversationState = {
         conversationId: `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -285,6 +305,7 @@ export class CapabilityConversationEngine {
         askedQuestionKeys: new Set(),
         personalDisclosures: [],
         discussedSubjects: new Set(),
+        roadmapAdjustments: [],
       };
 
       // Create empty qualitative insights
@@ -426,6 +447,9 @@ export class CapabilityConversationEngine {
       // Update course annotations and subject insights
       this.updateProfileFromInsights(calibratedInsights, qualitativeInsights);
 
+      // Detect roadmap-relevant adjustments from student's message
+      this.detectRoadmapAdjustments(studentMessage, state, state.currentTopic);
+
       // NEW: Update progress tracking with granular category tracking
       this.progress = updateProgress(
         this.progress,
@@ -535,6 +559,8 @@ export class CapabilityConversationEngine {
           offerTopicChoices,
           // CRITICAL: Pass conversation state for persistence
           conversationState: state,
+          // Pass deep academic report for grounded coaching context
+          deepAcademicReport: this.deepAcademicReport,
         };
 
         const dynamicResponse = await generateDynamicResponse(generateInput, {
@@ -726,6 +752,88 @@ export class CapabilityConversationEngine {
     }
 
     return false;
+  }
+
+  /**
+   * Detect roadmap-relevant adjustments from a student message.
+   * Checks if the student's response relates to any roadmap recommendation
+   * and detects sentiment toward recommended courses/priorities.
+   */
+  private detectRoadmapAdjustments(
+    studentMessage: string,
+    state: ConversationState,
+    currentTopic: ConversationTopic | null
+  ): void {
+    if (!this.deepAcademicReport) return;
+
+    const msg = studentMessage.toLowerCase();
+    const roadmap = this.deepAcademicReport.strategicRoadmap;
+
+    // Initialize if not present
+    if (!state.roadmapAdjustments) {
+      state.roadmapAdjustments = [];
+    }
+
+    // Check recommended courses
+    for (const rec of roadmap.courseStrategy.recommended) {
+      const courseLower = rec.course.toLowerCase();
+      // Only match if the course name is actually in the message
+      if (!msg.includes(courseLower) && !courseLower.split(' ').some(w => w.length > 3 && msg.includes(w))) {
+        continue;
+      }
+
+      // Detect sentiment
+      const positiveSignals = ['excited', 'interested', 'want to', 'looking forward', 'love', 'enjoy', 'sounds good', 'great idea'];
+      const negativeSignals = ['worried', 'scared', 'nervous', 'don\'t want', 'hate', 'too hard', 'not sure', 'concerned', 'struggle'];
+
+      const isPositive = positiveSignals.some(s => msg.includes(s));
+      const isNegative = negativeSignals.some(s => msg.includes(s));
+
+      const sentiment: RoadmapAdjustment['studentSentiment'] =
+        isPositive && !isNegative ? 'positive' :
+        isNegative && !isPositive ? 'negative' : 'uncertain';
+
+      state.roadmapAdjustments.push({
+        type: isPositive ? 'course_interest' : isNegative ? 'course_concern' : 'course_interest',
+        description: `Student expressed ${sentiment} sentiment about recommended course: ${rec.course}`,
+        originalRecommendation: `${rec.course} (risk: ${rec.risk})`,
+        studentSentiment: sentiment,
+        turnNumber: state.turnCount,
+      });
+    }
+
+    // Check roadmap priorities
+    for (const priority of roadmap.priorities) {
+      const titleLower = priority.title.toLowerCase();
+      const actionWords = priority.actionItems.flatMap(a => a.toLowerCase().split(' ').filter(w => w.length > 4));
+      const isRelevant = msg.includes(titleLower) || actionWords.some(w => msg.includes(w));
+
+      if (!isRelevant) continue;
+
+      const rethinkSignals = ['actually', 'changed my mind', 'rethink', 'not sure anymore', 'different path', 'reconsidering'];
+      const isRethink = rethinkSignals.some(s => msg.includes(s));
+
+      if (isRethink) {
+        state.roadmapAdjustments.push({
+          type: 'priority_shift',
+          description: `Student may be reconsidering priority: ${priority.title}`,
+          originalRecommendation: `Priority #${priority.priority}: ${priority.title}`,
+          studentSentiment: 'uncertain',
+          turnNumber: state.turnCount,
+        });
+      }
+    }
+
+    // Check for major rethink signals
+    const majorRethinkSignals = ['different major', 'change my major', 'not sure about my major', 'reconsidering', 'switch to'];
+    if (majorRethinkSignals.some(s => msg.includes(s))) {
+      state.roadmapAdjustments.push({
+        type: 'major_rethink',
+        description: 'Student expressed uncertainty about their intended major',
+        studentSentiment: 'uncertain',
+        turnNumber: state.turnCount,
+      });
+    }
   }
 
   /**
@@ -1390,6 +1498,7 @@ export class CapabilityConversationEngine {
       askedQuestionKeys: new Set(),
       personalDisclosures: [],
       discussedSubjects: new Set(),
+      roadmapAdjustments: [],
     };
   }
 

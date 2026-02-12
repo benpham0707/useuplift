@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/tuepham/uplift-final-final-18698-62030/.claude/scripts/session-context.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/tuepham/uplift-final-final-18698-62030/.claude/scripts/memory-sync.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

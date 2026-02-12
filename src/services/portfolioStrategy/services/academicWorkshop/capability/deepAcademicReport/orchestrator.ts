@@ -29,6 +29,7 @@ import { generateResearchContext } from './generators/researchGenerator';
 import { generateBottomLine } from './generators/bottomLineGenerator';
 import { validateReportOutput, fixRoadmapPostProcessing } from './validation/postProcessing';
 import { generateTemplateFallback } from './fallback/templateFallback';
+import { deepAcademicReportCache, generateHashedCacheKey } from '../../../../utils/caching';
 
 // ============================================================================
 // V4: Cross-section consistency validation
@@ -205,4 +206,37 @@ export async function generateDeepAcademicReport(
     researchContext,
     metadata,
   };
+}
+
+// ============================================================================
+// CACHED WRAPPER
+// ============================================================================
+
+/**
+ * Cache-first wrapper around generateDeepAcademicReport().
+ * Returns cached report if available, otherwise generates and caches.
+ *
+ * Reports cost ~$0.13 and depend on static transcript data,
+ * so caching with a 2-hour TTL is safe within a session.
+ */
+export async function getOrGenerateDeepAcademicReport(
+  input: DeepAcademicReportInput
+): Promise<DeepAcademicReport> {
+  const { key, hash } = generateHashedCacheKey(
+    'deep-report',
+    'deep_academic_report',
+    input
+  );
+
+  const cached = deepAcademicReportCache.get(key);
+  if (cached !== null) {
+    console.log('[DeepAcademicReport] Cache hit — returning cached report');
+    return cached as DeepAcademicReport;
+  }
+
+  console.log('[DeepAcademicReport] Cache miss — generating report');
+  const report = await generateDeepAcademicReport(input);
+  deepAcademicReportCache.set(key, report, hash);
+
+  return report;
 }

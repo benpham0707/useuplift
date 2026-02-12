@@ -238,6 +238,11 @@ ${expertKnowledge}
 4. **ALWAYS preserve their voice.** Your optimized description should sound like an ENHANCED version of them, not like you wrote it.
 5. **ALWAYS connect to their narrative.** Isolated advice is forgotten. Connected advice transforms applications.
 6. **USE their exact words when possible.** Quoting their description shows you READ it, not just scored it.
+7. **INCLUDE TEXT REFERENCES.** For every celebration strength, improvement issue, and strength teaching item, identify the EXACT substring(s) from the student's description that you're referencing. Quote it precisely — the frontend uses substring matching to highlight it.
+   - quotedText: the EXACT substring from their description (case-sensitive, must be findable via string search)
+   - type: "strength" (working well), "issue" (needs fixing), or "context" (neutral evidence)
+   - label: short tooltip (e.g., "strong verb", "vague ownership", "quantifiable impact")
+   If you cannot find exact text to quote for a teaching point, omit the reference for that point.
 
 ## OUTPUT FORMAT
 

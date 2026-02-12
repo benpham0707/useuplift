@@ -224,6 +224,7 @@ export async function callClaude<T = any>(
   let messages: Anthropic.Messages.MessageParam[];
   let useJsonMode: boolean;
   let customTimeout: number | undefined;
+  let cacheSystemPrompt = false;
 
   if (isObject && hasMessages) {
     // Message-based interface: callClaude({ model, system, messages, ... })
@@ -249,6 +250,7 @@ export async function callClaude<T = any>(
     systemParam = input.systemPrompt;
     customTimeout = input.timeoutMs;
     useJsonMode = input.useJsonMode ?? false;
+    cacheSystemPrompt = input.cacheSystemPrompt ?? false;
 
     messages = [
       {
@@ -265,6 +267,7 @@ export async function callClaude<T = any>(
     systemParam = opts.systemPrompt;
     useJsonMode = opts.useJsonMode ?? false;
     customTimeout = opts.timeoutMs;
+    cacheSystemPrompt = opts.cacheSystemPrompt ?? false;
 
     messages = [
       {
@@ -275,13 +278,20 @@ export async function callClaude<T = any>(
   }
 
   try {
+    // Build system parameter — use cache_control when caching requested
+    const systemForRequest = systemParam
+      ? cacheSystemPrompt
+        ? [{ type: 'text' as const, text: systemParam, cache_control: { type: 'ephemeral' as const } }]
+        : systemParam
+      : undefined;
+
     // Build request parameters
     const requestParams: Anthropic.Messages.MessageCreateParams = {
       model,
       max_tokens: maxTokens,
       temperature,
       messages,
-      ...(systemParam ? { system: systemParam } : {}),
+      ...(systemForRequest ? { system: systemForRequest } : {}),
     };
 
     // Get client

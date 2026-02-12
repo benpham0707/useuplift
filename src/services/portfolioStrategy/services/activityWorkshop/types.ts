@@ -86,6 +86,27 @@ export interface CitedText {
 }
 
 // ============================================================================
+// DESCRIPTION TEXT REFERENCES (for frontend highlighting)
+// ============================================================================
+
+/**
+ * A reference to a specific substring in the student's activity description.
+ *
+ * The frontend uses `description.indexOf(quotedText)` to locate the position
+ * and highlight the referenced text. More reliable than LLM-generated indices.
+ *
+ * All reference fields on teaching types are OPTIONAL for backward compatibility.
+ */
+export interface DescriptionReference {
+  /** Exact substring from the student's description (case-sensitive match) */
+  quotedText: string;
+  /** What this reference represents */
+  type: 'strength' | 'issue' | 'context';
+  /** Short label for the frontend tooltip (e.g., "quantifiable impact", "vague language") */
+  label: string;
+}
+
+// ============================================================================
 // ACTIVITY INPUT (Frontend Data)
 // ============================================================================
 
@@ -448,6 +469,8 @@ export interface ActivityTeaching {
   celebration?: {
     headline: string; // One powerful sentence celebrating their strongest aspect
     strengths: string[]; // 2-3 specific things working well
+    /** Text references for frontend highlighting of celebrated elements */
+    references?: DescriptionReference[];
   };
 
   // === TIER EXPLANATION ===
@@ -479,6 +502,8 @@ export interface ActivityTeaching {
     };
     howToLeverage: string;
     inApplications: string;
+    /** References to description text that evidence this strength */
+    references?: DescriptionReference[];
   }[];
 
   // === IMPROVEMENT TEACHING (Enhanced with deep structure) ===
@@ -496,6 +521,8 @@ export interface ActivityTeaching {
     exampleAfter: string;
     transformationAnalysis?: string; // NEW: Why the transformation works
     priority: 'high' | 'medium' | 'low';
+    /** References to description text that exhibit this issue */
+    references?: DescriptionReference[];
   }[];
 
   // === UPGRADE PATHWAY ===

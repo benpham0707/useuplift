@@ -107,6 +107,7 @@ export type {
   ConversationOpener,
   ConversationResponse,
   ResponseType,
+  RoadmapAdjustment,
 
   // NEW: Engagement and dynamic conversation types
   EngagementAssessment,
@@ -147,6 +148,8 @@ export {
   crossSubjectPatternsToTopics,
   type CrossSubjectPattern,
   type CrossSubjectPatternType,
+  // Report-derived topics
+  generateReportTopics,
 } from './topicDetector';
 
 // ============================================================================

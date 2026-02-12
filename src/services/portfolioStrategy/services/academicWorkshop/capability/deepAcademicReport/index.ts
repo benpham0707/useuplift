@@ -10,7 +10,7 @@
  * - Orchestrator that ties everything together
  */
 
-export { generateDeepAcademicReport } from './orchestrator';
+export { generateDeepAcademicReport, getOrGenerateDeepAcademicReport } from './orchestrator';
 export { assembleEnrichedContext } from './context/contextAssembly';
 export {
   calculateTierPosition,

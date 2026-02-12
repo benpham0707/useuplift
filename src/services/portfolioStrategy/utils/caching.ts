@@ -339,6 +339,12 @@ export const portfolioAnalysisCache = new AnalysisCache<unknown>({
   defaultTTLMs: 30 * 60 * 1000, // 30 minutes
 });
 
+// Cache for deep academic reports (~$0.13 per generation, static transcript data)
+export const deepAcademicReportCache = new AnalysisCache<unknown>({
+  maxSize: 50,
+  defaultTTLMs: 2 * 60 * 60 * 1000, // 2 hours — expensive to generate, data doesn't change within session
+});
+
 // ============================================================================
 // CACHE WARMING
 // ============================================================================

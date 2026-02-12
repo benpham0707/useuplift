@@ -32,6 +32,7 @@ import {
   TeachingContext,
   ActivityTeaching,
   ActivityTier,
+  DescriptionReference,
   getDescriptionCharLimit,
   getPlatformName,
 } from '../types';
@@ -470,7 +471,8 @@ Respond with JSON for ONE activity:
   "activityId": "${activityId}",
   "celebration": {
     "headline": "One celebratory sentence that QUOTES a specific phrase from their description. E.g.: 'Your phrase \"designed curriculum for 30+ students\" instantly signals ownership — AOs see YOU did this, not the club.'",
-    "strengths": ["Specific strength citing evidence from description", "Second specific strength"]
+    "strengths": ["Specific strength citing evidence from description", "Second specific strength"],
+    "references": [{ "quotedText": "exact substring from their description", "type": "strength", "label": "short highlight label" }]
   },
   "tierExplanation": {
     "assignedTier": ${analysis.classification.tier},
@@ -483,7 +485,8 @@ Respond with JSON for ONE activity:
     "strength": "main strength",
     "whyItMatters": { "text": "why admissions cares - use AO psychology", "citations": [] },
     "howToLeverage": "how to use this",
-    "inApplications": "where to highlight"
+    "inApplications": "where to highlight",
+    "references": [{ "quotedText": "exact text from description evidencing this strength", "type": "strength", "label": "label" }]
   }],
   "improvementTeaching": [{
     "issue": "main issue to fix",
@@ -491,7 +494,8 @@ Respond with JSON for ONE activity:
     "howToFix": "step by step guidance",
     "exampleBefore": "quote their weak text here",
     "exampleAfter": "your improved version here",
-    "priority": "high"
+    "priority": "high",
+    "references": [{ "quotedText": "exact text from description with this issue", "type": "issue", "label": "label" }]
   }],
   "descriptionOptimization": {
     "originalDescription": "${activity.description.replace(/"/g, '\\"').substring(0, 200)}",
@@ -516,9 +520,10 @@ Respond with JSON for ONE activity:
       model: this.MODEL,
       systemPrompt,
       userPrompt: prompt,
-      maxTokens: depth === 'deep' ? 5000 : 4000,
+      maxTokens: depth === 'deep' ? 6500 : 5000,
       temperature: 0.3,
-      timeoutMs: depth === 'deep' ? 180000 : 120000, // Deep teaching gets 3 min for full knowledge context
+      timeoutMs: depth === 'deep' ? 210000 : 150000,
+      cacheSystemPrompt: true, // Cache system prompt across parallel activity calls
     });
 
     this.trackUsage(response.usage, localCost, localTokens);
@@ -528,6 +533,17 @@ Respond with JSON for ONE activity:
 
     // Ensure activityId is set
     parsed.activityId = activityId;
+
+    // Validate celebration references
+    if (parsed.celebration?.references) {
+      parsed.celebration.references = (parsed.celebration.references as Array<Record<string, unknown>>).filter(
+        (ref: Record<string, unknown>) => ref?.quotedText && typeof ref.quotedText === 'string' && (ref.quotedText as string).length > 0
+      ).map((ref: Record<string, unknown>) => ({
+        quotedText: ref.quotedText as string,
+        type: (ref.type as string) || 'strength',
+        label: (ref.label as string) || '',
+      })) as DescriptionReference[];
+    }
 
     // Normalize the parsed response — improvements first so we can synthesize optimization
     // Filter out useless/placeholder improvements that the LLM failed to generate properly
@@ -1431,6 +1447,16 @@ Remember: Students are counting on you to transform their applications. The know
         transformationAnalysis: transformation.whyItWorks as string,
       }),
       priority: isUselessImprovement ? 'low' as const : ((imp.priority as 'high' | 'medium' | 'low') || 'medium'),
+      // Pass through validated text references for frontend highlighting
+      ...(Array.isArray(imp.references) && (imp.references as Array<Record<string, unknown>>).length > 0 && {
+        references: (imp.references as Array<Record<string, unknown>>).filter(
+          ref => ref?.quotedText && typeof ref.quotedText === 'string' && (ref.quotedText as string).length > 0
+        ).map(ref => ({
+          quotedText: ref.quotedText as string,
+          type: (ref.type as string) || 'issue',
+          label: (ref.label as string) || '',
+        })) as DescriptionReference[],
+      }),
       // Mark as useless so the caller can filter it out
       ...(isUselessImprovement && { _empty: true }),
     };
@@ -1458,6 +1484,16 @@ Remember: Students are counting on you to transform their applications. The know
       inApplications: (str.inApplications as string) || 'Essays, interviews, and additional information.',
       // Add theProblem if present (what would be lost without highlighting)
       ...(str.theProblem && { theProblem: str.theProblem as string }),
+      // Pass through validated text references for frontend highlighting
+      ...(Array.isArray(str.references) && str.references.length > 0 && {
+        references: (str.references as Array<Record<string, unknown>>).filter(
+          ref => ref?.quotedText && typeof ref.quotedText === 'string' && (ref.quotedText as string).length > 0
+        ).map(ref => ({
+          quotedText: ref.quotedText as string,
+          type: (ref.type as string) || 'strength',
+          label: (ref.label as string) || '',
+        })) as DescriptionReference[],
+      }),
     };
   }
 
