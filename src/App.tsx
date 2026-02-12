@@ -30,6 +30,7 @@ import PIQWorkshop from "./pages/PIQWorkshop";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
+import DashboardLayout from "./layouts/DashboardLayout";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -51,11 +52,15 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
+              {/* Public routes - keep website-style top navigation */}
               <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
               <Route path="/verify-email" element={<VerifyEmail />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/portfolio-scanner" element={<RequireVerified><RequireTermsAccepted><PortfolioScanner /></RequireTermsAccepted></RequireVerified>} />
-              <Route path="/portfolio-insights" element={<RequireVerified><RequireTermsAccepted><PortfolioInsightsNew /></RequireTermsAccepted></RequireVerified>} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              
+              {/* Marketing/demo pages - no auth required */}
               <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
               <Route path="/academic-planner" element={<AcademicPlanner />} />
               <Route path="/project-incubation" element={<ProjectIncubationHub />} />
@@ -65,16 +70,22 @@ const App = () => (
               <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
               <Route path="/project-incubation/projects" element={<ProjectManagement />} />
               <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
-              <Route path="/pricing" element={<Pricing />} />
-              <Route path="/auth" element={<Auth />} />
+              
+              {/* Test/demo routes */}
               <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
               <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
               <Route path="/workshop-demo" element={<WorkshopDemo />} />
-              <Route path="/piq-workshop" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
-              <Route path="/piq-workshop/:piqNumber" element={<RequireVerified><RequireTermsAccepted><PIQWorkshop /></RequireTermsAccepted></RequireVerified>} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              <Route path="/settings" element={<RequireVerified><RequireTermsAccepted><Settings /></RequireTermsAccepted></RequireVerified>} />
+              
+              {/* Dashboard routes - authenticated app shell with left sidebar */}
+              <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+                <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
+                <Route path="/portfolio-insights" element={<PortfolioInsightsNew />} />
+                <Route path="/piq-workshop" element={<PIQWorkshop />} />
+                <Route path="/piq-workshop/:piqNumber" element={<PIQWorkshop />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/settings" element={<Settings />} />
+              </Route>
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
 import { Check, Zap, Sparkles, GraduationCap, BookOpen, HelpCircle, Loader2 } from 'lucide-react';
 import GradientZap from '@/components/ui/GradientZap';
-import Navigation from '@/components/Navigation';
 import { ReferralCard } from '@/components/ReferralCard';
 import { usePricingData } from '@/query/usePricingData';
 
@@ -98,8 +97,6 @@ const Pricing = () => {
 
   return (
     <div className="min-h-screen bg-background font-sans">
-      <Navigation />
-      
       <div className="max-w-7xl mx-auto p-4 md:p-8 pb-20 space-y-16">
         <div className="text-center space-y-6">
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight">

@@ -60,7 +60,6 @@ import GradientZap from '@/components/ui/GradientZap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { gsap } from 'gsap';
 import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
-import Navigation from '@/components/Navigation';
 
 const PortfolioScanner = () => {
   const { user, loading, signOut } = useAuth();
@@ -779,8 +778,6 @@ const PortfolioScanner = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-
       {/* Coming Soon Banner */}
       {isPreviewMode && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl">
