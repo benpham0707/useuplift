@@ -65,7 +65,7 @@ export function verifyClerkTokenStructure(token: string): boolean {
     if (parts.length !== 3) return false;
 
     // Decode payload (don't verify signature - Supabase/Clerk will do that)
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
 
     // Check for 'sub' claim (Clerk user ID)
     if (!payload.sub || typeof payload.sub !== 'string') {
