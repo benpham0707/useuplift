@@ -85,8 +85,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { usePIQEssay, type PIQEssayData } from '@/query/usePIQEssay';
 import { queryKeys } from '@/query/queryKeys';
 
-// Navigation
-import Navigation from '@/components/Navigation';
+// Navigation - handled by DashboardLayout
 
 // Credits System
 import { canAnalyzeEssay, deductForEssayAnalysis, CREDIT_COSTS } from '@/services/credits';
@@ -1762,9 +1761,6 @@ export default function PIQWorkshop() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Main Navigation with credits */}
-      <Navigation />
-
       {/* Gradient background */}
       <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
 

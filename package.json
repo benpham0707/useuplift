@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "server": "PORT=8789 tsx src/http/server.ts",
-    "dev:full": "run-p server dev"
+    "dev:full": "run-p server dev",
+    "setup:local": "bash scripts/setup-local-dev.sh"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
