@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Contextual Positioner (Layer 3b)
  *

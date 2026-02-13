@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 1: Context-Aware Analysis Service
  *

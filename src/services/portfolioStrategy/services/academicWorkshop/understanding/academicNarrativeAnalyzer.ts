@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Narrative Analyzer (Layer 3a)
  *

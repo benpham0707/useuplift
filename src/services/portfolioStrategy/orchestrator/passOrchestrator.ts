@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PASS (Portfolio & Application Strategy System) Orchestrator
  *

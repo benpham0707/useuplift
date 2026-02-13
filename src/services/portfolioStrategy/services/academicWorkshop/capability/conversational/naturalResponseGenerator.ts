@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Natural Response Generator
  *

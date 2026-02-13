@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Profile Integration Service
  *

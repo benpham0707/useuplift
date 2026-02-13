@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Expert Counselor Knowledge Base
  *

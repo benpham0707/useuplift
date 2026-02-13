@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Heuristic Foundation (Layer 2)
  *

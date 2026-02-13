@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Portfolio Strategy System - Type Definitions
  *

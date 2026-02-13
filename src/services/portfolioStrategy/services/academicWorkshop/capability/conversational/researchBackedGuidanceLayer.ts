@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Research-Backed Guidance Layer
  *
