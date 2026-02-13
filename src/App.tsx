@@ -31,6 +31,9 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
+import { ConfigError } from "@/components/ConfigError";
+import { getSupabaseConfigErrors } from "@/integrations/supabase/client";
+import { CLERK_PUBLISHABLE_KEY } from "@/config/clerk";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -43,7 +46,24 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => (
+const App = () => {
+  // Check for critical configuration errors
+  const supabaseErrors = getSupabaseConfigErrors();
+  const clerkError = !CLERK_PUBLISHABLE_KEY ? 'VITE_CLERK_PUBLISHABLE_KEY is not configured' : null;
+  
+  const allErrors = [...supabaseErrors, ...(clerkError ? [clerkError] : [])];
+  
+  // Show configuration error page if critical variables are missing
+  if (allErrors.length > 0) {
+    return (
+      <ConfigError
+        error="Critical environment variables are missing"
+        details={allErrors}
+      />
+    );
+  }
+  
+  return (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <FraudTrackingProvider>
@@ -96,6 +116,7 @@ const App = () => (
       </FraudTrackingProvider>
     </AuthProvider>
   </QueryClientProvider>
-);
+  );
+};
 
 export default App;
