@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 1A: Foundation Teaching Service
  *

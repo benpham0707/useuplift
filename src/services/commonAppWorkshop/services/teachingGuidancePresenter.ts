@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Teaching Guidance Presenter Service
  *

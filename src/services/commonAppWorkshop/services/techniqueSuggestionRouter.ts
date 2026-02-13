@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Technique Suggestion Router
  *

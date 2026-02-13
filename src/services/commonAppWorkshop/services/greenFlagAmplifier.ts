@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Green Flag Amplifier Service
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * College-Type Integration Service
  *

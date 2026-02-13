@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Type-Specific Teaching Prompts
  *

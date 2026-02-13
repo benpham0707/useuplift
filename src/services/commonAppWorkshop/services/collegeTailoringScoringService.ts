@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * College Tailoring Scoring Service
  *

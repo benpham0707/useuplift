@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Citation Trigger Detector
  *

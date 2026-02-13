@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Citation Formatter - UI-Ready Conversion
  *

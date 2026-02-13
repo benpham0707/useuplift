@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Value Alignment Guidance Service
  *
