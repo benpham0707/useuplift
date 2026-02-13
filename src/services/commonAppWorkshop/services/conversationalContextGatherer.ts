@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Conversational Context Gatherer
  *

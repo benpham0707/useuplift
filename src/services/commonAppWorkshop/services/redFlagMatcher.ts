@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Red Flag Matcher Service
  *

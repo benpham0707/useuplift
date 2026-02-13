@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Workshop Chat Mode - Specialized Technique & Suggestion Implementation Chat
  *

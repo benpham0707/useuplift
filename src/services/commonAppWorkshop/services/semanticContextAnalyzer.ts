@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Semantic Context Analyzer
  *

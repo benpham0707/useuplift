@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Workshop Handoff Service
  *

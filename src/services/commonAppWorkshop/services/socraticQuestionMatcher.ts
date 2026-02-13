@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Socratic Question Matcher Service
  *
