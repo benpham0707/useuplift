@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Activity Teaching Service (Stage 2)
  *

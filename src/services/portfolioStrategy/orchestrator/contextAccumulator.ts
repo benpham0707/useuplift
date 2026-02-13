@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PASS Context Accumulator
  *

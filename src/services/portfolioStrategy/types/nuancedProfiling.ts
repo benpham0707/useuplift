@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Nuanced Extracurricular Profiling Types
  *

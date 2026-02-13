@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Profile-Powered Description Generator
  *

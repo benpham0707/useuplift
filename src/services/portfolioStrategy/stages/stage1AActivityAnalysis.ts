@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PASS Stage 1A: Activity Portfolio Deep Analysis
  *

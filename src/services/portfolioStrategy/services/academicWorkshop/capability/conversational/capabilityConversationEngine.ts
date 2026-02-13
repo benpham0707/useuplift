@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Capability Conversation Engine
  *

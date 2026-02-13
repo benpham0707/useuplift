@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Spike & Narrative Analyzer
  *

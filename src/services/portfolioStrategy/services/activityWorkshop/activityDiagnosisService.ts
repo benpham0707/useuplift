@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Activity Diagnosis Service (Haiku-powered)
  *

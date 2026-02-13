@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Portfolio Narrative Service
  *

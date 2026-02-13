@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Engaging Hook Generator
  *

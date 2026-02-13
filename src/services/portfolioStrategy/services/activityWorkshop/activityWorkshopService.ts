@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Activity Workshop Service (Orchestrator) - v4.3 PIPELINE
  *

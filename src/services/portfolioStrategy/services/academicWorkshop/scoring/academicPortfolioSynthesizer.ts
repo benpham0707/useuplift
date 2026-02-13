@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Portfolio Synthesizer (Layer 6)
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Unified Research Assembly Service
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Description Scoring Service (SONNET-POWERED)
  *

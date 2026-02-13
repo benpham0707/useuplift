@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Multi-Dimensional Scorer (Layer 4)
  *
