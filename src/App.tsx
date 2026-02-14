@@ -25,6 +25,7 @@ import RequireTermsAccepted from "@/components/RequireTermsAccepted";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 import WorkshopDemo from "./pages/WorkshopDemo";
+import ActivityWorkshop from "./pages/ActivityWorkshop";
 import Pricing from "./pages/Pricing";
 import PIQWorkshop from "./pages/PIQWorkshop";
 import Privacy from "./pages/Privacy";
@@ -95,6 +96,7 @@ const App = () => {
               <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
               <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
               <Route path="/workshop-demo" element={<WorkshopDemo />} />
+              <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
               
               {/* Dashboard routes - authenticated app shell with left sidebar */}
               <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
