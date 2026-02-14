@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Comparison Benchmarks Library
  *

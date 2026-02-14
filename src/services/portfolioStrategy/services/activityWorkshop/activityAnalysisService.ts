@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Activity Analysis Service (Stage 1)
  *

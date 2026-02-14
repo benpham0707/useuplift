@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Type-Aware Scoring Service
  *

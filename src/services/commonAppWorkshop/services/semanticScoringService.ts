@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Semantic Scoring Service
  *

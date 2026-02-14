@@ -64,10 +64,17 @@ interface TeachingLayerResponse {
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-}
+let _supabase: ReturnType<typeof createClient> | null = null;
 
-const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+function getSupabase() {
+  if (!_supabase) {
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase not configured for teaching layer');
+    }
+    _supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return _supabase;
+}
 
 // ============================================================================
 // MAIN SERVICE FUNCTION
@@ -127,7 +134,7 @@ export async function enhanceWithTeachingLayer(
     };
 
     // Call edge function
-    const { data, error } = await supabase.functions.invoke<TeachingLayerResponse>(
+    const { data, error } = await getSupabase().functions.invoke<TeachingLayerResponse>(
       'teaching-layer',
       {
         body: requestBody,

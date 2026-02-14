@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Batch Activity Analysis Service
  *

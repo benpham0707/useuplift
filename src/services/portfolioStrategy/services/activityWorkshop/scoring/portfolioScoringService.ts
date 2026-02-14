@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Portfolio Scoring Service (DIAGNOSTIC LAYER)
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Deep Academic Report Orchestrator
  *

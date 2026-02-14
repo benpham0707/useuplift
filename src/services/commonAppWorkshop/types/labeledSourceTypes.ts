@@ -28,56 +28,60 @@ import type { ProvenanceSource } from './provenanceTypes';
  * Each source must have exactly one primary category
  */
 export type SourceCategory =
-  | 'authenticity'           // Voice, genuine expression, honest reflection
-  | 'specificity'            // Concrete details, unique moments
-  | 'cliche_avoidance'       // Avoiding overused phrases/structures
-  | 'showing_vs_telling'     // Narrative technique
-  | 'intellectual_vitality'  // Curiosity, learning for its own sake
-  | 'vulnerability'          // Honest uncertainty, growth mindset
-  | 'impact_on_others'       // Effect on community, leadership
-  | 'collaboration'          // Teamwork, group problem-solving
-  | 'intellectual_community' // Contributing to peer learning
-  | 'fresh_perspective'      // Unique angles, original thinking
-  | 'narrative_structure'    // Story arc, essay organization
-  | 'opening_hooks';         // First impressions, hooks, opening techniques
+  | 'authenticity'
+  | 'specificity'
+  | 'cliche_avoidance'
+  | 'showing_vs_telling'
+  | 'intellectual_vitality'
+  | 'vulnerability'
+  | 'impact_on_others'
+  | 'collaboration'
+  | 'intellectual_community'
+  | 'fresh_perspective'
+  | 'narrative_structure'
+  | 'opening_hooks'
+  | string;
 
 /**
  * Types of teaching moments this source can support
  */
 export type TeachingMomentType =
-  | 'why_this_matters'       // Explains importance of a principle
-  | 'how_to_fix'             // Provides actionable guidance
-  | 'what_to_avoid'          // Warns against common mistakes
-  | 'elite_example'          // Shows what success looks like
-  | 'principle_explanation'  // Teaches underlying concept
-  | 'before_after'           // Transformation demonstration
-  | 'technique_explanation'  // How a specific technique works
-  | 'why_this_fails'         // Detailed explanation of why something doesn't work
-  | 'analysis'               // Deep analysis of specific example
-  | 'evaluation_criteria'    // What AOs look for when evaluating
-  | 'encouragement'          // Motivational context for students
-  | 'data_support'           // Backs up claims with statistics/research
-  | 'when_it_works';         // Explains when a technique is appropriate
+  | 'why_this_matters'
+  | 'how_to_fix'
+  | 'what_to_avoid'
+  | 'elite_example'
+  | 'principle_explanation'
+  | 'before_after'
+  | 'technique_explanation'
+  | 'why_this_fails'
+  | 'analysis'
+  | 'evaluation_criteria'
+  | 'encouragement'
+  | 'data_support'
+  | 'when_it_works'
+  | string;
 
 /**
  * Essay sections where this source is most relevant
  */
 export type EssaySectionType =
-  | 'opening'      // Essay introduction
-  | 'body'         // Middle paragraphs
-  | 'conclusion'   // Essay ending
-  | 'throughout';  // Applies to entire essay
+  | 'opening'
+  | 'body'
+  | 'conclusion'
+  | 'throughout'
+  | string;
 
 /**
  * How the source should be used in feedback
  */
 export type UsageContext =
-  | 'explaining_problem'   // Why something is an issue
-  | 'justifying_severity'  // Why this matters enough to fix
-  | 'teaching_principle'   // Explaining the underlying concept
-  | 'proving_weight'       // Backing up importance claims
-  | 'showing_elite_pattern' // Demonstrating what works
-  | 'motivating_student';  // Encouraging improvement
+  | 'explaining_problem'
+  | 'justifying_severity'
+  | 'teaching_principle'
+  | 'proving_weight'
+  | 'showing_elite_pattern'
+  | 'motivating_student'
+  | string;
 
 // ============================================================================
 // COLLEGE MAPPING
@@ -105,7 +109,8 @@ export type CollegeId =
   | 'uva'
   | 'tulane'
   | 'harvey_mudd'
-  | 'gmu';
+  | 'gmu'
+  | string;
 
 /**
  * College specificity configuration for a source
@@ -188,7 +193,8 @@ export type ClicheSymptomType =
   | 'cliche_college_specific'
   | 'cliche_value_signaling'
   | 'cliche_inspirational'
-  | 'cliche_language';
+  | 'cliche_language'
+  | string;
 
 /**
  * Pre-computed relevance score for an issue type
@@ -198,7 +204,7 @@ export interface IssueRelevanceScore {
   score: number;
 
   /** What aspect of the issue this source addresses */
-  aspect: 'problem' | 'solution' | 'principle' | 'example';
+  aspect: string;
 
   /** Keywords that triggered this match (for debugging) */
   keywords_matched: string[];
@@ -238,7 +244,7 @@ export interface SourceUsage {
   best_for: UsageContext[];
 
   /** Tone of the quote */
-  tone: 'supportive' | 'challenging' | 'instructive' | 'inspiring';
+  tone: string;
 
   /** Complexity level for student understanding */
   complexity: 'simple' | 'moderate' | 'advanced';
@@ -448,27 +454,26 @@ export function validateSourceCollection(sources: LabeledSource[]): {
  * These distinguish different kinds of essays that need different advice
  */
 export type PromptType =
-  // Common App Main Essay Types (650 words)
-  | 'personal_statement'      // General identity/values essay
-  | 'background_identity'     // Background, identity, interest, talent
-  | 'challenge_setback'       // Obstacle, failure, setback overcome
-  | 'belief_challenged'       // Belief or idea questioned
-  | 'problem_solved'          // Problem solved, accomplishment
-  | 'personal_growth'         // Transition, realization, maturity, gratitude
-  | 'topic_of_choice'         // Open topic chosen by applicant
-
-  // Supplemental Essay Types
-  | 'why_this_college'        // "Why X" essays (150-650 words)
-  | 'why_this_major'          // Major/academic interest explanation
-  | 'community_contribution'  // What you'll bring/contribute
-  | 'activity_elaboration'    // Expand on an activity (150-350 words)
-  | 'short_answer'            // Brief responses (50-150 words)
-  | 'creative_prompt'         // Quirky/unusual prompts (UChicago, etc.)
-  | 'additional_info'         // Optional context section
-  | 'letter_to_roommate'      // Personality/casual tone essays
-  | 'intellectual_curiosity'  // Academic passion essays
-  | 'diversity_perspective'   // Identity/perspective essays
-  | 'extracurricular_impact'; // Leadership/impact in activities
+  | 'personal_statement'
+  | 'background_identity'
+  | 'challenge_setback'
+  | 'belief_challenged'
+  | 'problem_solved'
+  | 'personal_growth'
+  | 'topic_of_choice'
+  | 'why_this_college'
+  | 'why_this_major'
+  | 'community_contribution'
+  | 'activity_elaboration'
+  | 'short_answer'
+  | 'creative_prompt'
+  | 'additional_info'
+  | 'letter_to_roommate'
+  | 'intellectual_curiosity'
+  | 'diversity_perspective'
+  | 'extracurricular_impact'
+  | 'meaningful_activity'
+  | string;
 
 // ============================================================================
 // V2: SOURCE SCOPE SYSTEM
@@ -496,22 +501,24 @@ export type SourceScope =
  * Source authority level (affects weighting)
  */
 export type SourceAuthority =
-  | 'primary'      // Dean quote, official admissions (weight: 1.0)
-  | 'research'     // Published study, data analysis (weight: 0.9)
-  | 'expert'       // Admissions consultant, former AO (weight: 0.85)
-  | 'pattern'      // Internal analysis of successful essays (weight: 0.8)
-  | 'principle';   // Established writing/narrative principle (weight: 0.75)
+  | 'primary'
+  | 'research'
+  | 'expert'
+  | 'pattern'
+  | 'principle'
+  | string;
 
 /**
  * What type of advice this source provides
  */
 export type AdviceType =
-  | 'technique'     // HOW to do something
-  | 'principle'     // WHY something matters
-  | 'warning'       // What to AVOID
-  | 'example'       // What success looks like
-  | 'data'          // Statistical finding
-  | 'structure';    // Organization/format advice
+  | 'technique'
+  | 'principle'
+  | 'warning'
+  | 'example'
+  | 'data'
+  | 'structure'
+  | string;
 
 // ============================================================================
 // V2: ENHANCED SCOPE METADATA

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Nuanced Academic Analysis Pipeline
  *

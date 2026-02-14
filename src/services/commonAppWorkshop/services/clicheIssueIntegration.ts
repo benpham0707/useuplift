@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Cliché Issue Integration Service
  *

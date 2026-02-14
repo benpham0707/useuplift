@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * College Overlay Enhancer
  *

@@ -1,39 +1,113 @@
 
 
-## Fix Build Errors in `collegeResearch.ts`
+## Activity Workshop — Extracurricular Portfolio Overview Section
 
-All build errors come from `brown.ts` (and likely other college data files) using fields and values that `collegeResearch.ts` doesn't define. The fix is entirely in the types file -- we do NOT touch `brown.ts` or any data files.
+### Overview
 
-### Changes to `src/services/commonAppWorkshop/types/collegeResearch.ts`
+Build a new page at `/activity-workshop/:sessionId` with the top "portfolio at a glance" hero section. This mirrors the PortfolioScanner hero pattern: gradient background, 5 clickable metric tiles, expandable insights panel, story pitch, context badges, and narrative threads. All data is mock, matching the `ActivityWorkshopPipelineResult` type from the context doc.
 
-**1. `CollegeEssayPrompt` (lines 109-132)**
-- Make `promptNumber`, `promptTitle`, `primaryAssessment`, `importance`, `importanceContext`, `rubric`, `dimensionalCriteria` all optional
-- Make `wordCount` optional
-- Add `wordLimit?: number`
-- Add `essayPattern?: string`, `whatItReveals?: string[]`, `requiredOrOptional?: string`
-- Add `rubricCriteria?: Array<{ criterion: string; weight: number; excellent: string; adequate: string; weak: string }>`
-- Add `promptSpecificRedFlags?: string[]`, `promptSpecificGreenFlags?: string[]`
-- Add index signature `[key: string]: unknown`
+---
 
-**2. `CollegeRedFlag.evidence` (line 216-220)**
-- Change from single object to `evidence: { source: string; quote: string; explanation: string; context?: string } | { source: string; quote: string; explanation: string; context?: string }[]`
-- This allows both single evidence and arrays with context
+### Files to Create
 
-**3. `CollegeGreenFlag.strength` (line 249)**
-- Widen from `'exceptional' | 'strong' | 'positive'` to `string`
+**1. `src/pages/ActivityWorkshop.tsx`**
+- New page component registered at `/activity-workshop/:sessionId`
+- Imports and renders `ActivityPortfolioOverview`
+- Uses `useParams` for sessionId
+- Minimal shell: full-width layout, no sidebar needed initially
 
-**4. `CollegeGreenFlag.evidence` (lines 258-263)**
-- Add `context?: string` to evidence, same as RedFlag
+**2. `src/components/portfolio/activity-workshop/ActivityPortfolioOverview.tsx`**
+- The main hero section component (self-contained)
+- Accepts the full `ActivityWorkshopPipelineResult` as a prop
+- Sections (top to bottom):
+  - **Header**: "Activity Workshop" title with blue/indigo gradient, archetype badge ("innovator"), confidence bar
+  - **Harvard Scale gauge**: Large circular SVG gauge showing 3/6 with "Competitive" label, score-based glow (reuses `getScoreStyles` pattern from PortfolioScanner)
+  - **5 Metric Tiles** (2-col mobile, 5-col desktop):
+    1. Harvard Scale (3/6)
+    2. Coherence (78/100)
+    3. Avg Activity Score (7.2/10)
+    4. Avg Description Score (5.8/10)
+    5. Spike Maturity (emerging)
+  - Each tile uses `GradientText` for the score value with tone-based colors (same `toneToColors` pattern)
+  - Clicking a tile opens/closes an **insights panel** below (same toggle pattern as PortfolioScanner `handleMetricClick`)
+  - **Tier Distribution bar**: Visual horizontal bar showing T1=0, T2=2, T3=2, T4=1 with gold/blue/green/gray colors
+  - **Context Badges**: "First-Gen", "Works 20 hrs/week", "Rural" as badges
+  - **Story Pitch card**: Prominent blockquote-style card with the 2-sentence pitch from `finalNarrative.story.pitch`
+  - **Narrative Threads**: 3 thread cards showing thread name, linked activities, and synergy strength
+  - **Top Elevations**: 2 elevation cards showing activity relationships (e.g., grocery -> research [transformative])
+  - **Recommended Activity Order**: Numbered list with rank, activity title, reason
+  - **Action Plan accordion**: 3 sections (Do Now, Next Months, Long-Term) using Collapsible
 
-**5. `CollegeSocraticQuestionBank` (lines 286-301)**
-- Change all `CollegeSocraticQuestion[]` to `(string | CollegeSocraticQuestion)[]`
-- Make `byPurpose` optional
-- Make `byPrompt` and `byIssue` use `(string | CollegeSocraticQuestion)[]` too
+**3. `src/components/portfolio/activity-workshop/ActivityMetricTile.tsx`**
+- Reusable metric tile component
+- Props: `label`, `value`, `maxValue`, `suffix?`, `onClick`, `isSelected`, `ref`
+- Uses `GradientText` with tone-based colors
+- Hover/selected state styling matching PortfolioScanner `holo-surface` pattern but with blue/indigo theming
 
-**6. Add index signatures**
-- Add `[key: string]: unknown` to `CollegeRedFlag` and `CollegeGreenFlag` for forward compatibility
+**4. `src/components/portfolio/activity-workshop/ActivityInsightsPanel.tsx`**
+- Expandable panel that shows detail for the selected metric
+- Harvard Scale detail: explanation, what would improve it
+- Coherence detail: primary theme, thread breakdown
+- Activity Score detail: breakdown of scoring dimensions
+- Description Score detail: breakdown of description dimensions
+- Spike detail: area, maturity, related activities
 
-### No other files changed
-- `brown.ts` and all college data files stay exactly as-is
-- No `@ts-nocheck` needed for this fix
+**5. `src/components/portfolio/activity-workshop/mockData.ts`**
+- All hard-coded mock data matching `ActivityWorkshopPipelineResult`
+- Comment at the top: `// HARD-CODED MOCK DATA: Sample ActivityWorkshopPipelineResult representing a first-gen student's portfolio analysis. Replace with real API data when the pipeline endpoint is wired up.`
+- Uses the E2E sample values from the prompt (Harvard 3, coherence 78, innovator archetype, etc.)
+
+### Files to Modify
+
+**6. `src/App.tsx`**
+- Add route: `<Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />`
+- Add lazy import for `ActivityWorkshop`
+
+---
+
+### Design Details
+
+- **Color scheme**: Blue/indigo primary (`from-blue-600 to-indigo-600` gradients), distinct from purple PIQ and cyan Portfolio
+- **Tier colors**: Gold (`amber-500`) = Tier 1, Blue (`blue-500`) = Tier 2, Green (`green-500`) = Tier 3, Gray (`gray-400`) = Tier 4
+- **Score glow**: Reuse the `getScoreStyles` logic from PortfolioScanner (hue shifts from red -> amber -> green -> blue based on score)
+- **Metric tone mapping**: Same `toneToColors` function adapted for 1-6 Harvard Scale and 0-100 coherence
+- **Context badges**: `Badge variant="secondary"` with relevant icons (GraduationCap for first-gen, Clock for work hours, MapPin for rural)
+- **Story pitch**: Large card with left border accent, italic quote styling, `text-lg` font
+- **Narrative threads**: Cards with colored left border based on `strength` (strong=green, emerging=amber, weak=gray)
+- **Dark mode**: All colors use Tailwind `dark:` variants
+- **Responsive**: 1-col mobile stacking, 2-col tablet, full desktop layout
+
+### Component Hierarchy
+
+```text
+ActivityWorkshop (page)
+  +-- ActivityPortfolioOverview
+       +-- Header (title + archetype badge + confidence)
+       +-- Harvard Scale Gauge (SVG circle)
+       +-- Metric Tiles Grid (5 tiles)
+       |    +-- ActivityMetricTile x5
+       +-- ActivityInsightsPanel (collapsible, below tiles)
+       +-- Tier Distribution Bar
+       +-- Context Badges Row
+       +-- Story Pitch Card
+       +-- Narrative Threads (3 cards)
+       +-- Elevations (2 cards)
+       +-- Recommended Order (numbered list)
+       +-- Action Plan (3 collapsible sections)
+```
+
+### Mock Data Values (from E2E sample)
+
+| Field | Value |
+|-------|-------|
+| Harvard Scale | 3/6 ("Competitive") |
+| Confidence | 78% |
+| Archetype | "innovator" |
+| Coherence | 78/100 |
+| Spike | "Computer Science & Educational Leadership" (emerging) |
+| Tier Mix | T1=0, T2=2, T3=2, T4=1 |
+| Avg Activity Score | ~7.2 |
+| Avg Description Score | ~5.8 |
+| Context | First-gen, Works 20 hrs/week, Rural |
+| Activities | 5 (research, cs-club, farm, grocery, tutoring) |
 

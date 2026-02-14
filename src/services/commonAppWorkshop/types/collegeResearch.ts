@@ -24,41 +24,23 @@
  * Contains all research for a single college, fully structured
  */
 export interface CollegeResearch {
-  // College Identification
-  collegeId: string;                    // e.g., 'stanford', 'mit', 'harvard'
-  collegeName: string;                  // e.g., 'Stanford University'
-
-  // Research Quality Metadata
-  researchQuality: {
-    score: number;                      // 0-100, from overlay header
-    totalSources: number;               // e.g., 43+ for Stanford
-    lastUpdated: string;                // ISO date
-    keyInstitutionalSources: string[];  // CDS, Dean quotes, etc.
+  collegeId: string;
+  collegeName: string;
+  researchQuality: number | {
+    score: number;
+    totalSources: number;
+    lastUpdated: string;
+    keyInstitutionalSources: string[];
   };
-
-  // Core Values (the heart of college-specific feedback)
   coreValues: CollegeCoreValue[];
-
-  // Essay Prompts with Rubrics
   essayPrompts: CollegeEssayPrompt[];
-
-  // Red Flags (college-specific problems to detect)
   redFlags: CollegeRedFlag[];
-
-  // Green Flags (college-specific strengths to recognize)
   greenFlags: CollegeGreenFlag[];
-
-  // Socratic Questions (college-specific teaching questions)
   socraticQuestions: CollegeSocraticQuestionBank;
-
-  // Elite Examples (annotated successful essays)
   eliteExamples: CollegeEliteExample[];
-
-  // Key Quotes (from deans, admissions, etc.)
   keyQuotes: CollegeKeyQuote[];
-
-  // Dimension Weight Adjustments (how this college weights 12 dimensions)
   dimensionWeights: CollegeDimensionWeights;
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -108,27 +90,41 @@ export interface CollegeCoreValue {
  */
 export interface CollegeEssayPrompt {
   promptId: string;                     // e.g., 'stanford_intellectual_vitality'
-  promptNumber: number;                 // 1, 2, 3, etc.
-  promptTitle: string;                  // e.g., 'Intellectual Vitality'
+  promptNumber?: number;                // 1, 2, 3, etc.
+  promptTitle?: string;                 // e.g., 'Intellectual Vitality'
   promptText: string;                   // Full prompt text
 
-  wordCount: {
+  wordCount?: {
     min: number;
     max: number;
   };
 
+  // Word limit (alternative to wordCount range)
+  wordLimit?: number;
+
   // Primary purpose of this essay
-  primaryAssessment: string;            // e.g., 'Pure Intellectual Vitality'
+  primaryAssessment?: string;           // e.g., 'Pure Intellectual Vitality'
 
   // How important is this essay?
-  importance: 'critical' | 'high' | 'medium';
-  importanceContext: string;            // Why it's important
+  importance?: string;
+  importanceContext?: string;           // Why it's important
 
   // Full scoring rubric
-  rubric: CollegeEssayRubric;
+  rubric?: CollegeEssayRubric;
 
   // Dimensional evaluation criteria specific to this prompt
-  dimensionalCriteria: PromptDimensionalCriteria[];
+  dimensionalCriteria?: PromptDimensionalCriteria[];
+
+  // Extended fields for superior data format
+  essayPattern?: string;
+  whatItReveals?: string[];
+  requiredOrOptional?: string;
+  rubricCriteria?: Array<{ criterion: string; weight: number; excellent: string; adequate: string; weak: string }>;
+  promptSpecificRedFlags?: string[];
+  promptSpecificGreenFlags?: string[];
+
+  // Forward compatibility
+  [key: string]: unknown;
 }
 
 /**
@@ -196,42 +192,37 @@ export interface PromptDimensionalCriteria {
  * These are problems that this college particularly dislikes
  */
 export interface CollegeRedFlag {
-  flagId: string;                       // e.g., 'CLASS_BASED_ONLY'
-  flagName: string;                     // Human-readable name
-
-  // Which essays this applies to (empty = all)
-  applicablePrompts: string[];
-
-  // Severity of this flag
-  severity: 'critical' | 'major' | 'minor';
-
-  // Detection criteria
-  detection: {
-    description: string;                // What to look for
-    signalPhrases: string[];            // Phrases that might indicate this flag
-    patterns: string[];                 // Regex patterns (optional)
+  flagId: string;
+  flagName?: string;
+  applicablePrompts?: string[];
+  severity?: string;
+  detection?: {
+    description: string;
+    signalPhrases: string[];
+    patterns: string[];
   };
-
-  // Evidence from college sources
-  evidence: {
+  evidence?: {
     source: string;
     quote: string;
-    explanation: string;
+    explanation?: string;
+    context?: string;
+  } | Array<{
+    source: string;
+    quote: string;
+    explanation?: string;
+    context?: string;
+  }>;
+  teaching?: {
+    problem: string;
+    whyItMatters: string;
+    howToFix: string;
+    exampleFix?: string;
   };
-
-  // Teaching when this flag is detected
-  teaching: {
-    problem: string;                    // What's wrong
-    whyItMatters: string;               // Why college cares
-    howToFix: string;                   // How to address
-    exampleFix?: string;                // Before/after example
+  scoreImpact?: {
+    dimension: string;
+    penalty: string;
   };
-
-  // Impact on score
-  scoreImpact: {
-    dimension: string;                  // Which dimension is affected
-    penalty: string;                    // e.g., 'Caps at 69'
-  };
+  [key: string]: unknown;
 }
 
 /**
@@ -239,41 +230,36 @@ export interface CollegeRedFlag {
  * These are strengths that this college particularly values
  */
 export interface CollegeGreenFlag {
-  flagId: string;                       // e.g., 'SELF_DIRECTED_EXPLORATION'
-  flagName: string;
-
-  // Which essays this applies to
-  applicablePrompts: string[];
-
-  // How strong this signal is
-  strength: 'exceptional' | 'strong' | 'positive';
-
-  // Detection criteria
-  detection: {
+  flagId: string;
+  flagName?: string;
+  applicablePrompts?: string[];
+  strength?: string;
+  detection?: {
     description: string;
     signalPhrases: string[];
     patterns: string[];
   };
-
-  // Evidence from college sources
-  evidence: {
+  evidence?: {
     source: string;
     quote: string;
-    explanation: string;
+    explanation?: string;
+    context?: string;
+  } | Array<{
+    source: string;
+    quote: string;
+    explanation?: string;
+    context?: string;
+  }>;
+  teaching?: {
+    whatWorks: string;
+    whyItMatters: string;
+    howToEnhance: string;
   };
-
-  // Teaching when this flag is detected
-  teaching: {
-    whatWorks: string;                  // What they did well
-    whyItMatters: string;               // Why college values this
-    howToEnhance: string;               // How to make it even stronger
-  };
-
-  // Impact on score
-  scoreImpact: {
+  scoreImpact?: {
     dimension: string;
-    bonus: string;                      // e.g., 'Supports 85+'
+    bonus: string;
   };
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -285,19 +271,22 @@ export interface CollegeGreenFlag {
  */
 export interface CollegeSocraticQuestionBank {
   // Questions organized by purpose
-  byPurpose: {
-    deepening: CollegeSocraticQuestion[];     // To deepen reflection
-    specificity: CollegeSocraticQuestion[];   // To add specifics
-    connection: CollegeSocraticQuestion[];    // To connect to college
-    voice: CollegeSocraticQuestion[];         // To strengthen voice
-    vulnerability: CollegeSocraticQuestion[]; // To add vulnerability
+  byPurpose?: {
+    deepening: (string | CollegeSocraticQuestion)[];     // To deepen reflection
+    specificity: (string | CollegeSocraticQuestion)[];   // To add specifics
+    connection: (string | CollegeSocraticQuestion)[];    // To connect to college
+    voice: (string | CollegeSocraticQuestion)[];         // To strengthen voice
+    vulnerability: (string | CollegeSocraticQuestion)[]; // To add vulnerability
   };
 
   // Questions organized by essay prompt
-  byPrompt: Record<string, CollegeSocraticQuestion[]>;
+  byPrompt?: Record<string, (string | CollegeSocraticQuestion)[]>;
 
   // Questions organized by issue type
-  byIssue: Record<string, CollegeSocraticQuestion[]>;
+  byIssue?: Record<string, (string | CollegeSocraticQuestion)[]>;
+
+  // Forward compatibility
+  [key: string]: unknown;
 }
 
 /**
@@ -335,39 +324,27 @@ export interface CollegeSocraticQuestion {
  * An annotated elite example for this college
  */
 export interface CollegeEliteExample {
-  exampleId: string;                    // e.g., 'STAN_IV_001'
-
-  // Which prompt this is for
-  promptId: string;
-  promptTitle: string;
-
-  // The example content
-  content: {
-    fullText: string;                   // Complete essay text
+  exampleId: string;
+  promptId?: string;
+  promptTitle?: string;
+  promptType?: string;
+  content?: {
+    fullText: string;
     wordCount: number;
   };
-
-  // Quality assessment
-  quality: {
-    score: number;                      // 0-100
-    tier: 'exceptional' | 'excellent' | 'strong';
+  quality?: {
+    score: number;
+    tier: string;
   };
-
-  // What this example demonstrates
-  demonstrates: string[];               // e.g., ['self-directed exploration', 'authentic voice']
-
-  // Detailed annotations
-  annotations: ExampleAnnotation[];
-
-  // Techniques used that can be taught
-  teachableTechniques: {
+  demonstrates?: string[];
+  annotations?: ExampleAnnotation[];
+  teachableTechniques?: {
     technique: string;
     howItWorks: string;
-    whereInExample: string;             // Quote from example
+    whereInExample: string;
   }[];
-
-  // Tags for matching to student issues
-  tags: string[];
+  tags?: string[];
+  [key: string]: unknown;
 }
 
 /**
@@ -395,29 +372,24 @@ export interface ExampleAnnotation {
  */
 export interface CollegeKeyQuote {
   quoteId: string;
-
-  source: {
-    name: string;                       // e.g., 'Dean Richard Shaw'
-    title: string;                      // e.g., 'Dean of Admission and Financial Aid'
-    publication?: string;               // e.g., 'Stanford Magazine'
+  source?: string | {
+    name: string;
+    title: string;
+    publication?: string;
     date?: string;
   };
-
-  quote: string;                        // Exact quote
-  context: string;                      // What they were discussing
-
-  // What this quote teaches us
-  insight: string;
-
-  // When to cite this quote
-  useCases: {
-    issue?: string;                     // When student has this issue
-    dimension?: string;                 // When teaching this dimension
-    flag?: string;                      // When this flag is detected
+  quote?: string;
+  context?: string;
+  insight?: string;
+  useCases?: {
+    issue?: string;
+    dimension?: string;
+    flag?: string;
+    context?: string;
+    [key: string]: unknown;
   }[];
-
-  // How to use in teaching
-  teachingApplication: string;
+  teachingApplication?: string;
+  [key: string]: unknown;
 }
 
 // ============================================================================
@@ -428,26 +400,16 @@ export interface CollegeKeyQuote {
  * How this college weights the 12 standard dimensions
  */
 export interface CollegeDimensionWeights {
-  // Each dimension with college-specific weight and context
-  dimensions: {
-    dimensionId: string;                // Standard dimension ID
+  dimensions?: {
+    dimensionId: string;
     dimensionName: string;
-
-    // College-specific weight (default is 8.33 for even distribution)
-    weight: number;                     // 0-100, all should sum to 100
-
-    // Why this college weights this dimension this way
+    weight: number;
     context: string;
-
-    // College-specific evidence for this weight
     evidence?: string;
   }[];
-
-  // Top 3 dimensions for this college
-  primaryDimensions: string[];
-
-  // Which dimensions are de-emphasized
-  secondaryDimensions: string[];
+  primaryDimensions?: string[];
+  secondaryDimensions?: string[];
+  [key: string]: unknown;
 }
 
 // ============================================================================

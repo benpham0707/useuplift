@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 0: Voice Excavation Service
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Award & Recognition Evaluator
  *

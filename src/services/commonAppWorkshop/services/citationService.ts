@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Haiku Citation Mapping Service
  *

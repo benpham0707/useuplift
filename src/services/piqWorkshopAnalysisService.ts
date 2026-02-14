@@ -7,12 +7,21 @@
  */
 
 import type { AnalysisResult, ValidationSummary } from '@/components/portfolio/extracurricular/workshop/backendTypes';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-// Supabase client for edge function calls
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Supabase client for edge function calls — lazy init to avoid crash when env vars are missing
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !supabaseAnonKey) {
+      throw new Error('Supabase not configured for PIQ workshop analysis');
+    }
+    _supabase = createClient(supabaseUrl, supabaseAnonKey);
+  }
+  return _supabase;
+}
 
 // ============================================================================
 // TWO-STEP ANALYSIS CALLBACKS
@@ -58,7 +67,7 @@ export async function analyzePIQEntryTwoStep(
 
     const phase17Start = Date.now();
 
-    const { data: phase17Data, error: phase17Error } = await supabase.functions.invoke(
+    const { data: phase17Data, error: phase17Error } = await getSupabase().functions.invoke(
       'workshop-analysis',
       {
         body: {
@@ -128,7 +137,7 @@ export async function analyzePIQEntryTwoStep(
 
     const phase18Start = Date.now();
 
-    const { data: phase18Data, error: phase18Error } = await supabase.functions.invoke(
+    const { data: phase18Data, error: phase18Error } = await getSupabase().functions.invoke(
       'validate-workshop',
       {
         body: {
@@ -164,7 +173,7 @@ export async function analyzePIQEntryTwoStep(
 
     const phase19Start = Date.now();
 
-    const { data: phase19Data, error: phase19Error } = await supabase.functions.invoke(
+    const { data: phase19Data, error: phase19Error } = await getSupabase().functions.invoke(
       'teaching-layer',
       {
         body: {
@@ -246,7 +255,7 @@ export async function analyzePIQEntryTwoStep(
     const phase20Enhanced = await Promise.all(
       teachingEnhancedItems.map(async (item, index) => {
         try {
-          const { data: rationaleData, error: rationaleError } = await supabase.functions.invoke(
+          const { data: rationaleData, error: rationaleError } = await getSupabase().functions.invoke(
             'suggestion-rationales',
             {
               body: {
@@ -323,7 +332,7 @@ export async function analyzePIQEntry(
   try {
     // Call workshop-analysis edge function
 
-    const { data, error } = await supabase.functions.invoke('workshop-analysis', {
+    const { data, error } = await getSupabase().functions.invoke('workshop-analysis', {
       body: {
         essayText,
         essayType: options.essayType || 'uc_piq',

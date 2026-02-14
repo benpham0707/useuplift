@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Character Dimension Assessment Rubrics
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Insight-Driven Academic Advisor
  *

@@ -10,9 +10,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 
-// SECURITY: Load credentials from environment only
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+// SECURITY: Load credentials from environment only (Vite uses import.meta.env)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
 // Validate at module load
 if (!SUPABASE_URL) {
@@ -65,7 +65,7 @@ export function verifyClerkTokenStructure(token: string): boolean {
     if (parts.length !== 3) return false;
 
     // Decode payload (don't verify signature - Supabase/Clerk will do that)
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
 
     // Check for 'sub' claim (Clerk user ID)
     if (!payload.sub || typeof payload.sub !== 'string') {

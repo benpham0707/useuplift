@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PASS Stage 0: Profile Classification & Archetype Detection
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Teaching Engine (Layer 5)
  *

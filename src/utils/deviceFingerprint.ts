@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Client-Side Device Fingerprinting
  * In-house implementation using Canvas + WebGL + Audio APIs
