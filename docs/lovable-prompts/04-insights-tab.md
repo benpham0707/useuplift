@@ -1,147 +1,121 @@
-# Prompt 4: Left Pane — Insights Tab (Teaching + Scoring + Guidance)
+# Prompt 4: Insights Tab — Teaching, Scoring & Guidance
 
-> Attach `00-context.md` + the Machine Learning Research teaching section from `ACTIVITY_WORKSHOP_E2E_SAMPLE_OUTPUT.txt` with this prompt.
+> Attach [00-context.md](./00-context.md) with this prompt. Optionally attach the Machine Learning Research section from `ACTIVITY_WORKSHOP_E2E_SAMPLE_OUTPUT.txt` for real data examples.
+
+**Prev**: [03 — Edit Tab](./03-edit-tab.md) | **Next**: [05 — AI Coach](./05-ai-coach.md)
 
 ---
 
-Build out the "Insights" tab in the left pane. This is the richest section — everything our AI analyzed about the currently selected activity, organized into scrollable sections.
+Build the "Insights" tab in the left pane of the split-pane layout from [Prompt 02](./02-split-pane-layout.md). This is the richest section — everything our AI analyzed about the currently selected activity, organized into scrollable sections.
 
-## What It Shows
+## What the Student Sees
 
-For the currently selected activity, display these sections in order:
+For the currently selected activity, these sections appear in order:
 
 ### 1. Celebration (always first)
-The system always leads with what's working. Real example:
+> Data source: `stage2.teachingDelivered[].teaching.celebration` — [see type in context](./00-context.md#stage-2--teaching)
 
-```
-🎉 "Your phrase 'Built data pipeline processing 50,000 patient records'
-is exactly what MIT wants to see — not 'helped with research' but
-'BUILT infrastructure at scale.'"
+The AI always leads with what's working. Warm, encouraging tone with green styling.
 
-+ Technical specificity (NLP, data pipeline) proves real CS work
-+ Scale (50,000 records) gives admissions concrete sense of complexity
-+ Socially relevant application (rural healthcare) — powerful for first-gen narrative
-+ Tangible deliverable (co-authored paper) provides external validation
-```
+Fields: `celebration.headline` (the main quote) + `celebration.strengths` (bullet points)
 
-Green/warm styling. This should feel encouraging.
+> 🎉 "Your phrase 'Built data pipeline processing 50,000 patient records' is exactly what MIT wants to see — not 'helped with research' but 'BUILT infrastructure at scale.'"
+> - Technical specificity (NLP, data pipeline) proves real CS work
+> - Scale (50,000 records) gives admissions concrete sense of complexity
+> - Socially relevant application (rural healthcare) — powerful for first-gen narrative
 
 ### 2. Tier Assessment
-```
-TIER 2 — Distinguished (State/Regional Recognition)
+> Data source: `stage2.teachingDelivered[].teaching.tierExplanation` — [see type in context](./00-context.md#stage-2--teaching)
 
-Why: Co-authored paper + technical depth + social relevance
+Fields: `assignedTier`, `explanation`, `whatMakesThisTier`, `whatWouldChangeIt`
 
-What makes this tier:
-- Technical complexity (data pipeline for 50K records)
-- External validation (co-authorship)
-- Social relevance
+> **TIER 2** — Distinguished (State/Regional Recognition)
+>
+> Why: Co-authored paper + technical depth + social relevance
+>
+> What makes this tier: Technical complexity, external validation, social relevance
+>
+> How to reach Tier 1: Publication acceptance, first-author status, national recognition (ISEF, Regeneron STS)
 
-How to reach Tier 1:
-- Publication acceptance (submitted → published)
-- First-author status
-- National recognition (ISEF, Regeneron STS)
-```
-
-Tier badges: T1 gold, T2 blue, T3 green, T4 gray.
+Tier badge colors: T1 gold, T2 blue, T3 green, T4 gray.
 
 ### 3. Strengths (expandable cards, green accent)
-Each strength expands to show "why it matters" and "how to leverage."
+> Data source: `stage2.teachingDelivered[].teaching.strengthTeaching[]` — [see type in context](./00-context.md#stage-2--teaching)
 
-```
-▶ Builder Identity with Technical Depth
-  Why: MIT looks for students who BUILD things, not just study them. "Built data pipeline"
-  signals maker identity — problem → solution → implementation.
-  Leverage: Thread this builder identity through your entire application...
+Each entry has: `strength` (title), `whyItMatters.text` (paragraph), `howToLeverage` (actionable advice)
 
-▶ Socially Relevant Technical Application
-  Why: Connecting NLP to rural healthcare is authentic to your lived experience...
-  Leverage: Use as narrative bridge between 'technical excellence' and 'community responsibility'...
+Expandable cards — click to show "why it matters" and "how to leverage":
 
-▶ External Validation Through Co-Authorship
-  Why: Co-authorship is RARE for high school students...
-  Leverage: Lead with it in your activity description...
-```
+- ▶ Builder Identity with Technical Depth
+- ▶ Socially Relevant Technical Application
+- ▶ External Validation Through Co-Authorship
 
 ### 4. Improvements (expandable cards, amber accent, sorted by priority)
-Each improvement shows priority badge, explanation, and before/after example.
+> Data source: `stage2.teachingDelivered[].teaching.improvementTeaching[]` — [see type in context](./00-context.md#stage-2--teaching)
 
-```
-▶ [HIGH] Missing Context: Which university? Which professor? Which journal?
-  Why: Vagueness triggers red flags for admissions officers...
-  Fix: Add institution name, professor name, journal name
-  Before: "Worked with professor on NLP project analyzing rural healthcare access patterns."
-  After:  "Worked with Dr. [Name], UC [City] CS Dept, on NLP project analyzing rural
-           healthcare access patterns in [State/Region]."
+Each entry has: `issue` (title), `priority` (high/medium/low), `whyItMatters.text`, `howToFix`, `exampleBefore`, `exampleAfter`
 
-▶ [HIGH] Hidden Impact: What did the research FIND?
-  Before: "Built data pipeline processing 50,000 patient records."
-  After:  "Built data pipeline processing 50,000 patient records; identified 3x disparity
-           in specialist access for rural patients."
-```
+The before/after is the most impactful visual — show it prominently, side by side or as a diff.
 
-Before/after is the most impactful visual — show these prominently, side by side or as a diff.
+- **[HIGH]** Missing Context: Which university? Which professor?
+  - Before: "Worked with professor on NLP project..."
+  - After: "Worked with Dr. [Name], UC [City] CS Dept, on NLP project..."
+- **[HIGH]** Hidden Impact: What did the research FIND?
+  - Before: "Built data pipeline processing 50,000 patient records."
+  - After: "Built data pipeline processing 50,000 patient records; identified 3x disparity in specialist access."
 
-### 5. Scoring Breakdown (if available — optional data)
-When scores exist:
-```
-Combined: 7.2/10 (Activity: 7.8 × 0.7 + Description: 5.8 × 0.3)
+### 5. Scoring Breakdown (when available)
+> Data source: `scoring.activityScores[]` (the entry matching current activityId) — [see type in context](./00-context.md#scoring-optional--may-be-undefined)
 
-Activity Score: 7.8/10
-  Tier Assessment    8/10  (30%)
-  Recognition        7/10  (25%)
-  Commitment         8/10  (17.5%)
-  Community          7/10  (15%)
-  Leadership         8/10  (12.5%)
+**Important**: `scoring` may be `undefined` if the scoring pipeline failed. If not available, show a simple "Scoring not available" message — don't break anything.
 
-Description Score: 5.8/10
-  Role Ownership     6/10  (25%)
-  Evidence of Impact 5/10  (25%)
-  Differentiation    7/10  (20%)
-  Action Precision   5/10  (15%)
-  Quantification     5/10  (15%)
-```
+When available, show clean horizontal bars with percentage labels:
 
-If scoring is undefined, show "Scoring not available for this session" — don't break.
+> Combined: 7.2/10 (Activity: 7.8 × 70% + Description: 5.8 × 30%)
+>
+> **Activity Score: 7.8/10**
+> - Tier Assessment: 8/10 (30% weight)
+> - Recognition: 7/10 (25%)
+> - Commitment: 8/10 (17.5%)
+> - Community: 7/10 (15%)
+> - Leadership: 8/10 (12.5%)
+>
+> **Description Score: 5.8/10**
+> - Specificity: 6/10 (25%)
+> - Impact Clarity: 5/10 (25%)
+> - Authenticity/Voice: 7/10 (20%)
+> - Action Language: 5/10 (15%)
+> - Quantification: 5/10 (15%)
+
+Also show `summary.oneLiner`, `summary.topStrength`, `summary.topImprovement` from the scoring data.
 
 ### 6. Narrative Guidance
-```
-How to talk about this:
-"Frame it as the moment you realized CS is infrastructure for equity, not just
-algorithms. Lead with: 'I co-authored a research paper analyzing healthcare
-access in rural communities using NLP...'"
+> Data source: `stage2.teachingDelivered[].teaching.narrativeGuidance` — [see type in context](./00-context.md#stage-2--teaching)
 
-Your unique angle:
-"You chose a socially relevant application that connects to your lived experience,
-AND built production-level infrastructure, AND achieved external validation under
-Level 3 constraints."
+Fields: `howToTalkAboutThis.text`, `uniqueAngle`, `connectionToStory`, `interviewTips[]`
 
-Interview tips:
-1. Use the 30-second formula: Problem → Solution → Finding → Impact
-2. Be ready to explain your specific contribution (pipeline design)
-3. Avoid generic answers — connect to real-world impact
-4. If paper still pending, address proactively as learning opportunity
-```
+> **How to talk about this:** "Frame it as the moment you realized CS is infrastructure for equity, not just algorithms."
+>
+> **Your unique angle:** "You chose a socially relevant application that connects to your lived experience, AND built production-level infrastructure, AND achieved external validation."
+>
+> **Interview tips:**
+> 1. Use the 30-second formula: Problem → Solution → Finding → Impact
+> 2. Be ready to explain your specific contribution
 
-### For Quick Encouragement Activities
-If the selected activity is a "quick" teaching candidate (already strong), show just the celebration and a quick tip instead of the full teaching. Real example:
+### Quick Encouragement Activities
+> Data source: `stage2.quickEncouragements[]` — [see type in context](./00-context.md#stage-2--teaching)
 
-```
-🌟 Computer Science Club Founder
+If the activity is already strong (`teachingDepth === 'quick'` — check via `stage1.teachingCandidates.quickEncouragementIds`), show just the celebration card and a quick tip instead of the full teaching layout.
 
-"Your phrase 'Started the first CS club at my school since we had no STEM clubs'
-immediately signals to AOs that you're a builder who identifies gaps and fills them."
+Fields: `celebration` (string), `strengthReason`, `quickTip`
 
-Why it's strong: This perfectly anchors your innovator archetype and first-gen story.
-
-Quick tip: Add one concrete outcome from the hackathon (e.g., '40 students participated')
-to show the ripple effect.
-```
+> 🌟 CS Club Founder — "Your phrase 'Started the first CS club at my school' immediately signals you're a builder who identifies gaps and fills them."
+>
+> Quick tip: Add one concrete outcome (e.g., '40 students participated')
 
 ## Style
-- Celebration: warm green accents, celebration icon
+- Celebration: warm green accents
 - Strengths: green left border, expandable
 - Improvements: amber left border, priority badges (high=red, medium=amber, low=blue), expandable
-- Before/After: visual diff, most prominent element in improvements
-- Scoring: clean horizontal bars with percentage labels
+- Before/After: the most prominent visual element in improvements — side by side or diff style
 - All sections collapsible to manage density

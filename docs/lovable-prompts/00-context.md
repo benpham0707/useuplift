@@ -1,12 +1,31 @@
-# Context File: Activity Workshop — Everything Lovable Needs to Know
+# Context: Activity Workshop for Uplift
 
-> Attach this file with EVERY prompt. It gives Lovable the full technical context.
+> Attach this file with every prompt. It gives Lovable everything it needs to build against our actual data and components.
 
 ---
 
-## What We're Building
+## Prompt Navigation
 
-An Activity Workshop page for a college application platform (Uplift). Students enter their extracurricular activities, and our AI pipeline analyzes them, teaches them how to improve, scores everything, and builds a portfolio narrative. The frontend displays all of this.
+- [01 — Portfolio Overview Display](./01-overview-display.md)
+- [02 — Activity Carousel + Split-Pane Layout](./02-split-pane-layout.md)
+- [03 — Edit Tab (Description Editor)](./03-edit-tab.md)
+- [04 — Insights Tab (Teaching + Scoring)](./04-insights-tab.md)
+- [05 — AI Coach Chat](./05-ai-coach.md)
+- [06 — Loading, Mobile & Polish](./06-polish-states.md)
+
+---
+
+## What is Uplift?
+
+Uplift is an AI-powered college application platform. Students get expert-level feedback on their applications — essays, extracurriculars, academics — using AI that thinks like a top admissions counselor.
+
+## What is the Activity Workshop?
+
+Students enter their extracurricular activities and our AI pipeline produces a complete portfolio analysis. The pipeline takes ~5-10 minutes and produces deeply personalized feedback across 4 stages + narrative + scoring.
+
+**There is no HTTP endpoint yet.** Build the frontend with mock data matching the types below. We'll wire up the API later.
+
+---
 
 ## Tech Stack
 
@@ -15,21 +34,112 @@ An Activity Workshop page for a college application platform (Uplift). Students 
 - **State**: React Query for server state, local state for UI
 - **Routing**: React Router (`/activity-workshop/:sessionId`)
 - **Auth**: Clerk
-- **AI**: Anthropic Claude (responses take ~5-10 minutes for full pipeline)
+- **AI**: Anthropic Claude (pipeline takes ~5-10 minutes)
 
-## API Endpoint
+---
 
-The Activity Workshop pipeline does NOT have an HTTP endpoint yet. For now, build the frontend with mock data matching the types below. We'll wire up the endpoint later.
+## Design Language
 
-**Service entry point** (for reference):
+- **Blue/indigo primary** palette for Activity Workshop (distinct from purple PIQ and cyan Portfolio)
+- **Green** = strengths, celebrations, positive feedback
+- **Amber** = improvements, constructive feedback
+- **Red** = high priority issues only
+- **Tier badges**: Gold (T1), Blue (T2), Green (T3), Gray (T4)
+- Dark mode supported via Tailwind `dark:` variants
+- Cards: `shadow-sm hover:shadow-md transition-all`
+- Score glow effects based on value (same pattern as PortfolioScanner)
+- Smooth transitions (200ms)
+
+---
+
+## Existing Components to Reuse
+
+### Workshop Layout (replicate for Activity Workshop)
+
+**`src/pages/PIQWorkshop.tsx`** — Full page to replicate:
+- Sticky `PIQCarouselNav` at top cycling through items
+- Two-column grid below: left pane (editor + rubric) scrollable, right pane (sticky AI coach chat)
+- Uses `ContextualWorkshopChat` with `mode="piq"`
+- State: current item ID, draft text, analysis result, save status, version history
+- Full database persistence and autosave
+
+**`src/components/portfolio/piq/workshop/PIQCarouselNav.tsx`** — Carousel nav to adapt:
 ```typescript
-// src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts
-class ActivityWorkshopService {
-  async runPipeline(input: ActivityWorkshopSessionInput): Promise<ActivityWorkshopPipelineResult>
+interface PIQCarouselNavProps {
+  currentPromptId: string;
+  onPromptChange?: (promptId: string) => void;
+  useRoutes?: boolean;
+  essayStatus?: Record<string, 'empty' | 'draft' | 'complete'>;
+  onPrefetch?: (promptId: string) => void;
 }
 ```
+Prev/next buttons, dropdown selector, dot indicators. Adapt for activities instead of PIQ prompts.
 
-**Input shape:**
+### AI Coach Chat (reuse directly)
+
+**`src/components/portfolio/extracurricular/workshop/components/ContextualWorkshopChat.tsx`**:
+```typescript
+interface ContextualWorkshopChatProps {
+  mode?: 'extracurricular' | 'piq';
+  activity: ExtracurricularItem;
+  currentDraft: string;
+  analysisResult: AnalysisResult | null;
+  teachingCoaching: TeachingCoachingOutput | null;
+  currentScore: number;
+  initialScore: number;
+  hasUnsavedChanges: boolean;
+  needsReanalysis: boolean;
+  externalMessages?: ChatMessage[];
+  onMessagesChange?: (messages: ChatMessage[]) => void;
+  onTriggerReanalysis?: () => void;
+  userId?: string | null;
+  getToken?: (options: { template: string }) => Promise<string | null>;
+}
+```
+Set `mode="extracurricular"`. Pass activity data, analysis, teaching, scores. Handles chat UI, credit checking, conversation starters, auto-scrolling.
+
+### Overview Display (adapt for portfolio overview)
+
+**`src/pages/PortfolioScanner.tsx`** — Hero section to adapt:
+- 5 clickable metric tiles in responsive grid (2 cols mobile, 5 cols desktop)
+- `GradientText` components for animated gradient metric labels
+- Score-based glow effects (colors shift based on value)
+- Collapsible insights panel that opens on metric click
+- Gradient background container
+
+### Score & Loading Components
+
+**`src/components/portfolio/piq/workshop/RandomizingScore.tsx`**:
+```typescript
+interface RandomizingScoreProps {
+  score: number;
+  isAnalyzing: boolean;
+  className?: string;
+}
+```
+Slot-machine animated score while loading, settles on final score when done.
+
+**`src/components/portfolio/ScoreIndicator.tsx`** — Simple score display
+**`src/components/portfolio/DimensionInsightCard.tsx`** — Score + strengths/growth areas
+**`src/components/portfolio/InsightCard.tsx`** — Rich insight card (8 types, priority-based)
+**`src/components/portfolio/ImpactMetricCard.tsx`** — Metric with sparkline and trend
+
+### Teaching Components
+
+**`src/components/portfolio/extracurricular/workshop/TeachingUnitCard.tsx`** — Expandable teaching card
+**`src/components/portfolio/extracurricular/workshop/components/TeachingIssueCard.tsx`** — Tab-based teaching
+**`src/components/portfolio/extracurricular/workshop/components/ExampleCard.tsx`** — Before/after examples
+
+### UI Primitives (shadcn/ui — all available)
+
+Card, Button (variants: default, outline, secondary, ghost, link, hero, premium), Badge, Tabs/TabsList/TabsTrigger/TabsContent, Progress, Popover, Tooltip, Textarea, Input, Label, GradientText (animated gradient text)
+
+**Icons** (lucide-react): BookOpen, Lightbulb, Sparkles, CheckCircle2, AlertCircle, AlertTriangle, ChevronDown/Up/Left/Right, TrendingUp, Target, Award, Eye, MessageSquare, Copy, Star, PartyPopper, Clock, Rocket, Brain
+
+---
+
+## Pipeline Input
+
 ```typescript
 interface ActivityWorkshopSessionInput {
   activities: Array<{
@@ -38,7 +148,7 @@ interface ActivityWorkshopSessionInput {
     organization?: string;
     role?: string;
     description: string;
-    category: string;
+    category: 'work' | 'volunteer' | 'school_activity' | 'project';
     hoursPerWeek: number;
     weeksPerYear: number;
     yearsInvolved?: number;
@@ -58,292 +168,324 @@ interface ActivityWorkshopSessionInput {
 }
 ```
 
-**Output shape (ActivityWorkshopPipelineResult):**
+---
+
+## Pipeline Output Reference
+
+The pipeline returns `ActivityWorkshopPipelineResult`. Below is every section of the output, organized by which prompt uses it.
+
+### Stage 0 — Story Detection
+> Used by: [Prompt 01 — Overview](#stage-0-story-detection) (sections 2, 3, 4, 5)
+
 ```typescript
-interface ActivityWorkshopPipelineResult {
-  sessionId: string;
-  version: string; // "4.3.0"
-  totalCost: number;
-
-  // Stage 0: Story Detection
-  stage0: {
-    narrativeIdentity: {
-      archetype: string; // "innovator", "builder", "advocate", etc.
-      archetypeConfidence: number; // 0-100
-      storyEssence: string; // 1-2 sentences
-      primaryTheme: string;
-      secondaryThemes: string[];
-    };
-    spikeHypothesis: {
-      spikeArea?: string;
-      maturity: "mature" | "developing" | "emerging" | "absent";
-    };
-    contextualFactors: {
-      hasWorkFamilyObligations: boolean;
-      workFamilyContext?: string;
-      hasResourceConstraints: boolean;
-      firstGenIndicators: boolean;
-    };
-    narrativeThreads: Array<{
-      thread: string;
-      activityIds: string[];
-      strength: "strong" | "emerging" | "weak";
-      evidence: string;
-    }>;
-    activityStoryRoles: Array<{
-      activityId: string;
-      storyRole: "core_identity" | "passion_pursuit" | "impact_vehicle" | "obligation" | "skill_building";
-      centralityScore: number; // 0-100
-      roleExplanation: string;
-    }>;
+stage0: {
+  narrativeIdentity: {
+    archetype: 'innovator' | 'leader' | 'scholar' | 'creative' | 'advocate' | 'builder' | 'competitor' | 'explorer' | 'caretaker' | 'polymath';
+    archetypeConfidence: number; // 0-100
+    storyEssence: string;       // 1-2 sentence identity summary
+    primaryTheme: string;
+    secondaryThemes: string[];
   };
 
-  // Stage 1: Analysis
-  stage1: {
-    activities: Record<string, {
-      activityId: string;
-      classification: {
-        tier: 1 | 2 | 3 | 4; // Sara Harberson framework
-        detectedCategory: string;
-      };
-      timeInvestment: { totalHours: number };
-      redFlags: Array<{ flag: string; severity: string }>;
-      greenFlags: Array<{ flag: string }>;
-      descriptionQuality: { issues: string[] };
-    }>;
-    tierDistribution: { tier1: number; tier2: number; tier3: number; tier4: number };
-    teachingCandidates: {
-      deepTeachingIds: string[];
-      mediumTeachingIds: string[];
-      quickEncouragementIds: string[];
-    };
-    coherenceAnalysis: { score: number; primaryTheme: string };
+  spikeHypothesis: {
+    likelySpike: boolean;
+    spikeArea?: string;
+    spikeActivityIds: string[];
+    maturity: 'mature' | 'developing' | 'emerging' | 'absent';
+    evidence: string;
   };
 
-  // Stage 2: Teaching
-  stage2: {
-    teachingDelivered: Array<{
+  contextualFactors: {
+    hasWorkFamilyObligations: boolean;
+    workFamilyContext?: string;          // e.g. "Works 20 hrs/week at grocery store..."
+    hasResourceConstraints: boolean;
+    constraintsContext?: string;          // e.g. "First-generation, low-income student..."
+    hasGeographicLimitations: boolean;
+    geographicContext?: string;           // e.g. "Rural context evident from farm work..."
+    firstGenIndicators: boolean;
+  };
+
+  narrativeThreads: Array<{
+    thread: string;                       // e.g. "Building Educational Infrastructure"
+    activityIds: string[];
+    strength: 'strong' | 'emerging' | 'weak';
+    evidence: string;                     // paragraph explaining the thread
+  }>;
+
+  activityStoryRoles: Array<{
+    activityId: string;
+    storyRole: 'core_identity' | 'passion_pursuit' | 'impact_vehicle' | 'obligation' | 'skill_building' | 'exploration' | 'filler';
+    centralityScore: number;              // 0-100
+    roleExplanation: string;              // paragraph explaining why
+  }>;
+}
+```
+
+### Stage 1 — Analysis
+> Used by: [Prompt 01 — Overview](#stage-1-analysis) (section 1 tier distribution), [Prompt 04 — Insights](#stage-1-analysis) (per-activity classification)
+
+```typescript
+stage1: {
+  activities: Record<string, {
+    activityId: string;
+    classification: {
+      tier: 1 | 2 | 3 | 4;
+      detectedCategory: string;          // e.g. "research", "stem_leadership", "work_paid_employment"
+    };
+    timeInvestment: { totalHours: number };
+    redFlags: Array<{ flag: string; severity: string }>;
+    greenFlags: Array<{ flag: string }>;
+    descriptionQuality: { issues: string[] };
+  }>;
+
+  tierDistribution: { tier1: number; tier2: number; tier3: number; tier4: number };
+
+  teachingCandidates: {
+    deepTeachingIds: string[];
+    mediumTeachingIds: string[];
+    quickEncouragementIds: string[];
+  };
+
+  coherenceAnalysis: {
+    score: number;                        // 0-100
+    primaryTheme: string;
+  };
+}
+```
+
+### Stage 2 — Teaching
+> Used by: [Prompt 03 — Edit Tab](#stage-2-teaching) (references, recommended description), [Prompt 04 — Insights](#stage-2-teaching) (celebration, tier, strengths, improvements, narrative guidance), [Prompt 01 — Overview](#stage-2-teaching) (portfolio teaching)
+
+```typescript
+stage2: {
+  // === PER-ACTIVITY TEACHING (for Insights tab + Edit tab) ===
+  teachingDelivered: Array<{
+    activityId: string;
+    teachingDepth: 'deep' | 'medium';
+    teaching: {
       activityId: string;
-      teachingDepth: "deep" | "medium";
-      teaching: {
-        activityId: string;
 
-        celebration?: {
-          headline: string;
-          strengths: string[];
-          references?: Array<{
-            quotedText: string; // exact substring from description
-            type: "strength" | "issue" | "context";
-            label: string;
-          }>;
-        };
-
-        tierExplanation: {
-          assignedTier: 1 | 2 | 3 | 4;
-          explanation: string;
-          whatMakesThisTier: string;
-          whatWouldChangeIt: string;
-        };
-
-        strengthTeaching: Array<{
-          strength: string;
-          whyItMatters: { text: string };
-          howToLeverage: string;
-          references?: Array<{ quotedText: string; type: string; label: string }>;
+      celebration?: {
+        headline: string;                 // The main celebration quote
+        strengths: string[];              // Bullet points of what's working
+        references?: Array<{
+          quotedText: string;             // EXACT substring from student's description
+          type: 'strength' | 'issue' | 'context';
+          label: string;                  // Tooltip label e.g. "builder identity + scale"
         }>;
-
-        improvementTeaching: Array<{
-          issue: string;
-          priority: "high" | "medium" | "low";
-          whyItMatters: { text: string };
-          howToFix: string;
-          exampleBefore: string;
-          exampleAfter: string;
-          references?: Array<{ quotedText: string; type: string; label: string }>;
-        }>;
-
-        descriptionOptimization: {
-          originalDescription: string;
-          optimizedDescription: string;
-          characterCount: number;
-          changesExplained: Array<{ change: string; reason: string }>;
-        };
-
-        narrativeGuidance: {
-          howToTalkAboutThis: { text: string };
-          uniqueAngle: string;
-          connectionToStory: string;
-          interviewTips: string[];
-        };
       };
-    }>;
 
-    quickEncouragements: Array<{
-      activityId: string;
-      celebration: string;
-      strengthReason: string;
-      quickTip?: string;
-    }>;
+      tierExplanation: {
+        assignedTier: 1 | 2 | 3 | 4;
+        explanation: string;              // Why this tier
+        whatMakesThisTier: string;        // Detailed justification
+        whatWouldChangeIt: string;        // How to reach higher tier
+      };
 
-    portfolioTeaching: {
-      narrativeTeaching: { currentState: string; recommendation: string; twoSentencePitch: string };
-      coherenceTeaching: { currentScore: number; improvements: string[] };
-      strategicDirection: string;
+      strengthTeaching: Array<{
+        strength: string;                 // Strength title
+        whyItMatters: { text: string };   // Paragraph explanation
+        howToLeverage: string;            // Actionable advice
+        references?: Array<{ quotedText: string; type: string; label: string }>;
+      }>;
+
+      improvementTeaching: Array<{
+        issue: string;                    // Issue title
+        priority: 'high' | 'medium' | 'low';
+        whyItMatters: { text: string };   // Paragraph explanation
+        howToFix: string;                 // Actionable fix
+        exampleBefore: string;            // Student's current text
+        exampleAfter: string;             // Improved version
+        references?: Array<{ quotedText: string; type: string; label: string }>;
+      }>;
+
+      descriptionOptimization: {
+        originalDescription: string;
+        optimizedDescription: string;
+        characterCount: number;
+        changesExplained: Array<{ change: string; reason: string }>;
+      };
+
+      narrativeGuidance: {
+        howToTalkAboutThis: { text: string };
+        uniqueAngle: string;
+        connectionToStory: string;
+        interviewTips: string[];
+      };
     };
+  }>;
+
+  // === QUICK ENCOURAGEMENTS (for already-strong activities) ===
+  quickEncouragements: Array<{
+    activityId: string;
+    celebration: string;
+    strengthReason: string;
+    quickTip?: string;
+  }>;
+
+  // === PORTFOLIO-LEVEL TEACHING (for Overview) ===
+  portfolioTeaching: {
+    narrativeTeaching: {
+      currentState: string;               // e.g. "Potential spike exists but not clearly presented"
+      recommendation: string;
+      twoSentencePitch: string;
+    };
+    coherenceTeaching: {
+      currentScore: number;
+      improvements: string[];             // e.g. "Family Farm feels disconnected from narrative..."
+    };
+    strategicDirection: string;           // e.g. "CS Club shows most promise as spike..."
+  };
+}
+```
+
+### Stage 3 — Synthesis
+> Used by: [Prompt 01 — Overview](#stage-3-synthesis) (sections 1, 9, 11)
+
+```typescript
+stage3: {
+  finalAssessment: {
+    harvardScale: 1 | 2 | 3 | 4 | 5 | 6;    // 1=outstanding, 6=weak
+    harvardScaleRationale: string;
+    overallStrength: 'exceptional' | 'strong' | 'competitive' | 'developing' | 'needs_work';
+    confidence: number;                        // 0-100
   };
 
-  // Stage 3: Synthesis
-  stage3: {
-    finalAssessment: {
-      harvardScale: 1 | 2 | 3 | 4 | 5 | 6; // 1=exceptional, 6=weak
-      overallStrength: "exceptional" | "strong" | "competitive" | "developing" | "needs_work";
-      confidence: number; // 0-100
-    };
-    orderedActivities: Array<{
-      rank: number;
-      activityId: string;
-      reason: string;
-    }>;
-    actionPlan: {
-      immediate: Array<{ action: string; impact: string }>;
-      shortTerm: Array<{ action: string; impact: string; deadline?: string }>;
-      longTerm: Array<{ action: string; impact: string }>;
-    };
+  orderedActivities: Array<{
+    rank: number;
+    activityId: string;
+    reason: string;                            // Why this rank
+  }>;
+
+  actionPlan: {
+    immediate: Array<{ action: string; impact: string }>;
+    shortTerm: Array<{ action: string; impact: string; deadline?: string }>;
+    longTerm: Array<{ action: string; impact: string }>;
   };
 
-  // Narrative (single pass at end)
-  finalNarrative?: {
-    story: { pitch: string; uniqueAngle: string; emergentTraits: string[] };
-    threads: Array<{ name: string; activityIds: string[]; synergy: string }>;
-    elevations: Array<{
-      elevatingActivityId: string;
-      elevatedActivityId: string;
-      mechanism: string;
-      strength: "transformative" | "strong" | "moderate" | "subtle";
-    }>;
-    coherence: { score: number; assessment: string };
-    spike: { primarySpike: { area: string; activities: string[] } };
+  pipelineCost: {
+    stage0: number;
+    stage1: number;
+    stage2: number;
+    stage3: number;
+    total: number;
+  };
+}
+```
+
+### Final Narrative
+> Used by: [Prompt 01 — Overview](#final-narrative) (sections 6, 7, 8)
+
+```typescript
+finalNarrative?: {
+  story: {
+    pitch: string;                             // The compelling 2-3 sentence counselor pitch
+    uniqueAngle: string;
+    emergentTraits: string[];
   };
 
-  // Scoring (OPTIONAL — may be undefined if batch scoring fails)
-  scoring?: {
-    activityScores: Array<{
-      activityId: string;
-      activityTitle: string;
-      combinedScore: { total: number }; // 1-10
-      activityScore: {
-        total: number;
-        breakdown: {
-          tierAssessment: { score: number; weight: 0.30 };
-          recognitionLevel: { score: number; weight: 0.25 };
-          commitmentProgression: { score: number; weight: 0.175 };
-          communityCharacter: { score: number; weight: 0.15 };
-          leadershipImpact: { score: number; weight: 0.125 };
-        };
-      };
-      descriptionScore: {
-        total: number;
-        breakdown: {
-          specificity: { score: number }; // 25% weight
-          impactClarity: { score: number }; // 25%
-          authenticityVoice: { score: number }; // 20%
-          actionLanguage: { score: number }; // 15%
-          quantification: { score: number }; // 15%
-        };
-      };
-    }>;
-    portfolioRubric: {
-      overallScore: { total: number };
-      harvardScale: { rating: number; description: string };
+  threads: Array<{
+    name: string;                              // e.g. "Technology as Community Infrastructure"
+    activityIds: string[];
+    synergy: string;                           // How these activities strengthen each other
+  }>;
+
+  elevations: Array<{
+    elevatingActivityId: string;               // The activity doing the elevating
+    elevatedActivityId: string;                // The activity being elevated
+    mechanism: string;                         // How one makes the other more impressive
+    strength: 'transformative' | 'strong' | 'moderate' | 'subtle';
+  }>;
+
+  coherence: {
+    score: number;                             // 0-100
+    assessment: string;
+  };
+
+  spike: {
+    primarySpike: {
+      area: string;
+      activities: string[];
     };
   };
 }
 ```
 
-## Existing Components to Reuse
+### Scoring (Optional — may be undefined)
+> Used by: [Prompt 01 — Overview](#scoring) (average scores), [Prompt 04 — Insights](#scoring) (per-activity breakdown)
 
-**Workshop layout (from PIQ Workshop — replicate this pattern):**
-```
-src/pages/PIQWorkshop.tsx                          — Full page structure to copy
-src/components/portfolio/piq/workshop/PIQCarouselNav.tsx — Carousel nav (adapt for activities)
-src/components/portfolio/piq/workshop/PIQTabsNav.tsx    — Tab-style nav alternative
-```
+```typescript
+scoring?: {
+  portfolioRubric: {
+    overallScore: { total: number; confidence: number; rationale: string };
+    harvardScale: { rating: number; description: string };
+    keyStrengths: string[];
+    keyGaps: string[];
+    metadata: {
+      averageDescriptionScore: number;
+      averageActivityScore: number;
+    };
+  };
 
-**AI Coach chat (reuse directly):**
-```
-src/components/portfolio/extracurricular/workshop/components/ContextualWorkshopChat.tsx
-  Props: mode, activity, currentDraft, analysisResult, currentScore, initialScore,
-         hasUnsavedChanges, onTriggerReanalysis, externalMessages, onMessagesChange
-  Supports: mode="extracurricular" | mode="piq"
-```
+  activityScores: Array<{
+    activityId: string;
+    activityTitle: string;
 
-**Score & insight display:**
-```
-src/components/portfolio/ScoreIndicator.tsx          — Simple score display
-src/components/portfolio/DimensionInsightCard.tsx     — Dimension card with score + strengths/growth
-src/components/portfolio/InsightCard.tsx              — Rich insight card (8 types, priority-based)
-src/components/portfolio/ImpactMetricCard.tsx         — Metric with sparkline and trend
-```
+    combinedScore: {
+      total: number;                           // 1-10 (activityScore × 0.7 + descriptionScore × 0.3)
+      rationale: string;
+    };
 
-**Overview display (from Portfolio Scanner — adapt this pattern):**
-```
-src/pages/PortfolioScanner.tsx                       — Hero with 5 metric tiles, glow effects, insights panel
-src/components/portfolio/HolisticPortfolioHero.tsx   — ProfileCard + overarching insights
-src/components/portfolio/ProfileCard.tsx              — Card with tilt animation
-```
+    activityScore: {
+      total: number;                           // 1-10
+      breakdown: {
+        tierAssessment:        { score: number; weight: 0.30; tier: 1|2|3|4; rationale: string };
+        recognitionLevel:      { score: number; weight: 0.25; level: string; rationale: string };
+        commitmentProgression: { score: number; weight: 0.175; years: number; rationale: string };
+        communityCharacter:    { score: number; weight: 0.15; rationale: string };
+        leadershipImpact:      { score: number; weight: 0.125; rationale: string };
+      };
+    };
 
-**Teaching components:**
-```
-src/components/portfolio/extracurricular/workshop/TeachingUnitCard.tsx     — Expandable teaching card
-src/components/portfolio/extracurricular/workshop/components/TeachingIssueCard.tsx — Tab-based teaching
-src/components/portfolio/extracurricular/workshop/components/ExampleCard.tsx       — Before/after examples
-```
+    descriptionScore: {
+      total: number;                           // 1-10
+      breakdown: {
+        specificity:      { score: number; rationale: string };  // 25% weight
+        impactClarity:    { score: number; rationale: string };  // 25%
+        authenticityVoice: { score: number; rationale: string }; // 20%
+        actionLanguage:   { score: number; rationale: string };  // 15%
+        quantification:   { score: number; rationale: string };  // 15%
+      };
+    };
 
-**Workshop infrastructure:**
-```
-src/components/portfolio/extracurricular/workshop/HeroSection.tsx          — Workshop hero
-src/components/portfolio/extracurricular/workshop/OverallScoreCard.tsx     — Score display
-src/components/portfolio/extracurricular/workshop/WorkshopComplete.tsx     — Completion state
-src/components/portfolio/piq/workshop/RandomizingScore.tsx                 — Animated score (loading)
-```
-
-**UI primitives (shadcn/ui — all available):**
-```
-Card, CardHeader, CardContent, CardTitle
-Button (variants: default, destructive, outline, secondary, ghost, link, hero, premium)
-Badge (variants: default, secondary, outline, destructive)
-Tabs, TabsList, TabsTrigger, TabsContent
-Progress
-Popover, PopoverTrigger, PopoverContent
-Tooltip, TooltipTrigger, TooltipContent, TooltipProvider
-Textarea, Input, Label
-GradientText (animated gradient text, src/components/ui/GradientText.tsx)
+    summary: {
+      oneLiner: string;
+      topStrength: string;
+      topImprovement: string;
+    };
+  }>;
+}
 ```
 
-**Icons (lucide-react):**
-```
-BookOpen, Lightbulb, Sparkles, CheckCircle2, AlertCircle, AlertTriangle,
-ChevronDown, ChevronUp, ChevronLeft, ChevronRight, TrendingUp, Target,
-Award, Eye, MessageSquare, Copy, Star, PartyPopper, Clock, Rocket, Brain
-```
-
-## Design Language
-
-- **Blue/indigo primary** for Activity Workshop (different from purple PIQ and cyan Portfolio)
-- **Green** = strengths, celebrations, positive
-- **Amber** = improvements, warnings, constructive feedback
-- **Red** = high priority issues only
-- **Gold** = Tier 1, Blue = Tier 2, Green = Tier 3, Gray = Tier 4
-- Dark mode supported via Tailwind `dark:` variants
-- Cards: `shadow-sm hover:shadow-md transition-all`
-- Score glow effects based on value (same pattern as PortfolioScanner)
+---
 
 ## Key Domain Terms
 
-- **Tier** (1-4): Sara Harberson admissions framework. Tier 1 = rare achievement, Tier 4 = participation
-- **Harvard Scale** (1-6): Overall portfolio rating. 1 = outstanding, 6 = weak
-- **Spike**: Area of exceptional depth/distinction
-- **Coherence**: How well activities tell a unified story (0-100)
-- **Teaching depth**: deep (full analysis), medium (shorter), quick (just a celebration)
-- **References**: AI identifies exact substrings in descriptions for highlighting
-- **Common App limit**: 150 characters per activity description
+| Term | Meaning |
+|------|---------|
+| **Tier** (1-4) | Sara Harberson admissions framework. T1 = rare/national, T4 = participation |
+| **Harvard Scale** (1-6) | Overall portfolio rating. 1 = outstanding, 6 = weak |
+| **Spike** | Area of exceptional depth that makes a student stand out |
+| **Coherence** (0-100) | How well all activities tell one unified story |
+| **Teaching depth** | deep = full analysis, medium = shorter, quick = just celebration |
+| **Elevation** | How one activity makes another MORE impressive |
+| **Common App limit** | 150 characters per activity description |
+| **Archetype** | Student identity type: innovator, builder, advocate, etc. |
+| **Narrative Thread** | A thematic connection across multiple activities |
+| **Story Role** | How an activity functions in the narrative: core_identity, obligation, etc. |
+
+---
+
+## Real Example Data
+
+All prompts use data from a real E2E test: a first-gen, rural student working 20 hrs/week, targeting MIT for CS, with 5 activities. See the attached `ACTIVITY_WORKSHOP_E2E_SAMPLE_OUTPUT.txt` for the full pipeline output.

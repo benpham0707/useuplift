@@ -1,59 +1,58 @@
 # Prompt 2: Activity Carousel + Split-Pane Workshop Layout
 
-> Attach `00-context.md` with this prompt.
+> Attach [00-context.md](./00-context.md) with this prompt.
+
+**Prev**: [01 — Overview Display](./01-overview-display.md) | **Next**: [03 — Edit Tab](./03-edit-tab.md)
 
 ---
 
-Below the portfolio overview we just built, add the main workshop area. This replicates our PIQ Workshop layout exactly.
+Below the portfolio overview from [Prompt 01](./01-overview-display.md), build the main workshop area where students work on individual activities one at a time.
 
-## What to Copy
+## What to Replicate
 
-Our `src/pages/PIQWorkshop.tsx` has this structure:
-1. **Sticky carousel nav** at top — cycles through PIQ prompts
+Our PIQ Workshop (`src/pages/PIQWorkshop.tsx`) already has this exact pattern — [see component details in context](./00-context.md#workshop-layout-replicate-for-activity-workshop):
+
+1. **Sticky carousel** at top — cycles through items one at a time
 2. **Two-column split pane** below:
-   - Left: Essay editor + rubric dimensions
-   - Right: AI coach chat (sticky, stays visible while left scrolls)
+   - Left: Content area (scrollable)
+   - Right: AI coach chat (sticky, stays visible while left pane scrolls)
 
-We want the identical layout, adapted for extracurricular activities:
-1. **Sticky activity carousel** — cycles through the student's activities
-2. **Two-column split pane:**
-   - Left: **Tab toggle** between "Edit" (description editor) and "Insights" (AI teaching)
-   - Right: **AI coach chat** (reuse `ContextualWorkshopChat` component)
+We want this identical layout, adapted for extracurricular activities instead of essay prompts.
 
 ## Activity Carousel
+> Data source: `stage3.orderedActivities` for order, `stage1.activities[id].classification.tier` for tier, `stage1.teachingCandidates` for depth — [see types in context](./00-context.md#stage-3--synthesis)
 
-Adapt `PIQCarouselNav` (at `src/components/portfolio/piq/workshop/PIQCarouselNav.tsx`). Instead of PIQ prompts, show activities:
+Adapt our existing `PIQCarouselNav` component — [see props in context](./00-context.md#workshop-layout-replicate-for-activity-workshop):
 
 ```
-[◀] | Machine Learning Research (T2) | [▶]
-[●][●][●][●][●]  ← dot indicators for 5 activities
+[◀] Machine Learning Research (T2 🔵) [▶]
+         ● ● ● ● ●  ← 5 activities
 ```
 
-Each carousel item shows: activity title + tier badge (T1 gold, T2 blue, T3 green, T4 gray) + teaching depth (deep/medium/quick icon).
+Each carousel item shows: activity title + tier badge (T1 gold, T2 blue, T3 green, T4 gray) + teaching depth indicator (deep/medium/quick).
 
-Ordered by the recommended Common App order from `stage3.orderedActivities`:
-1. Machine Learning Research — Tier 2, deep
-2. CS Club Founder — Tier 2, quick (already strong)
-3. Family Farm Work — Tier 3, deep
-4. Grocery Store Associate — Tier 3, medium
-5. Math & Science Tutor — Tier 4, deep
+Activities appear in the AI's recommended Common App order from `stage3.orderedActivities`.
 
-## Left Pane Tab Toggle
+## Left Pane — Tab Toggle
 
 Two tabs at the top of the left pane:
-- **"Edit"** — Where they see and edit their extracurricular description
-- **"Insights"** — Where they see all the AI analysis and teaching
+- **"Edit"** — Where students edit their activity description (built in [Prompt 03](./03-edit-tab.md))
+- **"Insights"** — Where they see all AI analysis and teaching (built in [Prompt 04](./04-insights-tab.md))
 
-Tab state persists when switching activities. Switching activities updates the content in whichever tab is active.
+Tab state persists when switching activities. Switching activities updates content in whichever tab is active.
 
 ## Right Pane — AI Coach
+> [See component details and props in context](./00-context.md#ai-coach-chat-reuse-directly)
 
-Reuse `ContextualWorkshopChat` from `src/components/portfolio/extracurricular/workshop/components/ContextualWorkshopChat.tsx`. Set `mode="extracurricular"`. Pass:
-- The current activity data
-- The full analysis/teaching results for context
-- Student context (target schools, major, constraints)
+Reuse our existing `ContextualWorkshopChat` component (`src/components/portfolio/extracurricular/workshop/components/ContextualWorkshopChat.tsx`). It already supports extracurricular mode — set `mode="extracurricular"`.
 
-When the student switches activities via carousel, the coach's context updates.
+The coach receives the current activity's analysis as context so it can answer questions like "Why is my research only Tier 2?" More details in [Prompt 05](./05-ai-coach.md).
+
+When the student switches activities via carousel, the coach's context updates but conversation history stays.
+
+## Mobile
+
+Stack vertically — left pane full width, AI coach accessible via floating button that opens a bottom drawer.
 
 ## Layout
 
@@ -64,11 +63,8 @@ When the student switches activities via carousel, the coach's context updates.
 ├────────────────────────┬─────────────────────────┤
 │  [Edit] [Insights]     │                         │
 │                        │     AI Coach Chat       │
-│  (tab content here     │     (sticky, scrolls    │
-│   — built in next      │      with viewport)     │
-│   prompts)             │                         │
+│  (tab content —        │     (sticky, scrolls    │
+│   see prompts 03/04)   │      with viewport)     │
 │                        │                         │
 └────────────────────────┴─────────────────────────┘
 ```
-
-Mobile: Stack vertically. Coach accessible via floating button → bottom drawer.
