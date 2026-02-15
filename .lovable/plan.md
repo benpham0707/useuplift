@@ -1,40 +1,22 @@
 
 
-## Fix: Migration Safety Rewrite
+## Fix: Restore the Missing `.env` File
 
-### Problem
-The migration `20260215091237_...sql` uses bare `CREATE TABLE` for 5 tables that already exist in production (`profiles`, `credit_transactions`, `essays`, `essay_analysis_reports`, `essay_revision_history`). Running this would destroy existing data and columns.
+### What We'll Do
+Create the `.env` file in the project root with the three required Vite environment variables:
 
-### Environment Variable Status
-All 4 code files already use `VITE_SUPABASE_ANON_KEY` correctly:
-- `src/integrations/supabase/client.ts` -- already correct
-- `src/services/credits/creditsService.ts` -- already correct  
-- `src/components/BugReportWidget.tsx` -- already correct
-- `src/App.tsx` -- already correct
+```
+VITE_SUPABASE_PROJECT_ID="wrppjajhxiftzddeeqsk"
+VITE_SUPABASE_URL="https://wrppjajhxiftzddeeqsk.supabase.co"
+VITE_SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndycHBqYWpoeGlmdHpkZGVlcXNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI2NTcsImV4cCI6MjA4NjY4ODY1N30.cFgyAcfDn6e15KYr_xpiLwfgyUJyOSlE9PoHD3aXhhs"
+```
 
-The `supabaseUrl is required` runtime error is caused by the auto-generated `.env` not being present. This resolves when Lovable Cloud syncs the environment. No code changes needed for this.
+### Why
+The file was deleted, so Vite has no environment variables to inject at build time, causing the `supabaseUrl is required` crash and blank screen.
 
-### Migration Rewrite
+### Safety
+These are publishable (public) client-side keys. RLS policies protect data server-side.
 
-Rewrite `supabase/migrations/20260215091237_784d3a47-0bde-4361-b8ba-e99be99e90a4.sql`:
-
-1. **Remove entirely**: `CREATE TABLE` + `ALTER TABLE ENABLE RLS` + `CREATE POLICY` blocks for `profiles`, `credit_transactions`, `essays`, `essay_analysis_reports`, `essay_revision_history` (lines 6-269). These tables exist with richer schemas in production.
-
-2. **Change to `CREATE TABLE IF NOT EXISTS`**: The 7 new tables (`personal_information`, `academic_journey`, `experiences_activities`, `personal_growth`, `family_responsibilities`, `goals_aspirations`, `support_network`).
-
-3. **Wrap RLS policies** for those 7 tables using `DROP POLICY IF EXISTS` then `CREATE POLICY` pattern.
-
-4. **Keep** the `CREATE OR REPLACE FUNCTION update_updated_at_column()` as-is (already safe).
-
-5. **Wrap all triggers** in `DO $$ BEGIN ... EXCEPTION WHEN duplicate_object THEN NULL; END $$;` blocks. Only include triggers for the 7 new tables (the existing tables' triggers already exist).
-
-### Technical Details
-
-**File modified:**
-- `supabase/migrations/20260215091237_784d3a47-0bde-4361-b8ba-e99be99e90a4.sql` -- full rewrite
-
-**No changes needed:**
-- `supabase/migrations/20260215091256_...` (already uses `ADD COLUMN IF NOT EXISTS`)
-- All 4 env var files (already correct)
-- `supabase/functions/notify-new-signin/index.ts` (already fixed)
+### Expected Result
+The app loads without the blank screen error.
 
