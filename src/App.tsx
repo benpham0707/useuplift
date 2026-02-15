@@ -33,8 +33,14 @@ import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { ConfigError } from "@/components/ConfigError";
-import { getSupabaseConfigErrors } from "@/integrations/supabase/client";
 import { CLERK_PUBLISHABLE_KEY } from "@/config/clerk";
+
+const getSupabaseConfigErrors = (): string[] => {
+  const errors: string[] = [];
+  if (!import.meta.env.VITE_SUPABASE_URL) errors.push('VITE_SUPABASE_URL is not configured');
+  if (!import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) errors.push('VITE_SUPABASE_PUBLISHABLE_KEY is not configured');
+  return errors;
+};
 
 const queryClient = new QueryClient({
   defaultOptions: {
