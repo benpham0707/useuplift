@@ -5,7 +5,7 @@
  * Handles API communication with Supabase backend
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import { ChatMessage } from './piqChatService';
 

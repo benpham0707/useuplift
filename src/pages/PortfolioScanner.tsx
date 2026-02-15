@@ -51,7 +51,7 @@ import Dock from '@/components/Dock';
 // import OnboardingFlow from '@/components/portfolio/OnboardingFlow';
 import PortfolioPathway from '@/components/portfolio/PortfolioPathway';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/utils';
 import GradientText from '@/components/ui/GradientText';
