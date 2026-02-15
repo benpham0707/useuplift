@@ -78,9 +78,9 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel, onProgr
         setData((prev) => ({
           ...prev,
           intendedMajor: ga.intended_major || '',
-          careerInterests: Array.isArray(ga.career_interests) ? ga.career_interests : [],
+          careerInterests: Array.isArray(ga.career_interests) ? (ga.career_interests as any[]).map(String) : [],
           highestDegree: ga.highest_degree || '',
-          collegeEnvironment: Array.isArray(ga.preferred_environment) ? ga.preferred_environment : [],
+          collegeEnvironment: Array.isArray(ga.preferred_environment) ? (ga.preferred_environment as any[]).map(String) : [],
           applyingToUC: '',
           usingCommonApp: '',
           startDate: '',
