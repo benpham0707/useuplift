@@ -1,91 +1,39 @@
 
 
-## Fix: Supabase Client Crash — Safe Lazy Initialization Wrapper
+## Fix: Clerk "Missing Publishable Key" Error
 
-### The Real Problem
+### Problem
+The `.env` file is auto-managed and keeps getting removed. When it's gone, `import.meta.env.VITE_CLERK_PUBLISHABLE_KEY` is `undefined`, and `main.tsx` blocks the entire app with the error page you're seeing.
 
-The error keeps recurring because of two compounding issues:
+The `VITE_CLERK_PUBLISHABLE_KEY` secret IS configured in Lovable Cloud, but Vite needs it in a physical `.env` file to inject it at build time.
 
-1. The `.env` file (auto-managed by Lovable Cloud) is not present on disk, so `import.meta.env.VITE_SUPABASE_URL` is `undefined`
-2. `src/integrations/supabase/client.ts` (also auto-generated) calls `createClient()` eagerly at module load — which throws immediately when the URL is undefined, crashing the entire app before anything renders
+### Solution
 
-Previous fixes only recreated the `.env` file, but it keeps disappearing because it is managed by the auto-generation system. Writing it manually gets overwritten or removed.
+**1. Recreate `.env` with all required variables**
 
-### The Solution: Two-Pronged Approach
+Restore the `.env` file with all three Supabase vars plus the Clerk key. The Clerk key value will need to come from the configured secret.
 
-#### 1. Recreate `.env` (necessary but not sufficient alone)
+**2. Make `main.tsx` and `clerk.ts` resilient (the real fix)**
 
-Write the `.env` file with the correct variable names:
+Apply the same lazy/fallback pattern we used for Supabase:
+- Remove the aggressive error gate in `main.tsx` that blocks the entire app
+- Instead, allow the app to render and handle missing Clerk config gracefully (e.g., redirect to a sign-in prompt rather than a dead error page)
+- If the key is available, use it normally; if not, show a user-friendly message inside the app rather than replacing the entire DOM
 
-```
-VITE_SUPABASE_PROJECT_ID="wrppjajhxiftzddeeqsk"
-VITE_SUPABASE_URL="https://wrppjajhxiftzddeeqsk.supabase.co"
-VITE_SUPABASE_ANON_KEY="<the anon key>"
-```
+### Files to Modify
 
-#### 2. Create a safe wrapper module (the real fix)
-
-Create `src/integrations/supabase/safeClient.ts` — a wrapper that:
-- Uses lazy initialization (only creates the client when first accessed)
-- Does NOT throw at module load time if env vars are missing
-- Shows a clear error in the console instead of a white screen crash
-- Falls back to hardcoded publishable values as a last resort (these are public keys, safe to embed)
-
-Then update the two files that import from `client.ts`:
-- `src/app/experiences/api.ts` — change import to use `safeClient`
-- `src/services/credits/creditsService.ts` — already creates its own client, no change needed
-
-Also update `src/App.tsx` to remove the config error gate that blocks the entire app, since the safe client handles this gracefully.
-
-### Files to Create/Modify
-
-| File | Action | Purpose |
-|------|--------|---------|
-| `.env` | Create | Restore env vars (may be overwritten, but needed) |
-| `src/integrations/supabase/safeClient.ts` | Create | Lazy-init wrapper that never crashes at load time |
-| `src/app/experiences/api.ts` | Modify | Import from `safeClient` instead of `client` |
-| `src/App.tsx` | Modify | Remove Supabase config error gate (safe client handles it) |
+| File | Change |
+|------|--------|
+| `.env` | Recreate with `VITE_SUPABASE_PROJECT_ID`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `VITE_CLERK_PUBLISHABLE_KEY` |
+| `src/main.tsx` | Remove the error gate that replaces the DOM; always render the React app |
+| `src/config/clerk.ts` | Keep validation logic but remove the side-effect console logging at module level that runs before the app mounts |
+| `src/App.tsx` | Add a top-level check: if Clerk key is missing, show an in-app error component instead of crashing |
 
 ### Technical Details
 
-The safe client pattern:
+In `main.tsx`, replace the current pattern:
+- Remove the `if (!clerkConfig.isValid)` block that writes raw HTML and throws
+- Always render `ClerkProvider` — if the key is empty string, Clerk will show its own error but won't crash the app
+- Alternatively, conditionally wrap with `ClerkProvider` only when the key exists, and show a fallback UI component otherwise
 
-```typescript
-// src/integrations/supabase/safeClient.ts
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from './types';
-
-// Hard-coded fallback values (these are publishable/public keys, safe to embed)
-const FALLBACK_URL = 'https://wrppjajhxiftzddeeqsk.supabase.co';
-const FALLBACK_KEY = '<anon key>';
-
-let _client: SupabaseClient<Database> | null = null;
-
-export function getSupabase(): SupabaseClient<Database> {
-  if (!_client) {
-    const url = import.meta.env.VITE_SUPABASE_URL || FALLBACK_URL;
-    const key = import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_KEY;
-    _client = createClient<Database>(url, key, {
-      auth: { storage: localStorage, persistSession: true, autoRefreshToken: true }
-    });
-  }
-  return _client;
-}
-
-// For backward compatibility with code doing `supabase.from(...)`
-export const supabase = new Proxy({} as SupabaseClient<Database>, {
-  get(_target, prop) {
-    return (getSupabase() as any)[prop];
-  }
-});
-```
-
-This uses a Proxy so existing code like `supabase.from('table')` works without any changes, but the actual client is only created on first use (not at import time).
-
-### Why This Finally Fixes It
-
-- Even if `.env` disappears again, the app will not crash — the fallback values kick in
-- The lazy initialization pattern means importing the module never throws
-- The Proxy preserves the exact same API as the original export
-- Other services in the codebase already use this lazy pattern successfully
-
+This ensures the app always boots into React, making it debuggable and recoverable rather than a dead HTML error page.
