@@ -35,12 +35,6 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import { ConfigError } from "@/components/ConfigError";
 import { CLERK_PUBLISHABLE_KEY } from "@/config/clerk";
 
-const getSupabaseConfigErrors = (): string[] => {
-  const errors: string[] = [];
-  if (!import.meta.env.VITE_SUPABASE_URL) errors.push('VITE_SUPABASE_URL is not configured');
-  if (!import.meta.env.VITE_SUPABASE_ANON_KEY) errors.push('VITE_SUPABASE_ANON_KEY is not configured');
-  return errors;
-};
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -54,18 +48,12 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  // Check for critical configuration errors
-  const supabaseErrors = getSupabaseConfigErrors();
-  const clerkError = !CLERK_PUBLISHABLE_KEY ? 'VITE_CLERK_PUBLISHABLE_KEY is not configured' : null;
-  
-  const allErrors = [...supabaseErrors, ...(clerkError ? [clerkError] : [])];
-  
-  // Show configuration error page if critical variables are missing
-  if (allErrors.length > 0) {
+  // Check for critical configuration errors (Supabase handled by safeClient fallbacks)
+  if (!CLERK_PUBLISHABLE_KEY) {
     return (
       <ConfigError
         error="Critical environment variables are missing"
-        details={allErrors}
+        details={['VITE_CLERK_PUBLISHABLE_KEY is not configured']}
       />
     );
   }

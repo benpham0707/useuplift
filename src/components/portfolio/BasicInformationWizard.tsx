@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, User, CheckCircle2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { useToast } from '@/hooks/use-toast';
 import { usePersonalInformation } from '@/query/usePortfolioData';
 

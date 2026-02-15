@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useAuth as useClerkAuth } from '@clerk/clerk-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { getAuthenticatedSupabaseClient } from '@/services/auth/getAuthenticatedSupabaseClient';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';

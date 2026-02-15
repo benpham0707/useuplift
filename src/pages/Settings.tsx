@@ -17,7 +17,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { useNavigate } from 'react-router-dom';
 import { 
   User, 
