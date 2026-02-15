@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
@@ -32,86 +33,90 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
+import { CLERK_PUBLISHABLE_KEY, hasClerkKey } from "@/config/clerk";
 import { ConfigError } from "@/components/ConfigError";
-import { CLERK_PUBLISHABLE_KEY } from "@/config/clerk";
-
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh, no refetch on remount
-      gcTime: 1000 * 60 * 30, // 30 minutes - keep unused data in memory
-      refetchOnWindowFocus: false, // avoid surprise refetches when alt-tabbing
-      retry: 1, // retry failed requests once
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+      refetchOnWindowFocus: false,
+      retry: 1,
     },
   },
 });
 
+const AppRoutes = () => (
+  <BrowserRouter>
+    <Routes>
+      {/* Public routes */}
+      <Route path="/" element={<Index />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+
+      {/* Marketing/demo pages */}
+      <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
+      <Route path="/academic-planner" element={<AcademicPlanner />} />
+      <Route path="/project-incubation" element={<ProjectIncubationHub />} />
+      <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
+      <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
+      <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
+      <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
+      <Route path="/project-incubation/projects" element={<ProjectManagement />} />
+      <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
+
+      {/* Test/demo routes */}
+      <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
+      <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
+      <Route path="/workshop-demo" element={<WorkshopDemo />} />
+      <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
+
+      {/* Dashboard routes */}
+      <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+        <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
+        <Route path="/portfolio-insights" element={<PortfolioInsightsNew />} />
+        <Route path="/piq-workshop" element={<PIQWorkshop />} />
+        <Route path="/piq-workshop/:piqNumber" element={<PIQWorkshop />} />
+        <Route path="/pricing" element={<Pricing />} />
+        <Route path="/settings" element={<Settings />} />
+      </Route>
+
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+    <ClickSparkGlobal />
+    <BugReportWidget />
+  </BrowserRouter>
+);
+
 const App = () => {
-  // Check for critical configuration errors (Supabase handled by safeClient fallbacks)
-  if (!CLERK_PUBLISHABLE_KEY) {
+  // If Clerk key is missing even after fallback, show in-app error instead of crashing
+  if (!hasClerkKey()) {
     return (
       <ConfigError
-        error="Critical environment variables are missing"
+        error="Authentication configuration is missing"
         details={['VITE_CLERK_PUBLISHABLE_KEY is not configured']}
       />
     );
   }
-  
+
   return (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <FraudTrackingProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <Routes>
-              {/* Public routes - keep website-style top navigation */}
-              <Route path="/" element={<Index />} />
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/verify-email" element={<VerifyEmail />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/privacy" element={<Privacy />} />
-              <Route path="/terms" element={<Terms />} />
-              
-              {/* Marketing/demo pages - no auth required */}
-              <Route path="/extracurricular-optimizer" element={<ExtracurricularOptimizer />} />
-              <Route path="/academic-planner" element={<AcademicPlanner />} />
-              <Route path="/project-incubation" element={<ProjectIncubationHub />} />
-              <Route path="/project-incubation/foundation" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/foundation/metrics" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/foundation/timeline" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/foundation/impact" element={<ProjectFoundation />} />
-              <Route path="/project-incubation/projects" element={<ProjectManagement />} />
-              <Route path="/project-incubation/discovery" element={<ProjectDiscovery />} />
-              
-              {/* Test/demo routes */}
-              <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
-              <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
-              <Route path="/workshop-demo" element={<WorkshopDemo />} />
-              <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
-              
-              {/* Dashboard routes - authenticated app shell with left sidebar */}
-              <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
-                <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
-                <Route path="/portfolio-insights" element={<PortfolioInsightsNew />} />
-                <Route path="/piq-workshop" element={<PIQWorkshop />} />
-                <Route path="/piq-workshop/:piqNumber" element={<PIQWorkshop />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/settings" element={<Settings />} />
-              </Route>
-              
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-            <ClickSparkGlobal />
-            <BugReportWidget />
-          </BrowserRouter>
-        </TooltipProvider>
-      </FraudTrackingProvider>
-    </AuthProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
+        <AuthProvider>
+          <FraudTrackingProvider>
+            <TooltipProvider>
+              <Toaster />
+              <Sonner />
+              <AppRoutes />
+            </TooltipProvider>
+          </FraudTrackingProvider>
+        </AuthProvider>
+      </ClerkProvider>
+    </QueryClientProvider>
   );
 };
 
