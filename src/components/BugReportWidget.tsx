@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 import { cn } from '@/lib/utils';
 
 interface BugReportData {
