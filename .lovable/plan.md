@@ -1,48 +1,38 @@
 
 
-## Remove PIQ Carousel Header and 12-Dimension Analysis
+## Fix: Prevent Blank Screen When Clerk Fails to Load
 
-### What Gets Removed
+### Root Cause
 
-**1. Sticky PIQ Carousel Header** (lines 1475-1513)
-The entire sticky header bar containing:
-- `PIQCarouselNav` component (the prompt switcher with 8 PIQ dots)
-- `SaveStatusIndicator` and sign-in warning
-- The backdrop-blur bar itself
+The Clerk JS SDK is hosted on your custom domain `clerk.uplift-app.com`. In the Lovable preview environment, network requests to this domain are blocked (`ERR_TUNNEL_CONNECTION_FAILED`). When Clerk fails to load, it throws an unhandled promise rejection that crashes the entire React app, resulting in a blank white screen.
 
-**2. NQI Score Card / Hero Section** (lines 1517-1860)
-The full "Narrative Quality Index" card above the two-column layout, including:
-- The analyzing spinner with "Analyzing Your PIQ Essay"
-- NQI score display with Strong/Needs Work/Critical counts
-- Dimension navigation buttons
-- Essay Overview text
-- Issues Resolved progress bar
+This affects ALL authenticated routes (Portfolio Scanner, PIQ Workshop, Settings, etc.), not just one page.
 
-**3. 12-Dimension Analysis Section** (lines 1899-1943)
-The entire bottom-left section containing:
-- "12-Dimension Analysis" gradient header
-- `RubricDimensionCard` list (or the empty-state placeholder)
+### Fix
 
-### What Stays
+**1. Add global unhandled rejection handler** in `src/App.tsx`
 
-- The editor (`EditorView`) in the left column
-- The AI chat (`ContextualWorkshopChat`) in the right column
-- Version history drawers and modals
-- Local recovery banner
-- All state, hooks, and handler functions (unused ones can be cleaned up later)
-- The background gradient
+Catch the Clerk loading failure so it doesn't crash the React tree. Add a `useEffect` with a `window.addEventListener('unhandledrejection', ...)` that specifically catches Clerk's `failed_to_load_clerk_js` error code and suppresses the crash.
 
-### Result
+**2. Add an error boundary around ClerkProvider** in `src/App.tsx`
 
-A clean two-column layout: editor on the left, AI chat on the right -- no PIQ navigation, no NQI scoring, no rubric cards. This gives you a blank canvas to layer in activity-specific UI.
+Wrap `ClerkProvider` in an error boundary component so that if Clerk fails to initialize, the app shows a friendly "Authentication unavailable" message instead of a blank screen. Users would see a retry button or a message explaining the situation.
 
-### Technical Details
+**3. Create `src/components/ClerkErrorBoundary.tsx`** (new file)
 
-| Location | Lines | What |
-|----------|-------|------|
-| `src/pages/ActivityWorkshop.tsx` | 1475-1513 | Remove sticky header with PIQCarouselNav |
-| `src/pages/ActivityWorkshop.tsx` | 1516-1860 | Remove NQI score card / hero section |
-| `src/pages/ActivityWorkshop.tsx` | 1899-1943 | Remove 12-Dimension Analysis section + header |
+A React error boundary that:
+- Catches errors thrown by Clerk during initialization
+- Renders a user-friendly fallback UI with a "Retry" button
+- Logs the error for debugging
 
-All changes are in a single file. The imports and state variables for these removed sections will remain (dead code) but won't cause errors -- they can be cleaned up in a future pass.
+### Files to Change
+
+| File | Action |
+|------|--------|
+| `src/components/ClerkErrorBoundary.tsx` | Create -- error boundary for Clerk failures |
+| `src/App.tsx` | Modify -- wrap ClerkProvider with error boundary, add unhandled rejection handler |
+
+### Important Note
+
+This is a **network environment issue** in the Lovable preview. Your production app at `uplift-final-final-18698-62030.lovable.app` likely works fine since it can reach `clerk.uplift-app.com`. The fix ensures the app degrades gracefully instead of showing a blank screen when Clerk is unreachable.
 
