@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ClerkProvider } from "@clerk/clerk-react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
+import ClerkErrorBoundary from "@/components/ClerkErrorBoundary";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
 import BugReportWidget from "@/components/BugReportWidget";
 import Index from "./pages/Index";
@@ -93,6 +95,24 @@ const AppRoutes = () => (
 );
 
 const App = () => {
+  // Catch Clerk SDK load failures so they don't crash the React tree
+  useEffect(() => {
+    const handler = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      if (
+        reason &&
+        typeof reason === 'object' &&
+        'code' in reason &&
+        reason.code === 'failed_to_load_clerk_js'
+      ) {
+        console.warn('[App] Clerk JS failed to load — suppressing crash:', reason);
+        event.preventDefault();
+      }
+    };
+    window.addEventListener('unhandledrejection', handler);
+    return () => window.removeEventListener('unhandledrejection', handler);
+  }, []);
+
   // If Clerk key is missing even after fallback, show in-app error instead of crashing
   if (!hasClerkKey()) {
     return (
@@ -105,17 +125,19 @@ const App = () => {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
-        <AuthProvider>
-          <FraudTrackingProvider>
-            <TooltipProvider>
-              <Toaster />
-              <Sonner />
-              <AppRoutes />
-            </TooltipProvider>
-          </FraudTrackingProvider>
-        </AuthProvider>
-      </ClerkProvider>
+      <ClerkErrorBoundary>
+        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} afterSignOutUrl="/">
+          <AuthProvider>
+            <FraudTrackingProvider>
+              <TooltipProvider>
+                <Toaster />
+                <Sonner />
+                <AppRoutes />
+              </TooltipProvider>
+            </FraudTrackingProvider>
+          </AuthProvider>
+        </ClerkProvider>
+      </ClerkErrorBoundary>
     </QueryClientProvider>
   );
 };
