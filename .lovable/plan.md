@@ -1,37 +1,48 @@
 
 
-## Plan: Exact Clone of PIQ Workshop into Activity Workshop
+## Remove PIQ Carousel Header and 12-Dimension Analysis
 
-### What This Does
+### What Gets Removed
 
-Replace the current `src/pages/ActivityWorkshop.tsx` (432 lines of adapted code that "looks terrible") with a **verbatim copy** of `src/pages/PIQWorkshop.tsx` (2,272 lines). No adaptations, no color changes, no renaming — just a straight copy.
+**1. Sticky PIQ Carousel Header** (lines 1475-1513)
+The entire sticky header bar containing:
+- `PIQCarouselNav` component (the prompt switcher with 8 PIQ dots)
+- `SaveStatusIndicator` and sign-in warning
+- The backdrop-blur bar itself
 
-### Why
+**2. NQI Score Card / Hero Section** (lines 1517-1860)
+The full "Narrative Quality Index" card above the two-column layout, including:
+- The analyzing spinner with "Analyzing Your PIQ Essay"
+- NQI score display with Strong/Needs Work/Critical counts
+- Dimension navigation buttons
+- Essay Overview text
+- Issues Resolved progress bar
 
-The current Activity Workshop attempted to adapt the PIQ Workshop's layout but diverged significantly in structure, styling, and functionality. Rather than trying to fix the adapted version, we start from an exact copy of the working PIQ Workshop and make incremental changes from there.
+**3. 12-Dimension Analysis Section** (lines 1899-1943)
+The entire bottom-left section containing:
+- "12-Dimension Analysis" gradient header
+- `RubricDimensionCard` list (or the empty-state placeholder)
 
-### What Changes
+### What Stays
 
-| File | Action |
-|------|--------|
-| `src/pages/ActivityWorkshop.tsx` | **Complete rewrite** — replace with exact copy of `PIQWorkshop.tsx` |
+- The editor (`EditorView`) in the left column
+- The AI chat (`ContextualWorkshopChat`) in the right column
+- Version history drawers and modals
+- Local recovery banner
+- All state, hooks, and handler functions (unused ones can be cleaned up later)
+- The background gradient
 
-### What Stays the Same
+### Result
 
-- All imports, state, hooks, handlers, and JSX from `PIQWorkshop.tsx` are copied as-is
-- The PIQ carousel nav, NQI score card, 12-dimension rubric, editor, chat — everything identical
-- The only change: the component is named `ActivityWorkshop` instead of `PIQWorkshop`, and the route param uses `sessionId` (existing route) while the PIQ-specific `piqNumber` param still works as-is since it defaults to `piq1`
+A clean two-column layout: editor on the left, AI chat on the right -- no PIQ navigation, no NQI scoring, no rubric cards. This gives you a blank canvas to layer in activity-specific UI.
 
-### What This Means
+### Technical Details
 
-When you visit `/activity-workshop/:sessionId`, you will see the **exact same page** as the PIQ Workshop — same purple gradients, same PIQ carousel with 8 prompts, same NQI score card, same editor, same chat in PIQ mode. It will be functionally identical.
+| Location | Lines | What |
+|----------|-------|------|
+| `src/pages/ActivityWorkshop.tsx` | 1475-1513 | Remove sticky header with PIQCarouselNav |
+| `src/pages/ActivityWorkshop.tsx` | 1516-1860 | Remove NQI score card / hero section |
+| `src/pages/ActivityWorkshop.tsx` | 1899-1943 | Remove 12-Dimension Analysis section + header |
 
-From there, you can tell me exactly what to change one piece at a time (swap carousel for activities, change colors, switch chat mode, etc.).
-
-### Technical Notes
-
-- The file will have `// @ts-nocheck` at the top (same as PIQ Workshop) since it has many integration points
-- All PIQ-specific imports (PIQCarouselNav, UC_PIQ_PROMPTS, analyzePIQEntry, piqDatabaseService, usePIQEssay, etc.) are kept as-is
-- The existing `ActivityCarouselNav.tsx` component remains available but won't be used until you decide to swap it in
-- Authentication, autosave, version history, credits — all work identically since they use the same services
+All changes are in a single file. The imports and state variables for these removed sections will remain (dead code) but won't cause errors -- they can be cleaned up in a future pass.
 
