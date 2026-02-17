@@ -1,105 +1,64 @@
 
 
-## Visual Hierarchy Overhaul for Overview Tab
+## Compact Overview Tab — Merge Hero into Score Dashboard
 
 ### Overview
 
-Rework the Overview tab's visual design in `src/pages/ActivityWorkshop.tsx` to create clear visual hierarchy differentiation between sections. All changes are render-only and mock data adjustments -- no new components or files needed.
+Eliminate the separate hero section entirely by merging the overall score into the score dashboard row, then tighten all spacing throughout the Overview tab to achieve news-article density.
 
 ### Changes
 
-**1. Score Dashboard -- Full-width expansion panel with caret**
+**1. Merge overall score into score dashboard row (lines 1559-1578)**
 
-Current: Each card has its own small rationale box expanding underneath it.
-New: Cards are buttons only (no individual expand). A single full-width panel renders below the entire 5-card grid when one is selected. The panel includes:
-- A small CSS triangle/caret pointing up, positioned horizontally at the center of the active card
-- The dimension name as a bold title
-- The rationale paragraph
-- 2-3 improvement bullet points (added to the `scoreCards` mock data as an `improvements` string array)
+Remove the entire hero area block (lines 1630-1644). Instead, add a 6th card at the LEFT of the score dashboard grid — the "OVERALL" card:
+- Grid changes from `grid-cols-2 md:grid-cols-5` to `grid-cols-2 md:grid-cols-6`
+- The OVERALL card is slightly wider: use `md:col-span-1` but with internal styling that makes the score larger (`text-4xl` vs `text-3xl` for the others) and the label "OVERALL" underneath
+- Score shows "7.8" in green, same color logic as other cards
+- Below the OVERALL card (outside the button, as two small badges stacked beneath it): Harvard Scale badge and Competitive pill, both in `text-[10px]` tiny text
+- The OVERALL card is NOT clickable for expansion (no rationale panel) — it's display-only. Alternatively it could be clickable but just show a summary. Simpler: make it non-expandable, just visual.
+- The `expandedScoreCard` index mapping stays the same (0-4 for the 5 dimension cards); the OVERALL card is rendered separately before the `.map()` loop
 
-The caret position will be calculated using refs on each card button. The panel uses `transition-all duration-300` for smooth open/close.
+Implementation approach: Wrap the grid in a structure where the first cell is the OVERALL card (rendered manually) and the remaining 5 come from the `scoreCards.map()`. The expansion panel caret logic stays unchanged since it only references indices 0-4.
 
-The `useEffect` for caret positioning will fire on both `expandedScoreCard` changes AND window resize events, with a resize event listener and proper cleanup on unmount.
+**2. Delete hero area block (lines 1630-1644)**
 
-Mock data update -- Add `improvements` array to each score card:
-- Activity Strength: ["Take on a named leadership role in at least one activity", "Add specific numbers to every description (members recruited, events organized)", "Document outcomes, not just participation"]
-- Spike Depth: ["Submit research to a student journal or conference", "Enter a CS competition (USACO, hackathon)", "Create a public artifact (GitHub repo, app, blog)"]
-- Story Coherence: ["Rewrite grocery job description to connect to your CS mission", "Frame farm work as problem-solving under constraint", "Add a bridge sentence connecting each activity to your core theme"]
-- Major Fit: ["Frame research and tutoring as directly supporting your CS trajectory", "Add technical specifics that connect each activity to your intended major", "Highlight how non-CS activities developed transferable skills (systems thinking, leadership)"]
-- Description Quality: ["Lead every description with the strongest outcome", "Use specific metrics in at least 3 of 5 descriptions", "Cut filler words -- every character of the 150 limit should earn its place"]
+Remove entirely — the centered score + badges block. This saves ~15 lines and a full visual section.
 
-**2. Hero area -- Score as centerpiece**
+**3. Tighten narrative section (lines 1647-1686)**
 
-Current: Score is `text-4xl` in a modest glass card, badges sit next to it at equal size.
-New:
-- Score container becomes a larger frosted rounded-square with `text-6xl md:text-7xl` for the number
-- Layout changes to a vertical stack: large score on top, badges underneath in a row
-- Harvard Scale and Competitive badges get smaller text (`text-xs`)
-- The whole hero area is centered, not left-aligned
+- Change `py-2` to `py-1` on the narrative container
+- The `mb-2` on the header row stays (it's already small)
 
-**3. Portfolio Narrative -- Blockquote style, not a card**
+**4. Shrink insight cards (lines 1688-1734)**
 
-Current: Glass card container with prominent edit/regenerate buttons.
-New:
-- Remove the `rounded-xl border bg-white/10` card wrapper
-- Replace with a `border-l-4 border-l-blue-400/50` left accent and light padding
-- Text size increases to `text-base` (from `text-sm`)
-- Controls (edit, arrows, regenerate) shrink: smaller icons (`h-3 w-3`), more transparent, grouped in a subtle row
-- "PORTFOLIO NARRATIVE" label stays but the overall feel is flowing text, not a data box
+- Change `p-4` to `p-3` on all three insight cards
+- Change `mb-2` to `mb-1` on the header rows inside each card
 
-**4. Quick Insight Cards -- Spotlight treatment**
+**5. Reduce overall section gaps**
 
-Current: Same `bg-white/10` as everything else.
-New:
-- Background changes to `bg-white/20 backdrop-blur-2xl` for more frosted/darker look
-- Add icons to each card header:
-  - YOUR SPIKE: `Target` icon (from lucide)
-  - WHAT THEY'LL REMEMBER: `Lightbulb` icon (from lucide)
-  - #1 PRIORITY: `Flag` icon (from lucide)
-- Content text gets `font-semibold` for the main value
-- Slightly thicker border: `border-white/35`
+- Line 1628: `space-y-4` on TabsContent changes to `space-y-3`
+- Line 1555: outer `py-8` changes to `py-6`
+- Line 1555: outer `space-y-4` changes to `space-y-3`
 
-**5. Key Strengths and Opportunities -- Stronger borders, tighter layout**
+**6. Compact Strategic Direction (lines 1766-1788)**
 
-Current: `border-l-4 border-l-green-500/60` with `p-5`.
-New:
-- Green border: `border-l-4 border-l-green-500` (full opacity, 4px solid)
-- Amber border: `border-l-4 border-l-amber-500` (full opacity)
-- Reduce padding to `p-3 px-4`
-- Reduce bullet spacing from `space-y-2` to `space-y-1.5`
-- These are compact quick-scan lists
+- Change `p-5` to `p-3 px-4` on the outer container
+- Change `space-y-3` to `space-y-2` inside
+- Change coaching pitch inner `p-4` to `p-3`
+- Change `mb-2` to `mb-1` on the coaching pitch label
+- Change `mb-1` to `mb-0.5` on Current State and Strategic Direction labels
 
-**6. Strategic Direction -- Coaching Pitch first**
+### What Gets Removed
 
-Current: Current State -> Direction -> Coaching Pitch (at bottom).
-New: Reorder to Coaching Pitch (top) -> Current State -> Strategic Direction.
-- Coaching Pitch gets a subtle purple-tinted background (`bg-purple-500/10`) and a quote icon or quotation marks styling
-- Current State and Strategic Direction paragraphs become slightly smaller text
-
-**7. General spacing reduction**
-
-- Outer `space-y-6` on the TabsContent changes to `space-y-4`
-- `mt-6` on TabsContent changes to `mt-4`
-- `py-12` on the outer container reduces to `py-8`
-
-### New Imports
-
-Add `Target`, `Lightbulb`, `Flag` from lucide-react (add to existing import line).
-
-### New Refs and State
-
-- `scoreCardRefs = useRef<(HTMLButtonElement | null)[]>([])` for card position measurement
-- `scoreContainerRef = useRef<HTMLDivElement>(null)` for relative positioning
-- `caretLeftPx` state for triangle horizontal position
-
-### Caret useEffect
-
-Recalculates caret position when `expandedScoreCard` changes. Also attaches a `window.addEventListener('resize', recalc)` with `removeEventListener` cleanup on unmount. This ensures the triangle stays aligned if the browser is resized while a panel is open.
+- The entire hero area block (lines 1630-1644): the centered `flex-col items-center` div with the large score, Harvard badge, and Competitive pill
 
 ### What Stays the Same
 
-- All state variables and interactivity (click to expand, carousel cycling, edit mode)
-- Tab bar styling and placeholder tabs
+- Score dashboard expansion panel with caret (unchanged logic)
+- Tab bar
+- All carousel/edit interactivity
+- Portfolio narrative content and controls
+- Strengths/Opportunities panels
 - Two-column workspace below
 
 ### Technical Details
@@ -107,10 +66,11 @@ Recalculates caret position when `expandedScoreCard` changes. Also attaches a `w
 | Area | Detail |
 |------|--------|
 | File | `src/pages/ActivityWorkshop.tsx` only |
-| Mock data change | Add `improvements: string[]` to each scoreCard object |
-| New refs | `scoreCardRefs`, `scoreContainerRef` for caret positioning |
-| New state | `caretLeftPx: number` for triangle position |
-| New useEffect | Recalculate caret on `expandedScoreCard` change + window resize listener with cleanup |
-| New imports | `Target`, `Lightbulb`, `Flag` from lucide-react |
-| Major Fit improvements | Corrected to focus on strengthening CS alignment, not diversifying away from it |
+| Grid change | `grid-cols-2 md:grid-cols-5` becomes `grid-cols-3 md:grid-cols-6` (3 cols on mobile to fit OVERALL + 2 per row cleanly) |
+| OVERALL card | Rendered before the `.map()`, not part of `scoreCards` array, not expandable |
+| Harvard/Competitive badges | Rendered as tiny text below the OVERALL card, outside the button element |
+| Caret refs | No change — indices 0-4 still map to the 5 dimension cards via `scoreCardRefs` |
+| Spacing reductions | `py-8` to `py-6`, `space-y-4` to `space-y-3`, insight `p-4` to `p-3`, strategic direction `p-5` to `p-3 px-4` |
+| Lines removed | ~15 (hero block) |
+| Lines modified | ~20 (spacing class changes + grid restructure) |
 
