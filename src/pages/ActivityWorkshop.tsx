@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History, XCircle, CheckCircle, PenTool, Info, Sparkles, X, ChevronLeft, ChevronRight, Pencil, Check } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History, XCircle, CheckCircle, PenTool, Info, Sparkles, X, ChevronLeft, ChevronRight, Pencil, Check, Lightbulb, Flag } from 'lucide-react';
 import GradientText from '@/components/ui/GradientText';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -213,14 +213,39 @@ export default function ActivityWorkshop() {
   const [memorableIndex, setMemorableIndex] = useState(0);
   const [priorityIndex, setPriorityIndex] = useState(0);
 
-  // ---- Hard-coded mock data: Score Dashboard cards with scores and rationale ----
+  // ---- Hard-coded mock data: Score Dashboard cards with scores, rationale, and improvement suggestions ----
   const scoreCards = [
-    { label: 'Activity Strength', score: 7.2, rationale: 'Your activities show solid involvement but could benefit from deeper leadership roles and more quantifiable outcomes. Focus on demonstrating initiative rather than just participation.' },
-    { label: 'Spike Depth', score: 8.1, rationale: 'Strong concentration in CS with a clear progression from self-teaching to research. The CS Club founding demonstrates initiative. Deepen by publishing work or competing.' },
-    { label: 'Story Coherence', score: 7.8, rationale: 'Your activities connect well around a theme of building access from scratch. The thread from personal experience to technical solutions is compelling. Tighten by making the grocery/farm jobs explicitly support the narrative.' },
-    { label: 'Major Fit', score: 6.5, rationale: 'CS intent is clear from club and research, but admissions wants to see breadth of intellectual curiosity beyond one domain. A humanities or social science pursuit would strengthen this.' },
-    { label: 'Description Quality', score: 7.4, rationale: 'Descriptions are functional but could be more impactful. Lead with outcomes and numbers rather than role descriptions. Every character should earn its place in the 150-char limit.' },
+    { label: 'Activity Strength', score: 7.2, rationale: 'Your activities show solid involvement but could benefit from deeper leadership roles and more quantifiable outcomes. Focus on demonstrating initiative rather than just participation.', improvements: ['Take on a named leadership role in at least one activity', 'Add specific numbers to every description (members recruited, events organized)', 'Document outcomes, not just participation'] },
+    { label: 'Spike Depth', score: 8.1, rationale: 'Strong concentration in CS with a clear progression from self-teaching to research. The CS Club founding demonstrates initiative. Deepen by publishing work or competing.', improvements: ['Submit research to a student journal or conference', 'Enter a CS competition (USACO, hackathon)', 'Create a public artifact (GitHub repo, app, blog)'] },
+    { label: 'Story Coherence', score: 7.8, rationale: 'Your activities connect well around a theme of building access from scratch. The thread from personal experience to technical solutions is compelling. Tighten by making the grocery/farm jobs explicitly support the narrative.', improvements: ['Rewrite grocery job description to connect to your CS mission', 'Frame farm work as problem-solving under constraint', 'Add a bridge sentence connecting each activity to your core theme'] },
+    { label: 'Major Fit', score: 6.5, rationale: 'CS intent is clear from club and research, but admissions wants to see breadth of intellectual curiosity beyond one domain. A humanities or social science pursuit would strengthen this.', improvements: ['Frame research and tutoring as directly supporting your CS trajectory', 'Add technical specifics that connect each activity to your intended major', 'Highlight how non-CS activities developed transferable skills (systems thinking, leadership)'] },
+    { label: 'Description Quality', score: 7.4, rationale: 'Descriptions are functional but could be more impactful. Lead with outcomes and numbers rather than role descriptions. Every character should earn its place in the 150-char limit.', improvements: ['Lead every description with the strongest outcome', 'Use specific metrics in at least 3 of 5 descriptions', 'Cut filler words — every character of the 150 limit should earn its place'] },
   ];
+
+  // Refs for caret positioning on score dashboard
+  const scoreCardRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const scoreContainerRef = useRef<HTMLDivElement>(null);
+  const [caretLeftPx, setCaretLeftPx] = useState<number | null>(null);
+
+  // Recalculate caret position on card selection and window resize
+  useEffect(() => {
+    const recalc = () => {
+      if (expandedScoreCard === null || !scoreContainerRef.current) {
+        setCaretLeftPx(null);
+        return;
+      }
+      const btn = scoreCardRefs.current[expandedScoreCard];
+      const container = scoreContainerRef.current;
+      if (btn && container) {
+        const btnRect = btn.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        setCaretLeftPx(btnRect.left - containerRect.left + btnRect.width / 2);
+      }
+    };
+    recalc();
+    window.addEventListener('resize', recalc);
+    return () => window.removeEventListener('resize', recalc);
+  }, [expandedScoreCard]);
 
   // ---- Hard-coded mock data: Portfolio narrative variants ----
   const narrativeVariants = [
@@ -1527,13 +1552,15 @@ export default function ActivityWorkshop() {
       {/* SCORE DASHBOARD + TABBED OVERVIEW                                  */}
       {/* ================================================================== */}
       <div className="hero-gradient text-white relative">
-        <div className="max-w-7xl mx-auto px-4 py-12 space-y-6">
+        <div className="max-w-7xl mx-auto px-4 py-8 space-y-4">
 
-          {/* Score Dashboard: 5 cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            {scoreCards.map((card, idx) => (
-              <div key={card.label}>
+          {/* Score Dashboard: 5 cards + full-width expansion panel */}
+          <div ref={scoreContainerRef} className="relative space-y-0">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+              {scoreCards.map((card, idx) => (
                 <button
+                  key={card.label}
+                  ref={(el) => { scoreCardRefs.current[idx] = el; }}
                   onClick={() => setExpandedScoreCard(expandedScoreCard === idx ? null : idx)}
                   className={`w-full text-center p-4 rounded-xl border backdrop-blur-xl transition-all duration-300 cursor-pointer ${
                     expandedScoreCard === idx
@@ -1548,20 +1575,44 @@ export default function ActivityWorkshop() {
                     {card.label}
                   </div>
                 </button>
-                {/* Rationale expand (smooth animation) */}
-                <div
-                  className="overflow-hidden transition-all duration-300"
-                  style={{
-                    maxHeight: expandedScoreCard === idx ? '200px' : '0px',
-                    opacity: expandedScoreCard === idx ? 1 : 0,
-                  }}
-                >
-                  <div className="mt-2 p-3 rounded-lg border border-white/20 bg-white/10 backdrop-blur-md text-sm text-white/90 leading-relaxed">
-                    {card.rationale}
+              ))}
+            </div>
+
+            {/* Full-width expansion panel with caret */}
+            <div
+              className="overflow-hidden transition-all duration-300"
+              style={{
+                maxHeight: expandedScoreCard !== null ? '400px' : '0px',
+                opacity: expandedScoreCard !== null ? 1 : 0,
+              }}
+            >
+              {expandedScoreCard !== null && (
+                <div className="relative mt-3">
+                  {/* Caret triangle */}
+                  {caretLeftPx !== null && (
+                    <div
+                      className="absolute -top-2 w-4 h-4 bg-white/15 border-t border-l border-white/30 rotate-45 z-10 backdrop-blur-xl"
+                      style={{ left: caretLeftPx - 8 }}
+                    />
+                  )}
+                  <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-xl p-5">
+                    <h4 className="font-bold text-white text-base mb-2">{scoreCards[expandedScoreCard].label}</h4>
+                    <p className="text-sm text-white/90 leading-relaxed mb-3">{scoreCards[expandedScoreCard].rationale}</p>
+                    <div className="bg-white/10 rounded-lg p-3">
+                      <p className="text-xs font-semibold text-white/70 uppercase tracking-wider mb-2">How to improve</p>
+                      <ul className="space-y-1.5">
+                        {scoreCards[expandedScoreCard].improvements.map((imp, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-white/90">
+                            <TrendingUp className="h-3.5 w-3.5 text-teal-400 mt-0.5 flex-shrink-0" />
+                            <span>{imp}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )}
+            </div>
           </div>
 
           {/* Tab Bar */}
@@ -1574,51 +1625,53 @@ export default function ActivityWorkshop() {
             </TabsList>
 
             {/* ============ OVERVIEW TAB ============ */}
-            <TabsContent value="overview" className="mt-6 space-y-6">
+            <TabsContent value="overview" className="mt-4 space-y-4">
 
-              {/* Hero area: overall score + badges */}
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="px-6 py-4 rounded-2xl border border-white/30 bg-white/15 backdrop-blur-xl">
-                  <span className="text-4xl font-bold text-green-400">7.8</span>
-                  <span className="text-lg text-white/70 ml-1">/ 10</span>
+              {/* Hero area: score as centerpiece */}
+              <div className="flex flex-col items-center text-center gap-3">
+                <div className="px-8 py-6 rounded-2xl border border-white/30 bg-white/15 backdrop-blur-xl">
+                  <span className="text-6xl md:text-7xl font-bold text-green-400">7.8</span>
+                  <span className="text-xl text-white/60 ml-1">/ 10</span>
                 </div>
-                <Badge className="bg-white/15 border-white/25 text-white/90 text-sm px-3 py-1.5">
-                  Harvard Scale 4 — Average (Top 40%)
-                </Badge>
-                <Badge className="bg-teal-500/20 border-teal-400/30 text-teal-300 text-sm px-3 py-1.5">
-                  Competitive
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-white/15 border-white/25 text-white/80 text-xs px-2 py-1">
+                    Harvard Scale 4 — Average (Top 40%)
+                  </Badge>
+                  <Badge className="bg-teal-500/20 border-teal-400/30 text-teal-300 text-xs px-2 py-1">
+                    Competitive
+                  </Badge>
+                </div>
               </div>
 
-              {/* Portfolio Narrative */}
-              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-5">
-                <div className="flex items-center justify-between mb-3">
+              {/* Portfolio Narrative — blockquote style */}
+              <div className="border-l-4 border-l-blue-400/50 pl-4 py-2">
+                <div className="flex items-center justify-between mb-2">
                   <div className="text-xs uppercase tracking-widest text-white/60 font-semibold">Portfolio Narrative</div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
                     {!isEditingNarrative && (
                       <button
-                        className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition"
+                        className="p-1 rounded-md hover:bg-white/10 transition"
                         onClick={() => { setNarrativeDraft(narrativeVariants[narrativeVariantIndex]); setIsEditingNarrative(true); }}
                         aria-label="Edit narrative"
                       >
-                        <Pencil className="h-4 w-4 text-white" />
+                        <Pencil className="h-3 w-3 text-white/70" />
                       </button>
                     )}
-                    <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setNarrativeVariantIndex((i) => (i - 1 + narrativeVariants.length) % narrativeVariants.length)} aria-label="Previous variant">
-                      <ChevronLeft className="h-4 w-4 text-white" />
+                    <button className="p-1 rounded-md hover:bg-white/10 transition" onClick={() => setNarrativeVariantIndex((i) => (i - 1 + narrativeVariants.length) % narrativeVariants.length)} aria-label="Previous variant">
+                      <ChevronLeft className="h-3 w-3 text-white/70" />
                     </button>
-                    <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setNarrativeVariantIndex((i) => (i + 1) % narrativeVariants.length)} aria-label="Next variant">
-                      <ChevronRight className="h-4 w-4 text-white" />
+                    <button className="p-1 rounded-md hover:bg-white/10 transition" onClick={() => setNarrativeVariantIndex((i) => (i + 1) % narrativeVariants.length)} aria-label="Next variant">
+                      <ChevronRight className="h-3 w-3 text-white/70" />
                     </button>
                     {!isEditingNarrative && (
-                      <button className="ml-1 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs text-white/90 transition flex items-center gap-1">
-                        <RefreshCcw className="h-3 w-3" /> Regenerate
+                      <button className="p-1 rounded-md hover:bg-white/10 transition" aria-label="Regenerate">
+                        <RefreshCcw className="h-3 w-3 text-white/70" />
                       </button>
                     )}
                   </div>
                 </div>
                 {!isEditingNarrative ? (
-                  <p className="text-white/90 text-sm leading-7">{narrativeVariants[narrativeVariantIndex]}</p>
+                  <p className="text-white/90 text-base leading-7">{narrativeVariants[narrativeVariantIndex]}</p>
                 ) : (
                   <div className="space-y-2">
                     <Textarea value={narrativeDraft} onChange={(e) => setNarrativeDraft(e.target.value)} placeholder="Write your narrative angle..." className="bg-white/20 text-white placeholder:text-white/60 min-h-[80px] border-white/20" />
@@ -1632,51 +1685,59 @@ export default function ActivityWorkshop() {
                 )}
               </div>
 
-              {/* Three Quick Insight Cards */}
-              <div className="grid md:grid-cols-3 gap-4">
+              {/* Three Quick Insight Cards — spotlight treatment */}
+              <div className="grid md:grid-cols-3 gap-3">
                 {/* YOUR SPIKE */}
-                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-4">
+                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs uppercase tracking-widest text-white/60 font-semibold">Your Spike</div>
+                    <div className="flex items-center gap-1.5">
+                      <Target className="h-3.5 w-3.5 text-blue-400" />
+                      <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">Your Spike</span>
+                    </div>
                     <div className="flex items-center gap-1">
-                      <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setSpikeIndex((i) => (i - 1 + spikeVariants.length) % spikeVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
-                      <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setSpikeIndex((i) => (i + 1) % spikeVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
+                      <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setSpikeIndex((i) => (i - 1 + spikeVariants.length) % spikeVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
+                      <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setSpikeIndex((i) => (i + 1) % spikeVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
                     </div>
                   </div>
-                  <p className="text-white/95 text-sm font-medium">{spikeVariants[spikeIndex]}</p>
+                  <p className="text-white/95 text-sm font-semibold">{spikeVariants[spikeIndex]}</p>
                 </div>
 
                 {/* WHAT THEY'LL REMEMBER */}
-                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-4">
+                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs uppercase tracking-widest text-white/60 font-semibold">What They'll Remember</div>
+                    <div className="flex items-center gap-1.5">
+                      <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
+                      <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">What They'll Remember</span>
+                    </div>
                     <div className="flex items-center gap-1">
-                      <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setMemorableIndex((i) => (i - 1 + memorableVariants.length) % memorableVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
-                      <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setMemorableIndex((i) => (i + 1) % memorableVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
+                      <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setMemorableIndex((i) => (i - 1 + memorableVariants.length) % memorableVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
+                      <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setMemorableIndex((i) => (i + 1) % memorableVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
                     </div>
                   </div>
-                  <p className="text-white/95 text-sm">{memorableVariants[memorableIndex]}</p>
+                  <p className="text-white/95 text-sm font-semibold">{memorableVariants[memorableIndex]}</p>
                 </div>
 
                 {/* #1 PRIORITY */}
-                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-4">
+                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <div className="text-xs uppercase tracking-widest text-white/60 font-semibold">#1 Priority</div>
+                    <div className="flex items-center gap-1.5">
+                      <Flag className="h-3.5 w-3.5 text-red-400" />
+                      <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">#1 Priority</span>
+                    </div>
                     <div className="flex items-center gap-1">
-                      <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setPriorityIndex((i) => (i - 1 + priorityVariants.length) % priorityVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
-                      <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setPriorityIndex((i) => (i + 1) % priorityVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
+                      <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setPriorityIndex((i) => (i - 1 + priorityVariants.length) % priorityVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
+                      <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setPriorityIndex((i) => (i + 1) % priorityVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
                     </div>
                   </div>
-                  <p className="text-white/95 text-sm">{priorityVariants[priorityIndex]}</p>
+                  <p className="text-white/95 text-sm font-semibold">{priorityVariants[priorityIndex]}</p>
                 </div>
               </div>
 
-              {/* Key Strengths & Opportunities */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Key Strengths */}
-                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-5 border-l-4 border-l-green-500/60">
-                  <h3 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Key Strengths</h3>
-                  <ul className="space-y-2">
+              {/* Key Strengths & Opportunities — tighter, stronger borders */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-3 px-4 border-l-4 border-l-green-500">
+                  <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Key Strengths</h3>
+                  <ul className="space-y-1.5">
                     {/* ---- Hard-coded mock data: strength bullets ---- */}
                     {['Pioneer initiative in zero-resource environment', 'Clear CS spike with social impact angle', 'Authentic first-gen narrative'].map((s, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-white/90">
@@ -1687,10 +1748,9 @@ export default function ActivityWorkshop() {
                   </ul>
                 </div>
 
-                {/* Opportunities */}
-                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-5 border-l-4 border-l-amber-500/60">
-                  <h3 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Opportunities to Strengthen</h3>
-                  <ul className="space-y-2">
+                <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-3 px-4 border-l-4 border-l-amber-500">
+                  <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Opportunities to Strengthen</h3>
+                  <ul className="space-y-1.5">
                     {/* ---- Hard-coded mock data: opportunity bullets ---- */}
                     {['Limited external recognition', 'Some activities feel disconnected from spike'].map((s, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm text-white/90">
@@ -1702,27 +1762,27 @@ export default function ActivityWorkshop() {
                 </div>
               </div>
 
-              {/* Strategic Direction */}
-              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-5 space-y-4">
+              {/* Strategic Direction — Coaching Pitch first */}
+              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-5 space-y-3">
                 <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Strategic Direction</h3>
                 {/* ---- Hard-coded mock data: strategic direction paragraphs ---- */}
+                {/* Coaching Pitch — top, visually distinct */}
+                <div className="rounded-lg bg-purple-500/10 border-l-4 border-l-purple-400/60 p-4">
+                  <div className="text-xs uppercase tracking-wide text-white/50 mb-2">Coaching Pitch</div>
+                  <p className="text-sm text-white/90 leading-relaxed italic">
+                    "You're not just a CS student — you're someone who saw a gap and built the bridge. The admissions committee will remember the kid who started a CS club with no computers, not the one who joined an existing one. Now make every line of your application prove that story with numbers, outcomes, and artifacts they can point to."
+                  </p>
+                </div>
                 <div>
                   <div className="text-xs uppercase tracking-wide text-white/50 mb-1">Current State</div>
-                  <p className="text-sm text-white/90 leading-relaxed">
+                  <p className="text-sm text-white/80 leading-relaxed">
                     You have a distinctive profile centered on building CS infrastructure from scratch in a low-resource environment. Your activities demonstrate genuine initiative and a clear connection between personal experience and technical ambition. The foundation is strong but needs more external validation and tighter narrative connections.
                   </p>
                 </div>
                 <div>
                   <div className="text-xs uppercase tracking-wide text-white/50 mb-1">Strategic Direction</div>
-                  <p className="text-sm text-white/90 leading-relaxed">
+                  <p className="text-sm text-white/80 leading-relaxed">
                     Double down on the "builder who creates access" angle. Every activity description should reinforce this thread. Seek external recognition (competitions, publications, community partnerships) to validate what you've built. Tighten the connection between your work experiences and your CS mission.
-                  </p>
-                </div>
-                {/* Coaching Pitch — visually distinct blockquote */}
-                <div className="mt-2 rounded-lg border-l-4 border-l-blue-400/60 bg-white/5 p-4">
-                  <div className="text-xs uppercase tracking-wide text-white/50 mb-2">Coaching Pitch</div>
-                  <p className="text-sm text-white/90 leading-relaxed italic">
-                    "You're not just a CS student — you're someone who saw a gap and built the bridge. The admissions committee will remember the kid who started a CS club with no computers, not the one who joined an existing one. Now make every line of your application prove that story with numbers, outcomes, and artifacts they can point to."
                   </p>
                 </div>
               </div>
@@ -1730,21 +1790,21 @@ export default function ActivityWorkshop() {
             </TabsContent>
 
             {/* ============ PLACEHOLDER TABS ============ */}
-            <TabsContent value="your-story" className="mt-6">
+            <TabsContent value="your-story" className="mt-4">
               <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-8 text-center">
                 <p className="text-white/70 text-sm">
                   <span className="font-semibold text-white/90">Your Story</span> — How your activities weave into a compelling narrative. Coming soon.
                 </p>
               </div>
             </TabsContent>
-            <TabsContent value="your-edge" className="mt-6">
+            <TabsContent value="your-edge" className="mt-4">
               <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-8 text-center">
                 <p className="text-white/70 text-sm">
                   <span className="font-semibold text-white/90">Your Edge</span> — Your competitive positioning and school fit analysis. Coming soon.
                 </p>
               </div>
             </TabsContent>
-            <TabsContent value="action-plan" className="mt-6">
+            <TabsContent value="action-plan" className="mt-4">
               <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-8 text-center">
                 <p className="text-white/70 text-sm">
                   <span className="font-semibold text-white/90">Action Plan</span> — Exactly what to do next, prioritized by impact. Coming soon.
