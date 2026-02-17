@@ -10,11 +10,13 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History, XCircle, CheckCircle, PenTool, Info } from 'lucide-react';
+import { ArrowLeft, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History, XCircle, CheckCircle, PenTool, Info, Sparkles, X, ChevronLeft, ChevronRight, Pencil, Check } from 'lucide-react';
 import GradientText from '@/components/ui/GradientText';
 
 // UI Components
@@ -197,6 +199,147 @@ export default function ActivityWorkshop() {
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
+
+  // ============================================================================
+  // HERO OVERVIEW STATE (cloned from PortfolioScanner)
+  // ============================================================================
+
+  type HeroMetricId = 'impact' | 'academic' | 'curiosity' | 'story' | 'character';
+  const [heroSelectedMetric, setHeroSelectedMetric] = useState<HeroMetricId | null>(null);
+  const [isHeroInsightsOpen, setIsHeroInsightsOpen] = useState(false);
+  const [heroNarrativeIndex, setHeroNarrativeIndex] = useState(0);
+  const [isEditingHeroNarrative, setIsEditingHeroNarrative] = useState(false);
+  const [heroNarrativeDraft, setHeroNarrativeDraft] = useState('');
+  const [heroNarratives, setHeroNarratives] = useState<string[]>([]);
+  const [heroUnifyIndex, setHeroUnifyIndex] = useState(0);
+  const [heroProofIndex, setHeroProofIndex] = useState(0);
+  const [heroSequenceIndex, setHeroSequenceIndex] = useState(0);
+  const [heroCarrotLeft, setHeroCarrotLeft] = useState<number | null>(null);
+
+  const heroMetricRefs = useRef<Record<HeroMetricId, HTMLDivElement | null>>({ impact: null, academic: null, curiosity: null, story: null, character: null });
+  const heroInsightsPanelRef = useRef<HTMLDivElement | null>(null);
+  const heroOverviewRef = useRef<HTMLDivElement | null>(null);
+
+  // ---- Hard-coded mock data for hero overview (Portfolio Scanner preview values) ----
+  // These are placeholder scores displayed in the hero dashboard tiles.
+  // impact=8.2, academic=8.1, curiosity=7.6, story=7.8, character=7.3, progress=67%
+  const heroMockData = {
+    impact: 8.2,
+    academic: 8.1,
+    curiosity: 7.6,
+    story: 7.8,
+    character: 7.3,
+    progress: 67,
+  };
+
+  const heroOverallScore = Math.round(
+    (heroMockData.impact + heroMockData.academic + heroMockData.curiosity + heroMockData.story + heroMockData.character) / 5 * 10
+  ) / 10;
+
+  // ---- Hero helpers ----
+
+  const getHoloToneClass = (value: number) => {
+    if (value < 5) return 'red';
+    if (value < 7) return 'yellow';
+    if (value < 9) return 'green';
+    return 'blue';
+  };
+
+  const toneToColors = (tone: 'red' | 'yellow' | 'green' | 'blue') => {
+    switch (tone) {
+      case 'red': return ['#ff3b3b', '#ff6b6b', '#ff3b3b', '#ff6b6b', '#ff3b3b'];
+      case 'yellow': return ['#ff9f1a', '#ffd166', '#ff9f1a', '#ffd166', '#ff9f1a'];
+      case 'green': return ['#0f9d58', '#34d399', '#0f9d58', '#34d399', '#0f9d58'];
+      case 'blue':
+      default: return ['#60a5fa', '#a78bfa', '#60a5fa', '#a78bfa', '#60a5fa'];
+    }
+  };
+
+  const getHeroMetricTheme = (metric: string) => {
+    const valMap: Record<string, number> = {
+      impact: heroMockData.impact, leadership: heroMockData.impact,
+      academic: heroMockData.academic,
+      curiosity: heroMockData.curiosity, growth: heroMockData.curiosity,
+      story: heroMockData.story, overall: heroOverallScore,
+      character: heroMockData.character, uniqueness: heroMockData.character,
+      completion: heroMockData.progress / 10,
+    };
+    const value = valMap[metric] ?? 0;
+    const tone = getHoloToneClass(value) as 'red' | 'yellow' | 'green' | 'blue';
+    const colors = toneToColors(tone);
+    return { start: colors[0], end: colors[1], gradientCss: `linear-gradient(90deg, ${colors[0]}, ${colors[1]})` };
+  };
+
+  const handleHeroMetricClick = (metric: HeroMetricId) => {
+    if (isHeroInsightsOpen && heroSelectedMetric === metric) {
+      setIsHeroInsightsOpen(false);
+      return;
+    }
+    setHeroSelectedMetric(metric);
+    setIsHeroInsightsOpen(true);
+  };
+
+  const getHeroDisplayValue = (metric: HeroMetricId): number => {
+    const m = heroMockData as Record<string, number>;
+    return m[metric] ?? 0;
+  };
+
+  const generateHeroNarrativeVariant = (variant: number) => {
+    const dims = [
+      { key: 'Impact & Leadership', value: heroMockData.impact },
+      { key: 'Academic Performance', value: heroMockData.academic },
+      { key: 'Intellectual Curiosity', value: heroMockData.curiosity },
+      { key: 'Storytelling', value: heroMockData.story },
+      { key: 'Character & Community', value: heroMockData.character },
+    ].sort((a, b) => b.value - a.value);
+    const al = dims[0].key.toLowerCase();
+    const bl = dims[1].key.toLowerCase();
+    const overall = heroOverallScore;
+    switch (variant % 6) {
+      case 0: return `Growing up with a single mother, I learned to take initiative early and shoulder responsibility. I now channel that resilience into ${al} and programs that support families, turning ideas into repeatable systems with measurable outcomes.`;
+      case 1: return `I'm building depth in ${al} and translating it into community benefit through ${bl}. I publish work with clear numbers so progress compounds, attracts collaborators, and tells a credible story at an overall level around ${overall}.`;
+      case 2: return `Curiosity leads me to turn questions into projects that serve real people. By focusing on ${al} and amplifying it with ${bl}, I make learning visible through artifacts others can use and improve.`;
+      case 3: return `I combine ${al} with leadership so good ideas become deliverables that matter. I organize people and resources around targets, then publish results so impact lasts beyond me.`;
+      case 4: return `My work connects personal experience with service, using ${al} and ${bl} as the engine. I build repeatable programs with feedback loops so each iteration raises the ceiling for the community.`;
+      default: return `I'm shaping a cohesive profile by leaning into ${al} while reinforcing it with ${bl}. Each month I ship a public proof of progress, tightening the narrative and scaling real-world outcomes.`;
+    }
+  };
+
+  const heroStorageKey = userId ? `uplift:hero-narratives:${userId}` : 'uplift:hero-narratives:anon';
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(heroStorageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length) { setHeroNarratives(parsed); return; }
+      }
+    } catch {}
+    setHeroNarratives(Array.from({ length: 5 }, (_, i) => generateHeroNarrativeVariant(i)));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [heroStorageKey]);
+
+  const persistHeroNarratives = (next: string[]) => {
+    setHeroNarratives(next);
+    try { localStorage.setItem(heroStorageKey, JSON.stringify(next)); } catch {}
+  };
+
+  // Carrot position for hero insights panel
+  useEffect(() => {
+    const updateCarrot = () => {
+      if (!heroSelectedMetric || !isHeroInsightsOpen) { setHeroCarrotLeft(null); return; }
+      const el = heroMetricRefs.current[heroSelectedMetric];
+      const panel = heroInsightsPanelRef.current;
+      if (!el || !panel) return;
+      const rect = el.getBoundingClientRect();
+      const panelRect = panel.getBoundingClientRect();
+      setHeroCarrotLeft(rect.left + rect.width / 2 - panelRect.left);
+    };
+    updateCarrot();
+    window.addEventListener('resize', updateCarrot);
+    window.addEventListener('scroll', updateCarrot, { passive: true });
+    return () => { window.removeEventListener('resize', updateCarrot); window.removeEventListener('scroll', updateCarrot); };
+  }, [heroSelectedMetric, isHeroInsightsOpen]);
 
   // ============================================================================
   // COMPUTED VALUES
@@ -1471,6 +1614,322 @@ export default function ActivityWorkshop() {
   return (
     <div className="min-h-screen bg-background">
       <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
+
+      {/* ================================================================== */}
+      {/* HERO OVERVIEW SECTION (cloned from PortfolioScanner)               */}
+      {/* ================================================================== */}
+      <div ref={heroOverviewRef} className="hero-gradient text-white relative">
+        <div className="max-w-7xl mx-auto px-4 py-12">
+          {/* Header */}
+          <div className="text-center mb-12">
+            <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
+              Portfolio Dashboard
+            </h1>
+            <p className="text-xl text-white/90 max-w-2xl mx-auto drop-shadow-md">
+              Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
+            </p>
+          </div>
+
+          {/* Profile Completion */}
+          <div className="mb-8">
+            <div className="rounded-2xl border border-white/25 bg-white/15 backdrop-blur-md p-4 shadow-lg">
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-xs uppercase tracking-wide text-white/85">Profile Completion</div>
+                <div className="text-xs font-semibold text-white/95">{heroMockData.progress}%</div>
+              </div>
+              <div className="mt-2">
+                <Progress value={heroMockData.progress} className="h-3.5 bg-white/25" />
+              </div>
+            </div>
+          </div>
+
+          {/* Five Key Metrics grid */}
+          {(() => {
+            const metrics: { id: HeroMetricId; label: string; value: number }[] = [
+              { id: 'impact', label: 'Impact & Leadership', value: heroMockData.impact },
+              { id: 'academic', label: 'Academic Performance', value: heroMockData.academic },
+              { id: 'curiosity', label: 'Intellectual Curiosity', value: heroMockData.curiosity },
+              { id: 'story', label: 'Storytelling', value: heroMockData.story },
+              { id: 'character', label: 'Character & Community', value: heroMockData.character },
+            ];
+            return (
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-3">
+                {metrics.map((m) => (
+                  <div
+                    key={m.id}
+                    className="text-center p-4 rounded-xl holo-surface holo-sheen elev-strong elev-hover cursor-pointer"
+                    ref={(el) => (heroMetricRefs.current[m.id] = el)}
+                    onClick={() => handleHeroMetricClick(m.id)}
+                  >
+                    <GradientText
+                      className="text-3xl font-bold metric-value"
+                      colors={toneToColors(getHoloToneClass(m.value) as any)}
+                      animationSpeed={10}
+                      showBorder={false}
+                      textOnly
+                    >
+                      {m.value.toFixed(1)}
+                    </GradientText>
+                    <div className="text-sm metric-label font-semibold mt-1">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Portfolio Overview (shown when insights panel is collapsed) */}
+          {!isHeroInsightsOpen && (
+            <div className="mt-6">
+              <Card className="relative border-2 border-white/40 bg-white/20 text-white backdrop-blur-xl shadow-strong overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-white/10 to-transparent pointer-events-none" aria-hidden="true" />
+                <div className="relative h-1 w-full" style={{ backgroundImage: getHeroMetricTheme('overall').gradientCss }} />
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between gap-4 text-hero-contrast">
+                    <CardTitle>Portfolio Overview</CardTitle>
+                    <div className="flex items-center gap-3">
+                      <span className="px-3 py-1.5 rounded-md text-sm font-semibold bg-white/25 no-text-shadow">
+                        {heroOverallScore.toFixed(1)} / 10
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const dims = [
+                      { key: 'Impact & Leadership', value: heroMockData.impact },
+                      { key: 'Academic Performance', value: heroMockData.academic },
+                      { key: 'Intellectual Curiosity', value: heroMockData.curiosity },
+                      { key: 'Character & Community', value: heroMockData.character },
+                    ].sort((a, b) => b.value - a.value);
+                    const top2 = dims.slice(0, 2).map(d => d.key);
+                    const bottom2 = dims.slice(-2).map(d => d.key);
+                    const overall = heroOverallScore;
+
+                    // ---- Hard-coded narrative summary text matching Portfolio Scanner preview ----
+                    const narrativeSummary = overall >= 7.8
+                      ? `You have a strong foundation with standout momentum in ${top2.join(' and ')}. To hit top-tier, unify everything under one throughline and convert more work into public, measurable outcomes. Focus attention on ${bottom2.join(' and ')} to raise the ceiling.`
+                      : `You've built solid early progress with emerging strengths in ${top2.join(' and ')}. Concentrate on ${bottom2.join(' and ')} to create noticeable lift in the next 60–90 days.`;
+
+                    return (
+                      <div className="space-y-5">
+                        <div className="text-white/90 text-[15px] leading-7 text-hero-contrast">
+                          {narrativeSummary}
+                        </div>
+
+                        {/* Editable Portfolio Narrative */}
+                        <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-4 text-hero-contrast">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="text-xs uppercase tracking-wide">Portfolio narrative</div>
+                            <div className="flex items-center gap-2">
+                              {!isEditingHeroNarrative && (
+                                <button className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => { setHeroNarrativeDraft(heroNarratives[heroNarrativeIndex] || ''); setIsEditingHeroNarrative(true); }} aria-label="Edit narrative">
+                                  <Pencil className="h-4 w-4 text-white" />
+                                </button>
+                              )}
+                              <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroNarrativeIndex((i) => (i - 1 + 5) % 5)} aria-label="Previous narrative">
+                                <ChevronLeft className="h-4 w-4 text-white" />
+                              </button>
+                              <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroNarrativeIndex((i) => (i + 1) % 5)} aria-label="Next narrative">
+                                <ChevronRight className="h-4 w-4 text-white" />
+                              </button>
+                              {!isEditingHeroNarrative && (
+                                <button className="ml-1 px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-xs transition" onClick={() => { const next = [...heroNarratives]; next[heroNarrativeIndex] = generateHeroNarrativeVariant(heroNarrativeIndex + Math.floor(Math.random() * 6)); persistHeroNarratives(next); }}>Regenerate</button>
+                              )}
+                            </div>
+                          </div>
+                          {!isEditingHeroNarrative ? (
+                            <div className="text-white/95 text-sm leading-6">{heroNarratives[heroNarrativeIndex]}</div>
+                          ) : (
+                            <div className="space-y-2">
+                              <Textarea value={heroNarrativeDraft} onChange={(e) => setHeroNarrativeDraft(e.target.value)} placeholder="Write your narrative angle here..." className="bg-white/20 text-white placeholder:text-white/60 min-h-[80px]" />
+                              <div className="flex justify-end">
+                                <Button size="sm" variant="secondary" onClick={() => { const next = [...heroNarratives]; next[heroNarrativeIndex] = heroNarrativeDraft.trim(); persistHeroNarratives(next); setIsEditingHeroNarrative(false); }}>
+                                  <Check className="h-4 w-4 mr-1" /> Save
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Three insight cards: Unify, Make Proof Visible, Sequence */}
+                        <div className="grid md:grid-cols-3 gap-4">
+                          {/* Unify Card */}
+                          <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs uppercase tracking-wide">Unify</div>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroUnifyIndex((i) => (i + 2) % 3)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroUnifyIndex((i) => (i + 1) % 3)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
+                              </div>
+                            </div>
+                            <div className="text-white/95 text-sm">
+                              {['Rename and reorder activities to reinforce one throughline; remove or downsize items that don\'t fit.',
+                                'Group efforts under 2–3 themes (e.g., education equity, health tech); explain how each activity advances one theme.',
+                                'Rewrite activity blurbs to lead with outcomes and tie each result to the same purpose statement.'][heroUnifyIndex]}
+                            </div>
+                          </div>
+
+                          {/* Make Proof Visible Card */}
+                          <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs uppercase tracking-wide">Make proof visible</div>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroProofIndex((i) => (i + 2) % 3)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroProofIndex((i) => (i + 1) % 3)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
+                              </div>
+                            </div>
+                            <div className="text-white/95 text-sm">
+                              {['Publish a small artifact every 2–3 weeks (demo, write‑up, repo, testimonial) tied to a number.',
+                                'Track impact with three metrics (people reached, hours saved, dollars raised) and show a simple before/after.',
+                                'Create a single hub page linking evidence: timeline of artifacts, quick metrics, and 1–2 quotes from beneficiaries.'][heroProofIndex]}
+                            </div>
+                          </div>
+
+                          {/* Sequence Card */}
+                          <div className="rounded-lg border border-white/25 bg-white/12 backdrop-blur-md p-3 text-hero-contrast">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="text-xs uppercase tracking-wide">Sequence</div>
+                              <div className="flex items-center gap-1">
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroSequenceIndex((i) => (i + 2) % 3)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
+                                <button className="p-1 rounded-md bg-white/10 hover:bg-white/20 transition" onClick={() => setHeroSequenceIndex((i) => (i + 1) % 3)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
+                              </div>
+                            </div>
+                            <div className="text-white/95 text-sm">
+                              {['Commit to one 60–90 day push in the weakest area; schedule weekly check‑ins and a public update.',
+                                'Plan three milestones (week 3, 6, 9) with deliverables; each milestone ends with a visible proof post.',
+                                'Pick a mentor or peer for accountability; share progress every two weeks and ask one specific question.'][heroSequenceIndex]}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Collapsible Insights Panel */}
+          <Collapsible open={isHeroInsightsOpen} onOpenChange={setIsHeroInsightsOpen}>
+            {heroSelectedMetric && (
+              <CollapsibleContent>
+                <div
+                  className="rounded-2xl border shadow-xl relative overflow-hidden my-6 max-w-7xl mx-auto"
+                  ref={heroInsightsPanelRef}
+                  style={{ borderColor: 'rgba(0,0,0,0.1)', background: 'rgba(255,255,255,0.92)' }}
+                >
+                  <div className="h-1 w-full" style={{ backgroundImage: getHeroMetricTheme(heroSelectedMetric === 'impact' ? 'leadership' : heroSelectedMetric === 'curiosity' ? 'growth' : heroSelectedMetric === 'story' ? 'overall' : heroSelectedMetric === 'character' ? 'uniqueness' : heroSelectedMetric).gradientCss }} />
+                  {heroCarrotLeft !== null && (
+                    <div
+                      className="absolute -top-2 h-3.5 w-3.5 rotate-45"
+                      style={{
+                        left: Math.max(12, Math.min(heroCarrotLeft - 7, (heroInsightsPanelRef.current?.clientWidth || 0) - 14)),
+                        backgroundImage: getHeroMetricTheme(heroSelectedMetric === 'impact' ? 'leadership' : heroSelectedMetric === 'curiosity' ? 'growth' : heroSelectedMetric === 'story' ? 'overall' : heroSelectedMetric === 'character' ? 'uniqueness' : heroSelectedMetric).gradientCss,
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
+                        border: '1px solid rgba(0,0,0,0.1)'
+                      }}
+                      aria-hidden="true"
+                    />
+                  )}
+
+                  <div className="p-5 md:p-6">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-xl md:text-2xl font-semibold text-foreground">
+                          {(heroSelectedMetric === 'impact' && 'Impact & Leadership - Insights') ||
+                           (heroSelectedMetric === 'academic' && 'Academic Rigor - Insights') ||
+                           (heroSelectedMetric === 'curiosity' && 'Intellectual Curiosity - Insights') ||
+                           (heroSelectedMetric === 'story' && 'Storytelling - Insights') ||
+                           'Character & Community - Insights'}
+                        </h3>
+                      </div>
+                      <button className="text-muted-foreground hover:text-foreground transition" onClick={() => setIsHeroInsightsOpen(false)} aria-label="Close insights">
+                        <X className="h-5 w-5" />
+                      </button>
+                    </div>
+
+                    <div className="mt-5 grid md:grid-cols-1 gap-8">
+                      <section className="space-y-1">
+                        <div className="text-sm uppercase tracking-wide text-muted-foreground mb-2">Overview</div>
+                        <div className="space-y-2">
+                          {/* ---- Hard-coded fallback insight text per metric ---- */}
+                          <p className="text-sm text-foreground/90 leading-6">
+                            {(heroSelectedMetric === 'impact' && 'Admissions look for proof you move people and projects. Quantify outcomes (people helped, dollars raised, time saved) and show roles where others relied on you.') ||
+                             (heroSelectedMetric === 'academic' && 'Top schools value trajectory and rigor. Show a steady climb in course challenge with A-/B+ or better and highlight the toughest classes you can succeed in next.') ||
+                             (heroSelectedMetric === 'curiosity' && 'Demonstrate self-driven learning: independent projects, research outreach, or certifications. Tie exploration to a clear interest arc.') ||
+                             (heroSelectedMetric === 'story' && 'Connect your activities to a single throughline—why you do them and what you\'re building toward. Evidence beats adjectives.') ||
+                             'Translate values into community outcomes. Spotlight 1–2 commitments where you consistently show up and make a difference.'}
+                          </p>
+                          <div className="grid md:grid-cols-3 gap-3">
+                            <div className="rounded-lg border p-3 bg-white/60">
+                              <div className="text-xs uppercase text-muted-foreground">What top admits show</div>
+                              <div className="text-sm mt-1 leading-6 text-foreground">
+                                {(heroSelectedMetric === 'impact' && 'Clear evidence of steering people and resources to a measurable win—projects that grow, teams that improve, or communities that benefit in ways you can quantify.') ||
+                                 (heroSelectedMetric === 'academic' && 'A transcript that stretches into challenging courses with a rising trajectory, paired with proof you can master difficult material.') ||
+                                 (heroSelectedMetric === 'curiosity' && 'Self-propelled exploration that turns questions into prototypes, brief write-ups, or collaborations beyond the classroom.') ||
+                                 (heroSelectedMetric === 'story' && 'A coherent narrative where choices stack toward a purpose, with results that make that purpose believable.') ||
+                                 'Long-haul commitment to people or places—consistent service that leaves behind systems or outcomes others can point to.'}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border p-3 bg-white/60">
+                              <div className="text-xs uppercase text-muted-foreground">Your quick opportunity</div>
+                              <div className="text-sm mt-1 leading-6 text-foreground">
+                                {(heroSelectedMetric === 'impact' && 'Choose one current initiative and set a 6–8 week goal tied to a number (beneficiaries, dollars, or hours saved); publish a short update when you hit it.') ||
+                                 (heroSelectedMetric === 'academic' && 'Enroll in one stretch class and pre-schedule weekly support (office hours, peer tutor); track progress with two short reflections.') ||
+                                 (heroSelectedMetric === 'curiosity' && 'Run a 4–6 week mini-project with weekly deliverables and one mentor touchpoint; ship a public artifact at the end.') ||
+                                 (heroSelectedMetric === 'story' && 'Write a 2–3 sentence thesis for your application story and reframe your three main activities to prove it with outcomes.') ||
+                                 'Pick one cause and show up weekly; capture before/after metrics or testimonials to make the benefit visible.'}
+                              </div>
+                            </div>
+                            <div className="rounded-lg border p-3 bg-white/60">
+                              <div className="text-xs uppercase text-muted-foreground">Distance to top tier</div>
+                              <div className="text-sm mt-1 leading-6 text-foreground">
+                                {(() => {
+                                  const current = getHeroDisplayValue(heroSelectedMetric!);
+                                  const target = 9.2;
+                                  const gap = Math.max(0, Number((target - current).toFixed(1)));
+                                  return gap === 0 ? 'You are performing at or above typical Top-25 admit levels—focus on sustaining visible outcomes.' : `${gap} points from a typical Top-25 admit profile—close it with 2–3 focused moves in the next 60–90 days.`;
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </section>
+
+                      <hr className="border-t border-black/10" />
+
+                      <section>
+                        <div className="text-sm uppercase tracking-wide text-muted-foreground mb-2">Top 4 Improvements</div>
+                        <ol className="mt-1 grid md:grid-cols-2 gap-x-6 gap-y-3">
+                          {/* ---- Hard-coded improvement suggestions per metric ---- */}
+                          {((): string[] => {
+                            if (heroSelectedMetric === 'impact') return ['Quantify your outcomes by reporting people helped, revenue raised, or hours saved for each major initiative.', 'Elevate your responsibility by training peers or leading a small sub-team with clear goals and check-ins.', 'Ship one visible deliverable within 6–8 weeks and communicate results to the stakeholders who benefit.', 'Document proof with one or two public links (website, repo, media, or a short testimonial).'];
+                            if (heroSelectedMetric === 'academic') return ['Add one stretch course next term and write an explicit support plan that includes office hours or tutoring.', 'Visualize your semester-by-semester grade trend and annotate what changed to drive improvement.', 'Take an external benchmark (AP/IB/dual-enroll/competition) to validate your readiness for rigor.', 'Publish a brief reflection that explains a hard concept you mastered and why it matters for your interests.'];
+                            if (heroSelectedMetric === 'curiosity') return ['Launch a 6-week independent project with weekly milestones and one guiding research question.', 'Email one mentor or researcher for feedback and summarize the three most important insights you gained.', 'Produce a tangible artifact such as a public repo, prototype, short paper, or tutorial video.', 'Connect the project to your longer arc with a clear statement of the next experiment.'];
+                            if (heroSelectedMetric === 'story') return ['Draft a 2–3 sentence thesis that explains your why and the impact you aim to create.', 'Align your top three activities under this thesis and downsize items that do not reinforce it.', 'Rewrite activity descriptions to lead with outcomes and concrete evidence instead of duties.', 'Secure one recommendation that explicitly reinforces this thesis with specific examples.'];
+                            return ['Choose one or two causes and commit weekly time for the next two months to create continuity.', 'Measure who benefits and how by capturing before/after numbers or brief testimonials.', 'Add one leadership act within your service work such as coordination, training, or resource design.', 'Attach a visible proof link (program page, photo log, letter, or media mention).'];
+                          })().map((p, i) => (
+                            <li key={i} className="flex items-start gap-2">
+                              <span className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-semibold text-white flex-shrink-0" style={{ backgroundImage: getHeroMetricTheme(heroSelectedMetric === 'impact' ? 'leadership' : heroSelectedMetric === 'curiosity' ? 'growth' : heroSelectedMetric === 'story' ? 'overall' : heroSelectedMetric === 'character' ? 'uniqueness' : heroSelectedMetric).gradientCss }}>
+                                {i + 1}
+                              </span>
+                              <span className="text-[14px] text-foreground leading-6">{p}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      </section>
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            )}
+          </Collapsible>
+        </div>
+      </div>
+
+      {/* ================================================================== */}
+      {/* TWO-COLUMN WORKSPACE                                               */}
+      {/* ================================================================== */}
       <div className="relative z-10 mx-auto px-4 py-4">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="space-y-6">
