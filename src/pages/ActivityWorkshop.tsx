@@ -1865,29 +1865,28 @@ export default function ActivityWorkshop() {
                       {/* ---- Hard-coded mock data: spike strength badge ---- */}
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Moderate</span>
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-md p-4">
-                        <h4 className="text-sm font-semibold text-white mb-2">Depth</h4>
-                        <p className="text-sm text-white/80 leading-relaxed">Founded CS club from zero infrastructure, progressed to ML research — shows sustained technical deepening over 2+ years</p>
-                      </div>
-                      <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-md p-4">
-                        <h4 className="text-sm font-semibold text-white mb-2">What Makes It Stand Out</h4>
-                        <p className="text-sm text-white/80 leading-relaxed">First-gen student building STEM access while working 20hrs/week — most CS spikes come from resource-rich environments</p>
-                      </div>
+                    {/* ---- Hard-coded mock data: Depth and What Makes It Stand Out blockquotes ---- */}
+                    <div className="border-l-4 border-l-teal-400 pl-4 py-2 mb-3">
+                      <h4 className="text-sm font-semibold text-white mb-2">Depth</h4>
+                      <p className="text-sm text-white/80 leading-relaxed">Founded CS club from zero infrastructure, progressed to ML research — shows sustained technical deepening over 2+ years. You didn't just join existing programs; you created the foundation others now build on. The progression from teaching yourself to teach others, then to contributing at a university level, demonstrates exactly the kind of intellectual trajectory top schools look for. This isn't a checkbox activity — it's a genuine arc of deepening mastery.</p>
+                    </div>
+                    <div className="border-l-4 border-l-purple-400 pl-4 py-2 mb-3">
+                      <h4 className="text-sm font-semibold text-white mb-2">What Makes It Stand Out</h4>
+                      <p className="text-sm text-white/80 leading-relaxed">First-gen student building STEM access while working 20hrs/week — most CS spikes come from resource-rich environments. Your spike stands out precisely because it was built under constraints that would stop most applicants. While other CS applicants had summer camps, tutors, and school resources, you built your own. That context transforms a 'good CS profile' into a genuinely distinctive one that admissions officers will remember.</p>
                     </div>
                     <div>
                       <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Supporting Activities</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {/* ---- Hard-coded mock data: supporting activity cards ---- */}
+                      {/* ---- Hard-coded mock data: supporting activity rows ---- */}
+                      <div className="divide-y divide-white/10">
                         {[
-                          { name: 'CS Club Founder', support: 'Demonstrates initiative and technical leadership from scratch', elevation: 'Elevates spike by showing you create infrastructure, not just use it' },
-                          { name: 'ML Research Assistant', support: 'Validates technical depth through university-level work', elevation: 'Elevates spike by adding academic rigor to self-taught foundation' },
-                          { name: 'Math Tutor', support: 'Teaching pattern reinforces mission of building access', elevation: "Elevates spike by showing multiplier effect — you don't just learn, you teach" },
+                          { name: 'CS Club Founder', support: "Demonstrates initiative and technical leadership from scratch. Building something from nothing — no budget, no faculty sponsor, no precedent — is the strongest possible evidence of entrepreneurial drive.", elevation: 'Elevates spike by showing you create infrastructure, not just use it' },
+                          { name: 'ML Research Assistant', support: "Validates technical depth through university-level work. Moving from self-taught to contributing real research proves your skills are genuine, not just hobbyist-level.", elevation: 'Elevates spike by adding academic rigor to self-taught foundation' },
+                          { name: 'Math Tutor', support: "Teaching pattern reinforces mission of building access. The fact that you seek out teaching roles in multiple contexts shows this isn't resume padding — it's a core part of who you are.", elevation: "Elevates spike by showing multiplier effect — you don't just learn, you teach" },
                         ].map((a, i) => (
-                          <div key={i} className="rounded-xl border border-white/20 bg-white/10 backdrop-blur-md p-3">
-                            <h4 className="text-sm font-semibold text-white mb-1">{a.name}</h4>
-                            <p className="text-xs text-white/70 leading-relaxed mb-1">{a.support}</p>
-                            <p className="text-xs text-white/50 italic">{a.elevation}</p>
+                          <div key={i} className="flex items-start gap-4 py-3">
+                            <span className="text-sm font-semibold text-white flex-shrink-0 w-[140px]">{a.name}</span>
+                            <p className="text-xs text-white/70 leading-relaxed flex-1">{a.support}</p>
+                            <p className="text-xs text-white/50 italic flex-shrink-0 max-w-[240px]">{a.elevation}</p>
                           </div>
                         ))}
                       </div>
@@ -1908,26 +1907,23 @@ export default function ActivityWorkshop() {
                     {/* ---- Hard-coded mock data: Portfolio Coherence section ---- */}
                     <div>
                       <h3 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Portfolio Coherence</h3>
-                      <div className="flex items-center gap-4 mb-3">
-                        <svg width="64" height="64" viewBox="0 0 100 100" className="flex-shrink-0">
+                      <div className="flex flex-col items-center gap-1 mb-4 w-fit">
+                        <svg width="80" height="80" viewBox="0 0 100 100" className="flex-shrink-0">
                           <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
                           <circle cx="50" cy="50" r="40" fill="none" stroke="#60a5fa" strokeWidth="8"
                             strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - 0.78)}
                             strokeLinecap="round" transform="rotate(-90 50 50)" />
                           <text x="50" y="55" textAnchor="middle" className="fill-white text-xl font-bold" fontSize="22">78</text>
                         </svg>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30 w-fit">Strong</span>
-                          <span className="text-[10px] text-white/50">out of 100</span>
-                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Strong</span>
                       </div>
-                      <div className="mb-3">
+                      <div className="mb-3 mt-3">
                         <h4 className="text-xs font-semibold text-white/80 mb-1">What Ties It Together</h4>
-                        <p className="text-xs text-white/70 leading-relaxed">Your activities are connected by a clear through-line: identifying resource gaps and building technical solutions to fill them. Whether it's creating a CS club where none existed, researching healthcare access in underserved areas, or tutoring students who lack academic support, you consistently find places where something is missing and build the bridge.</p>
+                        <p className="text-sm text-white/70 leading-relaxed">Your activities are connected by a clear through-line: identifying resource gaps and building technical solutions to fill them. Whether it's creating a CS club where none existed, researching healthcare access in underserved areas, or tutoring students who lack academic support, you consistently find places where something is missing and build the bridge.</p>
                       </div>
                       <div>
                         <h4 className="text-xs font-semibold text-white/80 mb-2">Activities to Better Integrate</h4>
-                        <div className="rounded-xl border border-white/20 bg-white/10 p-3">
+                        <div className="border-l-4 border-l-amber-400 bg-amber-500/5 border border-amber-500/20 rounded-lg p-3">
                           <h5 className="text-sm font-semibold text-white mb-1">Grocery Store Associate</h5>
                           <p className="text-xs text-white/70 leading-relaxed">Reframe around problem-solving under constraint and operational systems thinking to connect it to your builder identity.</p>
                         </div>
