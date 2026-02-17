@@ -1,38 +1,56 @@
 
 
-## Fix: Prevent Blank Screen When Clerk Fails to Load
+## Clone Portfolio Scanner Hero Section into Activity Workshop
 
-### Root Cause
+### What Gets Added
 
-The Clerk JS SDK is hosted on your custom domain `clerk.uplift-app.com`. In the Lovable preview environment, network requests to this domain are blocked (`ERR_TUNNEL_CONNECTION_FAILED`). When Clerk fails to load, it throws an unhandled promise rejection that crashes the entire React app, resulting in a blank white screen.
+The entire hero overview section from the Portfolio Scanner will be cloned verbatim into `src/pages/ActivityWorkshop.tsx`, placed above the existing two-column editor/chat grid. This includes:
 
-This affects ALL authenticated routes (Portfolio Scanner, PIQ Workshop, Settings, etc.), not just one page.
+1. **Hero gradient container** with the "Portfolio Dashboard" header, subtitle, and preview mode badge
+2. **Profile Completion bar** (progress indicator with percentage)
+3. **Five Key Metric tiles** (Impact & Leadership, Academic Performance, Intellectual Curiosity, Storytelling, Character & Community) with animated gradient text and click-to-expand behavior
+4. **Portfolio Overview card** (narrative summary, editable portfolio narrative with carousel, and the three insight cards: Unify, Make Proof Visible, Sequence)
+5. **Collapsible Insights panel** that expands when a metric tile is clicked, showing dimension-specific insights with a carrot indicator
 
-### Fix
+### What Changes
 
-**1. Add global unhandled rejection handler** in `src/App.tsx`
+All changes are in a single file: `src/pages/ActivityWorkshop.tsx`
 
-Catch the Clerk loading failure so it doesn't crash the React tree. Add a `useEffect` with a `window.addEventListener('unhandledrejection', ...)` that specifically catches Clerk's `failed_to_load_clerk_js` error code and suppresses the crash.
+**New state variables** needed to support the hero:
+- `selectedMetric`, `isInsightsOpen` -- metric tile click behavior
+- `narrativeIndex`, `isEditingNarrative`, `narrativeDraft`, `narratives` -- narrative carousel
+- `unifyIndex`, `proofIndex`, `sequenceIndex` -- insight card carousels
+- `carrotLeft` -- carrot position for insights panel
+- `overallProgress` -- profile completion percentage
+- Mock rubric scores and overall score (hard-coded, matching Portfolio Scanner preview values)
+- Refs: `metricRefs`, `insightsPanelRef`, `overviewRef`
 
-**2. Add an error boundary around ClerkProvider** in `src/App.tsx`
+**New imports**: `Collapsible`, `CollapsibleContent`, `Textarea`, `CardHeader`, `CardTitle`, `CardContent`, plus additional lucide icons (`Pencil`, `Check`, `ChevronLeft`, `ChevronRight`, `Sparkles`, etc.)
 
-Wrap `ClerkProvider` in an error boundary component so that if Clerk fails to initialize, the app shows a friendly "Authentication unavailable" message instead of a blank screen. Users would see a retry button or a message explaining the situation.
+**New helper functions** copied from Portfolio Scanner:
+- `getHoloToneClass()` / `toneToColors()` -- color mapping by score
+- `getMetricTheme()` -- gradient CSS for metric themes
+- `handleMetricClick()` -- toggle insights panel
+- `generateNarrativeVariant()` -- narrative text generation
+- `persistNarratives()` -- localStorage persistence
 
-**3. Create `src/components/ClerkErrorBoundary.tsx`** (new file)
+**Layout change**: The hero section is inserted between the background gradient div and the two-column grid container, spanning full width above both columns.
 
-A React error boundary that:
-- Catches errors thrown by Clerk during initialization
-- Renders a user-friendly fallback UI with a "Retry" button
-- Logs the error for debugging
+### What Stays the Same
 
-### Files to Change
+- The two-column layout (EditorView left, ContextualWorkshopChat right) is untouched
+- All existing state, version history, autosave, and chat logic remains
+- The "Coming Soon" banner is NOT copied (it's Portfolio Scanner-specific)
 
-| File | Action |
+### Technical Details
+
+| Area | Detail |
 |------|--------|
-| `src/components/ClerkErrorBoundary.tsx` | Create -- error boundary for Clerk failures |
-| `src/App.tsx` | Modify -- wrap ClerkProvider with error boundary, add unhandled rejection handler |
+| File | `src/pages/ActivityWorkshop.tsx` |
+| Insert location | After the background gradient div (line 1473), before the grid container (line 1474) |
+| Mock data | Hard-coded scores (impact: 8.2, academic: 8.1, curiosity: 7.6, story: 7.8, character: 7.3, progress: 67%) with comment annotation per project conventions |
+| New state vars | ~12 new useState calls + 3 useRef calls |
+| New helpers | ~6 functions cloned from PortfolioScanner |
+| CSS dependencies | Uses existing `hero-gradient`, `holo-surface`, `holo-sheen`, `elev-strong`, `elev-hover`, `text-hero-contrast` classes already in the project |
 
-### Important Note
-
-This is a **network environment issue** in the Lovable preview. Your production app at `uplift-final-final-18698-62030.lovable.app` likely works fine since it can reach `clerk.uplift-app.com`. The fix ensures the app degrades gracefully instead of showing a blank screen when Clerk is unreachable.
-
+This gives you an exact replica of the Portfolio Scanner overview as a starting point, ready to be customized for activity-specific metrics in subsequent iterations.
