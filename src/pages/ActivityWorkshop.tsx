@@ -16,7 +16,7 @@ import { Progress } from '@/components/ui/progress';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { ArrowLeft, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History, XCircle, CheckCircle, PenTool, Info, Sparkles, X, ChevronLeft, ChevronRight, Pencil, Check, Lightbulb, Flag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, RefreshCcw, Target, TrendingUp, TrendingDown, Minus, AlertTriangle, History, XCircle, CheckCircle, PenTool, Info, Sparkles, X, ChevronLeft, ChevronRight, Pencil, Check, Lightbulb, Flag } from 'lucide-react';
 import GradientText from '@/components/ui/GradientText';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
@@ -212,6 +212,12 @@ export default function ActivityWorkshop() {
   const [spikeIndex, setSpikeIndex] = useState(0);
   const [memorableIndex, setMemorableIndex] = useState(0);
   const [priorityIndex, setPriorityIndex] = useState(0);
+
+  // Drill-down state for Overview tab
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [expandedStrengths, setExpandedStrengths] = useState<number | null>(null);
+  const [expandedOpps, setExpandedOpps] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
 
   // ---- Hard-coded mock data: Score Dashboard cards with scores, rationale, and improvement suggestions ----
   const scoreCards = [
@@ -1632,7 +1638,7 @@ export default function ActivityWorkshop() {
           </div>
 
           {/* Tab Bar */}
-          <Tabs defaultValue="overview" className="w-full">
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setExpandedSection(null); }} className="w-full">
             <TabsList className="bg-white/10 border border-white/20 backdrop-blur-md w-full justify-start">
               <TabsTrigger value="overview" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">Overview</TabsTrigger>
               <TabsTrigger value="your-story" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">Your Story</TabsTrigger>
@@ -1643,11 +1649,16 @@ export default function ActivityWorkshop() {
             {/* ============ OVERVIEW TAB ============ */}
             <TabsContent value="overview" className="mt-3 space-y-3">
 
-              {/* Portfolio Narrative — blockquote style */}
-              <div className="border-l-4 border-l-blue-400/50 pl-4 py-1">
+            {expandedSection === null ? (
+              <div className="space-y-3 animate-fade-in">
+              {/* Portfolio Narrative — blockquote style, clickable for drill-down */}
+              <div
+                className="border-l-4 border-l-blue-400/50 pl-4 py-1 cursor-pointer hover:brightness-110 transition-all duration-200 relative group"
+                onClick={() => setExpandedSection('narrative')}
+              >
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs uppercase tracking-widest text-white/60 font-semibold">Portfolio Narrative</div>
-                  <div className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
                     {!isEditingNarrative && (
                       <button
                         className="p-1 rounded-md hover:bg-white/10 transition"
@@ -1671,9 +1682,12 @@ export default function ActivityWorkshop() {
                   </div>
                 </div>
                 {!isEditingNarrative ? (
-                  <p className="text-white/90 text-base leading-7">{narrativeVariants[narrativeVariantIndex]}</p>
+                  <div className="flex items-start gap-2">
+                    <p className="text-white/90 text-base leading-7 flex-1">{narrativeVariants[narrativeVariantIndex]}</p>
+                    <ArrowRight className="h-3 w-3 text-white/40 mt-2 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                     <Textarea value={narrativeDraft} onChange={(e) => setNarrativeDraft(e.target.value)} placeholder="Write your narrative angle..." className="bg-white/20 text-white placeholder:text-white/60 min-h-[80px] border-white/20" />
                     <div className="flex justify-end gap-2">
                       <Button size="sm" variant="ghost" className="text-white/70" onClick={() => setIsEditingNarrative(false)}>Cancel</Button>
@@ -1685,64 +1699,88 @@ export default function ActivityWorkshop() {
                 )}
               </div>
 
-              {/* Three Quick Insight Cards — spotlight treatment */}
+              {/* Three Quick Insight Cards — clickable for drill-down */}
               <div className="grid md:grid-cols-3 gap-3">
-                {/* YOUR SPIKE */}
-                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3">
+                <div
+                  className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3 cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-all duration-200 relative group"
+                  onClick={() => setExpandedSection('spike')}
+                >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Target className="h-3.5 w-3.5 text-blue-400" />
                       <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">Your Spike</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setSpikeIndex((i) => (i - 1 + spikeVariants.length) % spikeVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
                       <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setSpikeIndex((i) => (i + 1) % spikeVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
                     </div>
                   </div>
                   <p className="text-white/95 text-sm font-semibold">{spikeVariants[spikeIndex]}</p>
+                  <ArrowRight className="h-3 w-3 text-white/40 absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
 
-                {/* WHAT THEY'LL REMEMBER */}
-                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3">
+                <div
+                  className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3 cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-all duration-200 relative group"
+                  onClick={() => setExpandedSection('memorable')}
+                >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
                       <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">What They'll Remember</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setMemorableIndex((i) => (i - 1 + memorableVariants.length) % memorableVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
                       <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setMemorableIndex((i) => (i + 1) % memorableVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
                     </div>
                   </div>
                   <p className="text-white/95 text-sm font-semibold">{memorableVariants[memorableIndex]}</p>
+                  <ArrowRight className="h-3 w-3 text-white/40 absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
 
-                {/* #1 PRIORITY */}
-                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3">
+                <div
+                  className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3 cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-all duration-200 relative group"
+                  onClick={() => setExpandedSection('priority')}
+                >
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Flag className="h-3.5 w-3.5 text-red-400" />
                       <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">#1 Priority</span>
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                       <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setPriorityIndex((i) => (i - 1 + priorityVariants.length) % priorityVariants.length)}><ChevronLeft className="h-3.5 w-3.5 text-white" /></button>
                       <button className="p-1 rounded-md hover:bg-white/20 transition" onClick={() => setPriorityIndex((i) => (i + 1) % priorityVariants.length)}><ChevronRight className="h-3.5 w-3.5 text-white" /></button>
                     </div>
                   </div>
                   <p className="text-white/95 text-sm font-semibold">{priorityVariants[priorityIndex]}</p>
+                  <ArrowRight className="h-3 w-3 text-white/40 absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
               </div>
 
-              {/* Key Strengths & Opportunities — tighter, stronger borders */}
+              {/* Key Strengths & Opportunities — inline expandable bullets */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-3 px-4 border-l-4 border-l-green-500">
                   <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Key Strengths</h3>
                   <ul className="space-y-1.5">
-                    {/* ---- Hard-coded mock data: strength bullets ---- */}
-                    {['Pioneer initiative in zero-resource environment', 'Clear CS spike with social impact angle', 'Authentic first-gen narrative'].map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-white/90">
-                        <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
-                        <span>{s}</span>
+                    {/* ---- Hard-coded mock data: strength bullets with inline expansion context ---- */}
+                    {[
+                      { text: 'Pioneer initiative in zero-resource environment', detail: 'You founded the CS Club with no existing infrastructure, budget, or faculty sponsor. This kind of zero-to-one initiative is exactly what admissions committees at top schools look for.' },
+                      { text: 'Clear CS spike with social impact angle', detail: 'Your progression from self-teaching to ML research shows a sustained, deepening engagement with CS. The social impact angle makes it distinctive from typical CS applicants.' },
+                      { text: 'Authentic first-gen narrative', detail: "Being first-gen isn't just a demographic checkbox — your activities authentically demonstrate how this background shaped your drive to build access and opportunity." },
+                    ].map((s, i) => (
+                      <li key={i}>
+                        <div
+                          className="flex items-start gap-2 text-sm text-white/90 cursor-pointer hover:text-white transition-colors"
+                          onClick={() => setExpandedStrengths(expandedStrengths === i ? null : i)}
+                        >
+                          <CheckCircle className="h-4 w-4 text-green-400 mt-0.5 flex-shrink-0" />
+                          <span>{s.text}</span>
+                        </div>
+                        <div
+                          className="overflow-hidden transition-all duration-200"
+                          style={{ maxHeight: expandedStrengths === i ? '100px' : '0px', opacity: expandedStrengths === i ? 1 : 0 }}
+                        >
+                          <p className="text-xs text-white/60 ml-6 mt-1 leading-relaxed">{s.detail}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -1751,22 +1789,35 @@ export default function ActivityWorkshop() {
                 <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-3 px-4 border-l-4 border-l-amber-500">
                   <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Opportunities to Strengthen</h3>
                   <ul className="space-y-1.5">
-                    {/* ---- Hard-coded mock data: opportunity bullets ---- */}
-                    {['Limited external recognition', 'Some activities feel disconnected from spike'].map((s, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-white/90">
-                        <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
-                        <span>{s}</span>
+                    {/* ---- Hard-coded mock data: opportunity bullets with inline expansion context ---- */}
+                    {[
+                      { text: 'Limited external recognition', detail: 'Your achievements are real but lack third-party validation. Competitions, publications, or community awards would give admissions committees concrete evidence to advocate for you.' },
+                      { text: 'Some activities feel disconnected from spike', detail: "The grocery store and farm jobs are valuable work experiences but their descriptions don't connect to your CS/social impact narrative. Reframe them to show transferable skills." },
+                    ].map((s, i) => (
+                      <li key={i}>
+                        <div
+                          className="flex items-start gap-2 text-sm text-white/90 cursor-pointer hover:text-white transition-colors"
+                          onClick={() => setExpandedOpps(expandedOpps === i ? null : i)}
+                        >
+                          <AlertTriangle className="h-4 w-4 text-amber-400 mt-0.5 flex-shrink-0" />
+                          <span>{s.text}</span>
+                        </div>
+                        <div
+                          className="overflow-hidden transition-all duration-200"
+                          style={{ maxHeight: expandedOpps === i ? '100px' : '0px', opacity: expandedOpps === i ? 1 : 0 }}
+                        >
+                          <p className="text-xs text-white/60 ml-6 mt-1 leading-relaxed">{s.detail}</p>
+                        </div>
                       </li>
                     ))}
                   </ul>
                 </div>
               </div>
 
-              {/* Strategic Direction — Coaching Pitch first */}
+              {/* Strategic Direction — with "See Full Action Plan" link */}
               <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-3 px-4 space-y-2">
                 <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Strategic Direction</h3>
                 {/* ---- Hard-coded mock data: strategic direction paragraphs ---- */}
-                {/* Coaching Pitch — top, visually distinct */}
                 <div className="rounded-lg bg-purple-500/10 border-l-4 border-l-purple-400/60 p-3">
                   <div className="text-xs uppercase tracking-wide text-white/50 mb-1">Coaching Pitch</div>
                   <p className="text-sm text-white/90 leading-relaxed italic">
@@ -1785,7 +1836,228 @@ export default function ActivityWorkshop() {
                     Double down on the "builder who creates access" angle. Every activity description should reinforce this thread. Seek external recognition (competitions, publications, community partnerships) to validate what you've built. Tighten the connection between your work experiences and your CS mission.
                   </p>
                 </div>
+                <button
+                  className="text-xs text-blue-400 hover:text-blue-300 cursor-pointer transition-colors mt-1"
+                  onClick={() => setActiveTab('action-plan')}
+                >
+                  See Full Action Plan →
+                </button>
               </div>
+
+              </div>
+            ) : (
+              /* ============ EXPANDED DETAIL VIEWS ============ */
+              <div className="transition-all duration-300 animate-fade-in space-y-4">
+                <button
+                  className="flex items-center gap-1.5 text-sm text-white/60 hover:text-white cursor-pointer transition-colors"
+                  onClick={() => setExpandedSection(null)}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back to Overview</span>
+                </button>
+
+                {/* ---- SPIKE EXPANDED VIEW ---- */}
+                {expandedSection === 'spike' && (
+                  <div className="space-y-4">
+                    {/* ---- Hard-coded mock data: Spike drill-down content ---- */}
+                    <h2 className="text-lg font-bold text-white">Your Spike: Computer Science with Social Impact Focus</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-md p-4">
+                        <h4 className="text-sm font-semibold text-white mb-2">Depth</h4>
+                        <p className="text-sm text-white/80 leading-relaxed">Founded CS club from zero infrastructure, progressed to ML research — shows sustained technical deepening over 2+ years</p>
+                      </div>
+                      <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-md p-4">
+                        <h4 className="text-sm font-semibold text-white mb-2">What Makes It Stand Out</h4>
+                        <p className="text-sm text-white/80 leading-relaxed">First-gen student building STEM access while working 20hrs/week — most CS spikes come from resource-rich environments</p>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Supporting Activities</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {/* ---- Hard-coded mock data: supporting activity cards ---- */}
+                        {[
+                          { name: 'CS Club Founder', support: 'Demonstrates initiative and technical leadership from scratch', elevation: 'Elevates spike by showing you create infrastructure, not just use it' },
+                          { name: 'ML Research Assistant', support: 'Validates technical depth through university-level work', elevation: 'Elevates spike by adding academic rigor to self-taught foundation' },
+                          { name: 'Math Tutor', support: 'Teaching pattern reinforces mission of building access', elevation: "Elevates spike by showing multiplier effect — you don't just learn, you teach" },
+                        ].map((a, i) => (
+                          <div key={i} className="rounded-xl border border-white/20 bg-white/10 backdrop-blur-md p-3">
+                            <h4 className="text-sm font-semibold text-white mb-1">{a.name}</h4>
+                            <p className="text-xs text-white/70 leading-relaxed mb-1">{a.support}</p>
+                            <p className="text-xs text-white/50 italic">{a.elevation}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Complementary Breadth</h3>
+                      {/* ---- Hard-coded mock data: breadth card ---- */}
+                      <div className="rounded-xl border border-white/20 bg-white/10 backdrop-blur-md p-3">
+                        <h4 className="text-sm font-semibold text-white mb-1">Community Leadership</h4>
+                        <div className="flex gap-1.5 mb-1.5">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/70">Grocery Store</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/70">Farm Work</span>
+                        </div>
+                        <p className="text-xs text-white/70 leading-relaxed">Shows work ethic and real-world responsibility that grounds the technical spike in lived experience</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* ---- MEMORABLE EXPANDED VIEW ---- */}
+                {expandedSection === 'memorable' && (
+                  <div className="space-y-4">
+                    {/* ---- Hard-coded mock data: Memorable/positioning drill-down content ---- */}
+                    <h2 className="text-lg font-bold text-white">What Sets You Apart</h2>
+                    <div className="bg-white/15 border-l-4 border-l-amber-400 rounded-r-lg p-4">
+                      <p className="text-sm text-white/90 italic leading-relaxed">"First-gen student who turns resource scarcity into technical solutions"</p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2">Your Differentiators</h3>
+                      <ul className="space-y-1.5">
+                        {['First-gen student who builds infrastructure, not just participates', 'Technical depth validated by university research partnership', 'Teaching pattern across multiple contexts shows multiplier mindset'].map((d, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-white/80">
+                            <span className="text-blue-400 mt-0.5">•</span>
+                            <span>{d}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2">Your Strengths</h3>
+                      <ul className="space-y-1.5">
+                        {['Authentic narrative rooted in personal experience', 'Clear progression from self-teaching to formal research', 'Every activity connects to a larger mission'].map((s, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-white/80">
+                            <CheckCircle className="h-3.5 w-3.5 text-green-400 mt-0.5 flex-shrink-0" />
+                            <span>{s}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2">School Types That Fit</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {['Research Universities', 'Liberal Arts Colleges', 'Tech-Forward Schools', 'Schools Valuing Diversity'].map((t) => (
+                          <span key={t} className="text-xs px-3 py-1 rounded-full bg-white/15 text-white/80 border border-white/20">{t}</span>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="rounded-xl border border-white/20 bg-white/10 p-4">
+                      <h3 className="text-sm font-semibold text-white mb-2">Competitive Assessment</h3>
+                      <p className="text-sm text-white/80 leading-relaxed">
+                        Your profile is most competitive at schools that value initiative and authentic narratives over polished pedigree. Research universities will appreciate the ML work; liberal arts colleges will value the community-building angle. Your biggest gap is external validation — competitions or publications would move you from 'promising' to 'proven'.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ---- PRIORITY EXPANDED VIEW ---- */}
+                {expandedSection === 'priority' && (
+                  <div className="space-y-4">
+                    {/* ---- Hard-coded mock data: Priority drill-down content ---- */}
+                    <h2 className="text-lg font-bold text-white">Your Top Priorities</h2>
+                    <div className="space-y-3">
+                      {[
+                        { title: 'Quantify CS Club impact with specific metrics', impact: "Adding numbers (e.g., '12 members recruited, 3 workshops hosted, partnered with local library') transforms a good activity into a great one. Admissions officers need concrete evidence.", tag: 'CS Club' },
+                        { title: 'Strengthen research narrative with publication or presentation', impact: 'Publishing your ML healthcare research or presenting at a student symposium adds third-party validation. This is the single highest-ROI action for your profile.', tag: 'ML Research' },
+                        { title: 'Rewrite work experience descriptions to connect to CS mission', impact: "Your grocery and farm jobs show grit, but currently read as disconnected. Frame them as 'problem-solving under resource constraints' to reinforce your core narrative.", tag: 'Work Experience' },
+                      ].map((a, i) => (
+                        <div key={i} className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-md p-4">
+                          <h4 className="text-sm font-bold text-white mb-2">{a.title}</h4>
+                          <p className="text-sm text-white/80 leading-relaxed mb-2">{a.impact}</p>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/60">{a.tag}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Coming Up (1-3 Months)</h3>
+                      <div className="space-y-2">
+                        {/* ---- Hard-coded mock data: short-term action items ---- */}
+                        {[
+                          { action: 'Apply to USACO or a regional hackathon', deadline: 'Within 6 weeks' },
+                          { action: "Draft a blog post or GitHub README documenting your CS Club's journey", deadline: 'Within 8 weeks' },
+                        ].map((item, i) => (
+                          <div key={i} className="flex items-center justify-between rounded-lg border border-white/15 bg-white/10 p-3">
+                            <p className="text-sm text-white/80">{item.action}</p>
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 text-white/50 whitespace-nowrap ml-3">{item.deadline}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer transition-colors font-medium"
+                      onClick={() => { setExpandedSection(null); setActiveTab('action-plan'); }}
+                    >
+                      See Full Action Plan →
+                    </button>
+                  </div>
+                )}
+
+                {/* ---- NARRATIVE EXPANDED VIEW ---- */}
+                {expandedSection === 'narrative' && (
+                  <div className="space-y-4">
+                    {/* ---- Hard-coded mock data: Narrative drill-down content ---- */}
+                    <h2 className="text-lg font-bold text-white">Your Portfolio Story</h2>
+                    <div className="border-l-4 border-l-blue-400/50 pl-4 py-1">
+                      <p className="text-white/90 text-base leading-7">{narrativeVariants[narrativeVariantIndex]}</p>
+                      <div className="flex items-center gap-1.5 mt-2 opacity-60 hover:opacity-100 transition-opacity">
+                        <button className="p-1 rounded-md hover:bg-white/10 transition" onClick={() => setNarrativeVariantIndex((i) => (i - 1 + narrativeVariants.length) % narrativeVariants.length)}><ChevronLeft className="h-3 w-3 text-white/70" /></button>
+                        <button className="p-1 rounded-md hover:bg-white/10 transition" onClick={() => setNarrativeVariantIndex((i) => (i + 1) % narrativeVariants.length)}><ChevronRight className="h-3 w-3 text-white/70" /></button>
+                        <button className="p-1 rounded-md hover:bg-white/10 transition"><RefreshCcw className="h-3 w-3 text-white/70" /></button>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2">What Makes You Unique</h3>
+                      <p className="text-sm text-white/80 leading-relaxed">
+                        You don't come from a school with a robotics lab or a CS department. You come from a school where you ARE the CS department. That's not a disadvantage — it's your most compelling story. Every admissions reader will remember the student who built something from nothing.
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2">Why Colleges Should Care</h3>
+                      <p className="text-sm text-white/80 leading-relaxed">
+                        Colleges aren't just admitting a student — they're admitting someone who will build communities on their campus. Your track record proves you don't wait for programs to exist; you create them. That's exactly the kind of student who thrives in college environments.
+                      </p>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2">Character Traits</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {/* ---- Hard-coded mock data: character trait chips ---- */}
+                        <span className="text-xs px-3 py-1 rounded-full bg-green-500/20 text-green-300 border border-green-500/30">Resilient</span>
+                        <span className="text-xs px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Innovative</span>
+                        <span className="text-xs px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">Resourceful</span>
+                        <span className="text-xs px-3 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">Builder</span>
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Narrative Threads Preview</h3>
+                      <div className="space-y-3">
+                        {/* ---- Hard-coded mock data: narrative thread cards ---- */}
+                        {[
+                          { thread: 'Building Access', tags: ['CS Club', 'Math Tutor', 'ML Research'], synergy: 'These activities form a coherent thread about creating opportunities where none existed' },
+                          { thread: 'Technical Depth', tags: ['CS Club', 'ML Research'], synergy: 'Shows progression from self-taught to university-validated technical skills' },
+                          { thread: 'Work Ethic Under Constraint', tags: ['Grocery Store', 'Farm Work'], synergy: 'Demonstrates grit and time management that contextualizes all other achievements' },
+                        ].map((t, i) => (
+                          <div key={i} className="rounded-xl border border-white/20 bg-white/10 p-3">
+                            <h4 className="text-sm font-semibold text-white mb-1">{t.thread}</h4>
+                            <div className="flex flex-wrap gap-1.5 mb-1.5">
+                              {t.tags.map((tag) => (
+                                <span key={tag} className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/60">{tag}</span>
+                              ))}
+                            </div>
+                            <p className="text-xs text-white/70 leading-relaxed">{t.synergy}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <button
+                      className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer transition-colors font-medium"
+                      onClick={() => { setExpandedSection(null); setActiveTab('your-story'); }}
+                    >
+                      Explore all narrative threads →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
 
             </TabsContent>
 
