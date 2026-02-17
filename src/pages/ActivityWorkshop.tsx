@@ -1620,28 +1620,6 @@ export default function ActivityWorkshop() {
       {/* ================================================================== */}
       <div ref={heroOverviewRef} className="hero-gradient text-white relative">
         <div className="max-w-7xl mx-auto px-4 py-12">
-          {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-5xl font-bold text-white mb-4 drop-shadow-lg">
-              Portfolio Dashboard
-            </h1>
-            <p className="text-xl text-white/90 max-w-2xl mx-auto drop-shadow-md">
-              Build your comprehensive profile step by step. Track your progress and unlock new opportunities.
-            </p>
-          </div>
-
-          {/* Profile Completion */}
-          <div className="mb-8">
-            <div className="rounded-2xl border border-white/25 bg-white/15 backdrop-blur-md p-4 shadow-lg">
-              <div className="flex items-center justify-between gap-4">
-                <div className="text-xs uppercase tracking-wide text-white/85">Profile Completion</div>
-                <div className="text-xs font-semibold text-white/95">{heroMockData.progress}%</div>
-              </div>
-              <div className="mt-2">
-                <Progress value={heroMockData.progress} className="h-3.5 bg-white/25" />
-              </div>
-            </div>
-          </div>
 
           {/* Five Key Metrics grid */}
           {(() => {
