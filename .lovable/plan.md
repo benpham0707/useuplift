@@ -1,128 +1,116 @@
 
 
-## Replace Hero Section with Score Dashboard + Tabbed Overview
+## Visual Hierarchy Overhaul for Overview Tab
 
 ### Overview
 
-Remove the entire Portfolio Scanner hero clone (metric tiles, portfolio overview card, insight cards, collapsible insights panel, and all associated state/helpers) and replace it with a purpose-built Activity Workshop overview consisting of a Score Dashboard and a 4-tab interface. Only the Overview tab will be fully built; the other 3 tabs will show descriptive placeholders.
+Rework the Overview tab's visual design in `src/pages/ActivityWorkshop.tsx` to create clear visual hierarchy differentiation between sections. All changes are render-only and mock data adjustments -- no new components or files needed.
 
-### What Gets Removed
+### Changes
 
-**State variables** (lines 207-342): All `hero*` state, refs, mock data, and helper functions:
-- `heroSelectedMetric`, `isHeroInsightsOpen`, `heroNarrativeIndex`, `isEditingHeroNarrative`, `heroNarrativeDraft`, `heroNarratives`, `heroUnifyIndex`, `heroProofIndex`, `heroSequenceIndex`, `heroCarrotLeft`
-- `heroMetricRefs`, `heroInsightsPanelRef`, `heroOverviewRef`
-- `heroMockData`, `heroOverallScore`, `heroStorageKey`
-- Functions: `getHoloToneClass`, `toneToColors`, `getHeroMetricTheme`, `handleHeroMetricClick`, `getHeroDisplayValue`, `generateHeroNarrativeVariant`, `persistHeroNarratives`
-- Both `useEffect` hooks (narrative init + carrot position)
+**1. Score Dashboard -- Full-width expansion panel with caret**
 
-**Render block** (lines 1618-1906): The entire hero gradient section with metric tiles, portfolio overview card, insight carousels, and collapsible insights panel.
+Current: Each card has its own small rationale box expanding underneath it.
+New: Cards are buttons only (no individual expand). A single full-width panel renders below the entire 5-card grid when one is selected. The panel includes:
+- A small CSS triangle/caret pointing up, positioned horizontally at the center of the active card
+- The dimension name as a bold title
+- The rationale paragraph
+- 2-3 improvement bullet points (added to the `scoreCards` mock data as an `improvements` string array)
 
-**Unused imports**: `Progress`, `GradientText`, `Collapsible`, `CollapsibleContent` (if not used elsewhere in the file).
+The caret position will be calculated using refs on each card button. The panel uses `transition-all duration-300` for smooth open/close.
 
-### What Gets Added
+The `useEffect` for caret positioning will fire on both `expandedScoreCard` changes AND window resize events, with a resize event listener and proper cleanup on unmount.
 
-**1. Score Dashboard** (pinned above tabs, inside the gradient section)
+Mock data update -- Add `improvements` array to each score card:
+- Activity Strength: ["Take on a named leadership role in at least one activity", "Add specific numbers to every description (members recruited, events organized)", "Document outcomes, not just participation"]
+- Spike Depth: ["Submit research to a student journal or conference", "Enter a CS competition (USACO, hackathon)", "Create a public artifact (GitHub repo, app, blog)"]
+- Story Coherence: ["Rewrite grocery job description to connect to your CS mission", "Frame farm work as problem-solving under constraint", "Add a bridge sentence connecting each activity to your core theme"]
+- Major Fit: ["Frame research and tutoring as directly supporting your CS trajectory", "Add technical specifics that connect each activity to your intended major", "Highlight how non-CS activities developed transferable skills (systems thinking, leadership)"]
+- Description Quality: ["Lead every description with the strongest outcome", "Use specific metrics in at least 3 of 5 descriptions", "Cut filler words -- every character of the 150 limit should earn its place"]
 
-5 glassmorphism cards in a responsive row:
+**2. Hero area -- Score as centerpiece**
 
-| Card | Score | Rationale (on click) |
-|------|-------|---------------------|
-| Activity Strength | 7.2 | "Your activities show solid involvement but could benefit from deeper leadership roles and more quantifiable outcomes. Focus on demonstrating initiative rather than just participation." |
-| Spike Depth | 8.1 | "Strong concentration in CS with a clear progression from self-teaching to research. The CS Club founding demonstrates initiative. Deepen by publishing work or competing." |
-| Story Coherence | 7.8 | "Your activities connect well around a theme of building access from scratch. The thread from personal experience to technical solutions is compelling. Tighten by making the grocery/farm jobs explicitly support the narrative." |
-| Major Fit | 6.5 | "CS intent is clear from club and research, but admissions wants to see breadth of intellectual curiosity beyond one domain. A humanities or social science pursuit would strengthen this." |
-| Description Quality | 7.4 | "Descriptions are functional but could be more impactful. Lead with outcomes and numbers rather than role descriptions. Every character should earn its place in the 150-char limit." |
+Current: Score is `text-4xl` in a modest glass card, badges sit next to it at equal size.
+New:
+- Score container becomes a larger frosted rounded-square with `text-6xl md:text-7xl` for the number
+- Layout changes to a vertical stack: large score on top, badges underneath in a row
+- Harvard Scale and Competitive badges get smaller text (`text-xs`)
+- The whole hero area is centered, not left-aligned
 
-Score color coding:
-- Green (text-green-500): 8.0+
-- Teal (text-teal-500): 6.0-7.9
-- Amber (text-amber-500): 4.0-5.9
-- Red (text-red-500): below 4.0
+**3. Portfolio Narrative -- Blockquote style, not a card**
 
-Click behavior: accordion-style, one card at a time. Smooth expand/collapse using CSS `transition-all duration-300` with `max-height` and `opacity` animation.
+Current: Glass card container with prominent edit/regenerate buttons.
+New:
+- Remove the `rounded-xl border bg-white/10` card wrapper
+- Replace with a `border-l-4 border-l-blue-400/50` left accent and light padding
+- Text size increases to `text-base` (from `text-sm`)
+- Controls (edit, arrows, regenerate) shrink: smaller icons (`h-3 w-3`), more transparent, grouped in a subtle row
+- "PORTFOLIO NARRATIVE" label stays but the overall feel is flowing text, not a data box
 
-**2. Tab Bar** (4 tabs below score dashboard)
+**4. Quick Insight Cards -- Spotlight treatment**
 
-Using the existing Radix `Tabs` component. Labels: "Overview", "Your Story", "Your Edge", "Action Plan" (full name, not truncated).
+Current: Same `bg-white/10` as everything else.
+New:
+- Background changes to `bg-white/20 backdrop-blur-2xl` for more frosted/darker look
+- Add icons to each card header:
+  - YOUR SPIKE: `Target` icon (from lucide)
+  - WHAT THEY'LL REMEMBER: `Lightbulb` icon (from lucide)
+  - #1 PRIORITY: `Flag` icon (from lucide)
+- Content text gets `font-semibold` for the main value
+- Slightly thicker border: `border-white/35`
 
-Placeholder tabs (Your Story, Your Edge, Action Plan) show a descriptive message:
-- Your Story: "Your Story -- How your activities weave into a compelling narrative. Coming soon."
-- Your Edge: "Your Edge -- Your competitive positioning and school fit analysis. Coming soon."
-- Action Plan: "Action Plan -- Exactly what to do next, prioritized by impact. Coming soon."
+**5. Key Strengths and Opportunities -- Stronger borders, tighter layout**
 
-**3. Overview Tab Content**
+Current: `border-l-4 border-l-green-500/60` with `p-5`.
+New:
+- Green border: `border-l-4 border-l-green-500` (full opacity, 4px solid)
+- Amber border: `border-l-4 border-l-amber-500` (full opacity)
+- Reduce padding to `p-3 px-4`
+- Reduce bullet spacing from `space-y-2` to `space-y-1.5`
+- These are compact quick-scan lists
 
-**Hero area**: 
-- Large overall score badge "7.8 / 10" on the left in a glassmorphism container
-- "Harvard Scale 4 -- Average (Top 40%)" badge (corrected from the earlier "Good/Top 15%" error)
-- "Competitive" colored pill (teal/blue)
+**6. Strategic Direction -- Coaching Pitch first**
 
-**Portfolio Narrative**:
-- "PORTFOLIO NARRATIVE" uppercase label
-- Story pitch text (the full CS club sample paragraph from the prompt)
-- Pencil edit icon, "Regenerate" button, left/right arrows for variant cycling
-- 3 hard-coded variants to cycle through
+Current: Current State -> Direction -> Coaching Pitch (at bottom).
+New: Reorder to Coaching Pitch (top) -> Current State -> Strategic Direction.
+- Coaching Pitch gets a subtle purple-tinted background (`bg-purple-500/10`) and a quote icon or quotation marks styling
+- Current State and Strategic Direction paragraphs become slightly smaller text
 
-**Three Quick Insight Cards** in a row:
-- "YOUR SPIKE": "CS with Social Impact" + left/right arrows
-- "WHAT THEY'LL REMEMBER": "First-gen student who turns resource scarcity into technical solutions" + arrows
-- "#1 PRIORITY": "Quantify CS Club impact with specific metrics" + arrows
+**7. General spacing reduction**
 
-**Key Strengths and Opportunities** side-by-side panels:
-- Left panel "Key Strengths" with green left-border accent:
-  - Pioneer initiative in zero-resource environment
-  - Clear CS spike with social impact angle  
-  - Authentic first-gen narrative
-- Right panel "Opportunities to Strengthen" with amber left-border accent:
-  - Limited external recognition
-  - Some activities feel disconnected from spike
-- Stacks vertically on mobile (grid-cols-1 md:grid-cols-2)
-
-**Strategic Direction** at bottom:
-- "Current State" paragraph
-- "Strategic Direction" paragraph
-- "Coaching Pitch" as a visually distinct quoted block: subtle background, left border accent (blue/primary), italic text with quotation marks styling. Uses a blockquote-style card rather than plain paragraph to create the "coach talking to you" feel.
-
-### New State Variables
-
-```text
-activeTab              -- string, default "overview"
-expandedScoreCard      -- number | null, index of expanded card (null = all collapsed)
-narrativeVariantIndex  -- number, default 0
-isEditingNarrative     -- boolean
-narrativeDraft         -- string
-spikeIndex             -- number, carousel index for spike card
-memorableIndex         -- number, carousel index for memorable card
-priorityIndex          -- number, carousel index for priority card
-```
-
-### New Helper
-
-`getScoreColor(score: number)` -- returns tailwind class string based on thresholds (green 8+, teal 6-7.9, amber 4-5.9, red below 4).
+- Outer `space-y-6` on the TabsContent changes to `space-y-4`
+- `mt-6` on TabsContent changes to `mt-4`
+- `py-12` on the outer container reduces to `py-8`
 
 ### New Imports
 
-`Tabs, TabsList, TabsTrigger, TabsContent` from `@/components/ui/tabs` (already installed).
+Add `Target`, `Lightbulb`, `Flag` from lucide-react (add to existing import line).
+
+### New Refs and State
+
+- `scoreCardRefs = useRef<(HTMLButtonElement | null)[]>([])` for card position measurement
+- `scoreContainerRef = useRef<HTMLDivElement>(null)` for relative positioning
+- `caretLeftPx` state for triangle horizontal position
+
+### Caret useEffect
+
+Recalculates caret position when `expandedScoreCard` changes. Also attaches a `window.addEventListener('resize', recalc)` with `removeEventListener` cleanup on unmount. This ensures the triangle stays aligned if the browser is resized while a panel is open.
 
 ### What Stays the Same
 
-- The two-column workspace below (EditorView + ContextualWorkshopChat) is completely untouched
-- All editor state, autosave, version history, chat, credits logic remain
-- The background gradient div remains
-- All existing imports that are still used remain
+- All state variables and interactivity (click to expand, carousel cycling, edit mode)
+- Tab bar styling and placeholder tabs
+- Two-column workspace below
 
 ### Technical Details
 
 | Area | Detail |
 |------|--------|
-| File modified | `src/pages/ActivityWorkshop.tsx` only |
-| Lines removed | ~135 lines of hero state/helpers (207-342), ~290 lines of hero render (1618-1906) |
-| Lines added | ~8 state vars, 1 helper, ~250 lines of new render |
-| All sample data | Hard-coded with `// ---- Hard-coded mock data ...` comment blocks per project conventions |
-| Score card animation | `transition-all duration-300` on expand/collapse with `overflow-hidden` |
-| Harvard Scale | Correctly labeled: "Harvard 4 -- Average (Top 40%)" |
-| Tab labels | Full names: "Overview", "Your Story", "Your Edge", "Action Plan" |
-| Placeholder tabs | Descriptive one-liner + "Coming soon" |
-| Coaching Pitch | Blockquote-style card with left border accent and italic styling |
-| Mobile responsive | Score cards wrap 2-col on small screens, strength/opportunity panels stack vertically |
+| File | `src/pages/ActivityWorkshop.tsx` only |
+| Mock data change | Add `improvements: string[]` to each scoreCard object |
+| New refs | `scoreCardRefs`, `scoreContainerRef` for caret positioning |
+| New state | `caretLeftPx: number` for triangle position |
+| New useEffect | Recalculate caret on `expandedScoreCard` change + window resize listener with cleanup |
+| New imports | `Target`, `Lightbulb`, `Flag` from lucide-react |
+| Major Fit improvements | Corrected to focus on strengthening CS alignment, not diversifying away from it |
 
