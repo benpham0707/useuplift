@@ -1,56 +1,128 @@
 
 
-## Clone Portfolio Scanner Hero Section into Activity Workshop
+## Replace Hero Section with Score Dashboard + Tabbed Overview
+
+### Overview
+
+Remove the entire Portfolio Scanner hero clone (metric tiles, portfolio overview card, insight cards, collapsible insights panel, and all associated state/helpers) and replace it with a purpose-built Activity Workshop overview consisting of a Score Dashboard and a 4-tab interface. Only the Overview tab will be fully built; the other 3 tabs will show descriptive placeholders.
+
+### What Gets Removed
+
+**State variables** (lines 207-342): All `hero*` state, refs, mock data, and helper functions:
+- `heroSelectedMetric`, `isHeroInsightsOpen`, `heroNarrativeIndex`, `isEditingHeroNarrative`, `heroNarrativeDraft`, `heroNarratives`, `heroUnifyIndex`, `heroProofIndex`, `heroSequenceIndex`, `heroCarrotLeft`
+- `heroMetricRefs`, `heroInsightsPanelRef`, `heroOverviewRef`
+- `heroMockData`, `heroOverallScore`, `heroStorageKey`
+- Functions: `getHoloToneClass`, `toneToColors`, `getHeroMetricTheme`, `handleHeroMetricClick`, `getHeroDisplayValue`, `generateHeroNarrativeVariant`, `persistHeroNarratives`
+- Both `useEffect` hooks (narrative init + carrot position)
+
+**Render block** (lines 1618-1906): The entire hero gradient section with metric tiles, portfolio overview card, insight carousels, and collapsible insights panel.
+
+**Unused imports**: `Progress`, `GradientText`, `Collapsible`, `CollapsibleContent` (if not used elsewhere in the file).
 
 ### What Gets Added
 
-The entire hero overview section from the Portfolio Scanner will be cloned verbatim into `src/pages/ActivityWorkshop.tsx`, placed above the existing two-column editor/chat grid. This includes:
+**1. Score Dashboard** (pinned above tabs, inside the gradient section)
 
-1. **Hero gradient container** with the "Portfolio Dashboard" header, subtitle, and preview mode badge
-2. **Profile Completion bar** (progress indicator with percentage)
-3. **Five Key Metric tiles** (Impact & Leadership, Academic Performance, Intellectual Curiosity, Storytelling, Character & Community) with animated gradient text and click-to-expand behavior
-4. **Portfolio Overview card** (narrative summary, editable portfolio narrative with carousel, and the three insight cards: Unify, Make Proof Visible, Sequence)
-5. **Collapsible Insights panel** that expands when a metric tile is clicked, showing dimension-specific insights with a carrot indicator
+5 glassmorphism cards in a responsive row:
 
-### What Changes
+| Card | Score | Rationale (on click) |
+|------|-------|---------------------|
+| Activity Strength | 7.2 | "Your activities show solid involvement but could benefit from deeper leadership roles and more quantifiable outcomes. Focus on demonstrating initiative rather than just participation." |
+| Spike Depth | 8.1 | "Strong concentration in CS with a clear progression from self-teaching to research. The CS Club founding demonstrates initiative. Deepen by publishing work or competing." |
+| Story Coherence | 7.8 | "Your activities connect well around a theme of building access from scratch. The thread from personal experience to technical solutions is compelling. Tighten by making the grocery/farm jobs explicitly support the narrative." |
+| Major Fit | 6.5 | "CS intent is clear from club and research, but admissions wants to see breadth of intellectual curiosity beyond one domain. A humanities or social science pursuit would strengthen this." |
+| Description Quality | 7.4 | "Descriptions are functional but could be more impactful. Lead with outcomes and numbers rather than role descriptions. Every character should earn its place in the 150-char limit." |
 
-All changes are in a single file: `src/pages/ActivityWorkshop.tsx`
+Score color coding:
+- Green (text-green-500): 8.0+
+- Teal (text-teal-500): 6.0-7.9
+- Amber (text-amber-500): 4.0-5.9
+- Red (text-red-500): below 4.0
 
-**New state variables** needed to support the hero:
-- `selectedMetric`, `isInsightsOpen` -- metric tile click behavior
-- `narrativeIndex`, `isEditingNarrative`, `narrativeDraft`, `narratives` -- narrative carousel
-- `unifyIndex`, `proofIndex`, `sequenceIndex` -- insight card carousels
-- `carrotLeft` -- carrot position for insights panel
-- `overallProgress` -- profile completion percentage
-- Mock rubric scores and overall score (hard-coded, matching Portfolio Scanner preview values)
-- Refs: `metricRefs`, `insightsPanelRef`, `overviewRef`
+Click behavior: accordion-style, one card at a time. Smooth expand/collapse using CSS `transition-all duration-300` with `max-height` and `opacity` animation.
 
-**New imports**: `Collapsible`, `CollapsibleContent`, `Textarea`, `CardHeader`, `CardTitle`, `CardContent`, plus additional lucide icons (`Pencil`, `Check`, `ChevronLeft`, `ChevronRight`, `Sparkles`, etc.)
+**2. Tab Bar** (4 tabs below score dashboard)
 
-**New helper functions** copied from Portfolio Scanner:
-- `getHoloToneClass()` / `toneToColors()` -- color mapping by score
-- `getMetricTheme()` -- gradient CSS for metric themes
-- `handleMetricClick()` -- toggle insights panel
-- `generateNarrativeVariant()` -- narrative text generation
-- `persistNarratives()` -- localStorage persistence
+Using the existing Radix `Tabs` component. Labels: "Overview", "Your Story", "Your Edge", "Action Plan" (full name, not truncated).
 
-**Layout change**: The hero section is inserted between the background gradient div and the two-column grid container, spanning full width above both columns.
+Placeholder tabs (Your Story, Your Edge, Action Plan) show a descriptive message:
+- Your Story: "Your Story -- How your activities weave into a compelling narrative. Coming soon."
+- Your Edge: "Your Edge -- Your competitive positioning and school fit analysis. Coming soon."
+- Action Plan: "Action Plan -- Exactly what to do next, prioritized by impact. Coming soon."
+
+**3. Overview Tab Content**
+
+**Hero area**: 
+- Large overall score badge "7.8 / 10" on the left in a glassmorphism container
+- "Harvard Scale 4 -- Average (Top 40%)" badge (corrected from the earlier "Good/Top 15%" error)
+- "Competitive" colored pill (teal/blue)
+
+**Portfolio Narrative**:
+- "PORTFOLIO NARRATIVE" uppercase label
+- Story pitch text (the full CS club sample paragraph from the prompt)
+- Pencil edit icon, "Regenerate" button, left/right arrows for variant cycling
+- 3 hard-coded variants to cycle through
+
+**Three Quick Insight Cards** in a row:
+- "YOUR SPIKE": "CS with Social Impact" + left/right arrows
+- "WHAT THEY'LL REMEMBER": "First-gen student who turns resource scarcity into technical solutions" + arrows
+- "#1 PRIORITY": "Quantify CS Club impact with specific metrics" + arrows
+
+**Key Strengths and Opportunities** side-by-side panels:
+- Left panel "Key Strengths" with green left-border accent:
+  - Pioneer initiative in zero-resource environment
+  - Clear CS spike with social impact angle  
+  - Authentic first-gen narrative
+- Right panel "Opportunities to Strengthen" with amber left-border accent:
+  - Limited external recognition
+  - Some activities feel disconnected from spike
+- Stacks vertically on mobile (grid-cols-1 md:grid-cols-2)
+
+**Strategic Direction** at bottom:
+- "Current State" paragraph
+- "Strategic Direction" paragraph
+- "Coaching Pitch" as a visually distinct quoted block: subtle background, left border accent (blue/primary), italic text with quotation marks styling. Uses a blockquote-style card rather than plain paragraph to create the "coach talking to you" feel.
+
+### New State Variables
+
+```text
+activeTab              -- string, default "overview"
+expandedScoreCard      -- number | null, index of expanded card (null = all collapsed)
+narrativeVariantIndex  -- number, default 0
+isEditingNarrative     -- boolean
+narrativeDraft         -- string
+spikeIndex             -- number, carousel index for spike card
+memorableIndex         -- number, carousel index for memorable card
+priorityIndex          -- number, carousel index for priority card
+```
+
+### New Helper
+
+`getScoreColor(score: number)` -- returns tailwind class string based on thresholds (green 8+, teal 6-7.9, amber 4-5.9, red below 4).
+
+### New Imports
+
+`Tabs, TabsList, TabsTrigger, TabsContent` from `@/components/ui/tabs` (already installed).
 
 ### What Stays the Same
 
-- The two-column layout (EditorView left, ContextualWorkshopChat right) is untouched
-- All existing state, version history, autosave, and chat logic remains
-- The "Coming Soon" banner is NOT copied (it's Portfolio Scanner-specific)
+- The two-column workspace below (EditorView + ContextualWorkshopChat) is completely untouched
+- All editor state, autosave, version history, chat, credits logic remain
+- The background gradient div remains
+- All existing imports that are still used remain
 
 ### Technical Details
 
 | Area | Detail |
 |------|--------|
-| File | `src/pages/ActivityWorkshop.tsx` |
-| Insert location | After the background gradient div (line 1473), before the grid container (line 1474) |
-| Mock data | Hard-coded scores (impact: 8.2, academic: 8.1, curiosity: 7.6, story: 7.8, character: 7.3, progress: 67%) with comment annotation per project conventions |
-| New state vars | ~12 new useState calls + 3 useRef calls |
-| New helpers | ~6 functions cloned from PortfolioScanner |
-| CSS dependencies | Uses existing `hero-gradient`, `holo-surface`, `holo-sheen`, `elev-strong`, `elev-hover`, `text-hero-contrast` classes already in the project |
+| File modified | `src/pages/ActivityWorkshop.tsx` only |
+| Lines removed | ~135 lines of hero state/helpers (207-342), ~290 lines of hero render (1618-1906) |
+| Lines added | ~8 state vars, 1 helper, ~250 lines of new render |
+| All sample data | Hard-coded with `// ---- Hard-coded mock data ...` comment blocks per project conventions |
+| Score card animation | `transition-all duration-300` on expand/collapse with `overflow-hidden` |
+| Harvard Scale | Correctly labeled: "Harvard 4 -- Average (Top 40%)" |
+| Tab labels | Full names: "Overview", "Your Story", "Your Edge", "Action Plan" |
+| Placeholder tabs | Descriptive one-liner + "Coming soon" |
+| Coaching Pitch | Blockquote-style card with left border accent and italic styling |
+| Mobile responsive | Score cards wrap 2-col on small screens, strength/opportunity panels stack vertically |
 
-This gives you an exact replica of the Portfolio Scanner overview as a starting point, ready to be customized for activity-specific metrics in subsequent iterations.
