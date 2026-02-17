@@ -1860,7 +1860,11 @@ export default function ActivityWorkshop() {
                 {expandedSection === 'spike' && (
                   <div className="space-y-4">
                     {/* ---- Hard-coded mock data: Spike drill-down content ---- */}
-                    <h2 className="text-lg font-bold text-white">Your Spike: Computer Science with Social Impact Focus</h2>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      Your Spike: Computer Science with Social Impact Focus
+                      {/* ---- Hard-coded mock data: spike strength badge ---- */}
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Moderate</span>
+                    </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-md p-4">
                         <h4 className="text-sm font-semibold text-white mb-2">Depth</h4>
@@ -1897,7 +1901,36 @@ export default function ActivityWorkshop() {
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/70">Grocery Store</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/70">Farm Work</span>
                         </div>
-                        <p className="text-xs text-white/70 leading-relaxed">Shows work ethic and real-world responsibility that grounds the technical spike in lived experience</p>
+                      <p className="text-xs text-white/70 leading-relaxed">Shows work ethic and real-world responsibility that grounds the technical spike in lived experience</p>
+                      </div>
+                    </div>
+
+                    {/* ---- Hard-coded mock data: Portfolio Coherence section ---- */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-3 uppercase tracking-wider">Portfolio Coherence</h3>
+                      <div className="flex items-center gap-4 mb-3">
+                        <svg width="64" height="64" viewBox="0 0 100 100" className="flex-shrink-0">
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="8" />
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="#60a5fa" strokeWidth="8"
+                            strokeDasharray="251.2" strokeDashoffset={251.2 * (1 - 0.78)}
+                            strokeLinecap="round" transform="rotate(-90 50 50)" />
+                          <text x="50" y="55" textAnchor="middle" className="fill-white text-xl font-bold" fontSize="22">78</text>
+                        </svg>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/20 text-green-300 border border-green-500/30 w-fit">Strong</span>
+                          <span className="text-[10px] text-white/50">out of 100</span>
+                        </div>
+                      </div>
+                      <div className="mb-3">
+                        <h4 className="text-xs font-semibold text-white/80 mb-1">What Ties It Together</h4>
+                        <p className="text-xs text-white/70 leading-relaxed">Your activities are connected by a clear through-line: identifying resource gaps and building technical solutions to fill them. Whether it's creating a CS club where none existed, researching healthcare access in underserved areas, or tutoring students who lack academic support, you consistently find places where something is missing and build the bridge.</p>
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-semibold text-white/80 mb-2">Activities to Better Integrate</h4>
+                        <div className="rounded-xl border border-white/20 bg-white/10 p-3">
+                          <h5 className="text-sm font-semibold text-white mb-1">Grocery Store Associate</h5>
+                          <p className="text-xs text-white/70 leading-relaxed">Reframe around problem-solving under constraint and operational systems thinking to connect it to your builder identity.</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -2030,11 +2063,11 @@ export default function ActivityWorkshop() {
                     <div>
                       <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Narrative Threads Preview</h3>
                       <div className="space-y-3">
-                        {/* ---- Hard-coded mock data: narrative thread cards ---- */}
+                        {/* ---- Hard-coded mock data: narrative thread cards with enriched synergy + whyAdmissions ---- */}
                         {[
-                          { thread: 'Building Access', tags: ['CS Club', 'Math Tutor', 'ML Research'], synergy: 'These activities form a coherent thread about creating opportunities where none existed' },
-                          { thread: 'Technical Depth', tags: ['CS Club', 'ML Research'], synergy: 'Shows progression from self-taught to university-validated technical skills' },
-                          { thread: 'Work Ethic Under Constraint', tags: ['Grocery Store', 'Farm Work'], synergy: 'Demonstrates grit and time management that contextualizes all other achievements' },
+                          { thread: 'Building Access', tags: ['CS Club', 'Math Tutor', 'ML Research'], synergy: "These activities form a coherent thread about creating opportunities where none existed. The CS Club creates infrastructure, the tutoring provides direct mentorship, and the ML research applies technical skills to access problems. Together, they show a student who doesn't just notice gaps — they systematically build bridges across them. This isn't scattered volunteering; it's a deliberate mission.", whyAdmissions: "Admissions officers look for students who will build community on campus. This thread proves you already do that instinctively." },
+                          { thread: 'Technical Depth', tags: ['CS Club', 'ML Research'], synergy: "Shows progression from self-taught to university-validated technical skills. Starting a CS club required learning enough to teach others; the ML research required learning enough to contribute to real science. Each step built on the last, creating a clear upward trajectory. The arc from 'curious beginner' to 'research contributor' is exactly the growth story top schools want to see.", whyAdmissions: "Technical depth with a clear growth arc signals a student who will thrive in rigorous college coursework." },
+                          { thread: 'Work Ethic Under Constraint', tags: ['Grocery Store', 'Farm Work'], synergy: "Demonstrates grit and time management that contextualizes all other achievements. Working 20+ hours per week while maintaining academics and extracurriculars isn't just impressive — it reframes every other activity. The CS club wasn't built with free time and parental support; it was built in the margins. The research wasn't a summer hobby; it was squeezed between shifts.", whyAdmissions: "Context matters enormously in holistic review. This thread transforms 'good activities' into 'remarkable achievements given circumstances.'" },
                         ].map((t, i) => (
                           <div key={i} className="rounded-xl border border-white/20 bg-white/10 p-3">
                             <h4 className="text-sm font-semibold text-white mb-1">{t.thread}</h4>
@@ -2044,10 +2077,41 @@ export default function ActivityWorkshop() {
                               ))}
                             </div>
                             <p className="text-xs text-white/70 leading-relaxed">{t.synergy}</p>
+                            <p className="text-xs text-white/50 italic mt-1.5">Why admissions values this: {t.whyAdmissions}</p>
                           </div>
                         ))}
                       </div>
                     </div>
+
+                    {/* ---- Hard-coded mock data: How Your Activities Boost Each Other (elevation pairs) ---- */}
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">How Your Activities Boost Each Other</h3>
+                      <div className="space-y-3">
+                        {[
+                          { from: 'Grocery Store', to: 'ML Research', strength: 'transformative' as const, mechanism: "Research while working 20hrs/week retail transforms the research from 'expected for MIT applicant' to 'remarkable given constraints.' The grocery work isn't a distraction — it's proof this student operates at a high level under real pressure." },
+                          { from: 'ML Research', to: 'CS Club', strength: 'strong' as const, mechanism: "The CS club could read as 'nice local initiative.' But the research proves legitimate technical chops — they weren't just teaching basics, they were building toward research-level competency." },
+                          { from: 'Farm Work', to: 'ML Research', strength: 'strong' as const, mechanism: "The research topic (rural healthcare access) could seem random. But farm work establishes authentic rural experience — this isn't a suburban student doing 'poverty tourism' research. They're analyzing problems they've lived." },
+                          { from: 'CS Club', to: 'Math Tutor', strength: 'moderate' as const, mechanism: "Combined with founding a CS club teaching 25 students, tutoring establishes a pattern: this student is a natural educator who seeks teaching opportunities across contexts." },
+                          { from: 'Math Tutor', to: 'CS Club', strength: 'moderate' as const, mechanism: "Both show teaching/mentorship in different contexts. Together they prove this isn't 'I helped my friends' — it's a deliberate pattern of educational leadership." },
+                        ].map((pair, i) => {
+                          const badgeStyles = {
+                            transformative: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+                            strong: 'bg-green-500/20 text-green-300 border-green-500/30',
+                            moderate: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+                          };
+                          return (
+                            <div key={i} className="rounded-xl border border-white/20 bg-white/10 p-3">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-sm font-semibold text-white">{pair.from} → {pair.to}</span>
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full border ${badgeStyles[pair.strength]}`}>{pair.strength}</span>
+                              </div>
+                              <p className="text-xs text-white/70 leading-relaxed">{pair.mechanism}</p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     <button
                       className="text-sm text-blue-400 hover:text-blue-300 cursor-pointer transition-colors font-medium"
                       onClick={() => { setExpandedSection(null); setActiveTab('your-story'); }}
