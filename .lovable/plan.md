@@ -1,76 +1,154 @@
 
 
-## Compact Overview Tab — Merge Hero into Score Dashboard
+## Drill-Down Interaction Pattern for Overview Tab
 
 ### Overview
 
-Eliminate the separate hero section entirely by merging the overall score into the score dashboard row, then tighten all spacing throughout the Overview tab to achieve news-article density.
+Add a state-driven drill-down system to the Overview tab. Clicking certain sections replaces the tab content area with an expanded detail view. The score dashboard and tab bar remain visible. A "Back to Overview" link returns to the compact dashboard. All expanded view content is hard-coded mock data.
 
-### Changes
+### New State
 
-**1. Merge overall score into score dashboard row (lines 1559-1578)**
+```text
+expandedSection: string | null   -- null = compact dashboard, "spike" | "memorable" | "priority" | "narrative" = expanded view
+expandedStrengths: number | null -- index of expanded strength bullet (inline toggle)
+expandedOpps: number | null      -- index of expanded opportunity bullet (inline toggle)
+```
 
-Remove the entire hero area block (lines 1630-1644). Instead, add a 6th card at the LEFT of the score dashboard grid — the "OVERALL" card:
-- Grid changes from `grid-cols-2 md:grid-cols-5` to `grid-cols-2 md:grid-cols-6`
-- The OVERALL card is slightly wider: use `md:col-span-1` but with internal styling that makes the score larger (`text-4xl` vs `text-3xl` for the others) and the label "OVERALL" underneath
-- Score shows "7.8" in green, same color logic as other cards
-- Below the OVERALL card (outside the button, as two small badges stacked beneath it): Harvard Scale badge and Competitive pill, both in `text-[10px]` tiny text
-- The OVERALL card is NOT clickable for expansion (no rationale panel) — it's display-only. Alternatively it could be clickable but just show a summary. Simpler: make it non-expandable, just visual.
-- The `expandedScoreCard` index mapping stays the same (0-4 for the 5 dimension cards); the OVERALL card is rendered separately before the `.map()` loop
+### New Import
 
-Implementation approach: Wrap the grid in a structure where the first cell is the OVERALL card (rendered manually) and the remaining 5 come from the `scoreCards.map()`. The expansion panel caret logic stays unchanged since it only references indices 0-4.
+Add `ArrowRight` from lucide-react (already imported: `ArrowLeft`).
 
-**2. Delete hero area block (lines 1630-1644)**
+### Changes to Existing Sections (when expandedSection is null)
 
-Remove entirely — the centered score + badges block. This saves ~15 lines and a full visual section.
+**3 Insight Cards** -- add click handler + hover affordance + arrow icon:
+- Each card wraps in a `cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-all duration-200` container
+- Add `onClick={() => setExpandedSection('spike' | 'memorable' | 'priority')}` to each card's outer div
+- Add a small `ArrowRight` icon (h-3 w-3, text-white/40) in the bottom-right corner of each card
+- The existing carousel arrows need `e.stopPropagation()` so clicking them doesn't trigger drill-down
 
-**3. Tighten narrative section (lines 1647-1686)**
+**Portfolio Narrative** -- add click handler:
+- Wrap the narrative blockquote area in a clickable div with `cursor-pointer hover:brightness-110 transition-all duration-200`
+- `onClick={() => setExpandedSection('narrative')}` on the outer wrapper
+- Add a small `ArrowRight` icon after the narrative text
+- The edit/variant controls need `e.stopPropagation()`
 
-- Change `py-2` to `py-1` on the narrative container
-- The `mb-2` on the header row stays (it's already small)
+**Key Strengths bullets** -- inline expand on click:
+- Each bullet becomes clickable with `cursor-pointer`
+- On click, toggle `expandedStrengths` to show/hide 1-2 sentences of extra context below that bullet
+- Use `transition-all duration-200` with `max-height` for slide-down animation
+- Hard-coded extra context for each:
+  - "Pioneer initiative...": "You founded the CS Club with no existing infrastructure, budget, or faculty sponsor. This kind of zero-to-one initiative is exactly what admissions committees at top schools look for."
+  - "Clear CS spike...": "Your progression from self-teaching to ML research shows a sustained, deepening engagement with CS. The social impact angle makes it distinctive from typical CS applicants."
+  - "Authentic first-gen...": "Being first-gen isn't just a demographic checkbox -- your activities authentically demonstrate how this background shaped your drive to build access and opportunity."
 
-**4. Shrink insight cards (lines 1688-1734)**
+**Opportunities bullets** -- same inline expand pattern:
+  - "Limited external recognition": "Your achievements are real but lack third-party validation. Competitions, publications, or community awards would give admissions committees concrete evidence to advocate for you."
+  - "Some activities feel disconnected...": "The grocery store and farm jobs are valuable work experiences but their descriptions don't connect to your CS/social impact narrative. Reframe them to show transferable skills."
 
-- Change `p-4` to `p-3` on all three insight cards
-- Change `mb-2` to `mb-1` on the header rows inside each card
+**Strategic Direction** -- add "See Full Action Plan" link:
+- Add a `cursor-pointer` link at the bottom: "See Full Action Plan -->" styled as `text-xs text-blue-400 hover:text-blue-300` that sets `activeTab` to "action-plan"
+- Note: Since Tabs uses `defaultValue` not `value`, we need to switch to controlled mode by changing to `value={activeTab}` and `onValueChange={setActiveTab}` with `activeTab` state initialized to `"overview"`
 
-**5. Reduce overall section gaps**
+### Tab Controlled Mode
 
-- Line 1628: `space-y-4` on TabsContent changes to `space-y-3`
-- Line 1555: outer `py-8` changes to `py-6`
-- Line 1555: outer `space-y-4` changes to `space-y-3`
+Change the `Tabs` component from `defaultValue="overview"` to `value={activeTab} onValueChange={(v) => { setActiveTab(v); setExpandedSection(null); }}`. Add `activeTab` state (default "overview"). This enables programmatic tab switching from "See Full Action Plan" links. Also reset `expandedSection` when switching tabs.
 
-**6. Compact Strategic Direction (lines 1766-1788)**
+### Transition Wrapper
 
-- Change `p-5` to `p-3 px-4` on the outer container
-- Change `space-y-3` to `space-y-2` inside
-- Change coaching pitch inner `p-4` to `p-3`
-- Change `mb-2` to `mb-1` on the coaching pitch label
-- Change `mb-1` to `mb-0.5` on Current State and Strategic Direction labels
+The entire `TabsContent value="overview"` content area will be wrapped in a conditional:
 
-### What Gets Removed
+```text
+if expandedSection is null:
+  render compact dashboard (current content) with fade-in
+else:
+  render expanded detail view for that section with slide-in-from-right
+```
 
-- The entire hero area block (lines 1630-1644): the centered `flex-col items-center` div with the large score, Harvard badge, and Competitive pill
+Use CSS transitions: the compact view gets `animate-fade-in` and expanded views get a `translate-x` + opacity transition via inline styles or a simple wrapper div with `transition-all duration-300`.
+
+### Expanded View: Spike (expandedSection === 'spike')
+
+All content below is hard-coded mock data.
+
+- "Back to Overview" link: `ArrowLeft` icon + text, `cursor-pointer text-white/60 hover:text-white text-sm`, onClick resets `expandedSection` to null
+- Title: "Your Spike: Computer Science with Social Impact Focus" (text-lg font-bold)
+- Two side-by-side cards (grid-cols-1 md:grid-cols-2):
+  - "Depth": "Founded CS club from zero infrastructure, progressed to ML research -- shows sustained technical deepening over 2+ years"
+  - "What Makes It Stand Out": "First-gen student building STEM access while working 20hrs/week -- most CS spikes come from resource-rich environments"
+- "Supporting Activities" section with 3 small cards:
+  - Card 1: "CS Club Founder" / "Demonstrates initiative and technical leadership from scratch" / "Elevates spike by showing you create infrastructure, not just use it"
+  - Card 2: "ML Research Assistant" / "Validates technical depth through university-level work" / "Elevates spike by adding academic rigor to self-taught foundation"
+  - Card 3: "Math Tutor" / "Teaching pattern reinforces mission of building access" / "Elevates spike by showing multiplier effect -- you don't just learn, you teach"
+- "Complementary Breadth" section with 1 card:
+  - Area: "Community Leadership" / Tags: "Grocery Store", "Farm Work" / Why: "Shows work ethic and real-world responsibility that grounds the technical spike in lived experience"
+
+### Expanded View: Memorable (expandedSection === 'memorable')
+
+All content below is hard-coded mock data.
+
+- Back link (same pattern)
+- Title: "What Sets You Apart"
+- Highlighted quote block (bg-white/15, border-l-4 border-l-amber-400, italic): "First-gen student who turns resource scarcity into technical solutions"
+- "Your Differentiators" bullet list (3 items):
+  - "First-gen student who builds infrastructure, not just participates"
+  - "Technical depth validated by university research partnership"
+  - "Teaching pattern across multiple contexts shows multiplier mindset"
+- "Your Strengths" bullet list (3 items):
+  - "Authentic narrative rooted in personal experience"
+  - "Clear progression from self-teaching to formal research"
+  - "Every activity connects to a larger mission"
+- "School Types That Fit" row of tag chips: "Research Universities", "Liberal Arts Colleges", "Tech-Forward Schools", "Schools Valuing Diversity"
+- Competitive assessment paragraph: "Your profile is most competitive at schools that value initiative and authentic narratives over polished pedigree. Research universities will appreciate the ML work; liberal arts colleges will value the community-building angle. Your biggest gap is external validation -- competitions or publications would move you from 'promising' to 'proven'."
+
+### Expanded View: Priority (expandedSection === 'priority')
+
+All content below is hard-coded mock data.
+
+- Back link
+- Title: "Your Top Priorities"
+- 3 immediate action cards (rounded-xl, bg-white/15, border, p-4):
+  - Card 1: Bold title: "Quantify CS Club impact with specific metrics" / Impact: "Adding numbers (e.g., '12 members recruited, 3 workshops hosted, partnered with local library') transforms a good activity into a great one. Admissions officers need concrete evidence." / Tag: "CS Club"
+  - Card 2: Bold title: "Strengthen research narrative with publication or presentation" / Impact: "Publishing your ML healthcare research or presenting at a student symposium adds third-party validation. This is the single highest-ROI action for your profile." / Tag: "ML Research"
+  - Card 3: Bold title: "Rewrite work experience descriptions to connect to CS mission" / Impact: "Your grocery and farm jobs show grit, but currently read as disconnected. Frame them as 'problem-solving under resource constraints' to reinforce your core narrative." / Tag: "Work Experience"
+- "Coming Up (1-3 Months)" section with 2 items:
+  - "Apply to USACO or a regional hackathon" / Deadline: "Within 6 weeks"
+  - "Draft a blog post or GitHub README documenting your CS Club's journey" / Deadline: "Within 8 weeks"
+- "See Full Action Plan" button: styled as a `cursor-pointer` link/button that sets `activeTab` to "action-plan"
+
+### Expanded View: Narrative (expandedSection === 'narrative')
+
+All content below is hard-coded mock data.
+
+- Back link
+- Title: "Your Portfolio Story"
+- Full pitch paragraph (the current narrative variant, editable with regenerate -- reuse existing narrative state/controls)
+- "What Makes You Unique" paragraph: "You don't come from a school with a robotics lab or a CS department. You come from a school where you ARE the CS department. That's not a disadvantage -- it's your most compelling story. Every admissions reader will remember the student who built something from nothing."
+- "Why Colleges Should Care" paragraph: "Colleges aren't just admitting a student -- they're admitting someone who will build communities on their campus. Your track record proves you don't wait for programs to exist; you create them. That's exactly the kind of student who thrives in college environments."
+- "Character Traits" row of colored tag chips: "Resilient" (green), "Innovative" (blue), "Resourceful" (amber), "Builder" (purple)
+- "Narrative Threads Preview" -- 2-3 cards:
+  - Thread 1: "Building Access" / Tags: "CS Club", "Math Tutor", "ML Research" / "These activities form a coherent thread about creating opportunities where none existed"
+  - Thread 2: "Technical Depth" / Tags: "CS Club", "ML Research" / "Shows progression from self-taught to university-validated technical skills"
+  - Thread 3: "Work Ethic Under Constraint" / Tags: "Grocery Store", "Farm Work" / "Demonstrates grit and time management that contextualizes all other achievements"
+- "Explore all narrative threads" button that sets `activeTab` to "your-story"
 
 ### What Stays the Same
 
-- Score dashboard expansion panel with caret (unchanged logic)
-- Tab bar
-- All carousel/edit interactivity
-- Portfolio narrative content and controls
-- Strengths/Opportunities panels
+- Score dashboard + expansion panel above tabs (always visible)
+- Tab bar (always visible)
 - Two-column workspace below
+- All editor, chat, version history, credits logic
 
 ### Technical Details
 
 | Area | Detail |
 |------|--------|
 | File | `src/pages/ActivityWorkshop.tsx` only |
-| Grid change | `grid-cols-2 md:grid-cols-5` becomes `grid-cols-3 md:grid-cols-6` (3 cols on mobile to fit OVERALL + 2 per row cleanly) |
-| OVERALL card | Rendered before the `.map()`, not part of `scoreCards` array, not expandable |
-| Harvard/Competitive badges | Rendered as tiny text below the OVERALL card, outside the button element |
-| Caret refs | No change — indices 0-4 still map to the 5 dimension cards via `scoreCardRefs` |
-| Spacing reductions | `py-8` to `py-6`, `space-y-4` to `space-y-3`, insight `p-4` to `p-3`, strategic direction `p-5` to `p-3 px-4` |
-| Lines removed | ~15 (hero block) |
-| Lines modified | ~20 (spacing class changes + grid restructure) |
+| New state | `expandedSection`, `expandedStrengths`, `expandedOpps`, plus changing `Tabs` to controlled with `activeTab` |
+| New import | `ArrowRight` from lucide-react |
+| Tabs change | `defaultValue` to `value={activeTab} onValueChange={...}` for programmatic switching |
+| Transition | Compact view: `animate-fade-in`. Expanded views: wrapper div with `transition-all duration-300` using opacity + translateX |
+| e.stopPropagation | On carousel arrows and edit controls inside clickable cards/narrative |
+| All mock data | Commented with `// ---- Hard-coded mock data: ...` per project conventions |
+| Lines added | ~250-300 lines (4 expanded views + inline expand data + state) |
+| Lines modified | ~30 lines (add click handlers, hover classes, arrow icons to existing sections) |
 
