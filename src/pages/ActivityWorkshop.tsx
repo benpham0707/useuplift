@@ -1552,11 +1552,27 @@ export default function ActivityWorkshop() {
       {/* SCORE DASHBOARD + TABBED OVERVIEW                                  */}
       {/* ================================================================== */}
       <div className="hero-gradient text-white relative">
-        <div className="max-w-7xl mx-auto px-4 py-8 space-y-4">
+        <div className="max-w-7xl mx-auto px-4 py-6 space-y-3">
 
           {/* Score Dashboard: 5 cards + full-width expansion panel */}
           <div ref={scoreContainerRef} className="relative space-y-0">
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+              {/* ---- OVERALL card: non-expandable, display-only ---- */}
+              <div className="flex flex-col items-center">
+                <div className="w-full text-center p-4 rounded-xl border border-white/30 bg-white/15 backdrop-blur-xl">
+                  <div className={`text-4xl font-bold ${getScoreCardColor(7.8)}`}>
+                    7.8
+                  </div>
+                  <div className="text-xs font-medium text-white/80 mt-1 uppercase tracking-wider">
+                    Overall
+                  </div>
+                </div>
+                {/* ---- Hard-coded mock data: Harvard Scale + Competitive badges ---- */}
+                <div className="flex flex-col items-center gap-0.5 mt-1">
+                  <span className="text-[10px] text-white/50">Harvard Scale 4 — Top 40%</span>
+                  <span className="text-[10px] text-teal-400/70 font-medium">Competitive</span>
+                </div>
+              </div>
               {scoreCards.map((card, idx) => (
                 <button
                   key={card.label}
@@ -1625,26 +1641,10 @@ export default function ActivityWorkshop() {
             </TabsList>
 
             {/* ============ OVERVIEW TAB ============ */}
-            <TabsContent value="overview" className="mt-4 space-y-4">
-
-              {/* Hero area: score as centerpiece */}
-              <div className="flex flex-col items-center text-center gap-3">
-                <div className="px-8 py-6 rounded-2xl border border-white/30 bg-white/15 backdrop-blur-xl">
-                  <span className="text-6xl md:text-7xl font-bold text-green-400">7.8</span>
-                  <span className="text-xl text-white/60 ml-1">/ 10</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-white/15 border-white/25 text-white/80 text-xs px-2 py-1">
-                    Harvard Scale 4 — Average (Top 40%)
-                  </Badge>
-                  <Badge className="bg-teal-500/20 border-teal-400/30 text-teal-300 text-xs px-2 py-1">
-                    Competitive
-                  </Badge>
-                </div>
-              </div>
+            <TabsContent value="overview" className="mt-3 space-y-3">
 
               {/* Portfolio Narrative — blockquote style */}
-              <div className="border-l-4 border-l-blue-400/50 pl-4 py-2">
+              <div className="border-l-4 border-l-blue-400/50 pl-4 py-1">
                 <div className="flex items-center justify-between mb-2">
                   <div className="text-xs uppercase tracking-widest text-white/60 font-semibold">Portfolio Narrative</div>
                   <div className="flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
@@ -1688,8 +1688,8 @@ export default function ActivityWorkshop() {
               {/* Three Quick Insight Cards — spotlight treatment */}
               <div className="grid md:grid-cols-3 gap-3">
                 {/* YOUR SPIKE */}
-                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Target className="h-3.5 w-3.5 text-blue-400" />
                       <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">Your Spike</span>
@@ -1703,8 +1703,8 @@ export default function ActivityWorkshop() {
                 </div>
 
                 {/* WHAT THEY'LL REMEMBER */}
-                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Lightbulb className="h-3.5 w-3.5 text-amber-400" />
                       <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">What They'll Remember</span>
@@ -1718,8 +1718,8 @@ export default function ActivityWorkshop() {
                 </div>
 
                 {/* #1 PRIORITY */}
-                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="rounded-xl border border-white/35 bg-white/20 backdrop-blur-2xl p-3">
+                  <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-1.5">
                       <Flag className="h-3.5 w-3.5 text-red-400" />
                       <span className="text-xs uppercase tracking-widest text-white/60 font-semibold">#1 Priority</span>
@@ -1763,24 +1763,24 @@ export default function ActivityWorkshop() {
               </div>
 
               {/* Strategic Direction — Coaching Pitch first */}
-              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-5 space-y-3">
+              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-md p-3 px-4 space-y-2">
                 <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Strategic Direction</h3>
                 {/* ---- Hard-coded mock data: strategic direction paragraphs ---- */}
                 {/* Coaching Pitch — top, visually distinct */}
-                <div className="rounded-lg bg-purple-500/10 border-l-4 border-l-purple-400/60 p-4">
-                  <div className="text-xs uppercase tracking-wide text-white/50 mb-2">Coaching Pitch</div>
+                <div className="rounded-lg bg-purple-500/10 border-l-4 border-l-purple-400/60 p-3">
+                  <div className="text-xs uppercase tracking-wide text-white/50 mb-1">Coaching Pitch</div>
                   <p className="text-sm text-white/90 leading-relaxed italic">
                     "You're not just a CS student — you're someone who saw a gap and built the bridge. The admissions committee will remember the kid who started a CS club with no computers, not the one who joined an existing one. Now make every line of your application prove that story with numbers, outcomes, and artifacts they can point to."
                   </p>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-white/50 mb-1">Current State</div>
+                  <div className="text-xs uppercase tracking-wide text-white/50 mb-0.5">Current State</div>
                   <p className="text-sm text-white/80 leading-relaxed">
                     You have a distinctive profile centered on building CS infrastructure from scratch in a low-resource environment. Your activities demonstrate genuine initiative and a clear connection between personal experience and technical ambition. The foundation is strong but needs more external validation and tighter narrative connections.
                   </p>
                 </div>
                 <div>
-                  <div className="text-xs uppercase tracking-wide text-white/50 mb-1">Strategic Direction</div>
+                  <div className="text-xs uppercase tracking-wide text-white/50 mb-0.5">Strategic Direction</div>
                   <p className="text-sm text-white/80 leading-relaxed">
                     Double down on the "builder who creates access" angle. Every activity description should reinforce this thread. Seek external recognition (competitions, publications, community partnerships) to validate what you've built. Tighten the connection between your work experiences and your CS mission.
                   </p>
