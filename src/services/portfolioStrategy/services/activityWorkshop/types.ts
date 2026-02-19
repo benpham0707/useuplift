@@ -204,6 +204,24 @@ export interface ActivityWorkshopSessionInput {
     constraintNotes?: string;
     geographicContext?: string;
   };
+  /**
+   * Scoring cache session ID for incremental scoring.
+   * When provided, the scoring orchestrator reuses cached scores for
+   * unchanged activities, only re-scoring activities that changed.
+   * The sessionId is returned in the pipeline result for subsequent calls.
+   */
+  scoringSessionId?: string;
+
+  /**
+   * Optional activity profiles from chat conversations.
+   * Keyed by activity ID. When present, enriches analysis and teaching
+   * with verified student context instead of fabricated examples.
+   *
+   * DESIGN: Profiles are ALWAYS optional. The pipeline works identically
+   * without them. When present, they enhance guidance quality but do NOT
+   * inflate scores (scores reflect what the AO reads in the description).
+   */
+  activityProfiles?: Record<string, import('./profile/types').ActivityProfile>;
 }
 
 // ============================================================================
@@ -712,6 +730,13 @@ export interface ActivityWorkshopResult {
       teaching: { input: number; output: number };
     };
   };
+
+  /**
+   * Scoring cache session ID for incremental scoring.
+   * Pass this back as scoringSessionId in ActivityWorkshopSessionInput
+   * to reuse cached scores for unchanged activities.
+   */
+  scoringSessionId?: string;
 }
 
 // ============================================================================
@@ -938,6 +963,12 @@ export interface AnalysisContext extends PortfolioAnalysis {
     activityScoresById: Record<string, ActivityScoreRubric>;
     /** Whether scoring was run */
     scoringComplete: boolean;
+    /**
+     * Scoring cache session ID for incremental scoring.
+     * Preserved from the scoring orchestrator result so the pipeline
+     * can return it to the caller for subsequent incremental calls.
+     */
+    scoringSessionId?: string;
   };
 
   // === STAGE METADATA ===
@@ -1315,6 +1346,23 @@ export interface NarrativeProgression {
 }
 
 /**
+ * Recommendation for whether an activity should have a chat conversation.
+ * Generated after pipeline completion based on analysis findings.
+ */
+export interface ActivityChatRecommendation {
+  activityId: string;
+  activityTitle: string;
+  /** Whether to initiate a conversation for this activity */
+  shouldInitiate: boolean;
+  /** What triggered this recommendation (maps to ConversationTrigger) */
+  trigger: string;
+  /** How urgent the conversation is */
+  urgency: 'high' | 'medium' | 'low';
+  /** Why we recommend (or don't recommend) a conversation */
+  rationale: string;
+}
+
+/**
  * Complete Pipeline Result (v4.2 — parallel processing, single narrative pass)
  */
 export interface ActivityWorkshopPipelineResult {
@@ -1337,6 +1385,17 @@ export interface ActivityWorkshopPipelineResult {
     scoringTeaching?: TeachingLayerOutput;
   };
 
+  // === TEACHING SUMMARY (Tab 1 Strategic Direction) ===
+  /** Coach's summary surfaced from Stage 2 teaching data */
+  teachingSummary?: {
+    /** Current state assessment of the student's portfolio */
+    currentState: string;
+    /** Strategic direction / what to focus on */
+    strategicDirection: string;
+    /** Two-sentence coaching pitch */
+    twoSentencePitch: string;
+  };
+
   // All stage outputs
   stage0: StoryContext;
   stage1: AnalysisContext;
@@ -1349,4 +1408,14 @@ export interface ActivityWorkshopPipelineResult {
 
   // Total cost
   totalCost: number;
+
+  /**
+   * Scoring cache session ID for incremental scoring.
+   * Pass this back on subsequent calls via scoringSessionId in
+   * ActivityWorkshopSessionInput to reuse cached scores for unchanged activities.
+   */
+  scoringSessionId?: string;
+
+  /** Chat recommendations for activities that would benefit from profiling */
+  chatRecommendations?: ActivityChatRecommendation[];
 }

@@ -20,9 +20,19 @@ import {
   QuestionCategory,
   QuestionGenerationInput,
   QuestionGenerationOutput,
+  WorkshopContextForChat,
 } from './types';
 import { ActivityProfile, ProfileCompleteness } from '../profile/types';
 import { activityProfileService } from '../profile/activityProfileService';
+
+/**
+ * Extended state type that may carry workshop context.
+ * Stored pragmatically on the state to avoid type conflicts with
+ * the other agent editing types.ts. Access via type assertion.
+ */
+interface ConversationStateWithWorkshopContext extends ConversationState {
+  workshopContext?: WorkshopContextForChat;
+}
 
 // ============================================================================
 // QUESTION BANKS
@@ -310,7 +320,13 @@ export class QuestionGeneratorService {
     const completeness = activityProfileService.calculateCompleteness(state.currentProfile);
 
     // Generate candidate questions
-    const candidates = this.generateCandidates(state, completeness, preferredCategories, priorityFields);
+    let candidates = this.generateCandidates(state, completeness, preferredCategories, priorityFields);
+
+    // Apply workshop-context-aware priority adjustments if available
+    const workshopContext = (state as ConversationStateWithWorkshopContext).workshopContext;
+    if (workshopContext) {
+      candidates = this.adjustPrioritiesForWorkshopContext(candidates, workshopContext);
+    }
 
     // Sort by priority
     candidates.sort((a, b) => b.priority - a.priority);
@@ -825,7 +841,155 @@ export class QuestionGeneratorService {
       parts.push('valuable for essays/interviews');
     }
 
+    // Note workshop context influence in rationale
+    const workshopContext = (state as ConversationStateWithWorkshopContext).workshopContext;
+    if (workshopContext) {
+      if (workshopContext.undersold && (question.category === 'story_prompt' || question.category === 'specific_probe')) {
+        parts.push('workshop: activity appears undersold');
+      }
+      if (workshopContext.spikeCandidate && question.category === 'connection_suggest') {
+        parts.push('workshop: spike candidate — mapping connections');
+      }
+      if (workshopContext.redFlags?.length && question.targetField.includes('impact')) {
+        parts.push('workshop: addressing flagged impact gaps');
+      }
+    }
+
     return parts.join('; ');
+  }
+
+  // ============================================================================
+  // WORKSHOP-CONTEXT-AWARE PRIORITIZATION
+  // ============================================================================
+
+  /**
+   * Adjust question priorities based on workshop analysis results.
+   * When we know what the pipeline found (red flags, score gaps, etc.),
+   * we can ask smarter questions that address those specific issues.
+   *
+   * This does NOT sort — it only adjusts priority values so the
+   * existing sort in generateNextQuestion() picks the right order.
+   */
+  adjustPrioritiesForWorkshopContext(
+    candidates: QuestionCandidate[],
+    workshopContext: WorkshopContextForChat
+  ): QuestionCandidate[] {
+    return candidates.map(candidate => {
+      let priorityBoost = 0;
+
+      // If red flags include "vague impact" → boost fact_gathering questions about scale
+      if (workshopContext.redFlags?.some(f =>
+        f.flag.toLowerCase().includes('vague') || f.flag.toLowerCase().includes('impact')
+      )) {
+        if (candidate.targetField.includes('scale') || candidate.targetField.includes('impact')) {
+          priorityBoost += 30;
+        }
+      }
+
+      // If undersold → boost story_exploration to surface hidden achievements
+      if (workshopContext.undersold) {
+        if (candidate.category === 'story_prompt' || candidate.category === 'specific_probe') {
+          priorityBoost += 25;
+        }
+      }
+
+      // If spike candidate → boost connection_mapping questions
+      if (workshopContext.spikeCandidate) {
+        if (
+          candidate.targetField.includes('spike') ||
+          candidate.targetField.includes('connection') ||
+          candidate.category === 'connection_suggest'
+        ) {
+          priorityBoost += 20;
+        }
+      }
+
+      // If description score is low → boost questions that surface description-worthy content
+      if (workshopContext.descriptionScore !== undefined && workshopContext.descriptionScore < 50) {
+        if (
+          candidate.targetField.includes('facts') ||
+          candidate.targetField.includes('recognition') ||
+          candidate.targetField.includes('artifacts')
+        ) {
+          priorityBoost += 20;
+        }
+      }
+
+      // If specific description issues identified → target those
+      if (workshopContext.descriptionIssues?.length) {
+        for (const issue of workshopContext.descriptionIssues) {
+          if (issue.toLowerCase().includes('quantif') && candidate.targetField.includes('scale')) {
+            priorityBoost += 25;
+          }
+          if (issue.toLowerCase().includes('leadership') && candidate.targetField.includes('role')) {
+            priorityBoost += 25;
+          }
+          if (issue.toLowerCase().includes('specific') && candidate.category === 'specific_probe') {
+            priorityBoost += 20;
+          }
+        }
+      }
+
+      // If teaching priorities are set, boost questions that align
+      if (workshopContext.teachingPriorities?.length) {
+        for (const priority of workshopContext.teachingPriorities) {
+          const priorityLower = priority.toLowerCase();
+          if (priorityLower.includes('impact') && candidate.targetField.includes('impact')) {
+            priorityBoost += 15;
+          }
+          if (priorityLower.includes('story') && candidate.category === 'story_prompt') {
+            priorityBoost += 15;
+          }
+          if (priorityLower.includes('recognition') && candidate.targetField.includes('recognition')) {
+            priorityBoost += 15;
+          }
+          if (priorityLower.includes('scale') && candidate.targetField.includes('scale')) {
+            priorityBoost += 15;
+          }
+        }
+      }
+
+      // If activity score is low overall, boost high-impact fact-based questions
+      if (workshopContext.activityScore !== undefined && workshopContext.activityScore < 40) {
+        if (candidate.targetField.startsWith('facts.') || candidate.targetField.startsWith('impact.')) {
+          priorityBoost += 10;
+        }
+      }
+
+      if (priorityBoost === 0) {
+        return candidate;
+      }
+
+      return {
+        ...candidate,
+        priority: candidate.priority + priorityBoost,
+      };
+    });
+  }
+
+  /**
+   * Generate a workshop-context-aware opening insight.
+   * Returns a brief sentence that acknowledges what the pipeline found,
+   * giving the student a sense that the system understands their activity.
+   * Returns null if no meaningful insight is available.
+   */
+  generateWorkshopInsight(
+    workshopContext: WorkshopContextForChat,
+    activityTitle: string
+  ): string | null {
+    if (workshopContext.undersold) {
+      return `Your analysis suggests "${activityTitle}" is stronger than your description shows. I'd love to help you uncover what's missing.`;
+    }
+    if (workshopContext.spikeCandidate) {
+      return `"${activityTitle}" looks like it could be central to your application story. Let's make sure we capture everything important.`;
+    }
+    if (workshopContext.redFlags?.length) {
+      return `I noticed some areas where "${activityTitle}" could be presented more effectively. Let me ask a few questions to help strengthen it.`;
+    }
+    if (workshopContext.greenFlags?.length && workshopContext.descriptionScore !== undefined && workshopContext.descriptionScore < 50) {
+      return `There are some great things about "${activityTitle}" already — let's make sure they come through clearly in your description.`;
+    }
+    return null;
   }
 
   /**

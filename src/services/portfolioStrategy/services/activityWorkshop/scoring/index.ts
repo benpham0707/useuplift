@@ -65,7 +65,7 @@
  * // Access scoring rubric
  * const { rubric, teaching, cacheInfo } = result1;
  * console.log(`Overall Score: ${rubric.overallScore.total}/10`);
- * console.log(`Harvard Rating: ${rubric.harvardScale.rating}`);
+ * console.log(`Competitive Tier: ${rubric.harvardScale.description}`);
  *
  * // Access teaching transformations
  * if (teaching) {

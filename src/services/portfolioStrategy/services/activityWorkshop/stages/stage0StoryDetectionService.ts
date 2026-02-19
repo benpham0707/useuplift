@@ -38,6 +38,8 @@ import {
   ActivityWorkshopInput,
   StoryContext,
 } from '../types';
+import { ActivityProfile } from '../profile/types';
+import { profileBridgeService } from '../profileBridge';
 
 /**
  * Stage 0: Story Detection Service
@@ -49,11 +51,20 @@ export class Stage0StoryDetectionService {
 
   /**
    * Detect the student's story from their activities
+   *
+   * @param input - Workshop session input with activities and student context
+   * @param activityProfiles - Optional map of activity ID → ActivityProfile from chat system.
+   *   When present, enriches the story detection prompt with verified student context
+   *   (origin story, key moments, meaning) for more accurate archetype/theme detection.
+   *   Cost impact: ~50-200 extra tokens per activity with a profile.
    */
-  async detectStory(input: ActivityWorkshopSessionInput): Promise<StoryContext> {
+  async detectStory(
+    input: ActivityWorkshopSessionInput,
+    activityProfiles?: Record<string, ActivityProfile>
+  ): Promise<StoryContext> {
     const startTime = Date.now();
 
-    const prompt = this.buildStoryDetectionPrompt(input);
+    const prompt = this.buildStoryDetectionPrompt(input, activityProfiles);
     const systemPrompt = this.getSystemPrompt();
 
     try {
@@ -93,12 +104,15 @@ export class Stage0StoryDetectionService {
   /**
    * Build the prompt for story detection
    */
-  private buildStoryDetectionPrompt(input: ActivityWorkshopSessionInput): string {
+  private buildStoryDetectionPrompt(
+    input: ActivityWorkshopSessionInput,
+    activityProfiles?: Record<string, ActivityProfile>
+  ): string {
     const { activities, studentContext } = input;
 
-    // Format activities for the prompt
+    // Format activities for the prompt, enriching with profile data when available
     const activitiesText = activities
-      .map((a, i) => this.formatActivity(a, i + 1))
+      .map((a, i) => this.formatActivity(a, i + 1, activityProfiles))
       .join('\n\n');
 
     // Format student context if available
@@ -161,19 +175,27 @@ Respond with a JSON object following this exact structure:
     "likelySpike": true/false,
     "spikeArea": "area if true",
     "spikeActivityIds": ["ids that form spike"],
-    "maturity": "mature|developing|emerging|absent",
-    "evidence": "Why we think this"
+    "maturity": "developing|emerging|absent",
+    "evidence": "Why we think this (keep it brief — this is a quick hypothesis)"
   }
 }`;
   }
 
   /**
    * Format a single activity for the prompt
+   *
+   * When an ActivityProfile exists for this activity and is useful,
+   * appends a DEEP CONTEXT block with verified story elements from
+   * the student conversation (origin, key moments, meaning, spike connection).
    */
-  private formatActivity(activity: ActivityWorkshopInput, index: number): string {
+  private formatActivity(
+    activity: ActivityWorkshopInput,
+    index: number,
+    activityProfiles?: Record<string, ActivityProfile>
+  ): string {
     const hours = activity.hoursPerWeek * activity.weeksPerYear * (activity.yearsInvolved || 1);
 
-    return `ACTIVITY ${index} (ID: ${activity.id}):
+    let activityBlock = `ACTIVITY ${index} (ID: ${activity.id}):
 Title: ${activity.title}
 Organization: ${activity.organization || 'N/A'}
 Role: ${activity.role || 'N/A'}
@@ -185,6 +207,32 @@ Paid: ${activity.isPaid ? 'Yes' : 'No'}
 Continuing: ${activity.isContinuing ? 'Yes' : 'No'}
 ${activity.constraintsContext ? `Constraints: ${activity.constraintsContext}` : ''}
 ${activity.achievements?.length ? `Achievements: ${activity.achievements.map(a => a.title).join(', ')}` : ''}`;
+
+    // Enrich with profile data when available
+    if (activityProfiles?.[activity.id]) {
+      const profile = activityProfiles[activity.id];
+      if (profileBridgeService.isProfileUseful(profile)) {
+        const summary = profileBridgeService.summarizeForStory(profile);
+        activityBlock += `\n\nDEEP CONTEXT (verified from student conversation):`;
+        if (summary.originStory) {
+          activityBlock += `\nOrigin: ${summary.originStory}`;
+        }
+        if (summary.keyMoments && summary.keyMoments.length > 0) {
+          activityBlock += `\nKey Moments: ${summary.keyMoments.join('; ')}`;
+        }
+        if (summary.evolutionSummary) {
+          activityBlock += `\nEvolution: ${summary.evolutionSummary}`;
+        }
+        if (summary.meaningConnection) {
+          activityBlock += `\nMeaning: ${summary.meaningConnection}`;
+        }
+        if (summary.spikeConnection) {
+          activityBlock += `\nSpike Connection: ${summary.spikeConnection}`;
+        }
+      }
+    }
+
+    return activityBlock;
   }
 
   /**
@@ -219,7 +267,13 @@ KEY PRINCIPLES:
    - caretaker: Helping others, service-oriented
    - polymath: Genuine excellence across multiple domains
 
-4. SPIKE DETECTION
+4. SPIKE DETECTION (Quick Hypothesis Only)
+   - This is a PRELIMINARY hypothesis — detailed spike analysis happens later in the pipeline
+   - Be CONSERVATIVE with maturity labels:
+     * "developing" — only when you see CLEAR evidence of depth + progression + recognition
+     * "emerging" — when you see thematic clustering or early signs of focus (DEFAULT for any spike signal)
+     * "absent" — when activities are scattered with no discernible spike area
+   - NEVER use "mature" — that determination requires detailed tier analysis in later stages
    - A spike is NOT just doing many activities in one area
    - A spike shows DEPTH: progression, leadership, recognition
    - Stanford wants "T-shaped" students: depth in one area + breadth
@@ -327,12 +381,22 @@ Output ONLY valid JSON. No explanations outside the JSON structure.`;
 
   /**
    * Validate maturity value
+   *
+   * Stage 0 is a quick hypothesis — it should NEVER claim "mature".
+   * If the LLM returns "mature", we downgrade to "developing" since
+   * the definitive maturity assessment happens in Stage 1 with actual
+   * tier data. This prevents contradictions where Stage 0 says "mature"
+   * but Stage 1 (with real analysis) finds the spike is weaker.
    */
   private validateMaturity(
     maturity: string | undefined
   ): StoryContext['spikeHypothesis']['maturity'] {
     const validMaturities = ['mature', 'developing', 'emerging', 'absent'] as const;
     if (maturity && validMaturities.includes(maturity as typeof validMaturities[number])) {
+      // Downgrade "mature" → "developing" — Stage 0 is too lightweight to claim maturity
+      if (maturity === 'mature') {
+        return 'developing';
+      }
       return maturity as typeof validMaturities[number];
     }
     return 'absent';

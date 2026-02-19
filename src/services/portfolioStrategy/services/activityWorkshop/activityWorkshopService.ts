@@ -30,7 +30,7 @@
  *   - Quick encouragements + portfolio teaching
  *
  * Stage 3: Portfolio Synthesis (Haiku, ~$0.005)
- *   - Final Harvard 1-6 assessment
+ *   - Final competitive tier assessment
  *
  * Final Narrative (Sonnet, ~$0.07)
  *   - Single narrative pass at end of pipeline
@@ -45,6 +45,7 @@ import {
   ActivityWorkshopResult,
   ActivityWorkshopSession,
   ActivityWorkshopPipelineResult,
+  ActivityChatRecommendation,
   PortfolioAnalysis,
   PortfolioTeaching,
   IActivityWorkshopService,
@@ -355,6 +356,10 @@ function convertToLegacyTeaching(
 }
 
 // ============================================================================
+// CHAT RECOMMENDATION TYPE (uses ActivityChatRecommendation from types.ts)
+// ============================================================================
+
+// ============================================================================
 // ACTIVITY WORKSHOP SERVICE CLASS (v4.0)
 // ============================================================================
 
@@ -395,7 +400,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 0] ─────────────────────────────────────────`);
 
     const stage0StartTime = Date.now();
-    const storyContext = await stage0StoryDetectionService.detectStory(input);
+    const storyContext = await stage0StoryDetectionService.detectStory(input, input.activityProfiles);
 
     console.log(`[Stage 0] Complete in ${Date.now() - stage0StartTime}ms`);
     console.log(`[Stage 0] Archetype: ${storyContext.narrativeIdentity.archetype}`);
@@ -410,14 +415,14 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 1] ─────────────────────────────────────────`);
 
     const stage1StartTime = Date.now();
-    const analysisContext = await stage1ContextAwareAnalysisService.analyze(input, storyContext);
+    const analysisContext = await stage1ContextAwareAnalysisService.analyze(input, storyContext, input.activityProfiles);
 
     console.log(`[Stage 1] Complete in ${Date.now() - stage1StartTime}ms`);
     console.log(`[Stage 1] Tier Distribution: T1=${analysisContext.tierDistribution.tier1}, T2=${analysisContext.tierDistribution.tier2}, T3=${analysisContext.tierDistribution.tier3}, T4=${analysisContext.tierDistribution.tier4}`);
     console.log(`[Stage 1] Teaching Candidates: ${analysisContext.teachingCandidates.deepTeachingIds.length} deep, ${analysisContext.teachingCandidates.mediumTeachingIds.length} medium`);
     console.log(`[Stage 1] Primary Need: ${analysisContext.portfolioTeachingNeeds.primaryIssue}`);
     if (analysisContext.scoring?.scoringComplete) {
-      console.log(`[Stage 1] Scoring: Portfolio ${analysisContext.scoring.portfolioRubric.overallScore.total}/10, Harvard ${analysisContext.scoring.portfolioRubric.harvardScale.rating}/6`);
+      console.log(`[Stage 1] Scoring: Portfolio ${analysisContext.scoring.portfolioRubric.overallScore.total}/10 — ${analysisContext.scoring.portfolioRubric.harvardScale.description}`);
     }
     console.log('');
 
@@ -429,7 +434,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     console.log(`[Stage 2] ─────────────────────────────────────────`);
 
     const stage2StartTime = Date.now();
-    const teachingContext = await stage2ConditionalTeachingService.teach(input, storyContext, analysisContext);
+    const teachingContext = await stage2ConditionalTeachingService.teach(input, storyContext, analysisContext, input.activityProfiles);
 
     console.log(`[Stage 2] Complete in ${Date.now() - stage2StartTime}ms`);
     console.log(`[Stage 2] Taught: ${teachingContext.teachingDelivered.length} activities`);
@@ -453,10 +458,11 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
             input,
             storyContext,
             analysisContext,
-            teachingContext
+            teachingContext,
+            input.activityProfiles
           );
           console.log(`[Stage 3] Complete in ${Date.now() - stage3StartTime}ms`);
-          console.log(`[Stage 3] Harvard Scale: ${result.finalAssessment.harvardScale}/6`);
+          console.log(`[Stage 3] Competitive Tier: ${result.finalAssessment.overallStrength}`);
           console.log(`[Stage 3] Overall Strength: ${result.finalAssessment.overallStrength}`);
           return { success: true as const, result };
         } catch (error) {
@@ -523,7 +529,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       console.log(`[ActivityWorkshop v4.3] ──────────────────────────────────────`);
       console.log(`[ActivityWorkshop v4.3] SCORING:`);
       console.log(`[ActivityWorkshop v4.3]   Portfolio: ${analysisContext.scoring.portfolioRubric.overallScore.total}/10`);
-      console.log(`[ActivityWorkshop v4.3]   Harvard: ${analysisContext.scoring.portfolioRubric.harvardScale.rating}/6`);
+      console.log(`[ActivityWorkshop v4.3]   Tier: ${analysisContext.scoring.portfolioRubric.harvardScale.description}`);
       if (teachingContext.scoringTeaching) {
         console.log(`[ActivityWorkshop v4.3]   Transformations: ${teachingContext.scoringTeaching.activityTransformations.length}`);
       }
@@ -533,6 +539,12 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     // Convert to legacy formats for backward compatibility
     const legacyAnalysis = convertToLegacyAnalysis(analysisContext);
     const legacyTeaching = convertToLegacyTeaching(teachingContext, storyContext, analysisContext);
+
+    // Compute chat recommendations for activities that would benefit from profiling
+    const chatRecommendations = await this.computeChatRecommendations(input, {
+      stage0: storyContext,
+      stage1: analysisContext,
+    });
 
     return {
       sessionId,
@@ -549,6 +561,22 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
         scoringTeaching: teachingContext.scoringTeaching?.fullOutput,
       } : undefined,
 
+      // Return the scoring cache session ID so the caller can reuse it
+      // for incremental scoring on subsequent pipeline calls
+      scoringSessionId: analysisContext.scoring?.scoringSessionId,
+
+      // Teaching summary for UI Tab 1 Strategic Direction
+      teachingSummary: {
+        currentState: teachingContext.portfolioTeaching?.narrativeTeaching?.currentState
+          || (analysisContext.spikeAnalysis?.hasSpike
+            ? `You have a developing spike in ${analysisContext.spikeAnalysis.spikeType}`
+            : 'Your portfolio shows breadth but no clear spike yet'),
+        strategicDirection: teachingContext.portfolioTeaching?.strategicDirection
+          || 'Focus on deepening your strongest area of engagement',
+        twoSentencePitch: teachingContext.portfolioTeaching?.narrativeTeaching?.twoSentencePitch
+          || 'Your activities demonstrate genuine engagement across multiple domains.',
+      },
+
       // Stage outputs
       stage0: storyContext,
       stage1: analysisContext,
@@ -558,6 +586,9 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
       // Legacy compatibility
       analysis: legacyAnalysis,
       teaching: legacyTeaching,
+
+      // Chat recommendations
+      chatRecommendations,
 
       totalCost,
     };
@@ -639,6 +670,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
         analysis: pipelineResult.analysis,
         teaching: pipelineResult.teaching,
         costTracking,
+        scoringSessionId: pipelineResult.scoringSessionId,
       };
     } catch (error) {
       session.context.lastError = error instanceof Error ? error.message : 'Unknown error';
@@ -660,8 +692,8 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     }
 
     // Run stages 0 and 1
-    const storyContext = await stage0StoryDetectionService.detectStory(input);
-    const analysisContext = await stage1ContextAwareAnalysisService.analyze(input, storyContext);
+    const storyContext = await stage0StoryDetectionService.detectStory(input, input.activityProfiles);
+    const analysisContext = await stage1ContextAwareAnalysisService.analyze(input, storyContext, input.activityProfiles);
     return convertToLegacyAnalysis(analysisContext);
   }
 
@@ -678,7 +710,7 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     }
 
     // Need story context for teaching, so run stage 0
-    const storyContext = await stage0StoryDetectionService.detectStory(input);
+    const storyContext = await stage0StoryDetectionService.detectStory(input, input.activityProfiles);
 
     // Create mock AnalysisContext from legacy analysis
     const analysisContext: AnalysisContext = {
@@ -720,7 +752,8 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     const teachingContext = await stage2ConditionalTeachingService.teach(
       input,
       storyContext,
-      analysisContext
+      analysisContext,
+      input.activityProfiles
     );
 
     return convertToLegacyTeaching(teachingContext, storyContext, analysisContext);
@@ -738,6 +771,50 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     analysis: PortfolioAnalysis
   ): Promise<PortfolioTeaching> {
     return this.runTeaching(input, analysis);
+  }
+
+  /**
+   * Compute which activities would benefit from chat profiling.
+   * Uses assessConversationNeed from the chat service for accurate
+   * recommendations based on profile completeness and pipeline context.
+   */
+  private async computeChatRecommendations(
+    input: ActivityWorkshopSessionInput,
+    pipelineResult: {
+      stage0: StoryContext;
+      stage1: AnalysisContext;
+    }
+  ): Promise<ActivityChatRecommendation[]> {
+    const recommendations: ActivityChatRecommendation[] = [];
+
+    try {
+      const { activityProfileChatService } = await import('./chat');
+      const { createEmptyProfile } = await import('./profile/types');
+
+      for (const activity of input.activities) {
+        const profile = input.activityProfiles?.[activity.id] || createEmptyProfile(activity.id, activity.title);
+        const storyRole = pipelineResult.stage0.activityStoryRoles.find(r => r.activityId === activity.id);
+        const activityAnalysis = pipelineResult.stage1.activities[activity.id];
+
+        const recommendation = activityProfileChatService.assessConversationNeed(profile, {
+          isSpike: pipelineResult.stage0.spikeHypothesis.spikeActivityIds.includes(activity.id),
+          currentDescriptionScore: activityAnalysis?.descriptionQuality?.overallScore,
+          portfolioRole: storyRole?.storyRole === 'core_identity' ? 'highlight' :
+                         storyRole?.storyRole === 'filler' ? 'filler' : 'support',
+        });
+
+        recommendations.push({
+          activityId: activity.id,
+          activityTitle: activity.title,
+          ...recommendation,
+        });
+      }
+    } catch (error) {
+      console.error('[ActivityWorkshop] Chat recommendations failed (non-fatal):', error);
+      // Return empty recommendations on failure — this is a non-critical feature
+    }
+
+    return recommendations;
   }
 
   // Session management

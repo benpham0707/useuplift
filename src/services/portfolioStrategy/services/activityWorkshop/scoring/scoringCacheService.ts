@@ -76,10 +76,11 @@ export class ScoringCacheService {
   // ==========================================================================
 
   /**
-   * Create a new scoring session
+   * Create a new scoring session, optionally with a specific ID.
+   * If no ID is provided, a new UUID is generated.
    */
-  createSession(): string {
-    const sessionId = uuidv4();
+  createSession(requestedSessionId?: string): string {
+    const sessionId = requestedSessionId || uuidv4();
     const now = new Date();
 
     const session: ScoringSession = {
@@ -104,7 +105,10 @@ export class ScoringCacheService {
   }
 
   /**
-   * Get an existing session or create a new one
+   * Get an existing session or create a new one.
+   * When a sessionId is provided but not found (e.g., expired/evicted),
+   * a new session is created WITH that same ID so the caller can
+   * continue using it transparently.
    */
   getOrCreateSession(sessionId?: string): ScoringSession {
     if (sessionId && this.sessions.has(sessionId)) {
@@ -113,9 +117,10 @@ export class ScoringCacheService {
       return session;
     }
 
-    // Create new session if not found or not provided
-    const newSessionId = sessionId || this.createSession();
-    return this.sessions.get(newSessionId) || this.sessions.get(this.createSession())!;
+    // Create a new session. If the caller provided an ID, reuse it
+    // so the returned session ID matches what was requested.
+    const newSessionId = this.createSession(sessionId);
+    return this.sessions.get(newSessionId)!;
   }
 
   /**
@@ -397,10 +402,15 @@ export class ScoringCacheService {
 
       if (detection.isNew) {
         // Already in newActivities
-      } else if (detection.descriptionChanged) {
-        result.changedDescriptions.push(activity.id);
-      } else if (detection.activityDetailsChanged) {
-        result.changedDetails.push(activity.id);
+      } else if (detection.descriptionChanged || detection.activityDetailsChanged) {
+        // Track both types of changes independently — an activity can have
+        // both a changed description AND changed details simultaneously
+        if (detection.descriptionChanged) {
+          result.changedDescriptions.push(activity.id);
+        }
+        if (detection.activityDetailsChanged) {
+          result.changedDetails.push(activity.id);
+        }
       } else {
         result.unchanged.push(activity.id);
       }
@@ -422,6 +432,21 @@ export class ScoringCacheService {
   // ==========================================================================
   // STATISTICS & REPORTING
   // ==========================================================================
+
+  /**
+   * Store previous portfolio score for anchoring on subsequent runs.
+   * Called after portfolio scoring completes so the next run can
+   * reference what score was given previously for consistency.
+   */
+  setPreviousPortfolioScore(
+    sessionId: string,
+    score: NonNullable<ScoringSession['previousPortfolioScore']>
+  ): void {
+    const session = this.getSession(sessionId);
+    if (session) {
+      session.previousPortfolioScore = score;
+    }
+  }
 
   /**
    * Get session statistics
@@ -508,7 +533,10 @@ export class ScoringCacheService {
   // ==========================================================================
 
   /**
-   * Compute hash for description scoring input
+   * Compute hash for description scoring input.
+   * Includes ALL fields that the scoring prompt uses:
+   * - description, activityTitle, activityType, position (always)
+   * - hoursPerWeek, weeksPerYear (used for time investment context in prompt)
    */
   computeDescriptionHash(input: DescriptionScoringInput): string {
     const normalized: NormalizedDescriptionInput = {
@@ -516,6 +544,8 @@ export class ScoringCacheService {
       activityTitle: this.normalizeString(input.activityTitle || ''),
       activityType: this.normalizeString(input.activityType || ''),
       position: this.normalizeString(input.position || ''),
+      hoursPerWeek: input.hoursPerWeek || 0,
+      weeksPerYear: input.weeksPerYear || 0,
     };
 
     return this.hashObject({
@@ -526,7 +556,14 @@ export class ScoringCacheService {
   }
 
   /**
-   * Compute hash for activity scoring input
+   * Compute hash for activity scoring input.
+   * Includes ALL fields that the scoring prompt uses, including intendedMajor.
+   *
+   * Note on intendedMajor: The activity scoring prompt includes the student's
+   * intended major (activityScoringService.ts line 313), which means the AI model
+   * can and does factor it into scores. Therefore the hash MUST include it to
+   * prevent stale cached scores when the user changes their intended major.
+   * Portfolio-level major alignment is a separate concern in portfolioScoringService.
    */
   computeActivityHash(input: ActivityScoringInput): string {
     const normalized: NormalizedActivityInput = {
@@ -539,8 +576,7 @@ export class ScoringCacheService {
       hoursPerWeek: input.hoursPerWeek || 0,
       weeksPerYear: input.weeksPerYear || 0,
       honors: this.normalizeString(input.honors || ''),
-      // Note: intendedMajor intentionally NOT included
-      // Individual scores are absolute, major alignment is at portfolio level
+      intendedMajor: this.normalizeString(input.intendedMajor || ''),
     };
 
     return this.hashObject({

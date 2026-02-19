@@ -33,6 +33,7 @@ import {
   AnalysisContext,
   ActivityTier,
 } from '../types';
+import { ActivityProfile } from '../profile/types';
 
 // Import the batch analysis service for sub-batch analysis + profiler
 import { batchActivityAnalysisService } from '../batchActivityAnalysisService';
@@ -83,11 +84,16 @@ export class Stage1ContextAwareAnalysisService {
    *
    * @param input - Workshop session input
    * @param storyContext - Stage 0 story context output
+   * @param activityProfiles - Optional map of activity ID → ActivityProfile from chat system.
+   *   When present, enriches the sub-batch LLM prompts with verified student context
+   *   (facts, recognition, scale, impact) for more accurate tier assessment and
+   *   undersold activity detection.
    * @returns AnalysisContext with teaching candidates identified
    */
   async analyze(
     input: ActivityWorkshopSessionInput,
-    storyContext: StoryContext
+    storyContext: StoryContext,
+    activityProfiles?: Record<string, ActivityProfile>
   ): Promise<AnalysisContext> {
     const startTime = Date.now();
     // R2: Use local accumulator instead of instance-level to prevent race conditions
@@ -115,7 +121,7 @@ export class Stage1ContextAwareAnalysisService {
             studentContext: input.studentContext,
           };
           console.log(`[Stage1] Sub-batch ${i + 1}/${chunks.length}: ${chunk.map(a => a.id).join(', ')}`);
-          return batchActivityAnalysisService.analyzeSubBatch(subInput, profilerResult);
+          return batchActivityAnalysisService.analyzeSubBatch(subInput, profilerResult, activityProfiles);
         })
       ),
       // Scoring orchestrator (NEW — runs in parallel)
@@ -180,6 +186,12 @@ export class Stage1ContextAwareAnalysisService {
     baseAnalysis.tierDistribution.tier4 = recomputedTiers.tier4;
     console.log(`[Stage1] Merged ${Object.keys(mergedActivities).length} activity analyses`);
     console.log(`[Stage1] Tier distribution (recomputed): T1=${recomputedTiers.tier1}, T2=${recomputedTiers.tier2}, T3=${recomputedTiers.tier3}, T4=${recomputedTiers.tier4}`);
+
+    // Step 1c-ii: Reconcile spike analysis with Stage 0 hypothesis
+    // Stage 1 is the authoritative source for spike assessment using actual tier data.
+    // However, if Stage 0 detected a spike area, we should never report "none/absent"
+    // without checking — at minimum we floor at "emerging" to avoid contradictions.
+    this.reconcileSpikeWithStoryHypothesis(baseAnalysis, storyContext, mergedActivities);
 
     // Step 1d: Get story-enriched adjustments via LLM
     console.log(`[Stage1] Getting story-enriched adjustments...`);
@@ -256,6 +268,8 @@ export class Stage1ContextAwareAnalysisService {
           portfolioRubric: rubric,
           activityScoresById: scoresById,
           scoringComplete: true,
+          // Preserve the scoring cache session ID for incremental scoring
+          scoringSessionId: scoringResult.cacheInfo?.sessionId,
         };
       })() : undefined,
       // R2: Use local accumulator for thread-safe metadata
@@ -274,7 +288,7 @@ export class Stage1ContextAwareAnalysisService {
     console.log(`[Stage1] Analysis complete in ${Date.now() - startTime}ms`);
     console.log(`[Stage1] Teaching candidates: ${teachingCandidates.deepTeachingIds.length} deep, ${teachingCandidates.mediumTeachingIds.length} medium, ${teachingCandidates.quickEncouragementIds.length} quick`);
     if (scoringResult?.success) {
-      console.log(`[Stage1] Scoring: Portfolio ${scoringResult.rubric?.overallScore.total}/10, Harvard ${scoringResult.rubric?.harvardScale.rating}/6`);
+      console.log(`[Stage1] Scoring: Portfolio ${scoringResult.rubric?.overallScore.total}/10 — ${scoringResult.rubric?.harvardScale.description}`);
     } else {
       console.log(`[Stage1] Scoring: Not available (non-fatal)`);
     }
@@ -301,8 +315,16 @@ export class Stage1ContextAwareAnalysisService {
           targetSchools: input.studentContext?.targetSchools,
         },
         teachingOptions: { includeTeaching: false }, // Teaching happens in Stage 2
+        // Forward the scoring cache session ID for incremental scoring.
+        // When a user changes one activity, only that activity gets re-scored.
+        cacheOptions: input.scoringSessionId
+          ? { sessionId: input.scoringSessionId }
+          : undefined,
       });
       console.log(`[Stage1] Scoring complete in ${Date.now() - scoringStart}ms (success=${result.success})`);
+      if (result.cacheInfo) {
+        console.log(`[Stage1] Scoring cache: ${result.cacheInfo.summary.descriptionsCached} desc cached, ${result.cacheInfo.summary.descriptionsFresh} fresh`);
+      }
       return result.success ? result : null;
     } catch (error) {
       console.error(`[Stage1] Scoring failed in ${Date.now() - scoringStart}ms (non-fatal):`, error);
@@ -332,6 +354,7 @@ export class Stage1ContextAwareAnalysisService {
         userPrompt: prompt,
         maxTokens: 2000,
         temperature: 0.2,
+        cacheSystemPrompt: true, // Large expert system prompt benefits from caching
       });
 
       // R2: Accumulate usage into local accumulator for cost tracking
@@ -641,6 +664,76 @@ Output valid JSON only.`;
         skipThreshold: TEACHING_THRESHOLDS.quickEncouragement,
       },
     };
+  }
+
+  /**
+   * Reconcile Stage 1's profiler-based spike analysis with Stage 0's hypothesis.
+   *
+   * Stage 0 (Haiku, quick scan) provides a spike hypothesis that may detect
+   * thematic clustering the heuristic profiler misses. Stage 1 is authoritative
+   * because it has actual tier data, but it should not contradict Stage 0 by
+   * reporting "none/absent" when Stage 0 saw real signal.
+   *
+   * Rules:
+   * - If Stage 0 flagged a spike and Stage 1 finds Tier 1/2 activities in that area → "developing" or "mature"
+   * - If Stage 0 flagged a spike but activities are all Tier 3/4 → "emerging" (there's clustering, not strength yet)
+   * - If Stage 0 saw no spike, Stage 1's profiler assessment stands unchanged
+   */
+  private reconcileSpikeWithStoryHypothesis(
+    baseAnalysis: PortfolioAnalysis,
+    storyContext: StoryContext,
+    mergedActivities: Record<string, ActivityAnalysis>
+  ): void {
+    // Only reconcile if Stage 0 flagged a potential spike
+    if (!storyContext.spikeHypothesis.likelySpike || !storyContext.spikeHypothesis.spikeArea) {
+      return;
+    }
+
+    const spikeActivityIds = storyContext.spikeHypothesis.spikeActivityIds || [];
+
+    // Check actual tiers of Stage 0's hypothesized spike activities
+    const spikeActivityTiers = spikeActivityIds
+      .map(id => mergedActivities[id]?.classification?.tier)
+      .filter((tier): tier is number => tier !== undefined);
+
+    // If none of the hypothesized activities exist in merged results, nothing to reconcile
+    if (spikeActivityTiers.length === 0) {
+      console.log(`[Stage1] Spike reconciliation: Stage 0 spike activities not found in analysis, keeping profiler assessment`);
+      return;
+    }
+
+    const hasTier1Or2 = spikeActivityTiers.some(t => t <= 2);
+    const avgTier = spikeActivityTiers.reduce((a, b) => a + b, 0) / spikeActivityTiers.length;
+    const currentStage = baseAnalysis.spikeAnalysis.spikeDevelopmentStage;
+    const currentStrength = baseAnalysis.spikeAnalysis.spikeStrength;
+
+    // Only upgrade — never downgrade the profiler's assessment
+    if (currentStage === 'absent' || currentStrength === 'none') {
+      if (hasTier1Or2) {
+        // Stage 0 was right — real spike with quality activities
+        baseAnalysis.spikeAnalysis.hasSpike = true;
+        baseAnalysis.spikeAnalysis.spikeDevelopmentStage = avgTier <= 2 ? 'developing' : 'emerging';
+        baseAnalysis.spikeAnalysis.spikeStrength = avgTier <= 2 ? 'regional' : 'emerging';
+        baseAnalysis.spikeAnalysis.spikeActivities = spikeActivityIds;
+        baseAnalysis.spikeAnalysis.spikeEvidence = [
+          ...baseAnalysis.spikeAnalysis.spikeEvidence,
+          `Stage 0 hypothesis confirmed: ${storyContext.spikeHypothesis.spikeArea} area with ${spikeActivityTiers.filter(t => t <= 2).length} Tier 1/2 activities`
+        ];
+        console.log(`[Stage1] Spike reconciliation: Upgraded from absent/none → ${baseAnalysis.spikeAnalysis.spikeDevelopmentStage}/${baseAnalysis.spikeAnalysis.spikeStrength} (Stage 0 confirmed by tier data)`);
+      } else {
+        // Stage 0 saw activity clustering but no strong activities yet — emerging
+        baseAnalysis.spikeAnalysis.spikeDevelopmentStage = 'emerging';
+        baseAnalysis.spikeAnalysis.spikeStrength = 'emerging';
+        baseAnalysis.spikeAnalysis.spikeActivities = spikeActivityIds;
+        baseAnalysis.spikeAnalysis.spikeEvidence = [
+          ...baseAnalysis.spikeAnalysis.spikeEvidence,
+          `Stage 0 detected thematic clustering in ${storyContext.spikeHypothesis.spikeArea} but activities are Tier 3/4 — spike is emerging`
+        ];
+        console.log(`[Stage1] Spike reconciliation: Upgraded from absent/none → emerging (Stage 0 clustering, no Tier 1/2 yet)`);
+      }
+    } else {
+      console.log(`[Stage1] Spike reconciliation: Profiler already reports ${currentStage}/${currentStrength}, no upgrade needed`);
+    }
   }
 
   /**

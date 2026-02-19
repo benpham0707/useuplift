@@ -47,6 +47,7 @@ import {
   ConversationTrigger,
   ExtractionResult,
   ConversationDynamics,
+  WorkshopContextForChat,
 } from './types';
 import { ActivityProfile } from '../profile/types';
 import { activityProfileService } from '../profile/activityProfileService';
@@ -55,6 +56,15 @@ import { questionGeneratorService } from './questionGenerator';
 import { responseExtractorService } from './responseExtractor';
 import { conversationModeService } from './conversationModeService';
 import { dynamicConversationEngine } from './dynamicConversationEngine';
+
+/**
+ * Extended state type that carries workshop context alongside the base state.
+ * Workshop context is stored pragmatically as an extra property to avoid
+ * type conflicts with the other agent editing types.ts.
+ */
+interface ConversationStateWithWorkshopContext extends ConversationState {
+  workshopContext?: WorkshopContextForChat;
+}
 
 // ============================================================================
 // ACTIVITY PROFILE CHAT SERVICE
@@ -71,7 +81,7 @@ export class ActivityProfileChatService {
   async startConversation(input: StartConversationInput): Promise<StartConversationOutput> {
     try {
       // Initialize conversation state
-      let state = conversationManager.initializeConversation(
+      let state: ConversationStateWithWorkshopContext = conversationManager.initializeConversation(
         input.activityId,
         input.activityTitle,
         input.trigger,
@@ -88,22 +98,55 @@ export class ActivityProfileChatService {
         dynamics: conversationModeService.createInitialDynamics(),
       };
 
+      // Store workshop context on state if provided, so it's available
+      // during question generation and throughout the conversation
+      if (input.workshopContext) {
+        state = {
+          ...state,
+          workshopContext: input.workshopContext,
+        };
+        console.log(
+          `[ActivityProfileChatService] Workshop context attached — ` +
+          `tier: ${input.workshopContext.tier ?? 'N/A'}, ` +
+          `descScore: ${input.workshopContext.descriptionScore ?? 'N/A'}, ` +
+          `redFlags: ${input.workshopContext.redFlags?.length ?? 0}, ` +
+          `undersold: ${input.workshopContext.undersold ?? false}, ` +
+          `spike: ${input.workshopContext.spikeCandidate ?? false}`
+        );
+      }
+
       // Generate personalized opening message
-      const openingMessage = conversationManager.generateOpeningMessage(state);
+      let openingMessage = conversationManager.generateOpeningMessage(state);
+
+      // If workshop context provides a useful insight, prepend it to the opening
+      if (input.workshopContext) {
+        const insight = questionGeneratorService.generateWorkshopInsight(
+          input.workshopContext,
+          input.activityTitle
+        );
+        if (insight) {
+          openingMessage = `${insight}\n\n${openingMessage}`;
+        }
+      }
 
       // Generate first question based on profile gaps
+      // Workshop context on state will influence priority scoring
       const questionResult = questionGeneratorService.generateNextQuestion({
         state,
         maxQuestions: 3,
       });
 
       // Record the question in state
-      const updatedState = conversationManager.recordQuestion(
-        state,
-        questionResult.nextQuestion.question,
-        questionResult.nextQuestion.targetField,
-        questionResult.nextQuestion.category
-      );
+      const updatedState: ConversationStateWithWorkshopContext = {
+        ...conversationManager.recordQuestion(
+          state,
+          questionResult.nextQuestion.question,
+          questionResult.nextQuestion.targetField,
+          questionResult.nextQuestion.category
+        ),
+        // Preserve workshop context through state transitions
+        workshopContext: (state as ConversationStateWithWorkshopContext).workshopContext,
+      };
 
       return {
         success: true,
@@ -134,6 +177,9 @@ export class ActivityProfileChatService {
     try {
       const { state, response, metadata } = input;
 
+      // Preserve workshop context across state transitions
+      const workshopContext = (state as ConversationStateWithWorkshopContext).workshopContext;
+
       // Get the last question that was asked
       const lastQuestion = state.questionsAsked[state.questionsAsked.length - 1];
       if (!lastQuestion) {
@@ -152,12 +198,16 @@ export class ActivityProfileChatService {
       );
 
       // Process the response and update state
-      let updatedState = conversationManager.processResponse(
-        state,
-        response,
-        extraction,
-        lastQuestion.question
-      );
+      let updatedState: ConversationStateWithWorkshopContext = {
+        ...conversationManager.processResponse(
+          state,
+          response,
+          extraction,
+          lastQuestion.question
+        ),
+        // Re-attach workshop context so it survives state transitions
+        workshopContext,
+      };
 
       // ════════════════════════════════════════════════════════════════════════
       // ADAPTIVE MODE SYSTEM: Update dynamics based on extraction results
@@ -188,10 +238,13 @@ export class ActivityProfileChatService {
       });
 
       if (questionResult.shouldTransitionPhase && questionResult.suggestedNextPhase) {
-        updatedState = conversationManager.transitionPhase(
-          updatedState,
-          questionResult.suggestedNextPhase
-        );
+        updatedState = {
+          ...conversationManager.transitionPhase(
+            updatedState,
+            questionResult.suggestedNextPhase
+          ),
+          workshopContext, // preserve through phase transition
+        };
       }
 
       // Check if conversation should end
@@ -214,7 +267,10 @@ export class ActivityProfileChatService {
 
         // Accumulate token usage in state
         if (extraction.tokensUsed) {
-          updatedState = this.accumulateTokenUsage(updatedState, extraction.tokensUsed);
+          updatedState = {
+            ...this.accumulateTokenUsage(updatedState, extraction.tokensUsed),
+            workshopContext, // preserve through token accumulation
+          };
         }
 
         return {
@@ -328,12 +384,15 @@ export class ActivityProfileChatService {
       }
 
       // Record the next question with mode tracking
-      updatedState = conversationManager.recordQuestion(
-        updatedState,
-        composedQuestion,
-        questionResult.nextQuestion.targetField,
-        questionResult.nextQuestion.category
-      );
+      updatedState = {
+        ...conversationManager.recordQuestion(
+          updatedState,
+          composedQuestion,
+          questionResult.nextQuestion.targetField,
+          questionResult.nextQuestion.category
+        ),
+        workshopContext, // preserve through question recording
+      };
 
       // Mark the question with mode information
       const lastRecordedQuestion = updatedState.questionsAsked[updatedState.questionsAsked.length - 1];
@@ -351,7 +410,10 @@ export class ActivityProfileChatService {
         };
       }
       if (totalTokens) {
-        updatedState = this.accumulateTokenUsage(updatedState, totalTokens);
+        updatedState = {
+          ...this.accumulateTokenUsage(updatedState, totalTokens),
+          workshopContext, // preserve through token accumulation
+        };
       }
 
       return {

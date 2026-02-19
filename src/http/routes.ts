@@ -8,6 +8,7 @@ import * as Referrals from "./referrals";
 import * as DevAuth from "./dev-auth";
 import { handleClerkWebhook } from "./webhooks/clerk";
 import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/analytics/portfolio";
+import activityChatRouter from "./activityChatRoutes";
 
 const r = Router();
 
@@ -768,6 +769,9 @@ r.get("/academic-teaching/:issueType", async (req, res) => {
     });
   }
 });
+
+// Activity Chat Routes
+r.use(activityChatRouter);
 
 // Simple health check for dev tooling and frontends
 r.get('/health', (_req, res) => {

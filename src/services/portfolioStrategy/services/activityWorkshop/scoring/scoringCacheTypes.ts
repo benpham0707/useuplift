@@ -28,17 +28,22 @@ import { ActivityScore } from './activityScoringService';
 /**
  * Increment this when making changes to prompts or rubrics
  * that would affect scoring results. This invalidates all cached scores.
+ *
+ * CHANGELOG:
+ * 1.1.0 - Added hoursPerWeek/weeksPerYear to description hash,
+ *          added intendedMajor to activity hash for correctness
+ * 1.0.0 - Initial cache implementation
  */
-export const SCORING_CACHE_VERSION = '1.0.0';
+export const SCORING_CACHE_VERSION = '1.1.0';
 
 /**
  * Model versions used for scoring.
  * Cache entries with different model versions are invalid.
  */
 export const SCORING_MODEL_VERSIONS = {
-  descriptionScoring: 'claude-haiku-4-5-20251001',
-  activityScoring: 'claude-haiku-4-5-20251001',
-  portfolioScoring: 'claude-haiku-4-5-20251001',
+  descriptionScoring: 'claude-sonnet-4-5-20250929',
+  activityScoring: 'claude-sonnet-4-5-20250929',
+  portfolioScoring: 'claude-sonnet-4-5-20250929',
   teaching: 'claude-sonnet-4-5-20250929',
 } as const;
 
@@ -125,6 +130,23 @@ export interface ScoringSession {
    * Used for detecting added/removed activities
    */
   lastActivityIds: Set<string>;
+
+  /**
+   * Previous portfolio score from the last completed scoring run.
+   * Used to anchor subsequent scoring for consistency — the AI sees
+   * what score it gave previously and adjusts only for material changes.
+   */
+  previousPortfolioScore?: {
+    total: number;
+    breakdown: {
+      tierDistribution: number;
+      spikeDetection: number;
+      coherence: number;
+      majorAlignment: number;
+      presentationQuality: number;
+    };
+    competitiveTier: string;
+  };
 
   /**
    * Accumulated statistics for this session
@@ -286,18 +308,24 @@ export interface CacheUsageInfo {
 
 /**
  * Normalized input for description scoring cache
- * These are the fields that affect the score
+ * These are the fields that affect the score.
+ * Includes hoursPerWeek/weeksPerYear because the prompt uses them
+ * for time investment context when present.
  */
 export interface NormalizedDescriptionInput {
   description: string;
   activityTitle: string;
   activityType: string;
   position: string;
+  hoursPerWeek: number;
+  weeksPerYear: number;
 }
 
 /**
  * Normalized input for activity scoring cache
- * These are the fields that affect the score
+ * These are the fields that affect the score.
+ * Includes intendedMajor because the activity scoring prompt sends it
+ * to the AI model, meaning it can influence the score output.
  */
 export interface NormalizedActivityInput {
   title: string;
@@ -309,9 +337,7 @@ export interface NormalizedActivityInput {
   hoursPerWeek: number;
   weeksPerYear: number;
   honors: string;
-  // Note: intendedMajor is NOT included because individual activity
-  // scores are absolute, not relative to major. Major alignment
-  // is computed at the portfolio level.
+  intendedMajor: string;
 }
 
 // ============================================================================

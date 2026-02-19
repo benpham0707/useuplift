@@ -178,33 +178,54 @@ export class ActivityTeachingLayerService {
         input.targetPlatform
       );
 
-      // Call Claude Sonnet for quality teaching
-      const response = await callClaude(
-        prompt,
-        {
-          systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform),
-          model: 'claude-sonnet-4-5-20250929',
-          maxTokens: 8000,
-          temperature: 0.3,
-          timeoutMs: 180000, // 3 min — teaching layer with 8K output needs more than default 120s
-        }
-      );
+      // Call Claude Sonnet for quality teaching (with 1 retry on empty/parse-failed result)
+      const callOpts = {
+        systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform),
+        model: 'claude-sonnet-4-5-20250929' as const,
+        cacheSystemPrompt: true,
+        maxTokens: 8000,
+        temperature: 0.3,
+        timeoutMs: 180000, // 3 min — teaching layer with 8K output needs more than default 120s
+      };
 
-      if (!response.content) {
-        return {
-          success: false,
-          error: 'Failed to generate teaching content',
-        };
+      let teaching: TeachingLayerOutput | null = null;
+
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const response = await callClaude(
+          attempt === 0 ? prompt : `${prompt}\n\nIMPORTANT: You MUST respond with ONLY valid JSON. No markdown, no code fences, no explanatory text. Start your response with { and end with }.`,
+          { ...callOpts, temperature: attempt === 0 ? 0.3 : 0.1 }
+        );
+
+        if (!response.content) {
+          if (attempt === 0) {
+            console.warn('[TeachingLayer] Empty response on attempt 1, retrying...');
+            continue;
+          }
+          return { success: false, error: 'Failed to generate teaching content after 2 attempts' };
+        }
+
+        // parseTeachingResponse catches errors internally and returns minimal output
+        // (0 transformations) on parse failure — detect this and retry
+        const result = this.parseTeachingResponse(
+          response.content,
+          scoringRubric,
+          activitiesToTransform,
+          response.usage,
+          input.targetPlatform
+        );
+
+        if (result.activityTransformations.length > 0 || attempt === 1) {
+          teaching = result;
+          break;
+        }
+
+        // Empty transformations on first attempt — likely parse failure, retry
+        console.warn(`[TeachingLayer] 0 transformations on attempt 1 (expected ${activitiesToTransform.length}), retrying with stricter prompt...`);
       }
 
-      // Parse the response
-      const teaching = this.parseTeachingResponse(
-        response.content,
-        scoringRubric,
-        activitiesToTransform,
-        response.usage,
-        input.targetPlatform
-      );
+      if (!teaching) {
+        return { success: false, error: 'Failed to generate teaching after 2 attempts' };
+      }
 
       const timing = { totalMs: Date.now() - startTime };
       console.log(`[TeachingLayer] Teaching generated in ${timing.totalMs}ms`);
@@ -559,7 +580,7 @@ ${studentContext?.currentGrade ? `- Current Grade: ${gradeLabel}` : ''}
 - Detected Spike: ${spikeContext.detectedSpike}
 - Spike Strength: ${spikeContext.spikeStrength}
 - Overall Portfolio Score: ${rubric.overallScore.total}/10
-- Harvard Rating: ${rubric.harvardScale.rating}
+- Competitive Tier: ${rubric.harvardScale.description}
 
 ## DIAGNOSTIC SUMMARY (already shared with student — don't repeat, BUILD ON):
 Story: "${spikeContext.narrativeSummary}"
@@ -579,7 +600,7 @@ ${studentContext?.currentGrade === 12 ? '⚠️ SENIOR YEAR: Focus ONLY on descr
 
 1. **TRANSFORMATION PRINCIPLE**
 - Name the principle being applied
-- Explain WHY it matters to admissions officers (1-2 sentences)
+- Explain WHY it matters to admissions officers (be concise: 1 sentence for obvious fixes like "use active verbs" or "add numbers"; 2-3 sentences only when the insight is non-obvious and genuinely needs context)
 - Explain how it applies to THIS specific activity
 
 2. **CONCRETE REWRITE**
@@ -822,9 +843,8 @@ Respond in this JSON structure:
    */
   private determineApproach(rubric: PortfolioScoreRubric): string {
     const overallScore = rubric.overallScore.total;
-    const harvard = rubric.harvardScale.rating;
 
-    if (overallScore >= 8 && harvard <= 2) {
+    if (overallScore >= 8) {
       return 'Polish and refinement - your portfolio is strong, we\'re optimizing for excellence';
     }
     if (overallScore >= 6) {

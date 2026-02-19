@@ -394,6 +394,35 @@ export interface ExtractedInformation {
 /**
  * Input to start a new conversation
  */
+/**
+ * Workshop results that inform chat behavior.
+ * Subset of pipeline output, focused on what helps the chat be smarter.
+ */
+export interface WorkshopContextForChat {
+  /** Activity tier from analysis */
+  tier?: number;
+  /** Description quality score (0-10) */
+  descriptionScore?: number;
+  /** Overall activity score (0-10) */
+  activityScore?: number;
+  /** Red flags detected */
+  redFlags?: { flag: string; severity: string }[];
+  /** Green flags detected */
+  greenFlags?: { flag: string }[];
+  /** What the teaching layer prioritized */
+  teachingPriorities?: string[];
+  /** Is this a spike candidate? */
+  spikeCandidate?: boolean;
+  /** Is this activity undersold? */
+  undersold?: boolean;
+  /** Specific issues found in description */
+  descriptionIssues?: string[];
+  /** Harvard scale from synthesis */
+  harvardScale?: number;
+  /** Story role assigned by Stage 0 (e.g., 'core_identity', 'filler') */
+  storyRole?: string;
+}
+
 export interface StartConversationInput {
   /** Activity to discuss */
   activityId: string;
@@ -414,6 +443,14 @@ export interface StartConversationInput {
     yearsInvolved?: number;
     activityType?: string;
   };
+
+  /**
+   * Results from a previous workshop run, if available.
+   * Makes the conversation smarter about what to ask.
+   * When present, the chat prioritizes questions that address
+   * specific workshop findings (red flags, undersold status, etc.)
+   */
+  workshopContext?: WorkshopContextForChat;
 }
 
 /**

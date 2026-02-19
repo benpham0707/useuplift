@@ -550,7 +550,8 @@ export class DescriptionScoringService {
         {
           model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for nuanced description assessment
           systemPrompt: buildDescriptionScoringSystemPrompt(charLimit, platformName),
-          temperature: 0.3,
+          cacheSystemPrompt: true, // Enable Anthropic prompt caching
+          temperature: 0.15, // Low temperature for scoring consistency
           maxTokens: 1500,
         }
       );
@@ -611,13 +612,17 @@ export class DescriptionScoringService {
     }
 
     try {
+      // Scale maxTokens with activity count: ~1000 tokens per description score output
+      const batchMaxTokens = Math.min(12000, input.activities.length * 1500 + 1000);
       const response = await callClaude(
         buildBatchDescriptionScoringPrompt(input.activities),
         {
           model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for nuanced description assessment
           systemPrompt: buildDescriptionScoringSystemPrompt(charLimit, platformName),
-          temperature: 0.3,
-          maxTokens: 6000, // More tokens for batch
+          cacheSystemPrompt: true, // Enable Anthropic prompt caching — 90% cost reduction on cache hits
+          temperature: 0.15, // Low temperature for scoring consistency
+          maxTokens: batchMaxTokens,
+          timeoutMs: 240000, // 4 min — matches activityScoringService; default 120s was causing timeouts
         }
       );
 
@@ -670,8 +675,10 @@ export class DescriptionScoringService {
 
   /**
    * Parse batch score response from LLM
+   * Uses activityIndex from LLM output to correctly order results,
+   * falling back to sequential order if activityIndex is missing.
    */
-  private parseBatchScoreResponse(content: string, expectedCount: number): DescriptionScore[] | null {
+  parseBatchScoreResponse(content: string, expectedCount: number): DescriptionScore[] | null {
     try {
       // R7: Use robust parseClaudeJSON with jsonrepair fallback
       const data = tryParseClaudeJSON<Record<string, unknown>>(content, 'DescriptionScoringService.batch');
@@ -682,19 +689,49 @@ export class DescriptionScoringService {
         return null;
       }
 
-      // Normalize each score
-      const scores: DescriptionScore[] = [];
+      // Try to use activityIndex for correct ordering
+      const hasActivityIndex = data.scores.every(
+        (s: Record<string, unknown>) => typeof s?.activityIndex === 'number'
+      );
+
+      if (hasActivityIndex) {
+        // Place scores by activityIndex (1-based from LLM)
+        const scores: DescriptionScore[] = new Array(expectedCount);
+        for (const scoreData of data.scores as Record<string, unknown>[]) {
+          const idx = (scoreData.activityIndex as number) - 1;
+          if (idx >= 0 && idx < expectedCount) {
+            const normalized = this.normalizeScoreData(scoreData);
+            if (normalized) {
+              scores[idx] = normalized;
+            }
+          }
+        }
+
+        const filledCount = scores.filter(Boolean).length;
+        if (filledCount !== expectedCount) {
+          console.warn(
+            `[DescriptionScoringService] Expected ${expectedCount} scores, got ${filledCount} (by activityIndex)`
+          );
+        }
+
+        return scores;
+      }
+
+      // Fallback: sequential ordering
+      const scores: DescriptionScore[] = new Array(expectedCount);
+      let placed = 0;
       for (const scoreData of data.scores) {
+        if (placed >= expectedCount) break;
         const normalized = this.normalizeScoreData(scoreData);
         if (normalized) {
-          scores.push(normalized);
+          scores[placed] = normalized;
+          placed++;
         }
       }
 
-      // Warn if count mismatch but still return what we got
-      if (scores.length !== expectedCount) {
+      if (placed !== expectedCount) {
         console.warn(
-          `[DescriptionScoringService] Expected ${expectedCount} scores, got ${scores.length}`
+          `[DescriptionScoringService] Expected ${expectedCount} scores, got ${placed}`
         );
       }
 

@@ -174,9 +174,7 @@ GREAT transformation:
 
 ### PHASE 4: CONNECT (To Their Story)
 
-Every improvement should strengthen their narrative:
-
-"This robotics activity isn't just about robots — it's evidence of your Builder Arc. You see problems, you create solutions, you scale them. MIT lives for this pattern. Make sure your description shows the ARC: problem identified → solution built → impact measured."
+Link improvements to how this specific activity strengthens their application. Keep it brief and activity-specific — do NOT re-explain their overall narrative arc or constraint background (those are covered once in the holistic section). A single phrase like "reinforces your builder pattern" is enough.
 
 ## TEACHING DEPTH: ${depth.toUpperCase()}
 
@@ -388,14 +386,14 @@ export function buildActivityExpertContext(
 ${expertContext.schoolArchetypes[0].descriptionAdvice}`);
   }
 
-  // Add constraint context
+  // Add constraint context — brief reminder only (full profile is in holistic/system prompt)
   if (expertContext.constraintLevel) {
-    sections.push(`CONSTRAINT CONTEXT (Level ${expertContext.constraintLevel.level}): ${expertContext.constraintLevel.evaluationNote}`);
+    sections.push(`CONSTRAINT NOTE: Level ${expertContext.constraintLevel.level} — factor into tier assessment. Do NOT restate the full constraint profile.`);
   }
 
-  // Add narrative arc
+  // Add narrative arc — brief label only (do NOT re-explain the arc per activity)
   if (expertContext.narrativeArc) {
-    sections.push(`NARRATIVE ARC: Student shows "${expertContext.narrativeArc.name}" pattern (${expertContext.narrativeArc.pattern}). Connect teaching to this arc.`);
+    sections.push(`ARC: "${expertContext.narrativeArc.name}" — reference briefly if relevant, do NOT re-derive or re-explain.`);
   }
 
   // Add relevant advanced issues
