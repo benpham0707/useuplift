@@ -34,6 +34,7 @@ import type {
 } from '../types/stage0Types';
 import type { TechniqueCategory } from './techniqueCategories';
 import { TECHNIQUE_BUNDLES } from './techniqueCategories';
+import { getSourcesForTechnique } from '../data/techniqueSources';
 
 // ============================================================================
 // CONSTANTS
@@ -207,6 +208,19 @@ function getTechniqueGuidance(technique: TechniqueCategory): string {
     return ''; // No specific guidance if technique unknown
   }
 
+  // Get research-backed sources for this technique
+  const sources = getSourcesForTechnique(technique);
+  const sourcesFormatted = sources
+    .slice(0, 2) // Top 2 to keep batch prompt size reasonable
+    .map(s => `• "${s.quote.slice(0, 200)}${s.quote.length > 200 ? '...' : ''}" — ${s.author}, ${s.author_title}`)
+    .join('\n');
+
+  // Get before/after transformations
+  const transformationsFormatted = (bundle.transformations || [])
+    .slice(0, 1) // 1 transformation per issue in batch mode (space-efficient)
+    .map(t => `BEFORE: "${t.before}"\nAFTER: "${t.after}"`)
+    .join('\n');
+
   return `
 ═══════════════════════════════════════════════════════════
 REQUIRED TECHNIQUE: ${bundle.name.toUpperCase()}
@@ -217,14 +231,14 @@ REQUIRED TECHNIQUE: ${bundle.name.toUpperCase()}
 **Core Principles (FOLLOW THESE)**:
 ${bundle.corePrinciples.map(p => `• ${p}`).join('\n')}
 
-**Example Phrases (USE AS INSPIRATION)**:
-${bundle.examplePhrases.map(p => `• ${p}`).join('\n')}
+**Research Evidence**:
+${sourcesFormatted}
+
+**Example Transformation**:
+${transformationsFormatted}
 
 **Anti-Patterns (AVOID THESE)**:
 ${bundle.antiPatterns.map(p => `• ${p}`).join('\n')}
-
-**Integration Tips**:
-${bundle.integrationTips.map(t => `• ${t}`).join('\n')}
 
 ⚠️  CRITICAL: Your suggestions MUST use ${bundle.name} techniques.
 ${technique !== 'storytelling' ? `Do NOT default to storytelling - this issue specifically requires ${bundle.name}.` : ''}

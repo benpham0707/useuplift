@@ -273,8 +273,9 @@ export class ResponseExtractorService {
         {
           model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for accurate extraction
           systemPrompt: EXTRACTION_SYSTEM_PROMPT,
+          cacheSystemPrompt: true, // Cache the ~800-token system prompt across turns
           temperature: 0.2, // Low temperature for consistency
-          maxTokens: 4000, // Increased from 3000 to avoid truncation
+          maxTokens: 3000, // Sufficient — test data shows max output is ~2,710 tokens
         }
       );
 
@@ -298,7 +299,11 @@ export class ResponseExtractorService {
       const normalized = this.normalizeExtraction(parsed, response);
       return { ...normalized, tokensUsed };
     } catch (error) {
-      console.error('[ResponseExtractor] Extraction error:', error);
+      const errMsg = error instanceof Error ? error.message : String(error);
+      console.error('[ResponseExtractor] Extraction error:', errMsg);
+      if (errMsg.includes('API key') || errMsg.includes('not found')) {
+        console.error('[ResponseExtractor] CRITICAL: API key issue — extraction will always fail until resolved');
+      }
       return this.getEmptyExtractionResult();
     }
   }

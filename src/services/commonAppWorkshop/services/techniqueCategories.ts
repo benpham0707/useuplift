@@ -40,6 +40,12 @@ export interface TechniqueRecommendation {
   signals: string[];       // What would indicate this technique is working
 }
 
+export interface TechniqueTransformation {
+  before: string;
+  after: string;
+  why_it_works: string;
+}
+
 export interface TechniqueBundle {
   category: TechniqueCategory;
   name: string;
@@ -50,6 +56,7 @@ export interface TechniqueBundle {
   examplePhrases: string[];
   antiPatterns: string[];
   integrationTips: string[];  // How to combine with other techniques
+  transformations: TechniqueTransformation[];  // Before/after examples for prompts
 }
 
 // ============================================================================
@@ -100,6 +107,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Use story to set up evidence: "That night, I saw the data: 40% improvement"',
       'Don\'t let story dominate - it\'s a vehicle, not the destination',
     ],
+    transformations: [
+      {
+        before: 'I learned a lot from being team captain.',
+        after: '"You\'re not listening!" My co-captain\'s words stopped me mid-sentence. She was right. I\'d spent ten minutes explaining my strategy without once asking for input.',
+        why_it_works: 'Grounds an abstract claim in a specific, vivid moment with dialogue that reveals character through action.',
+      },
+      {
+        before: 'The competition was really stressful.',
+        after: 'Three AM. The code still broken. Coffee cold. My teammate asleep on the keyboard. I deleted everything and started over.',
+        why_it_works: 'Replaces a told emotion with a shown scene using sensory details and pacing that lets the reader feel the stress.',
+      },
+    ],
   },
 
   technical_depth: {
@@ -144,6 +163,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Pair technical depth with reflection on what it taught you',
       'Use specific examples to ground abstract concepts',
       'Show the human side: what excited or frustrated you?',
+    ],
+    transformations: [
+      {
+        before: 'I did research on machine learning.',
+        after: 'I implemented a convolutional neural network with three hidden layers, experimenting with dropout rates to address overfitting. When accuracy plateaued at 78%, I hypothesized that our feature extraction was losing spatial information.',
+        why_it_works: 'Replaces a vague claim with specific methodology and intellectual process, demonstrating genuine domain knowledge.',
+      },
+      {
+        before: 'I\'m interested in economics.',
+        after: 'Reading Kahneman\'s work on loss aversion, I began questioning the rational actor model I\'d learned in AP Econ. If people systematically overweight losses, what does that mean for policies designed around utility maximization?',
+        why_it_works: 'Shows intellectual engagement through specific references and an unresolved question that reveals genuine curiosity.',
+      },
     ],
   },
 
@@ -190,6 +221,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Follow metrics with meaning: "These numbers meant..."',
       'Balance quantitative with qualitative impact',
     ],
+    transformations: [
+      {
+        before: 'Our club made a real difference in the community.',
+        after: 'In two years, we grew from 8 members to 43, partnered with 12 local businesses, and raised $4,200 for the food bank—enough to provide 12,600 meals.',
+        why_it_works: 'Replaces a vague claim with specific, quantifiable outcomes that create credibility through precision.',
+      },
+      {
+        before: 'I helped many students with tutoring.',
+        after: 'I tutored 15 students weekly, with 11 improving by at least one letter grade. Three went from failing to honor roll.',
+        why_it_works: 'Quantifies impact with meaningful metrics and shows progression, not just effort.',
+      },
+    ],
   },
 
   intellectual_character: {
@@ -233,6 +276,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Ground intellectual character in specific examples',
       'Show thinking through dialogue with mentors or texts',
       'Balance curiosity with some provisional conclusions',
+    ],
+    transformations: [
+      {
+        before: 'I discovered I love physics.',
+        after: 'I keep a notebook of "physics moments"—times when a concept suddenly connected to something unexpected. Last month: realizing that the feeling of being pressed into your seat on a roller coaster and gravity are, fundamentally, indistinguishable. Einstein\'s insight, experienced.',
+        why_it_works: 'Shows how the writer engages with ideas through a specific intellectual habit, not just a claimed interest.',
+      },
+      {
+        before: 'The project taught me a lot.',
+        after: 'The project forced me to confront a question I\'m still working through: at what point does optimization become over-optimization? We improved efficiency by 40%, but the original system had a certain robustness that the optimized version lost.',
+        why_it_works: 'Reveals ongoing intellectual engagement and an unresolved question, showing thinking process rather than just conclusions.',
+      },
     ],
   },
 
@@ -278,6 +333,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'One deep insight beats three shallow ones',
       'Show ongoing reflection, not just past tense "I learned"',
     ],
+    transformations: [
+      {
+        before: 'This experience taught me the importance of teamwork.',
+        after: 'What surprised me wasn\'t that teamwork mattered—I knew that. It was discovering that my instinct to take control when things got hard was actually the opposite of leadership. Real leadership meant trusting others with pieces I cared about.',
+        why_it_works: 'Goes beyond a generic lesson to an unexpected, personal insight that complicates the obvious takeaway.',
+      },
+      {
+        before: 'I learned to never give up.',
+        after: 'I used to think persistence meant refusing to quit. Now I understand it differently: persistence is knowing when to quit one approach so you can try another. I "gave up" on my original design three times before finding one that worked.',
+        why_it_works: 'Redefines a cliche through specific experience and shows intellectual growth through qualified insight.',
+      },
+    ],
   },
 
   voice_authenticity: {
@@ -321,6 +388,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Voice comes through most in how you present other elements',
       'Humor works best when paired with substance',
       'Read your essay aloud - does it sound like you?',
+    ],
+    transformations: [
+      {
+        before: 'I have always been passionate about helping others.',
+        after: 'Honestly? I didn\'t start volunteering because I wanted to help people. I started because my mom made me. The wanting-to-help part came later, around hour 30, when I realized I looked forward to Saturdays.',
+        why_it_works: 'Replaces performed enthusiasm with an honest, specific admission that sounds like a real person talking.',
+      },
+      {
+        before: 'This experience was very meaningful to me.',
+        after: 'Here\'s the weird part: I miss the frustration. I miss staring at code that refuses to compile at 2 AM. I miss the specific kind of tired that comes from actually caring whether something works.',
+        why_it_works: 'Says something only this person would say, in the way they would say it—unexpected honesty that reveals authentic voice.',
+      },
     ],
   },
 
@@ -367,6 +446,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Don\'t let nuance undermine your core message',
       'Show that complexity doesn\'t mean inaction',
     ],
+    transformations: [
+      {
+        before: 'Volunteering taught me to appreciate what I have.',
+        after: 'I went in expecting to feel grateful for my privileges. Instead, I felt something more complicated: guilt for my relief that I could go home, respect for resilience I\'d never needed to develop, and an uncomfortable awareness that "helping" can be its own kind of taking.',
+        why_it_works: 'Resists the easy conclusion and shows the tensions the writer is still processing—maturity through complexity.',
+      },
+      {
+        before: 'Leadership requires putting the team first.',
+        after: 'The hardest leadership decision I made wasn\'t about the team—it was about me. I had to admit that my vision for the project, the one I\'d been pushing for months, was wrong. Putting the team first meant letting go of being right.',
+        why_it_works: 'Finds the paradox within conventional wisdom and shows it through a specific experience.',
+      },
+    ],
   },
 
   connection_specificity: {
@@ -409,6 +500,18 @@ export const TECHNIQUE_BUNDLES: Record<TechniqueCategory, TechniqueBundle> = {
       'Connection specificity often pairs with evidence of past interest',
       'Ground school connections in your story: "When I did X, I realized Y at [school] could..."',
       'Show you\'ve thought beyond admission to what you\'d actually do there',
+    ],
+    transformations: [
+      {
+        before: 'I want to attend your university because of its strong engineering program.',
+        after: 'Professor Martinez\'s work on sustainable concrete alternatives directly connects to my independent research on construction waste. I want to bring my data on local demolition patterns to her lab and explore whether regional material availability affects optimal mix designs.',
+        why_it_works: 'Names specific people, programs, and connects them to the writer\'s specific work—passes the "swap test" completely.',
+      },
+      {
+        before: 'I love the collaborative environment at your school.',
+        after: 'The d.school\'s requirement to take at least one course outside your major solved a problem I\'ve been wrestling with: how to combine my interest in urban planning with my background in data science. The ME 310 Global Innovation course would let me do exactly that.',
+        why_it_works: 'Cites specific programs/courses and explains precisely why they matter to this particular student\'s goals.',
+      },
     ],
   },
 };

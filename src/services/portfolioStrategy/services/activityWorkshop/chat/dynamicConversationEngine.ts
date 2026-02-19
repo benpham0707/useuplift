@@ -264,23 +264,29 @@ function extractQuotablePhrases(response: string): string[] {
   const quotes: string[] = [];
 
   // Numbers with context (e.g., "50 students", "3 hours a week")
-  const numberPatterns = response.match(/\d+\s+[\w\s]{2,20}/g) || [];
+  // Use word-boundary anchored patterns to avoid mid-word truncation
+  const numberPatterns = response.match(/\d+\s+(?:\w+\s+){0,3}\w+/g) || [];
   quotes.push(...numberPatterns.slice(0, 2));
 
-  // Action phrases (I + verb) - expanded verb list
-  const actionPatterns = response.match(/I\s+(?:helped|created|led|organized|built|designed|started|managed|taught|wrote|ran|joined|liked?|loved?|worked|did|made|learned|tried)\s+[\w\s]{2,30}/gi) || [];
-  quotes.push(...actionPatterns.slice(0, 2));
+  // Action phrases (I + verb + up to ~5 words, ending at word boundary)
+  const actionPatterns = response.match(/I\s+(?:helped|created|led|organized|built|designed|started|managed|taught|wrote|ran|joined|liked?|loved?|worked|did|made|learned|tried)\s+(?:\w+[\s,]*){1,5}\w+/gi) || [];
+  // Trim each match to end on a full word and cap at ~60 chars
+  const cleanedActions = actionPatterns.map(p => {
+    const trimmed = p.length > 60 ? p.slice(0, 60).replace(/\s+\S*$/, '') : p;
+    return trimmed;
+  });
+  quotes.push(...cleanedActions.slice(0, 2));
 
   // Transformation phrases (from X to Y)
-  const transformPatterns = response.match(/from\s+[\w\s]+\s+to\s+[\w\s]+/gi) || [];
+  const transformPatterns = response.match(/from\s+(?:\w+\s+){1,4}to\s+(?:\w+\s*){1,4}\w+/gi) || [];
   quotes.push(...transformPatterns.slice(0, 1));
 
   // Self-descriptive phrases for quality anchors
-  const qualityPatterns = response.match(/(?:we|I)\s+(?:actually|really|finally|successfully)\s+[\w\s]{2,25}/gi) || [];
+  const qualityPatterns = response.match(/(?:we|I)\s+(?:actually|really|finally|successfully)\s+(?:\w+\s+){1,4}\w+/gi) || [];
   quotes.push(...qualityPatterns.slice(0, 1));
 
   // Humble phrases (to acknowledge and reframe)
-  const humblePatterns = response.match(/(?:just|only|nothing special|anyone could|the team|we all)\s+[\w\s]{2,20}/gi) || [];
+  const humblePatterns = response.match(/(?:just|only|nothing special|anyone could|the team|we all)\s+(?:\w+\s+){1,3}\w+/gi) || [];
   quotes.push(...humblePatterns.slice(0, 1));
 
   // FALLBACK: For very short responses, extract the core content

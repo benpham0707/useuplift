@@ -112,7 +112,7 @@ function getTechniquePrompt(
     .map(s => `- "${s.quote}" — ${s.author}, ${s.author_title}`)
     .join('\n');
 
-  const transformationsFormatted = teachingBundle.transformations
+  const transformationsFormatted = (teachingBundle.transformations || [])
     .slice(0, 2)
     .map(t => `BEFORE: "${t.before}"\nAFTER: "${t.after}"\nWHY: ${t.why_it_works}`)
     .join('\n\n');
@@ -124,10 +124,10 @@ SELECTED TECHNIQUE: ${technique.toUpperCase().replace(/_/g, ' ')}
 ═══════════════════════════════════════════════════════════
 
 CORE PRINCIPLE:
-${teachingBundle.core_principle}
+${teachingBundle.corePrinciples.join('; ')}
 
 WHY THIS TECHNIQUE (NOT STORYTELLING):
-${teachingBundle.when_to_use.join('\n- ')}
+${teachingBundle.whenToUse.join('\n- ')}
 
 ═══════════════════════════════════════════════════════════
 RESEARCH-BACKED EVIDENCE
@@ -511,8 +511,8 @@ export class TechniqueSuggestionRouter {
 
     return {
       name: technique.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      description: bundle.core_principle,
-      best_for: bundle.when_to_use,
+      description: bundle.description,
+      best_for: bundle.whenToUse,
       sources_available: sources.length,
     };
   }
