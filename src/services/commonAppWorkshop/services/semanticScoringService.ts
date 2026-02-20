@@ -463,7 +463,7 @@ Return ONLY the JSON object, no other text.`;
 
 export class SemanticScoringService {
   private client: Anthropic;
-  private model: string = 'claude-sonnet-4-5-20250514';
+  private model: string = 'claude-sonnet-4-5-20250929';
 
   constructor() {
     this.client = new Anthropic();

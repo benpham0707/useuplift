@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * PIQ ISSUE PATTERNS
  *
@@ -1098,7 +1097,7 @@ const CRAFT_ISSUES: PIQIssuePattern[] = [
 const COHERENCE_ISSUES: PIQIssuePattern[] = [
   {
     id: 'coherence-scattered-themes',
-    dimension: 'thematic_coherence',
+    dimension: 'narrative_arc_stakes',
     title: 'Scattered Themes Without Clear Throughline',
     severity: 'major',
     triggerConditions: {
@@ -1123,7 +1122,7 @@ const COHERENCE_ISSUES: PIQIssuePattern[] = [
 
   {
     id: 'coherence-disconnected-paragraphs',
-    dimension: 'thematic_coherence',
+    dimension: 'narrative_arc_stakes',
     title: 'Disconnected Paragraphs',
     severity: 'minor',
     triggerConditions: {
@@ -1148,7 +1147,7 @@ const COHERENCE_ISSUES: PIQIssuePattern[] = [
 
   {
     id: 'coherence-theme-drift',
-    dimension: 'thematic_coherence',
+    dimension: 'narrative_arc_stakes',
     title: 'Theme Drift - Losing Focus',
     severity: 'minor',
     triggerConditions: {

@@ -210,11 +210,12 @@ Provide your analysis as JSON following the exact format specified in the system
 
   try {
     const response = await callClaude<RoleClarityAnalysis>(userPrompt, {
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       temperature: 0.3,
       maxTokens: 2048,
       systemPrompt,
       useJsonMode: true,
+      cacheSystemPrompt: true,
     });
 
     return response.content;

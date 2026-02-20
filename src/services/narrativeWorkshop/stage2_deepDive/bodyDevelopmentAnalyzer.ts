@@ -193,6 +193,7 @@ export async function analyzeBodyDevelopment(
         temperature: 0.4,
         useJsonMode: true,
         maxTokens: 3000,
+        cacheSystemPrompt: true,
       }
     );
 

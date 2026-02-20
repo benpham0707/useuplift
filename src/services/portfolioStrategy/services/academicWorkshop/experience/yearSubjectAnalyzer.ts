@@ -252,7 +252,7 @@ export class YearSubjectAnalyzer {
         subjectAnalysis: SubjectAnalysis[];
       }>(prompt, {
         provider: 'claude',
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         temperature: 0.6,
         maxTokens: 4000,
         systemPrompt:

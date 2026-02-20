@@ -682,7 +682,7 @@ export async function executeStage0(
   const prompt = buildStage0Prompt(input);
 
   const response = await callClaude(prompt, {
-    model: 'claude-sonnet-4-5-20250514',
+    model: 'claude-sonnet-4-5-20250929',
     maxTokens: 6000,
     temperature: 0.4,
     useJsonMode: true,

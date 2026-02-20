@@ -462,11 +462,12 @@ Return your verification as a JSON object matching the Stage5Output interface.`;
 
   try {
     const response = await callClaude({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       systemPrompt,
       userPrompt,
       maxTokens: 6000,
       temperature: 0.2,
+      cacheSystemPrompt: true,
     });
 
     // Parse and validate response

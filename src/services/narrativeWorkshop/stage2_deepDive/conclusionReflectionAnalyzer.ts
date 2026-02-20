@@ -223,6 +223,7 @@ export async function analyzeConclusionReflection(
         temperature: 0.4,
         useJsonMode: true,
         maxTokens: 2500,
+        cacheSystemPrompt: true,
       }
     );
 

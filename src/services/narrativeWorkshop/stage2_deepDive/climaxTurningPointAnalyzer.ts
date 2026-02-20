@@ -194,6 +194,7 @@ export async function analyzeClimaxTurningPoint(
         temperature: 0.5,
         useJsonMode: true,
         maxTokens: 3000,
+        cacheSystemPrompt: true,
       }
     );
 

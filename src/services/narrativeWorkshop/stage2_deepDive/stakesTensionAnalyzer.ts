@@ -236,6 +236,7 @@ export async function analyzeStakesTension(
         temperature: 0.5,
         useJsonMode: true,
         maxTokens: 3000,
+        cacheSystemPrompt: true,
       }
     );
 

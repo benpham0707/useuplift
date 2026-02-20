@@ -66,6 +66,7 @@ export async function analyzeVoiceFingerprint(essayText: string): Promise<VoiceF
         temperature: 0.2, // Low temperature for consistent analysis
         useJsonMode: true,
         maxTokens: 1000,
+        cacheSystemPrompt: true,
       }
     );
 

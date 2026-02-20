@@ -244,6 +244,7 @@ export async function analyzeCharacterDevelopment(
         temperature: 0.5,
         useJsonMode: true,
         maxTokens: 8000,
+        cacheSystemPrompt: true,
       }
     );
 

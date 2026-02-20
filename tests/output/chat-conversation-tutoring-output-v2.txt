@@ -1,0 +1,668 @@
+Activity Profile Chat E2E Test — Peer Tutoring Program
+Started: 2026-02-19T20:17:39.812Z
+────────────────────────────────────────────────────────────────────────────────
+
+================================================================================
+  STEP 1: START CONVERSATION
+================================================================================
+
+Activity: Peer Tutoring Program Founder
+Category: Community Service
+Role: Founder & Lead Tutor
+Hours/Week: 10
+Years: 2
+Description: Founded and run school tutoring program helping struggling students
+Trigger: user_initiated
+
+[System Opening Message]:
+I'd be happy to help you develop your Peer Tutoring Program Founder description. Let's start by understanding what your involvement really looked like.
+
+[First Question]:
+When you think about who you directly impacted, roughly how many people would that be?
+
+[Initial State]
+  Phase: opening
+  Turn: 0
+  Profile Completeness: 8%
+  Extracted Fields: 0
+
+================================================================================
+  TURN 1: USER RESPONSE
+================================================================================
+
+[User Message] (63 words):
+I noticed a lot of my classmates were struggling in math and science but couldn't afford private tutoring. I started helping a few friends after school and word spread quickly. I went to the principal with a plan to make it official and she helped me get a classroom space. Within the first month we had 15 tutors and 40 students signed up.
+
+--- Turn 1 Results ---
+
+[Next Question]:
+Just to recap what you've shared: 40, 15, Started informally by helping friends after school, then formalized by presenting a plan to the principal to get official classroom space. Anything you'd add? You mentioned 15 tutors and 40 students in the first month. How has the program grown since then? What are the current numbers?
+
+[State After Turn 1]
+  Phase: opening
+  Turn Number: 1
+  Turns in Phase: 1
+
+[Extraction Details]
+  Quality: rich
+  Fields Extracted This Turn: 11
+    - facts.scale.peopleDirectlyImpacted = 40 [high]
+    - facts.scale.teamSize = 15 [high]
+    - story.origin.howStarted = Started informally by helping friends after school, then formalized by presenting a plan to the prin [high]
+    - story.origin.initialMotivation = Noticed classmates struggling in math and science but couldn't afford private tutoring [high]
+    - story.keyMoments = [{"type":"breakthrough","description":"Organic growth through word of mouth","whatHappened":"Started [high]
+    - story.evolution = [{"phase":"Informal beginnings","description":"Started as casual after-school help for friends","wha [high]
+    - story.relationships = [{"type":"mentor","description":"Principal who supported formalization","impact":"Provided classroom [high]
+    - impact.directBeneficiaries = [{"who":"40 students in first month","howHelped":"Provided free peer tutoring in math and science"," [high]
+    - meaning.values = [{"value":"Educational equity/access","howDemonstrated":"Created free tutoring program specifically  [high]
+    - connections.characterTraits = [{"trait":"Initiative","howDemonstrated":"Proactively approached principal with formal plan to scale [high]
+    - facts.roles = [{"role":"Program Designer","responsibilities":"Created formal plan for tutoring program structure"} [medium]
+  Quotes Captured: 3
+    - "I noticed a lot of my classmates were struggling in math and science but couldn'..." (essay)
+    - "word spread quickly..." (description)
+    - "I went to the principal with a plan..." (interview)
+  Implicit Findings: 6
+  Needs Clarification: 3
+  Suggested Follow-ups: 7
+
+[Profile Completeness]
+  Overall: 49%
+  Facts: 45%
+  Story: 90%
+  Meaning: 25%
+  Impact: 35%
+  Connections: 25%
+  Cumulative Extracted Fields: 11
+  Cumulative Quotes: 3
+
+[Token Usage This Turn]
+  Input: 2550
+  Output: 2719
+  Turn Duration: 40.8s
+
+================================================================================
+  TURN 2: USER RESPONSE
+================================================================================
+
+[User Message] (58 words):
+Last semester, the students we tutored saw an average grade improvement of 1.5 letter grades. 12 students went from failing to passing. I personally trained all 15 tutors using a curriculum I designed — I created study guides, practice problems, and a tracking spreadsheet. We now serve about 60 students per week across math, science, English, and history.
+
+--- Turn 2 Results ---
+
+[Next Question]:
+What's been the most challenging part of training other tutors? Any surprising lessons you learned about teaching others to teach?
+
+[State After Turn 2]
+  Phase: opening
+  Turn Number: 2
+  Turns in Phase: 2
+
+[Extraction Details]
+  Quality: rich
+  Fields Extracted This Turn: 9
+    - facts.scale.peopleDirectlyImpacted = 60 [high]
+    - impact.beforeAfter = {"before":"Students' baseline grades before tutoring","after":"Average improvement of 1.5 letter gra [high]
+    - impact.directBeneficiaries = [{"who":"12 failing students","howHelped":"Provided tutoring support through peer tutoring program", [high]
+    - facts.roles = [{"role":"Trainer/Curriculum Developer","responsibilities":"Personally trained all 15 tutors using s [high]
+    - facts.artifacts = [{"type":"curriculum","name":"Tutor Training Curriculum","description":"Comprehensive training progr [high]
+    - facts.scale.resourcesCreated = 4 [high]
+    - facts.scale.resourcesDescription = Training curriculum, study guides, practice problems, and progress tracking spreadsheet [high]
+    - story.evolution = [{"phase":"Expansion Phase","description":"Program grew from 40 to 60 students per week and expanded [high]
+    - meaning.skills = [{"skill":"Curriculum Design","howDeveloped":"Created comprehensive training curriculum for peer tut [high]
+  Quotes Captured: 3
+    - "the students we tutored saw an average grade improvement of 1.5 letter grades..." (description)
+    - "12 students went from failing to passing..." (essay)
+    - "I personally trained all 15 tutors using a curriculum I designed..." (interview)
+  Implicit Findings: 6
+  Needs Clarification: 3
+  Suggested Follow-ups: 5
+
+[Profile Completeness]
+  Overall: 65%
+  Facts: 70%
+  Story: 90%
+  Meaning: 45%
+  Impact: 60%
+  Connections: 25%
+  Cumulative Extracted Fields: 19
+  Cumulative Quotes: 6
+
+[Token Usage This Turn]
+  Input: 2732
+  Output: 2421
+  Turn Duration: 36.8s
+
+================================================================================
+  TURN 3: USER RESPONSE
+================================================================================
+
+[User Message] (76 words):
+The biggest challenge was when two of my best tutors graduated and I had to rebuild. I created a training manual so knowledge wouldn't be lost again. I also had to deal with students who felt embarrassed about needing help — I renamed it from 'remedial tutoring' to 'Academic Success Partners' to remove the stigma. Education equity is really important to me because my parents are immigrants and they couldn't help me with homework growing up.
+
+--- Turn 3 Results ---
+
+[Next Question]:
+Were you recognized for your work in any way — awards, honors, media features?
+
+[State After Turn 3]
+  Phase: opening
+  Turn Number: 3
+  Turns in Phase: 3
+
+[Extraction Details]
+  Quality: rich
+  Fields Extracted This Turn: 8
+    - facts.artifacts = [{"type":"training_manual","name":"Tutor Training Manual","description":"Comprehensive training manu [high]
+    - story.keyMoments = [{"type":"challenge","description":"Loss of two best tutors to graduation","whatHappened":"Two of th [high]
+    - story.keyMoments = [{"type":"innovation","description":"Rebranding to reduce stigma","whatHappened":"Students felt emba [high]
+    - meaning.values = [{"value":"Education equity","howDemonstrated":"Created accessible tutoring program; redesigned prog [high]
+    - story.origin.initialMotivation = Personal experience as child of immigrant parents who couldn't help with homework; understanding of  [high]
+    - meaning.hardestChallenge = Maintaining program continuity and quality when best tutors graduated; addressing student stigma aro [high]
+    - facts.roles = [{"role":"Program Rebranding Lead","responsibilities":"Renamed program from 'remedial tutoring' to ' [high]
+    - meaning.skills = [{"skill":"Change management","howDeveloped":"Navigated tutor turnover by creating systematic traini [medium]
+  Quotes Captured: 4
+    - "The biggest challenge was when two of my best tutors graduated and I had to rebu..." (essay)
+    - "I created a training manual so knowledge wouldn't be lost again...." (interview)
+    - "I renamed it from 'remedial tutoring' to 'Academic Success Partners' to remove t..." (essay)
+    - "Education equity is really important to me because my parents are immigrants and..." (essay)
+  Implicit Findings: 6
+  Needs Clarification: 3
+  Suggested Follow-ups: 5
+
+[Profile Completeness]
+  Overall: 70%
+  Facts: 70%
+  Story: 100%
+  Meaning: 60%
+  Impact: 60%
+  Connections: 25%
+  Cumulative Extracted Fields: 26
+  Cumulative Quotes: 10
+
+[Token Usage This Turn]
+  Input: 2852
+  Output: 2447
+  Turn Duration: 38.5s
+
+================================================================================
+  TURN 4: USER RESPONSE
+================================================================================
+
+[User Message] (62 words):
+I want to study education policy in college because I've seen firsthand how a simple program can change outcomes. The principal told me our program contributed to the school's 15% improvement in math proficiency scores. I'm also working on getting the program adopted by other schools in our district — I presented to the superintendent last month. Three schools have expressed interest.
+
+--- Turn 4 Results ---
+
+[Next Question]:
+What drew you to Peer Tutoring Program Founder in the first place?
+
+[State After Turn 4]
+  Phase: fact_gathering
+  Turn Number: 4
+  Turns in Phase: 0
+
+[Extraction Details]
+  Quality: rich
+  Fields Extracted This Turn: 9
+    - facts.recognition = [{"type":"acknowledgment","name":"Principal Recognition for School Math Proficiency Improvement","le [high]
+    - facts.recognition = [{"type":"presentation","name":"District Superintendent Presentation","level":"district","selectivit [high]
+    - facts.roles = [{"role":"District Program Advocate/Presenter","responsibilities":"Presenting program model to distr [high]
+    - impact.beforeAfter = {"before":"baseline math proficiency scores","after":"15% improvement in school math proficiency sco [high]
+    - impact.ongoingLegacy = Working to expand program district-wide; three schools have expressed interest in adopting the model [high]
+    - meaning.whyItMatters = Experience demonstrated how accessible programs can change educational outcomes, inspiring pursuit o [high]
+    - connections.majorAlignment.howRelevant = Direct experience with education program design and impact measurement informs interest in education [high]
+    - story.evolution = [{"phase":"District Expansion Phase","description":"Transitioned from school-level program to distri [high]
+    - connections.characterTraits = [{"trait":"Systems Thinker","howDemonstrated":"Recognized that individual tutoring success could be  [high]
+  Quotes Captured: 3
+    - "I want to study education policy in college because I've seen firsthand how a si..." (essay)
+    - "The principal told me our program contributed to the school's 15% improvement in..." (description)
+    - "I've seen firsthand how a simple program can change outcomes..." (interview)
+  Implicit Findings: 5
+  Needs Clarification: 3
+  Suggested Follow-ups: 6
+
+[Profile Completeness]
+  Overall: 77%
+  Facts: 85%
+  Story: 100%
+  Meaning: 70%
+  Impact: 60%
+  Connections: 40%
+  Cumulative Extracted Fields: 34
+  Cumulative Quotes: 12
+
+[Token Usage This Turn]
+  Input: 2929
+  Output: 2364
+  Turn Duration: 41.3s
+
+================================================================================
+  FINAL ANALYSIS
+================================================================================
+
+--- Conversation Summary ---
+What We Learned:
+  - Captured concrete details and metrics
+  - Learned about key moments and experiences
+  - Understood personal significance
+  - Documented impact on others
+  - Connected to broader narrative
+Completeness Before: 5%
+Completeness After: 77%
+Key Quotes Captured:
+  - "I noticed a lot of my classmates were struggling in math and science but couldn't afford private tutoring"
+  - "word spread quickly"
+  - "the students we tutored saw an average grade improvement of 1.5 letter grades"
+Remaining Gaps:
+Estimated Score Impact:
+  Description: +2.2
+  Activity: +1.1
+  Portfolio: +0.7
+Suggested Next Steps:
+  - Your profile is strong enough to generate an improved activity description
+  - Consider using some of your authentic quotes in your essays or description
+  - Regenerate your activity description to see significant improvements
+
+--- Completeness Progression (Turn by Turn) ---
+  Turn 0: 8% [####] (0 fields)
+  Turn 1: 49% [#########################] (11 fields)
+  Turn 2: 65% [#################################] (19 fields)
+  Turn 3: 70% [###################################] (26 fields)
+  Turn 4: 77% [#######################################] (34 fields)
+
+--- All Questions Asked ---
+  Turn 0: When you think about who you directly impacted, roughly how many people would that be?
+  Turn 1: Just to recap what you've shared: 40, 15, Started informally by helping friends after school, then formalized by presenting a plan to the principal to get official classroom space. Anything you'd add? You mentioned 15 tutors and 40 students in the first month. How has the program grown since then? What are the current numbers?
+  Turn 2: What's been the most challenging part of training other tutors? Any surprising lessons you learned about teaching others to teach?
+  Turn 3: Were you recognized for your work in any way — awards, honors, media features?
+  Turn 4: What drew you to Peer Tutoring Program Founder in the first place?
+
+--- Question Repetition Analysis ---
+  No question repetitions detected. PASS
+
+--- Token Usage Summary ---
+  Total Input Tokens: 11063
+  Total Output Tokens: 9951
+  Estimated Cost: $0.1825
+
+--- Conversation Analytics ---
+  Total Turns: 4
+  Avg Response Length: 65 words
+  Extraction Quality Trend: rich -> rich -> rich -> rich
+  Phases Visited: opening, fact_gathering
+  Fields Populated: 34
+  Quotes Captured: 12
+  Engagement Level: high
+
+================================================================================
+  FULL FINAL PROFILE (JSON)
+================================================================================
+{
+  "activityId": "peer-tutoring-001",
+  "activityTitle": "Peer Tutoring Program Founder",
+  "profileVersion": 5,
+  "lastUpdated": "2026-02-19T20:20:17.290Z",
+  "dataCompleteness": 77,
+  "facts": {
+    "duration": {
+      "totalYears": 2,
+      "hoursPerWeek": 10,
+      "weeksPerYear": 36,
+      "totalHoursEstimated": 720
+    },
+    "scale": {
+      "peopleDirectlyImpacted": 60,
+      "teamSize": 15,
+      "resourcesCreated": 4,
+      "resourcesDescription": "Training curriculum, study guides, practice problems, and progress tracking spreadsheet"
+    },
+    "roles": [
+      {
+        "role": "Founder & Lead Tutor",
+        "startDate": "unknown",
+        "responsibilities": []
+      },
+      {
+        "role": "Program Designer",
+        "responsibilities": "Created formal plan for tutoring program structure"
+      },
+      {
+        "role": "Recruiter",
+        "responsibilities": "Built team of 15 tutors in first month"
+      },
+      {
+        "role": "Trainer/Curriculum Developer",
+        "responsibilities": "Personally trained all 15 tutors using self-designed curriculum"
+      },
+      {
+        "role": "Program Rebranding Lead",
+        "responsibilities": "Renamed program from 'remedial tutoring' to 'Academic Success Partners' to reduce stigma and increase accessibility"
+      },
+      {
+        "role": "District Program Advocate/Presenter",
+        "responsibilities": "Presenting program model to district leadership for expansion to other schools"
+      }
+    ],
+    "recognition": [
+      {
+        "type": "acknowledgment",
+        "name": "Principal Recognition for School Math Proficiency Improvement",
+        "level": "school",
+        "selectivity": "not_applicable",
+        "description": "Principal attributed 15% improvement in school's math proficiency scores to the tutoring program"
+      },
+      {
+        "type": "presentation",
+        "name": "District Superintendent Presentation",
+        "level": "district",
+        "selectivity": "selective",
+        "date": "last month",
+        "description": "Presented tutoring program model to district superintendent for potential district-wide adoption"
+      }
+    ],
+    "artifacts": [
+      {
+        "type": "curriculum",
+        "name": "Tutor Training Curriculum",
+        "description": "Comprehensive training program for peer tutors",
+        "impact": "Used to train all 15 tutors in the program"
+      },
+      {
+        "type": "educational_materials",
+        "name": "Study Guides",
+        "description": "Study guides created for tutoring sessions",
+        "impact": "Used across math, science, English, and history tutoring"
+      },
+      {
+        "type": "educational_materials",
+        "name": "Practice Problems",
+        "description": "Practice problem sets for student use",
+        "impact": "Supporting 60 students per week"
+      },
+      {
+        "type": "tool",
+        "name": "Student Progress Tracking Spreadsheet",
+        "description": "Custom spreadsheet system for monitoring student progress",
+        "impact": "Tracks progress for 60 students weekly"
+      },
+      {
+        "type": "training_manual",
+        "name": "Tutor Training Manual",
+        "description": "Comprehensive training manual created to preserve institutional knowledge after key tutors graduated",
+        "impact": "Ensures program continuity and consistent training quality across tutor cohorts"
+      }
+    ]
+  },
+  "story": {
+    "origin": {
+      "howStarted": "Started informally by helping friends after school, then formalized by presenting a plan to the principal to get official classroom space",
+      "whyJoined": "",
+      "initialMotivation": "Personal experience as child of immigrant parents who couldn't help with homework; understanding of barriers to academic support"
+    },
+    "keyMoments": [
+      {
+        "type": "breakthrough",
+        "description": "Organic growth through word of mouth",
+        "whatHappened": "Started helping a few friends and word spread quickly",
+        "whatYouDid": "Provided informal tutoring that was effective enough for reputation to grow",
+        "outcome": "Generated demand that led to formalization"
+      },
+      {
+        "type": "turning_point",
+        "description": "Formalizing the program with administration",
+        "whatHappened": "Approached principal with a formal plan",
+        "whatYouDid": "Created and presented a plan to make tutoring official",
+        "outcome": "Secured classroom space and administrative support"
+      },
+      {
+        "type": "milestone",
+        "description": "Rapid first-month growth",
+        "whatHappened": "Program scaled quickly once formalized",
+        "whatYouDid": "Recruited tutors and students",
+        "outcome": "15 tutors and 40 students within first month"
+      },
+      {
+        "type": "challenge",
+        "description": "Loss of two best tutors to graduation",
+        "whatHappened": "Two of the most experienced and effective tutors graduated, creating a knowledge gap",
+        "whatYouDid": "Created a comprehensive training manual to systematize and preserve tutoring knowledge",
+        "outcome": "Established sustainable system for knowledge transfer across tutor generations"
+      },
+      {
+        "type": "innovation",
+        "description": "Rebranding to reduce stigma",
+        "whatHappened": "Students felt embarrassed about needing tutoring help",
+        "whatYouDid": "Renamed program from 'remedial tutoring' to 'Academic Success Partners' to remove stigma",
+        "outcome": "Made program more accessible and welcoming to students who needed help"
+      }
+    ],
+    "evolution": [
+      {
+        "phase": "Informal beginnings",
+        "description": "Started as casual after-school help for friends",
+        "whatChanged": "Organic word-of-mouth growth created demand"
+      },
+      {
+        "phase": "Formalization",
+        "description": "Transitioned from informal to official school program",
+        "whatChanged": "Gained administrative support, classroom space, and formal structure"
+      },
+      {
+        "phase": "Scaling",
+        "description": "Rapid growth in first month",
+        "whatChanged": "Expanded from helping a few friends to coordinating 15 tutors serving 40 students"
+      },
+      {
+        "phase": "Expansion Phase",
+        "description": "Program grew from 40 to 60 students per week and expanded from math/science to include English and history",
+        "whatChanged": "Student capacity increased by 50%, subject areas expanded from 2 to 4 disciplines"
+      },
+      {
+        "phase": "District Expansion Phase",
+        "description": "Transitioned from school-level program to district advocacy",
+        "whatChanged": "Began working to scale program beyond original school; presented to superintendent and gained interest from three additional schools"
+      }
+    ],
+    "relationships": [
+      {
+        "type": "mentor",
+        "description": "Principal who supported formalization",
+        "impact": "Provided classroom space and helped establish official program"
+      }
+    ]
+  },
+  "meaning": {
+    "skills": [
+      {
+        "skill": "Curriculum Design",
+        "howDeveloped": "Created comprehensive training curriculum for peer tutors including study guides and practice problems",
+        "proficiencyLevel": "advanced"
+      },
+      {
+        "skill": "Training & Development",
+        "howDeveloped": "Personally trained all 15 tutors using self-designed curriculum",
+        "proficiencyLevel": "advanced"
+      },
+      {
+        "skill": "Data Management",
+        "howDeveloped": "Created and maintained tracking spreadsheet for 60 students' progress",
+        "proficiencyLevel": "intermediate"
+      },
+      {
+        "skill": "Change management",
+        "howDeveloped": "Navigated tutor turnover by creating systematic training documentation",
+        "proficiencyLevel": "intermediate"
+      },
+      {
+        "skill": "Marketing/branding",
+        "howDeveloped": "Rebranded program to reduce stigma and increase student participation",
+        "proficiencyLevel": "intermediate"
+      },
+      {
+        "skill": "Organizational sustainability",
+        "howDeveloped": "Created training manual to ensure program continuity beyond founding leadership",
+        "proficiencyLevel": "intermediate"
+      }
+    ],
+    "values": [
+      {
+        "value": "Educational equity/access",
+        "howDemonstrated": "Created free tutoring program specifically for students who couldn't afford private tutoring"
+      },
+      {
+        "value": "Education equity",
+        "howDemonstrated": "Created accessible tutoring program; redesigned program branding to reduce stigma; motivated by personal experience as child of immigrants who couldn't help with homework"
+      }
+    ],
+    "personalGrowth": [],
+    "proudestMoment": "",
+    "hardestChallenge": "Maintaining program continuity and quality when best tutors graduated; addressing student stigma around seeking help",
+    "whyItMatters": "Experience demonstrated how accessible programs can change educational outcomes, inspiring pursuit of education policy in college to create systemic change",
+    "authenticQuotes": [
+      {
+        "quote": "I noticed a lot of my classmates were struggling in math and science but couldn't afford private tutoring",
+        "context": "Explaining the origin and motivation for starting the program",
+        "potentialUse": "essay"
+      },
+      {
+        "quote": "word spread quickly",
+        "context": "Describing organic growth of informal tutoring",
+        "potentialUse": "description"
+      },
+      {
+        "quote": "I went to the principal with a plan",
+        "context": "Taking initiative to formalize the program",
+        "potentialUse": "interview"
+      },
+      {
+        "quote": "the students we tutored saw an average grade improvement of 1.5 letter grades",
+        "context": "Describing measurable impact of the tutoring program",
+        "potentialUse": "description"
+      },
+      {
+        "quote": "12 students went from failing to passing",
+        "context": "Highlighting transformative impact on struggling students",
+        "potentialUse": "essay"
+      },
+      {
+        "quote": "I personally trained all 15 tutors using a curriculum I designed",
+        "context": "Explaining leadership role and curriculum development",
+        "potentialUse": "interview"
+      },
+      {
+        "quote": "The biggest challenge was when two of my best tutors graduated and I had to rebuild.",
+        "context": "Discussing challenges in training tutors and program sustainability",
+        "potentialUse": "essay"
+      },
+      {
+        "quote": "I created a training manual so knowledge wouldn't be lost again.",
+        "context": "Response to losing experienced tutors",
+        "potentialUse": "interview"
+      },
+      {
+        "quote": "I renamed it from 'remedial tutoring' to 'Academic Success Partners' to remove the stigma.",
+        "context": "Addressing student embarrassment about seeking help",
+        "potentialUse": "essay"
+      },
+      {
+        "quote": "Education equity is really important to me because my parents are immigrants and they couldn't help me with homework growing up.",
+        "context": "Explaining personal motivation for the program",
+        "potentialUse": "essay"
+      },
+      {
+        "quote": "I want to study education policy in college because I've seen firsthand how a simple program can change outcomes.",
+        "context": "Explaining the connection between tutoring experience and future academic/career goals",
+        "potentialUse": "essay"
+      },
+      {
+        "quote": "The principal told me our program contributed to the school's 15% improvement in math proficiency scores.",
+        "context": "Describing recognition and measurable impact of the program",
+        "potentialUse": "description"
+      }
+    ]
+  },
+  "impact": {
+    "directBeneficiaries": [
+      {
+        "who": "40 students in first month",
+        "howHelped": "Provided free peer tutoring in math and science",
+        "measurableOutcome": "Access to tutoring they couldn't otherwise afford"
+      },
+      {
+        "who": "12 failing students",
+        "howHelped": "Provided tutoring support through peer tutoring program",
+        "measurableOutcome": "Went from failing to passing grades"
+      }
+    ],
+    "testimonials": [],
+    "beforeAfter": {
+      "before": "baseline math proficiency scores",
+      "after": "15% improvement in school math proficiency scores",
+      "yourRole": "founded and led peer tutoring program that principal credited for improvement"
+    },
+    "ongoingLegacy": "Working to expand program district-wide; three schools have expressed interest in adopting the model after superintendent presentation"
+  },
+  "connections": {
+    "spikeRelevance": {
+      "connectsToSpike": false,
+      "strength": "unrelated"
+    },
+    "majorAlignment": {
+      "relevantToMajor": false,
+      "howRelevant": "Direct experience with education program design and impact measurement informs interest in education policy; firsthand observation of how interventions affect student outcomes"
+    },
+    "characterTraits": [
+      {
+        "trait": "Initiative",
+        "howDemonstrated": "Proactively approached principal with formal plan to scale informal tutoring"
+      },
+      {
+        "trait": "Leadership",
+        "howDemonstrated": "Recruited and coordinated 15 tutors to serve 40 students"
+      },
+      {
+        "trait": "Empathy",
+        "howDemonstrated": "Noticed classmates' struggles and financial barriers to getting help"
+      },
+      {
+        "trait": "Systems Thinker",
+        "howDemonstrated": "Recognized that individual tutoring success could be scaled to district-wide impact; connected program outcomes to broader education policy implications"
+      },
+      {
+        "trait": "Ambitious/Visionary",
+        "howDemonstrated": "Not satisfied with school-level success; actively working to expand program to entire district"
+      }
+    ],
+    "relatedActivities": [],
+    "narrativeRole": "supporting"
+  },
+  "generated": {
+    "descriptions": [],
+    "essayAngles": [],
+    "interviewPoints": []
+  },
+  "metadata": {
+    "conversationHistory": [],
+    "confidenceScores": {
+      "facts": 0,
+      "story": 0,
+      "meaning": 0,
+      "impact": 0,
+      "connections": 0
+    },
+    "gapsIdentified": [],
+    "suggestedFollowUps": [],
+    "developmentPriority": "medium",
+    "potentialScoreImpact": {
+      "description": 0,
+      "activity": 0,
+      "portfolio": 0
+    }
+  }
+}
+
+================================================================================
+Test completed in 157.5s
+================================================================================
+
+Output written to: /Users/tuepham/uplift-final-final-18698-62030/tests/output/chat-conversation-tutoring-output.txt

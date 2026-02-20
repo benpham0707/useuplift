@@ -40,7 +40,7 @@ import { getSourcesForTechnique } from '../data/techniqueSources';
 // CONSTANTS
 // ============================================================================
 
-const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 const SONNET_PRICING = {
   input: 3.0 / 1_000_000,   // $3 per million input tokens
   output: 15.0 / 1_000_000, // $15 per million output tokens

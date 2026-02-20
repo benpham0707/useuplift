@@ -42,7 +42,7 @@ const SYSTEM_VERSION = '2.0.0';
 
 // Model selection
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 
 // Cost estimates (per 1M tokens, in cents)
 const COST_PER_1M = {

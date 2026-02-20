@@ -752,11 +752,12 @@ Return your analysis as a JSON object matching the Stage2Output interface.`;
 
   try {
     const response = await callClaude({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       systemPrompt,
       userPrompt,
       maxTokens: 8000,
       temperature: 0.3,
+      cacheSystemPrompt: true,
     });
 
     // Parse and validate response

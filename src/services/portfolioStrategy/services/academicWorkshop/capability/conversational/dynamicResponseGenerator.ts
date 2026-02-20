@@ -1743,7 +1743,7 @@ Respond in JSON format:
 }`;
 
   const modelId = model === 'sonnet'
-    ? 'claude-sonnet-4-20250514'
+    ? 'claude-sonnet-4-5-20250929'
     : 'claude-haiku-4-5-20251001';
 
   // Use callClaudeWithFallback for graceful degradation on timeout
@@ -2579,7 +2579,7 @@ export async function generateRephrasedQuestion(
   options: { model?: 'haiku' | 'sonnet' } = {}
 ): Promise<string> {
   const model = options.model === 'sonnet'
-    ? 'claude-sonnet-4-20250514'
+    ? 'claude-sonnet-4-5-20250929'
     : 'claude-haiku-4-5-20251001';
 
   try {

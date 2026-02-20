@@ -138,7 +138,7 @@ export class CacheOptimizationService {
     ];
 
     return {
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4000,
       temperature: 0.4,
       system: systemBlocks,
@@ -183,7 +183,7 @@ export class CacheOptimizationService {
     ];
 
     return {
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4000,
       temperature: 0.4,
       system: systemBlocks,

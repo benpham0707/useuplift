@@ -1042,7 +1042,7 @@ export class SemanticClicheAnalyzer {
       const response = await withRetry(
         () =>
           this.anthropic.messages.create({
-            model: 'claude-sonnet-4-5-20250514',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 1500,
             messages: [{ role: 'user', content: prompt }],
           }),

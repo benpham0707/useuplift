@@ -47,7 +47,7 @@ export async function analyzeAuthenticityVoice(
 
   try {
     const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 3500,
       temperature: 0.7, // Higher creativity for nuanced voice analysis
       system: systemPrompt,
@@ -64,7 +64,7 @@ export async function analyzeAuthenticityVoice(
 
     try {
       const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3500,
         temperature: 0.7,
         system: systemPrompt,

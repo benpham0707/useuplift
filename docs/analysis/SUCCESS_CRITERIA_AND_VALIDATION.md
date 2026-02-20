@@ -560,46 +560,46 @@ ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" npx tsx tests/run-writing-improvement-sui
 
 Copy this checklist and update as you complete each phase.
 
-### Phase 0: Foundation ⬜
+### Phase 0: Foundation ✅ (2026-02-19)
 
 ```
 Implementation:
-  ⬜ Model IDs fixed (grep confirms 0 stale)
-  ⬜ Prompt caching enabled (all Sonnet calls with stable prompts)
-  ⬜ PIQ @ts-nocheck removed + types fixed
-  ⬜ PIQ teaching examples completed (9 remaining dimensions)
+  ✅ Model IDs fixed (grep confirms 0 stale) — 80+ instances across src/ and supabase/
+  ✅ Prompt caching enabled (all Sonnet calls with stable prompts) — 58 total files cached (41 new + 13 existing + voiceProfileService). Uncached: Common App/portfolio dimension analyzers (raw SDK), academic workshop (callUnifiedLLM), deep report (dynamic prompts), edge functions (raw API)
+  ✅ PIQ @ts-nocheck removed + types fixed — thematic_coherence → narrative_arc_stakes
+  ⬜ PIQ teaching examples completed (9 remaining dimensions) — deferred to later phase
 
 Validation:
-  ⬜ grep "20250514" returns 0
-  ⬜ npx tsc --noEmit passes
-  ⬜ Prompt caching shows 30%+ reduction on second run
-  ⬜ Existing tests still pass
+  ✅ grep "20250514" returns 0
+  ✅ npx tsc --noEmit passes
+  ⬜ Prompt caching shows 30%+ reduction on second run — needs runtime validation
+  ⬜ Existing tests still pass — needs runtime validation with API key
 
-Gate: ⬜ PASSED / ⬜ BLOCKED (reason: ___)
+Gate: ✅ PARTIAL PASS — model IDs and type fixes complete, caching needs runtime validation
 ```
 
-### Phase 1: Voice System ⬜
+### Phase 1: Voice System — Phase 1A ✅ (2026-02-19)
 
 ```
 Implementation:
-  ⬜ StudentVoiceProfile type created
-  ⬜ VoiceProfileService implemented (build, enrich, save, load)
-  ⬜ Database migration applied (voice_profiles table)
-  ⬜ Converters from existing formats (CommonApp, Activity, PIQ)
-  ⬜ Integrated into Common App orchestrator
-  ⬜ Integrated into Activity workshop
-  ⬜ Integrated into PIQ chat context
-  ⬜ Type stubs created (inlineEditor, RAG, analytics)
+  ✅ StudentVoiceProfile type created — src/services/voiceProfile/types.ts
+  ✅ VoiceProfileService implemented (build, enrich, save, load) — src/services/voiceProfile/voiceProfileService.ts
+  ✅ Database migration created (voice_profiles table) — supabase/migrations/20260220000000_add_voice_profiles.sql
+  ✅ Converters from existing formats (CommonApp, Activity, PIQ) — fromCommonAppFingerprint, fromActivityChatFingerprint, fromPIQFingerprint
+  ⬜ Integrated into Common App orchestrator — Phase 1B (Chat 2)
+  ⬜ Integrated into Activity workshop — Phase 1B (Chat 2)
+  ⬜ Integrated into PIQ chat context — Phase 1B (Chat 2)
+  ✅ Type stubs created (inlineEditor, RAG, analytics, storyMining, authenticity, sessionContext) — 6 services with types.ts + index.ts
 
 Validation:
-  ⬜ Voice accuracy: 80%+ agreement with human labels
-  ⬜ Voice preservation: profiled output closer to original
-  ⬜ Cross-workshop: metrics within 20%
-  ⬜ Persistence roundtrip works
-  ⬜ npx tsc --noEmit passes
+  ⬜ Voice accuracy: 80%+ agreement with human labels — needs runtime test
+  ⬜ Voice preservation: profiled output closer to original — needs runtime test
+  ⬜ Cross-workshop: metrics within 20% — needs integration (Phase 1B)
+  ⬜ Persistence roundtrip works — needs DB migration applied
+  ✅ npx tsc --noEmit passes
 
 Scorecard: ___/100 (target: 35+, up from 25)
-Gate: ⬜ PASSED / ⬜ BLOCKED (reason: ___)
+Gate: ✅ PHASE 1A COMPLETE — types, service, migration, stubs all in place. Phase 1B (workshop integration) in Chat 2.
 ```
 
 ### Phase 2: Inline Editing ⬜

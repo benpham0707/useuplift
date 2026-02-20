@@ -351,7 +351,7 @@ Focus on:
 5. What approach would work best for the next question?`;
 
     const model = options.model === 'sonnet'
-      ? 'claude-sonnet-4-20250514'
+      ? 'claude-sonnet-4-5-20250929'
       : 'claude-haiku-4-5-20251001';
 
     const response = await callClaude({

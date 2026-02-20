@@ -1025,7 +1025,7 @@ Analyze thoroughly and provide teaching insights. Every assessment should includ
 
     try {
       const response = await callClaude(userPrompt, {
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         systemPrompt,
         maxTokens: 8000,
         temperature: 0.3,

@@ -168,6 +168,7 @@ export async function analyzeHolisticUnderstanding(
         temperature: 0.4,
         useJsonMode: true,
         maxTokens: 4000,
+        cacheSystemPrompt: true,
       }
     );
 

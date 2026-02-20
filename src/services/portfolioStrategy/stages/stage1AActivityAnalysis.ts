@@ -611,7 +611,7 @@ export async function executeStage1A(
   const prompt = buildStage1APrompt(input, stage0Output);
 
   const response = await callClaude(prompt, {
-    model: 'claude-sonnet-4-5-20250514',
+    model: 'claude-sonnet-4-5-20250929',
     maxTokens: 8000,
     temperature: 0.4,
     useJsonMode: true,

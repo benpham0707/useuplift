@@ -128,7 +128,7 @@ Deno.serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 2048,
         temperature: 0.7,
         system: `You are an expert essay analyst specializing in voice fingerprinting. Analyze the student's unique writing voice across 4 key dimensions.
@@ -188,7 +188,7 @@ Return ONLY valid JSON with this structure:
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3072,
         temperature: 0.7,
         system: `You are an expert at identifying unique, non-convergent experiences in essays. Analyze for 6 dimensions of uniqueness and detect generic patterns.
@@ -258,7 +258,7 @@ Return ONLY valid JSON with this structure:
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
         temperature: 0.7,
         system: `You are an expert college admissions essay evaluator. Analyze this essay across 12 key dimensions.
@@ -341,7 +341,7 @@ Return ONLY valid JSON with this structure:
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 8192,
         temperature: 0.8,
         system: `You are a Narrative Editor helping a student write authentically about their experience.
