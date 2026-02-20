@@ -13,7 +13,7 @@ import GoalsAspirationsWizard from './GoalsAspirationsWizard';
 import SupportNetworkWizard from './SupportNetworkWizard';
 import PersonalGrowthWizard from './PersonalGrowthWizard';
 import FamilyResponsibilitiesWizard from './FamilyResponsibilitiesWizard';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { useAuth } from '@/hooks/useAuth';
 import FlowingBanner from './FlowingBanner';
 

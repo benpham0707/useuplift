@@ -23,7 +23,7 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import GradientZap from '@/components/ui/GradientZap';
 
 const navItems = [

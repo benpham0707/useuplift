@@ -23,7 +23,7 @@ import FamilyResponsibilitiesWizard from '@/components/portfolio/FamilyResponsib
 import GoalsAspirationsWizard from '@/components/portfolio/GoalsAspirationsWizard';
 import SupportNetworkWizard from '@/components/portfolio/SupportNetworkWizard';
 import PersonalGrowthWizard from '@/components/portfolio/PersonalGrowthWizard';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { usePortfolioProgress } from '@/query/usePortfolioData';
 
 interface AssessmentDashboardProps {

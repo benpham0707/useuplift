@@ -11,7 +11,7 @@
  * @deprecated Use piqDatabaseService.ts instead
  */
 
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import type { AnalysisResult } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import type { DraftVersion } from './storageService';
 
