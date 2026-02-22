@@ -29,6 +29,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import { parseClaudeJSON } from '../utils/jsonParser';
 import {
   DIMENSION_DEFINITIONS,
@@ -379,9 +380,7 @@ export class TypeAwareScoringService {
   private client: Anthropic;
 
   constructor(apiKey?: string) {
-    this.client = new Anthropic({
-      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = apiKey ? new Anthropic({ apiKey }) : getAnthropicClient();
   }
 
   /**

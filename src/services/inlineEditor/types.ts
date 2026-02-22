@@ -4,6 +4,7 @@
  */
 
 import type { StudentVoiceProfile } from '../voiceProfile/types';
+import type { QuickVoiceCheckResult } from '../voiceProfile/styleConsistencyService';
 
 /** Available editing commands for inline text transformation */
 export type EditingCommand =
@@ -40,6 +41,10 @@ export interface InlineEditRequest {
   essayType?: string;
   /** Additional context */
   additionalContext?: string;
+  /** Session ID for document context injection (Phase 2) */
+  sessionId?: string;
+  /** RAG-sourced example fragments to inject into the system prompt */
+  ragContext?: string;
 }
 
 /** Result from applying an inline editing command */
@@ -60,4 +65,9 @@ export interface InlineEditResult {
   principle: string;
   /** Token cost */
   cost: number;
+  /** Post-generation heuristic voice consistency checks (present when voiceProfile provided) */
+  voiceConsistency?: {
+    primary: QuickVoiceCheckResult;
+    creative: QuickVoiceCheckResult;
+  };
 }

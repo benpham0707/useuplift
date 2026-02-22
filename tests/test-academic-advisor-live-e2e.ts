@@ -7,9 +7,7 @@
  * Run with: ANTHROPIC_API_KEY="your-key" npx tsx tests/test-academic-advisor-live-e2e.ts
  */
 
-// Load environment variables FIRST before any imports
-import * as dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import * as fs from 'fs';
 import * as path from 'path';

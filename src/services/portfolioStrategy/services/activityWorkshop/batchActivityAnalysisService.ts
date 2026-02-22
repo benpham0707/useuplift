@@ -17,7 +17,8 @@
  * MODEL: Sonnet for quality (analysis requires nuanced judgment)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../../lib/llm/claude';
 import { callClaude } from '@/lib/llm/claude';
 import {
   ActivityWorkshopInput,
@@ -585,14 +586,7 @@ export class BatchActivityAnalysisService implements IActivityAnalysisService {
    */
   private get anthropic(): Anthropic {
     if (!this._anthropic) {
-      const apiKey = process.env.ANTHROPIC_API_KEY?.split('\n')[0]?.trim();
-      if (!apiKey) {
-        throw new Error(
-          'ANTHROPIC_API_KEY not found. ' +
-          'For tests: ensure dotenv.config() is called BEFORE importing services.'
-        );
-      }
-      this._anthropic = new Anthropic({ apiKey });
+      this._anthropic = getAnthropicClient();
     }
     return this._anthropic;
   }

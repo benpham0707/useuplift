@@ -9,6 +9,7 @@
  * - Cohesive, compelling, powerful, memorable essays
  */
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { SYSTEM_PROMPT } from './systemPrompt.ts';
 import { buildPIQContext, formatContextForLLM } from './contextBuilder.ts';
 import { buildConversationContext, calculateCost } from './helpers.ts';
@@ -37,6 +38,7 @@ interface PIQChatRequest {
   promptText: string;
   promptTitle: string;
   analysisResult: any; // Full AnalysisResult from workshop
+  userId?: string; // For loading voice profile from DB
   conversationHistory?: ChatMessage[];
   options?: {
     currentScore: number;
@@ -92,6 +94,39 @@ Deno.serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
+    // Initialize Supabase client for DB lookups (voice profile + RAG)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const hasSupabase = !!(supabaseUrl && supabaseServiceKey);
+    const supabase = hasSupabase ? createClient(supabaseUrl, supabaseServiceKey) : null;
+
+    // Load voice profile from Supabase if userId provided
+    let studentVoiceProfile = null;
+    if (requestBody.userId && supabase) {
+      try {
+        const { data: voiceData } = await supabase
+          .from('voice_profiles')
+          .select('profile')
+          .eq('user_id', requestBody.userId)
+          .single();
+        if (voiceData?.profile) {
+          studentVoiceProfile = voiceData.profile;
+        }
+      } catch (e) {
+        console.log('[PIQ Chat] No voice profile found, proceeding without');
+      }
+    }
+
+    // Try RAG retrieval for writing pattern examples (non-blocking)
+    let ragContext = '';
+    if (supabase) {
+      ragContext = await tryFetchRAGExamples(
+        supabase,
+        requestBody.essayText,
+        requestBody.promptId
+      );
+    }
+
     // Build PIQ context
     const context = buildPIQContext(
       requestBody.promptId,
@@ -99,7 +134,8 @@ Deno.serve(async (req) => {
       requestBody.promptTitle,
       requestBody.essayText,
       requestBody.analysisResult,
-      requestBody.options || {}
+      requestBody.options || {},
+      studentVoiceProfile
     );
 
     // Format context for LLM
@@ -110,10 +146,14 @@ Deno.serve(async (req) => {
       requestBody.conversationHistory || []
     );
 
-    // Build full user prompt
+    // Build full user prompt (inject RAG examples if available)
+    const fullContextBlock = ragContext
+      ? `${contextBlock}\n${ragContext}`
+      : contextBlock;
+
     const fullUserPrompt = buildUserPrompt(
       requestBody.userMessage,
-      contextBlock,
+      fullContextBlock,
       conversationContext
     );
 
@@ -189,6 +229,70 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// ============================================================================
+// RAG RETRIEVAL (text-based, non-blocking)
+// ============================================================================
+
+interface RAGFragmentRow {
+  technique: string | null;
+  dimension: string | null;
+  transferable_principle: string;
+  why_it_works: string;
+  similarity: number;
+}
+
+/**
+ * Try to fetch RAG examples via text-based trigram search.
+ * Returns formatted context string, or empty string on any failure.
+ * This is non-blocking — the chat proceeds normally without RAG if unavailable.
+ *
+ * Requires the `search_rag_fragments_by_text` RPC function in Supabase.
+ * If the function doesn't exist yet, this will silently return empty.
+ */
+async function tryFetchRAGExamples(
+  supabaseClient: ReturnType<typeof createClient>,
+  essayText: string,
+  promptId: string
+): Promise<string> {
+  try {
+    // Use first ~200 chars of essay as the search query
+    const queryText = essayText.substring(0, 200).trim();
+    if (!queryText) return '';
+
+    const { data, error } = await supabaseClient.rpc('search_rag_fragments_by_text', {
+      query_text: queryText,
+      filter_essay_type: 'piq',
+      match_count: 3,
+    });
+
+    if (error || !data || !Array.isArray(data) || data.length === 0) return '';
+
+    const rows = data as RAGFragmentRow[];
+    const examples = rows.map((r) => {
+      const technique = r.technique || r.dimension || 'Writing technique';
+      return [
+        `**Pattern: ${technique}**`,
+        `Principle: ${r.transferable_principle}`,
+        `Why it works: ${r.why_it_works}`,
+      ].join('\n');
+    }).join('\n\n');
+
+    return [
+      '# RAG EXAMPLES (Writing patterns from high-scoring essays)',
+      examples,
+      '',
+      'Use these as INSPIRATION for teaching principles. Never copy specific phrases.',
+      '',
+    ].join('\n');
+  } catch (e) {
+    console.log(
+      '[PIQ Chat] RAG retrieval failed, proceeding without:',
+      e instanceof Error ? e.message : 'Unknown'
+    );
+    return '';
+  }
+}
 
 // ============================================================================
 // PROMPT BUILDING

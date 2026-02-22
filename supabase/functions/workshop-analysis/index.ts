@@ -131,7 +131,10 @@ Deno.serve(async (req) => {
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 2048,
         temperature: 0.7,
-        system: `You are an expert essay analyst specializing in voice fingerprinting. Analyze the student's unique writing voice across 4 key dimensions.
+        system: [
+          {
+            type: 'text',
+            text: `You are an expert essay analyst specializing in voice fingerprinting. Analyze the student's unique writing voice across 4 key dimensions.
 
 Return ONLY valid JSON with this structure:
 {
@@ -152,6 +155,9 @@ Return ONLY valid JSON with this structure:
     "secondary": "string"
   }
 }`,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',
@@ -191,7 +197,10 @@ Return ONLY valid JSON with this structure:
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3072,
         temperature: 0.7,
-        system: `You are an expert at identifying unique, non-convergent experiences in essays. Analyze for 6 dimensions of uniqueness and detect generic patterns.
+        system: [
+          {
+            type: 'text',
+            text: `You are an expert at identifying unique, non-convergent experiences in essays. Analyze for 6 dimensions of uniqueness and detect generic patterns.
 
 Return ONLY valid JSON with this structure:
 {
@@ -223,6 +232,9 @@ Return ONLY valid JSON with this structure:
   ],
   "confidenceScore": number (0-10)
 }`,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',
@@ -261,7 +273,10 @@ Return ONLY valid JSON with this structure:
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4096,
         temperature: 0.7,
-        system: `You are an expert college admissions essay evaluator. Analyze this essay across 12 key dimensions.
+        system: [
+          {
+            type: 'text',
+            text: `You are an expert college admissions essay evaluator. Analyze this essay across 12 key dimensions.
 
 The 12 dimensions are:
 1. Opening Hook & Engagement
@@ -306,6 +321,9 @@ Return ONLY valid JSON with this structure:
   "overall_strengths": ["string"],
   "overall_weaknesses": ["string"]
 }`,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',
@@ -344,7 +362,10 @@ Return ONLY valid JSON with this structure:
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 8192,
         temperature: 0.8,
-        system: `You are a Narrative Editor helping a student write authentically about their experience.
+        system: [
+          {
+            type: 'text',
+            text: `You are a Narrative Editor helping a student write authentically about their experience.
 
 **YOUR CORE MISSION:**
 The student's essay should read like THEY wrote it - their authentic voice pulling from their heart,
@@ -441,6 +462,9 @@ Return ONLY valid JSON with this structure:
 - Make it sound like THIS student pulling from their heart, not a generic "good writer"
 - Every suggestion MUST use elements from the Experience Fingerprint
 - Fresh, lively writing - not AI convergence patterns`,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',

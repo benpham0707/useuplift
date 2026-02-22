@@ -25,7 +25,8 @@
  * - STRONG: Vivid, specific, emotionally grounded, memorable
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import { SupplementalType } from '../types';
 import type { ContextGap as SonnetGap, ExistingStrength } from './sonnetContextLayer';
 import type { EnrichedStudentContext } from '../types/contextGathering';
@@ -613,11 +614,12 @@ function buildClicheAwareFollowUp(
 // ============================================================================
 
 export class ConversationalContextGatherer {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
   private conversationStates: Map<string, GapConversationState[]> = new Map();
 
-  constructor() {
-    this.anthropic = new Anthropic();
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) this._anthropic = getAnthropicClient();
+    return this._anthropic;
   }
 
   /**

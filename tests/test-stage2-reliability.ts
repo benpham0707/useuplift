@@ -5,8 +5,7 @@
  * without falling back to heuristics.
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 console.log('╔══════════════════════════════════════════════════════════════╗');
 console.log('║           STAGE 2 CONDITIONAL TEACHING TEST                  ║');

@@ -40,6 +40,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import type { MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources/messages';
 import type { CollegeResearch } from '../types/collegeResearch';
 
@@ -106,9 +107,7 @@ export class CacheOptimizationService {
   private readonly CACHE_READ_PRICE = 0.3; // 90% discount on cache reads
 
   constructor(apiKey?: string) {
-    this.client = new Anthropic({
-      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = apiKey ? new Anthropic({ apiKey }) : getAnthropicClient();
   }
 
   /**

@@ -7,8 +7,7 @@
  * Run: ANTHROPIC_API_KEY="..." npx tsx tests/test-deep-academic-report.ts
  */
 
-import * as dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import { generateDeepAcademicReport } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReport';
 import type {

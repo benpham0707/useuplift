@@ -21,7 +21,7 @@
  * - General UC: 20% (critical differentiator)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   AuthenticityVoiceAnalysis,
@@ -29,10 +29,6 @@ import {
   HolisticPortfolioUnderstanding,
 } from '../types';
 import { PIQ_AUTHENTICITY_TIERS } from '../constants/ucCalibration';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 2.5: Authenticity & Voice Analyzer
@@ -46,7 +42,7 @@ export async function analyzeAuthenticityVoice(
   const userPrompt = buildUserPrompt(portfolio, holisticContext, mode);
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 3500,
       temperature: 0.7, // Higher creativity for nuanced voice analysis
@@ -63,7 +59,7 @@ export async function analyzeAuthenticityVoice(
   } catch (error) {
 
     try {
-      const retryResponse = await anthropic.messages.create({
+      const retryResponse = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3500,
         temperature: 0.7,

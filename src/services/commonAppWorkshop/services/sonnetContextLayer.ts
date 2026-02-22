@@ -19,7 +19,8 @@
  * - Returns structured gaps that the chat interface can use for targeted questions
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import crypto from 'crypto';
 import { SupplementalType } from '../types';
 
@@ -321,7 +322,7 @@ const TYPE_CONTEXT_PRIORITIES: Record<SupplementalType, {
 // ============================================================================
 
 export class SonnetContextLayer {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
   private defaultOptions: Required<SonnetLayerOptions> = {
     enabled: true,
     max_gaps: 5,
@@ -330,8 +331,9 @@ export class SonnetContextLayer {
     bypass_cache: false
   };
 
-  constructor() {
-    this.anthropic = new Anthropic();
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) this._anthropic = getAnthropicClient();
+    return this._anthropic;
   }
 
   /**

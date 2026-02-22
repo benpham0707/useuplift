@@ -14,7 +14,8 @@
  * - College-specific weights and elite markers
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import { parseClaudeJSON } from '../utils/jsonParser';
 import type { CollegeResearch } from '../types/collegeResearch';
 import {
@@ -102,9 +103,7 @@ export class CollegeTailroingScoringService {
   private client: Anthropic;
 
   constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = getAnthropicClient();
   }
 
   /**

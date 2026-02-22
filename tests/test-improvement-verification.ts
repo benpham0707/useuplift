@@ -10,7 +10,7 @@
  * Are working correctly.
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import {
   activityProfileChatService,

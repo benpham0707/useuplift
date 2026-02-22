@@ -12,7 +12,7 @@
  * Produces: Actionable guidance for improvement
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   HolisticPortfolioUnderstanding,
@@ -22,10 +22,6 @@ import {
   UCEvaluationMode,
   getWeightsForMode,
 } from '../types';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 4: Strategic Guidance Engine
@@ -41,7 +37,7 @@ export async function generateStrategicGuidance(
   const userPrompt = buildUserPrompt(portfolio, holistic, dimensions, synthesis, mode);
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4000,
       temperature: 0.6,
@@ -58,7 +54,7 @@ export async function generateStrategicGuidance(
   } catch (error) {
 
     try {
-      const retryResponse = await anthropic.messages.create({
+      const retryResponse = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
         temperature: 0.6,

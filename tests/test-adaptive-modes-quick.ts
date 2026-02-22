@@ -7,7 +7,7 @@
  * 3. Composes questions with appropriate prefixes/suffixes
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import { conversationModeService } from '../src/services/portfolioStrategy/services/activityWorkshop/chat/conversationModeService';
 import { createEmptyProfile } from '../src/services/portfolioStrategy/services/activityWorkshop/profile/types';

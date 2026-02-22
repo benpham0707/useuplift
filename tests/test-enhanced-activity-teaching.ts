@@ -9,8 +9,7 @@
  * - BEFORE/AFTER EXAMPLES: Concrete transformations
  */
 
-import * as dotenv from 'dotenv';
-dotenv.config();  // Must be BEFORE other imports that use API key
+import './utils/loadEnv';
 import { ActivityDiagnosisService } from '../src/services/portfolioStrategy/services/activityWorkshop/activityDiagnosisService';
 import { ActivityAnalysisService } from '../src/services/portfolioStrategy/services/activityWorkshop/activityAnalysisService';
 import { EnhancedActivityTeachingService, EnhancedActivityTeaching, EnhancedIssueTeaching } from '../src/services/portfolioStrategy/services/activityWorkshop/enhancedActivityTeachingService';

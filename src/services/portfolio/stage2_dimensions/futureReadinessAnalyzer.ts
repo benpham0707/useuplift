@@ -20,7 +20,7 @@
  * - General UC: 5% (slightly more relevant for placement)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   FutureReadinessAnalysis,
@@ -28,10 +28,6 @@ import {
   HolisticPortfolioUnderstanding,
 } from '../types';
 import { UC_CAMPUS_PROFILES } from '../constants/ucCalibration';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 2.6: Future Readiness Analyzer
@@ -45,7 +41,7 @@ export async function analyzeFutureReadiness(
   const userPrompt = buildUserPrompt(portfolio, holisticContext, mode);
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 2500,
       temperature: 0.5,
@@ -62,7 +58,7 @@ export async function analyzeFutureReadiness(
   } catch (error) {
 
     try {
-      const retryResponse = await anthropic.messages.create({
+      const retryResponse = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 2500,
         temperature: 0.5,

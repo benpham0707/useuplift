@@ -12,16 +12,13 @@
  * Run: ANTHROPIC_API_KEY="..." npx tsx tests/test-report-advisor-integration-e2e.ts
  */
 
-import * as dotenv from 'dotenv';
+import './utils/loadEnv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load .env from project root
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 import { generateDeepAcademicReport, getOrGenerateDeepAcademicReport } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReport';
 import type { DeepAcademicReportInput, DeepAcademicReport } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReportTypes';

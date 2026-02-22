@@ -27,6 +27,8 @@ import { callClaude } from '@/lib/llm/claude';
 import { ConversationDynamics, StudentPattern, ConversationMode } from './conversationModeService';
 import { ActivityProfile } from '../profile/types';
 import { ConversationState, ExtractionResult, QuestionCandidate } from './types';
+import { voiceProfileService } from '@/services/voiceProfile';
+import type { StudentVoiceProfile } from '@/services/voiceProfile/types';
 
 // ============================================================================
 // TYPES
@@ -61,6 +63,9 @@ export interface DynamicQuestionInput {
   // ═══════════════════════════════════════════════════════════════════════════
   // ANALYSIS INSIGHTS - "I've already studied your file" context
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Persistent voice profile (if loaded from DB) */
+  studentVoiceProfile?: StudentVoiceProfile;
 
   /** Pre-computed analysis results from System 1 */
   analysisInsights?: {
@@ -395,7 +400,28 @@ export class DynamicConversationEngine {
 
     // Extract voice fingerprint and quotable phrases from history
     const responses = conversationHistory.map(h => h.response);
-    const voiceFingerprint = analyzeVoice(responses);
+    // If a persistent voice profile exists, use it to seed the fingerprint
+    // instead of cold-starting from conversation history alone
+    let voiceFingerprint: VoiceFingerprint;
+    if (input.studentVoiceProfile) {
+      const vp = input.studentVoiceProfile;
+      voiceFingerprint = {
+        formality: vp.linguistics.formality === 'formal' ? 'formal' :
+                   vp.linguistics.formality === 'casual' ? 'casual' : 'neutral',
+        energy: vp.personality.energy === 'high' ? 'high' :
+                vp.personality.energy === 'low' ? 'low' : 'medium',
+        verbosity: 'moderate', // Default; override from conversation if available
+        emotionalOpenness: vp.personality.emotionalOpenness === 'open' ? 'expressive' :
+                           vp.personality.emotionalOpenness === 'reserved' ? 'guarded' : 'neutral',
+      };
+      // Refine verbosity from conversation if we have history
+      if (responses.length > 0) {
+        const avgLen = responses.reduce((sum, r) => sum + r.length, 0) / responses.length;
+        voiceFingerprint.verbosity = avgLen < 50 ? 'minimal' : avgLen > 200 ? 'detailed' : 'moderate';
+      }
+    } else {
+      voiceFingerprint = analyzeVoice(responses);
+    }
     const lastResponse = conversationHistory[conversationHistory.length - 1]?.response || '';
     const quotablePhrases = extractQuotablePhrases(lastResponse);
 

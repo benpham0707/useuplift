@@ -8,8 +8,7 @@
  * constraint intelligence, school-specific insights, and narrative arc detection.
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import assert from 'assert'; // R22: Enable pass/fail assertions
 import { activityWorkshopService } from '../src/services/portfolioStrategy/services/activityWorkshop';

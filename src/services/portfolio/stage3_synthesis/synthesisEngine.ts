@@ -13,7 +13,7 @@
  * Produces: Comprehensive synthesis with UC-specific insights
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   HolisticPortfolioUnderstanding,
@@ -24,10 +24,6 @@ import {
   getWeightsForMode,
 } from '../types';
 import { UC_CAMPUS_PROFILES } from '../constants/ucCalibration';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 3: Synthesis Engine
@@ -46,7 +42,7 @@ export async function synthesizePortfolio(
   const userPrompt = buildUserPrompt(portfolio, holistic, dimensions, mode, weightedScore);
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4000,
       temperature: 0.6,
@@ -63,7 +59,7 @@ export async function synthesizePortfolio(
   } catch (error) {
 
     try {
-      const retryResponse = await anthropic.messages.create({
+      const retryResponse = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
         temperature: 0.6,

@@ -7,6 +7,7 @@
 
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
+import { getAnthropicClient } from './claude';
 
 // ============================================================================
 // TYPES
@@ -42,24 +43,34 @@ export interface UnifiedLLMResponse<T = any> {
 // Check if we're in browser (Vite) or Node.js environment
 const isBrowser = typeof import.meta !== 'undefined' && !!import.meta.env;
 
-// Get API keys
-const ANTHROPIC_KEY = isBrowser
-  ? import.meta.env.VITE_ANTHROPIC_API_KEY
-  : process.env.ANTHROPIC_API_KEY;
-
+// Get API keys (OpenAI still read eagerly since it has no lazy getter)
 const OPENAI_KEY = isBrowser
   ? import.meta.env.VITE_UPLIFT_OPENAI_KEY
   : process.env.UPLIFT_OPENAI_KEY;
 
-if (!ANTHROPIC_KEY && !OPENAI_KEY) {
-  throw new Error('No LLM API keys found. Need ANTHROPIC_API_KEY or UPLIFT_OPENAI_KEY');
-}
+// Lazy Anthropic client — avoids calling `new Anthropic()` at module load time.
+// In Node the real key may only be available after dotenv runs, so we defer to
+// getAnthropicClient() from ./claude which handles that correctly.
+let _anthropicClient: Anthropic | null = null;
 
-// Initialize clients
-const anthropicClient = ANTHROPIC_KEY ? new Anthropic({
-  apiKey: ANTHROPIC_KEY,
-  dangerouslyAllowBrowser: isBrowser
-}) : null;
+function getAnthropicClientLazy(): Anthropic | null {
+  if (_anthropicClient) return _anthropicClient;
+
+  if (isBrowser) {
+    // Browser case — need explicit key from Vite env
+    const key = import.meta.env?.VITE_ANTHROPIC_API_KEY;
+    if (!key) return null;
+    _anthropicClient = new Anthropic({ apiKey: key, dangerouslyAllowBrowser: true });
+  } else {
+    try {
+      _anthropicClient = getAnthropicClient();
+    } catch {
+      return null;
+    }
+  }
+
+  return _anthropicClient;
+}
 
 const openaiClient = OPENAI_KEY ? new OpenAI({
   apiKey: OPENAI_KEY,
@@ -124,7 +135,8 @@ async function callClaude<T = any>(
   userPrompt: string,
   options: Omit<UnifiedLLMOptions, 'provider'>
 ): Promise<UnifiedLLMResponse<T>> {
-  if (!anthropicClient) {
+  const client = getAnthropicClientLazy();
+  if (!client) {
     throw new Error('Claude API key not configured');
   }
 
@@ -137,7 +149,7 @@ async function callClaude<T = any>(
   } = options;
 
   try {
-    const response = await anthropicClient.messages.create({
+    const response = await client.messages.create({
       model,
       max_tokens: maxTokens,
       temperature,

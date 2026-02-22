@@ -67,6 +67,10 @@ import {
 // Import holistic portfolio narrative service (v4.1)
 import { portfolioNarrativeService } from './stages/portfolioNarrativeService';
 
+// Voice profile integration
+import { voiceProfileService } from '@/services/voiceProfile';
+import type { StudentVoiceProfile } from '@/services/voiceProfile/types';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -390,6 +394,20 @@ export class ActivityWorkshopService implements IActivityWorkshopService {
     }
     if (validation.warnings.length > 0) {
       console.log(`[ActivityWorkshop v4.3] Warnings: ${validation.warnings.join(', ')}`);
+    }
+
+    // Load voice profile if userId is available
+    let voiceProfile: StudentVoiceProfile | null = null;
+    try {
+      const userId = (input as any).userId;
+      if (userId) {
+        voiceProfile = await voiceProfileService.load(userId);
+        if (voiceProfile) {
+          console.log(`[ActivityWorkshop v4.3] Voice profile loaded (confidence: ${voiceProfile.confidence.toFixed(2)})`);
+        }
+      }
+    } catch (e) {
+      console.error('[ActivityWorkshop] Failed to load voice profile:', e);
     }
 
     // ========================================================================

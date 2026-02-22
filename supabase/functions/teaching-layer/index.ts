@@ -11,6 +11,8 @@
  * - Match tone to magnitude of change required
  */
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -321,13 +323,17 @@ Your goal: They should close this and think "Wow, this system really gets me and
 // USER MESSAGE BUILDER
 // ============================================================================
 
-function buildUserMessage(request: TeachingLayerRequest): string {
+function buildUserMessage(request: TeachingLayerRequest, ragContext: string = ''): string {
+  const ragSection = ragContext
+    ? `\n**WRITING PATTERN EXAMPLES (from high-scoring essays):**\n${ragContext}\n`
+    : '';
+
   return `Provide teaching guidance for these workshop suggestions.
 
 **ESSAY CONTEXT:**
 Prompt: ${request.promptTitle}
 Current NQI: ${request.currentNQI}/100
-
+${ragSection}
 **ESSAY TEXT:**
 ${request.essayText}
 
@@ -412,8 +418,21 @@ Deno.serve(async (req) => {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
 
-    // Build user message
-    const userMessage = buildUserMessage(requestBody);
+    // Try RAG retrieval for writing pattern examples (non-blocking)
+    let ragContext = '';
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+      if (supabaseUrl && supabaseServiceKey) {
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        ragContext = await tryFetchRAGTransformations(supabase, requestBody.essayText);
+      }
+    } catch (e) {
+      console.log('[Teaching Layer] RAG retrieval failed, proceeding without');
+    }
+
+    // Build user message (inject RAG context if available)
+    const userMessage = buildUserMessage(requestBody, ragContext);
 
     // Call Claude API
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -427,7 +446,13 @@ Deno.serve(async (req) => {
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 8192,
         temperature: 0.7,
-        system: TEACHING_LAYER_SYSTEM_PROMPT,
+        system: [
+          {
+            type: 'text',
+            text: TEACHING_LAYER_SYSTEM_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',
@@ -489,3 +514,56 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+// ============================================================================
+// RAG RETRIEVAL (text-based, non-blocking)
+// ============================================================================
+
+interface RAGTransformationRow {
+  technique: string | null;
+  dimension: string | null;
+  principle: string;
+  why_it_works: string;
+  similarity: number;
+}
+
+/**
+ * Try to fetch RAG transformation examples via text-based trigram search.
+ * Returns formatted context string, or empty string on any failure.
+ * Non-blocking — teaching layer proceeds normally without RAG if unavailable.
+ *
+ * Requires the `search_rag_transformations_by_text` RPC function in Supabase.
+ * If the function doesn't exist yet, this will silently return empty.
+ */
+async function tryFetchRAGTransformations(
+  supabaseClient: ReturnType<typeof createClient>,
+  essayText: string
+): Promise<string> {
+  try {
+    const queryText = essayText.substring(0, 200).trim();
+    if (!queryText) return '';
+
+    const { data, error } = await supabaseClient.rpc('search_rag_transformations_by_text', {
+      query_text: queryText,
+      match_count: 3,
+    });
+
+    if (error || !data || !Array.isArray(data) || data.length === 0) return '';
+
+    const rows = data as RAGTransformationRow[];
+    return rows.map((r) => {
+      const technique = r.technique || r.dimension || 'Writing improvement';
+      return [
+        `**${technique}**`,
+        `Principle: ${r.principle}`,
+        `Why it works: ${r.why_it_works}`,
+      ].join('\n');
+    }).join('\n\n');
+  } catch (e) {
+    console.log(
+      '[Teaching Layer] RAG transformation retrieval failed:',
+      e instanceof Error ? e.message : 'Unknown'
+    );
+    return '';
+  }
+}

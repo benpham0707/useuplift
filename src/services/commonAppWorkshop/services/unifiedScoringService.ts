@@ -18,7 +18,8 @@
  * - Hybrid: ~$0.06 per essay (triage + full if needed)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import {
   SemanticScoringService,
   DEFAULT_WORD_LIMITS,
@@ -147,11 +148,15 @@ export interface UnifiedScoringOptions {
 
 export class UnifiedScoringService {
   private semanticService: SemanticScoringService;
-  private client: Anthropic;
+  private _client: Anthropic | null = null;
+
+  private get client(): Anthropic {
+    if (!this._client) this._client = getAnthropicClient();
+    return this._client;
+  }
 
   constructor() {
     this.semanticService = new SemanticScoringService();
-    this.client = new Anthropic();
   }
 
   /**

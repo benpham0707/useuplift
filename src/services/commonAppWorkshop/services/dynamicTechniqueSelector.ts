@@ -20,7 +20,8 @@
  * @date January 2025
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { TechniqueCategory } from './techniqueCategories';
 import { TECHNIQUE_BUNDLES } from './techniqueCategories';
 
@@ -169,10 +170,11 @@ OUTPUT FORMAT (JSON):
 // ============================================================================
 
 export class DynamicTechniqueSelector {
-  private client: Anthropic;
+  private _client: Anthropic | null = null;
 
-  constructor() {
-    this.client = new Anthropic();
+  private get client(): Anthropic {
+    if (!this._client) this._client = getAnthropicClient();
+    return this._client;
   }
 
   /**

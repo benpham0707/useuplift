@@ -75,6 +75,7 @@ const AppRoutes = () => (
       <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
       <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
       <Route path="/workshop-demo" element={<WorkshopDemo />} />
+      <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
       <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
 
       {/* Dashboard routes */}

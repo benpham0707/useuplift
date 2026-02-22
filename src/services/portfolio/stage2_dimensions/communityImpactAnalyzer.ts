@@ -20,7 +20,7 @@
  * - General UC: 10% (meaningful contribution to holistic review)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   CommunityImpactAnalysis,
@@ -28,10 +28,6 @@ import {
   HolisticPortfolioUnderstanding,
 } from '../types';
 import { COMMUNITY_IMPACT_TIERS, UC_CONTEXT_ADJUSTMENTS } from '../constants/ucCalibration';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 2.4: Community Impact Analyzer
@@ -45,7 +41,7 @@ export async function analyzeCommunityImpact(
   const userPrompt = buildUserPrompt(portfolio, holisticContext, mode);
 
   try {
-    const response = await anthropic.messages.create({
+    const response = await getAnthropicClient().messages.create({
       model: 'claude-sonnet-4-5-20250929',
       max_tokens: 3000,
       temperature: 0.6,
@@ -62,7 +58,7 @@ export async function analyzeCommunityImpact(
   } catch (error) {
 
     try {
-      const retryResponse = await anthropic.messages.create({
+      const retryResponse = await getAnthropicClient().messages.create({
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
         temperature: 0.6,

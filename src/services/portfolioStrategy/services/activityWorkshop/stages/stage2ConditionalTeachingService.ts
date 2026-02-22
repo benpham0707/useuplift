@@ -71,6 +71,9 @@ import type { TeachingLayerOutput } from '../scoring/teachingLayerTypes';
 import type { ActivityProfile } from '../profile/types';
 import { profileBridgeService } from '../profileBridge';
 
+// Import RAG service for example-backed teaching
+import { ragService } from '@/services/rag';
+
 /**
  * Teaching depth configuration
  */
@@ -508,6 +511,21 @@ IMPORTANT: Use this verified context to make your teaching SPECIFIC and PERSONAL
       }
     }
 
+    // RAG: retrieve transformation examples for the weakest issue (non-blocking)
+    let ragTeachingBlock = '';
+    try {
+      const weakestIssue = analysis.descriptionQuality.issues[0] || activity.description;
+      const ragResults = await ragService.retrieveTransformations(weakestIssue, {
+        dimension: analysis.classification.detectedCategory,
+        limit: 2,
+      });
+      if (ragResults.length > 0) {
+        ragTeachingBlock = `\nHERE'S HOW STRONG ACTIVITY DESCRIPTIONS HANDLE THIS:\n${ragService.formatTransformationsForPrompt(ragResults)}\n`;
+      }
+    } catch (e) {
+      console.warn(`[Stage2] RAG retrieval failed for "${activity.title}", proceeding without:`, e instanceof Error ? e.message : e);
+    }
+
     // Build a focused prompt for just this one activity
     // Per-activity prompts only include activity-specific data.
     const prompt = `Provide ${depth} teaching for this activity.
@@ -524,7 +542,7 @@ ACTIVITY: ${activity.title}
 ${knowledge ? `RESEARCH-BACKED KNOWLEDGE CONTEXT:
 
 ${knowledgeAssemblyService.formatForPrompt(knowledge)}` : ''}
-${profileContext}
+${profileContext}${ragTeachingBlock}
 TEACHING PROTOCOL:
 1. CELEBRATE ONLY WHEN GENUINE — If the activity has a noteworthy strength (strong metric, unique approach, real impact), celebrate it with a specific quote. If the description is weak or generic, SKIP celebration and focus on improvement teaching. Don't manufacture praise.
 2. EDUCATE CONCISELY — For obvious fixes (passive voice, missing numbers), explain WHY in 1 sentence. For non-obvious strategic insights, 2-3 sentences are fine if every sentence adds value.

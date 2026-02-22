@@ -143,7 +143,7 @@ export interface StudentVoiceProfile {
   preservationWarnings: string[];  // What NOT to change
 
   // === CONFIDENCE & SOURCES ===
-  confidence: number;              // 0-100
+  confidence: number;              // 0-1
   sampleCount: number;             // How many samples contributed
   lastSampleAt: string;
 }

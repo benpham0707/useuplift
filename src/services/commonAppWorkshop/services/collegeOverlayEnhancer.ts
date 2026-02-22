@@ -28,7 +28,8 @@
  * If preservation rate < 100%, this is a BUG that must be fixed immediately.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import { parseClaudeJSON } from '../utils/jsonParser';
 import type { CollegeResearch } from '../types/collegeResearch';
 import type {
@@ -129,9 +130,7 @@ export class CollegeOverlayEnhancer {
   private client: Anthropic;
 
   constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = getAnthropicClient();
   }
 
   /**

@@ -770,8 +770,188 @@ r.get("/academic-teaching/:issueType", async (req, res) => {
   }
 });
 
+// ============================================================================
+// Voice Profile API
+// ============================================================================
+r.get("/api/voice-profile", requireAuth, async (req, res) => {
+  try {
+    const { voiceProfileService } = await import("@/services/voiceProfile");
+    const profile = await voiceProfileService.load(req.auth.userId);
+    res.json({ success: true, data: profile });
+  } catch (error: any) {
+    console.error('[voice-profile] GET error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to load voice profile' });
+  }
+});
+
+r.put("/api/voice-profile", requireAuth, async (req, res) => {
+  try {
+    const { voiceProfileService } = await import("@/services/voiceProfile");
+    const { text, source } = req.body;
+    if (!text || !source) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: text, source' });
+    }
+    const existing = await voiceProfileService.load(req.auth.userId);
+    const profile = existing
+      ? await voiceProfileService.enrichProfile(req.auth.userId, text, source)
+      : await voiceProfileService.buildFromSample(req.auth.userId, text, source);
+    await voiceProfileService.save(profile);
+    res.json({ success: true, data: profile });
+  } catch (error: any) {
+    console.error('[voice-profile] PUT error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Failed to build voice profile' });
+  }
+});
+
+// ============================================================================
+// Inline Edit API
+// ============================================================================
+r.post("/api/inline-edit", requireAuth, async (req, res) => {
+  try {
+    const { inlineEditorService } = await import("@/services/inlineEditor");
+    const { sessionId, ragContext, ...rest } = req.body;
+    const result = await inlineEditorService.applyCommand({
+      ...rest,
+      ...(sessionId ? { sessionId } : {}),
+      ...(ragContext ? { ragContext } : {}),
+    });
+    res.json({ success: true, data: result });
+  } catch (error: any) {
+    console.error('[inline-edit] error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Inline edit failed' });
+  }
+});
+
+r.post("/api/inline-edit/suggest", requireAuth, async (req, res) => {
+  try {
+    const { inlineEditorService } = await import("@/services/inlineEditor");
+    const { selectedText, fullDocument, essayType } = req.body;
+    if (!selectedText || !fullDocument) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: selectedText, fullDocument' });
+    }
+    const suggestions = await inlineEditorService.suggestCommands(selectedText, fullDocument, essayType);
+    res.json({ success: true, data: suggestions });
+  } catch (error: any) {
+    console.error('[inline-edit/suggest] error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Suggest commands failed' });
+  }
+});
+
+// ============================================================================
+// Authenticity Check API
+// ============================================================================
+r.post("/api/authenticity-check", requireAuth, async (req, res) => {
+  try {
+    const { aiRiskScorer } = await import("@/services/authenticity");
+    const { text } = req.body;
+    if (!text) {
+      return res.status(400).json({ success: false, error: 'Missing required field: text' });
+    }
+    const assessment = aiRiskScorer.assessRisk(text);
+    res.json({ success: true, data: assessment });
+  } catch (error: any) {
+    console.error('[authenticity-check] error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Authenticity check failed' });
+  }
+});
+
 // Activity Chat Routes
 r.use(activityChatRouter);
+
+// ============================================================================
+// Story Mining API
+// ============================================================================
+r.post("/api/story-mining/mine", requireAuth, async (req, res) => {
+  try {
+    const { storyMiningService } = await import("@/services/storyMining");
+    const { activities, targetPrompts } = req.body;
+    if (!activities || !Array.isArray(activities) || activities.length === 0) {
+      return res.status(400).json({ success: false, error: 'Missing required field: activities (non-empty array)' });
+    }
+    const result = await storyMiningService.mineStories({
+      userId: req.auth.userId,
+      activities,
+      targetPrompts,
+    });
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Story mining failed';
+    console.error('[story-mining/mine] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+r.post("/api/story-mining/deepen", requireAuth, async (req, res) => {
+  try {
+    const { storyMiningService } = await import("@/services/storyMining");
+    const { seedId, seed } = req.body;
+    if (!seedId || !seed) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: seedId, seed' });
+    }
+    const result = await storyMiningService.deepenSeed(seedId, seed);
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Seed deepening failed';
+    console.error('[story-mining/deepen] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+r.post("/api/story-mining/rank", requireAuth, async (req, res) => {
+  try {
+    const { storyMiningService } = await import("@/services/storyMining");
+    const { seeds, promptText } = req.body;
+    if (!seeds || !Array.isArray(seeds) || seeds.length === 0 || !promptText) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: seeds (non-empty array), promptText' });
+    }
+    const result = await storyMiningService.rankForPrompt(seeds, promptText);
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Seed ranking failed';
+    console.error('[story-mining/rank] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+// ============================================================================
+// RAG Debug API
+// ============================================================================
+r.get("/api/rag/stats", requireAuth, async (_req, res) => {
+  try {
+    const { supabaseAdmin } = await import("@/supabase/admin");
+    const [fragmentsResult, transformationsResult] = await Promise.all([
+      supabaseAdmin.from('rag_essay_fragments').select('id', { count: 'exact', head: true }),
+      supabaseAdmin.from('rag_transformations').select('id', { count: 'exact', head: true }),
+    ]);
+    res.json({
+      success: true,
+      data: {
+        fragmentCount: fragmentsResult.count ?? 0,
+        transformationCount: transformationsResult.count ?? 0,
+      },
+    });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'RAG stats failed';
+    console.error('[rag/stats] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+r.post("/api/rag/search", requireAuth, async (req, res) => {
+  try {
+    const { ragService } = await import("@/services/rag");
+    const { query, options } = req.body;
+    if (!query) {
+      return res.status(400).json({ success: false, error: 'Missing required field: query' });
+    }
+    const results = await ragService.retrieveExamples(query, options || {});
+    res.json({ success: true, data: results });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'RAG search failed';
+    console.error('[rag/search] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
 
 // Simple health check for dev tooling and frontends
 r.get('/health', (_req, res) => {

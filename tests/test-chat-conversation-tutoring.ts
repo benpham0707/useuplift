@@ -13,8 +13,7 @@
  * - Profile completeness growth
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import * as fs from 'fs';
 import * as path from 'path';

@@ -494,7 +494,7 @@ export default function ContextualWorkshopChat({
   // ============================================================================
 
   return (
-    <div className="w-full flex flex-col border-2 border-purple-300 dark:border-purple-700 rounded-lg bg-card relative overflow-hidden" style={{ height: '600px' }}>
+    <div className="w-full flex flex-col border-2 border-purple-300 dark:border-purple-700 rounded-lg bg-card relative overflow-hidden h-full min-h-[400px]">
       {/* Header */}
       <div className="relative z-20 p-4 bg-card rounded-b-xl shadow-sm flex-shrink-0">
         <div className="flex items-center gap-2">

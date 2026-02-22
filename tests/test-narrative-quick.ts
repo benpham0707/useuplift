@@ -2,8 +2,7 @@
  * Quick test for Portfolio Narrative Service
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 console.log('Starting quick narrative test...');
 console.log('API Key found:', !!process.env.ANTHROPIC_API_KEY);

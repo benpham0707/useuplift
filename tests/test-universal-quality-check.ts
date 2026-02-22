@@ -13,7 +13,7 @@
  * 6. No generic filler phrases ("I appreciate you sharing", etc.)
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';

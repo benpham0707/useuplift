@@ -1,7 +1,7 @@
 /**
  * Quick diagnostic to test API key loading
  */
-import 'dotenv/config';
+import './utils/loadEnv';
 import Anthropic from '@anthropic-ai/sdk';
 
 async function main() {

@@ -20,6 +20,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import { Stage0Service } from './stage0Service';
 import { parseClaudeJSON } from '../utils/jsonParser';
 import type {
@@ -521,9 +522,7 @@ export class Stage0MultiStageService extends Stage0Service {
 
   constructor(apiKey?: string) {
     super(apiKey);
-    this.multiStageClient = new Anthropic({
-      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-    });
+    this.multiStageClient = apiKey ? new Anthropic({ apiKey }) : getAnthropicClient();
     this.cache = { lastUpdated: new Date() };
   }
 

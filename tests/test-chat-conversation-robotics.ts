@@ -11,8 +11,7 @@
  *   ANTHROPIC_API_KEY="..." npx tsx tests/test-chat-conversation-robotics.ts
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import * as fs from 'fs';
 import * as path from 'path';

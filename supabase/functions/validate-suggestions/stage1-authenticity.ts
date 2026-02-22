@@ -469,7 +469,13 @@ Return a JSON array of validation objects, one for each suggestion.`;
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 16384,
         temperature: 0.3,
-        system: STAGE_1_PROMPT,
+        system: [
+          {
+            type: 'text',
+            text: STAGE_1_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',

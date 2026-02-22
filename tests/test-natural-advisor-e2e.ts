@@ -9,11 +9,7 @@
  * Testing with Emma only as requested.
  */
 
-import * as dotenv from 'dotenv';
-
-// CRITICAL: Load environment variables FIRST before any other imports
-// This ensures ANTHROPIC_API_KEY is available when claude.ts initializes
-dotenv.config();
+import './utils/loadEnv';
 
 import * as fs from 'fs';
 import * as path from 'path';

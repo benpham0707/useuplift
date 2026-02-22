@@ -9,7 +9,7 @@
  * 5. One-Liner Teaching - Concise insights, not tiring explanations
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import { dynamicConversationEngine } from '../src/services/portfolioStrategy/services/activityWorkshop/chat/dynamicConversationEngine';
 import { conversationModeService } from '../src/services/portfolioStrategy/services/activityWorkshop/chat/conversationModeService';

@@ -191,6 +191,7 @@ All colors MUST be HSL.
   /* Smooth fade from hero gradient to page background */
   .hero-gradient-fade {
     position: relative;
+    will-change: transform; /* Promote to own compositor layer for scroll perf */
     /* Natural fade by masking the hero itself (works in Safari/Chrome/Firefox) */
     -webkit-mask-image: linear-gradient(
       to bottom,
@@ -234,7 +235,8 @@ All colors MUST be HSL.
     pointer-events: none;
   }
   
-  /* Cloud-like, wavy edge to avoid a straight rectangle seam */
+  /* Cloud-like, wavy edge to avoid a straight rectangle seam
+     Optimized: 3 radial gradients (down from 5) + reduced blur for GPU perf */
   .hero-gradient-fade::before {
     content: '';
     position: absolute;
@@ -243,12 +245,10 @@ All colors MUST be HSL.
     bottom: -1px; /* overlap to avoid gap */
     height: clamp(240px, 34vw, 480px);
     background:
-      radial-gradient(260px 160px at 6% 132%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%),
-      radial-gradient(320px 190px at 26% 130%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%),
-      radial-gradient(340px 200px at 50% 134%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%),
-      radial-gradient(320px 190px at 74% 130%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%),
-      radial-gradient(260px 160px at 94% 132%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%);
-    filter: blur(16px);
+      radial-gradient(380px 200px at 15% 131%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%),
+      radial-gradient(400px 220px at 50% 134%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%),
+      radial-gradient(380px 200px at 85% 131%, hsl(0 0% 100% / 0.95) 0 55%, transparent 58%);
+    filter: blur(6px);
     opacity: 0.92;
     pointer-events: none;
   }
@@ -262,8 +262,8 @@ All colors MUST be HSL.
       hsl(185 100% 97% / 0.65) 60%,
       hsl(300 100% 98% / 0.65)
     );
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
     box-shadow: 0 4px 10px -6px hsl(235 45% 20% / 0.22), 0 16px 36px -12px hsl(250 70% 60% / 0.22);
     border: none;
     border-radius: var(--radius);
@@ -501,11 +501,11 @@ All colors MUST be HSL.
   }
   
   .hover-lift {
-    @apply transition-all duration-300 hover:shadow-medium hover:-translate-y-1;
+    @apply transition-[box-shadow,transform] duration-300 hover:shadow-medium hover:-translate-y-1;
   }
-  
+
   .hover-glow-blue {
-    @apply transition-all duration-300;
+    @apply transition-[box-shadow,text-shadow] duration-300;
   }
   
   .hover-glow-blue:hover {
@@ -528,11 +528,11 @@ All colors MUST be HSL.
 
   /* Enhanced Visual Effects for Portfolio Dashboard */
   .glass-card {
-    @apply bg-card/70 backdrop-blur-md border border-border/50 shadow-soft;
+    @apply bg-card/70 backdrop-blur-sm border border-border/50 shadow-soft;
   }
 
   .hover-glow-subtle {
-    @apply transition-all duration-300;
+    @apply transition-[box-shadow] duration-300;
   }
 
   .hover-glow-subtle:hover {

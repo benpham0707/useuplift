@@ -5,6 +5,40 @@
 
 import type { EmotionalRegister } from '../commonAppWorkshop/types/stage0Types';
 
+// ============================================================================
+// INPUT TYPES
+// ============================================================================
+
+/** Activity input for story mining pipeline */
+export interface StoryMiningActivity {
+  id: string;
+  name: string;
+  role: string;
+  description: string;
+  category: string;
+  hoursPerWeek?: number;
+  weeksPerYear?: number;
+  yearsActive?: number;
+  achievements?: string;
+}
+
+/** A target essay prompt to rank seeds against */
+export interface TargetPrompt {
+  id: string;
+  promptText: string;
+}
+
+/** Full input for a story mining session */
+export interface StoryMiningInput {
+  userId: string;
+  activities: StoryMiningActivity[];
+  targetPrompts?: TargetPrompt[];
+}
+
+// ============================================================================
+// OUTPUT TYPES
+// ============================================================================
+
 /** A discovered story seed from student activities */
 export interface StorySeed {
   id: string;

@@ -180,7 +180,13 @@ Deno.serve(async (req) => {
         model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000, // Enough for 3 x 850 chars + JSON overhead
         temperature: 0.7,
-        system: SYSTEM_PROMPT,
+        system: [
+          {
+            type: 'text',
+            text: SYSTEM_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [
           {
             role: 'user',

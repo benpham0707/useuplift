@@ -15,7 +15,8 @@
  * 5. Assesses effect on reader, not checklist completion
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { SupplementalType } from '../../../data/commonAppSupplementalTypes';
 import {
   CORE_WRITING_PRINCIPLES,
@@ -462,11 +463,12 @@ Return ONLY the JSON object, no other text.`;
 // ============================================================================
 
 export class SemanticScoringService {
-  private client: Anthropic;
+  private _client: Anthropic | null = null;
   private model: string = 'claude-sonnet-4-5-20250929';
 
-  constructor() {
-    this.client = new Anthropic();
+  private get client(): Anthropic {
+    if (!this._client) this._client = getAnthropicClient();
+    return this._client;
   }
 
   /**
@@ -505,7 +507,13 @@ export class SemanticScoringService {
       model: this.model,
       max_tokens: 4000,
       temperature: 0.3,
-      system: SEMANTIC_SCORING_SYSTEM_PROMPT,
+      system: [
+        {
+          type: 'text',
+          text: SEMANTIC_SCORING_SYSTEM_PROMPT,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
       messages: [{
         role: 'user',
         content: buildScoringPrompt(essayType, essay, wordCount, wordCountContext)

@@ -5,8 +5,7 @@
  * to ensure all components work together smoothly.
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 // Force stdout to flush immediately
 process.stdout.write(''); // Initialize stdout
