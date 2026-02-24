@@ -160,10 +160,11 @@ export class HolisticAnalyzer {
     try {
       const response = await callClaude<HolisticAnalysis>(userPrompt, {
         systemPrompt,
-        model: 'claude-sonnet-4-5-20250514', // Use smartest model for this meta-analysis
+        model: 'claude-sonnet-4-5-20250929', // Use smartest model for this meta-analysis
         temperature: 0.3, // Slightly higher for creative synthesis (archetypes)
         maxTokens: 6000, // Increased to prevent JSON truncation
-        useJsonMode: true
+        useJsonMode: true,
+        cacheSystemPrompt: true,
       });
 
       return response.content;

@@ -41,7 +41,7 @@ import {
 
 // Model names following CLAUDE.md standards
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 
 // Fallback chain for models - try multiple options
 const HAIKU_FALLBACKS = [
@@ -343,7 +343,7 @@ export class AcademicAnalysisPipeline {
     );
 
     const response = await this.callLLM(
-      'claude-sonnet-4-5-20250514',
+      'claude-sonnet-4-5-20250929',
       prompt.systemPrompt,
       prompt.userPrompt,
       3000
@@ -370,7 +370,7 @@ export class AcademicAnalysisPipeline {
     );
 
     const response = await this.callLLM(
-      'claude-sonnet-4-5-20250514',
+      'claude-sonnet-4-5-20250929',
       prompt.systemPrompt,
       prompt.userPrompt,
       1500

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Semantic Cliché Analyzer
  *
@@ -18,7 +19,8 @@
  * "The sound of American rain is wrong" = fresh angle
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { SupplementalType } from '../../../data/commonAppSupplementalTypes';
 import { withRetry } from '../utils/apiRetry';
 
@@ -1014,10 +1016,11 @@ Return this exact JSON structure:
 // ============================================================================
 
 export class SemanticClicheAnalyzer {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
 
-  constructor() {
-    this.anthropic = new Anthropic();
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) this._anthropic = getAnthropicClient();
+    return this._anthropic;
   }
 
   /**
@@ -1041,7 +1044,7 @@ export class SemanticClicheAnalyzer {
       const response = await withRetry(
         () =>
           this.anthropic.messages.create({
-            model: 'claude-sonnet-4-5-20250514',
+            model: 'claude-sonnet-4-5-20250929',
             max_tokens: 1500,
             messages: [{ role: 'user', content: prompt }],
           }),

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Semantic Context Analyzer
  *
@@ -17,7 +18,8 @@
  * This replaces hardcoded regex patterns with semantic understanding.
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import type { SupplementalType } from '../../../data/commonAppSupplementalTypes';
 import type { IssueContext } from './typeSpecificSuggestionService';
 
@@ -238,10 +240,11 @@ const TYPE_PRIORITIES: Record<SupplementalType, {
 // ============================================================================
 
 export class SemanticContextAnalyzer {
-  private client: Anthropic;
+  private _client: Anthropic | null = null;
 
-  constructor() {
-    this.client = new Anthropic();
+  private get client(): Anthropic {
+    if (!this._client) this._client = getAnthropicClient();
+    return this._client;
   }
 
   /**

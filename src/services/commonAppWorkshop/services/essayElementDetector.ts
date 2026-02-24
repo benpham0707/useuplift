@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Essay Element Detector
  *

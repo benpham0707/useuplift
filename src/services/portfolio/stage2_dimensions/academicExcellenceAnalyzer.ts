@@ -20,7 +20,7 @@
  * - General UC: 40% (primary factor)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   AcademicExcellenceAnalysis,
@@ -34,10 +34,6 @@ import {
   isCompetitiveGPA,
 } from '../constants/ucCalibration';
 
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
-
 /**
  * Stage 2.1: Academic Excellence Analyzer
  */
@@ -50,8 +46,8 @@ export async function analyzeAcademicExcellence(
   const userPrompt = buildUserPrompt(portfolio, holisticContext, mode);
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+    const response = await getAnthropicClient().messages.create({
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 3000,
       temperature: 0.5, // Moderate creativity for contextual analysis
       system: systemPrompt,
@@ -73,8 +69,8 @@ export async function analyzeAcademicExcellence(
 
     // Retry once
     try {
-      const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250514',
+      const retryResponse = await getAnthropicClient().messages.create({
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
         temperature: 0.5,
         system: systemPrompt,

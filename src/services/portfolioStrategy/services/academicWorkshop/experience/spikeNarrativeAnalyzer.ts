@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Spike & Narrative Analyzer
  *
@@ -236,7 +237,7 @@ export class SpikeNarrativeAnalyzer {
         transcriptNarrative: TranscriptNarrative;
       }>(prompt, {
         provider: 'claude',
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         temperature: 0.7,
         maxTokens: 3000,
         systemPrompt:

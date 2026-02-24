@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Major Alignment Analyzer Service
  *

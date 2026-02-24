@@ -18,7 +18,7 @@
  * - Final description quality
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import {
   activityProfileChatService,

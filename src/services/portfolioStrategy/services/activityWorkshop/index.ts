@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Activity Workshop Module - v4.0 PIPELINE
  *

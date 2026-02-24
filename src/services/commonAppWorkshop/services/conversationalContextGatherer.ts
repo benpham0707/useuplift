@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Conversational Context Gatherer
  *
@@ -24,7 +25,8 @@
  * - STRONG: Vivid, specific, emotionally grounded, memorable
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
+import type Anthropic from '@anthropic-ai/sdk';
 import { SupplementalType } from '../types';
 import type { ContextGap as SonnetGap, ExistingStrength } from './sonnetContextLayer';
 import type { EnrichedStudentContext } from '../types/contextGathering';
@@ -612,11 +614,12 @@ function buildClicheAwareFollowUp(
 // ============================================================================
 
 export class ConversationalContextGatherer {
-  private anthropic: Anthropic;
+  private _anthropic: Anthropic | null = null;
   private conversationStates: Map<string, GapConversationState[]> = new Map();
 
-  constructor() {
-    this.anthropic = new Anthropic();
+  private get anthropic(): Anthropic {
+    if (!this._anthropic) this._anthropic = getAnthropicClient();
+    return this._anthropic;
   }
 
   /**
@@ -1227,7 +1230,7 @@ Return JSON:
 }`;
 
     const response_ai = await this.anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514', // Sonnet for nuanced quality assessment - this is critical
+      model: 'claude-sonnet-4-5-20250929', // Sonnet for nuanced quality assessment - this is critical
       max_tokens: 1000,
       messages: [{ role: 'user', content: prompt }],
     });

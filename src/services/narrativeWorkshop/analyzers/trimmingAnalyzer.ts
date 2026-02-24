@@ -62,9 +62,10 @@ export async function generateTrimmingSuggestions(
             promptContext,
             {
                 systemPrompt: TRIMMING_SYSTEM_PROMPT,
-                temperature: 0.4, 
+                temperature: 0.4,
                 useJsonMode: true,
-                maxTokens: 1500
+                maxTokens: 1500,
+                cacheSystemPrompt: true,
             }
         );
 

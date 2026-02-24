@@ -1,10 +1,12 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
+import ClerkErrorBoundary from "@/components/ClerkErrorBoundary";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
 import BugReportWidget from "@/components/BugReportWidget";
 import Index from "./pages/Index";
@@ -25,24 +27,22 @@ import RequireTermsAccepted from "@/components/RequireTermsAccepted";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 import WorkshopDemo from "./pages/WorkshopDemo";
+import ActivityWorkshop from "./pages/ActivityWorkshop";
 import Pricing from "./pages/Pricing";
 import PIQWorkshop from "./pages/PIQWorkshop";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
-import DashboardHome from "./pages/DashboardHome";
 import { ConfigError } from "@/components/ConfigError";
-import { getSupabaseConfigErrors } from "@/integrations/supabase/client";
-import { CLERK_PUBLISHABLE_KEY } from "@/config/clerk";
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 1000 * 60 * 5, // 5 minutes - data stays fresh, no refetch on remount
-      gcTime: 1000 * 60 * 30, // 30 minutes - keep unused data in memory
-      refetchOnWindowFocus: false, // avoid surprise refetches when alt-tabbing
-      retry: 1, // retry failed requests once
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 30,
+      refetchOnWindowFocus: false,
+      retry: 1,
     },
   },
 });
@@ -98,24 +98,15 @@ const App = () => {
               <Route path="/workshop-demo" element={<WorkshopDemo />} />
               
               {/* Dashboard routes - authenticated app shell with left sidebar */}
-              <Route path="dashboard" element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
-                <Route index element={<DashboardHome />} />
-                <Route path="scanner" element={<PortfolioScanner />} />
-                <Route path="insights" element={<PortfolioInsightsNew />} />
-                <Route path="workshop" element={<PIQWorkshop />} />
-                <Route path="workshop/:piqNumber" element={<PIQWorkshop />} />
-                <Route path="pricing" element={<Pricing />} />
-                <Route path="settings" element={<Settings />} />
+              <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+                <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
+                <Route path="/portfolio-insights" element={<PortfolioInsightsNew />} />
+                <Route path="/piq-workshop" element={<PIQWorkshop />} />
+                <Route path="/piq-workshop/:piqNumber" element={<PIQWorkshop />} />
+                <Route path="/pricing" element={<Pricing />} />
+                <Route path="/settings" element={<Settings />} />
               </Route>
-
-              {/* Backward compatibility redirects */}
-              <Route path="/portfolio-scanner" element={<Navigate replace to="/dashboard/scanner" />} />
-              <Route path="/portfolio-insights" element={<Navigate replace to="/dashboard/insights" />} />
-              <Route path="/piq-workshop" element={<Navigate replace to="/dashboard/workshop" />} />
-              <Route path="/piq-workshop/:piqNumber" element={<Navigate replace to="/dashboard/workshop/:piqNumber" />} />
-              <Route path="/pricing" element={<Navigate replace to="/dashboard/pricing" />} />
-              <Route path="/settings" element={<Navigate replace to="/dashboard/settings" />} />
-
+              
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

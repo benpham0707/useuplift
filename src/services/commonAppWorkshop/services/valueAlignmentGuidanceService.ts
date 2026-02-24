@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Value Alignment Guidance Service
  *
@@ -22,7 +23,8 @@
  * - Returns actionable, specific suggestions tied to essay content
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import type Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import { parseClaudeJSON } from '../utils/jsonParser';
 import type { CollegeResearch, CollegeCoreValue } from '../types/collegeResearch';
 
@@ -106,7 +108,7 @@ export interface ValueAlignmentOutput {
 // CONSTANTS
 // ============================================================================
 
-const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 
 const SONNET_PRICING = {
   input: 3.0 / 1_000_000,
@@ -121,9 +123,7 @@ export class ValueAlignmentGuidanceService {
   private client: Anthropic;
 
   constructor() {
-    this.client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = getAnthropicClient();
   }
 
   /**

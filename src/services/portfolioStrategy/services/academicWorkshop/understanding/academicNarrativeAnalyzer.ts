@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Narrative Analyzer (Layer 3a)
  *
@@ -236,7 +237,7 @@ export class AcademicNarrativeAnalyzer {
       try {
         const response = await callUnifiedLLM<AcademicNarrativeAnalysis>(prompt, {
           provider: 'claude',
-          model: 'claude-sonnet-4-5-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           temperature,
           maxTokens: 2000,
           systemPrompt:

@@ -3,11 +3,11 @@
  * Run: ANTHROPIC_API_KEY="..." npx tsx tests/generate-deep-report-output.ts
  */
 
-import * as dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import { generateDeepAcademicReport } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReport';
 import type { DeepAcademicReportInput } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReportTypes';
+import { UPLIFT_SCALE_DATABASE } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/deepAcademicReportTypes';
 import type { NuancedCapabilityAnalysis } from '../src/services/portfolioStrategy/services/academicWorkshop/capability/nuancedCapabilityAnalyzer';
 
 // Same mock as the test
@@ -163,8 +163,13 @@ async function main() {
 
   md.push(`## Your Academic Profile`);
   md.push('');
-  md.push(`**Your Uplift Grade: ${grade}** — ${tp.currentTier} Schools`);
-  md.push(`> Schools like ${tp.tierExamples.slice(0, 4).join(', ')}`);
+  const gradeDesc = UPLIFT_SCALE_DATABASE.find(d => d.grade === grade);
+  md.push(`**Your Uplift Grade: ${grade}${gradeDesc ? ` — ${gradeDesc.label}` : ''}**`);
+  if (gradeDesc) {
+    md.push(`> ${gradeDesc.schoolFit}`);
+    md.push('');
+    md.push(gradeDesc.description);
+  }
   md.push('');
 
   // Unified narrative (now includes tier and rating context woven in)
@@ -300,7 +305,13 @@ async function main() {
     md.push('');
   }
 
-  md.push(`### Major Alignment: ${report.strategicRoadmap.majorAlignment.score}/100`);
+  const maScore = report.strategicRoadmap.majorAlignment.score;
+  const maLevel = maScore >= 90 ? 'Exceptional — Ivy/Elite Level'
+    : maScore >= 75 ? 'Strong — Highly Selective Level'
+    : maScore >= 55 ? 'Moderate — Selective Level'
+    : maScore >= 30 ? 'Developing — Competitive Level'
+    : 'Building Foundation';
+  md.push(`### Major Alignment: ${maLevel}`);
   md.push('');
   md.push(report.strategicRoadmap.majorAlignment.assessment);
   md.push('');

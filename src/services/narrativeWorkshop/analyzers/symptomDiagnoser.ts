@@ -192,7 +192,8 @@ export async function diagnoseSymptom(quote: string, surroundingContext: string)
             systemPrompt: DIAGNOSIS_SYSTEM_PROMPT,
             temperature: 0.1, // High precision
             maxTokens: 400, // Increased for missing_elements
-            useJsonMode: true
+            useJsonMode: true,
+            cacheSystemPrompt: true,
         });
 
         const result = typeof response.content === 'string' ? JSON.parse(response.content) : response.content;

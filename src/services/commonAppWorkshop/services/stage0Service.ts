@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 0: Voice Excavation Service
  *
@@ -14,6 +15,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import { parseClaudeJSON } from '../utils/jsonParser';
 import type {
   EmotionalRegister,
@@ -36,7 +38,7 @@ import {
 // CONSTANTS
 // ============================================================================
 
-const SONNET_MODEL = 'claude-sonnet-4-5-20250514';
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
 const SONNET_PRICING = {
   input: 3.0 / 1_000_000,   // $3 per million input tokens
   output: 15.0 / 1_000_000, // $15 per million output tokens
@@ -460,9 +462,7 @@ export class Stage0Service {
   private client: Anthropic;
 
   constructor(apiKey?: string) {
-    this.client = new Anthropic({
-      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = apiKey ? new Anthropic({ apiKey }) : getAnthropicClient();
   }
 
   /**

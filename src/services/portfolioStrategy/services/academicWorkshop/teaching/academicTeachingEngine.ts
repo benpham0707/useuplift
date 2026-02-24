@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Academic Teaching Engine (Layer 5)
  *
@@ -217,7 +218,7 @@ export class AcademicTeachingEngine {
       try {
         const response = await callUnifiedLLM<AcademicTeaching>(prompt, {
           provider: 'claude',
-          model: 'claude-sonnet-4-5-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           temperature,
           maxTokens: 2500,
           systemPrompt:

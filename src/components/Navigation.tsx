@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Menu, X, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import GradientZap from '@/components/ui/GradientZap';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/query/queryKeys';

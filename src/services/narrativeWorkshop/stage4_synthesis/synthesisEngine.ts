@@ -368,6 +368,7 @@ export async function synthesizeInsights(
         temperature: 0.3,
         useJsonMode: true,
         maxTokens: 4000,
+        cacheSystemPrompt: true,
       }
     );
 

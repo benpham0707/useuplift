@@ -20,9 +20,19 @@ import {
   QuestionCategory,
   QuestionGenerationInput,
   QuestionGenerationOutput,
+  WorkshopContextForChat,
 } from './types';
 import { ActivityProfile, ProfileCompleteness } from '../profile/types';
 import { activityProfileService } from '../profile/activityProfileService';
+
+/**
+ * Extended state type that may carry workshop context.
+ * Stored pragmatically on the state to avoid type conflicts with
+ * the other agent editing types.ts. Access via type assertion.
+ */
+interface ConversationStateWithWorkshopContext extends ConversationState {
+  workshopContext?: WorkshopContextForChat;
+}
 
 // ============================================================================
 // QUESTION BANKS
@@ -310,10 +320,28 @@ export class QuestionGeneratorService {
     const completeness = activityProfileService.calculateCompleteness(state.currentProfile);
 
     // Generate candidate questions
-    const candidates = this.generateCandidates(state, completeness, preferredCategories, priorityFields);
+    let candidates = this.generateCandidates(state, completeness, preferredCategories, priorityFields);
 
-    // Sort by priority
-    candidates.sort((a, b) => b.priority - a.priority);
+    // Apply workshop-context-aware priority adjustments if available
+    const workshopContext = (state as ConversationStateWithWorkshopContext).workshopContext;
+    if (workshopContext) {
+      candidates = this.adjustPrioritiesForWorkshopContext(candidates, workshopContext);
+    }
+
+    // Apply topic diversity penalty to prevent consecutive same-topic questions
+    candidates = this.applyTopicDiversityPenalty(candidates, state);
+
+    // Sort by priority with deterministic tie-breaking.
+    // When two candidates share the same priority, prefer template questions
+    // over follow-ups (more reliable), and break further ties by targetField
+    // alphabetical order to ensure stable, repeatable ordering.
+    candidates.sort((a, b) => {
+      if (b.priority !== a.priority) return b.priority - a.priority;
+      // Prefer non-follow-ups over follow-ups for stability
+      if (a.isFollowUp !== b.isFollowUp) return a.isFollowUp ? 1 : -1;
+      // Deterministic alphabetical tie-break
+      return a.targetField.localeCompare(b.targetField);
+    });
 
     // Check if we should transition phase
     const { shouldTransition, nextPhase } = this.checkPhaseTransition(state, completeness, candidates);
@@ -341,7 +369,7 @@ export class QuestionGeneratorService {
     priorityFields?: string[]
   ): QuestionCandidate[] {
     const candidates: QuestionCandidate[] = [];
-    const askedQuestions = new Set(state.questionsAsked.map(q => q.targetField));
+    const askedTargetFields = new Set(state.questionsAsked.map(q => q.targetField));
     const activityTitle = state.activityTitle;
 
     // Build set of already extracted fields to avoid redundant questions
@@ -350,7 +378,7 @@ export class QuestionGeneratorService {
     // Generate questions from templates
     for (const [field, template] of Object.entries(QUESTION_TEMPLATES)) {
       // Skip if we've already asked about this field
-      if (askedQuestions.has(field)) continue;
+      if (askedTargetFields.has(field)) continue;
 
       // Skip if data for this field was already extracted from natural conversation
       if (this.isFieldSufficientlyExtracted(field, extractedFields, state.currentProfile)) continue;
@@ -395,18 +423,166 @@ export class QuestionGeneratorService {
       });
     }
 
-    // Generate follow-up questions based on last response
-    const followUps = this.generateFollowUps(state);
-    candidates.push(...followUps);
+    // Generate follow-up questions based on last response, then filter
+    // against already-asked questions to prevent repetition
+    const rawFollowUps = this.generateFollowUps(state);
+    const filteredFollowUps = this.filterFollowUpsAgainstAsked(rawFollowUps, state);
+    candidates.push(...filteredFollowUps);
 
     return candidates;
   }
 
   /**
-   * Generate follow-up questions based on last response and extraction
+   * Filter follow-up candidates against questions already asked.
+   *
+   * Follow-ups use synthetic targetField values like 'follow_up_detail' that
+   * can repeat across turns. This filter prevents re-asking the same follow-up
+   * type AND catches semantically redundant questions (e.g., asking about team
+   * size when the student already answered a template question about it).
+   */
+  private filterFollowUpsAgainstAsked(
+    followUps: QuestionCandidate[],
+    state: ConversationState
+  ): QuestionCandidate[] {
+    // Build comprehensive lookup of what's been asked:
+    // 1. By targetField (catches repeat follow-up types)
+    // 2. By question text similarity (catches semantically similar questions)
+    const askedTargetFields = new Set(state.questionsAsked.map(q => q.targetField));
+    const askedQuestionTexts = state.questionsAsked.map(q => q.question.toLowerCase());
+
+    return followUps.filter(followUp => {
+      // Check 1: Has this follow-up targetField already been asked?
+      // This prevents the same follow-up type (e.g., 'follow_up_detail',
+      // 'follow_up_reluctance') from being generated twice.
+      if (askedTargetFields.has(followUp.targetField)) {
+        // Exception: Some real profile fields like 'story.keyMoments' or
+        // 'facts.recognition' can legitimately appear as follow-up targets
+        // AND have been asked as templates. Allow these ONLY if the follow-up
+        // is probing deeper (isFollowUp=true) and the original was a template.
+        const wasTemplate = Object.keys(QUESTION_TEMPLATES).includes(followUp.targetField);
+        if (!wasTemplate) {
+          return false; // Synthetic follow-up field already asked — skip
+        }
+        // For real fields, allow if the follow-up question text is different
+        // from what was asked (it's probing deeper, not repeating)
+      }
+
+      // Check 2: Is the question text too similar to something already asked?
+      // Use simple substring overlap to catch near-duplicates.
+      const followUpLower = followUp.question.toLowerCase();
+      for (const askedText of askedQuestionTexts) {
+        if (this.areQuestionsSimilar(followUpLower, askedText)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  /**
+   * Check if two question texts are semantically similar enough to be
+   * considered duplicates. Uses keyword overlap rather than exact matching
+   * to catch rephrased versions of the same question.
+   */
+  private areQuestionsSimilar(q1: string, q2: string): boolean {
+    // Strip common filler words for comparison
+    const stopWords = new Set([
+      'a', 'an', 'the', 'is', 'was', 'are', 'were', 'be', 'been',
+      'do', 'did', 'does', 'have', 'has', 'had', 'can', 'could',
+      'would', 'should', 'will', 'shall', 'may', 'might',
+      'i', 'you', 'your', 'me', 'my', 'we', 'our', 'us',
+      'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from',
+      'that', 'this', 'it', 'its', 'about', 'more', 'tell',
+      'what', 'how', 'when', 'where', 'who', 'why',
+    ]);
+
+    const extractKeywords = (text: string): Set<string> => {
+      return new Set(
+        text.split(/\s+/)
+          .map(w => w.replace(/[^a-z]/g, ''))
+          .filter(w => w.length > 2 && !stopWords.has(w))
+      );
+    };
+
+    const kw1 = extractKeywords(q1);
+    const kw2 = extractKeywords(q2);
+
+    if (kw1.size === 0 || kw2.size === 0) return false;
+
+    // Count overlap
+    let overlap = 0;
+    for (const w of kw1) {
+      if (kw2.has(w)) overlap++;
+    }
+
+    // If more than 60% of the smaller set overlaps, they're similar
+    const minSize = Math.min(kw1.size, kw2.size);
+    return minSize > 0 && (overlap / minSize) > 0.6;
+  }
+
+  /**
+   * Apply topic diversity penalty to prevent consecutive questions from the
+   * same topic area. If the last 2+ questions targeted the same top-level
+   * topic (facts, story, meaning, impact, connections), penalize further
+   * questions in that area to encourage natural topic rotation.
+   *
+   * This ensures the conversation feels like a counselor exploring different
+   * angles, not a form being filled out section by section.
+   */
+  private applyTopicDiversityPenalty(
+    candidates: QuestionCandidate[],
+    state: ConversationState
+  ): QuestionCandidate[] {
+    if (state.questionsAsked.length < 2) return candidates;
+
+    // Count how many of the last N questions targeted each topic area
+    const recentWindow = 3;
+    const recentQuestions = state.questionsAsked.slice(-recentWindow);
+    const topicCounts = new Map<string, number>();
+
+    for (const asked of recentQuestions) {
+      const topicArea = asked.targetField.split('.')[0]; // e.g., 'facts', 'story', 'meaning'
+      topicCounts.set(topicArea, (topicCounts.get(topicArea) || 0) + 1);
+    }
+
+    return candidates.map(candidate => {
+      const candidateTopic = candidate.targetField.split('.')[0];
+      const recentCount = topicCounts.get(candidateTopic) || 0;
+
+      if (recentCount >= 2) {
+        // Heavy penalty: 3+ questions in this area recently — strongly deprioritize
+        return { ...candidate, priority: candidate.priority - 40 };
+      } else if (recentCount === 1) {
+        // Mild penalty: 1 recent question in this area — slight deprioritization
+        return { ...candidate, priority: candidate.priority - 15 };
+      }
+
+      // Bonus for topics NOT asked about recently — encourages rotation
+      if (recentCount === 0 && recentQuestions.length >= 2) {
+        return { ...candidate, priority: candidate.priority + 10 };
+      }
+
+      return candidate;
+    });
+  }
+
+  /**
+   * Generate follow-up questions based on last response and extraction.
+   *
+   * IMPORTANT: Follow-ups generated here are later filtered by
+   * filterFollowUpsAgainstAsked() in generateCandidates(). This method
+   * focuses on generating contextually appropriate follow-ups; the filter
+   * handles deduplication against the conversation history.
+   *
+   * GUARD: We also avoid generating the same follow-up type multiple times
+   * within a single generation pass (e.g., two 'follow_up_detail' candidates).
    */
   private generateFollowUps(state: ConversationState): QuestionCandidate[] {
     const followUps: QuestionCandidate[] = [];
+    // Track which follow-up types we've added in THIS generation pass
+    // to prevent duplicate candidates within a single call
+    const addedFollowUpTypes = new Set<string>();
 
     if (state.responsesReceived.length === 0) return followUps;
 
@@ -415,10 +591,16 @@ export class QuestionGeneratorService {
     const lastExtraction = lastTurn.extraction;
 
     // Generate follow-ups based on what was extracted
-    followUps.push(...this.generateExtractionBasedFollowUps(lastExtraction, state));
+    const extractionFollowUps = this.generateExtractionBasedFollowUps(lastExtraction, state);
+    for (const fu of extractionFollowUps) {
+      if (!addedFollowUpTypes.has(fu.targetField)) {
+        followUps.push(fu);
+        addedFollowUpTypes.add(fu.targetField);
+      }
+    }
 
     // Check for numbers that could be explored (only if not already extracted well)
-    if (lastExtraction.extractionQuality !== 'rich') {
+    if (lastExtraction.extractionQuality !== 'rich' && !addedFollowUpTypes.has('follow_up_number')) {
       const numberMatch = lastResponse.match(/\b(\d+(?:,\d{3})*(?:\.\d+)?)\b/);
       if (numberMatch) {
         const template = FOLLOW_UP_TEMPLATES.mentioned_number[0];
@@ -426,17 +608,19 @@ export class QuestionGeneratorService {
           question: template.replace('{number}', numberMatch[1]),
           targetField: 'follow_up_number',
           category: 'specific_probe',
-          priority: 110, // Boost to beat most template questions
+          priority: 110,
           phase: state.phase,
           isFollowUp: true,
           followsResponse: lastResponse,
           estimatedImpact: { descriptionScore: 1, activityScore: 0.5, narrativeValue: 0.5 },
         });
+        addedFollowUpTypes.add('follow_up_number');
       }
     }
 
-    // Check for challenge mentions (only if hardestChallenge not extracted)
-    if (!state.currentProfile.meaning.hardestChallenge) {
+    // Check for challenge mentions (only if hardestChallenge not extracted
+    // AND we haven't already asked about keyMoments via a follow-up this pass)
+    if (!state.currentProfile.meaning.hardestChallenge && !addedFollowUpTypes.has('story.keyMoments')) {
       const challengePatterns = [/difficult|hard|challenging|struggle|obstacle/i];
       for (const pattern of challengePatterns) {
         if (pattern.test(lastResponse)) {
@@ -444,30 +628,35 @@ export class QuestionGeneratorService {
             question: "You mentioned that was challenging. How did you handle that?",
             targetField: 'story.keyMoments',
             category: 'story_prompt',
-            priority: 120, // Boost - challenges are great for narrative
+            priority: 120,
             phase: 'story_exploration',
             isFollowUp: true,
             followsResponse: lastResponse,
             estimatedImpact: { descriptionScore: 1, activityScore: 0.5, narrativeValue: 2 },
           });
+          addedFollowUpTypes.add('story.keyMoments');
           break;
         }
       }
     }
 
     // Check for short responses (might need prompting)
-    // CRITICAL: Short responses with sparse extraction need HIGHEST priority probing
-    if (lastResponse.split(' ').length < 15 && lastExtraction.extractionQuality === 'sparse') {
+    // CRITICAL: Short responses with sparse extraction need HIGHEST priority probing.
+    // Guard: only add if we haven't already generated a detail follow-up this pass.
+    if (lastResponse.split(' ').length < 15
+        && lastExtraction.extractionQuality === 'sparse'
+        && !addedFollowUpTypes.has('follow_up_detail')) {
       followUps.push({
         question: "Tell me more about that — I'd love to hear more details.",
         targetField: 'follow_up_detail',
         category: 'open_exploratory',
-        priority: 150, // Higher than critical questions to ensure probing happens
+        priority: 150,
         phase: state.phase,
         isFollowUp: true,
         followsResponse: lastResponse,
         estimatedImpact: { descriptionScore: 0.5, activityScore: 0.5, narrativeValue: 0.5 },
       });
+      addedFollowUpTypes.add('follow_up_detail');
     }
 
     // Detect reluctance patterns and add gentle follow-ups
@@ -476,17 +665,20 @@ export class QuestionGeneratorService {
       /not a big deal|not that important|doesn't matter/i,
     ];
     const isReluctant = reluctancePatterns.some(p => p.test(lastResponse));
-    if (isReluctant && lastExtraction.extractionQuality !== 'rich') {
+    if (isReluctant
+        && lastExtraction.extractionQuality !== 'rich'
+        && !addedFollowUpTypes.has('follow_up_reluctance')) {
       followUps.push({
         question: "Even if it felt normal to you, I'm curious what you actually did day-to-day. Can you walk me through a typical experience?",
         targetField: 'follow_up_reluctance',
         category: 'open_exploratory',
-        priority: 140, // High priority for reluctant students
+        priority: 140,
         phase: state.phase,
         isFollowUp: true,
         followsResponse: lastResponse,
         estimatedImpact: { descriptionScore: 1, activityScore: 1, narrativeValue: 1 },
       });
+      addedFollowUpTypes.add('follow_up_reluctance');
     }
 
     // Detect underselling/humility patterns
@@ -496,7 +688,7 @@ export class QuestionGeneratorService {
       /i don't deserve|don't think i|not sure i should/i,
     ];
     const isUnderselling = humilityPatterns.some(p => p.test(lastResponse));
-    if (isUnderselling) {
+    if (isUnderselling && !addedFollowUpTypes.has('follow_up_underselling')) {
       followUps.push({
         question: "I hear that you value your team. But specifically, what was YOUR unique contribution that others relied on?",
         targetField: 'follow_up_underselling',
@@ -507,6 +699,7 @@ export class QuestionGeneratorService {
         followsResponse: lastResponse,
         estimatedImpact: { descriptionScore: 1.5, activityScore: 1, narrativeValue: 1 },
       });
+      addedFollowUpTypes.add('follow_up_underselling');
     }
 
     return followUps;
@@ -571,19 +764,20 @@ export class QuestionGeneratorService {
       }
     }
 
-    // Use suggested follow-ups from extraction if available
-    for (const suggestedQ of extraction.suggestedFollowUps.slice(0, 2)) {
-      if (suggestedQ && suggestedQ.length > 10) {
-        followUps.push({
-          question: suggestedQ,
-          targetField: 'extraction_suggested',
-          category: 'specific_probe',
-          priority: 105, // Boost to compete with template questions
-          phase: state.phase,
-          isFollowUp: true,
-          estimatedImpact: { descriptionScore: 0.5, activityScore: 0.5, narrativeValue: 1 },
-        });
-      }
+    // Use suggested follow-ups from extraction if available.
+    // Give each a unique targetField suffix to avoid collisions in the
+    // follow-up filter, and limit to 1 to avoid flooding candidates.
+    const suggestedFollowUps = extraction.suggestedFollowUps.filter(q => q && q.length > 10);
+    if (suggestedFollowUps.length > 0) {
+      followUps.push({
+        question: suggestedFollowUps[0],
+        targetField: 'extraction_suggested_0',
+        category: 'specific_probe',
+        priority: 105,
+        phase: state.phase,
+        isFollowUp: true,
+        estimatedImpact: { descriptionScore: 0.5, activityScore: 0.5, narrativeValue: 1 },
+      });
     }
 
     return followUps;
@@ -825,7 +1019,155 @@ export class QuestionGeneratorService {
       parts.push('valuable for essays/interviews');
     }
 
+    // Note workshop context influence in rationale
+    const workshopContext = (state as ConversationStateWithWorkshopContext).workshopContext;
+    if (workshopContext) {
+      if (workshopContext.undersold && (question.category === 'story_prompt' || question.category === 'specific_probe')) {
+        parts.push('workshop: activity appears undersold');
+      }
+      if (workshopContext.spikeCandidate && question.category === 'connection_suggest') {
+        parts.push('workshop: spike candidate — mapping connections');
+      }
+      if (workshopContext.redFlags?.length && question.targetField.includes('impact')) {
+        parts.push('workshop: addressing flagged impact gaps');
+      }
+    }
+
     return parts.join('; ');
+  }
+
+  // ============================================================================
+  // WORKSHOP-CONTEXT-AWARE PRIORITIZATION
+  // ============================================================================
+
+  /**
+   * Adjust question priorities based on workshop analysis results.
+   * When we know what the pipeline found (red flags, score gaps, etc.),
+   * we can ask smarter questions that address those specific issues.
+   *
+   * This does NOT sort — it only adjusts priority values so the
+   * existing sort in generateNextQuestion() picks the right order.
+   */
+  adjustPrioritiesForWorkshopContext(
+    candidates: QuestionCandidate[],
+    workshopContext: WorkshopContextForChat
+  ): QuestionCandidate[] {
+    return candidates.map(candidate => {
+      let priorityBoost = 0;
+
+      // If red flags include "vague impact" → boost fact_gathering questions about scale
+      if (workshopContext.redFlags?.some(f =>
+        f.flag.toLowerCase().includes('vague') || f.flag.toLowerCase().includes('impact')
+      )) {
+        if (candidate.targetField.includes('scale') || candidate.targetField.includes('impact')) {
+          priorityBoost += 30;
+        }
+      }
+
+      // If undersold → boost story_exploration to surface hidden achievements
+      if (workshopContext.undersold) {
+        if (candidate.category === 'story_prompt' || candidate.category === 'specific_probe') {
+          priorityBoost += 25;
+        }
+      }
+
+      // If spike candidate → boost connection_mapping questions
+      if (workshopContext.spikeCandidate) {
+        if (
+          candidate.targetField.includes('spike') ||
+          candidate.targetField.includes('connection') ||
+          candidate.category === 'connection_suggest'
+        ) {
+          priorityBoost += 20;
+        }
+      }
+
+      // If description score is low → boost questions that surface description-worthy content
+      if (workshopContext.descriptionScore !== undefined && workshopContext.descriptionScore < 50) {
+        if (
+          candidate.targetField.includes('facts') ||
+          candidate.targetField.includes('recognition') ||
+          candidate.targetField.includes('artifacts')
+        ) {
+          priorityBoost += 20;
+        }
+      }
+
+      // If specific description issues identified → target those
+      if (workshopContext.descriptionIssues?.length) {
+        for (const issue of workshopContext.descriptionIssues) {
+          if (issue.toLowerCase().includes('quantif') && candidate.targetField.includes('scale')) {
+            priorityBoost += 25;
+          }
+          if (issue.toLowerCase().includes('leadership') && candidate.targetField.includes('role')) {
+            priorityBoost += 25;
+          }
+          if (issue.toLowerCase().includes('specific') && candidate.category === 'specific_probe') {
+            priorityBoost += 20;
+          }
+        }
+      }
+
+      // If teaching priorities are set, boost questions that align
+      if (workshopContext.teachingPriorities?.length) {
+        for (const priority of workshopContext.teachingPriorities) {
+          const priorityLower = priority.toLowerCase();
+          if (priorityLower.includes('impact') && candidate.targetField.includes('impact')) {
+            priorityBoost += 15;
+          }
+          if (priorityLower.includes('story') && candidate.category === 'story_prompt') {
+            priorityBoost += 15;
+          }
+          if (priorityLower.includes('recognition') && candidate.targetField.includes('recognition')) {
+            priorityBoost += 15;
+          }
+          if (priorityLower.includes('scale') && candidate.targetField.includes('scale')) {
+            priorityBoost += 15;
+          }
+        }
+      }
+
+      // If activity score is low overall, boost high-impact fact-based questions
+      if (workshopContext.activityScore !== undefined && workshopContext.activityScore < 40) {
+        if (candidate.targetField.startsWith('facts.') || candidate.targetField.startsWith('impact.')) {
+          priorityBoost += 10;
+        }
+      }
+
+      if (priorityBoost === 0) {
+        return candidate;
+      }
+
+      return {
+        ...candidate,
+        priority: candidate.priority + priorityBoost,
+      };
+    });
+  }
+
+  /**
+   * Generate a workshop-context-aware opening insight.
+   * Returns a brief sentence that acknowledges what the pipeline found,
+   * giving the student a sense that the system understands their activity.
+   * Returns null if no meaningful insight is available.
+   */
+  generateWorkshopInsight(
+    workshopContext: WorkshopContextForChat,
+    activityTitle: string
+  ): string | null {
+    if (workshopContext.undersold) {
+      return `Your analysis suggests "${activityTitle}" is stronger than your description shows. I'd love to help you uncover what's missing.`;
+    }
+    if (workshopContext.spikeCandidate) {
+      return `"${activityTitle}" looks like it could be central to your application story. Let's make sure we capture everything important.`;
+    }
+    if (workshopContext.redFlags?.length) {
+      return `I noticed some areas where "${activityTitle}" could be presented more effectively. Let me ask a few questions to help strengthen it.`;
+    }
+    if (workshopContext.greenFlags?.length && workshopContext.descriptionScore !== undefined && workshopContext.descriptionScore < 50) {
+      return `There are some great things about "${activityTitle}" already — let's make sure they come through clearly in your description.`;
+    }
+    return null;
   }
 
   /**

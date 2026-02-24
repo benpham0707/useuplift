@@ -19,18 +19,19 @@
  * The 12 universal dimensions for supplemental essays
  */
 export type SupplementalDimension =
-  | 'specificity_evidence'      // Concrete details, numbers, names, examples
-  | 'authenticity_voice'        // Genuine voice vs essay-speak
-  | 'personal_connection'       // How personally connected to student's life
-  | 'fit_demonstration'         // Mutual fit between student and institution
-  | 'narrative_clarity'         // Clear structure, logical flow
-  | 'growth_transformation'     // Evidence of genuine change/learning
-  | 'vulnerability_balance'     // Honest self-reflection without oversharing
-  | 'reflection_insight'        // Depth of thinking, self-awareness
-  | 'research_depth'            // Deep investigation beyond surface
-  | 'strategic_coherence'       // How well essay fits larger application
-  | 'prompt_responsiveness'     // Does essay answer what was asked
-  | 'impact_memorability';      // Will this essay stick with reader
+  | 'specificity_evidence'
+  | 'authenticity_voice'
+  | 'personal_connection'
+  | 'fit_demonstration'
+  | 'narrative_clarity'
+  | 'growth_transformation'
+  | 'vulnerability_balance'
+  | 'reflection_insight'
+  | 'research_depth'
+  | 'strategic_coherence'
+  | 'prompt_responsiveness'
+  | 'impact_memorability'
+  | string;
 
 /**
  * Score for a single dimension (0-10 scale)

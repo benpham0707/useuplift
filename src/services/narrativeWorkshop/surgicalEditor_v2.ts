@@ -239,6 +239,7 @@ ${promptToUse}
         temperature: attemptNumber > 1 ? 0.6 : 0.7,
         useJsonMode: true,
         maxTokens: 1500,
+        cacheSystemPrompt: true,
       });
 
       // Parse response

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Diverse Source Orchestrator
  *

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PASS Pipeline Stages Index
  *

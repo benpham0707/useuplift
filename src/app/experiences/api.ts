@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/safeClient";
 import { apiFetch } from "@/lib/utils";
 
 export async function createExperience(payload: any) {

@@ -460,10 +460,16 @@ Deno.serve(async (req) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 8192,
         temperature: 0.7,
-        system: STRATEGIC_ANALYZER_PROMPT,
+        system: [
+          {
+            type: 'text',
+            text: STRATEGIC_ANALYZER_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [{
           role: 'user',
           content: `Analyze this UC PIQ essay for strategic constraints and provide comprehensive guidance:\n\n${JSON.stringify(analysisContext, null, 2)}`

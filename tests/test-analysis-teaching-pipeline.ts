@@ -9,7 +9,7 @@
  * This demonstrates the depth and detail available for each EC.
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 import Anthropic from '@anthropic-ai/sdk';
 
 import { activityDiagnosisService } from '../src/services/portfolioStrategy/services/activityWorkshop/activityDiagnosisService';

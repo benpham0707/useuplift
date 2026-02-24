@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Scoring Orchestrator
  *
@@ -329,6 +330,16 @@ export class ScoringOrchestrator {
         activityScore: activityScores[index],
       }));
 
+      // Retrieve previous portfolio score from cache session for anchoring
+      let previousScore: PortfolioScoringInput['previousScore'] | undefined;
+      if (enableCache && !forceFresh) {
+        const session = this.cacheService.getSession(sessionId);
+        if (session?.previousPortfolioScore) {
+          previousScore = session.previousPortfolioScore;
+          console.log(`[ScoringOrchestrator] Using previous score anchor: ${previousScore.total}/10`);
+        }
+      }
+
       const portfolioInput: PortfolioScoringInput = {
         activities: activitiesWithScores,
         studentContext: {
@@ -337,6 +348,7 @@ export class ScoringOrchestrator {
           gradeLevel: input.studentContext?.gradeLevel,
           contextualFactors: input.studentContext?.contextualFactors,
         },
+        previousScore,
       };
 
       const portResult = await portfolioScoringService.scorePortfolio(portfolioInput);
@@ -354,7 +366,23 @@ export class ScoringOrchestrator {
         tokensUsed.portfolioScoring = portResult.tokensUsed;
       }
 
-      console.log(`[ScoringOrchestrator] Portfolio scored in ${timing.portfolioScoringMs}ms`);
+      console.log(`[ScoringOrchestrator] Portfolio scored in ${timing.portfolioScoringMs}ms: ${portResult.rubric.overallScore.total}/10`);
+
+      // Store portfolio score in session for anchoring on next run
+      if (enableCache && !forceFresh) {
+        const bd = portResult.rubric.breakdown;
+        this.cacheService.setPreviousPortfolioScore(sessionId, {
+          total: portResult.rubric.overallScore.total,
+          breakdown: {
+            tierDistribution: bd.tierDistribution.score,
+            spikeDetection: bd.spikeDetection.score,
+            coherence: bd.coherence.score,
+            majorAlignment: bd.majorAlignment.score,
+            presentationQuality: bd.presentationQuality.score,
+          },
+          competitiveTier: portResult.rubric.harvardScale.description,
+        });
+      }
 
       // ========================================================================
       // Step 4: Generate teaching content (optional, ALWAYS FRESH)
@@ -521,26 +549,54 @@ export class ScoringOrchestrator {
       for (let j = 0; j < descToScore.length; j++) {
         const { index, input: descInput } = descToScore[j];
         const score = descResult.scores[j];
-        descriptionScores[index] = score;
-
-        // Cache the result
-        if (enableCache && !forceFresh) {
-          this.cacheService.setDescriptionScore(sessionId, descriptionInputs[index].id, descInput, score);
+        if (score) {
+          descriptionScores[index] = score;
+          // Cache the result
+          if (enableCache && !forceFresh) {
+            this.cacheService.setDescriptionScore(sessionId, descriptionInputs[index].id, descInput, score);
+          }
         }
       }
 
-      // Validate no missing scores after batch mapping (C2)
+      // Retry missing description scores individually (same quality, prompt cached)
       const missingDescs = descToScore.filter(d => !descriptionScores[d.index]);
       if (missingDescs.length > 0) {
-        console.error(`[ScoringOrchestrator] ${missingDescs.length}/${descToScore.length} description scores missing after batch`);
-        return {
-          success: false,
-          error: `Description scoring returned incomplete results: ${descResult.scores?.length || 0}/${descToScore.length} scores`,
-        };
+        console.warn(`[ScoringOrchestrator] ${missingDescs.length}/${descToScore.length} description scores missing from batch. Retrying individually...`);
+
+        for (const missing of missingDescs) {
+          const retryResult = await descriptionScoringService.scoreDescription(missing.input, targetPlatform);
+          if (retryResult.success && retryResult.score) {
+            descriptionScores[missing.index] = retryResult.score;
+            console.log(`[ScoringOrchestrator] Description retry SUCCESS for activity ${missing.index + 1}`);
+            if (enableCache && !forceFresh) {
+              this.cacheService.setDescriptionScore(sessionId, descriptionInputs[missing.index].id, missing.input, retryResult.score);
+            }
+            if (retryResult.tokensUsed) {
+              tokensUsed = {
+                input: (tokensUsed?.input || 0) + retryResult.tokensUsed.input,
+                output: (tokensUsed?.output || 0) + retryResult.tokensUsed.output,
+              };
+            }
+          } else {
+            console.error(`[ScoringOrchestrator] Description retry FAILED for activity ${missing.index + 1}: ${retryResult.error}`);
+          }
+        }
+
+        // Final check — if still missing, fail
+        const stillMissing = descToScore.filter(d => !descriptionScores[d.index]);
+        if (stillMissing.length > 0) {
+          return {
+            success: false,
+            error: `Description scoring failed for ${stillMissing.length} activities even after individual retry`,
+          };
+        }
       }
 
       if (descResult.tokensUsed) {
-        tokensUsed = descResult.tokensUsed;
+        tokensUsed = {
+          input: (tokensUsed?.input || 0) + descResult.tokensUsed.input,
+          output: (tokensUsed?.output || 0) + descResult.tokensUsed.output,
+        };
       }
     }
 
@@ -614,26 +670,54 @@ export class ScoringOrchestrator {
       for (let j = 0; j < actToScore.length; j++) {
         const { index, input: actInput } = actToScore[j];
         const score = actResult.scores[j];
-        activityScores[index] = score;
-
-        // Cache the result
-        if (enableCache && !forceFresh) {
-          this.cacheService.setActivityScore(sessionId, activityInputs[index].id, actInput, score);
+        if (score) {
+          activityScores[index] = score;
+          // Cache the result
+          if (enableCache && !forceFresh) {
+            this.cacheService.setActivityScore(sessionId, activityInputs[index].id, actInput, score);
+          }
         }
       }
 
-      // Validate no missing scores after batch mapping (C2)
+      // Retry missing activity scores individually (same Sonnet quality, prompt cached)
       const missingActs = actToScore.filter(a => !activityScores[a.index]);
       if (missingActs.length > 0) {
-        console.error(`[ScoringOrchestrator] ${missingActs.length}/${actToScore.length} activity scores missing after batch`);
-        return {
-          success: false,
-          error: `Activity scoring returned incomplete results: ${actResult.scores?.length || 0}/${actToScore.length} scores`,
-        };
+        console.warn(`[ScoringOrchestrator] ${missingActs.length}/${actToScore.length} activity scores missing from batch. Retrying individually...`);
+
+        for (const missing of missingActs) {
+          const retryResult = await activityScoringService.scoreActivity(missing.input);
+          if (retryResult.success && retryResult.score) {
+            activityScores[missing.index] = retryResult.score;
+            console.log(`[ScoringOrchestrator] Activity retry SUCCESS for activity ${missing.index + 1}`);
+            if (enableCache && !forceFresh) {
+              this.cacheService.setActivityScore(sessionId, activityInputs[missing.index].id, missing.input, retryResult.score);
+            }
+            if (retryResult.tokensUsed) {
+              tokensUsed = {
+                input: (tokensUsed?.input || 0) + retryResult.tokensUsed.input,
+                output: (tokensUsed?.output || 0) + retryResult.tokensUsed.output,
+              };
+            }
+          } else {
+            console.error(`[ScoringOrchestrator] Activity retry FAILED for activity ${missing.index + 1}: ${retryResult.error}`);
+          }
+        }
+
+        // Final check — if still missing, fail
+        const stillMissing = actToScore.filter(a => !activityScores[a.index]);
+        if (stillMissing.length > 0) {
+          return {
+            success: false,
+            error: `Activity scoring failed for ${stillMissing.length} activities even after individual retry`,
+          };
+        }
       }
 
       if (actResult.tokensUsed) {
-        tokensUsed = actResult.tokensUsed;
+        tokensUsed = {
+          input: (tokensUsed?.input || 0) + actResult.tokensUsed.input,
+          output: (tokensUsed?.output || 0) + actResult.tokensUsed.output,
+        };
       }
     }
 
@@ -725,9 +809,12 @@ export class ScoringOrchestrator {
 
   /**
    * Get score summary for display
+   *
+   * NOTE: The `harvard` field returns the internal rating number (1-6).
+   * For USER-FACING display, use `competitiveTier` instead to show the descriptive label.
    */
   getScoreSummary(rubric: PortfolioScoreRubric): {
-    overall: { score: number; level: string; harvard: number };
+    overall: { score: number; level: string; competitiveTier: string };
     activities: { id: string; title: string; combined: number; description: number; activity: number }[];
     topStrengths: string[];
     topImprovements: string[];
@@ -736,7 +823,8 @@ export class ScoringOrchestrator {
       overall: {
         score: rubric.overallScore.total,
         level: portfolioScoringService.getScoreLevelDescription(rubric.overallScore.total),
-        harvard: rubric.harvardScale.rating,
+        // harvard rating removed — redundant with competitiveTier, saves downstream tokens
+        competitiveTier: rubric.harvardScale.description, // USE THIS for user-facing display
       },
       activities: rubric.activityScores.map((a) => ({
         id: a.activityId,

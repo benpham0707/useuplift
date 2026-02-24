@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.4"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -21,6 +21,7 @@ export type Database = {
           class_size: number | null
           college_courses: Json | null
           course_history: Json | null
+          created_at: string
           current_grade: string | null
           current_school: Json | null
           english_proficiency: Json | null
@@ -28,11 +29,23 @@ export type Database = {
           gpa: number | null
           gpa_scale: string | null
           gpa_type: string | null
+          homeschooled: boolean | null
           ib_exams: Json | null
           id: string
+          in_ib_programme: boolean | null
+          is_boarding_school: boolean | null
+          need_english_proficiency: boolean | null
           other_schools: Json | null
           profile_id: string
+          rank_reporting_method: string | null
+          report_test_scores: boolean | null
           standardized_tests: Json | null
+          studied_abroad: boolean | null
+          taking_ap_exams: boolean | null
+          took_language_early: boolean | null
+          took_math_early: boolean | null
+          updated_at: string
+          will_graduate_from_school: boolean | null
         }
         Insert: {
           ap_exams?: Json | null
@@ -40,6 +53,7 @@ export type Database = {
           class_size?: number | null
           college_courses?: Json | null
           course_history?: Json | null
+          created_at?: string
           current_grade?: string | null
           current_school?: Json | null
           english_proficiency?: Json | null
@@ -47,11 +61,23 @@ export type Database = {
           gpa?: number | null
           gpa_scale?: string | null
           gpa_type?: string | null
+          homeschooled?: boolean | null
           ib_exams?: Json | null
           id?: string
+          in_ib_programme?: boolean | null
+          is_boarding_school?: boolean | null
+          need_english_proficiency?: boolean | null
           other_schools?: Json | null
           profile_id: string
+          rank_reporting_method?: string | null
+          report_test_scores?: boolean | null
           standardized_tests?: Json | null
+          studied_abroad?: boolean | null
+          taking_ap_exams?: boolean | null
+          took_language_early?: boolean | null
+          took_math_early?: boolean | null
+          updated_at?: string
+          will_graduate_from_school?: boolean | null
         }
         Update: {
           ap_exams?: Json | null
@@ -59,6 +85,7 @@ export type Database = {
           class_size?: number | null
           college_courses?: Json | null
           course_history?: Json | null
+          created_at?: string
           current_grade?: string | null
           current_school?: Json | null
           english_proficiency?: Json | null
@@ -66,11 +93,23 @@ export type Database = {
           gpa?: number | null
           gpa_scale?: string | null
           gpa_type?: string | null
+          homeschooled?: boolean | null
           ib_exams?: Json | null
           id?: string
+          in_ib_programme?: boolean | null
+          is_boarding_school?: boolean | null
+          need_english_proficiency?: boolean | null
           other_schools?: Json | null
           profile_id?: string
+          rank_reporting_method?: string | null
+          report_test_scores?: boolean | null
           standardized_tests?: Json | null
+          studied_abroad?: boolean | null
+          taking_ap_exams?: boolean | null
+          took_language_early?: boolean | null
+          took_math_early?: boolean | null
+          updated_at?: string
+          will_graduate_from_school?: boolean | null
         }
         Relationships: [
           {
@@ -82,34 +121,216 @@ export type Database = {
           },
         ]
       }
+      credit_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      essay_analysis_reports: {
+        Row: {
+          created_at: string
+          dimension_scores: Json | null
+          essay_id: string
+          id: string
+          improvements: Json | null
+          overall_score: number | null
+          raw_result: Json | null
+          strengths: Json | null
+          summary: string | null
+          teaching_feedback: Json | null
+        }
+        Insert: {
+          created_at?: string
+          dimension_scores?: Json | null
+          essay_id: string
+          id?: string
+          improvements?: Json | null
+          overall_score?: number | null
+          raw_result?: Json | null
+          strengths?: Json | null
+          summary?: string | null
+          teaching_feedback?: Json | null
+        }
+        Update: {
+          created_at?: string
+          dimension_scores?: Json | null
+          essay_id?: string
+          id?: string
+          improvements?: Json | null
+          overall_score?: number | null
+          raw_result?: Json | null
+          strengths?: Json | null
+          summary?: string | null
+          teaching_feedback?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "essay_analysis_reports_essay_id_fkey"
+            columns: ["essay_id"]
+            isOneToOne: false
+            referencedRelation: "essays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      essay_revision_history: {
+        Row: {
+          analysis_report_id: string | null
+          change_summary: string | null
+          created_at: string
+          created_by: string | null
+          dimension_scores: Json | null
+          draft_content: string | null
+          essay_id: string
+          id: string
+          is_deleted: boolean
+          label: string | null
+          parent_version_id: string | null
+          score: number | null
+          version: number
+          word_count: number | null
+        }
+        Insert: {
+          analysis_report_id?: string | null
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          dimension_scores?: Json | null
+          draft_content?: string | null
+          essay_id: string
+          id?: string
+          is_deleted?: boolean
+          label?: string | null
+          parent_version_id?: string | null
+          score?: number | null
+          version: number
+          word_count?: number | null
+        }
+        Update: {
+          analysis_report_id?: string | null
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string | null
+          dimension_scores?: Json | null
+          draft_content?: string | null
+          essay_id?: string
+          id?: string
+          is_deleted?: boolean
+          label?: string | null
+          parent_version_id?: string | null
+          score?: number | null
+          version?: number
+          word_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "essay_revision_history_analysis_report_id_fkey"
+            columns: ["analysis_report_id"]
+            isOneToOne: false
+            referencedRelation: "essay_analysis_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "essay_revision_history_essay_id_fkey"
+            columns: ["essay_id"]
+            isOneToOne: false
+            referencedRelation: "essays"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      essays: {
+        Row: {
+          created_at: string
+          draft_current: string | null
+          draft_original: string | null
+          essay_type: string
+          id: string
+          locked: boolean
+          max_words: number | null
+          prompt_text: string | null
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          draft_current?: string | null
+          draft_original?: string | null
+          essay_type: string
+          id?: string
+          locked?: boolean
+          max_words?: number | null
+          prompt_text?: string | null
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          created_at?: string
+          draft_current?: string | null
+          draft_original?: string | null
+          essay_type?: string
+          id?: string
+          locked?: boolean
+          max_words?: number | null
+          prompt_text?: string | null
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
       experiences_activities: {
         Row: {
-          academic_honors: Json | null
+          created_at: string
           extracurriculars: Json | null
-          formal_recognition: Json | null
           id: string
           personal_projects: Json | null
           profile_id: string
+          updated_at: string
           volunteer_service: Json | null
           work_experiences: Json | null
         }
         Insert: {
-          academic_honors?: Json | null
+          created_at?: string
           extracurriculars?: Json | null
-          formal_recognition?: Json | null
           id?: string
           personal_projects?: Json | null
           profile_id: string
+          updated_at?: string
           volunteer_service?: Json | null
           work_experiences?: Json | null
         }
         Update: {
-          academic_honors?: Json | null
+          created_at?: string
           extracurriculars?: Json | null
-          formal_recognition?: Json | null
           id?: string
           personal_projects?: Json | null
           profile_id?: string
+          updated_at?: string
           volunteer_service?: Json | null
           work_experiences?: Json | null
         }
@@ -125,22 +346,28 @@ export type Database = {
       }
       family_responsibilities: {
         Row: {
+          created_at: string
           id: string
           life_circumstances: Json | null
           profile_id: string
           responsibilities: Json | null
+          updated_at: string
         }
         Insert: {
+          created_at?: string
           id?: string
           life_circumstances?: Json | null
           profile_id: string
           responsibilities?: Json | null
+          updated_at?: string
         }
         Update: {
+          created_at?: string
           id?: string
           life_circumstances?: Json | null
           profile_id?: string
           responsibilities?: Json | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -154,31 +381,37 @@ export type Database = {
       }
       goals_aspirations: {
         Row: {
-          career_interests: string[] | null
+          career_interests: Json | null
           college_plans: Json | null
+          created_at: string
           highest_degree: string | null
           id: string
           intended_major: string | null
-          preferred_environment: string[] | null
+          preferred_environment: Json | null
           profile_id: string
+          updated_at: string
         }
         Insert: {
-          career_interests?: string[] | null
+          career_interests?: Json | null
           college_plans?: Json | null
+          created_at?: string
           highest_degree?: string | null
           id?: string
           intended_major?: string | null
-          preferred_environment?: string[] | null
+          preferred_environment?: Json | null
           profile_id: string
+          updated_at?: string
         }
         Update: {
-          career_interests?: string[] | null
+          career_interests?: Json | null
           college_plans?: Json | null
+          created_at?: string
           highest_degree?: string | null
           id?: string
           intended_major?: string | null
-          preferred_environment?: string[] | null
+          preferred_environment?: Json | null
           profile_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -193,21 +426,27 @@ export type Database = {
       personal_growth: {
         Row: {
           additional_context: Json | null
+          created_at: string
           id: string
           meaningful_experiences: Json | null
           profile_id: string
+          updated_at: string
         }
         Insert: {
           additional_context?: Json | null
+          created_at?: string
           id?: string
           meaningful_experiences?: Json | null
           profile_id: string
+          updated_at?: string
         }
         Update: {
           additional_context?: Json | null
+          created_at?: string
           id?: string
           meaningful_experiences?: Json | null
           profile_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -223,10 +462,11 @@ export type Database = {
         Row: {
           alternate_address: Json | null
           citizenship_status: string | null
+          created_at: string
           date_of_birth: string | null
           first_gen: boolean | null
           first_name: string | null
-          former_names: string[] | null
+          former_names: Json | null
           gender_identity: string | null
           hispanic_background: string | null
           hispanic_latino: string | null
@@ -245,18 +485,20 @@ export type Database = {
           primary_phone: string | null
           profile_id: string
           pronouns: string | null
-          race_ethnicity: string[] | null
+          race_ethnicity: Json | null
           secondary_phone: string | null
           siblings: Json | null
+          updated_at: string
           years_in_us: number | null
         }
         Insert: {
           alternate_address?: Json | null
           citizenship_status?: string | null
+          created_at?: string
           date_of_birth?: string | null
           first_gen?: boolean | null
           first_name?: string | null
-          former_names?: string[] | null
+          former_names?: Json | null
           gender_identity?: string | null
           hispanic_background?: string | null
           hispanic_latino?: string | null
@@ -275,18 +517,20 @@ export type Database = {
           primary_phone?: string | null
           profile_id: string
           pronouns?: string | null
-          race_ethnicity?: string[] | null
+          race_ethnicity?: Json | null
           secondary_phone?: string | null
           siblings?: Json | null
+          updated_at?: string
           years_in_us?: number | null
         }
         Update: {
           alternate_address?: Json | null
           citizenship_status?: string | null
+          created_at?: string
           date_of_birth?: string | null
           first_gen?: boolean | null
           first_name?: string | null
-          former_names?: string[] | null
+          former_names?: Json | null
           gender_identity?: string | null
           hispanic_background?: string | null
           hispanic_latino?: string | null
@@ -305,9 +549,10 @@ export type Database = {
           primary_phone?: string | null
           profile_id?: string
           pronouns?: string | null
-          race_ethnicity?: string[] | null
+          race_ethnicity?: Json | null
           secondary_phone?: string | null
           siblings?: Json | null
+          updated_at?: string
           years_in_us?: number | null
         }
         Relationships: [
@@ -322,75 +567,48 @@ export type Database = {
       }
       profiles: {
         Row: {
-          archived_at: string | null
-          completion_details: Json
-          completion_score: number
-          constraints: Json
+          completion_details: Json | null
+          completion_score: number | null
           created_at: string
+          credits: number
           deleted_at: string | null
-          demographics: Json
-          enrichment_priorities: Json
-          extracted_skills: Json
-          goals: Json
+          demographics: Json | null
           has_completed_assessment: boolean
-          hidden_strengths: string[]
           id: string
-          last_enrichment_date: string | null
-          narrative_summary: string | null
-          search_vector: unknown | null
-          status: Database["public"]["Enums"]["profile_status"]
+          referral_discount_active: boolean
           terms_accepted_at: string | null
           updated_at: string
-          user_context: Database["public"]["Enums"]["user_context"]
+          user_context: string | null
           user_id: string
-          credits: number
         }
         Insert: {
-          archived_at?: string | null
-          completion_details?: Json
-          completion_score?: number
-          constraints?: Json
+          completion_details?: Json | null
+          completion_score?: number | null
           created_at?: string
           credits?: number
           deleted_at?: string | null
-          demographics?: Json
-          enrichment_priorities?: Json
-          extracted_skills?: Json
-          goals?: Json
+          demographics?: Json | null
           has_completed_assessment?: boolean
-          hidden_strengths?: string[]
           id?: string
-          last_enrichment_date?: string | null
-          narrative_summary?: string | null
-          search_vector?: unknown | null
-          status?: Database["public"]["Enums"]["profile_status"]
+          referral_discount_active?: boolean
           terms_accepted_at?: string | null
           updated_at?: string
-          user_context: Database["public"]["Enums"]["user_context"]
+          user_context?: string | null
           user_id: string
         }
         Update: {
-          archived_at?: string | null
-          completion_details?: Json
-          completion_score?: number
-          constraints?: Json
+          completion_details?: Json | null
+          completion_score?: number | null
           created_at?: string
           credits?: number
           deleted_at?: string | null
-          demographics?: Json
-          enrichment_priorities?: Json
-          extracted_skills?: Json
-          goals?: Json
+          demographics?: Json | null
           has_completed_assessment?: boolean
-          hidden_strengths?: string[]
           id?: string
-          last_enrichment_date?: string | null
-          narrative_summary?: string | null
-          search_vector?: unknown | null
-          status?: Database["public"]["Enums"]["profile_status"]
+          referral_discount_active?: boolean
           terms_accepted_at?: string | null
           updated_at?: string
-          user_context?: Database["public"]["Enums"]["user_context"]
+          user_context?: string | null
           user_id?: string
         }
         Relationships: []
@@ -399,29 +617,32 @@ export type Database = {
         Row: {
           community_support: Json | null
           counselor: Json | null
-          documents: Json | null
+          created_at: string
           id: string
           portfolio_items: Json | null
           profile_id: string
-          teachers: string[] | null
+          teachers: Json | null
+          updated_at: string
         }
         Insert: {
           community_support?: Json | null
           counselor?: Json | null
-          documents?: Json | null
+          created_at?: string
           id?: string
           portfolio_items?: Json | null
           profile_id: string
-          teachers?: string[] | null
+          teachers?: Json | null
+          updated_at?: string
         }
         Update: {
           community_support?: Json | null
           counselor?: Json | null
-          documents?: Json | null
+          created_at?: string
           id?: string
           portfolio_items?: Json | null
           profile_id?: string
-          teachers?: string[] | null
+          teachers?: Json | null
+          updated_at?: string
         }
         Relationships: [
           {
@@ -438,97 +659,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      gtrgm_compress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_decompress: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_in: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      gtrgm_options: {
-        Args: { "": unknown }
-        Returns: undefined
-      }
-      gtrgm_out: {
-        Args: { "": unknown }
-        Returns: unknown
-      }
-      set_limit: {
-        Args: { "": number }
-        Returns: number
-      }
-      show_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      show_trgm: {
-        Args: { "": string }
-        Returns: string[]
-      }
+      [_ in never]: never
     }
     Enums: {
-      achievement_impact: "low" | "medium" | "high" | "exceptional"
-      achievement_scope:
-        | "school"
-        | "local"
-        | "regional"
-        | "state"
-        | "national"
-        | "international"
-      achievement_type:
-        | "academic"
-        | "athletic"
-        | "artistic"
-        | "leadership"
-        | "service"
-        | "technical"
-        | "entrepreneurial"
-        | "competition"
-        | "certification"
-        | "publication"
-        | "personal"
-      course_level:
-        | "regular"
-        | "honors"
-        | "ap"
-        | "ib"
-        | "dual_enrollment"
-        | "college"
-      experience_type:
-        | "work"
-        | "internship"
-        | "volunteer"
-        | "leadership"
-        | "project"
-        | "research"
-        | "creative"
-        | "athletic"
-        | "entrepreneurial"
-        | "caregiving"
-        | "self_directed"
-      gpa_scale: "4.0" | "5.0" | "100" | "international"
-      profile_status:
-        | "initial"
-        | "basic_complete"
-        | "enriched"
-        | "verified"
-        | "archived"
-      time_commitment: "minimal" | "part_time" | "significant" | "full_time"
-      user_context:
-        | "high_school_9th"
-        | "high_school_10th"
-        | "high_school_11th"
-        | "high_school_12th"
-        | "gap_year"
-        | "college_freshman"
-        | "college_sophomore"
-        | "college_junior"
-        | "college_senior"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -655,70 +789,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      achievement_impact: ["low", "medium", "high", "exceptional"],
-      achievement_scope: [
-        "school",
-        "local",
-        "regional",
-        "state",
-        "national",
-        "international",
-      ],
-      achievement_type: [
-        "academic",
-        "athletic",
-        "artistic",
-        "leadership",
-        "service",
-        "technical",
-        "entrepreneurial",
-        "competition",
-        "certification",
-        "publication",
-        "personal",
-      ],
-      course_level: [
-        "regular",
-        "honors",
-        "ap",
-        "ib",
-        "dual_enrollment",
-        "college",
-      ],
-      experience_type: [
-        "work",
-        "internship",
-        "volunteer",
-        "leadership",
-        "project",
-        "research",
-        "creative",
-        "athletic",
-        "entrepreneurial",
-        "caregiving",
-        "self_directed",
-      ],
-      gpa_scale: ["4.0", "5.0", "100", "international"],
-      profile_status: [
-        "initial",
-        "basic_complete",
-        "enriched",
-        "verified",
-        "archived",
-      ],
-      time_commitment: ["minimal", "part_time", "significant", "full_time"],
-      user_context: [
-        "high_school_9th",
-        "high_school_10th",
-        "high_school_11th",
-        "high_school_12th",
-        "gap_year",
-        "college_freshman",
-        "college_sophomore",
-        "college_junior",
-        "college_senior",
-      ],
-    },
+    Enums: {},
   },
 } as const

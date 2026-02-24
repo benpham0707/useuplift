@@ -14,7 +14,7 @@
  * - Guidance improves with profile depth
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import {
   activityProfileChatService,

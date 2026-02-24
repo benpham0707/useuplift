@@ -9,6 +9,8 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import dotenv from 'dotenv';
+import path from 'path';
 
 // Single-key policy: only use ANTHROPIC_API_KEY (paid/subscription credits).
 // CLAUDE_CODE_KEY is no longer considered.
@@ -24,12 +26,39 @@ const isBrowser = typeof window !== 'undefined'
   && !navigator.userAgent.startsWith('Node.js')
   && (navigator.userAgent.includes('Mozilla') || navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Safari') || navigator.userAgent.includes('AppleWebKit'));
 
+// Ensure dotenv is loaded — idempotent, safe to call multiple times.
+// This eliminates import-order bugs where services are loaded before
+// the entry point has called dotenv.config().
+let _envLoaded = false;
+function ensureEnvLoaded(): void {
+  if (_envLoaded || isBrowser) return;
+  _envLoaded = true;
+
+  // Find project root by looking for package.json
+  let dir = __dirname;
+  for (let i = 0; i < 10; i++) {
+    try {
+      require.resolve(path.join(dir, 'package.json'));
+      break;
+    } catch {
+      dir = path.dirname(dir);
+    }
+  }
+
+  // Load .env.local first (higher priority), then .env
+  dotenv.config({ path: path.resolve(dir, '.env.local'), override: false });
+  dotenv.config({ path: path.resolve(dir, '.env'), override: false });
+}
+
 // Function to get API key - allows for runtime updates
 function getApiKey(): string | null {
   // Don't throw in browser context - just return null
   if (isBrowser) {
     return null;
   }
+
+  // Ensure env vars are loaded before reading the key
+  ensureEnvLoaded();
 
   // Sanitize: take only the first line and trim whitespace
   // Handles .env files with duplicate keys or malformed multi-line values
@@ -224,6 +253,7 @@ export async function callClaude<T = any>(
   let messages: Anthropic.Messages.MessageParam[];
   let useJsonMode: boolean;
   let customTimeout: number | undefined;
+  let cacheSystemPrompt = false;
 
   if (isObject && hasMessages) {
     // Message-based interface: callClaude({ model, system, messages, ... })
@@ -249,6 +279,7 @@ export async function callClaude<T = any>(
     systemParam = input.systemPrompt;
     customTimeout = input.timeoutMs;
     useJsonMode = input.useJsonMode ?? false;
+    cacheSystemPrompt = input.cacheSystemPrompt ?? false;
 
     messages = [
       {
@@ -265,6 +296,7 @@ export async function callClaude<T = any>(
     systemParam = opts.systemPrompt;
     useJsonMode = opts.useJsonMode ?? false;
     customTimeout = opts.timeoutMs;
+    cacheSystemPrompt = opts.cacheSystemPrompt ?? false;
 
     messages = [
       {
@@ -275,13 +307,20 @@ export async function callClaude<T = any>(
   }
 
   try {
+    // Build system parameter — use cache_control when caching requested
+    const systemForRequest = systemParam
+      ? cacheSystemPrompt
+        ? [{ type: 'text' as const, text: systemParam, cache_control: { type: 'ephemeral' as const } }]
+        : systemParam
+      : undefined;
+
     // Build request parameters
     const requestParams: Anthropic.Messages.MessageCreateParams = {
       model,
       max_tokens: maxTokens,
       temperature,
       messages,
-      ...(systemParam ? { system: systemParam } : {}),
+      ...(systemForRequest ? { system: systemForRequest } : {}),
     };
 
     // Get client

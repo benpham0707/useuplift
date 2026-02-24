@@ -86,6 +86,27 @@ export interface CitedText {
 }
 
 // ============================================================================
+// DESCRIPTION TEXT REFERENCES (for frontend highlighting)
+// ============================================================================
+
+/**
+ * A reference to a specific substring in the student's activity description.
+ *
+ * The frontend uses `description.indexOf(quotedText)` to locate the position
+ * and highlight the referenced text. More reliable than LLM-generated indices.
+ *
+ * All reference fields on teaching types are OPTIONAL for backward compatibility.
+ */
+export interface DescriptionReference {
+  /** Exact substring from the student's description (case-sensitive match) */
+  quotedText: string;
+  /** What this reference represents */
+  type: 'strength' | 'issue' | 'context';
+  /** Short label for the frontend tooltip (e.g., "quantifiable impact", "vague language") */
+  label: string;
+}
+
+// ============================================================================
 // ACTIVITY INPUT (Frontend Data)
 // ============================================================================
 
@@ -183,6 +204,24 @@ export interface ActivityWorkshopSessionInput {
     constraintNotes?: string;
     geographicContext?: string;
   };
+  /**
+   * Scoring cache session ID for incremental scoring.
+   * When provided, the scoring orchestrator reuses cached scores for
+   * unchanged activities, only re-scoring activities that changed.
+   * The sessionId is returned in the pipeline result for subsequent calls.
+   */
+  scoringSessionId?: string;
+
+  /**
+   * Optional activity profiles from chat conversations.
+   * Keyed by activity ID. When present, enriches analysis and teaching
+   * with verified student context instead of fabricated examples.
+   *
+   * DESIGN: Profiles are ALWAYS optional. The pipeline works identically
+   * without them. When present, they enhance guidance quality but do NOT
+   * inflate scores (scores reflect what the AO reads in the description).
+   */
+  activityProfiles?: Record<string, import('./profile/types').ActivityProfile>;
 }
 
 // ============================================================================
@@ -448,6 +487,8 @@ export interface ActivityTeaching {
   celebration?: {
     headline: string; // One powerful sentence celebrating their strongest aspect
     strengths: string[]; // 2-3 specific things working well
+    /** Text references for frontend highlighting of celebrated elements */
+    references?: DescriptionReference[];
   };
 
   // === TIER EXPLANATION ===
@@ -479,6 +520,8 @@ export interface ActivityTeaching {
     };
     howToLeverage: string;
     inApplications: string;
+    /** References to description text that evidence this strength */
+    references?: DescriptionReference[];
   }[];
 
   // === IMPROVEMENT TEACHING (Enhanced with deep structure) ===
@@ -496,6 +539,8 @@ export interface ActivityTeaching {
     exampleAfter: string;
     transformationAnalysis?: string; // NEW: Why the transformation works
     priority: 'high' | 'medium' | 'low';
+    /** References to description text that exhibit this issue */
+    references?: DescriptionReference[];
   }[];
 
   // === UPGRADE PATHWAY ===
@@ -685,6 +730,13 @@ export interface ActivityWorkshopResult {
       teaching: { input: number; output: number };
     };
   };
+
+  /**
+   * Scoring cache session ID for incremental scoring.
+   * Pass this back as scoringSessionId in ActivityWorkshopSessionInput
+   * to reuse cached scores for unchanged activities.
+   */
+  scoringSessionId?: string;
 }
 
 // ============================================================================
@@ -911,6 +963,12 @@ export interface AnalysisContext extends PortfolioAnalysis {
     activityScoresById: Record<string, ActivityScoreRubric>;
     /** Whether scoring was run */
     scoringComplete: boolean;
+    /**
+     * Scoring cache session ID for incremental scoring.
+     * Preserved from the scoring orchestrator result so the pipeline
+     * can return it to the caller for subsequent incremental calls.
+     */
+    scoringSessionId?: string;
   };
 
   // === STAGE METADATA ===
@@ -1288,6 +1346,23 @@ export interface NarrativeProgression {
 }
 
 /**
+ * Recommendation for whether an activity should have a chat conversation.
+ * Generated after pipeline completion based on analysis findings.
+ */
+export interface ActivityChatRecommendation {
+  activityId: string;
+  activityTitle: string;
+  /** Whether to initiate a conversation for this activity */
+  shouldInitiate: boolean;
+  /** What triggered this recommendation (maps to ConversationTrigger) */
+  trigger: string;
+  /** How urgent the conversation is */
+  urgency: 'high' | 'medium' | 'low';
+  /** Why we recommend (or don't recommend) a conversation */
+  rationale: string;
+}
+
+/**
  * Complete Pipeline Result (v4.2 — parallel processing, single narrative pass)
  */
 export interface ActivityWorkshopPipelineResult {
@@ -1310,6 +1385,17 @@ export interface ActivityWorkshopPipelineResult {
     scoringTeaching?: TeachingLayerOutput;
   };
 
+  // === TEACHING SUMMARY (Tab 1 Strategic Direction) ===
+  /** Coach's summary surfaced from Stage 2 teaching data */
+  teachingSummary?: {
+    /** Current state assessment of the student's portfolio */
+    currentState: string;
+    /** Strategic direction / what to focus on */
+    strategicDirection: string;
+    /** Two-sentence coaching pitch */
+    twoSentencePitch: string;
+  };
+
   // All stage outputs
   stage0: StoryContext;
   stage1: AnalysisContext;
@@ -1322,4 +1408,14 @@ export interface ActivityWorkshopPipelineResult {
 
   // Total cost
   totalCost: number;
+
+  /**
+   * Scoring cache session ID for incremental scoring.
+   * Pass this back on subsequent calls via scoringSessionId in
+   * ActivityWorkshopSessionInput to reuse cached scores for unchanged activities.
+   */
+  scoringSessionId?: string;
+
+  /** Chat recommendations for activities that would benefit from profiling */
+  chatRecommendations?: ActivityChatRecommendation[];
 }

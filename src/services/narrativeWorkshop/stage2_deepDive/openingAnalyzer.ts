@@ -170,6 +170,7 @@ export async function analyzeOpening(
         temperature: 0.5,
         useJsonMode: true,
         maxTokens: 2500,
+        cacheSystemPrompt: true,
       }
     );
 

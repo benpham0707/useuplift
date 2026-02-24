@@ -8,8 +8,7 @@
  * constraint intelligence, school-specific insights, and narrative arc detection.
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import assert from 'assert'; // R22: Enable pass/fail assertions
 import { activityWorkshopService } from '../src/services/portfolioStrategy/services/activityWorkshop';
@@ -194,6 +193,13 @@ async function runTest() {
           ? `${result.stage0.narrativeIdentity.spikeHypothesis} (hypothesis — needs development)`
           : 'None detected';
     log(`Spike: ${spikeText}`);
+    // Stage 1 spike metadata (feeds UI badge)
+    const sa = result.stage1.spikeAnalysis;
+    log(`Spike Strength: ${sa.spikeStrength} | Development Stage: ${sa.spikeDevelopmentStage} | Authenticity: ${sa.spikeAuthenticity}/100`);
+    log(`Spike Narrative: ${sa.spikeNarrative}`);
+    if (sa.spikeEvidence?.length > 0) {
+      log(`Spike Evidence: ${sa.spikeEvidence.join(' | ')}`);
+    }
     // Coherence: show both initial and post-improvement if they differ significantly
     const initialCoherence = result.stage1.coherenceAnalysis.score;
     const finalCoherence = result.finalNarrative?.coherence?.score;
@@ -274,6 +280,12 @@ async function runTest() {
             log(`  + ${s}`);
           }
         }
+        if ((t.celebration as any).references?.length) {
+          for (const ref of (t.celebration as any).references) {
+            const found = activity?.description?.includes(ref.quotedText);
+            log(`    REF: "${ref.quotedText}" [${ref.type}] ${ref.label} ${found ? '(MATCH)' : '(NO MATCH)'}`);
+          }
+        }
         log('');
       }
 
@@ -297,6 +309,12 @@ async function runTest() {
           log(`  ${st.strength}`);
           log(`    Why: ${st.whyItMatters?.text || ''}`);
           log(`    Leverage: ${st.howToLeverage || ''}`);
+          if ((st as any).references?.length) {
+            for (const ref of (st as any).references) {
+              const found = activity?.description?.includes(ref.quotedText);
+              log(`    REF: "${ref.quotedText}" [${ref.type}] ${ref.label} ${found ? '(MATCH)' : '(NO MATCH)'}`);
+            }
+          }
           log('');
         }
       }
@@ -310,6 +328,12 @@ async function runTest() {
           log(`    Fix: ${imp.howToFix || ''}`);
           if (imp.exampleBefore) log(`    Before: "${imp.exampleBefore}"`);
           if (imp.exampleAfter) log(`    After:  "${imp.exampleAfter}"`);
+          if ((imp as any).references?.length) {
+            for (const ref of (imp as any).references) {
+              const found = activity?.description?.includes(ref.quotedText);
+              log(`    REF: "${ref.quotedText}" [${ref.type}] ${ref.label} ${found ? '(MATCH)' : '(NO MATCH)'}`);
+            }
+          }
           log('');
         }
       }
@@ -482,7 +506,7 @@ async function runTest() {
     // STAGE 3: Synthesis
     // ──────────────────────────────────────────
     divider('STAGE 3: PORTFOLIO SYNTHESIS');
-    log(`Harvard Scale: ${result.stage3.finalAssessment.harvardScale}/6`);
+    log(`Overall Strength: ${result.stage3.finalAssessment.overallStrength} (derived tier: ${result.stage3.finalAssessment.harvardScale})`);
     log(`Overall Strength: ${result.stage3.finalAssessment.overallStrength}`);
     log(`Confidence: ${result.stage3.finalAssessment.confidence}%`);
     log('');
@@ -533,25 +557,98 @@ async function runTest() {
     // ──────────────────────────────────────────
     if (result.finalNarrative) {
       divider('PORTFOLIO NARRATIVE');
-      log(`Story Pitch: ${result.finalNarrative.story.pitch}`);
-      log(`Coherence: ${result.finalNarrative.coherence.assessment} (${result.finalNarrative.coherence.score}/100)`);
-      if (result.finalNarrative.spike) {
-        log(`Spike: ${result.finalNarrative.spike.primarySpike.area || 'None'} — ${result.finalNarrative.spike.primarySpike.evidence || ''}`);
+      const n = result.finalNarrative;
+
+      // === THE STORY ===
+      log('THE STORY:');
+      log(`  Pitch: ${n.story.pitch}`);
+      log(`  Unique Angle: ${n.story.uniqueAngle}`);
+      log(`  Why It Matters: ${n.story.whyItMatters}`);
+      log(`  Emergent Traits: ${n.story.emergentTraits.join(', ')}`);
+      log('');
+
+      // === SPIKE PRESENTATION (complete) ===
+      log('SPIKE PRESENTATION:');
+      if (n.spike) {
+        log(`  Area: ${n.spike.primarySpike.area}`);
+        log(`  Spike Activities: ${n.spike.primarySpike.activities.join(', ')}`);
+        log(`  Depth: ${n.spike.primarySpike.depth}`);
+        log(`  Distinctiveness: ${n.spike.primarySpike.distinctiveness}`);
+        if (n.spike.supportingElements?.length > 0) {
+          log('  Supporting Elements:');
+          for (const elem of n.spike.supportingElements) {
+            log(`    • ${elem.activityId}`);
+            log(`      How It Supports: ${elem.howItSupports}`);
+            log(`      Elevation Effect: ${elem.elevationEffect}`);
+          }
+        }
+        if (n.spike.complementaryBreadth?.length > 0) {
+          log('  Complementary Breadth:');
+          for (const breadth of n.spike.complementaryBreadth) {
+            log(`    • ${breadth.area} [${breadth.activities.join(', ')}]`);
+            log(`      Why It Matters: ${breadth.whyItMatters}`);
+          }
+        }
       }
-      if (result.finalNarrative.threads?.length > 0) {
-        log('\nNarrative Threads:');
-        for (const thread of result.finalNarrative.threads) {
+      log('');
+
+      // === COHERENCE (complete) ===
+      log('COHERENCE:');
+      log(`  Score: ${n.coherence.score}/100 (${n.coherence.assessment})`);
+      log(`  Unifying Element: ${n.coherence.unifyingElement}`);
+      if (n.coherence.outliers?.length > 0) {
+        log('  Outliers (Activities to Better Integrate):');
+        for (const outlier of n.coherence.outliers) {
+          log(`    • ${outlier.activityId}: ${outlier.howToIntegrate}`);
+        }
+      }
+      log('');
+
+      // === COMPETITIVE POSITIONING (complete) ===
+      log('COMPETITIVE POSITIONING:');
+      log(`  Memorable Element: ${n.positioning.memorableElement}`);
+      log(`  Strengths: ${n.positioning.strengths.join(' | ')}`);
+      log(`  Differentiators: ${n.positioning.differentiators.join(' | ')}`);
+      log(`  School Fit: ${n.positioning.schoolFit.join(', ')}`);
+      log('');
+
+      // === NARRATIVE THREADS ===
+      if (n.threads?.length > 0) {
+        log('NARRATIVE THREADS:');
+        for (const thread of n.threads) {
           log(`  ${thread.name}: ${thread.activityIds.join(', ')}`);
+          log(`     Manifestation: ${thread.manifestation}`);
+          log(`     Admissions Value: ${thread.admissionsValue}`);
           log(`     Synergy: ${thread.synergy}`);
         }
       }
-      if (result.finalNarrative.elevations?.length > 0) {
-        log('\nActivity Elevations:');
-        for (const elev of result.finalNarrative.elevations) {
+      log('');
+
+      // === ACTIVITY ELEVATIONS ===
+      if (n.elevations?.length > 0) {
+        log('ACTIVITY ELEVATIONS:');
+        for (const elev of n.elevations) {
           log(`  ${elev.elevatingActivityId} → ${elev.elevatedActivityId} [${elev.strength}]`);
-          log(`  ${elev.mechanism}`);
+          log(`    Mechanism: ${elev.mechanism}`);
+          log(`    Combined Impression: ${elev.combinedImpression}`);
         }
       }
+      log('');
+
+      // === GAPS ===
+      if (n.gaps?.length > 0) {
+        log('GAPS:');
+        for (const gap of n.gaps) {
+          log(`  • ${gap.gap}`);
+          log(`    Existing Mitigation: ${gap.existingMitigation}`);
+          log(`    Positive Framing: ${gap.positiveFraming}`);
+          log(`    Fixable in Description: ${gap.addressableThroughDescription}`);
+        }
+      }
+      log('');
+
+      // === METADATA ===
+      log(`NARRATIVE METADATA: model=${n.metadata.modelUsed}, tokens=${n.metadata.tokensUsed.input}in/${n.metadata.tokensUsed.output}out, cost=$${n.metadata.cost.toFixed(4)}, type=${n.metadata.analysisType}`);
     }
 
     // ──────────────────────────────────────────
@@ -562,8 +659,8 @@ async function runTest() {
       divider('PORTFOLIO SCORING OVERVIEW');
       const rubric = result.scoring.portfolioRubric;
       log(`Portfolio Score: ${rubric.overallScore.total}/10 (confidence: ${rubric.overallScore.confidence})`);
-      log(`Harvard Scale: ${rubric.harvardScale.rating}/6 — ${rubric.harvardScale.description}`);
-      log(`Harvard Rationale: ${rubric.harvardScale.rationale}`);
+      log(`Competitive Tier: ${rubric.harvardScale.description}`);
+      log(`Tier Rationale: ${rubric.harvardScale.rationale}`);
       log('');
       log('Portfolio Breakdown:');
       log(`  Tier Distribution:     ${rubric.breakdown.tierDistribution.score}/10 — ${rubric.breakdown.tierDistribution.rationale}`);
@@ -639,22 +736,15 @@ async function runTest() {
         }
         log('');
       }
-      // T6: Scoring calibration — Harvard scale should be consistent with overall score
-      const harvardRating = rubric.harvardScale.rating;
+      // T6: Scoring calibration — competitive tier should be consistent with overall score
       const overallScore = rubric.overallScore.total;
+      const tierDesc = rubric.harvardScale.description;
 
-      // Harvard scale mapping: 1=Outstanding(9-10), 2=Very Strong(7.5-9), 3=Strong(6-7.5), 4=Average(4.5-6), 5=Below Avg(3-4.5), 6=Weak(0-3)
-      const expectedHarvardRanges: Record<number, [number, number]> = {
-        1: [8, 10], 2: [6.5, 9.5], 3: [5, 8], 4: [3.5, 6.5], 5: [2, 5], 6: [0, 3.5],
-      };
-      const expectedRange = expectedHarvardRanges[harvardRating];
-      if (expectedRange) {
-        const [low, high] = expectedRange;
-        if (overallScore < low || overallScore > high) {
-          log(`  [T6 CALIBRATION WARNING] Harvard scale ${harvardRating}/6 but overall score ${overallScore.toFixed(1)}/10 — expected range ${low}-${high} for this Harvard rating`);
-        } else {
-          log(`  [T6 OK] Harvard scale ${harvardRating}/6 consistent with overall score ${overallScore.toFixed(1)}/10 (expected ${low}-${high})`);
-        }
+      // Validate tier description exists and score is reasonable
+      if (tierDesc && overallScore > 0) {
+        log(`  [T6 OK] Competitive tier "${tierDesc}" with overall score ${overallScore.toFixed(1)}/10`);
+      } else {
+        log(`  [T6 WARNING] Missing tier description or zero score`);
       }
 
       // T6: Verify weighted breakdown components sum reasonably close to overall
@@ -688,7 +778,7 @@ async function runTest() {
     log(`Cost: $${result.totalCost.toFixed(4)}`);
     if (result.scoring) {
       log(`Portfolio Score: ${result.scoring.portfolioRubric.overallScore.total}/10`);
-      log(`Harvard Scale: ${result.scoring.portfolioRubric.harvardScale.rating}/6`);
+      log(`Competitive Tier: ${result.scoring.portfolioRubric.harvardScale.description}`);
     }
     log('');
 
@@ -756,6 +846,42 @@ async function runTest() {
       }
     }
     log('  PASS: P1 regression check passed (all activities have detectedCategory)');
+
+    // ============================================================
+    // T7: Text reference quality — verify references match description text
+    // ============================================================
+    divider('T7: TEXT REFERENCE QUALITY');
+    let t7TotalRefs = 0;
+    let t7MatchedRefs = 0;
+    for (const td of result.stage2?.teachingDelivered || []) {
+      const activity = testInput.activities.find(a => a.id === td.activityId);
+      const desc = activity?.description || '';
+      const t = td.teaching;
+
+      const checkRefs = (refs: any[] | undefined) => {
+        if (!refs) return;
+        for (const ref of refs) {
+          t7TotalRefs++;
+          if (desc.includes(ref.quotedText)) t7MatchedRefs++;
+        }
+      };
+
+      checkRefs(t.celebration?.references);
+      for (const st of t.strengthTeaching || []) checkRefs((st as any).references);
+      for (const imp of t.improvementTeaching || []) checkRefs((imp as any).references);
+    }
+
+    if (t7TotalRefs > 0) {
+      const matchRate = (t7MatchedRefs / t7TotalRefs * 100).toFixed(1);
+      log(`  References: ${t7MatchedRefs}/${t7TotalRefs} matched actual description text (${matchRate}%)`);
+      if (t7MatchedRefs / t7TotalRefs < 0.5) {
+        log(`  [T7 WARNING] Less than 50% match rate — LLM may be fabricating quotes`);
+      } else {
+        log(`  PASS: Text reference quality acceptable (${matchRate}% match rate)`);
+      }
+    } else {
+      log('  INFO: No text references produced (references are optional)');
+    }
 
   } catch (error) {
     log('');

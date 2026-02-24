@@ -867,6 +867,13 @@ export interface ConversationState {
    * Subjects we've already discussed in depth - prevents over-asking about same subject.
    */
   discussedSubjects?: Set<SubjectArea>;
+
+  /**
+   * Roadmap adjustments detected from conversation.
+   * Accumulated as the student reacts to recommended courses/priorities.
+   * Used for potential roadmap re-generation or conversation summary.
+   */
+  roadmapAdjustments?: RoadmapAdjustment[];
 }
 
 /**
@@ -894,6 +901,19 @@ export interface PersonalDisclosure {
 
   /** How significant is this disclosure? Affects referencing priority */
   significance: 'high' | 'medium' | 'low';
+}
+
+/**
+ * A roadmap adjustment detected during conversation.
+ * Tracks when a student's responses indicate their roadmap recommendations
+ * should be reconsidered (e.g., expressing concern about a recommended course).
+ */
+export interface RoadmapAdjustment {
+  type: 'course_interest' | 'course_concern' | 'priority_shift' | 'major_rethink';
+  description: string;
+  originalRecommendation?: string;
+  studentSentiment: 'positive' | 'negative' | 'uncertain';
+  turnNumber: number;
 }
 
 export type ConversationPhase =

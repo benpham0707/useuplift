@@ -967,11 +967,12 @@ Return your guidance as a JSON object matching the Stage4Output interface.`;
 
   try {
     const response = await callClaude({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       systemPrompt,
       userPrompt,
       maxTokens: 12000,
       temperature: 0.4,
+      cacheSystemPrompt: true,
     });
 
     // Parse and validate response

@@ -8,7 +8,7 @@
  * 4. Teaching moments are concise (one sentence max)
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 import Anthropic from '@anthropic-ai/sdk';
 import { dynamicConversationEngine } from '../src/services/portfolioStrategy/services/activityWorkshop/chat/dynamicConversationEngine';
 import { conversationModeService } from '../src/services/portfolioStrategy/services/activityWorkshop/chat/conversationModeService';

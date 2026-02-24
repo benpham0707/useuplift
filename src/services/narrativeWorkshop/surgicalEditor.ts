@@ -115,6 +115,7 @@ export async function generateSurgicalFixes(
         temperature: 0.7,
         useJsonMode: true,
         maxTokens: 1500,
+        cacheSystemPrompt: true,
       }
     );
 

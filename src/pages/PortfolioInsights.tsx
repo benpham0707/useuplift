@@ -19,7 +19,7 @@ import {
   Award
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { PortfolioOverview } from '@/components/portfolio/PortfolioOverview';
 import { DimensionInsightCard } from '@/components/portfolio/DimensionInsightCard';
 import { RecommendationInsightCard } from '@/components/portfolio/RecommendationInsightCard';

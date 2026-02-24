@@ -4,7 +4,7 @@
  */
 
 // Load dotenv first (good practice even for non-API tests)
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import {
   knowledgeAssemblyService,

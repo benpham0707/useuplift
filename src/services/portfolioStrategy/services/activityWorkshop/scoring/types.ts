@@ -133,9 +133,18 @@ export interface ActivityScoreComponent {
 /**
  * Tier Assessment Component (special)
  * Weight: 30% of total score
+ *
+ * PRESENTATION GUIDANCE:
+ * - The numeric `tier` (1-4, lower = better) is kept for internal computation
+ * - USER-FACING presentation should use descriptive TIER NAMES
+ * - Use getTierName() helper to convert tier number to descriptive label
+ * - Example: Instead of "Tier 2", present as "Highly Competitive (State/Regional Recognition)"
  */
 export interface TierAssessmentComponent extends ActivityScoreComponent {
-  /** Sara Harberson tier classification */
+  /**
+   * Sara Harberson tier classification (1 = best, 4 = lowest)
+   * IMPORTANT: For user-facing display, convert to tier name using getTierName()
+   */
   tier: 1 | 2 | 3 | 4;
 }
 
@@ -440,24 +449,35 @@ export interface PortfolioScoreBreakdown {
 }
 
 /**
- * Harvard 1-6 Scale Equivalent
+ * Competitive Positioning Assessment
+ *
+ * PRESENTATION GUIDANCE:
+ * - The numeric `rating` (1-6) is kept for internal computation and backward compatibility
+ * - USER-FACING presentation should use the DESCRIPTIVE LABEL from `description`
+ * - Present as a TIER NAME (e.g., "Outstanding") NOT as a number (e.g., "2/6")
+ * - The description derives from the 1-10 portfolio score as a qualitative label
+ *
+ * Example: Instead of showing "Harvard Scale: 2/6", show "Competitive Tier: Outstanding (top 5%)"
  */
 export interface HarvardScaleAssessment {
-  /** Harvard rating (1 = best, 6 = worst) */
+  /**
+   * Internal rating for computation (1 = best, 6 = worst)
+   * IMPORTANT: Do NOT present this as "X/6" to users. Use the description instead.
+   */
   rating: 1 | 2 | 3 | 4 | 5 | 6;
 
   /**
-   * Description of what this rating means:
-   * 1: Exceptional (top 1%) - National/international distinction
-   * 2: Outstanding (top 5%) - Strong regional/state impact
-   * 3: Good (top 15%) - Meaningful local/school impact
-   * 4: Average (top 40%) - Solid participation
-   * 5: Below Average - Limited engagement
-   * 6: Weak - Minimal activity
+   * Descriptive tier label (USE THIS for user-facing presentation):
+   * - "Exceptional (top 1%)" - National/international distinction
+   * - "Outstanding (top 5%)" - Strong regional/state impact
+   * - "Good (top 15%)" - Meaningful local/school impact
+   * - "Average (top 40%)" - Solid participation
+   * - "Below Average" - Limited engagement
+   * - "Weak" - Minimal activity
    */
   description: string;
 
-  /** Detailed rationale for this rating */
+  /** Detailed rationale for this tier assignment */
   rationale: string;
 }
 
@@ -609,7 +629,10 @@ export const PORTFOLIO_SCORE_LEVELS = {
 } as const;
 
 /**
- * Harvard Scale Definitions
+ * Competitive Positioning Tier Definitions
+ *
+ * These are DESCRIPTIVE LABELS derived from the 1-10 portfolio score.
+ * Present these as tier NAMES (e.g., "Outstanding - Top 5%"), NOT as numeric ratings (e.g., "2/6").
  */
 export const HARVARD_SCALE_DEFINITIONS = {
   1: 'Exceptional (top 1%): National/international distinction, recruited athlete, published research',
@@ -619,3 +642,24 @@ export const HARVARD_SCALE_DEFINITIONS = {
   5: 'Below Average: Limited engagement, scattered activities, no clear impact',
   6: 'Weak: Minimal meaningful activity, possible padding',
 } as const;
+
+/**
+ * Activity Tier Name Definitions (Sara Harberson framework)
+ *
+ * Use these DESCRIPTIVE NAMES for user-facing presentation instead of "Tier 1", "Tier 2", etc.
+ */
+export const ACTIVITY_TIER_NAMES = {
+  1: 'Elite (National/International Recognition)',
+  2: 'Highly Competitive (State/Regional Recognition)',
+  3: 'Competitive (School/Local Leadership)',
+  4: 'Participant (Solid Engagement)',
+} as const;
+
+/**
+ * Helper function to get tier name for user-facing display
+ * @param tier - The numeric tier (1-4, lower = better)
+ * @returns Descriptive tier name
+ */
+export function getTierName(tier: 1 | 2 | 3 | 4): string {
+  return ACTIVITY_TIER_NAMES[tier];
+}

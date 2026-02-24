@@ -27,6 +27,9 @@ interface PIQContext {
     needsReanalysis: boolean;
   };
 
+  /** Persistent student voice profile from voice_profiles table */
+  studentVoiceProfile?: any;
+
   analysis: {
     nqi: number;
     initialNqi: number;
@@ -127,7 +130,8 @@ export function buildPIQContext(
     hasUnsavedChanges?: boolean;
     needsReanalysis?: boolean;
     versionHistory?: Array<{ timestamp: number; nqi: number; note?: string }>;
-  }
+  },
+  studentVoiceProfile?: any
 ): PIQContext {
   // Build PIQ essay metadata
   const promptNumber = parseInt(promptId.replace('piq', '')) || 1;
@@ -207,6 +211,7 @@ export function buildPIQContext(
   return {
     piqEssay,
     currentState,
+    studentVoiceProfile: studentVoiceProfile || undefined,
     analysis: analysisContext,
     voiceFingerprint,
     experienceFingerprint,
@@ -326,6 +331,28 @@ export function formatContextForLLM(context: PIQContext): string {
   sections.push(`**NQI Score**: ${context.analysis.nqi}/100 (${context.analysis.tier})`);
   sections.push(`**Improvement**: ${context.analysis.delta > 0 ? '+' : ''}${context.analysis.delta} points from initial ${context.analysis.initialNqi}`);
   sections.push('');
+
+  // Persistent Student Voice Profile (from voice_profiles DB table)
+  if (context.studentVoiceProfile) {
+    const vp = context.studentVoiceProfile;
+    sections.push('# STUDENT VOICE PROFILE (Persistent, Cross-Workshop)');
+    sections.push(`**Register**: ${vp.register?.primary || 'unknown'}`);
+    sections.push(`**Vocabulary**: ${vp.linguistics?.vocabularyLevel || 'clear'}`);
+    sections.push(`**Formality**: ${vp.linguistics?.formality || 'semi-formal'}`);
+    sections.push(`**Sentence length**: ~${vp.linguistics?.averageSentenceLength || 15} words`);
+    if (vp.linguistics?.signatureWords?.length) {
+      sections.push(`**Signature words**: ${vp.linguistics.signatureWords.join(', ')}`);
+    }
+    if (vp.linguistics?.avoidWords?.length) {
+      sections.push(`**AVOID these words**: ${vp.linguistics.avoidWords.join(', ')}`);
+    }
+    if (vp.preservationWarnings?.length) {
+      sections.push(`**DO NOT CHANGE**: ${vp.preservationWarnings.join('; ')}`);
+    }
+    sections.push('');
+    sections.push('⚠️ Match suggestions to this student\'s authentic voice.');
+    sections.push('');
+  }
 
   // Voice Fingerprint (CRITICAL for preventing flowery suggestions)
   if (context.voiceFingerprint) {

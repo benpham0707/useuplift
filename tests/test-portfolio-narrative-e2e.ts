@@ -10,8 +10,7 @@
  * This replaces the rigid archetype-based Stage 0 detection.
  */
 
-import dotenv from 'dotenv';
-dotenv.config();
+import './utils/loadEnv';
 
 import {
   portfolioNarrativeService,

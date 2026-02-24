@@ -23,7 +23,7 @@
  * - General UC: 15% (consistent across UCs)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   LeadershipInitiativeAnalysis,
@@ -31,10 +31,6 @@ import {
   HolisticPortfolioUnderstanding,
 } from '../types';
 import { LEADERSHIP_TIERS, UC_CONTEXT_ADJUSTMENTS } from '../constants/ucCalibration';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 2.2: Leadership & Initiative Analyzer
@@ -48,8 +44,8 @@ export async function analyzeLeadership(
   const userPrompt = buildUserPrompt(portfolio, holisticContext, mode);
 
   try {
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+    const response = await getAnthropicClient().messages.create({
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 3000,
       temperature: 0.6, // Slightly higher for pattern recognition
       system: systemPrompt,
@@ -65,8 +61,8 @@ export async function analyzeLeadership(
   } catch (error) {
 
     try {
-      const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250514',
+      const retryResponse = await getAnthropicClient().messages.create({
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 3000,
         temperature: 0.6,
         system: systemPrompt,

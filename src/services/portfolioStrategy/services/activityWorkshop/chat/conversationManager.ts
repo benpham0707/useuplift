@@ -17,6 +17,9 @@ import {
   ConversationTrigger,
   AskedQuestion,
   ExtractedInformation,
+  ExtractedField,
+  ExtractedQuote,
+  ImplicitFinding,
   ExtractionResult,
   StudentContext,
   OPENING_TEMPLATES,
@@ -32,6 +35,12 @@ import { activityProfileService } from '../profile/activityProfileService';
 const DEFAULT_MAX_TURNS_PER_PHASE = 4;
 const MAX_TOTAL_TURNS = 20;
 const MIN_TURNS_BEFORE_END = 3;
+
+/** Confidence levels ranked numerically for comparison */
+const CONFIDENCE_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
+
+/** Minimum word-overlap ratio to consider two strings near-duplicates */
+const SIMILARITY_THRESHOLD = 0.7;
 
 // ============================================================================
 // CONVERSATION MANAGER
@@ -340,17 +349,32 @@ export class ConversationManager {
   }
 
   /**
-   * Update extracted info with new extraction
+   * Update extracted info with new extraction, deduplicating across turns.
+   *
+   * For fields with the same path:
+   *   - Scalar paths: keep the entry with higher confidence (newer wins ties)
+   *   - Array-append paths: keep all unique entries
+   * For quotes: skip near-duplicates (word overlap > SIMILARITY_THRESHOLD)
+   * For implicit findings: skip near-duplicate observations
    */
   private updateExtractedInfo(
     current: ExtractedInformation,
     extraction: ExtractionResult,
     turnNumber: number
   ): ExtractedInformation {
+    // --- Merge fields with dedup ---
+    const mergedFields = this.deduplicateFields(current.fields, extraction.extractedFields);
+
+    // --- Merge quotes with similarity dedup ---
+    const mergedQuotes = this.deduplicateQuotes(current.quotes, extraction.authenticQuotes);
+
+    // --- Merge implicit findings with similarity dedup ---
+    const mergedImplicit = this.deduplicateImplicit(current.implicit, extraction.implicitFindings);
+
     return {
-      fields: [...current.fields, ...extraction.extractedFields],
-      quotes: [...current.quotes, ...extraction.authenticQuotes],
-      implicit: [...current.implicit, ...extraction.implicitFindings],
+      fields: mergedFields,
+      quotes: mergedQuotes,
+      implicit: mergedImplicit,
       updateHistory: [
         ...current.updateHistory,
         {
@@ -362,90 +386,397 @@ export class ConversationManager {
   }
 
   /**
-   * Apply extraction results to the profile
+   * Apply extraction results to the profile.
+   *
+   * DESIGN: All field updates are applied first WITHOUT per-field metadata
+   * updates (version, completeness). Metadata is updated ONCE at the end
+   * of the batch to avoid:
+   * - profileVersion incrementing per field instead of per turn
+   * - completeness being recalculated N times for N fields
+   * - inconsistent intermediate states
+   *
+   * Guards:
+   * - Low-confidence scalar extractions do NOT overwrite existing values
+   * - Fields flagged as contradictions in needsClarification are SKIPPED
+   * - Array fields always APPEND+DEDUP regardless of updateType
+   * - Empty/null values never overwrite existing meaningful data
+   * - Quotes are deduplicated by string similarity before adding
+   * - Character traits are deduplicated by trait name before adding
    */
   private applyExtractionToProfile(
     profile: ActivityProfile,
     extraction: ExtractionResult
   ): ActivityProfile {
-    let updatedProfile = { ...profile };
+    // Deep clone once — setProfileFieldInPlace will mutate in place
+    const updatedProfile: ActivityProfile = JSON.parse(JSON.stringify(profile));
 
-    for (const field of extraction.extractedFields) {
-      updatedProfile = this.setProfileField(updatedProfile, field.path, field.value, field.updateType);
+    // Collect contradiction paths so we can skip those fields
+    const contradictionPaths = new Set<string>();
+    for (const clarification of extraction.needsClarification) {
+      if (clarification.topic.startsWith('contradiction:')) {
+        const contradictedField = clarification.topic.replace('contradiction:', '').trim();
+        contradictionPaths.add(contradictedField);
+      }
     }
 
-    // Add authentic quotes
+    for (const field of extraction.extractedFields) {
+      // Skip fields with active contradictions — wait for student clarification
+      if (contradictionPaths.has(field.path)) {
+        console.log(
+          `[ConversationManager] Skipping contradicted field "${field.path}" — awaiting clarification`
+        );
+        continue;
+      }
+
+      // Confidence guard: for non-append scalar fields, skip low-confidence
+      // extractions when the profile already has a meaningful value at that path.
+      if (field.updateType !== 'append' && field.confidence === 'low') {
+        const existingValue = this.getProfileFieldValue(updatedProfile, field.path);
+        if (ConversationManager.isMeaningfulValue(existingValue)) {
+          continue;
+        }
+      }
+
+      // Apply field in place (no per-field clone or metadata update)
+      this.setProfileFieldInPlace(updatedProfile, field.path, field.value, field.updateType);
+    }
+
+    // Add authentic quotes — deduplicate against existing quotes in profile
     for (const quote of extraction.authenticQuotes) {
-      updatedProfile = activityProfileService.addAuthenticQuote(updatedProfile, {
-        quote: quote.quote,
-        context: quote.context,
-        potentialUse: quote.potentialUse,
-      });
+      const isDuplicate = updatedProfile.meaning.authenticQuotes.some(
+        existing => ConversationManager.areSimilarStrings(existing.quote, quote.quote)
+      );
+      if (!isDuplicate) {
+        updatedProfile.meaning.authenticQuotes.push({
+          quote: quote.quote,
+          context: quote.context,
+          potentialUse: quote.potentialUse,
+        });
+      }
     }
 
     // Apply implicit character traits if high confidence
     for (const implicit of extraction.implicitFindings) {
       if (implicit.confidence === 'high' && implicit.relatedField?.includes('characterTraits')) {
-        // Extract trait from observation if possible
         const traitMatch = implicit.observation.match(/demonstrates?\s+(\w+)/i);
         if (traitMatch) {
           const trait = traitMatch[1].toLowerCase();
           const validTraits = ['leadership', 'innovation', 'resilience', 'curiosity', 'empathy', 'discipline', 'creativity', 'integrity', 'collaboration', 'initiative', 'perseverance'];
           if (validTraits.includes(trait)) {
-            updatedProfile = activityProfileService.addCharacterTrait(updatedProfile, {
-              trait: trait as any,
-              howDemonstrated: implicit.basis,
-            });
+            const traitExists = updatedProfile.connections.characterTraits.some(
+              existing => existing.trait === trait
+            );
+            if (!traitExists) {
+              updatedProfile.connections.characterTraits.push({
+                trait: trait as any,
+                howDemonstrated: implicit.basis,
+              });
+            }
           }
         }
       }
     }
 
+    // === BATCH METADATA UPDATE (once per turn, not per field) ===
+    updatedProfile.profileVersion = profile.profileVersion + 1;
+    updatedProfile.lastUpdated = new Date().toISOString();
+
+    // Recalculate completeness ONCE after all fields are applied
+    const completeness = activityProfileService.calculateCompleteness(updatedProfile);
+    updatedProfile.dataCompleteness = completeness.overall;
+
     return updatedProfile;
   }
 
   /**
-   * Set a field in the profile by path
+   * Read a nested field value from the profile by dot-separated path.
    */
-  private setProfileField(
+  private getProfileFieldValue(profile: ActivityProfile, path: string): unknown {
+    const parts = path.split('.');
+    let current: unknown = profile;
+    for (const part of parts) {
+      if (current === null || current === undefined) return undefined;
+      if (typeof current !== 'object') return undefined;
+      current = (current as Record<string, unknown>)[part];
+    }
+    return current;
+  }
+
+  /**
+   * Set a field in the profile IN PLACE (no clone, no metadata update).
+   *
+   * Called by applyExtractionToProfile for each extracted field.
+   * Metadata (version, completeness, lastUpdated) is updated ONCE
+   * after all fields have been applied — see applyExtractionToProfile.
+   *
+   * Array handling:
+   *   - If existing value is an array, ALWAYS append+dedup regardless of
+   *     updateType. The LLM sometimes returns updateType: "new" for the
+   *     first extraction of an array field, which would wipe previous
+   *     turns' data if taken literally. Safe accumulation is always correct.
+   *
+   * Nested object handling:
+   *   - If existing value is a plain object and new value is also an object,
+   *     shallow-merge new keys into existing (preserving existing keys that
+   *     are not present in the new value).
+   *
+   * Scalar handling:
+   *   - Empty/null/undefined new values NEVER overwrite existing meaningful data.
+   *   - Non-empty new values replace existing values (most recent wins).
+   */
+  private setProfileFieldInPlace(
     profile: ActivityProfile,
     path: string,
     value: unknown,
     updateType: 'new' | 'update' | 'append'
-  ): ActivityProfile {
+  ): void {
     const parts = path.split('.');
-    const result = JSON.parse(JSON.stringify(profile)); // Deep clone
 
-    let current: unknown = result;
+    // Navigate to the parent object
+    let current: unknown = profile;
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i];
       if (current && typeof current === 'object') {
         current = (current as Record<string, unknown>)[part];
-      }
-    }
-
-    if (current && typeof current === 'object') {
-      const lastPart = parts[parts.length - 1];
-      const obj = current as Record<string, unknown>;
-
-      if (updateType === 'append' && Array.isArray(obj[lastPart])) {
-        if (Array.isArray(value)) {
-          obj[lastPart] = [...(obj[lastPart] as unknown[]), ...value];
-        } else {
-          (obj[lastPart] as unknown[]).push(value);
-        }
       } else {
-        obj[lastPart] = value;
+        return; // Invalid path — bail out silently
       }
     }
 
-    // Recalculate completeness
-    const completeness = activityProfileService.calculateCompleteness(result);
-    result.dataCompleteness = completeness.overall;
-    result.lastUpdated = new Date().toISOString();
-    result.profileVersion += 1;
+    if (!current || typeof current !== 'object') return;
+
+    const lastPart = parts[parts.length - 1];
+    const obj = current as Record<string, unknown>;
+    const existingValue = obj[lastPart];
+
+    // ---- ARRAY FIELDS: always append + dedup ----
+    // Regardless of updateType, arrays accumulate. This prevents the LLM
+    // from accidentally wiping turn 1's recognition by saying "new" in turn 3.
+    if (Array.isArray(existingValue)) {
+      const newItems = Array.isArray(value) ? value : (value != null ? [value] : []);
+      for (const item of newItems) {
+        if (!ConversationManager.isArrayItemDuplicate(existingValue, item)) {
+          existingValue.push(item);
+        }
+      }
+      return;
+    }
+
+    // ---- NESTED OBJECT FIELDS: shallow merge ----
+    // e.g., impact.beforeAfter, story.origin, connections.spikeRelevance
+    // Merge new keys into existing object without losing existing keys.
+    if (
+      existingValue && typeof existingValue === 'object' && !Array.isArray(existingValue) &&
+      value && typeof value === 'object' && !Array.isArray(value)
+    ) {
+      const existingObj = existingValue as Record<string, unknown>;
+      const newObj = value as Record<string, unknown>;
+      for (const key of Object.keys(newObj)) {
+        const newVal = newObj[key];
+        // Only overwrite if the new value is meaningful
+        if (ConversationManager.isMeaningfulValue(newVal)) {
+          // If the existing sub-field is an array, append instead of replace
+          if (Array.isArray(existingObj[key])) {
+            const subItems = Array.isArray(newVal) ? newVal : [newVal];
+            for (const item of subItems) {
+              if (!ConversationManager.isArrayItemDuplicate(existingObj[key] as unknown[], item)) {
+                (existingObj[key] as unknown[]).push(item);
+              }
+            }
+          } else {
+            existingObj[key] = newVal;
+          }
+        }
+      }
+      return;
+    }
+
+    // ---- SCALAR FIELDS: replace only if new value is meaningful ----
+    if (!ConversationManager.isMeaningfulValue(value)) {
+      // New value is empty/null/undefined — keep existing data intact
+      return;
+    }
+
+    obj[lastPart] = value;
+  }
+
+  /**
+   * Check if a value is meaningful (non-empty, non-null, non-zero-for-numbers).
+   */
+  static isMeaningfulValue(value: unknown): boolean {
+    if (value === undefined || value === null) return false;
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'number') return value !== 0;
+    if (typeof value === 'boolean') return true;
+    if (Array.isArray(value)) return value.length > 0;
+    if (typeof value === 'object') return Object.keys(value).length > 0;
+    return true;
+  }
+
+  // ============================================================================
+  // DEDUPLICATION HELPERS
+  // ============================================================================
+
+  /**
+   * Deduplicate extracted fields across turns.
+   *
+   * For scalar paths (numeric fields, strings): keep the higher-confidence
+   * entry; on tie keep the newer one (later in the array).
+   * For append paths: keep all entries (the actual array dedup happens in
+   * setProfileFieldInPlace when applying to the profile).
+   */
+  private deduplicateFields(
+    existing: ExtractedField[],
+    incoming: ExtractedField[]
+  ): ExtractedField[] {
+    const result = [...existing];
+
+    for (const newField of incoming) {
+      if (newField.updateType === 'append') {
+        // Append fields accumulate; profile-level dedup handles array items
+        result.push(newField);
+        continue;
+      }
+
+      // For scalar fields, check if we already have an entry at this path
+      const existingIndex = result.findIndex(
+        f => f.path === newField.path && f.updateType !== 'append'
+      );
+
+      if (existingIndex === -1) {
+        result.push(newField);
+      } else {
+        // Keep higher confidence; on tie keep newer (incoming)
+        const oldRank = CONFIDENCE_RANK[result[existingIndex].confidence] ?? 0;
+        const newRank = CONFIDENCE_RANK[newField.confidence] ?? 0;
+        if (newRank >= oldRank) {
+          result[existingIndex] = newField;
+        }
+        // else: old value had higher confidence, keep it
+      }
+    }
 
     return result;
+  }
+
+  /**
+   * Deduplicate quotes across turns using word-overlap similarity.
+   */
+  private deduplicateQuotes(
+    existing: ExtractedQuote[],
+    incoming: ExtractedQuote[]
+  ): ExtractedQuote[] {
+    const result = [...existing];
+
+    for (const newQuote of incoming) {
+      const isDuplicate = result.some(
+        q => ConversationManager.areSimilarStrings(q.quote, newQuote.quote)
+      );
+      if (!isDuplicate) {
+        result.push(newQuote);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Deduplicate implicit findings across turns using observation similarity.
+   */
+  private deduplicateImplicit(
+    existing: ImplicitFinding[],
+    incoming: ImplicitFinding[]
+  ): ImplicitFinding[] {
+    const result = [...existing];
+
+    for (const newFinding of incoming) {
+      const isDuplicate = result.some(
+        f => ConversationManager.areSimilarStrings(f.observation, newFinding.observation)
+      );
+      if (!isDuplicate) {
+        result.push(newFinding);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Determine whether a candidate item is a duplicate of something already
+   * in the array. Uses key-field matching for known profile object shapes,
+   * falling back to JSON.stringify for exact dedup.
+   */
+  static isArrayItemDuplicate(existingArray: unknown[], candidate: unknown): boolean {
+    if (candidate === null || candidate === undefined) return true;
+
+    // Primitive items (strings, numbers): exact match
+    if (typeof candidate !== 'object') {
+      return existingArray.includes(candidate);
+    }
+
+    const obj = candidate as Record<string, unknown>;
+
+    // Key-field strategy: check common identifier fields
+    // recognition / artifacts: "name"
+    // roles: "role"
+    // skills: "skill"
+    // values: "value"
+    // personalGrowth: "area"
+    // keyMoments: "description"
+    // evolution: "phase"
+    // relationships: "description" + "type"
+    // directBeneficiaries: "who"
+    // characterTraits: "trait"
+    const keyFields: Array<{ key: string; secondary?: string }> = [
+      { key: 'name' },
+      { key: 'role' },
+      { key: 'skill' },
+      { key: 'value' },
+      { key: 'area' },
+      { key: 'trait' },
+      { key: 'who' },
+      { key: 'quote' },
+    ];
+
+    for (const { key } of keyFields) {
+      if (obj[key] !== undefined && typeof obj[key] === 'string') {
+        const candidateKey = (obj[key] as string).toLowerCase().trim();
+        return existingArray.some(existing => {
+          if (existing && typeof existing === 'object') {
+            const existingKey = ((existing as Record<string, unknown>)[key] as string | undefined);
+            if (existingKey && typeof existingKey === 'string') {
+              return existingKey.toLowerCase().trim() === candidateKey
+                || ConversationManager.areSimilarStrings(existingKey, candidateKey);
+            }
+          }
+          return false;
+        });
+      }
+    }
+
+    // Fallback: JSON.stringify exact match
+    const candidateJson = JSON.stringify(candidate);
+    return existingArray.some(item => JSON.stringify(item) === candidateJson);
+  }
+
+  /**
+   * Check whether two strings are near-duplicates based on word overlap.
+   * Returns true if they share more than SIMILARITY_THRESHOLD of their words.
+   */
+  static areSimilarStrings(a: string, b: string): boolean {
+    const wordsA = new Set(a.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+    const wordsB = new Set(b.toLowerCase().split(/\s+/).filter(w => w.length > 2));
+
+    if (wordsA.size === 0 && wordsB.size === 0) return true;
+    if (wordsA.size === 0 || wordsB.size === 0) return false;
+
+    let overlap = 0;
+    for (const word of wordsA) {
+      if (wordsB.has(word)) overlap++;
+    }
+
+    const smaller = Math.min(wordsA.size, wordsB.size);
+    return overlap / smaller >= SIMILARITY_THRESHOLD;
   }
 }
 

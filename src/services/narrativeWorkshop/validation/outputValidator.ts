@@ -244,7 +244,8 @@ export class OutputValidator {
         systemPrompt: VALIDATION_SYSTEM_PROMPT,
         temperature: 0.1, // Low temperature for consistent validation
         maxTokens: 800,
-        useJsonMode: true
+        useJsonMode: true,
+        cacheSystemPrompt: true,
       });
 
       const result = typeof response.content === 'string'

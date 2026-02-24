@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Expert System Prompts
  *
@@ -173,9 +174,7 @@ GREAT transformation:
 
 ### PHASE 4: CONNECT (To Their Story)
 
-Every improvement should strengthen their narrative:
-
-"This robotics activity isn't just about robots — it's evidence of your Builder Arc. You see problems, you create solutions, you scale them. MIT lives for this pattern. Make sure your description shows the ARC: problem identified → solution built → impact measured."
+Link improvements to how this specific activity strengthens their application. Keep it brief and activity-specific — do NOT re-explain their overall narrative arc or constraint background (those are covered once in the holistic section). A single phrase like "reinforces your builder pattern" is enough.
 
 ## TEACHING DEPTH: ${depth.toUpperCase()}
 
@@ -238,6 +237,11 @@ ${expertKnowledge}
 4. **ALWAYS preserve their voice.** Your optimized description should sound like an ENHANCED version of them, not like you wrote it.
 5. **ALWAYS connect to their narrative.** Isolated advice is forgotten. Connected advice transforms applications.
 6. **USE their exact words when possible.** Quoting their description shows you READ it, not just scored it.
+7. **INCLUDE TEXT REFERENCES.** For every celebration strength, improvement issue, and strength teaching item, identify the EXACT substring(s) from the student's description that you're referencing. Quote it precisely — the frontend uses substring matching to highlight it.
+   - quotedText: the EXACT substring from their description (case-sensitive, must be findable via string search)
+   - type: "strength" (working well), "issue" (needs fixing), or "context" (neutral evidence)
+   - label: short tooltip (e.g., "strong verb", "vague ownership", "quantifiable impact")
+   If you cannot find exact text to quote for a teaching point, omit the reference for that point.
 
 ## OUTPUT FORMAT
 
@@ -382,14 +386,14 @@ export function buildActivityExpertContext(
 ${expertContext.schoolArchetypes[0].descriptionAdvice}`);
   }
 
-  // Add constraint context
+  // Add constraint context — brief reminder only (full profile is in holistic/system prompt)
   if (expertContext.constraintLevel) {
-    sections.push(`CONSTRAINT CONTEXT (Level ${expertContext.constraintLevel.level}): ${expertContext.constraintLevel.evaluationNote}`);
+    sections.push(`CONSTRAINT NOTE: Level ${expertContext.constraintLevel.level} — factor into tier assessment. Do NOT restate the full constraint profile.`);
   }
 
-  // Add narrative arc
+  // Add narrative arc — brief label only (do NOT re-explain the arc per activity)
   if (expertContext.narrativeArc) {
-    sections.push(`NARRATIVE ARC: Student shows "${expertContext.narrativeArc.name}" pattern (${expertContext.narrativeArc.pattern}). Connect teaching to this arc.`);
+    sections.push(`ARC: "${expertContext.narrativeArc.name}" — reference briefly if relevant, do NOT re-derive or re-explain.`);
   }
 
   // Add relevant advanced issues

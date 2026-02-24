@@ -190,7 +190,20 @@ export class ConversationModeService {
     profile: ActivityProfile,
     turnNumber: number
   ): ConversationDynamics {
-    const dynamics = { ...currentDynamics };
+    // Deep-clone modeEffectiveness Map to prevent shared-reference mutation
+    // (shallow spread would share the Map between old and new dynamics)
+    const clonedModeEffectiveness = new Map<ConversationMode, ModeEffectiveness>();
+    currentDynamics.modeEffectiveness.forEach((value, key) => {
+      clonedModeEffectiveness.set(key, { ...value });
+    });
+
+    const dynamics: ConversationDynamics = {
+      ...currentDynamics,
+      modeEffectiveness: clonedModeEffectiveness,
+    };
+
+    // Capture previous quality BEFORE updating — needed for effectiveness tracking
+    const previousQuality = currentDynamics.lastExtractionQuality;
 
     // Update extraction streaks
     if (extractionQuality === 'sparse' || extractionQuality === 'empty') {
@@ -218,8 +231,8 @@ export class ConversationModeService {
     // Determine which modes should be active
     dynamics.activeModes = this.determineActiveModes(dynamics, turnNumber);
 
-    // Track mode effectiveness
-    this.updateModeEffectiveness(dynamics, extractionQuality);
+    // Track mode effectiveness using the PREVIOUS quality for comparison
+    this.updateModeEffectiveness(dynamics, extractionQuality, previousQuality);
 
     return dynamics;
   }
@@ -374,11 +387,20 @@ export class ConversationModeService {
   }
 
   /**
-   * Update mode effectiveness based on extraction results
+   * Update mode effectiveness based on extraction results.
+   *
+   * Compares the PREVIOUS turn's extraction quality against the current quality
+   * to determine if active modes led to an improvement. The previousQuality
+   * parameter is the quality from BEFORE this turn was processed — it must be
+   * captured before lastExtractionQuality is overwritten.
    */
-  private updateModeEffectiveness(dynamics: ConversationDynamics, newQuality: 'rich' | 'moderate' | 'sparse' | 'empty'): void {
+  private updateModeEffectiveness(
+    dynamics: ConversationDynamics,
+    newQuality: 'rich' | 'moderate' | 'sparse' | 'empty',
+    previousQuality: 'rich' | 'moderate' | 'sparse' | 'empty'
+  ): void {
     // Track if extraction improved from previous turn
-    const improved = (dynamics.lastExtractionQuality === 'sparse' || dynamics.lastExtractionQuality === 'empty') &&
+    const improved = (previousQuality === 'sparse' || previousQuality === 'empty') &&
       (newQuality === 'rich' || newQuality === 'moderate');
 
     for (const mode of dynamics.activeModes) {

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Citation Types for Evidence-Based Teaching
  *

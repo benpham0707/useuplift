@@ -94,10 +94,16 @@ Return JSON array of validation results.`;
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5-20250514',
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 8192,
         temperature: 0.3,
-        system: VALIDATION_PROMPT,
+        system: [
+          {
+            type: 'text',
+            text: VALIDATION_PROMPT,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
         messages: [{ role: 'user', content: userMessage }]
       })
     });

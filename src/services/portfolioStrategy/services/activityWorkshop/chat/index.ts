@@ -35,3 +35,5 @@ export { ActivityProfileChatService, activityProfileChatService } from './activi
 export { QuestionGeneratorService, questionGeneratorService } from './questionGenerator';
 export { ResponseExtractorService, responseExtractorService } from './responseExtractor';
 export { ConversationManager, conversationManager } from './conversationManager';
+export { ChatPersistenceService, chatPersistenceService } from './chatPersistenceService';
+export type { ConversationListItem } from './chatPersistenceService';

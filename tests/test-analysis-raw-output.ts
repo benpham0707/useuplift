@@ -2,7 +2,7 @@
  * Debug test to see raw LLM output
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 import Anthropic from '@anthropic-ai/sdk';
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';

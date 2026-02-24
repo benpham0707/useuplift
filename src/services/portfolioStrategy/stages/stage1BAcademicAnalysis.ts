@@ -631,11 +631,12 @@ Return your analysis as a JSON object matching the Stage1BOutput interface.`;
 
   try {
     const response = await callClaude({
-      model: 'claude-sonnet-4-5-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       systemPrompt,
       userPrompt,
       maxTokens: 6000,
       temperature: 0.3,
+      cacheSystemPrompt: true,
     });
 
     // Parse and validate response

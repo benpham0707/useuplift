@@ -27,6 +27,8 @@ import { callClaude } from '@/lib/llm/claude';
 import { ConversationDynamics, StudentPattern, ConversationMode } from './conversationModeService';
 import { ActivityProfile } from '../profile/types';
 import { ConversationState, ExtractionResult, QuestionCandidate } from './types';
+import { voiceProfileService } from '@/services/voiceProfile';
+import type { StudentVoiceProfile } from '@/services/voiceProfile/types';
 
 // ============================================================================
 // TYPES
@@ -61,6 +63,9 @@ export interface DynamicQuestionInput {
   // ═══════════════════════════════════════════════════════════════════════════
   // ANALYSIS INSIGHTS - "I've already studied your file" context
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Persistent voice profile (if loaded from DB) */
+  studentVoiceProfile?: StudentVoiceProfile;
 
   /** Pre-computed analysis results from System 1 */
   analysisInsights?: {
@@ -264,23 +269,29 @@ function extractQuotablePhrases(response: string): string[] {
   const quotes: string[] = [];
 
   // Numbers with context (e.g., "50 students", "3 hours a week")
-  const numberPatterns = response.match(/\d+\s+[\w\s]{2,20}/g) || [];
+  // Use word-boundary anchored patterns to avoid mid-word truncation
+  const numberPatterns = response.match(/\d+\s+(?:\w+\s+){0,3}\w+/g) || [];
   quotes.push(...numberPatterns.slice(0, 2));
 
-  // Action phrases (I + verb) - expanded verb list
-  const actionPatterns = response.match(/I\s+(?:helped|created|led|organized|built|designed|started|managed|taught|wrote|ran|joined|liked?|loved?|worked|did|made|learned|tried)\s+[\w\s]{2,30}/gi) || [];
-  quotes.push(...actionPatterns.slice(0, 2));
+  // Action phrases (I + verb + up to ~5 words, ending at word boundary)
+  const actionPatterns = response.match(/I\s+(?:helped|created|led|organized|built|designed|started|managed|taught|wrote|ran|joined|liked?|loved?|worked|did|made|learned|tried)\s+(?:\w+[\s,]*){1,5}\w+/gi) || [];
+  // Trim each match to end on a full word and cap at ~60 chars
+  const cleanedActions = actionPatterns.map(p => {
+    const trimmed = p.length > 60 ? p.slice(0, 60).replace(/\s+\S*$/, '') : p;
+    return trimmed;
+  });
+  quotes.push(...cleanedActions.slice(0, 2));
 
   // Transformation phrases (from X to Y)
-  const transformPatterns = response.match(/from\s+[\w\s]+\s+to\s+[\w\s]+/gi) || [];
+  const transformPatterns = response.match(/from\s+(?:\w+\s+){1,4}to\s+(?:\w+\s*){1,4}\w+/gi) || [];
   quotes.push(...transformPatterns.slice(0, 1));
 
   // Self-descriptive phrases for quality anchors
-  const qualityPatterns = response.match(/(?:we|I)\s+(?:actually|really|finally|successfully)\s+[\w\s]{2,25}/gi) || [];
+  const qualityPatterns = response.match(/(?:we|I)\s+(?:actually|really|finally|successfully)\s+(?:\w+\s+){1,4}\w+/gi) || [];
   quotes.push(...qualityPatterns.slice(0, 1));
 
   // Humble phrases (to acknowledge and reframe)
-  const humblePatterns = response.match(/(?:just|only|nothing special|anyone could|the team|we all)\s+[\w\s]{2,20}/gi) || [];
+  const humblePatterns = response.match(/(?:just|only|nothing special|anyone could|the team|we all)\s+(?:\w+\s+){1,3}\w+/gi) || [];
   quotes.push(...humblePatterns.slice(0, 1));
 
   // FALLBACK: For very short responses, extract the core content
@@ -389,7 +400,28 @@ export class DynamicConversationEngine {
 
     // Extract voice fingerprint and quotable phrases from history
     const responses = conversationHistory.map(h => h.response);
-    const voiceFingerprint = analyzeVoice(responses);
+    // If a persistent voice profile exists, use it to seed the fingerprint
+    // instead of cold-starting from conversation history alone
+    let voiceFingerprint: VoiceFingerprint;
+    if (input.studentVoiceProfile) {
+      const vp = input.studentVoiceProfile;
+      voiceFingerprint = {
+        formality: vp.linguistics.formality === 'formal' ? 'formal' :
+                   vp.linguistics.formality === 'casual' ? 'casual' : 'neutral',
+        energy: vp.personality.energy === 'high' ? 'high' :
+                vp.personality.energy === 'low' ? 'low' : 'medium',
+        verbosity: 'moderate', // Default; override from conversation if available
+        emotionalOpenness: vp.personality.emotionalOpenness === 'open' ? 'expressive' :
+                           vp.personality.emotionalOpenness === 'reserved' ? 'guarded' : 'neutral',
+      };
+      // Refine verbosity from conversation if we have history
+      if (responses.length > 0) {
+        const avgLen = responses.reduce((sum, r) => sum + r.length, 0) / responses.length;
+        voiceFingerprint.verbosity = avgLen < 50 ? 'minimal' : avgLen > 200 ? 'detailed' : 'moderate';
+      }
+    } else {
+      voiceFingerprint = analyzeVoice(responses);
+    }
     const lastResponse = conversationHistory[conversationHistory.length - 1]?.response || '';
     const quotablePhrases = extractQuotablePhrases(lastResponse);
 

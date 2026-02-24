@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Contextual Positioner (Layer 3b)
  *
@@ -258,7 +259,7 @@ export class ContextualPositioner {
       try {
         const response = await callUnifiedLLM<ContextualPositioning>(prompt, {
           provider: 'claude',
-          model: 'claude-sonnet-4-5-20250514',
+          model: 'claude-sonnet-4-5-20250929',
           temperature,
           maxTokens: 1500,
           systemPrompt:

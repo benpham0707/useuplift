@@ -13,7 +13,7 @@
  * The output is formatted to show the actual user experience.
  */
 
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import {
   activityProfileChatService,

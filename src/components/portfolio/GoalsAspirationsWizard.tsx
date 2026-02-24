@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowRight, ArrowLeft, Target, Lightbulb } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/safeClient';
 import { toast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { apiFetch } from '@/lib/utils';
@@ -78,9 +78,9 @@ const GoalsAspirationsWizard: React.FC<Props> = ({ onComplete, onCancel, onProgr
         setData((prev) => ({
           ...prev,
           intendedMajor: ga.intended_major || '',
-          careerInterests: Array.isArray(ga.career_interests) ? ga.career_interests : [],
+          careerInterests: Array.isArray(ga.career_interests) ? (ga.career_interests as any[]).map(String) : [],
           highestDegree: ga.highest_degree || '',
-          collegeEnvironment: Array.isArray(ga.preferred_environment) ? ga.preferred_environment : [],
+          collegeEnvironment: Array.isArray(ga.preferred_environment) ? (ga.preferred_environment as any[]).map(String) : [],
           applyingToUC: '',
           usingCommonApp: '',
           startDate: '',

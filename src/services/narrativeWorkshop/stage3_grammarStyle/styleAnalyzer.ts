@@ -249,6 +249,7 @@ export async function analyzeStyle(
         temperature: 0.3,
         useJsonMode: true,
         maxTokens: 3000,
+        cacheSystemPrompt: true,
       }
     );
 

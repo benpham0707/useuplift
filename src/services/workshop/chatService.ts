@@ -161,7 +161,8 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
         systemPrompt,
         temperature,
         maxTokens,
-        model: 'claude-sonnet-4-5-20250514', // Use latest Sonnet
+        model: 'claude-sonnet-4-5-20250929', // Use latest Sonnet
+        cacheSystemPrompt: true,
       }
     );
 

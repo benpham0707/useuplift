@@ -19,7 +19,7 @@
  * - Context heavily weighted (first-gen, low-income, under-resourced)
  */
 
-import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import {
   PortfolioData,
   HolisticPortfolioUnderstanding,
@@ -33,10 +33,6 @@ import {
   getUCGPABenchmark,
   isCompetitiveGPA,
 } from '../constants/ucCalibration';
-
-const anthropic = new Anthropic({
-  apiKey: process.env.ANTHROPIC_API_KEY,
-});
 
 /**
  * Stage 1: Holistic Portfolio Analyzer
@@ -54,8 +50,8 @@ export async function analyzeHolisticPortfolio(
 
   try {
     // Primary attempt with Claude Sonnet 4.5
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250514',
+    const response = await getAnthropicClient().messages.create({
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 4000,
       temperature: 0.7, // Slight creativity for narrative synthesis
       system: systemPrompt,
@@ -78,8 +74,8 @@ export async function analyzeHolisticPortfolio(
 
     // Retry once before falling back to heuristic
     try {
-      const retryResponse = await anthropic.messages.create({
-        model: 'claude-sonnet-4-5-20250514',
+      const retryResponse = await getAnthropicClient().messages.create({
+        model: 'claude-sonnet-4-5-20250929',
         max_tokens: 4000,
         temperature: 0.7,
         system: systemPrompt,

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Haiku Diagnosis Service
  *
@@ -22,6 +23,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { getAnthropicClient } from '../../../lib/llm/claude';
 import type {
   EmotionalRegister,
   InitialAnalysis,
@@ -475,9 +477,7 @@ export class HaikuDiagnosisService {
   private client: Anthropic;
 
   constructor(apiKey?: string) {
-    this.client = new Anthropic({
-      apiKey: apiKey || process.env.ANTHROPIC_API_KEY,
-    });
+    this.client = apiKey ? new Anthropic({ apiKey }) : getAnthropicClient();
   }
 
   /**

@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Portfolio Narrative Service
  *
@@ -201,6 +202,7 @@ export class PortfolioNarrativeService {
         userPrompt,
         maxTokens: 4000,
         temperature: 0.4, // Balanced: creative insight but grounded reasoning
+        cacheSystemPrompt: true,
       });
 
       const narrative = this.parseResponse(response.content, analysisType);

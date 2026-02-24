@@ -10,8 +10,7 @@
  * RUN: npx tsx tests/test-knowledge-driven-activity-teaching.ts
  */
 
-// CRITICAL: Load dotenv BEFORE any imports that use API key
-import 'dotenv/config';
+import './utils/loadEnv';
 
 import { activityWorkshopService } from '../src/services/portfolioStrategy/services/activityWorkshop';
 import {

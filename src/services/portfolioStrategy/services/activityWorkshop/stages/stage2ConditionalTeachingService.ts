@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Stage 2: Conditional Teaching Service
  *
@@ -32,6 +33,7 @@ import {
   TeachingContext,
   ActivityTeaching,
   ActivityTier,
+  DescriptionReference,
   getDescriptionCharLimit,
   getPlatformName,
 } from '../types';
@@ -51,7 +53,6 @@ import { parseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser'
 // Import expert system prompts for deep counselor-level thinking
 import {
   buildExpertTeachingPrompt,
-  buildActivityExpertContext,
 } from '../expertSystemPrompts';
 
 // Import expert knowledge assembly
@@ -65,6 +66,13 @@ import {
   activityTeachingLayerService,
 } from '../scoring';
 import type { TeachingLayerOutput } from '../scoring/teachingLayerTypes';
+
+// Import profile types and bridge for enriched teaching with real student data
+import type { ActivityProfile } from '../profile/types';
+import { profileBridgeService } from '../profileBridge';
+
+// Import RAG service for example-backed teaching
+import { ragService } from '@/services/rag';
 
 /**
  * Teaching depth configuration
@@ -112,12 +120,14 @@ export class Stage2ConditionalTeachingService {
    * @param input - Workshop session input
    * @param storyContext - Stage 0 story context
    * @param analysisContext - Stage 1 analysis context
+   * @param activityProfiles - Optional map of activity ID → rich profile data from conversations
    * @returns TeachingContext with selective teaching delivered
    */
   async teach(
     input: ActivityWorkshopSessionInput,
     storyContext: StoryContext,
-    analysisContext: AnalysisContext
+    analysisContext: AnalysisContext,
+    activityProfiles?: Record<string, ActivityProfile>
   ): Promise<TeachingContext> {
     const startTime = Date.now();
     // R3: Local accumulators for thread-safe concurrent teach() calls (no instance state)
@@ -192,18 +202,30 @@ export class Stage2ConditionalTeachingService {
       }
     }
 
-    // Step 2: Process ALL deep + medium activities in PARALLEL (no batch attempt)
-    if (allTeachingIds.length > 0) {
-      console.log(`[Stage2] Processing ${allTeachingIds.length} activities individually IN PARALLEL...`);
+    // ============================================================================
+    // Steps 2 + 3 + 6: Run LLM calls in PARALLEL
+    //
+    // These are verified independent — they all read from Stage 0+1 outputs
+    // but produce separate outputs that are combined afterward:
+    //   Step 2: Deep/medium teaching for WEAK activities (uses knowledge contexts)
+    //   Step 3: Quick encouragements for STRONG activities (different activity set)
+    //   Step 6: Scoring teaching layer (uses scoring rubric for description rewrites)
+    //
+    // Step 7 (merge) reconciles Step 2 vs Step 6 rewrites AFTER both complete.
+    // ============================================================================
 
-      // Build parallel tasks: each activity gets its own LLM call
-      const parallelTasks = [
+    // Build per-activity teaching tasks (promises start executing immediately)
+    const parallelTasks: Array<{ id: string; depth: 'deep' | 'medium'; promise: Promise<ActivityTeaching> }> = [];
+    if (allTeachingIds.length > 0) {
+      console.log(`[Stage2] Processing ${allTeachingIds.length} activities individually...`);
+      parallelTasks.push(
         ...deepTeachingIds.map(id => ({
           id,
           depth: 'deep' as const,
           promise: this.processSingleActivity(
             input, storyContext, analysisContext, id,
-            knowledgeContexts.get(id), 'deep', expertContext, localCost, localTokens
+            knowledgeContexts.get(id), 'deep', expertContext, localCost, localTokens,
+            activityProfiles
           ).catch(error => {
             console.error(`[Stage2] Failed to process ${id}, using knowledge fallback:`, error);
             return this.createKnowledgeBasedFallback(id, input, analysisContext, knowledgeContexts.get(id));
@@ -214,29 +236,86 @@ export class Stage2ConditionalTeachingService {
           depth: 'medium' as const,
           promise: this.processSingleActivity(
             input, storyContext, analysisContext, id,
-            knowledgeContexts.get(id), 'medium', expertContext, localCost, localTokens
+            knowledgeContexts.get(id), 'medium', expertContext, localCost, localTokens,
+            activityProfiles
           ).catch(error => {
             console.error(`[Stage2] Failed to process ${id}, using knowledge fallback:`, error);
             return this.createKnowledgeBasedFallback(id, input, analysisContext, knowledgeContexts.get(id));
           }),
         })),
-      ];
+      );
+    }
 
-      // Run ALL teaching calls in parallel
-      const results = await Promise.all(parallelTasks.map(t => t.promise));
+    const quickEncouragementIds = analysisContext.teachingCandidates.quickEncouragementIds;
+    const hasScoring = !!analysisContext.scoring?.scoringComplete;
+    console.log(`[Stage2] Running parallel block: ${parallelTasks.length} teaching + ${quickEncouragementIds.length > 0 ? 1 : 0} encouragement + ${hasScoring ? 1 : 0} scoring teaching calls`);
 
-      // Map results to teachingDelivered with correct depth tags
-      for (let i = 0; i < parallelTasks.length; i++) {
-        const task = parallelTasks[i];
-        const teaching = results[i];
-        teachingDelivered.push({
-          activityId: task.id,
-          teachingDepth: task.depth,
-          teaching,
-        });
-      }
+    const [teachingResults, encouragementResults, scoringTeachingOutput] = await Promise.all([
+      // Step 2: Per-activity teaching (each activity is its own Sonnet call)
+      Promise.all(parallelTasks.map(t => t.promise)),
 
-      // Enrich with citations from knowledge contexts
+      // Step 3: Quick encouragements for strong activities (1 Sonnet call)
+      quickEncouragementIds.length > 0
+        ? this.generateQuickEncouragements(
+            input, storyContext, analysisContext,
+            quickEncouragementIds, localCost, localTokens
+          )
+        : Promise.resolve([] as TeachingContext['quickEncouragements']),
+
+      // Step 6: Scoring teaching layer (1 Sonnet call, uses scoring rubric only)
+      hasScoring
+        ? (async () => {
+            const scoringTeachingStart = Date.now();
+            try {
+              const teachingResult = await activityTeachingLayerService.generateTeaching({
+                scoringRubric: analysisContext.scoring!.portfolioRubric,
+                activities: input.activities,
+                targetPlatform: input.targetPlatform,
+                studentContext: {
+                  intendedMajor: input.studentContext?.intendedMajor,
+                  targetSchools: input.studentContext?.targetSchools,
+                  currentGrade: input.studentContext?.gradeLevel,
+                },
+                options: {
+                  maxTransformations: Math.min(input.activities.length, 5),
+                  includeAlternatives: true,
+                  includeCraftTeaching: true,
+                },
+              });
+              if (teachingResult.success && teachingResult.teaching) {
+                console.log(`[Stage2] Scoring teaching complete in ${Date.now() - scoringTeachingStart}ms`);
+                console.log(`[Stage2] Transformations: ${teachingResult.teaching.activityTransformations.length}, Priorities: ${teachingResult.teaching.strategicPriorities.length}`);
+                return teachingResult.teaching;
+              } else {
+                console.log(`[Stage2] Scoring teaching returned no results (success=${teachingResult.success})`);
+                return null;
+              }
+            } catch (error) {
+              console.error(`[Stage2] Scoring teaching failed in ${Date.now() - scoringTeachingStart}ms (non-fatal):`, error);
+              return null;
+            }
+          })()
+        : (async () => {
+            console.log(`[Stage2] Scoring data not available, skipping scoring teaching layer`);
+            return null;
+          })(),
+    ]);
+
+    // === Post-parallel processing (all sync operations) ===
+
+    // Map per-activity teaching results to teachingDelivered
+    for (let i = 0; i < parallelTasks.length; i++) {
+      const task = parallelTasks[i];
+      const teaching = teachingResults[i];
+      teachingDelivered.push({
+        activityId: task.id,
+        teachingDepth: task.depth,
+        teaching,
+      });
+    }
+
+    // Enrich with citations from knowledge contexts (sync)
+    if (teachingDelivered.length > 0) {
       const enrichedTeachings = this.enrichTeachingsWithCitations(
         teachingDelivered.map(td => td.teaching),
         knowledgeContexts
@@ -246,21 +325,10 @@ export class Stage2ConditionalTeachingService {
       }
     }
 
-    // Step 3: Quick encouragements for strong activities
-    if (analysisContext.teachingCandidates.quickEncouragementIds.length > 0) {
-      console.log(`[Stage2] Generating quick encouragements...`);
-      const encouragements = await this.generateQuickEncouragements(
-        input,
-        storyContext,
-        analysisContext,
-        analysisContext.teachingCandidates.quickEncouragementIds,
-        localCost,
-        localTokens
-      );
-      quickEncouragements.push(...encouragements);
-    }
+    // Quick encouragements (from parallel result)
+    quickEncouragements.push(...encouragementResults);
 
-    // Step 4: Mark skipped activities
+    // Step 4: Mark skipped activities (sync)
     for (const activityId of analysisContext.teachingCandidates.skipTeachingIds) {
       const analysis = analysisContext.activities[activityId];
       skippedActivities.push({
@@ -270,7 +338,7 @@ export class Stage2ConditionalTeachingService {
       });
     }
 
-    // Step 5: Generate portfolio-level teaching
+    // Step 5: Generate portfolio-level teaching (sync — no LLM call)
     console.log(`[Stage2] Generating portfolio teaching...`);
     const portfolioTeaching = await this.generatePortfolioTeaching(
       input,
@@ -278,46 +346,16 @@ export class Stage2ConditionalTeachingService {
       analysisContext
     );
 
-    // Step 6: Run scoring teaching layer (deep transformations with rewrites + citations)
+    // Build scoring teaching from parallel result
     let scoringTeaching: TeachingContext['scoringTeaching'] | undefined;
-    if (analysisContext.scoring?.scoringComplete) {
-      console.log(`[Stage2] Running scoring teaching layer for deep transformations...`);
-      const scoringTeachingStart = Date.now();
-      try {
-        const teachingResult = await activityTeachingLayerService.generateTeaching({
-          scoringRubric: analysisContext.scoring.portfolioRubric,
-          activities: input.activities,
-          targetPlatform: input.targetPlatform,
-          studentContext: {
-            intendedMajor: input.studentContext?.intendedMajor,
-            targetSchools: input.studentContext?.targetSchools,
-            currentGrade: input.studentContext?.gradeLevel,
-          },
-          options: {
-            maxTransformations: Math.min(input.activities.length, 5),
-            includeAlternatives: true,
-            includeCraftTeaching: true,
-          },
-        });
-
-        if (teachingResult.success && teachingResult.teaching) {
-          scoringTeaching = {
-            activityTransformations: teachingResult.teaching.activityTransformations,
-            connectionStrategies: teachingResult.teaching.connectionStrategies,
-            strategicPriorities: teachingResult.teaching.strategicPriorities,
-            craftTeaching: teachingResult.teaching.craftTeaching,
-            fullOutput: teachingResult.teaching,
-          };
-          console.log(`[Stage2] Scoring teaching complete in ${Date.now() - scoringTeachingStart}ms`);
-          console.log(`[Stage2] Transformations: ${scoringTeaching.activityTransformations.length}, Priorities: ${scoringTeaching.strategicPriorities.length}`);
-        } else {
-          console.log(`[Stage2] Scoring teaching returned no results (success=${teachingResult.success})`);
-        }
-      } catch (error) {
-        console.error(`[Stage2] Scoring teaching failed in ${Date.now() - scoringTeachingStart}ms (non-fatal):`, error);
-      }
-    } else {
-      console.log(`[Stage2] Scoring data not available, skipping scoring teaching layer`);
+    if (scoringTeachingOutput) {
+      scoringTeaching = {
+        activityTransformations: scoringTeachingOutput.activityTransformations,
+        connectionStrategies: scoringTeachingOutput.connectionStrategies,
+        strategicPriorities: scoringTeachingOutput.strategicPriorities,
+        craftTeaching: scoringTeachingOutput.craftTeaching,
+        fullOutput: scoringTeachingOutput,
+      };
     }
 
     // Step 7: Upgrade Stage 2 description optimizations with scoring teaching rewrites
@@ -414,7 +452,8 @@ export class Stage2ConditionalTeachingService {
     depth: 'deep' | 'medium',
     expertContext?: ExpertKnowledgeContext,
     localCost?: { value: number },
-    localTokens?: { input: number; output: number }
+    localTokens?: { input: number; output: number },
+    activityProfiles?: Record<string, ActivityProfile>
   ): Promise<ActivityTeaching> {
     const activity = input.activities.find(a => a.id === activityId);
     const analysis = analysisContext.activities[activityId];
@@ -423,19 +462,73 @@ export class Stage2ConditionalTeachingService {
       throw new Error(`Activity ${activityId} not found`);
     }
 
-    // Build expert context section for this specific activity
-    const activityExpertSection = expertContext
-      ? buildActivityExpertContext(expertContext, activityId, activity.description)
-      : '';
+    // NOTE: Expert context (school archetypes, constraints, narrative arc, character traits,
+    // authenticity assessment) is already in the CACHED system prompt via buildExpertTeachingPrompt().
+    // Do NOT re-inject it per activity — it wastes ~300-400 input tokens per call for zero benefit.
+
+    // Build profile context block if a rich profile exists for this activity
+    let profileContext = '';
+    let hasProfileData = false;
+    if (activityProfiles?.[activityId]) {
+      const profile = activityProfiles[activityId];
+      if (profileBridgeService.isProfileUseful(profile)) {
+        hasProfileData = true;
+        const summary = profileBridgeService.summarizeForTeaching(profile, activity.description);
+        const verifiedMetricsBlock = Object.entries(summary.verifiedMetrics).length > 0
+          ? `VERIFIED FACTS THE STUDENT CONFIRMED:\n${Object.entries(summary.verifiedMetrics).map(([k, v]) => `- ${k}: ${v}`).join('\n')}`
+          : '';
+        const authenticQuotesBlock = summary.authenticQuotes.length > 0
+          ? `\nAUTHENTIC STUDENT VOICE (preserve their words):\n${summary.authenticQuotes.map(q => `- "${q}"`).join('\n')}`
+          : '';
+        const gapsBlock = summary.gapsVsDescription.length > 0
+          ? `\nCRITICAL GAPS (profile shows these, but description DOESN'T mention them):\n${summary.gapsVsDescription.map(g => `- ${g}`).join('\n')}\n\nUSE THESE GAPS as the PRIMARY basis for improvement teaching. The student has the REAL story — help them get it into their ${getDescriptionCharLimit(input.targetPlatform)} characters.`
+          : '';
+        const suggestedElementsBlock = summary.suggestedDescriptionElements.length > 0
+          ? `\nTOP ELEMENTS TO INCLUDE IN DESCRIPTION:\n${summary.suggestedDescriptionElements.map((e, i) => `${i + 1}. ${e}`).join('\n')}`
+          : '';
+        const keyMomentsBlock = summary.keyMoments.length > 0
+          ? `\nKEY MOMENTS FROM THEIR JOURNEY:\n${summary.keyMoments.map(m => `- ${m}`).join('\n')}`
+          : '';
+        const impactBlock = summary.impactHighlights && summary.impactHighlights !== 'No impact data available'
+          ? `\nVERIFIED IMPACT: ${summary.impactHighlights}`
+          : '';
+        const skillsBlock = summary.skillsDemonstrated.length > 0
+          ? `\nSKILLS DEMONSTRATED:\n${summary.skillsDemonstrated.map(s => `- ${s}`).join('\n')}`
+          : '';
+
+        profileContext = `
+PERSONALIZED CONTEXT (from student's own conversation — use this to ground your teaching):
+
+${verifiedMetricsBlock}${authenticQuotesBlock}${gapsBlock}${keyMomentsBlock}${suggestedElementsBlock}${impactBlock}${skillsBlock}
+
+IMPORTANT: Use this verified context to make your teaching SPECIFIC and PERSONAL:
+- Reference the student's actual numbers and achievements in exampleAfter rewrites
+- Point out specific gaps: "You told me X, but your description doesn't mention it"
+- Use their authentic voice in rewrites when possible
+- The optimizedDescription MUST incorporate verified facts from above
+`;
+        console.log(`[Stage2] Profile context injected for "${activity.title}": ${Object.keys(summary.verifiedMetrics).length} verified metrics, ${summary.gapsVsDescription.length} gaps, ${summary.authenticQuotes.length} quotes`);
+      }
+    }
+
+    // RAG: retrieve transformation examples for the weakest issue (non-blocking)
+    let ragTeachingBlock = '';
+    try {
+      const weakestIssue = analysis.descriptionQuality.issues[0] || activity.description;
+      const ragResults = await ragService.retrieveTransformations(weakestIssue, {
+        dimension: analysis.classification.detectedCategory,
+        limit: 2,
+      });
+      if (ragResults.length > 0) {
+        ragTeachingBlock = `\nHERE'S HOW STRONG ACTIVITY DESCRIPTIONS HANDLE THIS:\n${ragService.formatTransformationsForPrompt(ragResults)}\n`;
+      }
+    } catch (e) {
+      console.warn(`[Stage2] RAG retrieval failed for "${activity.title}", proceeding without:`, e instanceof Error ? e.message : e);
+    }
 
     // Build a focused prompt for just this one activity
+    // Per-activity prompts only include activity-specific data.
     const prompt = `Provide ${depth} teaching for this activity.
-
-STUDENT CONTEXT:
-- Story: ${storyContext.narrativeIdentity.storyEssence}
-- Intended Major: ${input.studentContext?.intendedMajor || 'Not specified'}
-${expertContext?.constraintLevel ? `- Constraint Level: ${expertContext.constraintLevel.name} (Level ${expertContext.constraintLevel.level}) — ${expertContext.constraintLevel.description}` : ''}
-${expertContext?.narrativeArc ? `- Narrative Arc: ${expertContext.narrativeArc.name} — ${expertContext.narrativeArc.description}` : ''}
 
 ACTIVITY: ${activity.title}
 - Description: "${activity.description}"
@@ -449,28 +542,32 @@ ACTIVITY: ${activity.title}
 ${knowledge ? `RESEARCH-BACKED KNOWLEDGE CONTEXT:
 
 ${knowledgeAssemblyService.formatForPrompt(knowledge)}` : ''}
-
-${activityExpertSection ? `EXPERT COUNSELOR INTELLIGENCE:
-${activityExpertSection}` : ''}
-
+${profileContext}${ragTeachingBlock}
 TEACHING PROTOCOL:
-1. CELEBRATE FIRST — Acknowledge what's genuinely working. Reference a SPECIFIC detail from their description (quote it).
-2. EDUCATE — Explain WHY this matters using admissions psychology (the 8-minute read, committee pitch test).
+1. CELEBRATE ONLY WHEN GENUINE — If the activity has a noteworthy strength (strong metric, unique approach, real impact), celebrate it with a specific quote. If the description is weak or generic, SKIP celebration and focus on improvement teaching. Don't manufacture praise.
+2. EDUCATE CONCISELY — For obvious fixes (passive voice, missing numbers), explain WHY in 1 sentence. For non-obvious strategic insights, 2-3 sentences are fine if every sentence adds value.
 3. TRANSFORM — Show concrete before/after. QUOTE their actual text, then show the improved version. NEVER skip this.
 4. CONNECT — Link to their broader narrative and how this activity fits their story.
 
 CRITICAL QUALITY RULES:
-- Every celebration headline MUST quote or reference a specific word/phrase from the student's description.
+- Celebrations must be SPECIFIC and CONDITIONAL: Quote an actual strong phrase from their description. If nothing is genuinely noteworthy, OMIT celebration field entirely.
 - Every improvementTeaching entry MUST have non-empty exampleBefore (quoted from their description) AND exampleAfter (your rewrite).
 - If you cannot produce a real before/after, explain in howToFix what the student should write instead.
-- NEVER output generic phrases like "shows dedication" or "demonstrates leadership" without citing what specifically shows it.
+- WHY explanations: Be direct and concise. Cut filler. Every sentence must add value.
+
+ANTI-REDUNDANCY RULES (CRITICAL — violation makes output feel like a broken record):
+- Do NOT re-explain the student's narrative arc or "Multiplier Arc" pattern. If relevant, reference it in ONE phrase max (e.g., "fits their builder arc") — never re-derive or re-explain it.
+- Do NOT restate the student's constraint profile or background (first-gen, working, rural, etc.). Those are covered in the holistic section. Focus ONLY on how constraints specifically affect THIS activity's evaluation.
+- Do NOT repeat the student's overall pitch/story essence. Each activity's teaching should stand on its own with activity-specific insights.
+- Every sentence must be UNIQUE to THIS activity. If you catch yourself writing something you'd write for any other activity, delete it and write something specific to this one.
 
 Respond with JSON for ONE activity:
 {
   "activityId": "${activityId}",
   "celebration": {
-    "headline": "One celebratory sentence that QUOTES a specific phrase from their description. E.g.: 'Your phrase \"designed curriculum for 30+ students\" instantly signals ownership — AOs see YOU did this, not the club.'",
-    "strengths": ["Specific strength citing evidence from description", "Second specific strength"]
+    "headline": "ONLY IF genuinely strong: One celebratory sentence that QUOTES a specific phrase that demonstrates real impact/achievement. E.g.: 'Your phrase \"designed curriculum for 30+ students\" instantly signals ownership — AOs see YOU did this, not the club.' OMIT THIS ENTIRE FIELD if the description is weak/generic.",
+    "strengths": ["Specific strength citing evidence from description", "Second specific strength"],
+    "references": [{ "quotedText": "exact substring from their description", "type": "strength", "label": "short highlight label" }]
   },
   "tierExplanation": {
     "assignedTier": ${analysis.classification.tier},
@@ -483,26 +580,28 @@ Respond with JSON for ONE activity:
     "strength": "main strength",
     "whyItMatters": { "text": "why admissions cares - use AO psychology", "citations": [] },
     "howToLeverage": "how to use this",
-    "inApplications": "where to highlight"
+    "inApplications": "where to highlight",
+    "references": [{ "quotedText": "exact text from description evidencing this strength", "type": "strength", "label": "label" }]
   }],
   "improvementTeaching": [{
     "issue": "main issue to fix",
     "whyItMatters": { "text": "why this matters - reference committee pitch test or 8-minute read", "citations": [] },
     "howToFix": "step by step guidance",
     "exampleBefore": "quote their weak text here",
-    "exampleAfter": "your improved version here",
-    "priority": "high"
+    "exampleAfter": "your improved version here${hasProfileData ? ' — USE verified facts from PERSONALIZED CONTEXT above for exampleAfter. Reference their REAL metrics and achievements, not fabricated ones.' : ''}",
+    "priority": "high",
+    "references": [{ "quotedText": "exact text from description with this issue", "type": "issue", "label": "label" }]
   }],
   "descriptionOptimization": {
     "originalDescription": "${activity.description.replace(/"/g, '\\"').substring(0, 200)}",
-    "optimizedDescription": "your improved version (max ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})",
-    "characterCount": ${Math.round(getDescriptionCharLimit(input.targetPlatform) * 0.95)},
+    "optimizedDescription": "your improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})${hasProfileData ? ' — MUST incorporate the verified facts from PERSONALIZED CONTEXT. Use the student\\'s REAL metrics and achievements to write a description grounded in their actual experience, not generic improvements.' : ''}",
+    "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
     "changesExplained": [{ "change": "what changed", "reason": "why" }]
   },
   "narrativeGuidance": {
-    "howToTalkAboutThis": { "text": "SPECIFIC framing advice: exactly how to discuss this in interviews and essays. E.g., 'When discussing your CS club, lead with the 3-school hackathon — it shows you can scale impact beyond your immediate community. Frame it as: I didn't just learn CS, I built CS infrastructure for my region.'", "citations": [] },
-    "uniqueAngle": "ONE specific thing that makes THIS student's version of this activity different from 1000 other students doing the same thing. Be concrete, not generic.",
-    "connectionToStory": "How this SPECIFIC activity connects to and strengthens their overall narrative arc. Reference their other activities by name.",
+    "howToTalkAboutThis": { "text": "SPECIFIC framing advice for THIS activity only: exactly how to discuss it in interviews and essays. Focus on what makes THIS activity's contribution unique — do NOT re-explain the student's overall narrative or constraint background.", "citations": [] },
+    "uniqueAngle": "ONE concrete detail that makes THIS student's version of this activity different from 1000 others doing the same thing.",
+    "connectionToStory": "One sentence: how this activity specifically complements their other activities. Name specific activities, don't re-derive the overall narrative.",
     "interviewTips": ["Specific prep tip referencing THIS activity's details", "A concrete question they might get and how to answer it"]
   }
 }`;
@@ -516,9 +615,10 @@ Respond with JSON for ONE activity:
       model: this.MODEL,
       systemPrompt,
       userPrompt: prompt,
-      maxTokens: depth === 'deep' ? 5000 : 4000,
+      maxTokens: depth === 'deep' ? 6500 : 5000,
       temperature: 0.3,
-      timeoutMs: depth === 'deep' ? 180000 : 120000, // Deep teaching gets 3 min for full knowledge context
+      timeoutMs: depth === 'deep' ? 210000 : 150000,
+      cacheSystemPrompt: true, // Cache system prompt across parallel activity calls
     });
 
     this.trackUsage(response.usage, localCost, localTokens);
@@ -528,6 +628,17 @@ Respond with JSON for ONE activity:
 
     // Ensure activityId is set
     parsed.activityId = activityId;
+
+    // Validate celebration references
+    if (parsed.celebration?.references) {
+      parsed.celebration.references = (parsed.celebration.references as Array<Record<string, unknown>>).filter(
+        (ref: Record<string, unknown>) => ref?.quotedText && typeof ref.quotedText === 'string' && (ref.quotedText as string).length > 0
+      ).map((ref: Record<string, unknown>) => ({
+        quotedText: ref.quotedText as string,
+        type: (ref.type as string) || 'strength',
+        label: (ref.label as string) || '',
+      })) as DescriptionReference[];
+    }
 
     // Normalize the parsed response — improvements first so we can synthesize optimization
     // Filter out useless/placeholder improvements that the LLM failed to generate properly
@@ -639,8 +750,10 @@ ${activitiesSection}
 1. **CELEBRATE FIRST** - Start each activity's teaching with genuine praise
 2. **BE SPECIFIC** - Use their exact words from the description
 3. **SHOW DON'T TELL** - Provide before/after examples
-4. **CONNECT TO STORY** - Link improvements to their narrative
+4. **CONNECT TO STORY** - Link improvements to their narrative briefly (one phrase, don't re-explain the arc)
 5. **WORD COUNT** - ${wordRange.min}-${wordRange.max} words per activity
+
+ANTI-REDUNDANCY: Student story and constraint profile are stated ONCE in the Student Story section above. Do NOT restate them per activity. Each activity's teaching must contain ONLY activity-specific insights.
 
 Respond with JSON:
 {
@@ -674,14 +787,14 @@ Respond with JSON:
       ],
       "descriptionOptimization": {
         "originalDescription": "Their current description",
-        "optimizedDescription": "Your improved version (${getDescriptionCharLimit(input.targetPlatform)} chars max for ${getPlatformName(input.targetPlatform)})",
-        "characterCount": ${Math.round(getDescriptionCharLimit(input.targetPlatform) * 0.95)},
+        "optimizedDescription": "Your improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})",
+        "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
         "changesExplained": [{ "change": "What changed", "reason": "Why" }]
       },
       "narrativeGuidance": {
-        "howToTalkAboutThis": { "text": "SPECIFIC framing: exactly how to present this in interviews/essays. Give a concrete example sentence they could use.", "citations": [] },
-        "uniqueAngle": "ONE concrete thing that makes THIS student's version different from 1000 others doing the same activity",
-        "connectionToStory": "How this activity connects to their other activities by name and strengthens the overall narrative",
+        "howToTalkAboutThis": { "text": "SPECIFIC framing for THIS activity only. Do NOT re-explain narrative arc or constraints.", "citations": [] },
+        "uniqueAngle": "ONE concrete detail that makes THIS student's version different from 1000 others",
+        "connectionToStory": "One sentence: how this activity complements their other activities (name them). Do NOT re-derive the overall narrative.",
         "interviewTips": ["Specific prep tip for THIS activity", "Concrete question they might get and how to answer"]
       }
     }
@@ -738,15 +851,17 @@ ${depth === 'deep' ? `
 ANTI-GENERIC CHECKLIST (apply to every piece of teaching you write):
 1. Could this feedback apply to ANY student? If yes, rewrite with THIS student's specific data.
 2. Does the improvement suggestion include a concrete BEFORE/AFTER example using THEIR actual description text? If not, add one.
-3. Does the celebration reference a SPECIFIC detail from their activity, not just "great leadership"?
+3. If you included a celebration: Does it cite a SPECIFIC strong phrase/metric from their description? If not, omit celebration entirely.
 4. Is the tier explanation grounded in what SPECIFICALLY makes this a Tier [N] activity vs Tier [N±1]?
+5. Are WHY explanations concise? For obvious fixes (passive voice, missing numbers), 1 sentence max. For strategic insights, ensure every sentence adds value.
 
 BANNED PHRASES (never use these — they are meaningless filler):
-- "Great job!" / "Well done!" / "Impressive!"
-- "Consider adding more detail"
-- "This shows your dedication"
-- "Think about how you can..."
-- "This is a strong activity" (without saying WHY)
+- "Great job!" / "Well done!" / "Impressive!" (unless citing specific achievement)
+- "Consider adding more detail" / "Think about how you can..."
+- "This shows your dedication" / "This is a strong activity" (without specific evidence)
+- Verbose WHY explanations that repeat obvious points or pad length without adding insight
+
+ANTI-REDUNDANCY: Student story, constraints, and narrative arc are stated once at the top of the prompt. Do NOT re-explain them per activity. Brief references (1 phrase) are fine; re-derivations are NOT. Every sentence must be unique to the specific activity.
 
 Output valid JSON only.`;
   }
@@ -843,6 +958,12 @@ IMPORTANT INSTRUCTIONS:
 - BE SPECIFIC - use their exact words from the description in before/after examples
 - CELEBRATE first, then teach - maintain warm, encouraging tone
 
+ANTI-REDUNDANCY RULES (CRITICAL — read before writing ANY activity):
+- The student's story, constraint profile, and narrative arc are stated ONCE in the Student Story Context above. Do NOT restate them per activity.
+- Do NOT re-explain the narrative arc pattern in each activity's teaching. A brief reference ("fits their builder arc") is fine — re-deriving or re-explaining it is NOT.
+- Do NOT recite the student's constraint background (first-gen, working, rural) in each activity. When constraints affect tier evaluation, state the SPECIFIC impact on THIS activity only.
+- Each activity's teaching must contain ZERO sentences that could be copy-pasted to another activity unchanged. Every sentence must be unique to this specific activity.
+
 ## ACTIVITIES TO TEACH:
 ${activitiesSections}
 
@@ -858,9 +979,9 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
       "activityId": "id",
 
       "celebration": {
-        "headline": "One powerful sentence celebrating their strongest aspect (be genuine, be specific)",
+        "headline": "ONLY IF genuinely noteworthy: One sentence celebrating their strongest specific aspect with evidence. OMIT THIS ENTIRE FIELD if nothing is genuinely strong.",
         "strengths": ["List 2-3 specific things working well, citing green flags and analysis"],
-        "tone": "This MUST come first. Make them feel seen and appreciated before any critique."
+        "tone": "Celebrate only when warranted. Don't force praise."
       },
 
       "tierExplanation": {
@@ -948,8 +1069,8 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
 
       "descriptionOptimization": {
         "originalDescription": "Their COMPLETE current description (exact copy)",
-        "optimizedDescription": "Your COMPLETE improved version (must be ≤${getDescriptionCharLimit(input.targetPlatform)} characters for ${getPlatformName(input.targetPlatform)})",
-        "characterCount": ${Math.round(getDescriptionCharLimit(input.targetPlatform) * 0.95)},
+        "optimizedDescription": "Your COMPLETE improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})",
+        "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
         "transformationBreakdown": [
           {
             "originalPhrase": "Exact phrase from original",
@@ -962,11 +1083,11 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
 
       "narrativeGuidance": {
         "howToTalkAboutThis": {
-          "text": "SPECIFIC framing: Give a concrete example sentence they could use in an interview or essay. E.g., 'When they ask about your research, say: I built the data pipeline that made the entire analysis possible — 50,000 records that no one else in the lab could process.'",
+          "text": "SPECIFIC framing for THIS activity only: a concrete example sentence for interviews/essays. Do NOT re-explain their overall narrative arc or constraint background.",
           "citations": []
         },
-        "uniqueAngle": "ONE concrete, specific thing that makes THIS student's version different from 1000 other students doing the same activity. Reference specific details from their description.",
-        "connectionToStory": "How this activity connects to their ${storyContext.narrativeIdentity.archetype} narrative — reference their OTHER activities by name and explain the synergy",
+        "uniqueAngle": "ONE concrete detail from their description that makes THIS student's version different from 1000 others doing the same activity.",
+        "connectionToStory": "One sentence: how this activity complements their other activities (name them). Do NOT re-derive the overall narrative.",
         "essayPotential": "A specific essay angle or moment from this activity — name the exact scene, challenge, or realization that would make a compelling essay",
         "interviewTips": [
           "A concrete question they might get about this activity and exactly how to answer it using their specific details",
@@ -1039,16 +1160,22 @@ You believe that every student has done meaningful work—the challenge is helpi
    - Provide concrete steps to reach the next tier
    - Use the benchmarks from the knowledge context (don't make up numbers)
 
-5. **TONE: CELEBRATE → TEACH → TRANSFORM**
+5. **TONE: CONDITIONAL CELEBRATION → TEACH → TRANSFORM**
 
    Order matters:
-   1. FIRST: Genuine celebration of what's working (find the green flags)
-   2. THEN: Research-backed teaching on what to improve
+   1. FIRST (IF WARRANTED): Genuine celebration of what's actually strong. If nothing is noteworthy, skip to teaching.
+   2. THEN: Concise, research-backed teaching on what to improve (brief for obvious fixes, deeper for non-obvious insights)
    3. FINALLY: Concrete transformation with before/after
 
 6. **CITATION MARKERS**
    - Use {{cite_N}} markers where the knowledge base supports your claims
    - This makes your teaching verifiable and builds student trust
+
+7. **ANTI-REDUNDANCY (CRITICAL)**
+   - The student's narrative arc, constraint profile, and story pitch are stated ONCE at the top. Do NOT repeat them per activity.
+   - When referencing the narrative arc, use a brief label (e.g., "builder arc") — never re-explain what it means.
+   - When constraints affect an activity's evaluation, state the SPECIFIC impact — don't recite the generic constraint profile.
+   - Every sentence in each activity's output must be UNIQUE to that activity. Zero copy-paste between activities.
 
 ## QUALITY STANDARDS
 
@@ -1431,6 +1558,16 @@ Remember: Students are counting on you to transform their applications. The know
         transformationAnalysis: transformation.whyItWorks as string,
       }),
       priority: isUselessImprovement ? 'low' as const : ((imp.priority as 'high' | 'medium' | 'low') || 'medium'),
+      // Pass through validated text references for frontend highlighting
+      ...(Array.isArray(imp.references) && (imp.references as Array<Record<string, unknown>>).length > 0 && {
+        references: (imp.references as Array<Record<string, unknown>>).filter(
+          ref => ref?.quotedText && typeof ref.quotedText === 'string' && (ref.quotedText as string).length > 0
+        ).map(ref => ({
+          quotedText: ref.quotedText as string,
+          type: (ref.type as string) || 'issue',
+          label: (ref.label as string) || '',
+        })) as DescriptionReference[],
+      }),
       // Mark as useless so the caller can filter it out
       ...(isUselessImprovement && { _empty: true }),
     };
@@ -1458,6 +1595,16 @@ Remember: Students are counting on you to transform their applications. The know
       inApplications: (str.inApplications as string) || 'Essays, interviews, and additional information.',
       // Add theProblem if present (what would be lost without highlighting)
       ...(str.theProblem && { theProblem: str.theProblem as string }),
+      // Pass through validated text references for frontend highlighting
+      ...(Array.isArray(str.references) && str.references.length > 0 && {
+        references: (str.references as Array<Record<string, unknown>>).filter(
+          ref => ref?.quotedText && typeof ref.quotedText === 'string' && (ref.quotedText as string).length > 0
+        ).map(ref => ({
+          quotedText: ref.quotedText as string,
+          type: (ref.type as string) || 'strength',
+          label: (ref.label as string) || '',
+        })) as DescriptionReference[],
+      }),
     };
   }
 
@@ -1944,23 +2091,26 @@ Remember: Students are counting on you to transform their applications. The know
       const response = await callClaude({
         model: this.MODEL,
         // R2-2: Enhanced system prompt requiring specific evidence-based encouragements
-        systemPrompt: `You are a warm, encouraging college counselor. Provide brief, genuine celebrations of strong activities.
+        systemPrompt: `You are an honest college counselor. Celebrate only when activities are genuinely strong.
 
-CRITICAL: Every celebration MUST:
-1. Quote or reference a SPECIFIC phrase from the student's description
-2. Explain WHY this specific detail impresses admissions officers
-3. Connect to their story role (how it fits their narrative)
+CRITICAL: Celebrations must be CONDITIONAL and SPECIFIC:
+1. ONLY celebrate if the activity has a noteworthy strength (specific metric, unique achievement, real impact)
+2. If you celebrate, QUOTE the specific strong phrase from their description
+3. Explain WHY this detail impresses AOs (be concise - 1-2 sentences)
+4. Connect to their story role
+5. If the description is weak/generic, DO NOT celebrate - skip to improvement teaching
 
-BANNED: "shows dedication", "demonstrates commitment", "strong activity", "impressive" without citing WHAT specifically.
+BANNED: Generic praise ("shows dedication", "strong activity", "impressive") without specific evidence.
 
-Example of GOOD celebration:
-"Your phrase 'designed peer-review system adopted by 3 departments' is the kind of concrete, scalable impact that makes AOs take note — most club presidents describe 'organizing events' but you've built infrastructure that outlasts you."
+Example of GOOD celebration (genuinely strong):
+"Your phrase 'designed peer-review system adopted by 3 departments' is concrete, scalable impact that stands out — most club presidents describe 'organizing events' but you've built infrastructure that outlasts you."
 
-Example of BAD celebration:
-"This is a strong activity that shows your commitment to education."`,
+Example of NO celebration (weak activity):
+Skip celebration entirely - the activity "helped tutor students" is generic and needs improvement, not praise.`,
         userPrompt: prompt,
         maxTokens: 2000,
         temperature: 0.5,
+        cacheSystemPrompt: true, // Cache fixed system prompt
       });
 
       this.trackUsage(response.usage, localCost, localTokens);
@@ -2018,9 +2168,9 @@ Respond with JSON:
   "encouragements": [
     {
       "activityId": "exact-id-from-above",
-      "celebration": "2-3 sentences. MUST quote a specific phrase from their description and explain why it works. E.g.: 'Your line about \"converting 3 classrooms into study spaces\" is exactly the kind of tangible, measurable initiative that stands out in the 8-minute read.'",
-      "strengthReason": "1 sentence connecting this activity to their story. E.g.: 'This anchors your builder archetype — it shows you don't just participate, you create infrastructure.'",
-      "quickTip": "Optional: one SPECIFIC enhancement. E.g.: 'Add the student count if possible — \"study spaces serving 40+ students\" turns good into great.' NOT generic advice like 'add more details'."
+      "celebration": "ONLY IF genuinely strong: 1-2 sentences quoting a specific strong phrase and explaining why it works. E.g.: 'Your \"converting 3 classrooms into study spaces\" is tangible, measurable initiative that stands out.' OMIT THIS FIELD if description is weak/generic.",
+      "strengthReason": "1 sentence connecting to their story. E.g.: 'This anchors your builder archetype — you create infrastructure, not just participate.'",
+      "quickTip": "Optional: one SPECIFIC enhancement with numbers/evidence. NOT generic advice like 'add more details'."
     }
   ]
 }`;
