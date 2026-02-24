@@ -12,7 +12,7 @@ Transform Uplift from a feature-first landing experience (Scanner on login) to a
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Routing Foundation** - Make Dashboard Home accessible as default landing page
+- [x] **Phase 1: Routing Foundation** - Make Dashboard Home accessible as default landing page (completed 2026-02-24)
 - [ ] **Phase 2: Core Dashboard UI** - Build visual components for next actions, status, deadlines, quick-launch
 - [ ] **Phase 3: Data & State** - Connect components to real data sources and implement state management
 - [ ] **Phase 4: Polish & Integration** - Test, optimize performance, validate accessibility, verify flows
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Routing Foundation | 0/1 | Not started | - |
+| 1. Routing Foundation | 0/1 | Complete    | 2026-02-24 |
 | 2. Core Dashboard UI | 0/TBD | Not started | - |
 | 3. Data & State | 0/TBD | Not started | - |
 | 4. Polish & Integration | 0/TBD | Not started | - |
