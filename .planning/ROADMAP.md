@@ -29,10 +29,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. "Home" navigation item appears as first sidebar entry with home icon
   4. User can navigate from Dashboard Home to Scanner/Workshop/Insights and back without layout remount
   5. Unauthenticated users are redirected to login (Clerk auth integration verified)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 01-01: TBD
+- [ ] 01-01-PLAN.md — Create Dashboard Home page, restructure routes to nested /dashboard structure, add Home navigation
 
 ### Phase 2: Core Dashboard UI
 **Goal**: Dashboard Home displays all visual components with proper layout and responsive design
@@ -86,7 +86,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Routing Foundation | 0/TBD | Not started | - |
+| 1. Routing Foundation | 0/1 | Not started | - |
 | 2. Core Dashboard UI | 0/TBD | Not started | - |
 | 3. Data & State | 0/TBD | Not started | - |
 | 4. Polish & Integration | 0/TBD | Not started | - |
