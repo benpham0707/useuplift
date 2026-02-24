@@ -30,7 +30,7 @@ interface ActivityInputFormProps {
   isAnalyzing?: boolean;
 }
 
-export function ActivityInputForm({ onAnalyze, isAnalyzing = false }: ActivityInputFormProps) {
+const ActivityInputFormInner = function ActivityInputForm({ onAnalyze, isAnalyzing = false }: ActivityInputFormProps) {
   const [activities, setActivities] = useState<ActivityFormData[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
@@ -120,4 +120,6 @@ export function ActivityInputForm({ onAnalyze, isAnalyzing = false }: ActivityIn
       </Button>
     </div>
   );
-}
+};
+
+export const ActivityInputForm = React.memo(ActivityInputFormInner);

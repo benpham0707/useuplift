@@ -31,11 +31,11 @@ export interface ScoreBreakdownProps {
   descriptionScore: {
     total: number;
     breakdown: {
-      specificity: { score: number };
-      impactClarity: { score: number };
-      authenticityVoice: { score: number };
-      actionLanguage: { score: number };
-      quantification: { score: number };
+      specificity: { score: number; weight: number };
+      impactClarity: { score: number; weight: number };
+      authenticityVoice: { score: number; weight: number };
+      actionLanguage: { score: number; weight: number };
+      quantification: { score: number; weight: number };
     };
   };
   combinedScore: number;
@@ -189,87 +189,58 @@ interface MetricDef {
   weight?: number;
 }
 
-function MetricRow({
+function MetricChip({
   metric,
   isExpanded,
-  isVisible,
   onClick,
   rationale,
   extraContext,
 }: {
   metric: MetricDef;
   isExpanded: boolean;
-  isVisible: boolean;
   onClick: () => void;
   rationale: string | null;
   extraContext: React.ReactNode;
 }) {
   const theme = getScoreTheme(metric.score);
-  const pct = (metric.score / 10) * 100;
-  const [barAnimated, setBarAnimated] = useState(false);
-
-  useEffect(() => {
-    if (isVisible) {
-      const frame = requestAnimationFrame(() => setBarAnimated(true));
-      return () => cancelAnimationFrame(frame);
-    }
-    setBarAnimated(false);
-  }, [isVisible]);
 
   return (
-    <div
-      className="grid transition-[grid-template-rows] duration-300 ease-out"
-      style={{ gridTemplateRows: isVisible ? '1fr' : '0fr' }}
-    >
-      <div className="overflow-hidden">
-        <div className="py-1">
-          {/* Collapsed metric bar — always present when visible */}
-          <button
-            type="button"
-            onClick={onClick}
-            className={[
-              'w-full flex items-center gap-3 px-2 py-1.5 -mx-2 rounded-lg',
-              'transition-colors duration-200 text-left',
-              'hover:bg-muted/40 dark:hover:bg-muted/20',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-              isExpanded ? 'bg-muted/30 dark:bg-muted/15' : '',
-            ].join(' ')}
-          >
-            <span className="text-xs text-muted-foreground min-w-0 flex-shrink-0 w-28 sm:w-36 truncate">
-              {metric.label}
-              {metric.weight !== undefined && (
-                <span className="text-muted-foreground/40 ml-1 text-[10px]">
-                  {(metric.weight * 100).toFixed(0)}%
-                </span>
-              )}
+    <div>
+      <button
+        type="button"
+        onClick={onClick}
+        className={[
+          'w-full flex items-center justify-between gap-1 px-2.5 py-1.5 rounded-lg text-left',
+          'transition-colors duration-150',
+          'hover:bg-muted/40 dark:hover:bg-muted/20',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          isExpanded ? 'bg-muted/30 dark:bg-muted/15 ring-1 ring-border/20' : '',
+        ].join(' ')}
+      >
+        <span className="text-[11px] text-muted-foreground truncate">
+          {metric.label}
+          {metric.weight !== undefined && (
+            <span className="text-muted-foreground/30 ml-0.5 text-[9px]">
+              {(metric.weight * 100).toFixed(0)}%
             </span>
-            <div className="flex-1 h-1.5 rounded-full bg-muted/50 dark:bg-muted/25 overflow-hidden">
-              <div
-                className={`h-full rounded-full ${theme.barClass}`}
-                style={{
-                  width: barAnimated ? `${pct}%` : '0%',
-                  transition: 'width 600ms cubic-bezier(0.16, 1, 0.3, 1)',
-                }}
-              />
-            </div>
-            <span className={`text-xs font-semibold tabular-nums w-8 text-right ${theme.textClass}`}>
-              {metric.score.toFixed(1)}
-            </span>
-          </button>
+          )}
+        </span>
+        <span className={`text-xs font-bold tabular-nums flex-shrink-0 ${theme.textClass}`}>
+          {metric.score.toFixed(1)}
+        </span>
+      </button>
 
-          {/* Expanded rationale — grid 0fr→1fr */}
-          <div
-            className="grid transition-[grid-template-rows] duration-300 ease-out"
-            style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
-          >
-            <div className="overflow-hidden">
-              <div className="pt-2 pb-1 px-2 space-y-2">
-                {rationale && (
-                  <ParagraphText text={rationale} className="text-xs text-muted-foreground/90 leading-relaxed" />
-                )}
-                {extraContext}
-              </div>
-            </div>
+      {/* Expanded rationale */}
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+      >
+        <div className="overflow-hidden">
+          <div className="pt-1.5 pb-1 px-2.5 space-y-1.5">
+            {rationale && (
+              <ParagraphText text={rationale} className="text-[11px] text-muted-foreground/80 leading-relaxed" />
+            )}
+            {extraContext}
           </div>
         </div>
       </div>
@@ -352,7 +323,7 @@ function TierSection({
 
 type ActiveTab = 'activity' | 'description';
 
-export function ScoreBreakdown({
+function ScoreBreakdownInner({
   activityScore,
   descriptionScore,
   combinedScore,
@@ -383,18 +354,18 @@ export function ScoreBreakdown({
   // -- Build metric lists --
   const activityMetrics: MetricDef[] = [
     { key: 'tierAssessment', label: 'Tier Assessment', score: activityScore.breakdown.tierAssessment.score, weight: activityScore.breakdown.tierAssessment.weight },
-    { key: 'recognitionLevel', label: 'Recognition Level', score: activityScore.breakdown.recognitionLevel.score, weight: activityScore.breakdown.recognitionLevel.weight },
-    { key: 'commitmentProgression', label: 'Commitment & Progression', score: activityScore.breakdown.commitmentProgression.score, weight: activityScore.breakdown.commitmentProgression.weight },
-    { key: 'communityCharacter', label: 'Community Character', score: activityScore.breakdown.communityCharacter.score, weight: activityScore.breakdown.communityCharacter.weight },
-    { key: 'leadershipImpact', label: 'Leadership Impact', score: activityScore.breakdown.leadershipImpact.score, weight: activityScore.breakdown.leadershipImpact.weight },
+    { key: 'recognitionLevel', label: 'Recognition', score: activityScore.breakdown.recognitionLevel.score, weight: activityScore.breakdown.recognitionLevel.weight },
+    { key: 'commitmentProgression', label: 'Commitment', score: activityScore.breakdown.commitmentProgression.score, weight: activityScore.breakdown.commitmentProgression.weight },
+    { key: 'communityCharacter', label: 'Community/Character', score: activityScore.breakdown.communityCharacter.score, weight: activityScore.breakdown.communityCharacter.weight },
+    { key: 'leadershipImpact', label: 'Leadership/Impact', score: activityScore.breakdown.leadershipImpact.score, weight: activityScore.breakdown.leadershipImpact.weight },
   ];
 
   const descriptionMetrics: MetricDef[] = [
-    { key: 'specificity', label: 'Specificity', score: descriptionScore.breakdown.specificity.score },
-    { key: 'impactClarity', label: 'Impact Clarity', score: descriptionScore.breakdown.impactClarity.score },
-    { key: 'authenticityVoice', label: 'Authenticity & Voice', score: descriptionScore.breakdown.authenticityVoice.score },
-    { key: 'actionLanguage', label: 'Action Language', score: descriptionScore.breakdown.actionLanguage.score },
-    { key: 'quantification', label: 'Quantification', score: descriptionScore.breakdown.quantification.score },
+    { key: 'specificity', label: 'Role Ownership', score: descriptionScore.breakdown.specificity.score, weight: descriptionScore.breakdown.specificity.weight },
+    { key: 'impactClarity', label: 'Evidence of Impact', score: descriptionScore.breakdown.impactClarity.score, weight: descriptionScore.breakdown.impactClarity.weight },
+    { key: 'authenticityVoice', label: 'Differentiation', score: descriptionScore.breakdown.authenticityVoice.score, weight: descriptionScore.breakdown.authenticityVoice.weight },
+    { key: 'actionLanguage', label: 'Action Precision', score: descriptionScore.breakdown.actionLanguage.score, weight: descriptionScore.breakdown.actionLanguage.weight },
+    { key: 'quantification', label: 'Quantification', score: descriptionScore.breakdown.quantification.score, weight: descriptionScore.breakdown.quantification.weight },
   ];
 
   const currentMetrics = activeTab === 'activity' ? activityMetrics : descriptionMetrics;
@@ -488,107 +459,82 @@ export function ScoreBreakdown({
   }
 
   return (
-    <div className="rounded-2xl backdrop-blur-md bg-card/80 dark:bg-card/60 border border-border/15 overflow-hidden">
-      {/* ── Top row: Combined score hero + mini toggles ── */}
-      <div className="px-4 pt-4 pb-3">
-        <div className="flex items-center gap-4">
-          {/* Combined score hero ring */}
+    <div className="rounded-xl bg-card/80 dark:bg-card/60 border border-border/15 overflow-hidden">
+      {/* ── Score header: combined + activity/description toggles — single compact row ── */}
+      <div className="px-3 pt-3 pb-2">
+        <div className="flex items-center gap-3">
+          {/* Combined score — compact */}
           <div className="flex-shrink-0">
-            <SvgRing score={combinedScore} size={72} strokeWidth={5} />
+            <SvgRing score={combinedScore} size={56} strokeWidth={4} />
           </div>
 
-          {/* Right side: label + mini rings */}
+          {/* Right side: toggle chips */}
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60 mb-2">
+            <p className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50 mb-1.5">
               Combined Score
             </p>
-
-            {/* Toggle row: two clickable mini-rings */}
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleTabSwitch('activity')}
-                className={[
-                  'flex items-center gap-2 rounded-lg px-2 py-1.5 -mx-1 transition-all duration-200',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  activeTab === 'activity'
-                    ? 'bg-muted/50 dark:bg-muted/25'
-                    : 'opacity-50 hover:opacity-80',
-                ].join(' ')}
-              >
-                <SvgRing score={activityScore.total} size={36} strokeWidth={3} showLabel={false} />
-                <div className="text-left">
-                  <p className={`text-[10px] font-semibold leading-tight ${activeTab === 'activity' ? 'text-foreground/90' : 'text-muted-foreground'}`}>
-                    Activity
-                  </p>
-                  <p className={`text-xs font-bold tabular-nums ${getScoreTheme(activityScore.total).textClass}`}>
-                    {activityScore.total.toFixed(1)}
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleTabSwitch('description')}
-                className={[
-                  'flex items-center gap-2 rounded-lg px-2 py-1.5 -mx-1 transition-all duration-200',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  activeTab === 'description'
-                    ? 'bg-muted/50 dark:bg-muted/25'
-                    : 'opacity-50 hover:opacity-80',
-                ].join(' ')}
-              >
-                <SvgRing score={descriptionScore.total} size={36} strokeWidth={3} showLabel={false} />
-                <div className="text-left">
-                  <p className={`text-[10px] font-semibold leading-tight ${activeTab === 'description' ? 'text-foreground/90' : 'text-muted-foreground'}`}>
-                    Description
-                  </p>
-                  <p className={`text-xs font-bold tabular-nums ${getScoreTheme(descriptionScore.total).textClass}`}>
-                    {descriptionScore.total.toFixed(1)}
-                  </p>
-                </div>
-              </button>
+            <div className="flex items-center gap-2">
+              {(['activity', 'description'] as const).map((tab) => {
+                const s = tab === 'activity' ? activityScore.total : descriptionScore.total;
+                const theme = getScoreTheme(s);
+                const isActive = activeTab === tab;
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => handleTabSwitch(tab)}
+                    className={[
+                      'flex items-center gap-1.5 rounded-md px-2 py-1 transition-all duration-150',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      isActive ? 'bg-muted/50 dark:bg-muted/25' : 'opacity-45 hover:opacity-75',
+                    ].join(' ')}
+                  >
+                    <span className={`text-[10px] font-semibold leading-none ${isActive ? 'text-foreground/80' : 'text-muted-foreground'}`}>
+                      {tab === 'activity' ? 'Activity' : 'Description'}
+                    </span>
+                    <span className={`text-xs font-bold tabular-nums ${theme.textClass}`}>
+                      {s.toFixed(1)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* Combined score rationale (subtle) */}
+        {/* Combined score rationale — single line */}
         {combinedScoreRationale && (
-          <ParagraphText text={combinedScoreRationale} className="text-[11px] text-muted-foreground/60 mt-2 leading-relaxed" />
+          <p className="text-[10px] text-muted-foreground/50 mt-1.5 leading-snug line-clamp-2">
+            {combinedScoreRationale}
+          </p>
         )}
       </div>
 
-      {/* ── Metric breakdown area ── */}
-      <div className="border-t border-border/10 px-4 py-3">
-        {/* Back button when expanded */}
+      {/* ── Metric breakdown — compact grid ── */}
+      <div className="border-t border-border/10 px-3 py-2">
+        {/* Overall rationale — compact */}
+        {!hasExpanded && (
+          <p className="text-[10px] text-muted-foreground/50 mb-1.5 leading-snug line-clamp-2">
+            {activeTab === 'activity' ? activityOverallRationale : descriptionOverallRationale}
+          </p>
+        )}
+
         {hasExpanded && (
           <button
             type="button"
             onClick={handleBackToAll}
-            className={[
-              'flex items-center gap-1 text-[11px] font-medium text-muted-foreground/70',
-              'hover:text-foreground/80 transition-colors duration-200 mb-2',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded px-1 py-0.5 -mx-1',
-            ].join(' ')}
+            className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground/60 hover:text-foreground/70 transition-colors mb-1.5 focus-visible:outline-none"
           >
-            <ArrowLeft className="h-3 w-3" />
-            <span>Back to all metrics</span>
+            <ArrowLeft className="h-2.5 w-2.5" />
+            <span>All metrics</span>
           </button>
         )}
 
-        {/* Overall rationale for selected tab */}
-        {!hasExpanded && (
-          <ParagraphText
-            text={activeTab === 'activity' ? activityOverallRationale : descriptionOverallRationale}
-            className="text-[11px] text-muted-foreground/60 mb-2 leading-relaxed"
-          />
-        )}
-
-        {/* Metric rows */}
-        <div className="space-y-0">
+        {/* Metric chips — 2-column grid when collapsed, full width when one is expanded */}
+        <div className={hasExpanded ? 'space-y-0' : 'grid grid-cols-2 gap-x-1 gap-y-0'}>
           {currentMetrics.map(metric => {
-            const isExpanded = expandedMetric === metric.key;
-            const isVisible = !hasExpanded || isExpanded;
+            const isExp = expandedMetric === metric.key;
+            if (hasExpanded && !isExp) return null;
 
             const rationale = activeTab === 'activity'
               ? getActivityRationale(metric.key)
@@ -599,11 +545,10 @@ export function ScoreBreakdown({
               : null;
 
             return (
-              <MetricRow
+              <MetricChip
                 key={metric.key}
                 metric={metric}
-                isExpanded={isExpanded}
-                isVisible={isVisible}
+                isExpanded={isExp}
                 onClick={() => handleMetricClick(metric.key)}
                 rationale={rationale}
                 extraContext={extraContext}
@@ -612,11 +557,10 @@ export function ScoreBreakdown({
           })}
         </div>
 
-        {/* Tier explanation — activity tab only */}
-        {activeTab === 'activity' && tierExplanation && !hasExpanded && (
-          <TierSection tierExplanation={tierExplanation} />
-        )}
+        {/* Tier explanation removed — shown in CelebrationTab's collapsible section instead */}
       </div>
     </div>
   );
 }
+
+export const ScoreBreakdown = React.memo(ScoreBreakdownInner);

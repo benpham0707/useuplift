@@ -29,11 +29,11 @@ export interface ActivityInsightData {
   descriptionScore: {
     total: number;
     breakdown: {
-      specificity: { score: number };
-      impactClarity: { score: number };
-      authenticityVoice: { score: number };
-      actionLanguage: { score: number };
-      quantification: { score: number };
+      specificity: { score: number; weight: number };
+      impactClarity: { score: number; weight: number };
+      authenticityVoice: { score: number; weight: number };
+      actionLanguage: { score: number; weight: number };
+      quantification: { score: number; weight: number };
     };
   };
   tier: 1 | 2 | 3 | 4;

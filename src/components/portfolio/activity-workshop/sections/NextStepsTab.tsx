@@ -36,14 +36,14 @@ const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 /** Description quality dimension labels */
 const DESC_DIMENSION_LABELS: Record<string, string> = {
-  specificity: 'Specificity',
-  impactClarity: 'Impact Clarity',
-  authenticityVoice: 'Authenticity & Voice',
-  actionLanguage: 'Action Language',
+  specificity: 'Role Ownership',
+  impactClarity: 'Evidence of Impact',
+  authenticityVoice: 'Differentiation',
+  actionLanguage: 'Action Precision',
   quantification: 'Quantification',
 };
 
-export function NextStepsTab({ data }: NextStepsTabProps) {
+function NextStepsTabInner({ data }: NextStepsTabProps) {
   // First improvement card expanded by default
   const [expandedIssue, setExpandedIssue] = useState<number | null>(0);
 
@@ -135,7 +135,7 @@ export function NextStepsTab({ data }: NextStepsTabProps) {
                     </span>
                     <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${theme.barClass}`}
+                        className={`h-full rounded-full transition-[width] duration-500 ${theme.barClass}`}
                         style={{ width: `${Math.min(dim.score * 10, 100)}%` }}
                       />
                     </div>
@@ -477,3 +477,5 @@ export function NextStepsTab({ data }: NextStepsTabProps) {
     </div>
   );
 }
+
+export const NextStepsTab = React.memo(NextStepsTabInner);

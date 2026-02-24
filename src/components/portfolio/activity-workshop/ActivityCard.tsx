@@ -61,7 +61,7 @@ interface ActivityCardProps {
   onDelete: () => void;
 }
 
-export function ActivityCard({
+const ActivityCardInner = function ActivityCard({
   activity,
   index,
   isExpanded,
@@ -268,4 +268,6 @@ export function ActivityCard({
       )}
     </div>
   );
-}
+};
+
+export const ActivityCard = React.memo(ActivityCardInner);

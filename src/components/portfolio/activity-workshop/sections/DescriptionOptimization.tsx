@@ -1,17 +1,22 @@
 /**
- * DescriptionOptimization — Stacked before/after description comparison with
- * highlighted changes linked to expandable issues.
+ * DescriptionOptimization — Unified before/after card with word-level diff
+ * highlighting and a collapsible issue list.
  *
- * Layout: Original description (top) → Optimized description (bottom) →
- * Issues & Improvements list (bottom). Highlighted spans in the descriptions
- * are clickable and smooth-scroll to the corresponding issue.
+ * Uses LCS-based word diff to highlight ONLY the words that changed between
+ * original and optimized descriptions. Common/unchanged words stay plain.
+ * Each diff region is color-coded to the best-matching issue. Clicking or
+ * hovering any highlight cross-links to the corresponding issue card.
+ *
+ * Expanded issues show: Why it matters → How to fix (the color-coded
+ * diff highlights in the main card visually connect rationale to changes).
  */
-import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import {
   Copy,
   Check,
   Sparkles,
   ChevronDown,
+  ArrowDown,
   ArrowRight,
   Quote,
   AlertTriangle,
@@ -20,16 +25,11 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { ParagraphText, CollapsibleText } from '../RichText';
+import ScoreRing from '../ScoreRing';
 
 // ============================================================================
 // TYPES
 // ============================================================================
-
-interface IssueReference {
-  quotedText: string;
-  type: string;
-  label: string;
-}
 
 interface ImprovementIssue {
   issue: string;
@@ -43,7 +43,22 @@ interface ImprovementIssue {
   exampleAfter: string;
   transformationAnalysis?: string;
   priority: string;
-  references: Array<IssueReference>;
+  references: Array<{ quotedText: string; type: string; label: string }>;
+}
+
+interface TransformationData {
+  currentScore: number;
+  revisionLevel: string;
+  principle: { name: string; whyItMatters: string; applicationToActivity: string };
+  rewrite: {
+    original: string;
+    suggested: string;
+    characterCount: number;
+    changesApplied: Array<{ element: string; original: string; transformed: string; rationale: string }>;
+  };
+  alternatives: Array<{ angle: string; rewrite: string; whenToUse: string }>;
+  citations: Array<{ source: string; sourceName: string; insight: string; application: string }>;
+  expectedScoreImprovement: { projectedScore: number; improvingComponents: string[]; rationale: string };
 }
 
 export interface DescriptionOptimizationProps {
@@ -56,10 +71,10 @@ export interface DescriptionOptimizationProps {
   };
   improvementTeaching?: ImprovementIssue[];
   accentColor: string;
-  // New props
   descriptionAlternatives?: string[];
   suggestedRewrite?: string;
   scoreProjection?: { projectedScore: number; improvingComponents: string[]; rationale: string } | null;
+  transformation?: TransformationData | null;
 }
 
 // ============================================================================
@@ -68,43 +83,57 @@ export interface DescriptionOptimizationProps {
 
 const CHAR_LIMIT = 150;
 
-/** Issue color palette — rotates for visual distinction */
+/** One color per issue — used for before highlights, after highlights, and annotation cards */
 const ISSUE_COLORS = [
   {
-    bg: 'bg-rose-100/50 dark:bg-rose-900/30',
-    border: 'border-rose-400 dark:border-rose-600',
-    text: 'text-rose-700 dark:text-rose-300',
+    bg: 'bg-rose-100/60 dark:bg-rose-900/35',
+    bgHover: 'bg-rose-200/70 dark:bg-rose-800/45',
+    border: 'border-rose-400 dark:border-rose-500',
+    dot: 'bg-rose-600 dark:bg-rose-500',
+    ring: 'ring-rose-300/50 dark:ring-rose-600/40',
+    leftBorder: 'border-l-rose-500 dark:border-l-rose-400',
+    annotationBg: 'bg-rose-50/50 dark:bg-rose-950/20',
     badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300',
-    ring: 'ring-rose-400/30 dark:ring-rose-600/30',
-    dot: 'bg-rose-500',
-    hover: 'hover:bg-rose-200/60 dark:hover:bg-rose-800/40',
   },
   {
-    bg: 'bg-amber-100/50 dark:bg-amber-900/30',
-    border: 'border-amber-400 dark:border-amber-600',
-    text: 'text-amber-700 dark:text-amber-300',
+    bg: 'bg-amber-100/60 dark:bg-amber-900/35',
+    bgHover: 'bg-amber-200/70 dark:bg-amber-800/45',
+    border: 'border-amber-400 dark:border-amber-500',
+    dot: 'bg-amber-600 dark:bg-amber-500',
+    ring: 'ring-amber-300/50 dark:ring-amber-600/40',
+    leftBorder: 'border-l-amber-500 dark:border-l-amber-400',
+    annotationBg: 'bg-amber-50/50 dark:bg-amber-950/20',
     badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
-    ring: 'ring-amber-400/30 dark:ring-amber-600/30',
-    dot: 'bg-amber-500',
-    hover: 'hover:bg-amber-200/60 dark:hover:bg-amber-800/40',
   },
   {
-    bg: 'bg-blue-100/50 dark:bg-blue-900/30',
-    border: 'border-blue-400 dark:border-blue-600',
-    text: 'text-blue-700 dark:text-blue-300',
+    bg: 'bg-blue-100/60 dark:bg-blue-900/35',
+    bgHover: 'bg-blue-200/70 dark:bg-blue-800/45',
+    border: 'border-blue-400 dark:border-blue-500',
+    dot: 'bg-blue-600 dark:bg-blue-500',
+    ring: 'ring-blue-300/50 dark:ring-blue-600/40',
+    leftBorder: 'border-l-blue-500 dark:border-l-blue-400',
+    annotationBg: 'bg-blue-50/50 dark:bg-blue-950/20',
     badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
-    ring: 'ring-blue-400/30 dark:ring-blue-600/30',
-    dot: 'bg-blue-500',
-    hover: 'hover:bg-blue-200/60 dark:hover:bg-blue-800/40',
   },
   {
-    bg: 'bg-violet-100/50 dark:bg-violet-900/30',
-    border: 'border-violet-400 dark:border-violet-600',
-    text: 'text-violet-700 dark:text-violet-300',
+    bg: 'bg-violet-100/60 dark:bg-violet-900/35',
+    bgHover: 'bg-violet-200/70 dark:bg-violet-800/45',
+    border: 'border-violet-400 dark:border-violet-500',
+    dot: 'bg-violet-600 dark:bg-violet-500',
+    ring: 'ring-violet-300/50 dark:ring-violet-600/40',
+    leftBorder: 'border-l-violet-500 dark:border-l-violet-400',
+    annotationBg: 'bg-violet-50/50 dark:bg-violet-950/20',
     badge: 'bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300',
-    ring: 'ring-violet-400/30 dark:ring-violet-600/30',
-    dot: 'bg-violet-500',
-    hover: 'hover:bg-violet-200/60 dark:hover:bg-violet-800/40',
+  },
+  {
+    bg: 'bg-teal-100/60 dark:bg-teal-900/35',
+    bgHover: 'bg-teal-200/70 dark:bg-teal-800/45',
+    border: 'border-teal-400 dark:border-teal-500',
+    dot: 'bg-teal-600 dark:bg-teal-500',
+    ring: 'ring-teal-300/50 dark:ring-teal-600/40',
+    leftBorder: 'border-l-teal-500 dark:border-l-teal-400',
+    annotationBg: 'bg-teal-50/50 dark:bg-teal-950/20',
+    badge: 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300',
   },
 ] as const;
 
@@ -113,94 +142,208 @@ function getIssueColor(index: number) {
 }
 
 const PRIORITY_CONFIG: Record<string, { label: string; icon: typeof AlertTriangle; className: string }> = {
-  high: {
-    label: 'High',
-    icon: AlertTriangle,
-    className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
-  },
-  medium: {
-    label: 'Medium',
-    icon: AlertCircle,
-    className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-  },
-  low: {
-    label: 'Low',
-    icon: Info,
-    className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  },
+  high: { label: 'High', icon: AlertTriangle, className: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+  medium: { label: 'Medium', icon: AlertCircle, className: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+  low: { label: 'Low', icon: Info, className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
 };
 
 // ============================================================================
-// HIGHLIGHTING ENGINE
+// HIGHLIGHTING ENGINE — word-level diff
+//
+// Compares original and optimized descriptions word-by-word using LCS.
+// Only the CHANGED words get highlighted — common words stay plain.
+// Each diff region is assigned to the best-matching issue by word overlap.
 // ============================================================================
 
 interface HighlightSegment {
   text: string;
-  issueIndex: number | null; // null = normal text
+  issueIndex: number | null;
+}
+
+interface WordToken {
+  word: string;
+  norm: string;   // lowercased, punctuation-stripped (for comparison)
+  start: number;  // char offset in original string
+  end: number;
+}
+
+/** Split text into word tokens preserving character positions. */
+function tokenize(text: string): WordToken[] {
+  const tokens: WordToken[] = [];
+  const re = /\S+/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    tokens.push({
+      word: m[0],
+      norm: m[0].toLowerCase().replace(/[.,;:!?'"()[\]]+$/g, '').replace(/^['"([\]]+/g, ''),
+      start: m.index,
+      end: m.index + m[0].length,
+    });
+  }
+  return tokens;
 }
 
 /**
- * Parse description text into segments of normal text and highlighted spans.
- * Each highlighted span corresponds to a `references[].quotedText` from an issue.
- * Issues are matched case-insensitively. Overlapping highlights are handled by
- * first-match-wins (earlier issues take priority).
+ * Longest Common Subsequence on word arrays (by normalized form).
+ * Returns sets of indices in a[] and b[] that are part of the LCS.
  */
-function buildHighlightSegments(
-  text: string,
-  issues: ImprovementIssue[],
-): HighlightSegment[] {
-  if (!text || issues.length === 0) {
-    return [{ text, issueIndex: null }];
+function wordLCS(a: string[], b: string[]): { aSet: Set<number>; bSet: Set<number> } {
+  const M = a.length;
+  const N = b.length;
+  const dp: number[][] = Array.from({ length: M + 1 }, () => Array(N + 1).fill(0));
+
+  for (let i = 1; i <= M; i++) {
+    for (let j = 1; j <= N; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
   }
 
-  // Collect all references with their issue index and find positions
-  const matches: Array<{ start: number; end: number; issueIndex: number }> = [];
-  const textLower = text.toLowerCase();
+  // Backtrack to recover which indices belong to the LCS
+  const aSet = new Set<number>();
+  const bSet = new Set<number>();
+  let i = M;
+  let j = N;
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) {
+      aSet.add(i - 1);
+      bSet.add(j - 1);
+      i--; j--;
+    } else if (dp[i - 1][j] > dp[i][j - 1]) {
+      i--;
+    } else {
+      j--;
+    }
+  }
+  return { aSet, bSet };
+}
 
-  issues.forEach((issue, issueIdx) => {
-    if (!issue.references) return;
-    issue.references.forEach((ref) => {
-      if (!ref.quotedText) return;
-      const refLower = ref.quotedText.toLowerCase();
-      const pos = textLower.indexOf(refLower);
-      if (pos !== -1) {
-        matches.push({ start: pos, end: pos + ref.quotedText.length, issueIndex: issueIdx });
-      }
-    });
+/**
+ * Merge adjacent diff-word tokens into contiguous character ranges.
+ * Words within `gap` characters of each other are merged.
+ */
+function mergeWordRanges(
+  tokens: WordToken[],
+  diffIndices: number[],
+  gap = 2,
+): Array<{ start: number; end: number }> {
+  if (diffIndices.length === 0) return [];
+
+  const ranges: Array<{ start: number; end: number }> = [];
+  let curStart = tokens[diffIndices[0]].start;
+  let curEnd = tokens[diffIndices[0]].end;
+
+  for (let k = 1; k < diffIndices.length; k++) {
+    const tok = tokens[diffIndices[k]];
+    if (tok.start - curEnd <= gap) {
+      curEnd = tok.end;
+    } else {
+      ranges.push({ start: curStart, end: curEnd });
+      curStart = tok.start;
+      curEnd = tok.end;
+    }
+  }
+  ranges.push({ start: curStart, end: curEnd });
+  return ranges;
+}
+
+/**
+ * Assign each diff range to the best-matching issue by word overlap
+ * with that issue's exampleBefore / exampleAfter.
+ */
+function assignRangesToIssues(
+  ranges: Array<{ start: number; end: number }>,
+  fullText: string,
+  issues: ImprovementIssue[],
+  side: 'before' | 'after',
+): Array<{ start: number; end: number; issueIndex: number }> {
+  if (issues.length === 0) return [];
+  if (issues.length === 1) return ranges.map((r) => ({ ...r, issueIndex: 0 }));
+
+  // Build word sets from each issue's example text
+  const issueWordSets = issues.map((issue) => {
+    const src = side === 'before' ? issue.exampleBefore : issue.exampleAfter;
+    if (!src) return new Set<string>();
+    return new Set(src.toLowerCase().split(/\W+/).filter((w) => w.length >= 3));
   });
 
-  if (matches.length === 0) {
-    return [{ text, issueIndex: null }];
-  }
+  return ranges.map((r) => {
+    const rangeWords = fullText.slice(r.start, r.end).toLowerCase().split(/\W+/).filter((w) => w.length >= 3);
 
-  // Sort by start position, then by length (longer match first for ties)
-  matches.sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
-
-  // Remove overlapping matches (first-match-wins)
-  const filtered: typeof matches = [];
-  let lastEnd = 0;
-  for (const m of matches) {
-    if (m.start >= lastEnd) {
-      filtered.push(m);
-      lastEnd = m.end;
+    let bestIdx = 0;
+    let bestScore = 0;
+    for (let k = 0; k < issues.length; k++) {
+      const overlap = rangeWords.filter((w) => issueWordSets[k].has(w)).length;
+      if (overlap > bestScore) { bestScore = overlap; bestIdx = k; }
     }
-  }
+    return { ...r, issueIndex: bestIdx };
+  });
+}
 
-  // Build segments
+/** Convert assigned ranges into a HighlightSegment array. */
+function rangestoSegments(
+  text: string,
+  assigned: Array<{ start: number; end: number; issueIndex: number }>,
+): HighlightSegment[] {
+  if (assigned.length === 0) return [{ text, issueIndex: null }];
+
+  const sorted = [...assigned].sort((a, b) => a.start - b.start);
   const segments: HighlightSegment[] = [];
   let cursor = 0;
-  for (const m of filtered) {
-    if (m.start > cursor) {
-      segments.push({ text: text.slice(cursor, m.start), issueIndex: null });
-    }
-    segments.push({ text: text.slice(m.start, m.end), issueIndex: m.issueIndex });
-    cursor = m.end;
-  }
-  if (cursor < text.length) {
-    segments.push({ text: text.slice(cursor), issueIndex: null });
-  }
 
+  for (const r of sorted) {
+    if (r.start > cursor) segments.push({ text: text.slice(cursor, r.start), issueIndex: null });
+    segments.push({ text: text.slice(r.start, r.end), issueIndex: r.issueIndex });
+    cursor = r.end;
+  }
+  if (cursor < text.length) segments.push({ text: text.slice(cursor), issueIndex: null });
   return segments;
+}
+
+/**
+ * Build diff-based highlight segments for both before and after text.
+ * Only words that CHANGED between original → optimized get highlighted.
+ * Each highlighted region is color-coded to the best-matching issue.
+ */
+function buildDiffHighlights(
+  original: string,
+  optimized: string,
+  issues: ImprovementIssue[],
+): { beforeSegments: HighlightSegment[]; afterSegments: HighlightSegment[] } {
+  const noHighlight = {
+    beforeSegments: [{ text: original || '', issueIndex: null }] as HighlightSegment[],
+    afterSegments: [{ text: optimized || '', issueIndex: null }] as HighlightSegment[],
+  };
+
+  if (!original || !optimized || issues.length === 0) return noHighlight;
+
+  const origTokens = tokenize(original);
+  const optTokens = tokenize(optimized);
+
+  const { aSet, bSet } = wordLCS(
+    origTokens.map((t) => t.norm),
+    optTokens.map((t) => t.norm),
+  );
+
+  // Non-LCS indices = words that were removed/changed (before) or added/changed (after)
+  const origDiffIdx = origTokens.map((_, idx) => idx).filter((idx) => !aSet.has(idx));
+  const optDiffIdx = optTokens.map((_, idx) => idx).filter((idx) => !bSet.has(idx));
+
+  if (origDiffIdx.length === 0 && optDiffIdx.length === 0) return noHighlight;
+
+  // Merge adjacent diff words into contiguous character ranges
+  const origRanges = mergeWordRanges(origTokens, origDiffIdx);
+  const optRanges = mergeWordRanges(optTokens, optDiffIdx);
+
+  // Assign each range to the best-matching issue
+  const origAssigned = assignRangesToIssues(origRanges, original, issues, 'before');
+  const optAssigned = assignRangesToIssues(optRanges, optimized, issues, 'after');
+
+  return {
+    beforeSegments: rangestoSegments(original, origAssigned),
+    afterSegments: rangestoSegments(optimized, optAssigned),
+  };
 }
 
 // ============================================================================
@@ -208,137 +351,91 @@ function buildHighlightSegments(
 // ============================================================================
 
 function getCharColor(count: number): { bar: string; text: string } {
-  if (count > CHAR_LIMIT) {
-    return { bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' };
-  }
-  if (count >= 140) {
-    return { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' };
-  }
+  if (count > CHAR_LIMIT) return { bar: 'bg-red-500', text: 'text-red-600 dark:text-red-400' };
+  if (count >= 140) return { bar: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400' };
   return { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' };
-}
-
-function charPercent(count: number): number {
-  return Math.min((count / CHAR_LIMIT) * 100, 100);
 }
 
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
 
-/** Compact character count progress bar */
-function CharacterBar({ count }: { count: number }) {
+function InlineCharCount({ count }: { count: number }) {
   const colors = getCharColor(count);
-  const pct = charPercent(count);
-
+  const pct = Math.min((count / CHAR_LIMIT) * 100, 100);
   return (
-    <div className="flex items-center gap-2.5 mt-2">
-      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all duration-500 ease-out ${colors.bar}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-      <span className={`text-[10px] font-medium tabular-nums whitespace-nowrap ${colors.text}`}>
-        {count}/{CHAR_LIMIT}
+    <span className="inline-flex items-center gap-1.5 ml-1.5">
+      <span className="w-10 h-1 rounded-full bg-muted overflow-hidden inline-block align-middle">
+        <span className={`block h-full rounded-full transition-[width] duration-500 ease-out ${colors.bar}`} style={{ width: `${pct}%` }} />
       </span>
-    </div>
+      <span className={`text-[10px] font-medium tabular-nums ${colors.text}`}>{count}/{CHAR_LIMIT}</span>
+    </span>
   );
 }
 
-/** Copy-to-clipboard button with "Copied!" feedback */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const handleCopy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
     } catch {
       const ta = document.createElement('textarea');
-      ta.value = text;
-      ta.style.position = 'fixed';
-      ta.style.opacity = '0';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      document.body.removeChild(ta);
-      setCopied(true);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => setCopied(false), 2000);
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
     }
+    setCopied(true);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => setCopied(false), 2000);
   }, [text]);
-
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, []);
 
   return (
     <button
       type="button"
       onClick={handleCopy}
-      className={`
-        flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md
-        transition-all duration-200
-        ${copied
+      className={`flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md transition-colors duration-200 ${
+        copied
           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
           : 'bg-muted/80 text-muted-foreground hover:bg-muted hover:text-foreground'
-        }
-      `}
+      }`}
     >
-      {copied ? (
-        <>
-          <Check className="h-3 w-3" />
-          Copied!
-        </>
-      ) : (
-        <>
-          <Copy className="h-3 w-3" />
-          Copy
-        </>
-      )}
+      {copied ? <><Check className="h-3 w-3" />Copied!</> : <><Copy className="h-3 w-3" />Copy</>}
     </button>
   );
 }
 
-/** Rendered highlighted description text */
-function HighlightedText({
+/** Rendered text with issue-colored highlights — used for both before and after */
+function IssueHighlightedText({
   segments,
-  onHighlightClick,
+  hoveredIssueIndex,
+  onIssueHover,
+  onIssueClick,
 }: {
   segments: HighlightSegment[];
-  onHighlightClick: (issueIndex: number) => void;
+  hoveredIssueIndex: number | null;
+  onIssueHover: (index: number | null) => void;
+  onIssueClick?: (issueIndex: number) => void;
 }) {
   return (
     <>
       {segments.map((seg, i) => {
-        if (seg.issueIndex === null) {
-          return <React.Fragment key={i}>{seg.text}</React.Fragment>;
-        }
+        if (seg.issueIndex === null) return <React.Fragment key={i}>{seg.text}</React.Fragment>;
         const colors = getIssueColor(seg.issueIndex);
+        const isHovered = hoveredIssueIndex === seg.issueIndex;
         return (
           <span
             key={i}
-            role="button"
-            tabIndex={0}
-            onClick={() => onHighlightClick(seg.issueIndex as number)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                onHighlightClick(seg.issueIndex as number);
-              }
-            }}
+            role={onIssueClick ? 'button' : undefined}
+            tabIndex={onIssueClick ? 0 : undefined}
+            onClick={onIssueClick ? () => onIssueClick(seg.issueIndex as number) : undefined}
+            onKeyDown={onIssueClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onIssueClick(seg.issueIndex as number); } } : undefined}
+            onMouseEnter={() => onIssueHover(seg.issueIndex)}
+            onMouseLeave={() => onIssueHover(null)}
             className={`
-              ${colors.bg} border-b-2 ${colors.border}
-              cursor-pointer rounded-sm px-0.5 -mx-0.5
-              transition-all duration-150
-              ${colors.hover}
+              rounded-sm px-0.5 -mx-0.5 border-b-2 transition-all duration-150
+              ${onIssueClick ? 'cursor-pointer' : 'cursor-default'}
+              ${isHovered ? `${colors.bgHover} ${colors.border} ring-1 ${colors.ring}` : `${colors.bg} ${colors.border}`}
             `}
-            title={`Issue ${seg.issueIndex + 1} — click to see details`}
           >
             {seg.text}
           </span>
@@ -348,202 +445,54 @@ function HighlightedText({
   );
 }
 
-/** Single expandable issue item */
-function IssueItem({
-  issue,
-  index,
-  isExpanded,
-  onToggle,
-  issueRef,
-}: {
-  issue: ImprovementIssue;
-  index: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-  issueRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  const colors = getIssueColor(index);
-  const priorityCfg = PRIORITY_CONFIG[issue.priority?.toLowerCase()] ?? PRIORITY_CONFIG.medium;
-  const PriorityIcon = priorityCfg.icon;
-
-  return (
-    <div
-      ref={issueRef}
-      id={`issue-${index}`}
-      className={`
-        rounded-lg border transition-all duration-200
-        ${isExpanded
-          ? `${colors.border} ring-1 ${colors.ring}`
-          : 'border-border/60 hover:border-border'
-        }
-      `}
-    >
-      {/* Collapsed header — always visible */}
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-2.5 p-3 text-left"
-      >
-        {/* Issue number badge */}
-        <span
-          className={`
-            flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center
-            text-[10px] font-bold text-white ${colors.dot}
-          `}
-        >
-          {index + 1}
-        </span>
-
-        {/* Issue title */}
-        <span className="flex-1 text-sm font-medium text-foreground min-w-0 truncate">
-          {issue.issue}
-        </span>
-
-        {/* Priority badge */}
-        <span className={`flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded-full font-medium ${priorityCfg.className}`}>
-          <PriorityIcon className="h-2.5 w-2.5 inline mr-0.5 -mt-px" />
-          {priorityCfg.label}
-        </span>
-
-        {/* Chevron */}
-        <ChevronDown
-          className={`h-4 w-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${
-            isExpanded ? 'rotate-180' : ''
-          }`}
-        />
-      </button>
-
-      {/* Expandable detail panel */}
-      <div
-        className="grid transition-all duration-200 ease-out"
-        style={{
-          gridTemplateRows: isExpanded ? '1fr' : '0fr',
-        }}
-      >
-        <div className="overflow-hidden">
-          <div className="px-3 pb-3 space-y-3">
-            {/* Separator */}
-            <div className="border-t border-border/40" />
-
-            {/* Why it matters */}
-            <div>
-              <h6 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Why this matters
-              </h6>
-              <CollapsibleText text={issue.whyItMatters} previewParagraphs={2} className="text-xs text-foreground/80" />
-            </div>
-
-            {/* How to fix */}
-            <div>
-              <h6 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                How to fix
-              </h6>
-              <ParagraphText text={issue.howToFix} className="text-xs text-foreground/80 leading-relaxed" />
-            </div>
-
-            {/* Before → After comparison */}
-            {(issue.exampleBefore || issue.exampleAfter) && (
-              <div className="rounded-md bg-muted/40 p-2.5 space-y-2">
-                <h6 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Example
-                </h6>
-                <div className="flex items-start gap-2">
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[9px] font-medium uppercase tracking-wider text-red-500 dark:text-red-400">
-                      Before
-                    </span>
-                    <p className="text-xs text-foreground/60 leading-relaxed mt-0.5 line-through decoration-red-300/50">
-                      {issue.exampleBefore}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-3" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-[9px] font-medium uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
-                      After
-                    </span>
-                    <p className="text-xs text-foreground leading-relaxed mt-0.5 font-medium">
-                      {issue.exampleAfter}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Expert insight quote */}
-            {issue.whyItMattersQuote && (
-              <div className="flex items-start gap-2 rounded-md bg-muted/30 p-2.5">
-                <Quote className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div className="min-w-0">
-                  <p className="text-xs text-foreground/70 leading-relaxed italic">
-                    &ldquo;{issue.whyItMattersQuote}&rdquo;
-                  </p>
-                  {issue.whyItMattersQuoteSource && (
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      — {issue.whyItMattersQuoteSource}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
-export function DescriptionOptimization({
+function DescriptionOptimizationInner({
   optimization,
   improvementTeaching = [],
-  accentColor,
-  descriptionAlternatives = [],
-  suggestedRewrite = '',
   scoreProjection = null,
+  transformation = null,
 }: DescriptionOptimizationProps) {
   const [expandedIssue, setExpandedIssue] = useState<number | null>(null);
+  const [hoveredIssueIndex, setHoveredIssueIndex] = useState<number | null>(null);
   const issueRefs = useRef<Map<number, HTMLDivElement | null>>(new Map());
 
-  // Build highlight segments for both descriptions
-  const originalSegments = useMemo(
-    () => buildHighlightSegments(optimization.original, improvementTeaching),
-    [optimization.original, improvementTeaching],
-  );
-
-  // For the optimized description, we don't have reference-based highlights,
-  // so show it as plain text (the changes are described in the issues section)
   const hasIssues = improvementTeaching.length > 0;
 
-  // Scroll to and expand a specific issue
-  const scrollToIssue = useCallback((issueIndex: number) => {
-    setExpandedIssue((prev) => (prev === issueIndex ? null : issueIndex));
+  // Word-level diff: only the CHANGED words get highlighted
+  const { beforeSegments, afterSegments } = useMemo(
+    () => buildDiffHighlights(optimization.original, optimization.optimized, improvementTeaching),
+    [optimization.original, optimization.optimized, improvementTeaching],
+  );
 
-    // Small delay to let the DOM update, then scroll
+  const scrollToIssue = useCallback((issueIndex: number) => {
+    setExpandedIssue((prev) => {
+      const next = prev === issueIndex ? null : issueIndex;
+      setHoveredIssueIndex(next);
+      return next;
+    });
     requestAnimationFrame(() => {
       const el = issueRefs.current.get(issueIndex);
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }, []);
 
   const toggleIssue = useCallback((index: number) => {
-    setExpandedIssue((prev) => (prev === index ? null : index));
+    setExpandedIssue((prev) => {
+      const next = prev === index ? null : index;
+      setHoveredIssueIndex(next);
+      return next;
+    });
   }, []);
 
-  // Create stable refs for each issue
   const getIssueRef = useCallback(
     (index: number) => ({
       current: issueRefs.current.get(index) ?? null,
       set current(el: HTMLDivElement | null) {
-        if (el) {
-          issueRefs.current.set(index, el);
-        } else {
-          issueRefs.current.delete(index);
-        }
+        if (el) issueRefs.current.set(index, el);
+        else issueRefs.current.delete(index);
       },
     }),
     [],
@@ -551,124 +500,168 @@ export function DescriptionOptimization({
 
   return (
     <div className="space-y-3">
-      {/* Section header */}
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        Description Optimization
-      </h4>
-
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* ORIGINAL DESCRIPTION                                               */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
+      {/* ── UNIFIED BEFORE/AFTER CARD ── */}
       <div className="rounded-xl border border-border/60 bg-card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border/40 bg-muted/20">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Your Current Description
-          </span>
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-sm leading-relaxed text-foreground/85">
-            <HighlightedText segments={originalSegments} onHighlightClick={scrollToIssue} />
-          </p>
-          <CharacterBar count={optimization.originalCharCount} />
-        </div>
-      </div>
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* OPTIMIZED DESCRIPTION                                              */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      <div className="rounded-xl border border-emerald-300/50 dark:border-emerald-700/40 bg-card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 border-b border-emerald-200/30 dark:border-emerald-800/30 bg-emerald-50/30 dark:bg-emerald-950/20">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-            <Sparkles className="h-3 w-3" />
-            Optimized Version
-          </span>
-          <CopyButton text={optimization.optimized} />
-        </div>
-        <div className="px-4 py-3">
-          <p className="text-sm leading-relaxed text-foreground font-medium">
-            {optimization.optimized}
+        {/* BEFORE */}
+        <div className="px-4 pt-3 pb-2.5">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">Before</span>
+            <InlineCharCount count={optimization.originalCharCount} />
+          </div>
+          <p className="text-[13px] leading-relaxed text-foreground/55 line-through decoration-red-300/30 dark:decoration-red-500/20 decoration-1">
+            <IssueHighlightedText
+              segments={beforeSegments}
+              hoveredIssueIndex={hoveredIssueIndex}
+              onIssueHover={setHoveredIssueIndex}
+              onIssueClick={scrollToIssue}
+            />
           </p>
-          <CharacterBar count={optimization.optimizedCharCount} />
         </div>
-      </div>
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* ISSUES & IMPROVEMENTS                                              */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {hasIssues && (
-        <div className="space-y-2">
-          <h5 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Issues & Improvements
-          </h5>
-          <div className="space-y-2">
-            {improvementTeaching.map((issue, i) => (
-              <IssueItem
-                key={i}
-                issue={issue}
-                index={i}
-                isExpanded={expandedIssue === i}
-                onToggle={() => toggleIssue(i)}
-                issueRef={getIssueRef(i)}
-              />
-            ))}
+        {/* Arrow */}
+        <div className="relative px-4 my-0.5">
+          <div className="border-t border-border/30" />
+          <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center bg-card px-2">
+            <ArrowDown className="h-3 w-3 text-muted-foreground/50" />
           </div>
         </div>
-      )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* ALTERNATIVE VERSIONS                                               */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {descriptionAlternatives && descriptionAlternatives.length > 0 && (
-        <div className="space-y-2">
-          <h5 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Alternative Versions
-          </h5>
-          {descriptionAlternatives.map((alt, i) => (
-            <div key={i} className="rounded-xl border border-blue-200/40 dark:border-blue-800/30 bg-card overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-2 border-b border-blue-200/30 dark:border-blue-800/30 bg-blue-50/30 dark:bg-blue-950/20">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-700 dark:text-blue-400">
-                  Alternative {i + 1}
-                </span>
-                <CopyButton text={alt} />
-              </div>
-              <div className="px-4 py-3">
-                <p className="text-sm leading-relaxed text-foreground/85">{alt}</p>
-                <CharacterBar count={alt.length} />
-              </div>
+        {/* AFTER — optimized description with issue-colored highlights */}
+        <div className="px-4 pt-2.5 pb-3 bg-emerald-50/20 dark:bg-emerald-950/10">
+          <div className="flex items-center justify-between mb-2 gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                Suggested
+              </span>
+              <InlineCharCount count={optimization.optimizedCharCount} />
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* SUGGESTED REWRITE (from scoring)                                   */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {suggestedRewrite && (
-        <div className="rounded-xl border border-purple-200/40 dark:border-purple-800/30 bg-card overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2 border-b border-purple-200/30 dark:border-purple-800/30 bg-purple-50/30 dark:bg-purple-950/20">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-purple-700 dark:text-purple-400 flex items-center gap-1">
-              <Sparkles className="h-3 w-3" />
-              Scoring-Based Rewrite
-            </span>
-            <CopyButton text={suggestedRewrite} />
+            <CopyButton text={optimization.optimized} />
           </div>
-          <div className="px-4 py-3">
-            <p className="text-sm leading-relaxed text-foreground font-medium">{suggestedRewrite}</p>
-            <CharacterBar count={suggestedRewrite.length} />
-          </div>
+          <p className="text-[13px] leading-relaxed text-foreground font-medium">
+            <IssueHighlightedText
+              segments={afterSegments}
+              hoveredIssueIndex={hoveredIssueIndex}
+              onIssueHover={setHoveredIssueIndex}
+              onIssueClick={scrollToIssue}
+            />
+          </p>
         </div>
-      )}
 
-      {/* ════════════════════════════════════════════════════════════════════ */}
-      {/* SCORE IMPROVEMENT PROJECTION                                       */}
-      {/* ════════════════════════════════════════════════════════════════════ */}
+        {/* ── ISSUE LIST (collapsible per issue) ── */}
+        {hasIssues && (
+          <div className="border-t border-border/40">
+            <div className="px-4 py-2.5 space-y-0">
+              {improvementTeaching.map((issue, i) => {
+                const color = getIssueColor(i);
+                const isHovered = hoveredIssueIndex === i;
+                const isExpanded = expandedIssue === i;
+                const priorityCfg = PRIORITY_CONFIG[issue.priority?.toLowerCase()] ?? PRIORITY_CONFIG.medium;
+                const PriorityIcon = priorityCfg.icon;
+
+                return (
+                  <div
+                    key={i}
+                    ref={getIssueRef(i)}
+                    className={`
+                      rounded-lg border-l-[3px] transition-all duration-150
+                      ${isHovered ? `${color.annotationBg} ${color.leftBorder}` : color.leftBorder}
+                    `}
+                    onMouseEnter={() => setHoveredIssueIndex(i)}
+                    onMouseLeave={() => setHoveredIssueIndex(null)}
+                  >
+                    {/* Collapsed: title + priority */}
+                    <button
+                      type="button"
+                      onClick={() => toggleIssue(i)}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-left group"
+                    >
+                      <span className={`flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold text-white ${color.dot}`}>
+                        {i + 1}
+                      </span>
+                      <span className="flex-1 text-xs font-medium text-foreground/80 group-hover:text-foreground transition-colors min-w-0 truncate">
+                        {issue.issue}
+                      </span>
+                      <span className={`flex-shrink-0 text-[9px] px-1.5 py-0.5 rounded-full font-medium ${priorityCfg.className}`}>
+                        <PriorityIcon className="h-2 w-2 inline mr-0.5 -mt-px" />
+                        {priorityCfg.label}
+                      </span>
+                      <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {/* Expanded: Why → Fix → Before/After (color-coded) */}
+                    <div
+                      className="grid transition-[grid-template-rows] duration-200 ease-out"
+                      style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+                    >
+                      <div className="overflow-hidden">
+                        <div className="px-3 pb-3 pl-9 space-y-3">
+                          {/* Why */}
+                          <div>
+                            <h6 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Why this matters</h6>
+                            <CollapsibleText text={issue.whyItMatters} previewParagraphs={2} className="text-xs text-foreground/80 leading-relaxed" />
+                          </div>
+
+                          {/* Fix */}
+                          <div>
+                            <h6 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">How to fix</h6>
+                            <ParagraphText text={issue.howToFix} className="text-xs text-foreground/80 leading-relaxed" />
+                          </div>
+
+                          {/* Transformation breakdown (if available) */}
+                          {issue.transformationAnalysis && (
+                            <div>
+                              <h6 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">Transformation breakdown</h6>
+                              <CollapsibleText text={issue.transformationAnalysis} previewParagraphs={2} className="text-xs text-foreground/80 leading-relaxed" />
+                            </div>
+                          )}
+
+                          {/* Quote */}
+                          {issue.whyItMattersQuote && (
+                            <div className="flex items-start gap-2 rounded-md bg-muted/30 p-2.5">
+                              <Quote className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                              <div className="min-w-0">
+                                <p className="text-xs text-foreground/70 leading-relaxed italic">&ldquo;{issue.whyItMattersQuote}&rdquo;</p>
+                                {issue.whyItMattersQuoteSource && (
+                                  <p className="text-[10px] text-muted-foreground mt-1">— {issue.whyItMattersQuoteSource}</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── SCORE PROJECTION ── */}
       {scoreProjection && (
         <div className="rounded-lg bg-emerald-50/40 dark:bg-emerald-950/20 border border-emerald-200/30 dark:border-emerald-800/30 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-            <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-              Projected Score: {scoreProjection.projectedScore.toFixed(1)}
-            </span>
+          <div className="flex items-center gap-2 mb-1.5">
+            {transformation?.currentScore != null ? (
+              <>
+                <ScoreRing score={transformation.currentScore} size={34} strokeWidth={2.5} />
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                <ScoreRing score={scoreProjection.projectedScore} size={34} strokeWidth={2.5} />
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500 ml-1" />
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  +{(scoreProjection.projectedScore - transformation.currentScore).toFixed(1)} projected
+                </span>
+              </>
+            ) : (
+              <>
+                <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
+                <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                  Projected Score: {scoreProjection.projectedScore.toFixed(1)}
+                </span>
+              </>
+            )}
           </div>
           <p className="text-xs text-foreground/80 leading-relaxed">{scoreProjection.rationale}</p>
           {scoreProjection.improvingComponents.length > 0 && (
@@ -683,3 +676,5 @@ export function DescriptionOptimization({
     </div>
   );
 }
+
+export const DescriptionOptimization = React.memo(DescriptionOptimizationInner);

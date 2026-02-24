@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -27,10 +27,10 @@ import RequireVerified from "@/components/RequireVerified";
 import RequireTermsAccepted from "@/components/RequireTermsAccepted";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
-import WorkshopDemo from "./pages/WorkshopDemo";
-import ActivityWorkshop from "./pages/ActivityWorkshop";
+const WorkshopDemo = lazy(() => import("./pages/WorkshopDemo"));
+const ActivityWorkshop = lazy(() => import("./pages/ActivityWorkshop"));
 import Pricing from "./pages/Pricing";
-import PIQWorkshop from "./pages/PIQWorkshop";
+const PIQWorkshop = lazy(() => import("./pages/PIQWorkshop"));
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
@@ -133,7 +133,9 @@ const App = () => {
               <TooltipProvider>
                 <Toaster />
                 <Sonner />
-                <AppRoutes />
+                <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                  <AppRoutes />
+                </Suspense>
               </TooltipProvider>
             </FraudTrackingProvider>
           </AuthProvider>

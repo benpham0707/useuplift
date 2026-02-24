@@ -20,8 +20,8 @@ import {
   Check,
 } from 'lucide-react';
 import type { ActivityInsightData } from '../insightTypes';
-import { getScoreColor, getScoreTextColor } from '../insightTypes';
 import { ParagraphText } from '../RichText';
+import ScoreRing from '../ScoreRing';
 
 interface TransformationTabProps {
   data: ActivityInsightData;
@@ -47,33 +47,6 @@ const REVISION_BADGE: Record<string, { className: string; label: string }> = {
   },
 };
 
-/** Small score ring for projection display */
-function MiniScoreRing({ score, label }: { score: number; label: string }) {
-  const size = 40;
-  const radius = (size - 5) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const pct = Math.min(score / 10, 1);
-  const offset = circumference * (1 - pct);
-  const color = getScoreColor(score);
-
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg width={size} height={size} className="transform -rotate-90">
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={2.5} className="text-muted/20" />
-          <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={color} strokeWidth={2.5} strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-[stroke-dashoffset] duration-[800ms] ease-out" />
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className={`text-xs font-bold tabular-nums ${getScoreTextColor(score)}`}>
-            {score.toFixed(1)}
-          </span>
-        </div>
-      </div>
-      <span className="text-[9px] text-muted-foreground font-medium">{label}</span>
-    </div>
-  );
-}
-
 /** Copy button */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -93,7 +66,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export function TransformationTab({ data }: TransformationTabProps) {
+function TransformationTabInner({ data }: TransformationTabProps) {
   const t = data.transformation;
   if (!t) return null;
 
@@ -107,9 +80,9 @@ export function TransformationTab({ data }: TransformationTabProps) {
       {/* ── Header: Score Projection + Revision Level ── */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <MiniScoreRing score={t.currentScore} label="Current" />
+          <ScoreRing score={t.currentScore} size={40} strokeWidth={2.5} label="Current" />
           <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          <MiniScoreRing score={t.expectedScoreImprovement.projectedScore} label="Projected" />
+          <ScoreRing score={t.expectedScoreImprovement.projectedScore} size={40} strokeWidth={2.5} label="Projected" />
         </div>
         <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${revBadge.className}`}>
           {revBadge.label}
@@ -314,3 +287,5 @@ export function TransformationTab({ data }: TransformationTabProps) {
     </div>
   );
 }
+
+export const TransformationTab = React.memo(TransformationTabInner);
