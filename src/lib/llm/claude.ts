@@ -35,7 +35,8 @@ function ensureEnvLoaded(): void {
   _envLoaded = true;
 
   // Find project root by looking for package.json
-  let dir = __dirname;
+  // Use __dirname in CJS or process.cwd() as fallback for ESM
+  let dir: string = typeof __dirname !== 'undefined' ? __dirname : process.cwd();
   for (let i = 0; i < 10; i++) {
     try {
       require.resolve(path.join(dir, 'package.json'));
@@ -180,6 +181,98 @@ const DEFAULT_MAX_TOKENS = 4096;
 // ============================================================================
 // TIMEOUT UTILITIES
 // ============================================================================
+
+/**
+ * Attempt to repair truncated JSON (common when Claude hits maxTokens).
+ * Strategy: find the last complete array element and close the array.
+ * Works for both arrays-of-objects `[{...}, {...}]` and standalone objects.
+ */
+function repairTruncatedJSON(text: string): unknown {
+  let s = text.trim();
+
+  // Strip markdown code block wrapper if present (common in Claude responses)
+  const codeBlockMatch = s.match(/```(?:json)?\s*([\s\S]*)/);
+  if (codeBlockMatch) {
+    s = codeBlockMatch[1].trim();
+    // Remove trailing ``` if present
+    if (s.endsWith('```')) {
+      s = s.slice(0, -3).trim();
+    }
+  }
+
+  // Find the start of JSON content (skip any preamble text)
+  const firstBracket = s.indexOf('[');
+  const firstBrace = s.indexOf('{');
+  if (firstBracket !== -1 && (firstBrace === -1 || firstBracket <= firstBrace)) {
+    s = s.substring(firstBracket);
+  } else if (firstBrace !== -1) {
+    s = s.substring(firstBrace);
+  }
+
+  // Track positions of complete top-level array elements
+  // Walk through the string tracking nesting depth
+  let inString = false;
+  let escape = false;
+  let depth = 0;
+  let arrayDepth = -1;
+  const elementEndPositions: number[] = [];
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (escape) { escape = false; continue; }
+    if (ch === '\\' && inString) { escape = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+
+    if (ch === '[') {
+      if (depth === 0) arrayDepth = i;
+      depth++;
+    } else if (ch === ']') {
+      depth--;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      // If we just closed a top-level array element (depth back to 1 = inside outer array)
+      if (depth === 1 && arrayDepth !== -1) {
+        elementEndPositions.push(i);
+      }
+      // If we just closed the only top-level object (not in an array)
+      if (depth === 0 && arrayDepth === -1) {
+        elementEndPositions.push(i);
+      }
+    }
+  }
+
+  console.warn(`[JSONRepair] Text length: ${s.length}, element end positions: ${elementEndPositions.length}, arrayDepth: ${arrayDepth}`);
+
+  // Try the full string first (shouldn't work if we're here, but just in case)
+  // Then try truncating to the last complete element
+  for (let attempt = elementEndPositions.length - 1; attempt >= 0; attempt--) {
+    const endPos = elementEndPositions[attempt];
+    let candidate = s.substring(0, endPos + 1);
+
+    // Close the outer array if needed
+    if (arrayDepth !== -1) {
+      candidate += ']';
+    }
+
+    // Clean trailing commas before closing bracket
+    candidate = candidate.replace(/,(\s*[\]}])/g, '$1');
+
+    try {
+      return JSON.parse(candidate);
+    } catch (e) {
+      if (attempt === elementEndPositions.length - 1) {
+        console.warn(`[JSONRepair] Last element attempt failed:`, (e as Error).message.substring(0, 100));
+        console.warn(`[JSONRepair] Candidate ends with: ...${candidate.slice(-80)}`);
+      }
+      // Try next earlier element
+    }
+  }
+
+  throw new Error('JSON repair failed');
+}
 
 /**
  * Calculate appropriate timeout based on expected response size.
@@ -358,25 +451,40 @@ export async function callClaude<T = any>(
 
         if (useJsonMode) {
           // Parse JSON from response
+          let jsonString = textContent.trim();
           try {
-            let jsonString = textContent.trim();
 
             // 1. Try extracting from code blocks
             const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
             if (jsonMatch) {
               jsonString = jsonMatch[1].trim();
             } else {
-              // 2. Fallback: Find first '{' and last '}'
+              // 2. Fallback: Find outermost JSON structure (object or array)
               const firstBrace = jsonString.indexOf('{');
               const lastBrace = jsonString.lastIndexOf('}');
-              if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+              const firstBracket = jsonString.indexOf('[');
+              const lastBracket = jsonString.lastIndexOf(']');
+
+              // Determine whether response is an array or object based on which delimiter comes first
+              const braceValid = firstBrace !== -1 && lastBrace > firstBrace;
+              const bracketValid = firstBracket !== -1 && lastBracket > firstBracket;
+
+              if (bracketValid && (!braceValid || firstBracket < firstBrace)) {
+                jsonString = jsonString.substring(firstBracket, lastBracket + 1);
+              } else if (braceValid) {
                 jsonString = jsonString.substring(firstBrace, lastBrace + 1);
               }
             }
 
             content = JSON.parse(jsonString);
           } catch (parseError) {
-            throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            // Attempt to repair truncated JSON (common when response hits maxTokens)
+            try {
+              content = repairTruncatedJSON(textContent);
+              console.warn('[Claude] JSON repair succeeded — response was truncated');
+            } catch {
+              throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+            }
           }
         } else {
           content = textContent;

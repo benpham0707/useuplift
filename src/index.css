@@ -870,3 +870,10 @@ All colors MUST be HSL.
 .insights-achievements-section {
   grid-column: span 12;
 }
+
+/* Pause all infinite animations when tab is hidden to save CPU/GPU */
+.tab-hidden *,
+.tab-hidden *::before,
+.tab-hidden *::after {
+  animation-play-state: paused !important;
+}

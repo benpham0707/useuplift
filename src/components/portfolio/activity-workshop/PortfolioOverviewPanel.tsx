@@ -73,7 +73,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
 
   return (
     <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setExpandedSection(null); }} className="w-full">
-          <TabsList className="bg-white/10 border border-white/20 backdrop-blur-sm w-full justify-start">
+          <TabsList className="bg-white/10 border border-white/20 w-full justify-start">
             <TabsTrigger value="overview" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">Overview</TabsTrigger>
             <TabsTrigger value="your-story" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">Your Story</TabsTrigger>
             <TabsTrigger value="your-edge" className="data-[state=active]:bg-white/20 data-[state=active]:text-white text-white/70">Your Edge</TabsTrigger>
@@ -87,7 +87,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
             <div className="space-y-3 animate-fade-in">
             {/* Portfolio Narrative — blockquote style, clickable for drill-down */}
             <div
-              className="border-l-4 border-l-blue-400/50 pl-4 py-1 cursor-pointer hover:brightness-110 transition-[filter] duration-200 relative group"
+              className="border-l-4 border-l-blue-400/50 pl-4 py-1 cursor-pointer hover:bg-white/5 transition-colors duration-200 relative group"
               onClick={() => setExpandedSection('narrative')}
             >
               <div className="flex items-center justify-between mb-2">
@@ -130,7 +130,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
             {/* Three Quick Insight Cards — clickable for drill-down */}
             <div className="grid md:grid-cols-3 gap-3">
               <div
-                className="rounded-xl border border-white/35 bg-white/25 p-3 cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-[filter,transform] duration-200 relative group"
+                className="rounded-xl border border-white/35 bg-white/25 p-3 cursor-pointer hover:bg-white/35 transition-colors duration-200 relative group"
                 onClick={() => setExpandedSection('spike')}
               >
                 <div className="flex items-center gap-1.5 mb-1">
@@ -142,7 +142,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
               </div>
 
               <div
-                className="rounded-xl border border-white/35 bg-white/25 p-3 cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-[filter,transform] duration-200 relative group"
+                className="rounded-xl border border-white/35 bg-white/25 p-3 cursor-pointer hover:bg-white/35 transition-colors duration-200 relative group"
                 onClick={() => setExpandedSection('memorable')}
               >
                 <div className="flex items-center gap-1.5 mb-1">
@@ -154,7 +154,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
               </div>
 
               <div
-                className="rounded-xl border border-white/35 bg-white/25 p-3 cursor-pointer hover:brightness-110 hover:scale-[1.01] transition-[filter,transform] duration-200 relative group"
+                className="rounded-xl border border-white/35 bg-white/25 p-3 cursor-pointer hover:bg-white/35 transition-colors duration-200 relative group"
                 onClick={() => setExpandedSection('priority')}
               >
                 <div className="flex items-center gap-1.5 mb-1">
@@ -168,7 +168,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
 
             {/* Key Strengths & Opportunities — inline expandable bullets */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm p-3 px-4 border-l-4 border-l-green-500">
+              <div className="rounded-xl border border-white/25 bg-white/10 p-3 px-4 border-l-4 border-l-green-500">
                 <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Key Strengths</h3>
                 <ul className="space-y-1.5">
                   {(keyStrengths.length > 0 ? keyStrengths : [{ text: 'Analysis pending...', detail: '' }]).map((s, i) => (
@@ -193,7 +193,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
                 </ul>
               </div>
 
-              <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm p-3 px-4 border-l-4 border-l-amber-500">
+              <div className="rounded-xl border border-white/25 bg-white/10 p-3 px-4 border-l-4 border-l-amber-500">
                 <h3 className="text-sm font-semibold text-white mb-2 uppercase tracking-wider">Opportunities to Strengthen</h3>
                 <ul className="space-y-1.5">
                   {(keyGaps.length > 0 ? keyGaps : [{ text: 'Analysis pending...', detail: '' }]).map((s, i) => (
@@ -220,7 +220,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
             </div>
 
             {/* Strategic Direction */}
-            <div className="rounded-xl border border-white/25 bg-white/10 backdrop-blur-sm p-3 px-4 space-y-2">
+            <div className="rounded-xl border border-white/25 bg-white/10 p-3 px-4 space-y-2">
               <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Strategic Direction</h3>
               {strategicPitch && (
                 <div className="rounded-lg bg-purple-500/10 border-l-4 border-l-purple-400/60 p-3">
@@ -360,7 +360,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
                   <h2 className="text-lg font-bold text-white">Your Top Priorities</h2>
                   <div className="space-y-3">
                     {(data.scoring?.portfolioRubric?.prioritizedRecommendations ?? []).map((rec, i) => (
-                      <div key={i} className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-sm p-4">
+                      <div key={i} className="rounded-xl border border-white/25 bg-white/15 p-4">
                         <h4 className="text-sm font-bold text-white mb-2">{rec.recommendation ?? ''}</h4>
                         <p className="text-sm text-white/80 leading-relaxed mb-2">{rec.impact ?? ''}</p>
                         <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/15 text-white/60 capitalize">{rec.effort ?? ''} effort</span>
@@ -439,8 +439,8 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
 
           </TabsContent>
 
-          {/* ============ YOUR STORY TAB ============ */}
-          <TabsContent value="your-story" className="mt-4 space-y-4">
+          {/* ============ YOUR STORY TAB (lazy) ============ */}
+          {activeTab === 'your-story' && <div className="mt-4 space-y-4">
             {/* Story Pitch */}
             {data.finalNarrative && (
               <>
@@ -532,12 +532,12 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
             {!data.finalNarrative && (
               <p className="text-sm text-white/60 text-center py-8">Story analysis pending...</p>
             )}
-          </TabsContent>
+          </div>}
 
-          {/* ============ YOUR EDGE TAB ============ */}
-          <TabsContent value="your-edge" className="mt-4 space-y-4">
+          {/* ============ YOUR EDGE TAB (lazy) ============ */}
+          {activeTab === 'your-edge' && <div className="mt-4 space-y-4">
             {/* Harvard Scale Assessment */}
-            <div className="rounded-xl border border-white/25 bg-white/15 backdrop-blur-sm p-5 text-center">
+            <div className="rounded-xl border border-white/25 bg-white/15 p-5 text-center">
               <div className="text-xs uppercase tracking-widest text-white/50 font-semibold mb-2">Harvard Scale Rating</div>
               <div className="text-5xl font-bold text-white mb-1">{data.stage3?.finalAssessment?.harvardScale ?? '—'}</div>
               <div className="text-sm text-teal-400 font-medium capitalize">
@@ -609,10 +609,10 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
                 </div>
               </div>
             )}
-          </TabsContent>
+          </div>}
 
-          {/* ============ ACTION PLAN TAB ============ */}
-          <TabsContent value="action-plan" className="mt-4 space-y-4">
+          {/* ============ ACTION PLAN TAB (lazy) ============ */}
+          {activeTab === 'action-plan' && <div className="mt-4 space-y-4">
             {/* Immediate Actions */}
             <div>
               <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
@@ -674,7 +674,7 @@ const PortfolioOverviewPanel = React.memo(function PortfolioOverviewPanel({ data
                 )}
               </div>
             </div>
-          </TabsContent>
+          </div>}
         </Tabs>
   );
 });

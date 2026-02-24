@@ -1,4 +1,4 @@
-import { createContext, useContext, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useMemo, ReactNode, useEffect } from 'react';
 import { useUser, useClerk, useAuth as useClerkAuth } from '@clerk/clerk-react';
 
 interface AuthContextType {
@@ -115,19 +115,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return { error: null };
   };
 
+  const contextValue = useMemo(() => ({
+    user,
+    session: null,
+    loading,
+    signUp,
+    signIn,
+    signInWithGoogle,
+    sendMagicLink,
+    requestPasswordReset,
+    updatePassword,
+    signOut,
+  }), [user, loading, signUp, signIn, signInWithGoogle, sendMagicLink, requestPasswordReset, updatePassword, signOut]);
+
   return (
-    <AuthContext.Provider value={{
-      user,
-      session: null,
-      loading,
-      signUp,
-      signIn,
-      signInWithGoogle,
-      sendMagicLink,
-      requestPasswordReset,
-      updatePassword,
-      signOut
-    }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );

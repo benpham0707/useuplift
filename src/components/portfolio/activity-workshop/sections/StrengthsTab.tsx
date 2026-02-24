@@ -28,12 +28,12 @@ interface StrengthsTabProps {
   data: ActivityInsightData;
 }
 
-export function StrengthsTab({ data }: StrengthsTabProps) {
+function StrengthsTabInner({ data }: StrengthsTabProps) {
   const roleCfg = getRoleConfig(data.storyRole);
   const showEssayCallout = data.essayWorthiness === 'excellent' || data.essayWorthiness === 'good';
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* ── What's Working (existing carousel) ── */}
       <WhatsWorking
         greenFlags={data.greenFlags}
@@ -139,30 +139,58 @@ export function StrengthsTab({ data }: StrengthsTabProps) {
         </div>
       )}
 
-      {/* ── Narrative Analysis ── */}
+      {/* ── Essay Potential ── */}
+      {data.essayPotential && (
+        <div className="rounded-lg bg-violet-50/50 dark:bg-violet-950/20 border border-violet-200/30 dark:border-violet-800/30 p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <FileText className="h-3.5 w-3.5 text-violet-500" />
+            <span className="text-xs font-semibold text-violet-700 dark:text-violet-300">
+              Essay Angle
+            </span>
+          </div>
+          <ParagraphText text={data.essayPotential.angle} className="text-xs text-foreground/80 leading-relaxed" />
+          {data.essayPotential.cautionAreas.length > 0 && (
+            <div className="mt-2 space-y-1">
+              <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">
+                Caution areas:
+              </span>
+              <ul className="space-y-0.5">
+                {data.essayPotential.cautionAreas.map((area, i) => (
+                  <li key={i} className="text-xs text-foreground/80 flex items-start gap-1.5">
+                    <span className="text-amber-500 mt-1 flex-shrink-0">&#8226;</span>
+                    {area}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Narrative Analysis — compact inline items ── */}
       {(data.narrativeStorytelling || data.narrativeEmotionalResonance || data.narrativeGrowthArc) && (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
             <BookOpen className="h-3.5 w-3.5" />
             Narrative Analysis
           </h4>
-          <div className="space-y-2">
+          <div className="rounded-lg bg-muted/20 divide-y divide-border/20">
             {data.narrativeStorytelling && (
-              <div className="rounded-lg bg-muted/30 p-2.5">
-                <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">Storytelling Value</span>
-                <ParagraphText text={data.narrativeStorytelling} className="text-xs text-foreground/80 leading-relaxed mt-0.5" />
+              <div className="px-2.5 py-1.5 flex items-baseline gap-2">
+                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 w-24">Storytelling</span>
+                <span className="text-[11px] text-foreground/75 leading-snug">{data.narrativeStorytelling}</span>
               </div>
             )}
             {data.narrativeEmotionalResonance && (
-              <div className="rounded-lg bg-muted/30 p-2.5">
-                <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">Emotional Resonance</span>
-                <ParagraphText text={data.narrativeEmotionalResonance} className="text-xs text-foreground/80 leading-relaxed mt-0.5" />
+              <div className="px-2.5 py-1.5 flex items-baseline gap-2">
+                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 w-24">Emotional</span>
+                <span className="text-[11px] text-foreground/75 leading-snug">{data.narrativeEmotionalResonance}</span>
               </div>
             )}
             {data.narrativeGrowthArc && (
-              <div className="rounded-lg bg-muted/30 p-2.5">
-                <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">Growth Arc</span>
-                <ParagraphText text={data.narrativeGrowthArc} className="text-xs text-foreground/80 leading-relaxed mt-0.5" />
+              <div className="px-2.5 py-1.5 flex items-baseline gap-2">
+                <span className="text-[9px] font-semibold text-muted-foreground uppercase tracking-wider flex-shrink-0 w-24">Growth Arc</span>
+                <span className="text-[11px] text-foreground/75 leading-snug">{data.narrativeGrowthArc}</span>
               </div>
             )}
           </div>
@@ -233,21 +261,19 @@ export function StrengthsTab({ data }: StrengthsTabProps) {
         </div>
       )}
 
-      {/* ── Score Assessment ── */}
+      {/* ── Score Assessment — compact ── */}
       {(data.activityOverallRationale || data.combinedScoreRationale) && (
         <div>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 flex items-center gap-1.5">
             <FileText className="h-3.5 w-3.5" />
             Score Assessment
           </h4>
-          <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+          <div className="rounded-lg border bg-muted/15 px-2.5 py-2 space-y-1">
             {data.activityOverallRationale && (
-              <ParagraphText text={data.activityOverallRationale} className="text-xs text-foreground/80 leading-relaxed" />
+              <p className="text-[11px] text-foreground/75 leading-snug">{data.activityOverallRationale}</p>
             )}
             {data.combinedScoreRationale && data.combinedScoreRationale !== data.activityOverallRationale && (
-              <div className="border-t border-border/30 pt-2">
-                <ParagraphText text={data.combinedScoreRationale} className="text-xs text-muted-foreground leading-relaxed" />
-              </div>
+              <p className="text-[11px] text-muted-foreground/70 leading-snug border-t border-border/20 pt-1">{data.combinedScoreRationale}</p>
             )}
           </div>
         </div>
@@ -255,3 +281,5 @@ export function StrengthsTab({ data }: StrengthsTabProps) {
     </div>
   );
 }
+
+export const StrengthsTab = React.memo(StrengthsTabInner);

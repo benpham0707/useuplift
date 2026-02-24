@@ -16,7 +16,7 @@ interface ParagraphTextProps {
   className?: string;
 }
 
-export function ParagraphText({ text, className = '' }: ParagraphTextProps) {
+const ParagraphTextInner = function ParagraphText({ text, className = '' }: ParagraphTextProps) {
   if (!text) return null;
 
   const paragraphs = text.split(/\n\n+/).filter((p) => p.trim().length > 0);
@@ -34,7 +34,9 @@ export function ParagraphText({ text, className = '' }: ParagraphTextProps) {
       ))}
     </div>
   );
-}
+};
+
+export const ParagraphText = React.memo(ParagraphTextInner);
 
 // ============================================================================
 // CollapsibleText — shows first N lines with "Show more" toggle
@@ -47,7 +49,7 @@ interface CollapsibleTextProps {
   className?: string;
 }
 
-export function CollapsibleText({
+const CollapsibleTextInner = function CollapsibleText({
   text,
   previewParagraphs = 2,
   className = '',
@@ -94,4 +96,6 @@ export function CollapsibleText({
       )}
     </div>
   );
-}
+};
+
+export const CollapsibleText = React.memo(CollapsibleTextInner);

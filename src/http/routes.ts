@@ -953,6 +953,125 @@ r.post("/api/rag/search", requireAuth, async (req, res) => {
   }
 });
 
+// ============================================================================
+// Writing Analytics API
+// ============================================================================
+
+// Track analytics events (suggestion shown/accepted/rejected, edits, score changes)
+r.post("/api/analytics/track", requireAuth, async (req, res) => {
+  try {
+    const { writingAnalyticsService } = await import("@/services/analytics");
+    const { sessionId, eventType, eventData } = req.body;
+    if (!sessionId || !eventType) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: sessionId, eventType' });
+    }
+
+    const userId = req.auth.userId;
+
+    switch (eventType) {
+      case 'suggestion_shown':
+        await writingAnalyticsService.trackSuggestionShown(userId, sessionId, eventData || {});
+        break;
+      case 'suggestion_accepted':
+        await writingAnalyticsService.trackSuggestionAccepted(userId, sessionId, eventData?.suggestionId, eventData?.workshop);
+        break;
+      case 'suggestion_rejected':
+        await writingAnalyticsService.trackSuggestionRejected(userId, sessionId, eventData?.suggestionId, eventData?.workshop);
+        break;
+      case 'inline_edit':
+        await writingAnalyticsService.trackInlineEdit(userId, sessionId, eventData || {});
+        break;
+      case 'score_change':
+        await writingAnalyticsService.trackScoreChange(userId, sessionId, eventData || {});
+        break;
+      case 'command_used':
+        await writingAnalyticsService.trackCommandUsed(userId, sessionId, eventData?.command, eventData);
+        break;
+      default:
+        return res.status(400).json({ success: false, error: `Unknown event type: ${eventType}` });
+    }
+
+    res.json({ success: true });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Analytics tracking failed';
+    console.error('[analytics/track] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+// Get suggestion acceptance rate
+r.get("/api/analytics/acceptance-rate", requireAuth, async (req, res) => {
+  try {
+    const { writingAnalyticsService } = await import("@/services/analytics");
+    const workshop = req.query.workshop as string | undefined;
+    const result = await writingAnalyticsService.getAcceptanceRate(workshop);
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to get acceptance rate';
+    console.error('[analytics/acceptance-rate] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+// Get most-used inline editing commands
+r.get("/api/analytics/commands", requireAuth, async (req, res) => {
+  try {
+    const { writingAnalyticsService } = await import("@/services/analytics");
+    const limit = parseInt(req.query.limit as string) || 10;
+    const result = await writingAnalyticsService.getMostUsedCommands(undefined, limit);
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to get command usage';
+    console.error('[analytics/commands] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+// Get average score improvement
+r.get("/api/analytics/score-improvement", requireAuth, async (req, res) => {
+  try {
+    const { writingAnalyticsService } = await import("@/services/analytics");
+    const workshop = req.query.workshop as string | undefined;
+    const result = await writingAnalyticsService.getAverageScoreImprovement(workshop);
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to get score improvement';
+    console.error('[analytics/score-improvement] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+// Get user analytics summary
+r.get("/api/analytics/summary", requireAuth, async (req, res) => {
+  try {
+    const { writingAnalyticsService } = await import("@/services/analytics");
+    const result = await writingAnalyticsService.getUserSummary(req.auth.userId);
+    res.json({ success: true, data: result });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Failed to get analytics summary';
+    console.error('[analytics/summary] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
+// Compare two essay versions
+r.post("/api/analytics/compare-versions", requireAuth, async (req, res) => {
+  try {
+    const { versionComparisonService } = await import("@/services/analytics");
+    const { oldVersion, newVersion, edits } = req.body;
+    if (!oldVersion || !newVersion) {
+      return res.status(400).json({ success: false, error: 'Missing required fields: oldVersion, newVersion' });
+    }
+    const comparison = versionComparisonService.compareVersions(oldVersion, newVersion, edits);
+    const summary = versionComparisonService.summarize(comparison);
+    res.json({ success: true, data: { ...comparison, summary } });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Version comparison failed';
+    console.error('[analytics/compare-versions] error:', error);
+    res.status(500).json({ success: false, error: message });
+  }
+});
+
 // Simple health check for dev tooling and frontends
 r.get('/health', (_req, res) => {
   const hasAnthropicKey = Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.length > 10);

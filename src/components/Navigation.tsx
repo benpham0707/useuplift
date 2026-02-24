@@ -124,13 +124,19 @@ const Navigation = () => {
             >
               Scanner & Insights
             </button>
-            <button 
+            <button
               onClick={() => handleNavigation('/piq-workshop')}
               className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
             >
               Workshop
             </button>
-            <button 
+            <button
+              onClick={() => navigate('/activity-workshop/demo')}
+              className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
+            >
+              Activity Workshop
+            </button>
+            <button
               onClick={() => navigate('/pricing')}
               onMouseEnter={prefetchPricing}
               className="text-foreground hover:text-primary transition-all duration-200 px-3 py-2 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium relative"
@@ -220,11 +226,17 @@ const Navigation = () => {
             >
               Scanner & Insights
             </button>
-            <button 
+            <button
               onClick={() => { handleNavigation('/piq-workshop'); setIsMenuOpen(false); }}
               className="w-full text-left block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
             >
               Workshop
+            </button>
+            <button
+              onClick={() => { navigate('/activity-workshop/demo'); setIsMenuOpen(false); }}
+              className="w-full text-left block px-3 py-2 text-foreground hover:text-primary transition-all duration-200 rounded-lg hover:bg-white/10 dark:hover:bg-white/5 text-sm font-medium"
+            >
+              Activity Workshop
             </button>
             <button
               onClick={() => { navigate('/pricing'); setIsMenuOpen(false); }}

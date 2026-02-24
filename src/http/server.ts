@@ -10,12 +10,16 @@
 // @ts-nocheck - Server file with type compatibility issues
 import 'dotenv/config';
 import express from "express";
+import compression from "compression";
 import routes from "./routes";
 import cors from "cors";
 import { logSecurityEvent } from "./security";
 
 const app = express();
 const isProduction = process.env.NODE_ENV === 'production';
+
+// Gzip/Brotli compression — reduces response sizes by 50-80%
+app.use(compression());
 
 // CORS Configuration
 // SECURITY: Strict in production, permissive only in development
@@ -85,8 +89,17 @@ app.use(express.json({
 app.use("/api/v1", routes);
 app.use("/api", routes);
 
+// Cache-Control for authenticated GET API responses (user-specific, short-lived)
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', 'private, max-age=30, stale-while-revalidate=60');
+  }
+  next();
+});
+
 // Health check endpoint (outside of routes for simpler monitoring)
 app.get('/health', (_req, res) => {
+  res.set('Cache-Control', 'public, max-age=30');
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),

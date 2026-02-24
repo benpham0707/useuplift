@@ -12,7 +12,7 @@
  * Master-detail pattern: list view (summary cards) → detail view (tabbed sections).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import type { ActivityInsightData } from './insightTypes';
 import { InsightSummaryCard } from './InsightSummaryCard';
 import { InsightDetailView } from './InsightDetailView';
@@ -95,11 +95,11 @@ function buildInsights(data: ActivityWorkshopPipelineResult): ActivityInsightDat
       descriptionScore: scoreData?.descriptionScore ?? {
         total: 0,
         breakdown: {
-          specificity: { score: 0 },
-          impactClarity: { score: 0 },
-          authenticityVoice: { score: 0 },
-          actionLanguage: { score: 0 },
-          quantification: { score: 0 },
+          specificity: { score: 0, weight: 0.25 },
+          impactClarity: { score: 0, weight: 0.25 },
+          authenticityVoice: { score: 0, weight: 0.20 },
+          actionLanguage: { score: 0, weight: 0.15 },
+          quantification: { score: 0, weight: 0.15 },
         },
       },
       tier: s1?.classification.tier ?? 4,
@@ -304,7 +304,7 @@ function buildInsights(data: ActivityWorkshopPipelineResult): ActivityInsightDat
 }
 
 export function ActivityInsightsList({ data }: ActivityInsightsListProps) {
-  const insights = buildInsights(data);
+  const insights = useMemo(() => buildInsights(data), [data]);
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
 
   const handleSelect = useCallback((id: string) => {
@@ -331,7 +331,7 @@ export function ActivityInsightsList({ data }: ActivityInsightsListProps) {
         <InsightSummaryCard
           key={item.activityId}
           data={item}
-          onClick={() => handleSelect(item.activityId)}
+          onSelect={handleSelect}
         />
       ))}
     </div>

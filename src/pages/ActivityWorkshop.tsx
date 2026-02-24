@@ -20,7 +20,6 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import type { ImperativePanelHandle } from 'react-resizable-panels';
 import { ActivityInputForm } from '@/components/portfolio/activity-workshop/ActivityInputForm';
 import type { ActivityFormData } from '@/components/portfolio/activity-workshop/ActivityCard';
-import { MOCK_DATA } from '@/components/portfolio/activity-workshop/mockData';
 import { ActivityInsightsList } from '@/components/portfolio/activity-workshop/ActivityInsightsList';
 import PortfolioOverviewPanel from '@/components/portfolio/activity-workshop/PortfolioOverviewPanel';
 import ScoreDashboard from '@/components/portfolio/activity-workshop/ScoreDashboard';
@@ -200,13 +199,15 @@ export default function ActivityWorkshop() {
   const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const activeIssues = dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed');
+  const activeIssues = useMemo(() => dimensions.flatMap(d => d.issues).filter(i => i.status !== 'fixed'), [dimensions]);
 
   // ============================================================================
   // LAYOUT STATE
   // ============================================================================
 
   const [leftPanelTab, setLeftPanelTab] = useState<'activities' | 'results'>('results');
+  const [pipelineData, setPipelineData] = useState<import('@/components/portfolio/activity-workshop/mockData').ActivityWorkshopPipelineResult | null>(null);
+  const [isLoadingPipelineData, setIsLoadingPipelineData] = useState(true);
   const [isChatOpen, setIsChatOpen] = useState(true);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const chatPanelRef = useRef<ImperativePanelHandle>(null);
@@ -243,6 +244,16 @@ export default function ActivityWorkshop() {
   const currentScore = analysisResult?.analysis?.narrative_quality_index || 0;
   const initialScore = initialScoreRef.current;
   const hasAnalysis = analysisResult !== null && dimensions.length > 0;
+
+  // ============================================================================
+  // DYNAMIC IMPORT: MOCK PIPELINE DATA (code-split for bundle size)
+  // ============================================================================
+  useEffect(() => {
+    import('@/components/portfolio/activity-workshop/mockDataPayload').then((mod) => {
+      setPipelineData(mod.default);
+      setIsLoadingPipelineData(false);
+    });
+  }, []);
 
   // ============================================================================
   // INSTANT PER-PROMPT HYDRATION
@@ -1325,33 +1336,32 @@ export default function ActivityWorkshop() {
   // ============================================================================
   // COMPUTED (continued)
   // ============================================================================
-  const totalIssues = dimensions.reduce((sum, d) => sum + d.issues.length, 0);
-  const fixedIssues = dimensions.reduce((sum, d) => sum + d.issues.filter(i => i.status === 'fixed').length, 0);
-  const criticalIssues = dimensions.filter(d => d.status === 'critical').length;
-  const needsWorkIssues = dimensions.filter(d => d.status === 'needs_work').length;
+  const totalIssues = useMemo(() => dimensions.reduce((sum, d) => sum + d.issues.length, 0), [dimensions]);
+  const fixedIssues = useMemo(() => dimensions.reduce((sum, d) => sum + d.issues.filter(i => i.status === 'fixed').length, 0), [dimensions]);
+  const criticalIssues = useMemo(() => dimensions.filter(d => d.status === 'critical').length, [dimensions]);
+  const needsWorkIssues = useMemo(() => dimensions.filter(d => d.status === 'needs_work').length, [dimensions]);
 
-  const getNQIConfig = () => {
+  const nqiConfig = useMemo(() => {
     const nqi = currentScore;
     if (nqi >= 85) return { label: 'Outstanding', color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-950/30', border: 'border-green-300 dark:border-green-800' };
     if (nqi >= 70) return { label: 'Competitive', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-950/30', border: 'border-blue-300 dark:border-blue-800' };
     if (nqi >= 55) return { label: 'Needs Significant Work', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-950/30', border: 'border-amber-300 dark:border-amber-800' };
     return { label: 'Critical Issues', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-950/30', border: 'border-red-300 dark:border-red-800' };
-  };
+  }, [currentScore]);
 
-  const getScoreColor = (score: number) => {
+  const getScoreColor = useCallback((score: number) => {
     if (score >= 90) return { gradient: true, colors: ['hsl(250 70% 60%)', 'hsl(185 80% 55%)', 'hsl(280 90% 65%)', 'hsl(250 70% 60%)'] };
     if (score >= 85) return { gradient: false, className: 'text-emerald-600 dark:text-emerald-400' };
     if (score >= 70) return { gradient: true, colors: ['hsl(217 91% 60%)', 'hsl(262 83% 58%)', 'hsl(217 91% 65%)', 'hsl(262 83% 58%)'] };
     if (score >= 55) return { gradient: false, className: 'text-amber-600 dark:text-amber-400' };
     return { gradient: false, className: 'text-red-600 dark:text-red-400' };
-  };
+  }, []);
 
-  const nqiConfig = getNQIConfig();
   const scoreDelta = (hasAnalysis && initialScore > 0) ? (currentScore - initialScore) : 0;
 
-  const goodDimensions = dimensions.filter(d => d.status === 'good');
-  const needsWorkDimensions = dimensions.filter(d => d.status === 'needs_work');
-  const criticalDimensions = dimensions.filter(d => d.status === 'critical');
+  const goodDimensions = useMemo(() => dimensions.filter(d => d.status === 'good'), [dimensions]);
+  const needsWorkDimensions = useMemo(() => dimensions.filter(d => d.status === 'needs_work'), [dimensions]);
+  const criticalDimensions = useMemo(() => dimensions.filter(d => d.status === 'critical'), [dimensions]);
 
   const scrollToDimension = (dimensionId: string) => {
     setExpandedDimensionId(dimensionId);
@@ -1544,7 +1554,7 @@ export default function ActivityWorkshop() {
         <div className="max-w-7xl mx-auto px-4 py-6 space-y-3">
 
           {/* Score Dashboard — extracted memoized component */}
-          <ScoreDashboard data={MOCK_DATA} />
+          {pipelineData && <ScoreDashboard data={pipelineData} />}
 
           {/* Portfolio Overview — collapsible below score cards */}
           <Collapsible open={isOverviewOpen} onOpenChange={setIsOverviewOpen}>
@@ -1556,7 +1566,7 @@ export default function ActivityWorkshop() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="space-y-3 pb-2">
-                <PortfolioOverviewPanel data={MOCK_DATA} />
+                {pipelineData && <PortfolioOverviewPanel data={pipelineData} />}
               </div>
             </CollapsibleContent>
           </Collapsible>
@@ -1614,7 +1624,7 @@ export default function ActivityWorkshop() {
                 ) : (
                   /* ============ ACTIVITY INSIGHTS TAB ============ */
                   <div className="p-4">
-                    <ActivityInsightsList data={MOCK_DATA} />
+                    {pipelineData && <ActivityInsightsList data={pipelineData} />}
                   </div>
                 )}
               </div>
@@ -1693,15 +1703,17 @@ export default function ActivityWorkshop() {
         )}
       </div>
 
-      <VersionHistoryDrawer
-        isOpen={showVersionHistoryDrawer}
-        onClose={() => setShowVersionHistoryDrawer(false)}
-        versions={dbVersionHistory}
-        currentVersionId={dbVersionHistory[0]?.id}
-        onRestore={handleRestoreFromDrawer}
-        isLoading={isLoadingVersionHistory}
-        error={versionHistoryError || undefined}
-      />
+      {showVersionHistoryDrawer && (
+        <VersionHistoryDrawer
+          isOpen={showVersionHistoryDrawer}
+          onClose={() => setShowVersionHistoryDrawer(false)}
+          versions={dbVersionHistory}
+          currentVersionId={dbVersionHistory[0]?.id}
+          onRestore={handleRestoreFromDrawer}
+          isLoading={isLoadingVersionHistory}
+          error={versionHistoryError || undefined}
+        />
+      )}
 
       {showVersionHistory && (
         <DraftVersionHistory
@@ -1719,13 +1731,15 @@ export default function ActivityWorkshop() {
         />
       )}
 
-      <InsufficientCreditsModal
-        isOpen={showInsufficientCreditsModal}
-        onClose={() => setShowInsufficientCreditsModal(false)}
-        currentBalance={currentCreditBalance}
-        requiredCredits={CREDIT_COSTS.ESSAY_ANALYSIS}
-        actionType="analysis"
-      />
+      {showInsufficientCreditsModal && (
+        <InsufficientCreditsModal
+          isOpen={showInsufficientCreditsModal}
+          onClose={() => setShowInsufficientCreditsModal(false)}
+          currentBalance={currentCreditBalance}
+          requiredCredits={CREDIT_COSTS.ESSAY_ANALYSIS}
+          actionType="analysis"
+        />
+      )}
     </div>
   );
 }
