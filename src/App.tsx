@@ -34,7 +34,10 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
+import DashboardHome from "./pages/DashboardHome";
 import { ConfigError } from "@/components/ConfigError";
+import { CLERK_PUBLISHABLE_KEY } from "@/config/clerk";
+import { getSupabaseConfigErrors } from "@/integrations/supabase/config";
 
 const queryClient = new QueryClient({
   defaultOptions: {
