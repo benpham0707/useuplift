@@ -3,7 +3,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
 import ClerkErrorBoundary from "@/components/ClerkErrorBoundary";
@@ -68,13 +69,14 @@ const App = () => {
   }
   
   return (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <FraudTrackingProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
+  <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+    <QueryClientProvider client={queryClient}>
+      <AuthProvider>
+        <FraudTrackingProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
             <Routes>
               {/* Public routes - keep website-style top navigation */}
               <Route path="/" element={<Index />} />
@@ -101,14 +103,25 @@ const App = () => {
               <Route path="/workshop-demo" element={<WorkshopDemo />} />
               
               {/* Dashboard routes - authenticated app shell with left sidebar */}
-              <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
-                <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
-                <Route path="/portfolio-insights" element={<PortfolioInsightsNew />} />
-                <Route path="/piq-workshop" element={<PIQWorkshop />} />
-                <Route path="/piq-workshop/:piqNumber" element={<PIQWorkshop />} />
-                <Route path="/pricing" element={<Pricing />} />
-                <Route path="/settings" element={<Settings />} />
+              <Route path="/dashboard" element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+                <Route index element={<DashboardHome />} />
+                <Route path="scanner" element={<PortfolioScanner />} />
+                <Route path="insights" element={<PortfolioInsightsNew />} />
+                <Route path="workshop" element={<PIQWorkshop />} />
+                <Route path="workshop/:piqNumber" element={<PIQWorkshop />} />
+                <Route path="activity-workshop" element={<ActivityWorkshop />} />
+                <Route path="pricing" element={<Pricing />} />
+                <Route path="settings" element={<Settings />} />
               </Route>
+
+              {/* Backward compatibility redirects for old routes */}
+              <Route path="/portfolio-scanner" element={<Navigate to="/dashboard/scanner" replace />} />
+              <Route path="/portfolio-insights" element={<Navigate to="/dashboard/insights" replace />} />
+              <Route path="/piq-workshop" element={<Navigate to="/dashboard/workshop" replace />} />
+              <Route path="/piq-workshop/:piqNumber" element={<Navigate to="/dashboard/workshop/:piqNumber" replace />} />
+              <Route path="/activity-workshop" element={<Navigate to="/dashboard/activity-workshop" replace />} />
+              <Route path="/pricing" element={<Navigate to="/dashboard/pricing" replace />} />
+              <Route path="/settings" element={<Navigate to="/dashboard/settings" replace />} />
               
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
@@ -120,6 +133,7 @@ const App = () => {
       </FraudTrackingProvider>
     </AuthProvider>
   </QueryClientProvider>
+  </ClerkProvider>
   );
 };
 
