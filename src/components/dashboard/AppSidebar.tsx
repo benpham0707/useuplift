@@ -12,6 +12,7 @@ import {
   SidebarSeparator,
 } from '@/components/ui/sidebar';
 import {
+  Home,
   BarChart3,
   Target,
   PenTool,
@@ -28,28 +29,33 @@ import GradientZap from '@/components/ui/GradientZap';
 
 const navItems = [
   {
+    title: 'Home',
+    href: '/dashboard',
+    icon: Home,
+  },
+  {
     title: 'Scanner',
-    href: '/portfolio-scanner',
+    href: '/dashboard/scanner',
     icon: BarChart3,
   },
   {
     title: 'Insights',
-    href: '/portfolio-insights',
+    href: '/dashboard/insights',
     icon: Target,
   },
   {
     title: 'Workshop',
-    href: '/piq-workshop',
+    href: '/dashboard/workshop',
     icon: PenTool,
   },
   {
     title: 'Pricing',
-    href: '/pricing',
+    href: '/dashboard/pricing',
     icon: Zap,
   },
   {
     title: 'Settings',
-    href: '/settings',
+    href: '/dashboard/settings',
     icon: Settings,
   },
 ];
@@ -82,11 +88,17 @@ export function AppSidebar() {
     return () => window.removeEventListener('credits:updated', onUpdated);
   }, [user]);
 
-  // Check if a route is active (including child routes like /piq-workshop/:piqNumber)
+  // Check if a route is active (including child routes like /dashboard/workshop/:piqNumber)
   const isActive = (href: string) => {
-    if (href === '/piq-workshop') {
-      return location.pathname.startsWith('/piq-workshop');
+    // Exact match for home to avoid matching all /dashboard/* routes
+    if (href === '/dashboard') {
+      return location.pathname === '/dashboard';
     }
+    // Existing logic for workshop (handles :piqNumber param)
+    if (href === '/dashboard/workshop') {
+      return location.pathname.startsWith('/dashboard/workshop');
+    }
+    // Exact match for all other routes
     return location.pathname === href;
   };
 
