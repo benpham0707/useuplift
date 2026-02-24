@@ -19,7 +19,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Navigation
 
-- [ ] **NAV-01**: "Home" appears as first item in sidebar with home icon
+- [x] **NAV-01**: "Home" appears as first item in sidebar with home icon
 - [ ] **NAV-02**: Sidebar supports collapsible state with Cmd+\ keyboard shortcut
 - [ ] **NAV-03**: Sidebar supports collapsible state with toggle button
 - [ ] **NAV-04**: Dashboard Home displays quick-launch cards for major features (Scanner, Workshop, etc.)
@@ -27,9 +27,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Routing
 
-- [ ] **ROUT-01**: /dashboard route shows Dashboard Home by default
-- [ ] **ROUT-02**: All existing feature pages remain accessible at current or adjusted routes
-- [ ] **ROUT-03**: Dashboard Home only displays to authenticated users (Clerk auth integration)
+- [x] **ROUT-01**: /dashboard route shows Dashboard Home by default
+- [x] **ROUT-02**: All existing feature pages remain accessible at current or adjusted routes
+- [x] **ROUT-03**: Dashboard Home only displays to authenticated users (Clerk auth integration)
 
 ### UI/UX
 
@@ -95,14 +95,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DASH-05 | Phase 2 | Pending |
 | DASH-06 | Phase 2 | Pending |
 | DASH-07 | Phase 2 | Pending |
-| NAV-01 | Phase 1 | Pending |
+| NAV-01 | Phase 1 | Complete |
 | NAV-02 | Phase 3 | Pending |
 | NAV-03 | Phase 3 | Pending |
 | NAV-04 | Phase 2 | Pending |
 | NAV-05 | Phase 2 | Pending |
-| ROUT-01 | Phase 1 | Pending |
-| ROUT-02 | Phase 1 | Pending |
-| ROUT-03 | Phase 1 | Pending |
+| ROUT-01 | Phase 1 | Complete |
+| ROUT-02 | Phase 1 | Complete |
+| ROUT-03 | Phase 1 | Complete |
 | UI-01 | Phase 2 | Pending |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 2 | Pending |
