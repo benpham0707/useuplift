@@ -1686,3 +1686,43 @@ ${context.impactCredibility === 'high_credibility'
 
   return sections.join('\n\n');
 }
+
+/**
+ * Lite version of expert knowledge for teaching prompts.
+ * Omits generic AO reading process, detailed school archetypes, and character traits
+ * to reduce token waste. The UI provides this context via hover cards.
+ */
+export function formatExpertKnowledgeLite(context: ExpertKnowledgeContext): string {
+  const sections: string[] = [];
+
+  // Constraint context — student-specific, always include
+  if (context.constraintLevel) {
+    sections.push(`## CONSTRAINT CONTEXT
+Level ${context.constraintLevel.level} (${context.constraintLevel.name}): ${context.constraintLevel.evaluationNote}
+Tier adjustment: +${context.constraintLevel.tierAdjustment}`);
+  }
+
+  // School targets — names only, no full descriptions
+  if (context.schoolArchetypes.length > 0) {
+    sections.push(`## TARGET SCHOOLS
+${context.schoolArchetypes.map(a => `${a.name}: values ${a.whatTheyValue.primary}`).join('\n')}`);
+  }
+
+  // Narrative arc — name and pattern only
+  if (context.narrativeArc) {
+    sections.push(`## NARRATIVE ARC: ${context.narrativeArc.name}
+Pattern: ${context.narrativeArc.pattern}`);
+  }
+
+  // Authenticity — brief assessment only
+  sections.push(`## AUTHENTICITY: ${context.authenticityAssessment.overallLevel.toUpperCase()}${
+    context.authenticityAssessment.redFlags.length > 0
+      ? `\nRed flags: ${context.authenticityAssessment.redFlags.slice(0, 2).join('; ')}`
+      : ''
+  }`);
+
+  // Impact credibility — one line
+  sections.push(`## IMPACT CREDIBILITY: ${context.impactCredibility.replace(/_/g, ' ').toUpperCase()}`);
+
+  return sections.join('\n\n');
+}

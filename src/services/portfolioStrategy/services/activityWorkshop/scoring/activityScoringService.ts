@@ -144,25 +144,21 @@ NOTE: Commitment & Progression is weighted 17.5%, Leadership & Impact 12.5%. Sus
 
 **Tier 1 (Score 9-10)**: National/international distinction, <1% of applicants
 - USAMO/USACO qualifier, Intel/Regeneron finalist, published peer-reviewed research, D1 recruited athlete, professional accomplishment
-- For context: ~500 USAMO qualifiers out of ~3 million high schoolers = 0.017%
 
 **Tier 2 (Score 7-8)**: State/regional impact with leadership
 - State competition winner (not just participant), founded organization with 100+ people reached, regional awards
-- For context: State champions are typically top 0.5-1% of their state
 
 **Tier 3 (Score 4-6)**: School-level distinction with meaningful commitment
 - Club president, team captain, school award winner, multi-year commitment with growth
-- For context: ~5-10% of students at competitive schools hold these positions
 
 **Tier 4 (Score 1-3)**: Participation without distinction
 - Club member, occasional volunteer, one-time events
-- For context: This describes ~70% of applicants' activities
 
-TIER CALIBRATION EXAMPLES (use these to anchor your assessments):
-- Tier 1 Example: "Founded coding bootcamp that trained 200+ underserved students, featured in local news, invited to present at state education conference" → National/regional impact, sustained commitment, recognized externally
-- Tier 2 Example: "Captain of varsity debate team, won 3 regional tournaments, mentored JV debaters" → Clear spike in one area with external recognition at regional level
-- Tier 3 Example: "President of Science Club, organized monthly speaker events, member for 3 years" → School-level leadership and commitment but no external recognition
-- Tier 4 Example: "Member of Spanish Club, participated in cultural events" → Participation without distinction or progression
+TIER CALIBRATION EXAMPLES:
+- T1: "Founded coding bootcamp that trained 200+ underserved students, featured in local news, invited to state education conference"
+- T2: "Captain of varsity debate team, won 3 regional tournaments, mentored JV debaters"
+- T3: "President of Science Club, organized monthly speaker events, member for 3 years"
+- T4: "Member of Spanish Club, participated in cultural events"
 
 COMMON MISCALIBRATION: Activities involving disadvantaged backgrounds or overcoming hardship get inflated tiers. Evaluate the ACHIEVEMENT, not the circumstances. Context matters for teaching, but tier assessment must be based on demonstrated impact and recognition.
 
@@ -274,7 +270,7 @@ In rationale, explain the arc. Example: "Starting as a freshman participant and 
       "leadershipApplicable": <true|false>
     }
   },
-  "tierJustification": "<detailed explanation with comparative framing>",
+  "tierJustification": "<1-2 sentences: WHY this specific activity lands at this tier, citing evidence from the description. Do NOT repeat generic tier definitions or percentiles — focus on what THIS student did.>",
   "comparisonBenchmarks": {
     "similarTo": "<specific example of similar-tier activity with context>",
     "above": "<specific example of what would be higher tier>",

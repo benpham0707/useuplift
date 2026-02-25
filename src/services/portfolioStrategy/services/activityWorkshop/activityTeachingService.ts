@@ -64,11 +64,13 @@ Target Schools: {{targetSchools}}
 
 ## Your Task:
 Based on the analysis, provide EDUCATIONAL, ACTIONABLE guidance. Help the student understand:
-1. WHY their activity is classified at this tier (with specific benchmarks)
+1. WHY their specific activity is classified at this tier (cite evidence from THEIR description)
 2. WHAT strengths to leverage
 3. HOW to improve specific issues
 4. WHAT an optimized description looks like
 5. HOW to talk about this activity
+
+IMPORTANT: The UI already shows generic tier definitions, percentiles, and framework descriptions in an interactive tooltip. Do NOT repeat generic tier characterizations (e.g., "Tier 2 activities are characterized by...") or percentile brackets (e.g., "top 5-10%"). Focus entirely on what's SPECIFIC to this student's activity.
 
 Be specific, cite benchmarks, give concrete examples.
 
@@ -76,18 +78,16 @@ Be specific, cite benchmarks, give concrete examples.
 {
   "tierExplanation": {
     "assignedTier": 1|2|3|4,
-    "explanation": "Detailed explanation of why this tier, educating the student",
+    "explanation": "Why THIS activity earns this tier — cite specific evidence from the student's description. Include the key factors (e.g., 'Three factors place this at Tier 2: (1) original methodology, (2) real dataset, (3) paper submission'). Skip generic tier definitions.",
     "benchmarksUsed": [
       {
         "tier": 1|2|3|4,
-        "benchmark": "specific benchmark",
+        "benchmark": "specific benchmark this student meets or misses",
         "source": "Sara Harberson Framework / Competition Database / etc.",
         "studentMeets": true|false,
         "gap": "what would be needed if not meeting"
       }
     ],
-    "whatMakesThisTier": "clear explanation of the criteria for this tier",
-    "whatWouldChangeIt": "specific steps to move to next tier"
   },
 
   "strengthTeaching": [
@@ -113,20 +113,20 @@ Be specific, cite benchmarks, give concrete examples.
   "upgradePathway": {
     "currentTier": 1|2|3|4,
     "targetTier": 1|2|3,
-    "feasibility": "high|medium|low",
-    "timeRequired": "realistic estimate",
+    "feasibility": "high|medium|low — honest assessment given student's constraints and remaining time",
+    "timeRequired": "realistic estimate (e.g., '2-4 months' not vague)",
     "steps": [
       {
         "step": 1,
-        "action": "specific action",
-        "rationale": "why this matters",
-        "milestone": "what success looks like",
-        "timeframe": "when to achieve",
-        "resources": ["helpful resources"]
+        "action": "Most impactful action specific to THIS activity — not generic advice. Reference what they've already built.",
+        "rationale": "What specific admissions evidence this creates (e.g., 'Published paper transforms this from claimed research to externally validated contribution')",
+        "milestone": "Concrete proof of completion an AO would see on the application",
+        "timeframe": "Realistic given their constraints",
+        "resources": ["Specific resources — name actual programs, competitions, organizations, not generic 'look for opportunities'"]
       }
     ],
-    "successIndicators": ["how to know you've upgraded"],
-    "risks": ["what could go wrong"]
+    "successIndicators": ["Observable proof on their application that this upgrade happened — what would the AO read differently?"],
+    "risks": ["Honest obstacles — time constraints, competition difficulty, seasonal deadlines, etc."]
   },
 
   "descriptionOptimization": {
@@ -404,8 +404,8 @@ export class ActivityTeachingService implements IActivityTeachingService {
           assignedTier: number;
           explanation: string;
           benchmarksUsed: { tier: number; benchmark: string; source: string; studentMeets: boolean; gap?: string }[];
-          whatMakesThisTier: string;
-          whatWouldChangeIt: string;
+          whatMakesThisTier?: string;
+          whatWouldChangeIt?: string;
         };
         strengthTeaching: { strength: string; whyItMatters: string; howToLeverage: string; inApplications: string }[];
         improvementTeaching: { issue: string; whyItMatters: string; howToFix: string; exampleBefore: string; exampleAfter: string; priority: string }[];
@@ -456,8 +456,8 @@ export class ActivityTeachingService implements IActivityTeachingService {
             studentMeets: b.studentMeets,
             gap: b.gap,
           })),
-          whatMakesThisTier: createCitedText(parsed.tierExplanation.whatMakesThisTier, tierCitations),
-          whatWouldChangeIt: createCitedText(parsed.tierExplanation.whatWouldChangeIt, upgradeCitations),
+          whatMakesThisTier: createCitedText(parsed.tierExplanation.whatMakesThisTier || '', tierCitations),
+          whatWouldChangeIt: createCitedText(parsed.tierExplanation.whatWouldChangeIt || '', upgradeCitations),
         },
         strengthTeaching: parsed.strengthTeaching.map((s) => {
           const greenCitations = activityCitationService.getCitationsForGreenFlag(s.strength, activity);

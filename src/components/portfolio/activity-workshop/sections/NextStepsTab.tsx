@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import type { ActivityInsightData } from '../insightTypes';
 import { PRIORITY_BADGE, getScoreTheme } from '../insightTypes';
+import { TierHoverCard } from '../AdmissionsContextCards';
 import { ParagraphText, CollapsibleText } from '../RichText';
 
 interface NextStepsTabProps {
@@ -350,7 +351,14 @@ function NextStepsTabInner({ data }: NextStepsTabProps) {
         <div>
           <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <TrendingUp className="h-3.5 w-3.5" />
-            Upgrade Pathway: Tier {data.upgradePathway.currentTier} → Tier {data.upgradePathway.targetTier}
+            Upgrade Pathway:{' '}
+            <TierHoverCard tier={data.upgradePathway.currentTier as 1 | 2 | 3 | 4}>
+              <span className="cursor-help">Tier {data.upgradePathway.currentTier}</span>
+            </TierHoverCard>
+            {' \u2192 '}
+            <TierHoverCard tier={data.upgradePathway.targetTier as 1 | 2 | 3 | 4}>
+              <span className="cursor-help">Tier {data.upgradePathway.targetTier}</span>
+            </TierHoverCard>
           </h4>
           <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
             <div className="flex items-center gap-3">

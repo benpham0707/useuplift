@@ -14,6 +14,7 @@
  */
 
 import { AnalysisResult, VoiceFingerprintData, ExperienceFingerprintData, DimensionScoreDetail } from '@/components/portfolio/extracurricular/workshop/backendTypes';
+import { writingPreAnalyzer, formatForPIQ } from '../../services/writingEngine';
 
 // ============================================================================
 // TYPES
@@ -407,6 +408,15 @@ export function formatPIQContextForLLM(context: PIQChatContext): string {
     sections.push(`**Tone**: ${context.voiceFingerprint.tone.primary}${context.voiceFingerprint.tone.secondary ? `, ${context.voiceFingerprint.tone.secondary}` : ''}`);
     sections.push('');
     sections.push(`⚠️ CRITICAL: All coaching must PRESERVE this voice pattern. Do NOT suggest flowery embellishments that violate their authentic style.`);
+    sections.push('');
+  }
+
+  // Computational writing signals
+  const preAnalysis = writingPreAnalyzer.analyze(context.currentState.draft);
+  const enrichmentBlock = preAnalysis ? formatForPIQ(preAnalysis) : null;
+  if (enrichmentBlock) {
+    sections.push(`## Computational Writing Signals`);
+    sections.push(enrichmentBlock.content);
     sections.push('');
   }
 

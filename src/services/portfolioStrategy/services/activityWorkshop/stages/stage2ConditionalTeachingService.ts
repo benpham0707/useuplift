@@ -573,8 +573,24 @@ Respond with JSON for ONE activity:
     "assignedTier": ${analysis.classification.tier},
     "explanation": { "text": "Why this tier - use Sara Harberson criteria", "citations": [] },
     "benchmarksUsed": [{ "tier": ${analysis.classification.tier}, "benchmark": "criteria met", "source": "Sara Harberson", "studentMeets": true, "evidence": "specific evidence" }],
-    "whatMakesThisTier": { "text": "specific evidence from their description", "citations": [] },
-    "whatWouldChangeIt": { "text": "actionable steps to improve tier", "citations": [] }
+    "whatMakesThisTier": { "text": "specific evidence from their description", "citations": [] }
+  },
+  "upgradePathway": {
+    "currentTier": ${analysis.classification.tier},
+    "targetTier": ${Math.max(1, analysis.classification.tier - 1)},
+    "feasibility": "high|medium|low — based on student's constraints, timeline, and current trajectory",
+    "timeRequired": "realistic estimate given their specific situation",
+    "steps": [
+      {
+        "step": 1,
+        "action": "Most impactful action they can take — be specific to their activity, not generic",
+        "rationale": "Why this step matters for tier advancement — reference what specific evidence it creates",
+        "milestone": "Concrete deliverable that proves completion (e.g., 'Paper accepted by IEEE' not 'get published')",
+        "timeframe": "Realistic given their constraints"
+      }
+    ],
+    "successIndicators": ["Observable proof they've reached the next tier — what would an AO see?"],
+    "risks": ["What could prevent this upgrade — be honest about feasibility"]
   },
   "strengthTeaching": [{
     "strength": "main strength",
@@ -594,7 +610,7 @@ Respond with JSON for ONE activity:
   }],
   "descriptionOptimization": {
     "originalDescription": "${activity.description.replace(/"/g, '\\"').substring(0, 200)}",
-    "optimizedDescription": "your improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})${hasProfileData ? ' — MUST incorporate the verified facts from PERSONALIZED CONTEXT. Use the student\\'s REAL metrics and achievements to write a description grounded in their actual experience, not generic improvements.' : ''}",
+    "optimizedDescription": "your improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})${hasProfileData ? ' — MUST incorporate the verified facts from PERSONALIZED CONTEXT. Use the student\'s REAL metrics and achievements to write a description grounded in their actual experience, not generic improvements.' : ''}",
     "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
     "changesExplained": [{ "change": "what changed", "reason": "why" }]
   },
@@ -762,10 +778,17 @@ Respond with JSON:
       "activityId": "id",
       "tierExplanation": {
         "assignedTier": 1-4,
-        "explanation": { "text": "Why this tier with celebration first", "citations": [] },
+        "explanation": { "text": "Why this tier — cite specific evidence from their description. Skip generic tier definitions.", "citations": [] },
         "benchmarksUsed": [{ "tier": 2, "benchmark": "What Tier 2 requires", "source": "Sara Harberson", "studentMeets": true, "gap": null }],
-        "whatMakesThisTier": { "text": "Specific evidence", "citations": [] },
-        "whatWouldChangeIt": { "text": "Specific actionable steps", "citations": [] }
+        "whatMakesThisTier": { "text": "Specific evidence from THIS activity", "citations": [] }
+      },
+      "upgradePathway": {
+        "currentTier": 3, "targetTier": 2,
+        "feasibility": "high|medium|low",
+        "timeRequired": "realistic estimate",
+        "steps": [{ "step": 1, "action": "Most impactful next step specific to THIS activity", "rationale": "Why", "milestone": "Concrete proof", "timeframe": "When" }],
+        "successIndicators": ["What an AO would see"],
+        "risks": ["Honest obstacles"]
       },
       "strengthTeaching": [
         {
@@ -1009,11 +1032,25 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
         "whatMakesThisTier": {
           "text": "Map their SPECIFIC description to the tier criteria. Quote their actual achievements.",
           "citations": []
-        },
-        "whatWouldChangeIt": {
-          "text": "Concrete, actionable steps to reach next tier. Use benchmarks from knowledge base.",
-          "citations": []
         }
+      },
+
+      "upgradePathway": {
+        "currentTier": "current tier number",
+        "targetTier": "next tier up",
+        "feasibility": "high|medium|low — honest assessment given this student's constraints and timeline",
+        "timeRequired": "realistic given their situation (e.g., '2-4 months' not 'soon')",
+        "steps": [
+          {
+            "step": 1,
+            "action": "Most impactful next step — specific to THIS activity (e.g., 'Submit IEEE paper revision with reviewer feedback addressed' not 'get published')",
+            "rationale": "What evidence this creates for admissions",
+            "milestone": "Concrete deliverable proving completion",
+            "timeframe": "Realistic deadline"
+          }
+        ],
+        "successIndicators": ["What an AO would see on the application that proves tier advancement"],
+        "risks": ["Honest obstacles — time constraints, competition difficulty, etc."]
       },
 
       "strengthTeaching": [
@@ -1625,11 +1662,12 @@ Remember: Students are counting on you to transform their applications. The know
       },
       benchmarksUsed: tierExplanation?.benchmarksUsed as ActivityTeaching['tierExplanation']['benchmarksUsed'] || [],
       whatMakesThisTier: tierExplanation?.whatMakesThisTier as ActivityTeaching['tierExplanation']['whatMakesThisTier'] || {
-        text: 'Based on recognition level and impact',
+        text: '',
         citations: [],
       },
+      // whatWouldChangeIt is now deprecated — upgrade guidance lives in upgradePathway
       whatWouldChangeIt: tierExplanation?.whatWouldChangeIt as ActivityTeaching['tierExplanation']['whatWouldChangeIt'] || {
-        text: 'Consider adding quantifiable metrics and leadership progression',
+        text: '',
         citations: [],
       },
     };

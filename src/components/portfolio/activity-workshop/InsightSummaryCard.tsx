@@ -20,6 +20,7 @@ import {
   TIER_LABELS,
 } from './insightTypes';
 import ScoreRing from './ScoreRing';
+import { TierHoverCard } from './AdmissionsContextCards';
 
 interface InsightSummaryCardProps {
   data: ActivityInsightData;
@@ -55,9 +56,11 @@ const InsightSummaryCardInner = function InsightSummaryCard({ data, onSelect }: 
               <div className="flex items-center gap-2 min-w-0 flex-1">
                 <h3 className="text-sm font-semibold truncate">{data.title}</h3>
                 <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-                  <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                    {tierLabel}
-                  </span>
+                  <TierHoverCard tier={data.tier}>
+                    <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground cursor-help">
+                      {tierLabel}
+                    </span>
+                  </TierHoverCard>
                   <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${getRoleBadgeClass(data.storyRole)}`}>
                     {roleCfg.label}
                   </span>
@@ -76,9 +79,11 @@ const InsightSummaryCardInner = function InsightSummaryCard({ data, onSelect }: 
             {/* Bottom row: metadata + strengths/improvements */}
             <div className="flex items-center gap-2 text-[10px]">
               {/* Mobile-only badges */}
-              <span className="sm:hidden text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                {tierLabel}
-              </span>
+              <TierHoverCard tier={data.tier}>
+                <span className="sm:hidden text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground cursor-help">
+                  {tierLabel}
+                </span>
+              </TierHoverCard>
               <span className="text-muted-foreground flex items-center gap-0.5">
                 <Clock className="h-2.5 w-2.5" />
                 {data.totalHours.toLocaleString()}h

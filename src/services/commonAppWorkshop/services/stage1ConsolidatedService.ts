@@ -41,6 +41,7 @@ import type {
   CollegeResearch,
   CollegeEssayPrompt,
 } from '../types/collegeResearch';
+import { writingPreAnalyzer, formatForCommonApp } from '../../../services/writingEngine';
 
 // ============================================================================
 // CONSTANTS
@@ -296,6 +297,9 @@ CITATION MAPPING (pre-selected relevant evidence):
 VOICE FINGERPRINT:
 {voiceFingerprint}
 
+COMPUTATIONAL WRITING SIGNALS:
+{computationalWritingSignals}
+
 ═══════════════════════════════════════════════════════════
 PART 1: CONCEPTUAL FOUNDATION
 ═══════════════════════════════════════════════════════════
@@ -535,7 +539,12 @@ export class Stage1ConsolidatedService {
       voiceContext
     );
 
-    // Step 2: Sonnet consolidated teaching
+    // Step 2: Writing pre-analysis (computational, <30ms, no LLM calls)
+    const preAnalysis = writingPreAnalyzer.analyze(essayDraft);
+    const enrichmentBlock = preAnalysis ? formatForCommonApp(preAnalysis) : null;
+    console.log(`[Stage1] Writing pre-analysis: ${preAnalysis?.computeTimeMs ?? 'disabled'}ms`);
+
+    // Step 3: Sonnet consolidated teaching
     console.log('  2/2: Running Sonnet consolidated teaching...');
 
     const prompt = STAGE1_CONSOLIDATED_PROMPT
@@ -548,7 +557,8 @@ export class Stage1ConsolidatedService {
       .replace('{authenticPhrases}', voiceContext.authenticPhrases.join('; '))
       .replace('{initialAnalysis}', JSON.stringify(initialAnalysis, null, 2))
       .replace('{citationMapping}', JSON.stringify(citationMapping, null, 2))
-      .replace('{voiceFingerprint}', JSON.stringify(voiceFingerprint, null, 2));
+      .replace('{voiceFingerprint}', JSON.stringify(voiceFingerprint, null, 2))
+      .replace('{computationalWritingSignals}', enrichmentBlock ? enrichmentBlock.content : '(feature disabled)');
 
     const response = await this.client.messages.create({
       model: SONNET_MODEL,

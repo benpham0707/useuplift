@@ -1150,47 +1150,12 @@ export class KnowledgeAssemblyService {
   formatForPrompt(context: ActivityKnowledgeContext): string {
     const sections: string[] = [];
 
-    // Section 1: Sara Harberson Tier Criteria
-    sections.push(`## SARA HARBERSON TIER CRITERIA
+    // Section 1: Tier summary (details in UI)
+    sections.push(`## ACTIVITY TIER: ${context.saraHarbersonCriteria.tierName} (Impact: ${context.saraHarbersonCriteria.admissionImpact})`);
 
-**Current Assessment: ${context.saraHarbersonCriteria.tierName}**
-
-${context.saraHarbersonCriteria.definition}
-
-**Evidence Required for This Tier:**
-${context.saraHarbersonCriteria.evidence.map((e) => `- ${e}`).join('\n')}
-
-**Examples at This Tier:**
-${context.saraHarbersonCriteria.examples.map((e) => `- ${e}`).join('\n')}
-
-**Admission Impact:** ${context.saraHarbersonCriteria.admissionImpact}`);
-
-    // Section 2: Category-Specific Benchmarks
-    sections.push(`## BENCHMARKS FOR ${context.categoryInsights.categoryName.toUpperCase()}
-
-**Competitive Context:**
-${context.categoryInsights.competitiveContext}
-
-**Top Achievements in This Category:**
-${context.categoryInsights.topAchievements.map((a) => `- ${a}`).join('\n')}
-
-**Common Mistakes to Avoid:**
-${context.categoryInsights.commonMistakes.map((m) => `- ${m}`).join('\n')}`);
-
-    // Section 3: Tier Benchmarks
-    const tierData = context.tierBenchmarks.find((t) => t.tier === context.saraHarbersonCriteria.tier);
-    if (tierData) {
-      sections.push(`## TIER ${tierData.tier} SPECIFIC CRITERIA
-
-**Name:** ${tierData.name}
-**Criteria:** ${tierData.criteria}
-
-**Key Metrics:**
-${tierData.metrics.map((m) => `- ${m}`).join('\n')}
-
-**Examples:**
-${tierData.examples.map((e) => `- ${e}`).join('\n')}`);
-    }
+    // Section 2: Category context (brief)
+    sections.push(`## CATEGORY: ${context.categoryInsights.categoryName.toUpperCase()}
+${context.categoryInsights.competitiveContext}`);
 
     // Section 4: Issue Teaching Bundles
     if (context.issueTeaching.length > 0) {

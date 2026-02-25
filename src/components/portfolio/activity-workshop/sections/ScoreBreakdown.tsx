@@ -283,20 +283,6 @@ function TierSection({
           <div className="pt-2 space-y-2">
             <ParagraphText text={tierExplanation.explanation} className="text-xs text-muted-foreground/90 leading-relaxed" />
 
-            {tierExplanation.whatMakesThisTier && (
-              <div>
-                <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">What makes this tier</span>
-                <ParagraphText text={tierExplanation.whatMakesThisTier} className="text-xs text-muted-foreground/80 leading-relaxed mt-0.5" />
-              </div>
-            )}
-
-            {tierExplanation.whatWouldChangeIt && (
-              <div>
-                <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">What would change it</span>
-                <ParagraphText text={tierExplanation.whatWouldChangeIt} className="text-xs text-muted-foreground/80 leading-relaxed mt-0.5" />
-              </div>
-            )}
-
             {tierExplanation.benchmarks.length > 0 && (
               <div className="space-y-1 pt-1">
                 <span className="text-[10px] font-semibold text-foreground/70 uppercase tracking-wider">Benchmarks</span>

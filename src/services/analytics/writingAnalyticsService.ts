@@ -163,6 +163,37 @@ export class WritingAnalyticsService {
     });
   }
 
+  /**
+   * Track a computational pre-analysis run.
+   * Called by WritingPreAnalyzer when enrichment is computed.
+   */
+  async trackAnalysisRun(
+    userId: string,
+    sessionId: string,
+    data: {
+      essayId?: string;
+      workshopType: 'common_app' | 'piq' | 'activity';
+      preAnalysisMs: number;
+      enrichmentTokens: number;
+      constraintViolationsFound?: number;
+      featureEnabled: boolean;
+    }
+  ): Promise<void> {
+    await this.insertEvent({
+      userId,
+      sessionId,
+      eventType: 'pre_analysis_run',
+      eventData: {
+        essayId: data.essayId,
+        workshopType: data.workshopType,
+        preAnalysisMs: data.preAnalysisMs,
+        enrichmentTokens: data.enrichmentTokens,
+        constraintViolationsFound: data.constraintViolationsFound,
+        featureEnabled: data.featureEnabled,
+      },
+    });
+  }
+
   // ==========================================================================
   // AGGREGATION QUERIES
   // ==========================================================================

@@ -255,6 +255,8 @@ Provide DEEP, EDUCATIONAL teaching that helps the student truly understand their
 
 Be specific to THIS student's activity. Reference the teaching knowledge base but personalize to their situation.
 
+CRITICAL: Your output must be specific to THIS student's actual text. Do not explain how admissions officers read applications, the committee pitch process, tier frameworks, or school archetypes — those are presented separately in the UI. Every sentence in your teaching must reference the student's actual description text.
+
 ## RESPOND IN THIS EXACT JSON FORMAT:
 
 {

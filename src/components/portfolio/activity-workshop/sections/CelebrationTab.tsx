@@ -12,7 +12,7 @@
  * showing label + score bar + score. Click to expand and see full rationale +
  * context badges. Prevents information overload while keeping depth accessible.
  */
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   CheckCircle,
   AlertTriangle,
@@ -28,9 +28,11 @@ import {
   Brain,
   FlaskConical,
   Quote,
+  Info,
 } from 'lucide-react';
 import type { ActivityInsightData } from '../insightTypes';
 import { getRoleConfig, getRoleBadgeClass, TIER_LABELS, getScoreTheme, ELEVATION_STRENGTH_BADGE } from '../insightTypes';
+import { TierHoverCard } from '../AdmissionsContextCards';
 import { ParagraphText, CollapsibleText } from '../RichText';
 
 // ============================================================================
@@ -160,20 +162,113 @@ function ContextBadge({ children, variant = 'default' }: { children: React.React
 // TIER SCALE — visual college tier alignment
 // ============================================================================
 
-const TIER_COLLEGE_LABELS: Record<number, { label: string; schools: string }> = {
-  4: { label: 'T4 Basic', schools: 'Participation level' },
-  3: { label: 'T3 Solid', schools: 'School recognition' },
-  2: { label: 'T2 Strong', schools: 'Regional / state level' },
-  1: { label: 'T1 Elite', schools: 'National / international' },
+const TIER_COLLEGE_LABELS: Record<number, {
+  label: string;
+  schools: string;
+  definition: string;
+  percentile: string;
+  examples: string;
+  source: string;
+}> = {
+  4: {
+    label: 'T4 Basic',
+    schools: 'Participation level',
+    definition: 'Participation without distinction — club membership, occasional volunteering, one-time events.',
+    percentile: '~70% of applicants\' activities fall here',
+    examples: 'Member of Spanish Club, participated in cultural events',
+    source: 'Sara Harberson 4-Tier Framework',
+  },
+  3: {
+    label: 'T3 Solid',
+    schools: 'School recognition',
+    definition: 'School-level distinction with meaningful commitment — leadership roles, school awards, multi-year growth.',
+    percentile: '~5–10% of students at competitive schools',
+    examples: 'Club president, team captain, school award winner with 2+ year commitment',
+    source: 'Sara Harberson 4-Tier Framework',
+  },
+  2: {
+    label: 'T2 Strong',
+    schools: 'Regional / state level',
+    definition: 'Significant achievement or leadership requiring sustained commitment with measurable impact beyond the immediate school community.',
+    percentile: 'Top 0.5–1% of their state',
+    examples: 'State competition winner, founded org reaching 100+ people, regional awards',
+    source: 'Sara Harberson 4-Tier Framework',
+  },
+  1: {
+    label: 'T1 Elite',
+    schools: 'National / international',
+    definition: 'National or international distinction — the rarest level of achievement among high school students.',
+    percentile: '<1% of applicants (~0.017% for top competitions)',
+    examples: 'USAMO/USACO qualifier, Regeneron finalist, published peer-reviewed research, D1 recruit',
+    source: 'Sara Harberson 4-Tier Framework',
+  },
 };
 
+function TierPopover({
+  tier,
+  isActive,
+  onClose,
+}: {
+  tier: typeof TIER_COLLEGE_LABELS[number];
+  isActive: boolean;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [onClose]);
+
+  return (
+    <div
+      ref={ref}
+      className="absolute z-50 top-full mt-1.5 left-1/2 -translate-x-1/2 w-56 rounded-lg bg-popover border border-border/30 shadow-lg p-2.5 animate-in fade-in-0 zoom-in-95 duration-150"
+    >
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold text-foreground/80">{tier.label}</span>
+          {isActive && (
+            <span className="text-[9px] font-medium text-teal-600 dark:text-teal-400 bg-teal-500/10 rounded px-1.5 py-0.5">
+              You are here
+            </span>
+          )}
+        </div>
+        <p className="text-[10px] text-foreground/65 leading-relaxed">{tier.definition}</p>
+        <div className="border-t border-border/10 pt-1.5 space-y-1">
+          <div className="flex items-start gap-1.5 text-[10px]">
+            <span className="text-muted-foreground/50 flex-shrink-0 w-12">Approx.</span>
+            <span className="text-foreground/60">{tier.percentile}</span>
+          </div>
+          <div className="flex items-start gap-1.5 text-[10px]">
+            <span className="text-muted-foreground/50 flex-shrink-0 w-12">Example</span>
+            <span className="text-foreground/60 italic">{tier.examples}</span>
+          </div>
+        </div>
+        <p className="text-[9px] text-muted-foreground/35 pt-0.5">{tier.source}</p>
+      </div>
+    </div>
+  );
+}
+
 function TierScale({ currentTier }: { currentTier: 1 | 2 | 3 | 4 }) {
+  const [openTier, setOpenTier] = useState<number | null>(null);
+
   const tiers = [
     { level: 4, color: 'bg-red-400', activeColor: 'bg-red-500' },
     { level: 3, color: 'bg-amber-400', activeColor: 'bg-amber-500' },
     { level: 2, color: 'bg-teal-400', activeColor: 'bg-teal-500' },
     { level: 1, color: 'bg-green-400', activeColor: 'bg-green-500' },
   ] as const;
+
+  const handleToggle = useCallback((level: number) => {
+    setOpenTier(prev => (prev === level ? null : level));
+  }, []);
+
+  const handleClose = useCallback(() => setOpenTier(null), []);
 
   return (
     <div className="space-y-1.5">
@@ -182,18 +277,37 @@ function TierScale({ currentTier }: { currentTier: 1 | 2 | 3 | 4 }) {
           const active = t.level === currentTier;
           const info = TIER_COLLEGE_LABELS[t.level];
           return (
-            <div key={t.level} className="flex-1 text-center">
-              <div className={`h-2 rounded-sm ${active ? t.activeColor : t.color} ${active ? '' : 'opacity-20'} transition-opacity`} />
-              <span className={`text-[9px] mt-0.5 block ${active ? 'font-semibold text-foreground/80' : 'text-muted-foreground/35'}`}>
-                {info.label}
-              </span>
-              <span className={`text-[8px] block leading-tight ${active ? 'text-muted-foreground/55' : 'text-muted-foreground/20'}`}>
-                {info.schools}
-              </span>
+            <div key={t.level} className="flex-1 text-center relative">
+              <button
+                type="button"
+                onClick={() => handleToggle(t.level)}
+                className="w-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded group"
+              >
+                <div className={`h-2 rounded-sm ${active ? t.activeColor : t.color} ${active ? '' : 'opacity-20'} transition-opacity group-hover:opacity-60`} />
+                <TierHoverCard tier={t.level}>
+                  <span className={`text-[9px] mt-0.5 block cursor-help ${active ? 'font-semibold text-foreground/80' : 'text-muted-foreground/35'} group-hover:text-foreground/60`}>
+                    {info.label}
+                  </span>
+                </TierHoverCard>
+                <span className={`text-[8px] block leading-tight ${active ? 'text-muted-foreground/55' : 'text-muted-foreground/20'}`}>
+                  {info.schools}
+                </span>
+              </button>
+              {openTier === t.level && (
+                <TierPopover
+                  tier={info}
+                  isActive={active}
+                  onClose={handleClose}
+                />
+              )}
             </div>
           );
         })}
       </div>
+      <p className="text-[8px] text-muted-foreground/30 flex items-center gap-0.5 justify-center">
+        <Info className="h-2.5 w-2.5" />
+        Tap any tier to learn more
+      </p>
     </div>
   );
 }
@@ -779,9 +893,11 @@ function OverviewTabInner({ data }: OverviewTabProps) {
 
             {/* Badges row */}
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-                {tierLabel}
-              </span>
+              <TierHoverCard tier={data.tier}>
+                <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground cursor-help">
+                  {tierLabel}
+                </span>
+              </TierHoverCard>
               <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${getRoleBadgeClass(data.storyRole)}`}>
                 {roleCfg.label}
               </span>
@@ -906,10 +1022,10 @@ function OverviewTabInner({ data }: OverviewTabProps) {
         <div className="rounded-xl bg-card/80 dark:bg-card/60 border border-border/15 p-4">
           <SectionHeader icon={GraduationCap} title="College Positioning" />
 
-          {/* Tier scale visualization */}
+          {/* Tier scale visualization — tap any tier for definitions */}
           <TierScale currentTier={data.tier} />
 
-          {/* Tier explanation */}
+          {/* Personalized tier explanation — why THIS activity earns its tier */}
           {data.tierExplanation.explanation && (
             <ParagraphText
               text={data.tierExplanation.explanation}
@@ -917,17 +1033,7 @@ function OverviewTabInner({ data }: OverviewTabProps) {
             />
           )}
 
-          {/* Tier justification */}
-          {data.tierJustification && (
-            <div className="mt-2">
-              <ParagraphText
-                text={data.tierJustification}
-                className="text-[11px] text-foreground/60 leading-relaxed"
-              />
-            </div>
-          )}
-
-          {/* Comparison benchmarks */}
+          {/* Comparison benchmarks — personalized per activity */}
           {data.comparisonBenchmarks && (
             <div className="mt-3 space-y-1.5 rounded-lg bg-muted/10 p-2.5">
               <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50">
@@ -950,31 +1056,8 @@ function OverviewTabInner({ data }: OverviewTabProps) {
             </div>
           )}
 
-          {/* What makes this tier */}
-          {data.tierExplanation.whatMakesThisTier && (
-            <div className="mt-3">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground/50">
-                What Places You Here
-              </span>
-              <ParagraphText
-                text={data.tierExplanation.whatMakesThisTier}
-                className="text-[11px] text-foreground/60 leading-relaxed mt-0.5"
-              />
-            </div>
-          )}
-
-          {/* How to move up */}
-          {data.tierExplanation.whatWouldChangeIt && (
-            <div className="mt-3 rounded-lg bg-indigo-50/30 dark:bg-indigo-950/15 border border-indigo-200/20 dark:border-indigo-800/20 p-2.5">
-              <span className="text-[9px] font-semibold uppercase tracking-wider text-indigo-600/70 dark:text-indigo-400/70">
-                How to Level Up
-              </span>
-              <ParagraphText
-                text={data.tierExplanation.whatWouldChangeIt}
-                className="text-[11px] text-foreground/65 leading-relaxed mt-1"
-              />
-            </div>
-          )}
+          {/* "How to Level Up" now lives in the Upgrade Pathway section (Next Steps tab)
+              with deeper, step-by-step guidance including feasibility, milestones, and timelines */}
 
           {/* Benchmarks checklist */}
           {data.tierExplanation.benchmarks.length > 0 && (

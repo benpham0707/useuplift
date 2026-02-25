@@ -71,8 +71,7 @@ Based on the analysis, provide EDUCATIONAL, ACTIONABLE guidance for EACH activit
         "assignedTier": 1|2|3|4,
         "explanation": "Detailed explanation of why this tier",
         "benchmarksUsed": [{"tier": 1|2|3|4, "benchmark": "specific benchmark", "source": "Sara Harberson Framework / Competition Database", "studentMeets": true|false, "gap": "what would be needed if not meeting"}],
-        "whatMakesThisTier": "clear criteria explanation",
-        "whatWouldChangeIt": "specific steps to move to next tier"
+        "whatMakesThisTier": "specific evidence from THIS activity"
       },
       "strengthTeaching": [{"strength": "name", "whyItMatters": "educational explanation", "howToLeverage": "specific advice", "inApplications": "how to present"}],
       "improvementTeaching": [{"issue": "specific issue", "whyItMatters": "why problematic", "howToFix": "actionable steps", "exampleBefore": "current phrasing", "exampleAfter": "improved version", "priority": "high|medium|low"}],
@@ -226,8 +225,8 @@ interface BatchTeachingResponse {
       assignedTier: number;
       explanation: string;
       benchmarksUsed: { tier: number; benchmark: string; source: string; studentMeets: boolean; gap?: string }[];
-      whatMakesThisTier: string;
-      whatWouldChangeIt: string;
+      whatMakesThisTier?: string;
+      whatWouldChangeIt?: string;
     };
     strengthTeaching: { strength: string; whyItMatters: string; howToLeverage: string; inApplications: string }[];
     improvementTeaching: { issue: string; whyItMatters: string; howToFix: string; exampleBefore: string; exampleAfter: string; priority: string }[];
@@ -422,8 +421,8 @@ export class BatchActivityTeachingService implements IActivityTeachingService {
               studentMeets: b.studentMeets,
               gap: b.gap,
             })),
-            whatMakesThisTier: createCitedText(teachingData.tierExplanation.whatMakesThisTier, tierCitations),
-            whatWouldChangeIt: createCitedText(teachingData.tierExplanation.whatWouldChangeIt, upgradeCitations),
+            whatMakesThisTier: createCitedText(teachingData.tierExplanation.whatMakesThisTier || '', tierCitations),
+            whatWouldChangeIt: createCitedText(teachingData.tierExplanation.whatWouldChangeIt || '', upgradeCitations),
           },
           strengthTeaching: teachingData.strengthTeaching.map(s => {
             const greenCitations = activityCitationService.getCitationsForGreenFlag(s.strength, activity);

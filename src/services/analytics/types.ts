@@ -10,7 +10,7 @@ export interface WritingAnalyticsEvent {
   id: string;
   userId: string;
   sessionId: string;
-  eventType: 'suggestion_shown' | 'suggestion_accepted' | 'suggestion_rejected' | 'score_change' | 'inline_edit' | 'command_used';
+  eventType: 'suggestion_shown' | 'suggestion_accepted' | 'suggestion_rejected' | 'score_change' | 'inline_edit' | 'command_used' | 'pre_analysis_run';
   eventData: Record<string, unknown>;
   createdAt: string;
 }

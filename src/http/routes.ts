@@ -9,6 +9,7 @@ import * as DevAuth from "./dev-auth";
 import { handleClerkWebhook } from "./webhooks/clerk";
 import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/analytics/portfolio";
 import activityChatRouter from "./activityChatRoutes";
+import { versionComparisonService, VersionScores, VersionEdit } from "@/services/analytics/versionComparisonService";
 
 const r = Router();
 
@@ -61,6 +62,49 @@ r.patch("/experiences/:id", requireAuth, Exp.update);
 // Analytics API
 r.get("/analytics/portfolio-strength", requireAuth, computePortfolioStrength);
 r.post("/analytics/reconcile", requireAuth, reconcilePortfolioStrength);
+
+// Version Comparison API
+r.post("/analytics/version-compare", requireAuth, async (req, res) => {
+  try {
+    const { oldVersion, newVersion, edits } = req.body as {
+      oldVersion: VersionScores;
+      newVersion: VersionScores;
+      edits?: VersionEdit[];
+    };
+
+    // Validate required fields
+    if (!oldVersion?.dimensionScores || !newVersion?.dimensionScores) {
+      return res.status(400).json({
+        success: false,
+        error: 'Both oldVersion and newVersion with dimensionScores are required',
+      });
+    }
+
+    if (typeof oldVersion.overallScore !== 'number' || typeof newVersion.overallScore !== 'number') {
+      return res.status(400).json({
+        success: false,
+        error: 'Both versions must include overallScore',
+      });
+    }
+
+    const comparison = versionComparisonService.compareVersions(oldVersion, newVersion, edits);
+    const summary = versionComparisonService.summarize(comparison);
+
+    return res.json({
+      success: true,
+      data: {
+        comparison,
+        summary,
+      },
+    });
+  } catch (error) {
+    console.error('[VersionCompare] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Version comparison failed',
+    });
+  }
+});
 
 // ============================================================================
 // Extracurricular Analysis Endpoint

@@ -28,6 +28,7 @@ import {
   TIER_LABELS,
 } from './insightTypes';
 import ScoreRing from './ScoreRing';
+import { TierHoverCard } from './AdmissionsContextCards';
 import { OverviewTab } from './sections/CelebrationTab';
 import { DescriptionOptimization } from './sections/DescriptionOptimization';
 import { NextStepsTab } from './sections/NextStepsTab';
@@ -78,9 +79,11 @@ const InsightDetailViewInner = function InsightDetailView({ data, onBack }: Insi
           <span className="text-xs font-bold text-muted-foreground/35">#{data.rank}</span>
           <h2 className="text-sm font-semibold truncate flex-1 min-w-0">{data.title}</h2>
           <div className="hidden sm:flex items-center gap-1 flex-shrink-0">
-            <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">
-              {tierLabel}
-            </span>
+            <TierHoverCard tier={data.tier}>
+              <span className="text-[9px] font-medium px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground cursor-help">
+                {tierLabel}
+              </span>
+            </TierHoverCard>
             <span className={`text-[9px] font-medium px-1.5 py-0.5 rounded-full ${getRoleBadgeClass(data.storyRole)}`}>
               {roleCfg.label}
             </span>
