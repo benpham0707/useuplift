@@ -271,7 +271,6 @@ function convertToLegacyTeaching(
         howToTalkAboutThis: { text: qe.celebration, citations: [] },
         uniqueAngle: 'Strong authentic engagement',
         connectionToStory: `Connects to your ${storyContext.narrativeIdentity.primaryTheme} narrative`,
-        interviewTips: ['Be ready to discuss your genuine passion'],
       },
     };
   }

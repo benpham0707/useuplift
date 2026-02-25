@@ -221,7 +221,7 @@ In rationale, explain the arc. Example: "Starting as a freshman participant and 
       "weight": 0.30,  // Tier
       "weightedScore": <score × weight>,
       "tier": <1|2|3|4>,
-      "rationale": "<SPECIFIC insight with comparative framing>"
+      "rationale": "<DO NOT restate the tier number, activity name, or generic tier definitions — the UI shows those. Jump straight to the specific evidence: what they did, their metrics, and how it compares to benchmarks. Max 2 sentences.>"
     },
     "recognitionLevel": {
       "score": <0-10>,

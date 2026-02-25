@@ -88,14 +88,12 @@ Based on the analysis, provide EDUCATIONAL, ACTIONABLE guidance for EACH activit
         "originalDescription": "current description",
         "optimizedDescription": "150-char optimized version",
         "characterCount": number,
-        "changesExplained": [{"change": "what changed", "reason": "why better"}],
         "alternativeVersions": ["optional alternatives"]
       },
       "narrativeGuidance": {
         "howToTalkAboutThis": "guidance on presenting",
         "uniqueAngle": "what makes distinctive",
         "connectionToStory": "broader narrative connection",
-        "interviewTips": ["tips for interviews"],
         "essayPotential": {"viable": true|false, "angle": "potential approach", "cautionAreas": ["what to avoid"]}
       }
     }
@@ -243,14 +241,14 @@ interface BatchTeachingResponse {
       originalDescription: string;
       optimizedDescription: string;
       characterCount: number;
-      changesExplained: { change: string; reason: string }[];
+      changesExplained?: { change: string; reason?: string }[];
       alternativeVersions?: string[];
     };
     narrativeGuidance: {
       howToTalkAboutThis: string;
       uniqueAngle: string;
       connectionToStory: string;
-      interviewTips: string[];
+      interviewTips?: string[];
       essayPotential?: { viable: boolean; angle: string; cautionAreas: string[] };
     };
   }>;
@@ -471,7 +469,6 @@ export class BatchActivityTeachingService implements IActivityTeachingService {
             howToTalkAboutThis: createCitedText(teachingData.narrativeGuidance.howToTalkAboutThis, []),
             uniqueAngle: teachingData.narrativeGuidance.uniqueAngle,
             connectionToStory: teachingData.narrativeGuidance.connectionToStory,
-            interviewTips: teachingData.narrativeGuidance.interviewTips,
             essayPotential: teachingData.narrativeGuidance.essayPotential,
           },
         };
@@ -608,7 +605,6 @@ export class BatchActivityTeachingService implements IActivityTeachingService {
         howToTalkAboutThis: { text: 'Focus on specific impact and personal growth', citations: [] },
         uniqueAngle: 'Highlight what makes your experience unique',
         connectionToStory: 'Connect to your broader narrative',
-        interviewTips: ['Be specific about your role', 'Quantify your impact', 'Show personal growth'],
       },
     };
   }

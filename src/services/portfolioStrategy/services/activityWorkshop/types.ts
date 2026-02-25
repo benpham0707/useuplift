@@ -568,7 +568,7 @@ export interface ActivityTeaching {
     characterCount: number;
     changesExplained: {
       change: string;
-      reason: string;
+      reason?: string;
     }[];
     alternativeVersions?: string[];
   };
@@ -578,7 +578,7 @@ export interface ActivityTeaching {
     howToTalkAboutThis: CitedText;
     uniqueAngle: string;
     connectionToStory: string;
-    interviewTips: string[];
+    interviewTips?: string[];
     essayPotential?: {
       viable: boolean;
       angle: string;

@@ -10,7 +10,7 @@ Intended Major: Computer Science
 
 [ActivityWorkshop v4.3] ══════════════════════════════════════
 [ActivityWorkshop v4.3] Starting PARALLEL PIPELINE
-[ActivityWorkshop v4.3] Session: 52fff6a4-dabf-46a1-9544-4ba48e9a2d29
+[ActivityWorkshop v4.3] Session: a58813a0-22cc-44c9-99f4-67d0c31c1710
 [ActivityWorkshop v4.3] Activities: 5
 [ActivityWorkshop v4.3] ══════════════════════════════════════
 
@@ -20,14 +20,14 @@ Intended Major: Computer Science
 [Stage0] Story detection failed, using fallback: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
     at Stage0StoryDetectionService.detectStory (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage0StoryDetectionService.ts:71:30)
-    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:421:60)
+    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:420:60)
     at runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:50)
     at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:896:1)
     at ModuleJob.run (node:internal/modules/esm/module_job:377:25)
     at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:689:26)
     at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
 [Stage0] Creating fallback story context
-[Stage 0] Complete in 3ms
+[Stage 0] Complete in 5ms
 [Stage 0] Archetype: leader
 [Stage 0] Story: A student with varied activities across different domains...
 [Stage 0] Spike Hypothesis: None
@@ -37,7 +37,7 @@ Intended Major: Computer Science
 [Stage 1] ─────────────────────────────────────────
 [Stage1] Starting context-aware analysis for 5 activities
 [Stage1] Running profiler on all activities...
-[Stage1] Profiler complete in 2ms
+[Stage1] Profiler complete in 1ms
 [Stage1] Analyzing 5 activities in 3 parallel sub-batches of ≤2...
 [Stage1] Running scoring orchestrator in parallel...
 [Stage1] Sub-batch 1/3: cs-club, research
@@ -45,8 +45,8 @@ Intended Major: Computer Science
 [Stage1] Sub-batch 3/3: farm
 [Stage1] Scoring orchestrator starting...
 [ScoringOrchestrator] Starting scoring for 5 activities
-[ScoringCache] Created session 6397460b-a9f4-46b5-b2cb-9df33812e345
-[ScoringOrchestrator] Cache: enabled=true, forceFresh=false, sessionId=6397460b-a9f4-46b5-b2cb-9df33812e345
+[ScoringCache] Created session 3cede4cf-420d-4b97-9ab8-1b988886218a
+[ScoringOrchestrator] Cache: enabled=true, forceFresh=false, sessionId=3cede4cf-420d-4b97-9ab8-1b988886218a
 [ScoringOrchestrator] Starting parallel description + activity scoring...
 [ScoringOrchestrator] Scoring descriptions...
 [ScoringOrchestrator] Scoring 5 descriptions (0 cached)
@@ -58,7 +58,7 @@ Intended Major: Computer Science
     at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:124:47)
     at Array.map (<anonymous>)
     at Stage1ContextAwareAnalysisService.analyze (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:118:16)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:436:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:435:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [SubBatchAnalysis] Error, using profiler fallback: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
@@ -66,7 +66,7 @@ Intended Major: Computer Science
     at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:124:47)
     at Array.map (<anonymous>)
     at Stage1ContextAwareAnalysisService.analyze (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:118:16)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:436:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:435:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [SubBatchAnalysis] Error, using profiler fallback: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
@@ -74,40 +74,40 @@ Intended Major: Computer Science
     at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:124:47)
     at Array.map (<anonymous>)
     at Stage1ContextAwareAnalysisService.analyze (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:118:16)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:436:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:435:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [DescriptionScoringService] Error scoring descriptions batch: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
     at DescriptionScoringService.scoreDescriptionsBatch (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/scoring/descriptionScoringService.ts:617:30)
     at ScoringOrchestrator.scoreDescriptionsWithCache (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/scoring/scoringOrchestrator.ts:536:58)
     at ScoringOrchestrator.scorePortfolio (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/scoring/scoringOrchestrator.ts:281:14)
-    at Stage1ContextAwareAnalysisService.runScoring (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:309:48)
+    at Stage1ContextAwareAnalysisService.runScoring (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:308:48)
     at Stage1ContextAwareAnalysisService.analyze (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:128:12)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:436:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:435:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [ActivityScoringService] Error scoring activities batch: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
     at ActivityScoringService.scoreActivitiesBatch (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/scoring/activityScoringService.ts:467:30)
     at ScoringOrchestrator.scoreActivitiesWithCache (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/scoring/scoringOrchestrator.ts:657:54)
     at ScoringOrchestrator.scorePortfolio (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/scoring/scoringOrchestrator.ts:285:14)
-    at Stage1ContextAwareAnalysisService.runScoring (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:309:48)
+    at Stage1ContextAwareAnalysisService.runScoring (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:308:48)
     at Stage1ContextAwareAnalysisService.analyze (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:128:12)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:436:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:435:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
-[ScoringOrchestrator] Parallel scoring complete in 4ms
-[Stage1] Scoring complete in 5ms (success=false)
-[Stage1] Parallel analysis + scoring complete in 6ms (3/3 sub-batches succeeded)
+[ScoringOrchestrator] Parallel scoring complete in 5ms
+[Stage1] Scoring complete in 6ms (success=false)
+[Stage1] Parallel analysis + scoring complete in 7ms (3/3 sub-batches succeeded)
 [Stage1] Merged 5 activity analyses
 [Stage1] Tier distribution (recomputed): T1=1, T2=0, T3=2, T4=2
 [Stage1] Getting story-enriched adjustments...
 [Stage1] Story adjustment failed, using base tiers: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
-    at Stage1ContextAwareAnalysisService.getStoryEnrichedAdjustments (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:351:30)
+    at Stage1ContextAwareAnalysisService.getStoryEnrichedAdjustments (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:350:30)
     at Stage1ContextAwareAnalysisService.analyze (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage1ContextAwareAnalysisService.ts:199:41)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:436:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:435:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [Stage1] Selecting teaching candidates...
-[Stage1] Analysis complete in 9ms
+[Stage1] Analysis complete in 10ms
 [Stage1] Teaching candidates: 2 deep, 0 medium, 2 quick
 [Stage1] Scoring: Not available (non-fatal)
 [Stage 1] Complete in 10ms
@@ -135,27 +135,27 @@ Intended Major: Computer Science
 [Stage2] Scoring data not available, skipping scoring teaching layer
 [Stage2] Encouragement generation failed: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
-    at Stage2ConditionalTeachingService.generateQuickEncouragements (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:2129:30)
+    at Stage2ConditionalTeachingService.generateQuickEncouragements (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:1988:30)
     at Stage2ConditionalTeachingService.teach (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:259:16)
-    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:455:68)
+    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:454:68)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [RAGService] Could not embed query, returning empty results
 [RAGService] Could not embed query, returning empty results
 [Stage2] Failed to process research, using knowledge fallback: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
-    at Stage2ConditionalTeachingService.processSingleActivity (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:630:28)
+    at Stage2ConditionalTeachingService.processSingleActivity (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:627:28)
     at async Promise.all (index 0)
     at async Promise.all (index 0)
     at async Stage2ConditionalTeachingService.teach (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:253:76)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:455:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:454:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [Stage2] Failed to process farm, using knowledge fallback: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
-    at Stage2ConditionalTeachingService.processSingleActivity (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:630:28)
+    at Stage2ConditionalTeachingService.processSingleActivity (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:627:28)
     at async Promise.all (index 1)
     at async Promise.all (index 0)
     at async Stage2ConditionalTeachingService.teach (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage2ConditionalTeachingService.ts:253:76)
-    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:455:29)
+    at async ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:454:29)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [Stage2] Generating portfolio teaching...
 [Stage2 Quality] Activities taught: 2
@@ -165,9 +165,9 @@ Intended Major: Computer Science
 [Stage2 Quality] Celebrations: 0/2
 [Stage2 Quality] Psychology References: 0
 [Stage2 Quality] Knowledge Application Score: 14
-[Stage2] Teaching complete in 4ms
+[Stage2] Teaching complete in 3ms
 [Stage2] Delivered: 2 teachings, 2 encouragements
-[Stage 2] Complete in 4ms
+[Stage 2] Complete in 3ms
 [Stage 2] Taught: 2 activities
 [Stage 2] Quick Encouragements: 2
 [Stage 2] Skipped: 1
@@ -180,15 +180,15 @@ Intended Major: Computer Science
 [Stage3] Synthesis failed: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
     at Stage3PortfolioSynthesisService.synthesize (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/stage3PortfolioSynthesisService.ts:83:30)
-    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:475:64)
-    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:490:7)
+    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:474:64)
+    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:489:7)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [PortfolioNarrative] Analysis failed: Error: ANTHROPIC_API_KEY not found in environment. For tests: add `import * as dotenv from "dotenv"; dotenv.config();` at the top of your test file. For production: ensure the environment variable is set.
     at callClaude (/Users/tuepham/uplift-final-final-18698-62030/src/lib/llm/claude.ts:425:15)
     at PortfolioNarrativeService.analyzeNarrative (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/portfolioNarrativeService.ts:199:30)
     at PortfolioNarrativeService.analyzeImprovedNarrative (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/stages/portfolioNarrativeService.ts:126:33)
-    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:496:67)
-    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:510:7)
+    at <anonymous> (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:495:67)
+    at ActivityWorkshopService.runPipeline (/Users/tuepham/uplift-final-final-18698-62030/src/services/portfolioStrategy/services/activityWorkshop/activityWorkshopService.ts:509:7)
     at async runTest (/Users/tuepham/uplift-final-final-18698-62030/tests/test-full-pipeline-e2e-output.ts:132:20)
 [PortfolioNarrative] Creating fallback narrative
 [Stage 3] Complete in 1ms
@@ -203,7 +203,7 @@ Intended Major: Computer Science
 
 [ActivityWorkshop v4.3] ══════════════════════════════════════
 [ActivityWorkshop v4.3] PIPELINE COMPLETE
-[ActivityWorkshop v4.3] Total time: 18ms
+[ActivityWorkshop v4.3] Total time: 19ms
 [ActivityWorkshop v4.3] Total cost: $0.0000
 [ActivityWorkshop v4.3] ──────────────────────────────────────
 [ActivityWorkshop v4.3] NARRATIVE SUMMARY:
@@ -319,14 +319,12 @@ TEACHING: Machine Learning Research [DEEP]
   RECOMMENDED DESCRIPTION:
   Original (189 chars): "Worked with professor on NLP project analyzing rural healthcare access patterns. Built data pipeline processing 50,000 patient records. Co-authored paper submitted to undergraduate journal."
   Recommended (189 chars): "Worked with professor on NLP project analyzing rural healthcare access patterns. Built data pipeline processing 50,000 patient records. Co-authored paper submitted to undergraduate journal."
-    - Apply teaching principles: Replace title with evidence: What CHANGED because of your leadership?
+    - Apply teaching: Replace title with evidence: What CHANGED because of your leadership?: undefined
 
   NARRATIVE GUIDANCE:
   How to talk about this: When discussing your Machine Learning Research, focus on First-author peer-reviewed publication. Lead with what makes YOUR experience specific, not the general category.
   Unique angle: What sets your Machine Learning Research apart is the specific context — emphasize what only YOU experienced.
   Story connection: This activity adds dimension to your story — it shows who you are beyond test scores and grades.
-  Interview tips:
-    - When discussing Machine Learning Research in interviews, avoid: Overstating contribution ("conducted research" vs "assisted with pipetting")
 
 ────────────────────────────────────────────────────────────────────────────────
 TEACHING: Family Farm Work [DEEP]
@@ -360,14 +358,12 @@ TEACHING: Family Farm Work [DEEP]
   RECOMMENDED DESCRIPTION:
   Original (110 chars): "Help on family farm during growing season. Drive equipment, manage irrigation, keep records of harvest yields."
   Recommended (110 chars): "Help on family farm during growing season. Drive equipment, manage irrigation, keep records of harvest yields."
-    - Apply teaching principles: Focus on: Scope numbers (people served, events organized, hours committed); Outcome metrics (dollars raised, improvements measured, participation increases)
+    - Apply teaching: Focus on: Scope numbers (people served, events organized, hours committed); Outcome metrics (dollars raised, improvements measured, participation increases): undefined
 
   NARRATIVE GUIDANCE:
   How to talk about this: When discussing your Family Farm Work, focus on Deep expertise in unusual field. Lead with what makes YOUR experience specific, not the general category.
   Unique angle: What sets your Family Farm Work apart is the specific context — emphasize what only YOU experienced.
   Story connection: This activity adds dimension to your story — it shows who you are beyond test scores and grades.
-  Interview tips:
-    - When discussing Family Farm Work in interviews, avoid: Not explaining why this matters
 
 
 💬 QUICK ENCOURAGEMENTS:

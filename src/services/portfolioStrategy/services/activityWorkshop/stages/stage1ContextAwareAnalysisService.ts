@@ -257,10 +257,9 @@ export class Stage1ContextAwareAnalysisService {
           const scoringTier = actScore.activityScore.breakdown.tierAssessment.tier;
 
           if (analysisTier && scoringTier && analysisTier !== scoringTier) {
-            // Tiers disagree — annotate the scoring rationale to acknowledge the discrepancy
+            // Tiers disagree — add concise context note (verbose explanation removed to reduce noise in downstream consumers)
             actScore.activityScore.breakdown.tierAssessment.rationale =
-              `[Context: Tier ${analysisTier}] ${actScore.activityScore.breakdown.tierAssessment.rationale} ` +
-              `Note: The contextual analysis (which factors in story arc and constraint adjustments) assigned Tier ${analysisTier} to this activity.`;
+              `[Contextual tier: ${analysisTier}] ${actScore.activityScore.breakdown.tierAssessment.rationale}`;
           }
         }
 

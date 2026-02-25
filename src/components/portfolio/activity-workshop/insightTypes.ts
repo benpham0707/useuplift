@@ -80,13 +80,13 @@ export interface ActivityInsightData {
     optimized: string;
     originalCharCount: number;
     optimizedCharCount: number;
-    changes: Array<{ change: string; reason: string }>;
+    changes: Array<{ change: string; reason?: string }>;
   } | null;
   narrativeGuidance: {
     howToTalkAboutThis: string;
     uniqueAngle: string;
     connectionToStory: string;
-    interviewTips: string[];
+    interviewTips?: string[];
   } | null;
 
   // Scoring detail

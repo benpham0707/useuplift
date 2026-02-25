@@ -133,9 +133,6 @@ Be specific, cite benchmarks, give concrete examples.
     "originalDescription": "current description",
     "optimizedDescription": "150-char optimized version for Common App",
     "characterCount": number,
-    "changesExplained": [
-      {"change": "what changed", "reason": "why it's better"}
-    ],
     "alternativeVersions": ["optional alternative phrasings"]
   },
 
@@ -143,7 +140,6 @@ Be specific, cite benchmarks, give concrete examples.
     "howToTalkAboutThis": "guidance on presenting this activity",
     "uniqueAngle": "what makes this distinctive",
     "connectionToStory": "how it connects to broader narrative",
-    "interviewTips": ["tips for discussing in interviews"],
     "essayPotential": {
       "viable": true|false,
       "angle": "potential essay approach",
@@ -422,14 +418,14 @@ export class ActivityTeachingService implements IActivityTeachingService {
           originalDescription: string;
           optimizedDescription: string;
           characterCount: number;
-          changesExplained: { change: string; reason: string }[];
+          changesExplained?: { change: string; reason?: string }[];
           alternativeVersions?: string[];
         };
         narrativeGuidance: {
           howToTalkAboutThis: string;
           uniqueAngle: string;
           connectionToStory: string;
-          interviewTips: string[];
+          interviewTips?: string[];
           essayPotential?: { viable: boolean; angle: string; cautionAreas: string[] };
         };
       }>(responseText);
@@ -508,7 +504,6 @@ export class ActivityTeachingService implements IActivityTeachingService {
           howToTalkAboutThis: createCitedText(parsed.narrativeGuidance.howToTalkAboutThis, []),
           uniqueAngle: parsed.narrativeGuidance.uniqueAngle,
           connectionToStory: parsed.narrativeGuidance.connectionToStory,
-          interviewTips: parsed.narrativeGuidance.interviewTips,
           essayPotential: parsed.narrativeGuidance.essayPotential,
         },
       };
@@ -693,7 +688,6 @@ export class ActivityTeachingService implements IActivityTeachingService {
         howToTalkAboutThis: { text: 'Unable to generate guidance - using fallback', citations: [] },
         uniqueAngle: 'Highlight what makes your experience unique',
         connectionToStory: 'Connect to your broader narrative',
-        interviewTips: ['Be specific', 'Show impact', 'Demonstrate growth'],
       },
     };
   }

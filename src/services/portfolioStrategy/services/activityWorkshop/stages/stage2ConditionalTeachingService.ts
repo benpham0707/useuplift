@@ -400,7 +400,6 @@ export class Stage2ConditionalTeachingService {
           if (transformation.rewrite?.changesApplied?.length) {
             descOpt.changesExplained = transformation.rewrite.changesApplied.map(c => ({
               change: c.element,
-              reason: c.rationale,
             }));
           }
         } else if (scoringRewrite) {
@@ -612,13 +611,11 @@ Respond with JSON for ONE activity:
     "originalDescription": "${activity.description.replace(/"/g, '\\"').substring(0, 200)}",
     "optimizedDescription": "your improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})${hasProfileData ? ' — MUST incorporate the verified facts from PERSONALIZED CONTEXT. Use the student\'s REAL metrics and achievements to write a description grounded in their actual experience, not generic improvements.' : ''}",
     "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
-    "changesExplained": [{ "change": "what changed", "reason": "why" }]
   },
   "narrativeGuidance": {
     "howToTalkAboutThis": { "text": "SPECIFIC framing advice for THIS activity only: exactly how to discuss it in interviews and essays. Focus on what makes THIS activity's contribution unique — do NOT re-explain the student's overall narrative or constraint background.", "citations": [] },
     "uniqueAngle": "ONE concrete detail that makes THIS student's version of this activity different from 1000 others doing the same thing.",
-    "connectionToStory": "One sentence: how this activity specifically complements their other activities. Name specific activities, don't re-derive the overall narrative.",
-    "interviewTips": ["Specific prep tip referencing THIS activity's details", "A concrete question they might get and how to answer it"]
+    "connectionToStory": "One sentence: how this activity specifically complements their other activities. Name specific activities, don't re-derive the overall narrative."
   }
 }`;
 
@@ -812,13 +809,11 @@ Respond with JSON:
         "originalDescription": "Their current description",
         "optimizedDescription": "Your improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})",
         "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
-        "changesExplained": [{ "change": "What changed", "reason": "Why" }]
       },
       "narrativeGuidance": {
         "howToTalkAboutThis": { "text": "SPECIFIC framing for THIS activity only. Do NOT re-explain narrative arc or constraints.", "citations": [] },
         "uniqueAngle": "ONE concrete detail that makes THIS student's version different from 1000 others",
-        "connectionToStory": "One sentence: how this activity complements their other activities (name them). Do NOT re-derive the overall narrative.",
-        "interviewTips": ["Specific prep tip for THIS activity", "Concrete question they might get and how to answer"]
+        "connectionToStory": "One sentence: how this activity complements their other activities (name them). Do NOT re-derive the overall narrative."
       }
     }
   ]
@@ -1107,15 +1102,7 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
       "descriptionOptimization": {
         "originalDescription": "Their COMPLETE current description (exact copy)",
         "optimizedDescription": "Your COMPLETE improved version (AIM FOR ${getDescriptionCharLimit(input.targetPlatform) - 5} chars or fewer — HARD LIMIT: ${getDescriptionCharLimit(input.targetPlatform)} chars for ${getPlatformName(input.targetPlatform)})",
-        "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10},
-        "transformationBreakdown": [
-          {
-            "originalPhrase": "Exact phrase from original",
-            "newPhrase": "Your replacement",
-            "principleApplied": "Which teaching bundle principle this uses",
-            "impact": "Why this change matters"
-          }
-        ]
+        "characterCount": ${getDescriptionCharLimit(input.targetPlatform) - 10}
       },
 
       "narrativeGuidance": {
@@ -1126,10 +1113,6 @@ Word count per activity: ${wordRange.min}-${wordRange.max} words
         "uniqueAngle": "ONE concrete detail from their description that makes THIS student's version different from 1000 others doing the same activity.",
         "connectionToStory": "One sentence: how this activity complements their other activities (name them). Do NOT re-derive the overall narrative.",
         "essayPotential": "A specific essay angle or moment from this activity — name the exact scene, challenge, or realization that would make a compelling essay",
-        "interviewTips": [
-          "A concrete question they might get about this activity and exactly how to answer it using their specific details",
-          "A common mistake to avoid when discussing this type of activity, with an alternative approach"
-        ],
         "commonMistakesToAvoid": ["From the category insights common_mistakes section"]
       }
     }
@@ -1363,7 +1346,7 @@ Remember: Students are counting on you to transform their applications. The know
         optimizedDescription: activity?.description || '', // Can't optimize without LLM
         characterCount: activity?.description?.length || 0,
         changesExplained: knowledge.issueTeaching.length > 0
-          ? [{ change: 'Apply teaching principles', reason: knowledge.issueTeaching[0].whatToDo.principle }]
+          ? [{ change: `Apply teaching: ${knowledge.issueTeaching[0].whatToDo.principle}` }]
           : [],
       },
       narrativeGuidance: {
@@ -1376,7 +1359,6 @@ Remember: Students are counting on you to transform their applications. The know
         connectionToStory: knowledge.fieldExpectations?.majorName
           ? `Your ${activity?.title || 'activity'} strengthens your ${knowledge.fieldExpectations.majorName} narrative by demonstrating hands-on engagement beyond academics.`
           : `This activity adds dimension to your story — it shows who you are beyond test scores and grades.`,
-        interviewTips: knowledge.categoryInsights.commonMistakes.slice(0, 1).map(m => `When discussing ${activity?.title || 'this activity'} in interviews, avoid: ${m}`),
       },
     };
   }
@@ -1689,13 +1671,8 @@ Remember: Students are counting on you to transform their applications. The know
     const charLimit = getDescriptionCharLimit(targetPlatform);
     const originalDescription = (optimization?.originalDescription as string) || activity?.description || '';
     let optimizedDescription = (optimization?.optimizedDescription as string) || '';
-    let changesExplained = (optimization?.changesExplained as ActivityTeaching['descriptionOptimization']['changesExplained']) || [];
-
-    // Sanitize LLM-provided changesExplained — truncate long reasons to concise summaries
-    changesExplained = changesExplained.map(c => ({
-      change: c.change,
-      reason: this.conciseChangeReason(c.reason),
-    }));
+    // changesExplained is no longer in the LLM prompt — derived from improvementTeaching instead
+    let changesExplained: ActivityTeaching['descriptionOptimization']['changesExplained'] = [];
 
     // Check if the LLM actually provided a different optimized description
     const hasRealOptimization = optimizedDescription.length > 0
@@ -1723,10 +1700,7 @@ Remember: Students are counting on you to transform their applications. The know
           changesExplained = normalizedImprovements
             .filter(imp => imp.issue && (imp.howToFix || imp.exampleAfter))
             .slice(0, 3)
-            .map(imp => ({
-              change: imp.issue,
-              reason: this.conciseChangeReason(imp.howToFix || ''),
-            }));
+            .map(imp => ({ change: imp.issue }));
         }
       }
     }
@@ -1742,10 +1716,7 @@ Remember: Students are counting on you to transform their applications. The know
       console.warn(`[Stage2] Description optimization for "${activity?.title}" is ${optimizedDescription.length} chars (limit: ${charLimit}). Adding warning.`);
       changesExplained = [
         ...changesExplained,
-        {
-          change: `Character count: ${optimizedDescription.length}/${charLimit}`,
-          reason: `This suggestion exceeds the ${getPlatformName(targetPlatform)} ${charLimit}-character limit by ${optimizedDescription.length - charLimit} characters. You'll need to trim it down — focus on keeping the strongest metrics and cutting filler words.`,
-        },
+        { change: `⚠ Over limit: ${optimizedDescription.length}/${charLimit} chars — trim by ${optimizedDescription.length - charLimit}` },
       ];
     }
 
@@ -1755,32 +1726,6 @@ Remember: Students are counting on you to transform their applications. The know
       characterCount: optimizedDescription.length,
       changesExplained,
     };
-  }
-
-  /**
-   * Convert a long howToFix paragraph into a concise change summary.
-   * Extracts the first actionable sentence instead of truncating mid-word.
-   */
-  private conciseChangeReason(text: string): string {
-    if (!text || text.length <= 120) return text;
-
-    // If it starts with "Step 1:" style, extract just the core action
-    const stepMatch = text.match(/^(?:Step \d+:\s*)?(.+?)(?:\.\s*Step \d+|$)/s);
-    if (stepMatch && stepMatch[1].length <= 150) {
-      const sentence = stepMatch[1].trim();
-      return sentence.endsWith('.') ? sentence : sentence + '.';
-    }
-
-    // Extract first complete sentence (ending in . ! or ?)
-    const sentenceMatch = text.match(/^(.+?[.!?])\s/);
-    if (sentenceMatch && sentenceMatch[1].length <= 150) {
-      return sentenceMatch[1];
-    }
-
-    // Truncate at a word boundary + ellipsis
-    const truncated = text.substring(0, 117);
-    const lastSpace = truncated.lastIndexOf(' ');
-    return (lastSpace > 60 ? truncated.substring(0, lastSpace) : truncated) + '...';
   }
 
   /**
@@ -1818,65 +1763,6 @@ Remember: Students are counting on you to transform their applications. The know
   }
 
   /**
-   * Generate category-specific interview tips.
-   * Each activity type gets different preparation questions.
-   */
-  private getCategorySpecificInterviewTips(category: string, title: string, strengths?: string[]): string[] {
-    const cat = category.toLowerCase();
-    const strengthNote = strengths?.length ? ` Your key differentiators: ${strengths.slice(0, 2).join(', ')}.` : '';
-
-    if (cat.includes('research') || cat.includes('stem') || cat.includes('academic')) {
-      return [
-        `Prepare to explain your research methodology in 2 minutes to someone without a technical background — AOs may not have STEM expertise.${strengthNote}`,
-        `Have a clear answer for: "What did YOU specifically contribute?" vs. what the lab/professor did. Distinguish your intellectual contribution from execution tasks.`,
-      ];
-    }
-    // Check family/farm BEFORE work — "work_family_responsibility" contains both
-    if (cat.includes('family') || cat.includes('caregiv') || cat.includes('farm')) {
-      return [
-        `If asked about family responsibilities, be matter-of-fact. State what you do, the scale, and the skills it built. Let the interviewer draw the "impressive" conclusion themselves.${strengthNote}`,
-        `Prepare to connect your family work to your academic interests: "Managing [farm/household/caregiving] taught me to think in systems — which is exactly what drew me to [your major]."`,
-      ];
-    }
-    if (cat.includes('work') || cat.includes('employ') || cat.includes('job')) {
-      return [
-        `When asked about challenges, have ONE specific story ready: a shift that went wrong, a difficult customer, a problem you solved. Be concrete, not general.${strengthNote}`,
-        `Prepare to answer: "What did this job teach you that you couldn't learn in school?" — connect your work skills to your academic or career goals.`,
-      ];
-    }
-    if (cat.includes('service') || cat.includes('volunteer') || cat.includes('tutor') || cat.includes('community') || cat.includes('education')) {
-      return [
-        `Have a specific student/person story ready — not "I helped many students" but "There was one student, Maria, who..." Personal stories are 10x more memorable than statistics.${strengthNote}`,
-        `Be ready to answer: "Why do you keep doing this?" — show sustained motivation beyond a requirement. What pulls you back each week?`,
-      ];
-    }
-    if (cat.includes('leader') || cat.includes('government') || cat.includes('council') || cat.includes('club')) {
-      return [
-        `Prepare your "what I changed" story: Before you led, X was true. After, Y was true. Use specific numbers if possible.${strengthNote}`,
-        `Have a ready answer for: "What was your biggest failure as a leader?" — AOs test for self-awareness and growth. Pick a real failure and what you learned.`,
-      ];
-    }
-    if (cat.includes('art') || cat.includes('music') || cat.includes('creative') || cat.includes('perform') || cat.includes('theater') || cat.includes('film')) {
-      return [
-        `Prepare to discuss your creative process, not just your achievements. AOs want to understand HOW you think creatively and what drives your artistic choices.${strengthNote}`,
-        `Have your "most meaningful piece/performance" story ready — not your biggest award, but the work that best represents who you are as an artist.`,
-      ];
-    }
-    if (cat.includes('athlet') || cat.includes('sport') || cat.includes('team')) {
-      return [
-        `Prepare a story about a setback or loss and how you responded — AOs use athletics to assess resilience and character, not just talent.${strengthNote}`,
-        `Be ready to discuss your role beyond your position: Did you mentor younger players? Change team culture? Create a training system?`,
-      ];
-    }
-
-    // Generic fallback
-    return [
-      `Prepare ONE specific story from ${title} that reveals your character — not your resume. AOs remember stories, not bullet points.${strengthNote}`,
-      `Have a clear answer for: "What would you miss most about ${title} if you had to stop?" — this reveals genuine passion vs. resume-building.`,
-    ];
-  }
-
-  /**
    * Normalize narrative guidance
    *
    * Handles multiple LLM response formats:
@@ -1906,22 +1792,6 @@ Remember: Students are counting on you to transform their applications. The know
     ];
     const lower = text.toLowerCase();
     return genericPatterns.filter(p => lower.includes(p)).length >= 2;
-  }
-
-  /**
-   * Detect if interview tips are templated mad-libs (same template with activity title swapped in).
-   */
-  private isTemplatedInterviewTips(tips: string[]): boolean {
-    if (!tips || tips.length === 0) return true;
-    const templateSignals = [
-      'prepare one specific story from',
-      'what would you miss most about',
-      'reveals genuine passion vs. resume-building',
-      'reveals your character — not your resume',
-      'aos remember stories, not bullet points',
-    ];
-    const lower = tips.join(' ').toLowerCase();
-    return templateSignals.filter(s => lower.includes(s)).length >= 2;
   }
 
   private normalizeNarrativeGuidance(
@@ -2019,19 +1889,8 @@ Remember: Students are counting on you to transform their applications. The know
       connectionToStory = this.getCategorySpecificStoryConnection(cat, title, context?.storyEssence, context?.narrativeArc);
     }
 
-    // Extract interviewTips — handle string or array
-    const rawTips = guidance?.interviewTips || guidance?.interview_tips;
-    let interviewTips: string[];
-    if (Array.isArray(rawTips) && !this.isTemplatedInterviewTips(rawTips.map(t => typeof t === 'string' ? t : String(t)))) {
-      interviewTips = rawTips.map(t => typeof t === 'string' ? t : String(t));
-    } else if (typeof rawTips === 'string' && !this.isGenericGuidance(rawTips)) {
-      interviewTips = [rawTips];
-    } else {
-      // Generate category-specific interview tips — NOT the same template for every activity
-      interviewTips = this.getCategorySpecificInterviewTips(cat, title, context?.strengths);
-    }
-
-    return { howToTalkAboutThis, uniqueAngle, connectionToStory, interviewTips };
+    // interviewTips removed from prompts — no longer generated or consumed
+    return { howToTalkAboutThis, uniqueAngle, connectionToStory };
   }
 
   /**

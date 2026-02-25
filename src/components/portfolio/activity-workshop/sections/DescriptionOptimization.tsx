@@ -67,7 +67,7 @@ export interface DescriptionOptimizationProps {
     optimized: string;
     originalCharCount: number;
     optimizedCharCount: number;
-    changes: Array<{ change: string; reason: string }>;
+    changes: Array<{ change: string; reason?: string }>;
   };
   improvementTeaching?: ImprovementIssue[];
   accentColor: string;
