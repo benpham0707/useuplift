@@ -663,3 +663,213 @@ export const ACTIVITY_TIER_NAMES = {
 export function getTierName(tier: 1 | 2 | 3 | 4): string {
   return ACTIVITY_TIER_NAMES[tier];
 }
+
+// ============================================================================
+// DECOMPOSED SCORING ARCHITECTURE TYPES
+// Internal types for the 4-phase scoring pipeline.
+// These are internal to the scoring layer — downstream consumers use the
+// existing types above (ActivityScore, ActivityScoreBreakdown, etc.)
+// ============================================================================
+
+/**
+ * Internal 6-tier classification (more granular than external 4-tier).
+ * Used by the tier classifier to constrain scoring ranges.
+ */
+export type InternalTier = 1 | 2 | 3 | 4 | 5 | 6;
+
+/**
+ * External 4-tier for backward compatibility with 50+ files.
+ * Maps from the 6-tier internal classification.
+ */
+export type ExternalTier = 1 | 2 | 3 | 4;
+
+/**
+ * Internal tier name definitions (6-tier system)
+ */
+export const INTERNAL_TIER_NAMES: Record<InternalTier, string> = {
+  1: 'Pinnacle (International/National Elite)',
+  2: 'National (National-Level Distinction)',
+  3: 'State/Regional (State/Regional Impact)',
+  4: 'School Leader (Strong School-Level)',
+  5: 'Active Participant (Committed Participation)',
+  6: 'Developing (Minimal Engagement)',
+} as const;
+
+/**
+ * Score range constraints per internal tier.
+ * Non-overlapping bands — a Tier 4 activity scores 4.0-5.4, never 5.5+.
+ * This is the structural guarantee that makes miscalibration impossible.
+ */
+export const TIER_SCORE_RANGES: Record<InternalTier, { min: number; max: number }> = {
+  1: { min: 9.0, max: 10.0 },  // 1.0 band — pinnacle is narrow by definition
+  2: { min: 7.0, max: 8.9 },   // 1.9 band — national distinction
+  3: { min: 5.5, max: 6.9 },   // 1.4 band — state/regional impact
+  4: { min: 4.0, max: 5.4 },   // 1.4 band — school standout
+  5: { min: 2.5, max: 3.9 },   // 1.4 band — active participant
+  6: { min: 1.0, max: 2.4 },   // 1.4 band — developing
+} as const;
+
+/**
+ * Per-component score constraints for each internal tier.
+ * Recognition is tightly constrained because it IS the tier definition.
+ * Community and Commitment have wider ranges because they partially transcend tier.
+ */
+export const TIER_COMPONENT_CONSTRAINTS: Record<InternalTier, {
+  recognition: { min: number; max: number };
+  leadership: { min: number; max: number };
+  community: { min: number; max: number };
+  commitment: { min: number; max: number };
+}> = {
+  1: { recognition: { min: 8, max: 10 }, leadership: { min: 7, max: 10 }, community: { min: 6, max: 10 }, commitment: { min: 7, max: 10 } },
+  2: { recognition: { min: 6, max: 9 },  leadership: { min: 5, max: 9 },  community: { min: 4, max: 9 },  commitment: { min: 5, max: 9 } },
+  3: { recognition: { min: 3, max: 7 },  leadership: { min: 3, max: 7 },  community: { min: 3, max: 8 },  commitment: { min: 3, max: 8 } },
+  4: { recognition: { min: 2, max: 5 },  leadership: { min: 2, max: 5 },  community: { min: 2, max: 6 },  commitment: { min: 2, max: 7 } },
+  5: { recognition: { min: 1, max: 3 },  leadership: { min: 1, max: 3 },  community: { min: 1, max: 5 },  commitment: { min: 1, max: 5 } },
+  6: { recognition: { min: 1, max: 2 },  leadership: { min: 1, max: 2 },  community: { min: 1, max: 3 },  commitment: { min: 1, max: 3 } },
+} as const;
+
+/**
+ * Mapping from 6 internal tiers to 4 external tiers for backward compatibility.
+ */
+export const INTERNAL_TO_EXTERNAL_TIER: Record<InternalTier, ExternalTier> = {
+  1: 1, // Pinnacle → Elite
+  2: 1, // National → Elite
+  3: 2, // State/Regional → Highly Competitive
+  4: 3, // School Leader → Competitive
+  5: 3, // Active Participant → Competitive
+  6: 4, // Developing → Participant
+} as const;
+
+/**
+ * Tier score for the tierAssessment.score component, computed deterministically
+ * from internal tier + number of matching signals.
+ */
+export const TIER_ASSESSMENT_SCORES: Record<InternalTier, { base: number; strong: number }> = {
+  1: { base: 9.5, strong: 10.0 },  // 2 signals → 9.5, 3+ → 10.0
+  2: { base: 7.5, strong: 8.5 },   // 2 signals → 7.5, 3+ → 8.5
+  3: { base: 6.0, strong: 6.5 },   // 2 signals → 6.0, 3+ → 6.5
+  4: { base: 4.5, strong: 5.0 },   // 2 signals → 4.5, 3+ → 5.0
+  5: { base: 3.0, strong: 3.5 },   // 1 signal → 3.0, 2+ → 3.5
+  6: { base: 1.5, strong: 2.0 },   // default → 1.5, 1 signal → 2.0
+} as const;
+
+/**
+ * Structured evidence extracted from activity description and metadata.
+ * Contains ONLY facts — no judgments, no scores, no tiers.
+ * Produced by Phase 1 (Evidence Extraction via Haiku).
+ */
+export interface ExtractedEvidence {
+  /** What scope does this activity operate at? */
+  scope: {
+    level: 'school' | 'local' | 'regional' | 'state' | 'national' | 'international';
+    confidence: number;  // 0-1, how clearly stated
+    evidence: string;    // The text that supports this classification
+  };
+
+  /** All recognitions/awards mentioned or implied */
+  recognitions: Array<{
+    name: string;
+    level: 'school' | 'local' | 'regional' | 'state' | 'national' | 'international';
+    isVerifiable: boolean;  // Is this a known, real award/competition?
+    selectivityContext?: string; // "top 500 of 300K" if extractable
+  }>;
+
+  /** Role and leadership signals */
+  role: {
+    title: string;
+    type: 'founder' | 'president_captain' | 'executive' | 'team_lead' | 'contributor' | 'participant' | 'member';
+    isLeadershipApplicable: boolean;  // false for solo research, individual competitions, etc.
+    evidence: string;
+  };
+
+  /** Quantified impact */
+  impact: {
+    hasQuantifiedOutcomes: boolean;
+    metrics: Array<{
+      value: string;
+      unit: string;
+      context: string;
+      isVerifiable: boolean;
+    }>;
+    estimatedPeopleReached: number | null;
+    tangibleOutcomes: string[];
+  };
+
+  /** Commitment signals */
+  commitment: {
+    yearsActive: number;
+    hoursPerWeek: number;
+    weeksPerYear: number;
+    showsProgression: boolean;
+    progressionArc: string | null;  // "member → captain → mentor" if detectable
+    sustainedThroughJunior: boolean;
+  };
+
+  /** Character and community signals */
+  character: {
+    primaryTrait: 'service' | 'innovation' | 'resilience' | 'curiosity' | 'empathy' | 'discipline' | 'creativity' | 'integrity';
+    communityBenefit: 'significant' | 'moderate' | 'minimal' | 'self-focused';
+    authenticitySignals: string[];   // Specific details that suggest genuine engagement
+    paddingSignals: string[];        // Red flags suggesting resume inflation
+  };
+
+  /** Category match from benchmarks library */
+  categoryMatch: {
+    category: string;                // Key from BENCHMARKS_BY_CATEGORY
+    confidence: 'high' | 'medium' | 'low';
+  };
+
+  /** Raw extraction confidence — how much useful signal was in the description */
+  overallSignalStrength: 'strong' | 'moderate' | 'weak';
+}
+
+/**
+ * A signal that contributed to (or failed to contribute to) a tier classification.
+ * Used for transparency and debugging — every classification can be explained
+ * by listing which rules fired.
+ */
+export interface TierSignal {
+  /** Rule identifier, e.g., "T1_NATIONAL_RECOGNITION" */
+  rule: string;
+  /** Whether this signal matched */
+  matched: boolean;
+  /** What specific evidence triggered or failed this rule */
+  evidence: string;
+  /** How strong this signal is (0-1) */
+  weight: number;
+}
+
+/**
+ * Complete tier classification result from the deterministic classifier.
+ * Produced by Phase 2 (Tier Classification — pure code, no LLM).
+ */
+export interface TierClassification {
+  /** Internal 6-tier classification (used for score constraints) */
+  internalTier: InternalTier;
+
+  /** External 4-tier mapping (for ActivityScore.breakdown.tierAssessment.tier) */
+  externalTier: ExternalTier;
+
+  /** How confident we are in this classification */
+  confidence: 'high' | 'medium' | 'low';
+
+  /** Which rules triggered this tier */
+  signals: TierSignal[];
+
+  /** Valid TOTAL score range — Phase 3 output MUST fall within this band */
+  scoreRange: { min: number; max: number };
+
+  /** Per-component score constraints for Phase 3 */
+  componentConstraints: {
+    recognition: { min: number; max: number };
+    leadership: { min: number; max: number };
+    community: { min: number; max: number };
+    commitment: { min: number; max: number };
+  };
+
+  /** The tierAssessment.score (0-10) derived deterministically from tier + signal strength */
+  tierScore: number;
+
+  /** Human-readable explanation of why this tier was assigned */
+  reasoning: string;
+}

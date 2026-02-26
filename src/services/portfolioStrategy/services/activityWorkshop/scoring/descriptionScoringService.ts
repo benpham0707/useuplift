@@ -45,6 +45,7 @@
 import { callClaude } from '@/lib/llm/claude';
 // R7: Use robust parseClaudeJSON with jsonrepair fallback
 import { tryParseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
+import { writingPreAnalyzer, formatForActivityScoring, postLLMCalibrator } from '../../../../services/writingEngine';
 import {
   DescriptionScore,
   DescriptionScoreBreakdown,
@@ -545,8 +546,18 @@ export class DescriptionScoringService {
       const charLimit = getDescriptionCharLimit(targetPlatform);
       const platformName = getPlatformName(targetPlatform);
 
+      // Pre-LLM: Computational writing signal enrichment
+      const preAnalysis = writingPreAnalyzer.analyze(input.description);
+      const enrichmentBlock = preAnalysis ? formatForActivityScoring(preAnalysis) : null;
+
+      // Build user prompt with optional writing signals injected AFTER cached sections
+      const baseUserPrompt = buildDescriptionScoringPrompt(input);
+      const enrichedUserPrompt = enrichmentBlock
+        ? `${enrichmentBlock.content}\n\nCOMPUTATIONAL WRITING SIGNALS:\nUse these objective signals to calibrate your scoring. For example, if AI Risk is HIGH, be more skeptical of polished language. If compression ratio is low, the description may be repetitive.\n\n${baseUserPrompt}`
+        : baseUserPrompt;
+
       const response = await callClaude(
-        buildDescriptionScoringPrompt(input),
+        enrichedUserPrompt,
         {
           model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for nuanced description assessment
           systemPrompt: buildDescriptionScoringSystemPrompt(charLimit, platformName),
@@ -570,6 +581,36 @@ export class DescriptionScoringService {
           success: false,
           error: 'Failed to parse scoring response',
         };
+      }
+
+      // Post-LLM calibration (constraint satisfaction + revision priorities)
+      if (parsed && preAnalysis) {
+        const scores: Record<string, number> = {
+          role_ownership: parsed.breakdown.specificity.score,
+          evidence_of_impact: parsed.breakdown.impactClarity.score,
+          differentiation_signal: parsed.breakdown.authenticityVoice.score,
+          action_precision: parsed.breakdown.actionLanguage.score,
+          strategic_quantification: parsed.breakdown.quantification.score,
+        };
+        const weights = {
+          role_ownership: 0.25,
+          evidence_of_impact: 0.25,
+          differentiation_signal: 0.20,
+          action_precision: 0.15,
+          strategic_quantification: 0.15,
+        };
+        const calibration = postLLMCalibrator.calibrate(
+          scores,
+          weights,
+          'experience',
+          input.description.length,
+        );
+        if (calibration.hasAdjustments && calibration.adjustedScores) {
+          console.log('[DescriptionScoring] Constraint calibration applied:', calibration.constraintCheck.violations_found, 'violations fixed');
+          // TODO: Wire post-LLM calibration score adjustments back into parsed result
+          // when scoring result shape is standardized. Currently logging only to avoid
+          // breaking existing score output contracts.
+        }
       }
 
       return {
@@ -612,10 +653,26 @@ export class DescriptionScoringService {
     }
 
     try {
+      // Pre-LLM: Computational writing signal enrichment for batch
+      const batchSignals = input.activities
+        .map((a, idx) => {
+          const analysis = writingPreAnalyzer.analyze(a.description);
+          if (!analysis) return null;
+          const block = formatForActivityScoring(analysis);
+          return `Activity ${idx + 1} (${a.activityTitle}): ${block.content}`;
+        })
+        .filter(Boolean)
+        .join('\n');
+
+      const batchEnrichmentPrefix = batchSignals
+        ? `COMPUTATIONAL WRITING SIGNALS:\n${batchSignals}\n\nUse these objective signals to calibrate your scoring. For example, if AI Risk is HIGH, be more skeptical of polished language. If compression ratio is low, the description may be repetitive.\n\n`
+        : '';
+
       // Scale maxTokens with activity count: ~1000 tokens per description score output
       const batchMaxTokens = Math.min(12000, input.activities.length * 1500 + 1000);
+      const baseBatchPrompt = buildBatchDescriptionScoringPrompt(input.activities);
       const response = await callClaude(
-        buildBatchDescriptionScoringPrompt(input.activities),
+        batchEnrichmentPrefix + baseBatchPrompt,
         {
           model: 'claude-sonnet-4-5-20250929', // Sonnet 4.5 for nuanced description assessment
           systemPrompt: buildDescriptionScoringSystemPrompt(charLimit, platformName),

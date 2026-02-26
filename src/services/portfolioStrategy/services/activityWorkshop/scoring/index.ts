@@ -158,3 +158,43 @@ export {
   type TeachingProfileContext,
   type ProfileEnhancedTeachingInput,
 } from './profileIntegrationService';
+
+// Feature Extraction — Layer 1 of cognitive decomposition
+// Haiku-powered extraction of structured features (no judgment, no scoring)
+export * from './featureTypes';
+
+export {
+  FeatureExtractorService,
+  featureExtractorService,
+} from './featureExtractor';
+
+// Tier Classifier — Layer 2 deterministic tier classification
+// Pure code, no LLM — maps ExtractedEvidence to TierClassification
+export {
+  TierClassifierService,
+  tierClassifierService,
+  classifyTier,
+  clampToTierRange,
+  clampComponentScore,
+  getInternalTierName,
+  getTierScoreRange,
+  getTierComponentConstraints,
+  toExternalTier,
+} from './tierClassifier';
+
+// Scoring Rules — Layer 3 constants (verb hierarchy, weights, lookup tables)
+export * from './scoringRules';
+
+// Description Rule Scorer — Layer 3a deterministic description scoring
+// Pure code, no LLM — maps ExtractedDescriptionFeatures to DescriptionScore
+export {
+  DescriptionRuleScorerService,
+  descriptionRuleScorerService,
+} from './descriptionRuleScorer';
+
+// Activity Rule Scorer — Layer 3b deterministic activity scoring
+// Pure code, no LLM — maps ExtractedEvidence + TierClassification to ActivityScore
+export {
+  ActivityRuleScorerService,
+  activityRuleScorerService,
+} from './activityRuleScorer';

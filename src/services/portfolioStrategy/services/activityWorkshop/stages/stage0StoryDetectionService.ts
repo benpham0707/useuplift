@@ -40,6 +40,7 @@ import {
 } from '../types';
 import { ActivityProfile } from '../profile/types';
 import { profileBridgeService } from '../profileBridge';
+import { writingPreAnalyzer, formatForActivityDescription } from '../../../../services/writingEngine';
 
 /**
  * Stage 0: Story Detection Service
@@ -115,6 +116,21 @@ export class Stage0StoryDetectionService {
       .map((a, i) => this.formatActivity(a, i + 1, activityProfiles))
       .join('\n\n');
 
+    // Pre-analyze activity descriptions for computational writing signals
+    const activitySignals = activities
+      .map(a => {
+        const analysis = writingPreAnalyzer.analyze(a.description);
+        return analysis ? `${a.title}: ${formatForActivityDescription(analysis).content}` : null;
+      })
+      .filter(Boolean)
+      .join('\n');
+
+    const writingSignalsSection = activitySignals
+      ? `\nWRITING SIGNALS (computational pre-analysis):\n${activitySignals}\n`
+      : '';
+
+    console.log(`[Stage0] Pre-analyzed ${activities.length} activity descriptions`);
+
     // Format student context if available
     const contextText = studentContext
       ? `
@@ -131,7 +147,7 @@ STUDENT CONTEXT:
 
     return `Analyze this student's activities to understand WHO they are.
 
-${contextText}
+${contextText}${writingSignalsSection}
 ACTIVITIES (${activities.length} total):
 
 ${activitiesText}
