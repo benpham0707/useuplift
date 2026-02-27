@@ -236,7 +236,7 @@ export const ActivityScoreDashboard: React.FC<ActivityScoreDashboardProps> = ({ 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="w-full flex flex-col lg:flex-row gap-4 items-stretch"
+      className="w-full flex flex-col lg:flex-row gap-4 items-start"
     >
       {/* Left Column: Holographic Score Card — fixed width, stable during view swaps */}
       <div className="w-full lg:w-[340px] flex-shrink-0">

@@ -76,11 +76,14 @@ export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, se
   const [expandedId, setExpandedId] = useState<string | null>(issues[0]?.id || null);
 
   const toggleExpand = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
+    const next = expandedId === id ? null : id;
+    setExpandedId(next);
+    // When expanding, lock the highlight on; when collapsing, clear it
+    setActiveIssueId(next);
   };
 
   return (
-    <div className="flex flex-col w-full py-2">
+    <div className="flex flex-col gap-1 w-full pt-1 pb-3">
       {issues.map((issue, index) => {
         const isHigh = issue.severity === "high";
         const isExpanded = expandedId === issue.id;
@@ -93,7 +96,10 @@ export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, se
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.12 + index * 0.06, type: "spring", stiffness: 140, damping: 20 }}
             onMouseEnter={() => setActiveIssueId(issue.id)}
-            onMouseLeave={() => setActiveIssueId(null)}
+            onMouseLeave={() => {
+              // Only clear if this issue isn't the expanded one
+              if (expandedId !== issue.id) setActiveIssueId(expandedId);
+            }}
             className="relative"
           >
             {/* ── Trigger Row ── */}

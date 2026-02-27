@@ -132,13 +132,15 @@ function ActivityWorkshopDescriptionInner(props: ActivityWorkshopDescriptionProp
         className="flex flex-col gap-0"
       >
         {/* ── Unified Diagnostic Console ── */}
-        <div className="relative flex flex-col rounded-xl border border-border bg-white overflow-hidden transition-colors duration-200 hover:border-purple-500/30">
+        <div className="group relative flex flex-col rounded-xl border-2 border-border/80 bg-white overflow-hidden transition-colors duration-200 hover:border-purple-500/30">
           {/* Text Analysis (Before → Suggested) */}
           <TextUpgradeForge data={workshopData} activeIssueId={activeIssueId} />
 
           {/* Tether + Accordion */}
           {hasIssues && (
-            <div className="border-t border-border/40">
+            <div className="relative">
+              {/* Separator — horizontal line with rounded top corners curving into the outer border */}
+              <div className="mx-[-2px] h-3 border-t-2 border-l-2 border-r-2 border-border/80 rounded-t-xl transition-colors duration-200 group-hover:border-purple-500/30" />
               <CritiqueAccordion issues={workshopData.issues} setActiveIssueId={setActiveIssueId} />
             </div>
           )}

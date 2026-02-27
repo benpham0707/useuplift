@@ -107,7 +107,7 @@ function StatBar({
 
   return (
     <div className="w-full">
-      <div className={cn('flex justify-between mb-2', isDetail ? 'items-center' : 'items-end')}>
+      <div className={cn('flex justify-between', isDetail ? 'items-center mb-2' : 'items-end mb-1.5')}>
         <div className="flex items-center gap-2 min-w-0">
           <span
             className={cn(
@@ -273,7 +273,7 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
   const handleClose = useCallback(() => setSelectedStat(null), []);
 
   return (
-    <div className="relative w-full glass-card rounded-2xl p-4 md:p-6 border border-border/15 overflow-hidden">
+    <div className="relative w-full h-full glass-card rounded-2xl p-4 md:p-5 border border-border/15 overflow-hidden">
       {/* Subtle tech grid background */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.03]"
@@ -294,10 +294,10 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
         style={{ willChange: 'opacity, transform' }}
         className={cn('overflow-hidden relative z-[1]', selectedStat && 'pointer-events-none')}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
           {/* Activity Column */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-border/10 pb-2 mb-1">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between border-b border-border/10 pb-1.5 mb-0.5">
               <div
                 className="flex items-center gap-1.5 font-extrabold tracking-widest uppercase text-[10px]"
                 style={{ color: CATEGORY_COLOR.activity }}
@@ -312,7 +312,7 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
               <div
                 key={stat.id}
                 onClick={() => setSelectedStat(stat)}
-                className="group cursor-pointer p-3 -mx-1.5 rounded-xl hover:bg-foreground/[0.03] border border-transparent hover:border-foreground/10 transition-all duration-200"
+                className="group cursor-pointer py-2 px-2.5 -mx-1 rounded-lg hover:bg-foreground/[0.03] border border-transparent hover:border-foreground/10 transition-all duration-200"
               >
                 <StatBar stat={stat} />
               </div>
@@ -320,8 +320,8 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
           </div>
 
           {/* Narrative Column */}
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-between border-b border-border/10 pb-2 mb-1">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between border-b border-border/10 pb-1.5 mb-0.5">
               <div
                 className="flex items-center gap-1.5 font-extrabold tracking-widest uppercase text-[10px]"
                 style={{ color: CATEGORY_COLOR.narrative }}
@@ -336,7 +336,7 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
               <div
                 key={stat.id}
                 onClick={() => setSelectedStat(stat)}
-                className="group cursor-pointer p-3 -mx-1.5 rounded-xl hover:bg-foreground/[0.03] border border-transparent hover:border-foreground/10 transition-all duration-200"
+                className="group cursor-pointer py-2 px-2.5 -mx-1 rounded-lg hover:bg-foreground/[0.03] border border-transparent hover:border-foreground/10 transition-all duration-200"
               >
                 <StatBar stat={stat} />
               </div>

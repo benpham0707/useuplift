@@ -142,9 +142,9 @@ export const TextUpgradeForge: React.FC<TextUpgradeForgeProps> = ({ data, active
         </p>
       </motion.div>
 
-      {/* ARROW DIVIDER */}
-      <div className="relative z-10 flex justify-center -my-1">
-        <div className="bg-white border border-border/60 rounded-full p-1.5 shadow-sm">
+      {/* DIVIDER with arrow */}
+      <div className="relative z-10 border-t border-border/60">
+        <div className="absolute left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white border border-border/60 rounded-full p-1.5">
           <ArrowDown className="w-3.5 h-3.5 text-muted-foreground/60" />
         </div>
       </div>

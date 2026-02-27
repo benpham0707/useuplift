@@ -286,17 +286,25 @@ export async function calibrateActivity(
   };
 
   try {
-    const response = await callClaudeWithRetry(prompt, options, 2);
+    const response = await callClaudeWithRetry<CalibrationLLMResponse>(prompt, options, 2);
 
-    // Parse response
-    const parsed = tryParseClaudeJSON<CalibrationLLMResponse>(
-      response.content,
-      'nuance-calibration'
-    );
+    // callClaudeWithRetry with useJsonMode:true already parses JSON into response.content
+    // If it's already an object, use directly; if string (fallback), parse it
+    const rawContent = response.content;
+    let parsed: CalibrationLLMResponse | null;
+    if (typeof rawContent === 'object' && rawContent !== null) {
+      parsed = rawContent as CalibrationLLMResponse;
+    } else {
+      parsed = tryParseClaudeJSON<CalibrationLLMResponse>(
+        String(rawContent),
+        'nuance-calibration'
+      );
+    }
 
     if (!parsed || !Array.isArray(parsed.adjustments)) {
       // Parse failed — fall back to uncalibrated scores
-      console.warn('[NuanceCalibration] Failed to parse LLM response, using uncalibrated scores');
+      const rawStr = typeof rawContent === 'string' ? rawContent.substring(0, 200) : JSON.stringify(rawContent).substring(0, 200);
+      console.warn('[NuanceCalibration] Failed to parse LLM response, using uncalibrated scores. Raw:', rawStr);
       return {
         adjustedActivityTotal: activityScore.total,
         adjustedComponents: {

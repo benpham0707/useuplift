@@ -11,13 +11,26 @@
  * - Component adjustments respect magnitude caps
  */
 
+// Load env BEFORE any imports that use ANTHROPIC_API_KEY
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') });
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+const _f = fileURLToPath(import.meta.url);
+const _d = path.dirname(_f);
+dotenv.config({ path: path.resolve(_d, '..', '.env.local'), override: true });
+dotenv.config({ path: path.resolve(_d, '..', '.env'), override: false });
+
+// Force the key into process.env if dotenv loaded it
+// (handles ESM module ordering where claude.ts may check before dotenv runs)
+if (!process.env.ANTHROPIC_API_KEY) {
+  // Read .env.local manually as fallback
+  const fs = await import('fs');
+  const envContent = fs.readFileSync(path.resolve(_d, '..', '.env.local'), 'utf-8');
+  const match = envContent.match(/^ANTHROPIC_API_KEY=(.+)$/m);
+  if (match) {
+    process.env.ANTHROPIC_API_KEY = match[1].trim();
+  }
+}
 
 import { calibrateActivity } from '../src/services/portfolioStrategy/services/activityWorkshop/scoring/nuanceCalibrationService';
 import { classifyTier } from '../src/services/portfolioStrategy/services/activityWorkshop/scoring/tierClassifier';
