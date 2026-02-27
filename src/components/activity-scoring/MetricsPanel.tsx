@@ -273,7 +273,7 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
   const handleClose = useCallback(() => setSelectedStat(null), []);
 
   return (
-    <div className="relative w-full h-full glass-card rounded-2xl p-4 md:p-5 border border-border/15 overflow-hidden">
+    <div className="relative w-full h-full glass-card rounded-2xl p-4 md:p-5 border border-border/15 overflow-hidden flex flex-col">
       {/* Subtle tech grid background */}
       <div
         className="absolute inset-0 pointer-events-none opacity-[0.03]"
@@ -292,11 +292,11 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
         }
         transition={{ duration: 0.15, ease: 'easeOut' }}
         style={{ willChange: 'opacity, transform' }}
-        className={cn('overflow-hidden relative z-[1]', selectedStat && 'pointer-events-none')}
+        className={cn('overflow-hidden relative z-[1] flex-1', selectedStat && 'pointer-events-none')}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 h-full">
           {/* Activity Column */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col justify-between">
             <div className="flex items-center justify-between border-b border-border/10 pb-1.5 mb-0.5">
               <div
                 className="flex items-center gap-1.5 font-extrabold tracking-widest uppercase text-[10px]"
@@ -320,7 +320,7 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
           </div>
 
           {/* Narrative Column */}
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col justify-between">
             <div className="flex items-center justify-between border-b border-border/10 pb-1.5 mb-0.5">
               <div
                 className="flex items-center gap-1.5 font-extrabold tracking-widest uppercase text-[10px]"

@@ -10,8 +10,9 @@ export const IssueSchema = z.object({
   id: z.string(),
   title: z.string(),
   description: IssueDescriptionSchema,
-  severity: z.enum(["high", "medium"]),
+  severity: z.enum(["high", "medium", "low"]),
   highlightedText: z.string(),
+  suggestedChangePhrase: z.string(),
 });
 
 export const DimensionGainSchema = z.object({

@@ -114,6 +114,63 @@ Before considering any code "done", verify:
 - Never commit secrets, API keys, or sensitive data
 - Run type check before committing
 
+### Branching Strategy
+
+> **`main` is the production branch. Never push directly to main. All changes go through feature branches and PRs.**
+
+**Branch naming convention:**
+
+| Prefix | Purpose | Example |
+|--------|---------|---------|
+| `feat/` | New features or capabilities | `feat/voice-profile-engine` |
+| `fix/` | Bug fixes | `fix/credit-deduction-race` |
+| `refactor/` | Code restructuring, no behavior change | `refactor/workshop-stage-types` |
+| `chore/` | Tooling, config, CI, dependency updates | `chore/upgrade-anthropic-sdk` |
+| `test/` | Adding or improving tests | `test/activity-pipeline-e2e` |
+| `docs/` | Documentation only | `docs/api-endpoint-reference` |
+
+Branch names: lowercase, hyphens, short but descriptive. No UUIDs, no random suffixes.
+
+**Workflow for every code change:**
+
+```
+1. Create a feature branch from main:
+   git checkout main && git pull origin main
+   git checkout -b feat/my-feature
+
+2. Make commits on the feature branch (atomic, with clear messages)
+
+3. Push the branch and open a PR:
+   git push -u origin feat/my-feature
+   gh pr create --base main --title "feat: description" --body "..."
+
+4. After review/approval, merge via GitHub PR (squash or merge commit)
+
+5. Delete the branch after merge:
+   git branch -d feat/my-feature
+   git push origin --delete feat/my-feature
+```
+
+**Rules (enforced by pre-push hook):**
+
+1. **No direct pushes to `main`** — the pre-push hook will block this. All changes to main go through PRs.
+2. **Branch from latest `main`** — always pull main before branching to minimize merge conflicts.
+3. **One feature per branch** — don't bundle unrelated changes. If you discover a separate issue while working, create a new branch for it.
+4. **Keep branches short-lived** — merge or close within days, not weeks. Stale branches create confusion.
+5. **Delete after merge** — don't accumulate dead branches. Clean up both local and remote.
+
+**For agent swarms / worktrees:**
+- Swarm teammates working in worktrees should follow the same naming convention
+- The Lead creates the branch and assigns it before spawning teammates, OR teammates use `feat/{role}-{description}` format
+- Worktree branches get merged into the Lead's feature branch (not directly into main)
+- The Lead opens the final PR to main after integrating all teammate work
+
+**PR standards:**
+- Title follows conventional format: `feat:`, `fix:`, `refactor:`, etc.
+- Body includes a Summary section (what and why) and Test Plan section
+- Tag the other co-founder for review on significant changes
+- PRs that only touch non-functional files (docs, comments, config) can be self-merged
+
 ---
 
 ## PROJECT CONTEXT: UPLIFT
@@ -332,6 +389,9 @@ If you find yourself doing any of these, STOP and reassess:
 ### Commands
 
 ```bash
+# First-time setup (run once after cloning — enables shared git hooks)
+git config core.hooksPath .githooks
+
 # Type check
 npx tsc --noEmit
 
@@ -343,6 +403,12 @@ ANTHROPIC_API_KEY="..." npx tsx tests/test-comprehensive-e2e.ts
 
 # Start dev server
 npm run dev
+
+# Branch workflow
+git checkout main && git pull origin main
+git checkout -b feat/my-feature        # create feature branch
+git push -u origin feat/my-feature     # push & track
+gh pr create --base main               # open PR
 
 # Supabase commands
 supabase db push
@@ -375,6 +441,47 @@ Take the time to do it right. Tue is counting on you to be the technical excelle
 ## AGENT TEAMS / SWARM MODE
 
 > **This section governs multi-agent collaborative development.** When agent teams are active, a Lead agent coordinates specialized Teammates that work in parallel across independent Git worktrees.
+
+### Proactive Swarm Autonomy
+
+> **You have full autonomy to spin up agent teams (up to 8 teammates) without asking permission first.** Tue has Claude Max 20x — token cost is not a blocker. But autonomy demands good judgment. Every swarm should be a deliberate decision that produces better results than serial work.
+
+**Standing authorization:**
+- You MAY create agent teams at your discretion — no need to ask first
+- You are the **Lead** — plan the architecture, define type contracts, assign file ownership, coordinate handoffs, and review the combined output
+- Prefer **specialized, focused teammates** (each with a clear domain) over generalist agents doing a bit of everything
+
+**Strategic decision framework — before spawning, ask yourself:**
+
+1. **Is there real parallelism?** Can teammates work on genuinely independent units simultaneously, or will they mostly be waiting on each other? If work is inherently sequential (each step depends on the last), a swarm adds coordination overhead for no speed gain.
+
+2. **Does the task have clear domain boundaries?** Swarms excel when you can carve clean ownership lines (e.g., frontend/backend/tests). If the work is deeply interconnected in a single module, one focused agent thinking deeply will outperform three agents stepping on each other.
+
+3. **Is depth or breadth the bottleneck?** For tasks needing deep, careful reasoning in one area (complex algorithm, nuanced prompt engineering), a single agent with full context wins. For tasks needing breadth across many areas (cross-layer feature, codebase-wide refactor), a swarm wins.
+
+4. **Right-size the team.** More agents ≠ better results. Match team size to the actual parallelizable work:
+   - **2-3 agents**: Moderate tasks with 2-3 independent workstreams
+   - **4-5 agents**: Cross-layer features (frontend + backend + services + tests)
+   - **6-8 agents**: Large builds, major refactors, or deep multi-angle investigations
+
+**High-value swarm scenarios:**
+- Cross-layer features (frontend + backend + services + tests in parallel)
+- Codebase-wide refactors where many files need consistent changes
+- Multi-angle investigation / debugging across architectural layers
+- Building new service modules with types, logic, tests, and docs simultaneously
+- Research-heavy tasks where agents can explore different hypotheses in parallel
+
+**Keep it single-agent:**
+- Single-file or few-file changes with clear implementation path
+- Work requiring deep sequential reasoning (complex prompt design, algorithm refinement)
+- Questions, explanations, code review, or small tweaks
+- Tasks where coordination overhead would exceed the parallel benefit
+
+**Anti-patterns to avoid:**
+- **Over-fragmentation**: Don't split a naturally cohesive piece of work across 4 agents just because you can. A single agent with full context will produce more coherent code.
+- **Swarm-for-swarm's-sake**: If you'd spend more time defining contracts and coordinating handoffs than actually doing the work, go single-agent.
+- **Shallow parallel work**: Three agents each doing surface-level work is worse than one agent going deep. Ensure each teammate has enough scope to do meaningful, substantive work.
+- **Premature spawning**: Understand the task fully before deciding team composition. Read the relevant code first, then decide if/how to parallelize.
 
 ### Swarm Philosophy
 
@@ -495,12 +602,9 @@ Before the Lead considers a swarm task complete:
 - [ ] Lead has reviewed the combined diff for consistency
 - [ ] No regressions in existing functionality
 
-### Cost Awareness
+### Resource Policy
 
-Agent teams consume **4-15x more tokens** than single-agent work. Use swarm mode strategically:
-
-**Good for swarms:** Multi-file features, cross-layer changes, parallel investigations, large refactors
-**Bad for swarms:** Single-file bug fixes, simple additions, quick questions, small tweaks
+Tue has **Claude Max 20x** — token budget is not a limiting factor. **Optimize for the best possible results**, not token savings. Never avoid a swarm because of cost concerns — but always avoid a swarm that would produce worse results than focused serial work. The question is never "can I afford this?" but "will this produce the best outcome?"
 
 ---
 
