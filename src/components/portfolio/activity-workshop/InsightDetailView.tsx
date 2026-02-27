@@ -30,7 +30,7 @@ import {
 import ScoreRing from './ScoreRing';
 import { TierHoverCard } from './AdmissionsContextCards';
 import { OverviewTab } from './sections/CelebrationTab';
-import { DescriptionOptimization } from './sections/DescriptionOptimization';
+import { ActivityWorkshopDescription } from '@/components/workshop/ActivityWorkshopDescription';
 import { NextStepsTab } from './sections/NextStepsTab';
 
 interface InsightDetailViewProps {
@@ -179,7 +179,7 @@ const InsightDetailViewInner = function InsightDetailView({ data, onBack }: Insi
           {activeTab === 'overview' && <OverviewTab data={data} />}
           {activeTab === 'description' && (
             hasDescription && data.descriptionOptimization ? (
-              <DescriptionOptimization
+              <ActivityWorkshopDescription
                 optimization={data.descriptionOptimization}
                 improvementTeaching={data.improvementTeaching}
                 accentColor={roleCfg.accent}

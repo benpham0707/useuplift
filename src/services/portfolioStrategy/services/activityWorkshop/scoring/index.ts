@@ -198,3 +198,36 @@ export {
   ActivityRuleScorerService,
   activityRuleScorerService,
 } from './activityRuleScorer';
+
+// Nuance Calibration Types — Layer 4 type definitions
+export * from './nuanceCalibrationTypes';
+
+// Achievement Intelligence Database — Layer 4 deep calibration benchmarks
+// 500+ entries across 18 categories with subcategories, achievement ladders, role hierarchies
+export {
+  ACHIEVEMENT_DATABASE,
+  getCategoryKeywordIndex,
+  getSubcategoryKeywordIndex,
+  getAchievementCategory,
+  getAchievementCategoryKeys,
+  getEntriesForTier,
+  getSubcategoryProfile,
+  getTotalEntryCount,
+} from './achievementIntelligence';
+
+// Achievement Retrieval — Layer 4 smart matching & calibration context assembly
+// Pure code, no LLM — assembles CalibrationContext from evidence + tier + activity metadata
+export {
+  AchievementRetrievalService,
+  achievementRetrievalService,
+  getCalibrationContext,
+} from './achievementRetrieval';
+
+// Nuance Calibration Service — Layer 4 Sonnet-powered score adjustment
+// Hybrid: rule scorer bounds + Sonnet nuance within those bounds
+export {
+  NuanceCalibrationService,
+  nuanceCalibrationService,
+  calibrateActivity,
+  calibrateBatch,
+} from './nuanceCalibrationService';
