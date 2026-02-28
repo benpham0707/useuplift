@@ -611,7 +611,7 @@ const MOCK_DATA: ActivityWorkshopPipelineResult = {
           ],
           expectedScoreImprovement: {
             projectedScore: 8.5,
-            improvingComponents: ['quantification (+2.0)', 'specificity (+1.0)', 'impactClarity (+1.5)'],
+            improvingComponents: ['Quantification', 'Specificity', 'Impact Clarity'],
             rationale: 'The revised description addresses the three weakest scoring dimensions (quantification, specificity, impact clarity) simultaneously. The addition of model accuracy, dataset scale, and population impact metrics should elevate these components from the 4-6 range to the 7-9 range, pushing the overall description score from 6.2 to approximately 8.5.',
           },
         },
@@ -643,7 +643,7 @@ const MOCK_DATA: ActivityWorkshopPipelineResult = {
           ],
           expectedScoreImprovement: {
             projectedScore: 8.0,
-            improvingComponents: ['quantification (+2.0)', 'specificity (+1.5)', 'impactClarity (+1.0)'],
+            improvingComponents: ['Quantification', 'Specificity', 'Impact Clarity'],
             rationale: 'Adding growth metrics (0→32), curriculum specifics (8 modules, Python/web dev), and event count (3 hackathons) addresses all three weak dimensions simultaneously. The first-gen student context adds authenticity that the original description lacked.',
           },
         },

@@ -96,10 +96,16 @@ function adaptToWorkshopData(props: ActivityWorkshopDescriptionProps): WorkshopD
   const totalGain = projectedScore - currentScore;
   const components = scoreProjection?.improvingComponents ?? [];
   const perDimGain = components.length > 0 ? totalGain / components.length : 0;
-  const dimensions = components.map((name) => ({
-    name,
-    value: Math.round(perDimGain * 10) / 10,
-  }));
+
+  // Parse dimension names and values. Pipeline may produce "name (+1.5)" format
+  // or clean names — handle both gracefully.
+  const dimensions = components.map((raw) => {
+    const match = raw.match(/^(.+?)\s*\(\+?([\d.]+)\)$/);
+    if (match) {
+      return { name: match[1].trim(), value: parseFloat(match[2]) };
+    }
+    return { name: raw, value: Math.round(perDimGain * 10) / 10 };
+  });
 
   return {
     beforeText: optimization.original,

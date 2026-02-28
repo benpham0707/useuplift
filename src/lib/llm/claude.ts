@@ -9,6 +9,7 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { jsonrepair } from 'jsonrepair';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -169,6 +170,47 @@ export interface ClaudeResponse<T = any> {
     cache_read_input_tokens?: number;
   };
   stopReason: string;
+}
+
+/**
+ * Structured error class for Claude API errors.
+ *
+ * Extends Error so existing `catch (e) { if (e instanceof Error) }` patterns
+ * continue to work. Adds structured fields for status code and error classification,
+ * so callers don't need to import the Anthropic SDK to inspect errors.
+ */
+export class ClaudeAPIError extends Error {
+  /** HTTP status code from the API (undefined for timeouts/network errors) */
+  readonly status: number | undefined;
+  /** True for 429 Too Many Requests */
+  readonly isRateLimit: boolean;
+  /** True for 5xx server errors */
+  readonly isServerError: boolean;
+  /** True for timeout errors (our client-side timeout or Anthropic's 408/504) */
+  readonly isTimeout: boolean;
+  /** True for 529 Overloaded */
+  readonly isOverloaded: boolean;
+  /** True if the error is worth retrying (429, 5xx, timeouts) */
+  readonly retryable: boolean;
+
+  constructor(message: string, options: {
+    status?: number;
+    cause?: unknown;
+  } = {}) {
+    super(message);
+    this.name = 'ClaudeAPIError';
+    this.status = options.status;
+    if (options.cause) {
+      this.cause = options.cause;
+    }
+
+    this.isRateLimit = this.status === 429;
+    this.isServerError = this.status !== undefined && this.status >= 500;
+    this.isTimeout = this.status === 408 || this.status === 504
+      || message.includes('timed out');
+    this.isOverloaded = this.status === 529;
+    this.retryable = this.isRateLimit || this.isServerError || this.isTimeout;
+  }
 }
 
 // ============================================================================
@@ -478,12 +520,19 @@ export async function callClaude<T = any>(
 
             content = JSON.parse(jsonString);
           } catch (parseError) {
-            // Attempt to repair truncated JSON (common when response hits maxTokens)
+            // Fallback 1: Use jsonrepair library (handles unescaped chars, trailing commas, etc.)
             try {
-              content = repairTruncatedJSON(textContent);
-              console.warn('[Claude] JSON repair succeeded — response was truncated');
+              const repaired = jsonrepair(jsonString);
+              content = JSON.parse(repaired);
+              console.warn('[Claude] jsonrepair library succeeded — response had malformed JSON');
             } catch {
-              throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+              // Fallback 2: Custom truncation repair (handles responses cut off by maxTokens)
+              try {
+                content = repairTruncatedJSON(textContent);
+                console.warn('[Claude] Truncation repair succeeded — response was truncated');
+              } catch {
+                throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+              }
             }
           }
         } else {
@@ -512,17 +561,35 @@ export async function callClaude<T = any>(
 
   } catch (error) {
     if (error instanceof Anthropic.APIError) {
-      throw new Error(`Claude API error: ${error.status} - ${error.message}`);
+      // Preserve status code and classification in a structured error.
+      // Message format "Claude API error: 429 - ..." is kept for backward
+      // compat with callers that do string matching on error.message.
+      throw new ClaudeAPIError(
+        `Claude API error: ${error.status} - ${error.message}`,
+        { status: error.status, cause: error }
+      );
+    }
+    // Wrap timeout errors from createTimeoutPromise as ClaudeAPIError
+    if (error instanceof Error && error.message.includes('timed out')) {
+      throw new ClaudeAPIError(error.message, { cause: error });
     }
     throw error;
   }
 }
 
 /**
- * Make a call to Claude with automatic retries for rate limits
+ * Make a call to Claude with automatic retries for transient errors.
+ *
+ * Retries on:
+ * - 429 (rate limit)
+ * - 5xx (server errors, including 529 overloaded)
+ * - Timeout errors
+ *
+ * Uses exponential backoff with jitter to prevent thundering herd.
+ * Accepts the same input types as callClaude (string, ClaudeMessageInput, ClaudeSimpleInput).
  */
 export async function callClaudeWithRetry<T = any>(
-  userPrompt: string,
+  promptOrInput: string | ClaudeMessageInput | ClaudeSimpleInput,
   options: ClaudeCallOptions = {},
   maxRetries = 3
 ): Promise<ClaudeResponse<T>> {
@@ -530,19 +597,36 @@ export async function callClaudeWithRetry<T = any>(
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await callClaude<T>(userPrompt, options);
+      return await callClaude<T>(promptOrInput, options);
     } catch (error) {
       lastError = error as Error;
 
-      // Check if it's a rate limit error
-      if (error instanceof Error && error.message.includes('429')) {
-        // Exponential backoff: 1s, 2s, 4s
-        const waitTime = Math.pow(2, attempt) * 1000;
+      // Determine if the error is retryable
+      let shouldRetry = false;
+      if (error instanceof ClaudeAPIError) {
+        shouldRetry = error.retryable;
+      } else if (error instanceof Error) {
+        // Fallback: string matching for errors not wrapped as ClaudeAPIError
+        shouldRetry = error.message.includes('429')
+          || error.message.includes('timed out')
+          || error.message.includes('500')
+          || error.message.includes('502')
+          || error.message.includes('503')
+          || error.message.includes('529');
+      }
+
+      if (shouldRetry && attempt < maxRetries - 1) {
+        // Exponential backoff with jitter: base * 2^attempt + random(0..base)
+        const baseMs = 1000;
+        const waitTime = baseMs * Math.pow(2, attempt) + Math.random() * baseMs;
+        console.warn(
+          `[Claude] Retry ${attempt + 1}/${maxRetries} after ${Math.round(waitTime)}ms — ${lastError.message.substring(0, 100)}`
+        );
         await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
 
-      // For other errors, throw immediately
+      // Non-retryable or final attempt — throw
       throw error;
     }
   }
@@ -551,28 +635,33 @@ export async function callClaudeWithRetry<T = any>(
 }
 
 /**
- * Batch multiple Claude calls in parallel with concurrency limit
+ * Batch multiple Claude calls in parallel with concurrency limit.
+ *
+ * Uses a sliding-window approach: up to `concurrencyLimit` calls run
+ * simultaneously. When one completes, the next starts immediately.
  */
 export async function batchCallClaude<T = any>(
   prompts: { prompt: string; options?: ClaudeCallOptions }[],
   concurrencyLimit = 3
 ): Promise<ClaudeResponse<T>[]> {
   const results: ClaudeResponse<T>[] = [];
-  const executing: Promise<void>[] = [];
+  const executing = new Set<Promise<void>>();
 
   for (let i = 0; i < prompts.length; i++) {
     const { prompt, options } = prompts[i];
 
-    const promise = callClaudeWithRetry<T>(prompt, options)
+    const task = callClaudeWithRetry<T>(prompt, options)
       .then(result => {
         results[i] = result;
+      })
+      .finally(() => {
+        executing.delete(task);
       });
 
-    executing.push(promise);
+    executing.add(task);
 
-    if (executing.length >= concurrencyLimit) {
+    if (executing.size >= concurrencyLimit) {
       await Promise.race(executing);
-      executing.splice(executing.findIndex(p => p === promise), 1);
     }
   }
 
@@ -606,8 +695,11 @@ export async function callClaudeWithFallback<T = any>(
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
 
-    // Check if it's a timeout
-    if (err.message.includes('timed out')) {
+    // Check if it's a timeout — prefer structured check, fall back to string match
+    const isTimeout = (err instanceof ClaudeAPIError && err.isTimeout)
+      || err.message.includes('timed out');
+
+    if (isTimeout) {
       console.warn('[Claude] LLM call timed out, falling back to heuristics');
       onTimeout?.();
     } else {
@@ -628,29 +720,48 @@ export function estimateTokens(text: string): number {
 }
 
 /**
- * Calculate cost for API call
- * Prices as of 2025 for Claude Sonnet 3.5
+ * Per-model pricing (USD per 1M tokens). Feb 2026 rates.
+ * Exported so services can consolidate duplicated local pricing constants.
  */
-export function calculateCost(usage: ClaudeResponse['usage']): number {
-  const INPUT_PRICE_PER_1M = 3.00; // $3 per 1M input tokens
-  const OUTPUT_PRICE_PER_1M = 15.00; // $15 per 1M output tokens
-  const CACHE_WRITE_PRICE_PER_1M = 3.75; // $3.75 per 1M cache write tokens
-  const CACHE_READ_PRICE_PER_1M = 0.30; // $0.30 per 1M cache read tokens
+export const MODEL_PRICING: Record<string, {
+  input: number;
+  output: number;
+  cacheWrite: number;
+  cacheRead: number;
+}> = {
+  // Sonnet 4.5
+  'claude-sonnet-4-5-20250929': { input: 3.00, output: 15.00, cacheWrite: 3.75, cacheRead: 0.30 },
+  // Haiku 4.5
+  'claude-haiku-4-5-20251001': { input: 1.00, output: 5.00, cacheWrite: 1.25, cacheRead: 0.10 },
+};
+
+/** Default pricing (Sonnet) used when model is not specified */
+const DEFAULT_PRICING = MODEL_PRICING['claude-sonnet-4-5-20250929'];
+
+/**
+ * Calculate cost for API call.
+ *
+ * @param usage  Token usage from ClaudeResponse
+ * @param model  Optional model ID. When provided, uses that model's pricing.
+ *               Defaults to Sonnet pricing (backward compatible for all 27 callers).
+ */
+export function calculateCost(usage: ClaudeResponse['usage'], model?: string): number {
+  const pricing = (model && MODEL_PRICING[model]) || DEFAULT_PRICING;
 
   let cost = 0;
 
   // Input tokens
-  cost += (usage.input_tokens / 1_000_000) * INPUT_PRICE_PER_1M;
+  cost += (usage.input_tokens / 1_000_000) * pricing.input;
 
   // Output tokens
-  cost += (usage.output_tokens / 1_000_000) * OUTPUT_PRICE_PER_1M;
+  cost += (usage.output_tokens / 1_000_000) * pricing.output;
 
   // Cache tokens
   if (usage.cache_creation_input_tokens) {
-    cost += (usage.cache_creation_input_tokens / 1_000_000) * CACHE_WRITE_PRICE_PER_1M;
+    cost += (usage.cache_creation_input_tokens / 1_000_000) * pricing.cacheWrite;
   }
   if (usage.cache_read_input_tokens) {
-    cost += (usage.cache_read_input_tokens / 1_000_000) * CACHE_READ_PRICE_PER_1M;
+    cost += (usage.cache_read_input_tokens / 1_000_000) * pricing.cacheRead;
   }
 
   return Math.round(cost * 10000) / 10000; // Round to 4 decimal places

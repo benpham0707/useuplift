@@ -23,6 +23,8 @@ import {
   DEFAULT_VERB_TIER,
   DESCRIPTION_DIMENSION_WEIGHTS,
 } from './scoringRules';
+import type { ExpertiseMatchResult } from './expertiseSignaling/types';
+import { getExpertiseDomain } from './expertiseSignaling';
 
 // ============================================================================
 // UTILITY
@@ -36,6 +38,43 @@ function clamp(value: number, min: number, max: number): number {
 /** Round to 1 decimal place */
 function round1(n: number): number {
   return Math.round(n * 10) / 10;
+}
+
+// ============================================================================
+// DOMAIN-SPECIFIC VERB LOOKUP
+// ============================================================================
+
+/**
+ * Build a domain-specific verb→tier mapping from an ExpertiseDomain's verbHierarchy.
+ *
+ * Maps the 3-tier domain system (power/standard/weak) to the global 5-tier scale:
+ *   power   → 5 (ELITE)  — field-specific verbs signaling original contribution
+ *   standard → 3 (GOOD)   — competent verbs appropriate for the field
+ *   weak     → 1 (POOR)   — passive verbs that signal resume padding
+ *
+ * Returns a Map<lowercase_lemma, tier> for O(1) lookup per verb.
+ * Returns undefined if no domain is found (caller falls back to global hierarchy).
+ */
+function buildDomainVerbLookup(expertiseResult: ExpertiseMatchResult): Map<string, 1 | 2 | 3 | 4 | 5> | undefined {
+  const domain = getExpertiseDomain(expertiseResult.domainId);
+  if (!domain || domain.verbHierarchy.length === 0) return undefined;
+
+  const tierMapping: Record<string, 1 | 2 | 3 | 4 | 5> = {
+    power: 5,
+    standard: 3,
+    weak: 1,
+  };
+
+  const lookup = new Map<string, 1 | 2 | 3 | 4 | 5>();
+  for (const verbTier of domain.verbHierarchy) {
+    const numericTier = tierMapping[verbTier.tier];
+    if (numericTier === undefined) continue;
+    for (const verb of verbTier.verbs) {
+      lookup.set(verb.toLowerCase(), numericTier);
+    }
+  }
+
+  return lookup.size > 0 ? lookup : undefined;
 }
 
 // ============================================================================
@@ -142,10 +181,20 @@ function scoreImpactEvidence(features: ExtractedDescriptionFeatures): Descriptio
 /**
  * C. Score Action Precision — How specific and powerful is the language?
  *
- * Based on verb quality from the VERB_QUALITY_HIERARCHY lookup table.
+ * Uses field-specific verb hierarchy when expertise signals are available,
+ * falling back to the global VERB_QUALITY_HIERARCHY for unlisted verbs.
+ *
+ * This matters because verb quality is field-dependent:
+ * - "Designed" is ELITE (5) in engineering but STANDARD (3) in visual arts
+ * - "Discovered" is ELITE (5) in research but has no special status in athletics
+ * - "Competed" is STANDARD (3) in athletics but WEAK (1) in research
+ *
  * Prefers individual-action verbs over team/org verbs.
  */
-function scoreActionPrecision(features: ExtractedDescriptionFeatures): DescriptionScoreComponent {
+function scoreActionPrecision(
+  features: ExtractedDescriptionFeatures,
+  expertiseResult?: ExpertiseMatchResult,
+): DescriptionScoreComponent {
   const allVerbs = features.verbs;
 
   // Prefer individual-action verbs; fall back to all verbs if none
@@ -160,8 +209,24 @@ function scoreActionPrecision(features: ExtractedDescriptionFeatures): Descripti
     };
   }
 
-  // Look up each verb's tier
-  const tiers = targetVerbs.map(v => VERB_QUALITY_HIERARCHY[v.lemma.toLowerCase()] ?? DEFAULT_VERB_TIER);
+  // Build domain-specific verb lookup if expertise data is available
+  const domainVerbLookup = expertiseResult ? buildDomainVerbLookup(expertiseResult) : undefined;
+  const usingDomainVerbs = domainVerbLookup !== undefined;
+
+  // Resolve verb tier: domain-specific → global → default
+  const resolveVerbTier = (lemma: string): 1 | 2 | 3 | 4 | 5 => {
+    const lower = lemma.toLowerCase();
+    // Domain-specific lookup takes priority
+    if (domainVerbLookup) {
+      const domainTier = domainVerbLookup.get(lower);
+      if (domainTier !== undefined) return domainTier;
+    }
+    // Fall back to global hierarchy
+    return VERB_QUALITY_HIERARCHY[lower] ?? DEFAULT_VERB_TIER;
+  };
+
+  // Look up each verb's tier using the layered resolver
+  const tiers = targetVerbs.map(v => resolveVerbTier(v.lemma));
   const avgTier = tiers.reduce((sum, t) => sum + t, 0) / tiers.length;
 
   // Map 1-5 tier scale to 0-10 score: tier × 2
@@ -170,7 +235,7 @@ function scoreActionPrecision(features: ExtractedDescriptionFeatures): Descripti
   // Bonus: 3+ distinct elite/strong verbs (tier 4-5)
   const eliteStrongCount = new Set(
     targetVerbs
-      .filter(v => (VERB_QUALITY_HIERARCHY[v.lemma.toLowerCase()] ?? DEFAULT_VERB_TIER) >= 4)
+      .filter(v => resolveVerbTier(v.lemma) >= 4)
       .map(v => v.lemma.toLowerCase())
   ).size;
   if (eliteStrongCount >= 3) score += 1;
@@ -183,17 +248,18 @@ function scoreActionPrecision(features: ExtractedDescriptionFeatures): Descripti
 
   // Generate rationale
   const bestVerbs = targetVerbs
-    .filter(v => (VERB_QUALITY_HIERARCHY[v.lemma.toLowerCase()] ?? DEFAULT_VERB_TIER) >= 4)
+    .filter(v => resolveVerbTier(v.lemma) >= 4)
     .map(v => v.lemma)
     .slice(0, 3);
   const worstVerbs = targetVerbs
-    .filter(v => (VERB_QUALITY_HIERARCHY[v.lemma.toLowerCase()] ?? DEFAULT_VERB_TIER) <= 2)
+    .filter(v => resolveVerbTier(v.lemma) <= 2)
     .map(v => v.lemma)
     .slice(0, 3);
 
   const parts: string[] = [`${targetVerbs.length} verb(s), average tier ${round1(avgTier)}/5`];
   if (bestVerbs.length > 0) parts.push(`strong: ${bestVerbs.join(', ')}`);
   if (worstVerbs.length > 0) parts.push(`weak: ${worstVerbs.join(', ')}`);
+  if (usingDomainVerbs) parts.push(`field-specific scoring: ${expertiseResult!.domainId}`);
 
   const rationale = `Action Precision scored ${score}/10: ${parts.join('; ')}.`;
 
@@ -298,14 +364,40 @@ function scoreDifferentiation(features: ExtractedDescriptionFeatures): Descripti
  *
  * Produces exactly the same `DescriptionScore` shape as the LLM-powered scorer.
  * Downstream consumers see the same type regardless of scoring method.
+ *
+ * @param features - Extracted description features from Haiku
+ * @param expertiseResult - Optional expertise match result for field-specific adjustments
  */
-function scoreDescription(features: ExtractedDescriptionFeatures): DescriptionScore {
+function scoreDescription(features: ExtractedDescriptionFeatures, expertiseResult?: ExpertiseMatchResult): DescriptionScore {
   // 1. Score all 5 dimensions
   const roleOwnershipResult = scoreRoleOwnership(features);
   const impactEvidenceResult = scoreImpactEvidence(features);
-  const actionPrecisionResult = scoreActionPrecision(features);
+  const actionPrecisionResult = scoreActionPrecision(features, expertiseResult);
   const quantificationResult = scoreQuantification(features);
   const differentiationResult = scoreDifferentiation(features);
+
+  // 1b. Apply expertise-based adjustments to differentiation (authenticity signal)
+  if (expertiseResult && expertiseResult.confidence !== 'low') {
+    const adj = expertiseResult.assessment.scoringAdjustments;
+
+    // Differentiation adjustment: real expertise signals boost, name-drops reduce
+    if (adj.differentiationModifier !== 0) {
+      differentiationResult.score = clamp(
+        round1(differentiationResult.score + adj.differentiationModifier),
+        0, 10,
+      );
+      differentiationResult.rationale += ` [Expertise: ${adj.differentiationModifier > 0 ? '+' : ''}${adj.differentiationModifier.toFixed(2)}, ${expertiseResult.detectedSignals.length} signals, ${expertiseResult.detectedTraps.length} traps]`;
+    }
+
+    // Specificity adjustment: field-specific precision signals
+    if (adj.specificityModifier !== 0) {
+      roleOwnershipResult.score = clamp(
+        round1(roleOwnershipResult.score + adj.specificityModifier),
+        0, 10,
+      );
+      roleOwnershipResult.rationale += ` [Expertise specificity: ${adj.specificityModifier > 0 ? '+' : ''}${adj.specificityModifier.toFixed(2)}]`;
+    }
+  }
 
   // 2. Calculate weighted total
   const weights = DESCRIPTION_DIMENSION_WEIGHTS;
@@ -375,9 +467,12 @@ export class DescriptionRuleScorerService {
   /**
    * Score a description deterministically from extracted features.
    * Produces the same DescriptionScore shape as the LLM-powered scorer.
+   *
+   * @param features - Extracted description features from Haiku
+   * @param expertiseResult - Optional expertise match result for field-specific adjustments
    */
-  scoreDescription(features: ExtractedDescriptionFeatures): DescriptionScore {
-    return scoreDescription(features);
+  scoreDescription(features: ExtractedDescriptionFeatures, expertiseResult?: ExpertiseMatchResult): DescriptionScore {
+    return scoreDescription(features, expertiseResult);
   }
 
   /**
@@ -391,8 +486,8 @@ export class DescriptionRuleScorerService {
     return scoreImpactEvidence(features);
   }
 
-  scoreActionPrecision(features: ExtractedDescriptionFeatures): DescriptionScoreComponent {
-    return scoreActionPrecision(features);
+  scoreActionPrecision(features: ExtractedDescriptionFeatures, expertiseResult?: ExpertiseMatchResult): DescriptionScoreComponent {
+    return scoreActionPrecision(features, expertiseResult);
   }
 
   scoreQuantification(features: ExtractedDescriptionFeatures): DescriptionScoreComponent {

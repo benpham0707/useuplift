@@ -79,10 +79,32 @@ import { featureExtractorService } from './featureExtractor';
 import type { BatchFeatureExtractionInput, ActivityFeatureExtraction } from './featureTypes';
 import { classifyTier } from './tierClassifier';
 import { activityRuleScorerService } from './activityRuleScorer';
+import { descriptionRuleScorerService } from './descriptionRuleScorer';
 import { calibrateBatch } from './nuanceCalibrationService';
 import type { NuanceCalibratedResult } from './nuanceCalibrationTypes';
 import { calibratePortfolio } from './portfolioCalibrator';
 import type { CalibrationInput } from './portfolioCalibrator';
+
+// Expertise Signaling Library — deterministic expertise matching ($0, <1ms)
+import {
+  getExpertiseDomain,
+  getExpertiseDomainWithSubResolution,
+  matchExpertiseSignals,
+  buildExpertiseTeachingContext,
+  batchMatchExpertiseSignals,
+  EXPERTISE_DOMAINS,
+  getExemplarsForDomain,
+} from './expertiseSignaling';
+import type { ExpertiseMatchResult, ExpertiseTeachingContext, Exemplar, DescriptionTransform } from './expertiseSignaling';
+
+// Cross-user cache — Supabase-backed scoring cache shared across users
+import { crossUserCacheService } from './crossUserCacheService';
+import { KB_VERSION } from './knowledge';
+
+// Impressiveness Analyzer — field-specific context ($0, <1ms)
+// Wired to the rich impressivenessCalibration module (12 domains, 5-level ladders, exemplars)
+import { analyzeImpressiveness } from './impressivenessCalibration';
+import type { ImpressionAnalysisResult } from './impressivenessCalibration';
 
 // ============================================================================
 // TYPES
@@ -176,10 +198,13 @@ export interface ScoringOrchestratorResult {
 // ORCHESTRATOR
 // ============================================================================
 
+/** M1: Maximum entries in the evidence cache before eviction */
+const MAX_EVIDENCE_CACHE_SIZE = 500;
+
 export class ScoringOrchestrator {
   private cacheService: ScoringCacheService;
   /** Evidence + tier cache — stored alongside activity score cache for portfolio calibration */
-  private evidenceCache = new Map<string, { evidence: ExtractedEvidence; tier: TierClassification }>();
+  private evidenceCache = new Map<string, { evidence: ExtractedEvidence; tier: TierClassification; descriptionScore?: DescriptionScore }>();
 
   constructor(cacheService?: ScoringCacheService) {
     this.cacheService = cacheService || scoringCacheService;
@@ -187,6 +212,18 @@ export class ScoringOrchestrator {
 
   private evidenceCacheKey(sessionId: string, activityId: string): string {
     return `${sessionId}:${activityId}`;
+  }
+
+  /** M1: Evict oldest evidence cache entries when size exceeds limit */
+  private enforceEvidenceCacheSize(): void {
+    if (this.evidenceCache.size <= MAX_EVIDENCE_CACHE_SIZE) return;
+    const excess = this.evidenceCache.size - MAX_EVIDENCE_CACHE_SIZE;
+    const keys = this.evidenceCache.keys();
+    for (let i = 0; i < excess; i++) {
+      const { value: key, done } = keys.next();
+      if (done) break;
+      this.evidenceCache.delete(key);
+    }
   }
 
   /**
@@ -280,40 +317,66 @@ export class ScoringOrchestrator {
         : undefined;
 
       // ========================================================================
-      // Steps 1 & 2: Description scoring + Feature extraction in PARALLEL
+      // Steps 1 & 2: Decomposed scoring pipeline
+      //   Feature extraction (Haiku) → Tier + Expertise + Rule scoring (code) →
+      //   Description scoring (code, $0) → Nuance calibration (Sonnet) →
+      //   Portfolio calibration (code)
+      //
+      // Description scoring is now DETERMINISTIC — uses features already extracted
+      // by Haiku, eliminating the separate Sonnet description batch call.
+      // Saves ~$0.01-0.02 per portfolio with identical type output.
       // ========================================================================
-      const parallelStart = Date.now();
-      console.log(`[ScoringOrchestrator] Starting parallel description scoring + feature extraction...`);
+      const pipelineStart = Date.now();
+      console.log(`[ScoringOrchestrator] Starting decomposed scoring pipeline...`);
 
-      const [descHelperResult, actHelperResult] = await Promise.all([
-        this.scoreDescriptionsWithCache(
-          descriptionInputs, enableCache, forceFresh, sessionId,
-          input.targetPlatform, descriptionCacheResults
-        ),
-        this.scoreActivitiesDecomposed(
-          input.activities, activityInputs,
-          enableCache, forceFresh, sessionId,
-          input.studentContext, activityCacheResults
-        ),
-      ]);
+      const actHelperResult = await this.scoreActivitiesDecomposed(
+        input.activities, activityInputs,
+        enableCache, forceFresh, sessionId,
+        input.studentContext, activityCacheResults
+      );
 
-      console.log(`[ScoringOrchestrator] Parallel scoring complete in ${Date.now() - parallelStart}ms`);
-
-      if (!descHelperResult.success) {
-        return { success: false, error: descHelperResult.error };
-      }
       if (!actHelperResult.success) {
         return { success: false, error: actHelperResult.error };
       }
 
-      const descriptionScores = descHelperResult.scores!;
       const activityScores = actHelperResult.scores!;
-      timing.descriptionScoringMs = descHelperResult.timingMs!;
+      const descriptionScores: DescriptionScore[] = actHelperResult.descriptionScores || [];
+
+      // Fall back to LLM description scoring for any activities missing scores
+      // (extraction failures or cache entries from before deterministic scoring)
+      const missingDescIndices: number[] = [];
+      for (let i = 0; i < input.activities.length; i++) {
+        if (!descriptionScores[i]) missingDescIndices.push(i);
+        // Mirror activity cache results for description cache tracking
+        descriptionCacheResults.set(input.activities[i].id, activityCacheResults.get(input.activities[i].id) ?? false);
+      }
+
+      if (missingDescIndices.length > 0) {
+        console.log(`[ScoringOrchestrator] ${missingDescIndices.length} activities need LLM description scoring (extraction fallback)...`);
+        const fallbackInputs = missingDescIndices.map(i => descriptionInputs[i].input);
+        const fallbackResult = await descriptionScoringService.scoreDescriptionsBatch({
+          activities: fallbackInputs,
+          targetPlatform: input.targetPlatform,
+        });
+        if (fallbackResult.success && fallbackResult.scores) {
+          for (let j = 0; j < missingDescIndices.length; j++) {
+            if (fallbackResult.scores[j]) {
+              descriptionScores[missingDescIndices[j]] = fallbackResult.scores[j];
+              descriptionCacheResults.set(input.activities[missingDescIndices[j]].id, false);
+            }
+          }
+          if (fallbackResult.tokensUsed) {
+            tokensUsed.descriptionScoring = fallbackResult.tokensUsed;
+          }
+        }
+      }
+
+      console.log(`[ScoringOrchestrator] Pipeline complete in ${Date.now() - pipelineStart}ms`);
+
+      // Description scoring is deterministic ($0) — included in pipeline timing
+      timing.descriptionScoringMs = 0;
       timing.activityScoringMs = actHelperResult.timingMs!;
 
-      if (descHelperResult.tokensUsed) {
-        tokensUsed.descriptionScoring = descHelperResult.tokensUsed;
-      }
       if (actHelperResult.tokensUsed) {
         tokensUsed.activityScoring = actHelperResult.tokensUsed;
       }
@@ -420,6 +483,21 @@ export class ScoringOrchestrator {
             includeCraftTeaching: input.teachingOptions?.includeCraftTeaching,
             focusActivities: input.teachingOptions?.focusActivities,
           },
+          // Per-activity expertise data for field-specific teaching
+          expertiseData: (() => {
+            const map = new Map();
+            for (let idx = 0; idx < input.activities.length; idx++) {
+              const actId = input.activities[idx].id;
+              if (allTeachingContexts[idx] && actId) {
+                map.set(actId, {
+                  teachingContext: allTeachingContexts[idx],
+                  exemplars: allExemplars[idx] || [],
+                  transforms: allTransforms[idx] || [],
+                });
+              }
+            }
+            return map.size > 0 ? map : undefined;
+          })(),
         };
 
         const teachResult = await activityTeachingLayerService.generateTeaching(teachingInput);
@@ -759,6 +837,7 @@ export class ScoringOrchestrator {
   ): Promise<{
     success: boolean;
     scores?: ActivityScore[];
+    descriptionScores?: DescriptionScore[];
     tokensUsed?: { input: number; output: number };
     timingMs?: number;
     error?: string;
@@ -767,15 +846,23 @@ export class ScoringOrchestrator {
     console.log(`[ScoringOrchestrator] Starting decomposed activity scoring for ${activities.length} activities...`);
 
     const activityScores: ActivityScore[] = new Array(activities.length);
+    const descriptionScores: (DescriptionScore | null)[] = new Array(activities.length).fill(null);
     const allEvidence: (ExtractedEvidence | null)[] = new Array(activities.length).fill(null);
     const allTiers: (TierClassification | null)[] = new Array(activities.length).fill(null);
-    const toExtract: number[] = []; // indices needing fresh pipeline
+    const allImpressions: (ImpressionAnalysisResult | null)[] = new Array(activities.length).fill(null);
+    const allTeachingContexts: Array<ExpertiseTeachingContext | undefined> = new Array(activities.length).fill(undefined);
+    const allExemplars: Array<Exemplar[]> = new Array(activities.length).fill([]);
+    const allTransforms: Array<DescriptionTransform[]> = new Array(activities.length).fill([]);
+    const toExtract: number[] = []; // indices needing fresh pipeline (full scoring)
+    const toExtractEvidenceOnly: number[] = []; // indices with cached scores but needing evidence for portfolio calibration
 
-    // ---- Phase 0: Check cache ----
+    // ---- Phase 0: Check cache (2-tier: session cache → cross-user cache) ----
+    let crossUserHits = 0;
     for (let i = 0; i < activities.length; i++) {
       const { id, input: actInput } = activityInputs[i];
 
       if (enableCache && !forceFresh) {
+        // Tier 1: Session cache (fastest, in-memory)
         const cacheResult = this.cacheService.getActivityScore(sessionId, id, actInput);
         const evKey = this.evidenceCacheKey(sessionId, id);
         const evCached = this.evidenceCache.get(evKey);
@@ -784,9 +871,60 @@ export class ScoringOrchestrator {
           activityScores[i] = cacheResult.value;
           allEvidence[i] = evCached.evidence;
           allTiers[i] = evCached.tier;
+          if (evCached.descriptionScore) {
+            descriptionScores[i] = evCached.descriptionScore;
+          }
           cacheResults.set(id, true);
-          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): CACHE HIT`);
+          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): SESSION CACHE HIT`);
           continue;
+        }
+
+        // Tier 2: Cross-user cache (Supabase, shared across users)
+        try {
+          const fingerprint = crossUserCacheService.computeFingerprint({
+            description: activities[i].description,
+            role: activities[i].role,
+            category: activities[i].category,
+            title: activities[i].title,
+            hoursPerWeek: activities[i].hoursPerWeek,
+            yearsActive: activities[i].yearsInvolved,
+          });
+          const crossUserResult = await crossUserCacheService.lookup(fingerprint);
+
+          if (crossUserResult && crossUserResult.isValid) {
+            // C1: Cross-user hit — reconstruct scores from cached entry
+            const cachedEntry = crossUserResult.entry;
+
+            // Reconstruct ActivityScore from cached components
+            activityScores[i] = {
+              total: cachedEntry.activityScore.total,
+              breakdown: cachedEntry.activityScore.components as unknown as ActivityScore['breakdown'],
+              tierJustification: 'Restored from cross-user cache',
+              comparisonBenchmarks: { similar: [], percentile: 'N/A (cached)' } as unknown as ActivityScore['comparisonBenchmarks'],
+              improvementPaths: [],
+              overallRationale: 'Score restored from cross-user cache',
+            };
+
+            // Reconstruct DescriptionScore from cached breakdown
+            descriptionScores[i] = {
+              total: cachedEntry.descriptionScore.total,
+              breakdown: cachedEntry.descriptionScore.breakdown as unknown as DescriptionScore['breakdown'],
+              strengths: [],
+              improvements: [],
+              overallRationale: 'Score restored from cross-user cache',
+            };
+
+            console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): CROSS-USER CACHE HIT (age: ${Math.round(crossUserResult.cacheAge / 3600000)}h, score: ${cachedEntry.activityScore.total.toFixed(1)})`);
+            crossUserHits++;
+            cacheResults.set(id, true);
+
+            // Still need evidence for portfolio calibration — extract features only, skip nuance LLM
+            toExtractEvidenceOnly.push(i);
+            continue;
+          }
+        } catch (err) {
+          // Cross-user cache failure is never fatal — just skip
+          console.warn(`[ScoringOrchestrator] Cross-user cache error for activity ${i + 1}:`, err instanceof Error ? err.message : err);
         }
       }
 
@@ -794,17 +932,21 @@ export class ScoringOrchestrator {
       cacheResults.set(id, false);
     }
 
-    const cachedCount = activities.length - toExtract.length;
-    console.log(`[ScoringOrchestrator] Cache: ${cachedCount} cached, ${toExtract.length} need fresh scoring`);
+    const cachedCount = activities.length - toExtract.length - toExtractEvidenceOnly.length;
+    console.log(`[ScoringOrchestrator] Cache: ${cachedCount} session cached, ${crossUserHits} cross-user hits, ${toExtractEvidenceOnly.length} evidence-only, ${toExtract.length} need fresh scoring`);
 
     let tokensUsed: { input: number; output: number } | undefined;
 
+    // Combine indices that need feature extraction (both full pipeline and evidence-only)
+    const allToExtract = [...toExtract, ...toExtractEvidenceOnly];
+    const evidenceOnlySet = new Set(toExtractEvidenceOnly);
+
     // ---- Phase 1: Feature Extraction (Haiku, parallel per-activity) ----
-    if (toExtract.length > 0) {
+    if (allToExtract.length > 0) {
       const extractStart = Date.now();
 
       const extractionInput: BatchFeatureExtractionInput = {
-        activities: toExtract.map(i => ({
+        activities: allToExtract.map(i => ({
           id: activities[i].id,
           title: activities[i].title,
           description: activities[i].description,
@@ -840,14 +982,30 @@ export class ScoringOrchestrator {
         tier: TierClassification;
         activityScore: ActivityScore;
         meta: { title: string; description: string; type?: string; position?: string };
+        expertiseContext?: {
+          domainId: string;
+          confidence: 'high' | 'medium' | 'low';
+          signalCount: number;
+          trapCount: number;
+          expertiseScore: number;
+          topSignals: string[];
+          topTraps: string[];
+        };
+        impressionContext?: ImpressionAnalysisResult;
       }> = [];
       const legacyFallbackIndices: number[] = [];
 
-      for (let j = 0; j < toExtract.length; j++) {
-        const i = toExtract[j];
+      for (let j = 0; j < allToExtract.length; j++) {
+        const i = allToExtract[j];
+        const isEvidenceOnly = evidenceOnlySet.has(i);
         const extraction = extractionResult.extractions[j];
 
         if (!extraction) {
+          if (isEvidenceOnly) {
+            // Evidence-only: extraction failed but we already have cached scores — just skip evidence
+            console.warn(`[ScoringOrchestrator] Evidence extraction failed for "${activities[i].title}" (cross-user cached, skipping evidence)`);
+            continue;
+          }
           // Extraction failed — will fall back to legacy scorer
           console.warn(`[ScoringOrchestrator] Extraction failed for "${activities[i].title}", using legacy fallback`);
           legacyFallbackIndices.push(i);
@@ -858,36 +1016,156 @@ export class ScoringOrchestrator {
         const evidence = extraction.activityEvidence;
         const tier = classifyTier(evidence);
 
+        // Phase 2b: Expertise signal matching (deterministic, <1ms, $0)
+        const detectedType = extraction.descriptionFeatures.detectedActivityType;
+        const expertiseDomain = getExpertiseDomainWithSubResolution(
+          detectedType,
+          [activities[i].title, activities[i].role ?? '', activities[i].category ?? ''],
+        );
+        let expertiseResult: ExpertiseMatchResult | undefined;
+        if (expertiseDomain) {
+          expertiseResult = matchExpertiseSignals(
+            activities[i].description,
+            extraction.descriptionFeatures,
+            expertiseDomain,
+            activities[i].role,
+          );
+        }
+
+        // Phase 2b-ii: Build teaching context + exemplars (deterministic, <1ms, $0)
+        let teachingCtx: ExpertiseTeachingContext | undefined;
+        let activityExemplars: Exemplar[] = [];
+        let applicableTransforms: DescriptionTransform[] = [];
+        if (expertiseDomain && expertiseResult) {
+          teachingCtx = buildExpertiseTeachingContext(expertiseDomain, expertiseResult, activities[i].role);
+          activityExemplars = getExemplarsForDomain(expertiseDomain.domainId, tier.internalTier) ?? [];
+          applicableTransforms = expertiseResult.applicableTransforms ?? [];
+        }
+        allTeachingContexts[i] = teachingCtx;
+        allExemplars[i] = activityExemplars;
+        allTransforms[i] = applicableTransforms;
+
+        // Phase 2c: Impressiveness analysis (deterministic, <1ms, $0)
+        // Provides field-specific context: WHY this achievement level matters, major alignment, depth markers
+        const impressionResult = analyzeImpressiveness(
+          evidence,
+          tier,
+          expertiseResult,
+          studentContext?.intendedMajor,
+          activities[i].description,
+        );
+        allImpressions[i] = impressionResult;
+
+        // Phase 2c-ii: Enrich exemplars from impressiveness calibration
+        // If the new module found domain-specific exemplars, convert and merge with existing
+        if (impressionResult.exemplars && impressionResult.exemplars.length > 0) {
+          const newExemplars: Exemplar[] = impressionResult.exemplars.map(e => ({
+            domainId: e.domainId,
+            tier: e.targetTier as 1 | 2 | 3 | 4 | 5 | 6,
+            description: e.text,
+            whyItWorks: e.whyItWorks,
+            techniques: e.demonstratesDimensions,
+          }));
+          // Prefer new impressiveness-calibrated exemplars, append any old ones that aren't duplicates
+          const existingIds = new Set(newExemplars.map(e => e.description));
+          const unique = allExemplars[i].filter(e => !existingIds.has(e.description));
+          allExemplars[i] = [...newExemplars, ...unique].slice(0, 5);
+        }
+
+        {
+          const markerNote = (impressionResult.technicalDepthMarkers ?? []).length > 0
+            ? `, ${(impressionResult.technicalDepthMarkers ?? []).length} depth markers`
+            : '';
+          const alignNote = impressionResult.majorAlignment && impressionResult.majorAlignment.relevance !== 'unrelated'
+            ? `, major=${impressionResult.majorAlignment.relevance}(${impressionResult.majorAlignment.boostFactor})`
+            : '';
+          console.log(`[ScoringOrchestrator] Activity ${i + 1}: impression=${impressionResult.percentileRange}${markerNote}${alignNote}`);
+        }
+
+        // For evidence-only indices (cross-user cache hit), store evidence/tier but skip scoring
+        if (isEvidenceOnly) {
+          allEvidence[i] = evidence;
+          allTiers[i] = tier;
+          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): evidence extracted for cached score (tier=${tier.internalTier})`);
+          continue;
+        }
+
+        // Phase 2d: Description scoring (deterministic, <1ms, $0)
+        // Uses features already extracted by Haiku — no separate LLM call needed
+        const descScore = descriptionRuleScorerService.scoreDescription(
+          extraction.descriptionFeatures, expertiseResult
+        );
+        descriptionScores[i] = descScore;
+
         // Phase 3a: Rule scoring (deterministic, ~0ms)
         const ruleScore = activityRuleScorerService.scoreActivity(evidence, tier);
 
-        console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): tier=${tier.internalTier}, ruleScore=${ruleScore.total.toFixed(1)}`);
+        // Phase 3b: Apply expertise-based scoring adjustments (deterministic, ~0ms)
+        if (expertiseResult && expertiseResult.confidence !== 'low') {
+          const adj = expertiseResult.assessment.scoringAdjustments;
+          // Adjust authenticity component (maps to communityCharacter)
+          if (adj.authenticityModifier !== 0) {
+            const cc = ruleScore.breakdown.communityCharacter;
+            cc.score = Math.max(0, Math.min(10, Math.round((cc.score + adj.authenticityModifier) * 10) / 10));
+            cc.rationale += ` [Expertise: ${adj.authenticityModifier > 0 ? '+' : ''}${adj.authenticityModifier.toFixed(2)} authenticity signal]`;
+          }
+        }
+
+        const expertiseNote = expertiseResult
+          ? `, expertise=${expertiseResult.assessment.expertiseScore.toFixed(1)} (${expertiseResult.detectedSignals.length}sig/${expertiseResult.detectedTraps.length}trap)`
+          : '';
+        console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): tier=${tier.internalTier}, ruleScore=${ruleScore.total.toFixed(1)}${expertiseNote}`);
 
         allEvidence[i] = evidence;
         allTiers[i] = tier;
         activityScores[i] = ruleScore;
 
-        // Queue for nuance calibration
-        nuanceInputs.push({
-          index: i,
-          evidence,
-          tier,
-          activityScore: ruleScore,
-          meta: {
-            title: activities[i].title,
-            description: activities[i].description,
-            type: activities[i].category,
-            position: activities[i].role,
-          },
-        });
+        // Selective nuance calibration: skip Sonnet call for clear-cut cases
+        // If the rule score is firmly in the middle of the tier range (25%+ from edges)
+        // AND expertise matching confirms the scoring, the deterministic score is reliable
+        const tierSpan = tier.scoreRange.max - tier.scoreRange.min;
+        const distFromMin = ruleScore.total - tier.scoreRange.min;
+        const distFromMax = tier.scoreRange.max - ruleScore.total;
+        const isMiddleOfTier = tierSpan > 0 && distFromMin >= tierSpan * 0.25 && distFromMax >= tierSpan * 0.25;
+        const expertiseConfident = expertiseResult != null && expertiseResult.confidence !== 'low';
+        const skipNuance = isMiddleOfTier && expertiseConfident;
+
+        if (skipNuance) {
+          console.log(`[ScoringOrchestrator] Activity ${i + 1}: skipping nuance (score ${ruleScore.total.toFixed(1)} firmly in tier ${tier.internalTier} range)`);
+        } else {
+          // Queue for nuance calibration with expertise context
+          nuanceInputs.push({
+            index: i,
+            evidence,
+            tier,
+            activityScore: ruleScore,
+            meta: {
+              title: activities[i].title,
+              description: activities[i].description,
+              type: activities[i].category,
+              position: activities[i].role,
+            },
+            expertiseContext: expertiseResult ? {
+              domainId: expertiseResult.domainId,
+              confidence: expertiseResult.confidence,
+              signalCount: expertiseResult.detectedSignals.length,
+              trapCount: expertiseResult.detectedTraps.length,
+              expertiseScore: expertiseResult.assessment.expertiseScore,
+              topSignals: expertiseResult.detectedSignals.slice(0, 3).map(s => s.signal.id),
+              topTraps: expertiseResult.detectedTraps.slice(0, 3).map(t => t.trap.id),
+            } : undefined,
+            impressionContext: impressionResult,
+          });
+        }
       }
 
-      console.log(`[ScoringOrchestrator] Tier + rule scoring: ${Date.now() - ruleStart}ms`);
+      const skippedNuanceCount = toExtract.length - legacyFallbackIndices.length - nuanceInputs.length;
+      console.log(`[ScoringOrchestrator] Tier + rule + desc scoring: ${Date.now() - ruleStart}ms (${nuanceInputs.length} need nuance, ${skippedNuanceCount} skipped, ${toExtractEvidenceOnly.length} evidence-only)`);
 
       // ---- Phase 3b: Nuance Calibration (Sonnet per-activity, concurrent) ----
       if (nuanceInputs.length > 0) {
         const nuanceStart = Date.now();
-        console.log(`[ScoringOrchestrator] Starting nuance calibration for ${nuanceInputs.length} activities...`);
+        console.log(`[ScoringOrchestrator] Starting nuance calibration for ${nuanceInputs.length} activities (${skippedNuanceCount} skipped as clear-cut)...`);
 
         const nuanceResults = await calibrateBatch(
           nuanceInputs.map(n => ({
@@ -895,6 +1173,8 @@ export class ScoringOrchestrator {
             tier: n.tier,
             activityScore: n.activityScore,
             meta: n.meta,
+            expertiseContext: n.expertiseContext,
+            impressionContext: n.impressionContext,
           }))
         );
 
@@ -970,10 +1250,11 @@ export class ScoringOrchestrator {
       );
     }
 
-    // ---- Cache fresh results ----
+    // ---- Cache fresh results (session cache + cross-user cache) ----
     if (enableCache && !forceFresh) {
       for (const i of toExtract) {
         if (activityScores[i]) {
+          // Session cache (in-memory, per-session)
           this.cacheService.setActivityScore(
             sessionId, activities[i].id, activityInputs[i].input, activityScores[i]
           );
@@ -981,7 +1262,40 @@ export class ScoringOrchestrator {
             this.evidenceCache.set(this.evidenceCacheKey(sessionId, activities[i].id), {
               evidence: allEvidence[i]!,
               tier: allTiers[i]!,
+              descriptionScore: descriptionScores[i] ?? undefined,
             });
+            this.enforceEvidenceCacheSize();
+          }
+
+          // Cross-user cache (Supabase, shared across users) — fire-and-forget
+          try {
+            const fingerprint = crossUserCacheService.computeFingerprint({
+              description: activities[i].description,
+              role: activities[i].role,
+              category: activities[i].category,
+              title: activities[i].title,
+              hoursPerWeek: activities[i].hoursPerWeek,
+              yearsActive: activities[i].yearsInvolved,
+            });
+            const tier = allTiers[i];
+            crossUserCacheService.write(fingerprint, {
+              descriptionTotal: descriptionScores[i]?.total ?? 0,
+              descriptionBreakdown: (descriptionScores[i]?.breakdown ?? {}) as Record<string, unknown>,
+              activityTotal: activityScores[i].total,
+              activityComponents: {
+                tierScore: activityScores[i].breakdown.tierAssessment.score,
+                recognitionScore: activityScores[i].breakdown.recognitionLevel.score,
+                leadershipScore: activityScores[i].breakdown.leadershipImpact.score,
+                communityScore: activityScores[i].breakdown.communityCharacter.score,
+                commitmentScore: activityScores[i].breakdown.commitmentProgression.score,
+              },
+              internalTier: (tier?.internalTier ?? 4) as import('./types').InternalTier,
+              externalTier: (tier?.externalTier ?? 3) as (1 | 2 | 3 | 4),
+            }).catch(err => {
+              console.warn(`[ScoringOrchestrator] Cross-user cache write failed for activity ${i + 1}:`, err instanceof Error ? err.message : err);
+            });
+          } catch (err) {
+            // Cross-user cache write failure is never fatal
           }
         }
       }
@@ -990,10 +1304,10 @@ export class ScoringOrchestrator {
     const timingMs = Date.now() - startTime;
     console.log(
       `[ScoringOrchestrator] Decomposed scoring complete in ${timingMs}ms ` +
-      `(${cachedCount} cached, ${toExtract.length} fresh)`
+      `(${cachedCount} session cached, ${crossUserHits} cross-user cached, ${toExtract.length} fresh)`
     );
 
-    return { success: true, scores: activityScores, tokensUsed, timingMs };
+    return { success: true, scores: activityScores, descriptionScores: descriptionScores as DescriptionScore[], tokensUsed, timingMs };
   }
 
   /**

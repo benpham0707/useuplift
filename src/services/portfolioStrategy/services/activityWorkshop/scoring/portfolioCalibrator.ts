@@ -23,6 +23,7 @@ import type {
   ExtractedEvidence,
 } from './types';
 import { TIER_SCORE_RANGES, TIER_COMPONENT_CONSTRAINTS } from './types';
+import { getMajorAlignment, getMajorRelevanceCategory } from './expertiseSignaling/majorAlignmentMatrix';
 
 // ============================================================================
 // TYPES
@@ -84,9 +85,11 @@ export type CalibrationRule =
  */
 export interface MajorRelevanceAnnotation {
   /** How relevant this activity is to the intended major */
-  relevance: 'core' | 'supporting' | 'unrelated';
+  relevance: 'core' | 'supporting' | 'complementary' | 'unrelated';
   /** Why this relevance was assigned */
   rationale: string;
+  /** Boost factor for downstream scoring [0, 1] */
+  boostFactor?: number;
 }
 
 /**
@@ -110,30 +113,15 @@ export interface PortfolioCalibrationResult {
 }
 
 // ============================================================================
-// MAJOR RELEVANCE KEYWORDS
+// MAJOR RELEVANCE — via Structured Alignment Matrix
 // ============================================================================
-
-/**
- * Keywords that indicate relevance to a major.
- * Used for the major-relevance annotation rule.
- */
-const MAJOR_RELEVANCE_MAP: Record<string, string[]> = {
-  'computer science': ['cs', 'computer', 'programming', 'coding', 'software', 'algorithm', 'data', 'machine learning', 'ai', 'artificial intelligence', 'web', 'app', 'robotics', 'cyber', 'tech', 'hackathon', 'nlp'],
-  'engineering': ['engineering', 'robotics', 'build', 'design', 'mechanical', 'electrical', 'civil', 'aerospace', 'prototype', 'cad', 'stem'],
-  'biology': ['biology', 'bio', 'lab', 'research', 'genetic', 'ecology', 'anatomy', 'hospital', 'medical', 'clinical', 'health', 'pre-med', 'premed'],
-  'medicine': ['hospital', 'clinical', 'health', 'medical', 'patient', 'shadowing', 'emt', 'volunteer clinic', 'pre-med', 'premed', 'anatomy', 'biology'],
-  'business': ['business', 'entrepreneur', 'startup', 'marketing', 'finance', 'investment', 'deca', 'fbla', 'economics', 'consulting', 'management', 'revenue'],
-  'political science': ['government', 'politics', 'debate', 'mun', 'model un', 'policy', 'campaign', 'advocacy', 'law', 'civic', 'legislature'],
-  'english': ['writing', 'journalism', 'literary', 'magazine', 'newspaper', 'creative writing', 'poetry', 'essay', 'editor', 'publication', 'scholastic'],
-  'mathematics': ['math', 'mathematics', 'amc', 'aime', 'usamo', 'mathcounts', 'calculus', 'statistics', 'number theory', 'algebra', 'competition math'],
-  'physics': ['physics', 'astrophysics', 'quantum', 'usapho', 'mechanics', 'optics', 'lab research'],
-  'chemistry': ['chemistry', 'chem', 'usnco', 'organic', 'biochem', 'lab'],
-  'environmental science': ['environment', 'sustainability', 'conservation', 'climate', 'ecology', 'recycling', 'green', 'wildlife'],
-  'psychology': ['psychology', 'mental health', 'counseling', 'peer mentor', 'behavioral', 'cognitive'],
-  'art': ['art', 'studio', 'gallery', 'sculpture', 'painting', 'drawing', 'visual', 'portfolio', 'ceramics', 'design'],
-  'music': ['music', 'orchestra', 'band', 'choir', 'instrument', 'composition', 'performance', 'recital', 'all-state', 'jazz'],
-  'theater': ['theater', 'theatre', 'drama', 'acting', 'directing', 'stage', 'musical', 'performance', 'improv'],
-};
+// Replaced flat keyword-based MAJOR_RELEVANCE_MAP with structured alignment
+// matrix from expertiseSignaling/majorAlignmentMatrix.ts. The matrix provides:
+// - 5 relevance tiers: critical | core | supporting | complementary | unrelated
+// - Numeric boost factors [0, 1]
+// - Admissions-informed rationale per alignment
+// - ~90 major name aliases for robust matching
+// See: getMajorAlignment() and getMajorRelevanceCategory() imported above
 
 // ============================================================================
 // RULE 1: EVIDENCE CONSISTENCY
@@ -325,8 +313,8 @@ function enforceRelativeOrdering(
     if (intendedMajor) {
       const aRelevance = computeMajorRelevance(a, intendedMajor);
       const bRelevance = computeMajorRelevance(b, intendedMajor);
-      const relevanceOrder = { core: 0, supporting: 1, unrelated: 2 };
-      return relevanceOrder[aRelevance] - relevanceOrder[bRelevance];
+      const relevanceOrder: Record<string, number> = { core: 0, supporting: 1, complementary: 2, unrelated: 3 };
+      return (relevanceOrder[aRelevance] ?? 3) - (relevanceOrder[bRelevance] ?? 3);
     }
     return 0;
   });
@@ -488,78 +476,49 @@ function enforceMinimumSpread(
 /**
  * Compute major relevance for a single activity.
  * Does NOT change scores — provides metadata for downstream portfolio scoring.
+ *
+ * Uses the impressiveness calibration alignment matrix (30 majors x 12 domains)
+ * with fallback to keyword-based matching for unmatched majors.
  */
 function computeMajorRelevance(
   input: CalibrationInput,
   intendedMajor?: string
-): 'core' | 'supporting' | 'unrelated' {
+): 'core' | 'supporting' | 'complementary' | 'unrelated' {
   if (!intendedMajor) return 'unrelated';
 
-  const majorLower = intendedMajor.toLowerCase();
-  const keywords = findMajorKeywords(majorLower);
-  if (keywords.length === 0) return 'unrelated';
+  // Use structured alignment matrix (15 majors x 12 domains, ~90 aliases)
+  const domainId = input.evidence.categoryMatch.category;
+  const alignment = getMajorAlignment(domainId, intendedMajor);
 
-  // Check activity title, description evidence, and category
-  const searchText = [
-    input.activityTitle,
-    input.evidence.role.title,
-    input.evidence.scope.evidence,
-    input.evidence.categoryMatch.category,
-    ...input.evidence.impact.tangibleOutcomes,
-    ...input.evidence.character.authenticitySignals,
-  ].join(' ').toLowerCase();
-
-  let matchCount = 0;
-  for (const keyword of keywords) {
-    if (searchText.includes(keyword)) matchCount++;
-  }
-
-  if (matchCount >= 3) return 'core';
-  if (matchCount >= 1) return 'supporting';
-  return 'unrelated';
-}
-
-/**
- * Find keywords for a given major (case-insensitive lookup).
- */
-function findMajorKeywords(majorLower: string): string[] {
-  // Direct match
-  if (MAJOR_RELEVANCE_MAP[majorLower]) {
-    return MAJOR_RELEVANCE_MAP[majorLower];
-  }
-
-  // Partial match (e.g., "computer science and engineering" matches "computer science")
-  for (const [key, keywords] of Object.entries(MAJOR_RELEVANCE_MAP)) {
-    if (majorLower.includes(key) || key.includes(majorLower)) {
-      return keywords;
-    }
-  }
-
-  return [];
+  // Map critical → core for backward compatibility with callers expecting 4 values
+  if (alignment.relevance === 'critical') return 'core';
+  return alignment.relevance;
 }
 
 /**
  * Annotate all activities with major relevance.
+ * Uses the structured alignment matrix for rich rationale and boost factors.
  */
 function annotateMajorRelevance(
   inputs: CalibrationInput[],
   intendedMajor?: string
 ): MajorRelevanceAnnotation[] {
   return inputs.map(input => {
-    const relevance = computeMajorRelevance(input, intendedMajor);
-
-    let rationale: string;
     if (!intendedMajor) {
-      rationale = 'No intended major specified';
-    } else if (relevance === 'core') {
-      rationale = `Directly relevant to ${intendedMajor} — multiple keyword matches in title/evidence`;
-    } else if (relevance === 'supporting') {
-      rationale = `Partially relevant to ${intendedMajor} — some keyword overlap`;
-    } else {
-      rationale = `Not directly relevant to ${intendedMajor}`;
+      return { relevance: 'unrelated' as const, rationale: 'No intended major specified' };
     }
 
-    return { relevance, rationale };
+    const domainId = input.evidence.categoryMatch.category;
+    const alignment = getMajorAlignment(domainId, intendedMajor);
+
+    // Map critical → core for backward compatibility
+    const relevance = alignment.relevance === 'critical' ? 'core' as const : alignment.relevance;
+
+    return {
+      relevance,
+      rationale: alignment.rationale,
+      boostFactor: alignment.boostFactor,
+    };
   });
 }
 

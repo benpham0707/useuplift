@@ -30,6 +30,7 @@ import {
   INTERNAL_TIER_NAMES,
 } from './types';
 import { BENCHMARKS_BY_CATEGORY, type BenchmarkEntry } from './comparisonBenchmarksLibrary';
+import { findRecognitionsInText } from './knowledge/recognitionIndex';
 
 // ============================================================================
 // TIER CLASSIFICATION RULES
@@ -104,6 +105,19 @@ function evaluateTier1Signals(evidence: ExtractedEvidence): TierSignal[] {
       ? `Matches benchmark: ${benchmarkMatch.benchmarkName}`
       : 'No Tier 1 benchmark match',
     weight: 0.9,
+  });
+
+  // [T1-E] KB recognition index match — O(1) lookup for known Tier 1 awards
+  const kbRecognitions = findKBRecognitionsFromEvidence(evidence);
+  const hasTier1KBMatch = kbRecognitions.some(r => r.entry.tier === 1 && r.confidence !== 'low');
+  const tier1KBMatch = kbRecognitions.find(r => r.entry.tier === 1 && r.confidence !== 'low');
+  signals.push({
+    rule: 'T1_E_KB_RECOGNITION',
+    matched: hasTier1KBMatch,
+    evidence: hasTier1KBMatch
+      ? `KB recognition: ${tier1KBMatch!.entry.name} (${tier1KBMatch!.confidence} confidence, ${tier1KBMatch!.entry.scope} scope)`
+      : 'No Tier 1 KB recognition match',
+    weight: 1.0,
   });
 
   return signals;
@@ -189,6 +203,19 @@ function evaluateTier2Signals(evidence: ExtractedEvidence): TierSignal[] {
       ? `Matches benchmark: ${benchmarkMatch.benchmarkName}`
       : 'No Tier 2 benchmark match',
     weight: 0.8,
+  });
+
+  // [T2-F2] KB recognition index match — O(1) lookup for known Tier 2 awards
+  const kbRecognitions = findKBRecognitionsFromEvidence(evidence);
+  const hasTier2KBMatch = kbRecognitions.some(r => r.entry.tier <= 2 && r.confidence !== 'low');
+  const tier2KBMatch = kbRecognitions.find(r => r.entry.tier <= 2 && r.confidence !== 'low');
+  signals.push({
+    rule: 'T2_F2_KB_RECOGNITION',
+    matched: hasTier2KBMatch,
+    evidence: hasTier2KBMatch
+      ? `KB recognition: ${tier2KBMatch!.entry.name} (tier ${tier2KBMatch!.entry.tier}, ${tier2KBMatch!.confidence} confidence)`
+      : 'No Tier 1-2 KB recognition match',
+    weight: 0.9,
   });
 
   // [T2-F] Published research: national recognition + verifiable quantified outcomes
@@ -724,6 +751,23 @@ const PROFESSIONAL_LEVEL_PATTERNS = [
   'peer-reviewed journal',
   'peer reviewed journal',
 ] as const;
+
+/**
+ * Find KB recognition entries from extracted evidence.
+ * Searches recognition names, role title, and description text against the KB recognition index.
+ * Results are cached per classifyTier call to avoid redundant lookups.
+ */
+function findKBRecognitionsFromEvidence(evidence: ExtractedEvidence): import('./knowledge/types').RecognitionLookupResult[] {
+  // Build searchable text from evidence
+  const searchParts: string[] = [];
+  for (const rec of evidence.recognitions) {
+    searchParts.push(rec.name);
+  }
+  searchParts.push(evidence.role.title);
+  const searchText = searchParts.join(' ');
+
+  return findRecognitionsInText(searchText);
+}
 
 /**
  * Check if a recognition name matches a professional-level pattern.

@@ -44,6 +44,22 @@ import {
 import { PortfolioScoreRubric, ActivityScoreRubric } from './types';
 import { ActivityWorkshopInput, ApplicationPlatform, getDescriptionCharLimit, getPlatformName } from '../types';
 
+// Teaching Sophistication Router — adaptive teaching depth by description score
+import {
+  type TeachingSophistication,
+  type SophisticationMap,
+  buildSophisticationMap,
+  getDominantSophistication,
+  getSophisticationPromptBlock,
+  getSystemSophisticationDirective,
+} from './teachingSophisticationRouter';
+
+// Expertise teaching formatters for prompt injection
+import {
+  buildExpertiseTeachingBlock,
+  buildExemplarBlock,
+} from '../expertSystemPrompts';
+
 // Import knowledge databases for research backing
 import {
   SPIKE_DEFINITIONS,
@@ -168,6 +184,16 @@ export class ActivityTeachingLayerService {
 
       console.log(`[TeachingLayer] Transforming ${activitiesToTransform.length} activities`);
 
+      // Build sophistication map from description scores
+      const sophisticationMap = buildSophisticationMap(
+        activitiesToTransform.map(a => ({
+          activityId: a.activityId,
+          descriptionScoreTotal: a.descriptionScore.total,
+        }))
+      );
+      const dominantSophistication = getDominantSophistication(sophisticationMap);
+      console.log(`[TeachingLayer] Sophistication: dominant=${dominantSophistication}, map=${[...sophisticationMap.entries()].map(([id, c]) => `${id}=${c.level}`).join(', ')}`);
+
       // Build the teaching prompt
       const prompt = this.buildTeachingPrompt(
         scoringRubric,
@@ -175,12 +201,14 @@ export class ActivityTeachingLayerService {
         activitiesToTransform,
         studentContext,
         options,
-        input.targetPlatform
+        input.targetPlatform,
+        sophisticationMap,
+        input.expertiseData
       );
 
       // Call Claude Sonnet for quality teaching (with 1 retry on empty/parse-failed result)
       const callOpts = {
-        systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform),
+        systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform, dominantSophistication),
         model: 'claude-sonnet-4-5-20250929' as const,
         cacheSystemPrompt: true,
         maxTokens: 8000,
@@ -298,10 +326,13 @@ export class ActivityTeachingLayerService {
   /**
    * Build the system prompt for teaching generation
    */
-  private getSystemPrompt(currentGrade?: number, targetPlatform?: ApplicationPlatform): string {
+  private getSystemPrompt(currentGrade?: number, targetPlatform?: ApplicationPlatform, dominantSophistication?: TeachingSophistication): string {
     const gradeContext = this.getGradeContext(currentGrade, targetPlatform);
     const charLimit = getDescriptionCharLimit(targetPlatform);
     const platformName = getPlatformName(targetPlatform);
+    const sophisticationDirective = dominantSophistication
+      ? getSystemSophisticationDirective(dominantSophistication)
+      : '';
 
     return `You are an elite college admissions essay coach with 20+ years of experience helping students get into Harvard, Stanford, MIT, and other top schools.
 
@@ -314,7 +345,7 @@ IMPORTANT:
 - Use second person ("you/your") throughout. Speak directly to the student.
 - Focus on what the student can actually CONTROL or AIM FOR.
 - Don't repeat information from the scoring layer — extend it with actionable guidance.
-
+${sophisticationDirective ? `\n## TEACHING SOPHISTICATION LEVEL\n${sophisticationDirective}\n` : ''}
 ## GRADE-LEVEL TIMELINE AWARENESS
 ${gradeContext}
 
@@ -535,13 +566,16 @@ Respond in valid JSON matching the requested structure exactly.`;
     activitiesToTransform: ActivityScoreRubric[],
     studentContext?: TeachingLayerInput['studentContext'],
     options?: TeachingLayerInput['options'],
-    targetPlatform?: ApplicationPlatform
+    targetPlatform?: ApplicationPlatform,
+    sophisticationMap?: SophisticationMap,
+    expertiseData?: TeachingLayerInput['expertiseData']
   ): string {
     const charLimit = getDescriptionCharLimit(targetPlatform);
     const platformName = getPlatformName(targetPlatform);
-    // Build activity context
+    // Build activity context with per-activity sophistication level
     const activityContext = activitiesToTransform.map((score) => {
       const activity = activities.find((a) => a.id === score.activityId);
+      const sophistication = sophisticationMap?.get(score.activityId);
       return {
         id: score.activityId,
         title: score.activityTitle,
@@ -549,6 +583,7 @@ Respond in valid JSON matching the requested structure exactly.`;
         currentScore: score.combinedScore.total,
         descriptionScore: score.descriptionScore.total,
         activityScore: score.activityScore.total,
+        teachingSophistication: sophistication?.level || 'foundational',
         issues: [
           ...score.descriptionScore.improvements,
           ...(score.activityScore.improvementPaths || []),
@@ -557,6 +592,28 @@ Respond in valid JSON matching the requested structure exactly.`;
         tierClassification: score.activityScore.breakdown.tierAssessment.tier,
       };
     });
+
+    // Build per-activity expertise blocks for prompt injection
+    let expertiseBlocks = '';
+    if (expertiseData && expertiseData.size > 0) {
+      const blocks: string[] = [];
+      for (const score of activitiesToTransform) {
+        const expData = expertiseData.get(score.activityId);
+        if (expData) {
+          const teachingBlock = buildExpertiseTeachingBlock(expData.teachingContext);
+          const exemplarBlock = buildExemplarBlock(expData.exemplars);
+          const transformBlock = expData.transforms.length > 0
+            ? `\n## FIELD-SPECIFIC IMPROVEMENTS FOR "${score.activityTitle}"\n${expData.transforms.slice(0, 3).map(t => `Before: "${t.before}"\nAfter: "${t.after}"\nWhy: ${t.explanation}`).join('\n\n')}`
+            : '';
+          if (teachingBlock || exemplarBlock || transformBlock) {
+            blocks.push(`### EXPERTISE CONTEXT: ${score.activityTitle}\n${teachingBlock}\n${exemplarBlock}\n${transformBlock}`);
+          }
+        }
+      }
+      if (blocks.length > 0) {
+        expertiseBlocks = `\n\n## FIELD-SPECIFIC EXPERTISE GUIDANCE (pre-computed, $0)\n\n${blocks.join('\n\n---\n\n')}`;
+      }
+    }
 
     // Build spike context from actual rubric fields
     const spikeContext = {
@@ -589,6 +646,15 @@ Gaps needing attention: ${rubric.keyGaps.join('; ')}
 
 ## ACTIVITIES NEEDING TRANSFORMATION:
 ${JSON.stringify(activityContext, null, 2)}
+
+## PER-ACTIVITY TEACHING DEPTH INSTRUCTIONS:
+${activitiesToTransform.map(score => {
+  const sophistication = sophisticationMap?.get(score.activityId);
+  if (!sophistication) return '';
+  return `### ${score.activityTitle} (descScore: ${score.descriptionScore.total.toFixed(1)}/10)
+${getSophisticationPromptBlock(sophistication.level)}`;
+}).filter(Boolean).join('\n\n')}
+${expertiseBlocks}
 
 ## YOUR TASK: PROVIDE THE PRESCRIPTION
 

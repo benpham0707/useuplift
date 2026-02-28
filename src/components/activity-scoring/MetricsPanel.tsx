@@ -1,20 +1,18 @@
 /**
- * MetricsPanel — Master-Detail "Inventory Takeover" pattern.
+ * MetricsPanel — Tabbed HUD with Master-Detail takeover.
  *
- * Grid View: Dual-column layout (Activity 70% | Narrative 30%) with compact stat bars.
- * Detail View: Clicking a stat crossfades the grid out and reveals a full-panel detail
- *   overlay with staggered content entrance. Grid stays in DOM for height stability.
- *
- * Animation architecture:
- *   Grid layer  — always rendered, instantly hidden via opacity when detail is active
- *   Detail layer — absolute overlay, fades in on top with sequenced content stagger
- *   Fully opaque detail bg — no bleed-through, no backdrop-blur (GPU-friendly)
+ * Architecture:
+ *   Single-column tabbed layout replaces the old 2-column grid.
+ *   StatTabs pill selector switches between Activity / Narrative.
+ *   Full-width stat rows maximize horizontal real estate.
+ *   Detail overlay fades in on click with staggered content entrance.
  */
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Zap, PenTool, ArrowLeft, X, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ParagraphText } from '@/components/portfolio/activity-workshop/RichText';
+import { StatTabs, type StatTabType } from './StatTabs';
 
 // ============================================================================
 // TYPES
@@ -36,52 +34,15 @@ interface MetricsPanelProps {
 }
 
 // ============================================================================
-// SCORE HELPERS
+// SCORE THEME — tier-matched gradients + glow
 // ============================================================================
 
-function scoreColorClass(score: number): string {
-  if (score >= 8.0) return 'text-green-500 dark:text-green-400';
-  if (score >= 6.0) return 'text-teal-500 dark:text-teal-400';
-  if (score >= 4.0) return 'text-amber-500 dark:text-amber-400';
-  return 'text-red-500 dark:text-red-400';
-}
-
-/**
- * Score-colored bar with progressive glow.
- *
- * Color matches the score tier (green / teal / amber / red) so bar and number
- * feel unified. The bar starts muted on the left and the glow VFX intensifies
- * with percentage — short bars are quiet, long bars radiate.
- *
- * Each tier defines: hue, base saturation/lightness (left edge), and glow RGB.
- */
-function barStyle(score: number, pct: number) {
-  const t = Math.min(pct / 100, 1);
-
-  // Pick hue family based on score tier (matches scoreColorClass)
-  let hue: number, baseSat: number, baseLight: number, glowRgb: string;
-  if (score >= 8.0) {
-    hue = 142; baseSat = 50; baseLight = 62; glowRgb = '34,197,94';       // green
-  } else if (score >= 6.0) {
-    hue = 168; baseSat = 50; baseLight = 62; glowRgb = '20,184,166';      // teal
-  } else if (score >= 4.0) {
-    hue = 38;  baseSat = 60; baseLight = 62; glowRgb = '245,158,11';      // amber
-  } else {
-    hue = 0;   baseSat = 55; baseLight = 62; glowRgb = '239,68,68';       // red
-  }
-
-  // End color: saturation and lightness intensify with bar length
-  const endSat = Math.round(baseSat + t * 40);    // e.g. 50% → 90%
-  const endLight = Math.round(baseLight - t * 18); // e.g. 62% → 44%
-
-  // Glow: quadratic ramp so short bars barely glow, long bars radiate
-  const glowAlpha = (t * t * 0.5).toFixed(2);     // 0 → 0.5
-  const glowSpread = Math.round(3 + t * t * 16);  // 3px → 19px
-
-  return {
-    background: `linear-gradient(to right, hsl(${hue} ${baseSat}% ${baseLight}%), hsl(${hue} ${endSat}% ${endLight}%))`,
-    boxShadow: `0 0 ${glowSpread}px rgba(${glowRgb},${glowAlpha})`,
-  };
+function getScoreTheme(score: number, maxScore: number) {
+  const ratio = score / maxScore;
+  if (ratio >= 0.8) return { gradient: 'from-emerald-400 to-teal-500', glowHex: '#10b981', textClass: 'text-emerald-500 dark:text-emerald-400' };
+  if (ratio >= 0.6) return { gradient: 'from-cyan-400 to-blue-500', glowHex: '#0ea5e9', textClass: 'text-cyan-500 dark:text-cyan-400' };
+  if (ratio >= 0.4) return { gradient: 'from-amber-400 to-orange-500', glowHex: '#f59e0b', textClass: 'text-amber-500 dark:text-amber-400' };
+  return { gradient: 'from-red-500 to-rose-600', glowHex: '#ef4444', textClass: 'text-red-500 dark:text-red-400' };
 }
 
 const CATEGORY_COLOR = {
@@ -96,75 +57,80 @@ const CATEGORY_COLOR = {
 function StatBar({
   stat,
   isDetail = false,
-  skipEntrance = false,
 }: {
   stat: StatItem;
   isDetail?: boolean;
-  skipEntrance?: boolean;
 }) {
-  const pct = Math.min(stat.score / stat.maxScore, 1) * 100;
-  const style = barStyle(stat.score, pct);
+  const percentage = (stat.score / stat.maxScore) * 100;
+  const theme = getScoreTheme(stat.score, stat.maxScore);
 
   return (
-    <div className="w-full">
-      <div className={cn('flex justify-between', isDetail ? 'items-center mb-2' : 'items-end mb-1.5')}>
-        <div className="flex items-center gap-2 min-w-0">
+    <div className="w-full flex flex-col justify-center">
+      <div className="flex items-end justify-between mb-2 w-full gap-6">
+        {/* Label — wraps gracefully, no truncation */}
+        <div className="flex items-center flex-1 relative pr-6">
           <span
             className={cn(
-              'font-bold transition-colors',
+              'font-semibold leading-tight transition-all duration-300 break-words w-full',
               isDetail
-                ? 'text-base text-foreground/90'
-                : 'text-[13px] text-foreground/80 group-hover:text-foreground',
+                ? 'text-lg text-foreground'
+                : 'text-[14px] text-foreground/80 group-hover:text-foreground group-hover:translate-x-1',
             )}
           >
             {stat.label}
           </span>
+          {/* Hover chevron — absolutely positioned, zero structural space */}
           {!isDetail && (
-            <span className="opacity-0 -translate-x-1.5 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 flex items-center text-[9px] uppercase tracking-wider font-bold text-muted-foreground/40">
-              Inspect <ChevronRight className="w-2.5 h-2.5 ml-0.5" />
-            </span>
-          )}
-          {isDetail && stat.badges && (
-            <div className="flex flex-wrap gap-1 items-center">
-              {stat.badges}
-            </div>
+            <ChevronRight className="absolute right-0 w-4 h-4 opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-300 text-foreground/40" />
           )}
         </div>
-        <span
-          className={cn(
-            'font-extrabold tabular-nums shrink-0 flex items-baseline gap-0.5',
-            isDetail ? 'text-xl' : 'text-[15px]',
-            scoreColorClass(stat.score),
-          )}
-        >
-          {stat.score.toFixed(1)}
+
+        {/* Score — pinned right */}
+        <div className="flex items-baseline gap-0.5 shrink-0 transition-transform duration-300 group-hover:-translate-x-1">
           <span
             className={cn(
-              'font-medium text-foreground/25',
-              isDetail ? 'text-base' : 'text-[9px]',
+              'font-extrabold tracking-tight tabular-nums',
+              theme.textClass,
+              isDetail ? 'text-3xl' : 'text-[16px]',
+            )}
+          >
+            {stat.score.toFixed(1)}
+          </span>
+          <span
+            className={cn(
+              'font-medium text-foreground/30',
+              isDetail ? 'text-sm' : 'text-[11px]',
             )}
           >
             /{stat.maxScore}
           </span>
-        </span>
+        </div>
       </div>
-      <div
-        className={cn(
-          'w-full rounded-full relative overflow-hidden',
-          isDetail ? 'h-2' : 'h-1.5',
-        )}
-        style={{
-          background: 'hsl(var(--foreground) / 0.05)',
-          boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
-        }}
-      >
+
+      {/* Segmented HUD Energy Bar */}
+      <div className={cn('w-full bg-foreground/10 rounded-full overflow-hidden relative z-10', isDetail ? 'h-2.5' : 'h-2')}>
+        {/* Universal segmentation overlay — slices through track + fill */}
+        <div className="absolute inset-0 z-20 flex pointer-events-none">
+          {[...Array(10)].map((_, i) => (
+            <div
+              key={i}
+              className="flex-1 border-r-[2px] border-card last:border-0 opacity-80"
+            />
+          ))}
+        </div>
+
         <motion.div
-          initial={skipEntrance ? false : { width: 0 }}
-          animate={{ width: `${Math.max(pct, stat.score > 0 ? 5 : 0)}%` }}
-          transition={{ duration: 0.8, type: 'spring', bounce: 0.15 }}
-          className="h-full rounded-full"
-          style={style}
-        />
+          initial={{ width: 0 }}
+          animate={{ width: `${percentage}%` }}
+          transition={{ duration: 1.2, type: 'spring', bounce: 0.1 }}
+          className={cn('h-full relative bg-gradient-to-r z-10', theme.gradient)}
+          style={{ boxShadow: `0 0 10px ${theme.glowHex}40` }}
+        >
+          {/* Energy accumulation at leading edge */}
+          <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white/60 to-transparent mix-blend-overlay" />
+          {/* Crisp glowing leading edge spark */}
+          <div className="absolute right-0 top-0 bottom-0 w-[1.5px] bg-white shadow-[0_0_8px_1px_rgba(255,255,255,0.9)]" />
+        </motion.div>
       </div>
     </div>
   );
@@ -183,11 +149,12 @@ function DetailOverlay({
 }) {
   return (
     <motion.div
+      key="detail-view"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0, transition: { duration: 0.12, ease: 'easeIn' } }}
       transition={{ duration: 0.15, ease: 'easeOut' }}
-      className="flex flex-col"
+      className="absolute inset-0 z-20 p-8 md:p-10 flex flex-col bg-card border border-foreground/10 shadow-2xl rounded-3xl overflow-y-auto"
       style={{ willChange: 'opacity' }}
     >
       {/* Header controls */}
@@ -195,69 +162,131 @@ function DetailOverlay({
         initial={{ opacity: 0, y: -6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1, duration: 0.2, ease: 'easeOut' }}
-        className="flex items-center justify-between mb-5 flex-shrink-0"
+        className="flex items-center justify-between mb-12 flex-shrink-0"
       >
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/60 hover:text-foreground transition-colors group"
+          className="flex items-center gap-2 text-sm font-bold tracking-wide uppercase text-foreground/50 hover:text-foreground transition-colors group"
         >
-          <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+          <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
           Back to Overview
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-full hover:bg-muted/20 transition-colors text-muted-foreground/40 hover:text-foreground"
+          className="p-2.5 rounded-full hover:bg-foreground/5 transition-colors text-foreground/50 hover:text-foreground"
         >
-          <X className="w-4 h-4" />
+          <X className="w-5 h-5" />
         </button>
       </motion.div>
 
-      {/* Content — panel sizes to fit */}
-      <div className="flex flex-col">
+      {/* Content */}
+      <div className="flex flex-col flex-1 max-w-2xl mx-auto w-full">
         {/* Category badge */}
         <motion.div
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.08, duration: 0.2, ease: 'easeOut' }}
-          className="mb-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/15 border border-border/10 text-[9px] font-extrabold uppercase tracking-[0.15em] w-fit"
+          className="mb-8 inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-foreground/5 border border-foreground/10 text-[10px] font-extrabold uppercase tracking-[0.2em] w-fit"
           style={{ color: CATEGORY_COLOR[stat.category] }}
         >
-          {stat.category === 'activity' ? <Zap className="w-3 h-3" /> : <PenTool className="w-3 h-3" />}
+          {stat.category === 'activity' ? <Zap className="w-3.5 h-3.5" /> : <PenTool className="w-3.5 h-3.5" />}
           {stat.category === 'activity' ? 'Activity Metric' : 'Narrative Metric'}
         </motion.div>
 
-        {/* Enlarged stat bar with inline badges */}
+        {/* Enlarged stat bar with badges */}
         <motion.div
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.12, duration: 0.2, ease: 'easeOut' }}
           className="mb-5"
         >
-          <StatBar stat={stat} isDetail skipEntrance />
+          <StatBar stat={stat} isDetail />
+          {stat.badges && (
+            <div className="flex flex-wrap gap-1 items-center mt-3">
+              {stat.badges}
+            </div>
+          )}
         </motion.div>
 
         {/* Full rationale */}
         {stat.description && (
           <motion.div
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2, duration: 0.25, ease: 'easeOut' }}
+            transition={{ delay: 0.2, duration: 0.5 }}
           >
-            <h3 className="text-xs font-bold text-foreground/70 uppercase tracking-wider mb-2">
-              Strategic Analysis
-            </h3>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-px bg-gradient-to-r from-foreground/20 to-transparent flex-1" />
+              <h3 className="text-[11px] font-extrabold uppercase tracking-[0.25em] text-foreground/40 shrink-0">
+                Strategic Analysis
+              </h3>
+              <div className="h-px bg-gradient-to-l from-foreground/20 to-transparent flex-1" />
+            </div>
             <div className="rounded-xl bg-muted/10 dark:bg-muted/5 p-4 border border-border/10">
               <ParagraphText
                 text={stat.description}
-                className="text-[12px] text-foreground/70 leading-relaxed"
+                className="text-[13px] text-foreground/70 leading-relaxed"
               />
             </div>
           </motion.div>
         )}
       </div>
     </motion.div>
+  );
+}
+
+// ============================================================================
+// STAT COLUMN — rendered at full width for the active tab
+// ============================================================================
+
+function StatColumn({
+  title,
+  weight,
+  stats,
+  color,
+  onSelectStat,
+}: {
+  title: string;
+  weight: string;
+  stats: StatItem[];
+  color: string;
+  onSelectStat: (stat: StatItem) => void;
+}) {
+  return (
+    <div className="flex flex-col w-full max-w-2xl mx-auto py-2">
+      <div className="flex items-center justify-between pb-3 mb-1 border-b-2 border-foreground/5">
+        <div className="flex flex-col">
+          <h3
+            className="font-extrabold tracking-tight text-lg leading-none"
+            style={{ color }}
+          >
+            {title}
+          </h3>
+          <span className="text-[10px] uppercase tracking-widest text-foreground/30 font-bold mt-1">
+            Assessment Categories
+          </span>
+        </div>
+        <div className="flex items-baseline gap-1 text-foreground/40 shrink-0 tabular-nums">
+          <span className="text-lg font-bold">{weight}</span>
+          <span className="text-xs uppercase tracking-widest font-semibold mt-1">Weight</span>
+        </div>
+      </div>
+
+      <div className="flex flex-col w-full">
+        {stats.map((stat) => (
+          <div
+            key={stat.id}
+            onClick={() => onSelectStat(stat)}
+            className="group cursor-pointer py-[18px] border-b border-foreground/5 last:border-0 relative overflow-hidden w-full"
+          >
+            <div className="absolute inset-0 bg-foreground/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg -mx-2 pointer-events-none" />
+            <StatBar stat={stat} />
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -270,91 +299,68 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
   narrativeStats,
 }) => {
   const [selectedStat, setSelectedStat] = useState<StatItem | null>(null);
+  const [activeTab, setActiveTab] = useState<StatTabType>('activity');
   const handleClose = useCallback(() => setSelectedStat(null), []);
 
   return (
-    <div className="relative w-full h-full glass-card rounded-2xl p-4 md:p-5 border border-border/15 overflow-hidden flex flex-col">
+    <div className="relative w-full h-full bg-card rounded-3xl p-6 md:p-8 border border-foreground/5 shadow-sm overflow-hidden flex flex-col">
       {/* Subtle tech grid background */}
       <div
-        className="absolute inset-0 pointer-events-none opacity-[0.03]"
+        className="absolute inset-0 pointer-events-none opacity-[0.02]"
         style={{
           backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)',
           backgroundSize: '24px 24px',
         }}
       />
 
-      {/* ── Grid layer — collapses when detail is shown ── */}
-      <motion.div
-        animate={
-          selectedStat
-            ? { opacity: 0, scale: 0.98, height: 0 }
-            : { opacity: 1, scale: 1, height: 'auto' }
-        }
-        transition={{ duration: 0.15, ease: 'easeOut' }}
-        style={{ willChange: 'opacity, transform' }}
-        className={cn('overflow-hidden relative z-[1] flex-1', selectedStat && 'pointer-events-none')}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 h-full">
-          {/* Activity Column */}
-          <div className="flex flex-col justify-between">
-            <div className="flex items-center justify-between border-b border-border/10 pb-1.5 mb-0.5">
-              <div
-                className="flex items-center gap-1.5 font-extrabold tracking-widest uppercase text-[10px]"
-                style={{ color: CATEGORY_COLOR.activity }}
-              >
-                <Zap className="w-3.5 h-3.5" /> Activity Strength
-              </div>
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/40 font-bold bg-muted/15 px-1.5 py-0.5 rounded">
-                70% Wgt
-              </span>
-            </div>
-            {activityStats.map((stat) => (
-              <div
-                key={stat.id}
-                onClick={() => setSelectedStat(stat)}
-                className="group cursor-pointer py-2 px-2.5 -mx-1 rounded-lg hover:bg-foreground/[0.03] border border-transparent hover:border-foreground/10 transition-all duration-200"
-              >
-                <StatBar stat={stat} />
-              </div>
-            ))}
-          </div>
+      {/* ── Tab selector ── */}
+      <div className="w-full flex justify-center mb-5 relative z-10">
+        <StatTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      </div>
 
-          {/* Narrative Column */}
-          <div className="flex flex-col justify-between">
-            <div className="flex items-center justify-between border-b border-border/10 pb-1.5 mb-0.5">
-              <div
-                className="flex items-center gap-1.5 font-extrabold tracking-widest uppercase text-[10px]"
-                style={{ color: CATEGORY_COLOR.narrative }}
-              >
-                <PenTool className="w-3.5 h-3.5" /> Narrative &amp; Detail
-              </div>
-              <span className="text-[9px] uppercase tracking-wider text-muted-foreground/40 font-bold bg-muted/15 px-1.5 py-0.5 rounded">
-                30% Wgt
-              </span>
-            </div>
-            {narrativeStats.map((stat) => (
-              <div
-                key={stat.id}
-                onClick={() => setSelectedStat(stat)}
-                className="group cursor-pointer py-2 px-2.5 -mx-1 rounded-lg hover:bg-foreground/[0.03] border border-transparent hover:border-foreground/10 transition-all duration-200"
-              >
-                <StatBar stat={stat} />
-              </div>
-            ))}
-          </div>
-        </div>
-      </motion.div>
+      {/* ── Active column — full width, animated transitions ── */}
+      <div className="flex-1 relative z-[1]">
+        <AnimatePresence mode="wait">
+          {!selectedStat ? (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {activeTab === 'activity' ? (
+                <StatColumn
+                  title="Activity Strength"
+                  weight="70%"
+                  stats={activityStats}
+                  color={CATEGORY_COLOR.activity}
+                  onSelectStat={setSelectedStat}
+                />
+              ) : (
+                <StatColumn
+                  title="Narrative & Detail"
+                  weight="30%"
+                  stats={narrativeStats}
+                  color={CATEGORY_COLOR.narrative}
+                  onSelectStat={setSelectedStat}
+                />
+              )}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
 
-      {/* ── Detail layer — absolute overlay, fades in on top ── */}
-      <AnimatePresence>
-        {selectedStat && (
-          <DetailOverlay
-            key={selectedStat.id}
-            stat={selectedStat}
-            onClose={handleClose}
-          />
-        )}
-      </AnimatePresence>
+        {/* ── Detail overlay ── */}
+        <AnimatePresence>
+          {selectedStat && (
+            <DetailOverlay
+              key={selectedStat.id}
+              stat={selectedStat}
+              onClose={handleClose}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 };

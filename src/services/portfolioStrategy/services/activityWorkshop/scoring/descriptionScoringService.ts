@@ -45,7 +45,7 @@
 import { callClaude } from '@/lib/llm/claude';
 // R7: Use robust parseClaudeJSON with jsonrepair fallback
 import { tryParseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
-import { writingPreAnalyzer, formatForActivityScoring, postLLMCalibrator } from '../../../../services/writingEngine';
+import { writingPreAnalyzer, formatForActivityScoring, postLLMCalibrator } from '../../../../writingEngine';
 import {
   DescriptionScore,
   DescriptionScoreBreakdown,
@@ -53,6 +53,7 @@ import {
   DESCRIPTION_SCORE_LEVELS,
 } from './types';
 import { ApplicationPlatform, getDescriptionCharLimit, getPlatformName } from '../types';
+import { resolveCategory } from './knowledge/categoryRegistry';
 
 // ============================================================================
 // TYPES
@@ -484,15 +485,32 @@ const buildDescriptionScoringPrompt = (input: DescriptionScoringInput): string =
     ? `\nTIME INVESTMENT: ${input.hoursPerWeek} hrs/week, ${input.weeksPerYear} weeks/year`
     : '';
 
+  // Inject KB AO expectations for field-specific scoring calibration
+  const aoBlock = buildAOContextForDescriptionScoring(input.activityType, input.description, input.position);
+
   return `Score this activity description:
 
-ACTIVITY: ${input.activityTitle}${input.activityType ? ` (${input.activityType})` : ''}${input.position ? `\nPOSITION: ${input.position}` : ''}${timeContext}
+ACTIVITY: ${input.activityTitle}${input.activityType ? ` (${input.activityType})` : ''}${input.position ? `\nPOSITION: ${input.position}` : ''}${timeContext}${aoBlock}
 
 DESCRIPTION (${input.description.length} characters):
 "${input.description}"
 
 Apply the rubric precisely. Provide your scoring in the JSON format specified.`;
 };
+
+/**
+ * Build AO context block from KB for description scoring.
+ * Helps Sonnet understand what AOs look for in this specific field.
+ */
+function buildAOContextForDescriptionScoring(activityType?: string, description?: string, role?: string): string {
+  if (!activityType && !description) return '';
+
+  const resolution = resolveCategory(description || activityType || '', activityType, role);
+  if (!resolution || !resolution.category.aoExpectations) return '';
+
+  const ao = resolution.category.aoExpectations;
+  return `\nFIELD CONTEXT (${resolution.category.label}): AOs ask: "${ao.goldenQuestion}" | They look for: ${ao.whatRegisters.slice(0, 2).join('; ')} | Red flags: ${ao.whatAOsSeeThrough.slice(0, 2).join('; ')}`;
+}
 
 const buildBatchDescriptionScoringPrompt = (inputs: DescriptionScoringInput[]): string => {
   const activitiesText = inputs

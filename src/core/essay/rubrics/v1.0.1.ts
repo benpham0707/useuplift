@@ -83,7 +83,7 @@ const dimensions: RubricDimensionDefinition[] = [
     name: 'narrative_arc_stakes_turn',
     display_name: 'Narrative Arc, Stakes & Turn',
     definition: 'Presence of tension → decision → consequence. Stakes can be internal (identity, belonging) or external (deadline, risk).',
-    weight: 0.12,
+    weight: 0.11,
 
     anchors: [
       {
@@ -137,7 +137,7 @@ const dimensions: RubricDimensionDefinition[] = [
     name: 'character_interiority_vulnerability',
     display_name: 'Character Interiority & Vulnerability',
     definition: 'We hear the mind on the page: emotions named, contradictions faced, limits admitted. 68% of exemplar essays show vulnerability.',
-    weight: 0.12,
+    weight: 0.11,
 
     anchors: [
       {
@@ -196,7 +196,7 @@ const dimensions: RubricDimensionDefinition[] = [
     name: 'show_dont_tell_craft',
     display_name: 'Show-Don\'t-Tell Craft',
     definition: 'Scenes, snippets of dialogue, concrete images carry meaning (not just summary).',
-    weight: 0.10,
+    weight: 0.09,
 
     anchors: [
       {
@@ -249,7 +249,7 @@ const dimensions: RubricDimensionDefinition[] = [
     name: 'reflection_meaning_making',
     display_name: 'Reflection & Meaning-Making',
     definition: 'Insight that reframes the experience without moral-of-the-story clichés.',
-    weight: 0.12,
+    weight: 0.11,
 
     anchors: [
       {
@@ -889,5 +889,5 @@ export const DIMENSION_WEIGHTS_V1_0_1 = dimensions.reduce((acc, dim) => {
 // Validate weights sum to 1.0
 const total_weight = dimensions.reduce((sum, dim) => sum + dim.weight, 0);
 if (Math.abs(total_weight - 1.0) > 0.001) {
-} else {
+  throw new Error(`Rubric v1.0.1 weight validation failed: weights sum to ${total_weight.toFixed(4)}, expected 1.0000`);
 }

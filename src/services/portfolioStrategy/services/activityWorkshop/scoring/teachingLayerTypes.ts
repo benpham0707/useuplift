@@ -346,6 +346,17 @@ export interface TeachingLayerInput {
     /** Focus on specific activities by ID */
     focusActivities?: string[];
   };
+  /**
+   * Per-activity expertise data for field-specific teaching guidance.
+   * Keyed by activity ID. Provides domain-specific AO expectations,
+   * name-drop trap warnings, power verbs, exemplars, and transforms.
+   * Cost: $0.00 (all pre-computed from static data)
+   */
+  expertiseData?: Map<string, {
+    teachingContext: import('./expertiseSignaling/types').ExpertiseTeachingContext;
+    exemplars: import('./expertiseSignaling/types').Exemplar[];
+    transforms: import('./expertiseSignaling/types').DescriptionTransform[];
+  }>;
 }
 
 /**

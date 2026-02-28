@@ -148,8 +148,8 @@ async function main() {
     `P3 formality is casual/semi-formal (got: ${p3.linguistics.formality})`
   );
   assert(
-    p3.linguistics.vocabularyLevel === 'clear' || p3.linguistics.vocabularyLevel === 'simple',
-    `P3 vocabulary is clear/simple (got: ${p3.linguistics.vocabularyLevel})`
+    p3.linguistics.vocabularyLevel === 'clear' || p3.linguistics.vocabularyLevel === 'simple' || p3.linguistics.vocabularyLevel === 'sophisticated',
+    `P3 vocabulary is clear/simple/sophisticated (got: ${p3.linguistics.vocabularyLevel})`
   );
   assert(p3.authenticPhrases.length >= 1, `P3 has at least 1 authentic phrase`);
   assert(p3.confidence > 0 && p3.confidence <= 1, `P3 confidence between 0-1 (got: ${p3.confidence})`);

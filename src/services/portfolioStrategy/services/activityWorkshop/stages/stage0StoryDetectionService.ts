@@ -40,7 +40,7 @@ import {
 } from '../types';
 import { ActivityProfile } from '../profile/types';
 import { profileBridgeService } from '../profileBridge';
-import { writingPreAnalyzer, formatForActivityDescription } from '../../../../services/writingEngine';
+import { writingPreAnalyzer, formatForActivityDescription } from '../../../../writingEngine';
 
 /**
  * Stage 0: Story Detection Service

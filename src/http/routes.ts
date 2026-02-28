@@ -1116,6 +1116,13 @@ r.post("/api/analytics/compare-versions", requireAuth, async (req, res) => {
   }
 });
 
+// Enhanced Workshop Routes (kill switch: ENABLE_ENHANCED_WORKSHOP env var)
+import enhancedWorkshopRouter from "./enhancedWorkshopRoutes";
+if (process.env.ENABLE_ENHANCED_WORKSHOP === 'true') {
+  r.use("/enhanced", enhancedWorkshopRouter);
+  console.log('Enhanced workshop routes: ENABLED');
+}
+
 // Simple health check for dev tooling and frontends
 r.get('/health', (_req, res) => {
   const hasAnthropicKey = Boolean(process.env.ANTHROPIC_API_KEY && process.env.ANTHROPIC_API_KEY.length > 10);

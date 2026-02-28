@@ -19,6 +19,7 @@ import {
   formatExpertKnowledgeForPrompt,
   formatExpertKnowledgeLite,
 } from './expertCounselorKnowledgeBase';
+import type { Exemplar, ExpertiseTeachingContext } from './scoring/expertiseSignaling/types';
 
 // ═══════════════════════════════════════════════════════════════════
 // LAYER 1: THE EXPERT ANALYSIS MINDSET
@@ -115,6 +116,85 @@ You are not a scoring machine. You are an expert reader who understands the HUMA
 // ═══════════════════════════════════════════════════════════════════
 
 /**
+ * Build an exemplar injection block for the teaching prompt.
+ * Provides pre-built, field-specific exemplar descriptions that the model
+ * references instead of generating examples from scratch.
+ */
+export function buildExemplarBlock(exemplars: Exemplar[] | undefined): string {
+  if (!exemplars || exemplars.length === 0) return '';
+
+  const exemplarLines = exemplars.map(e => {
+    const techniques = e.techniques.join(', ');
+    return `EXEMPLAR (Tier ${e.tier}):
+  "${e.description}"
+  This works because: ${e.whyItWorks}
+  Techniques: ${techniques}`;
+  }).join('\n\n');
+
+  return `
+## FIELD-SPECIFIC EXEMPLARS (pre-built, reference these instead of generating examples)
+
+When showing the student what a great description looks like at their level, reference these pre-validated exemplars:
+
+${exemplarLines}
+
+Use these as REFERENCE POINTS, not copy targets. The student's optimized description should be inspired by these techniques but written in THEIR voice about THEIR specific activity.`;
+}
+
+/**
+ * Build an expertise teaching context block for the teaching prompt.
+ * Injects field-specific AO expectations, traps, and power verbs.
+ */
+export function buildExpertiseTeachingBlock(teachingCtx: ExpertiseTeachingContext | undefined): string {
+  if (!teachingCtx) return '';
+
+  const sections: string[] = [];
+
+  // AO expectations
+  const ao = teachingCtx.aoExpectations;
+  sections.push(`## FIELD-SPECIFIC AO EXPECTATIONS (${teachingCtx.domainLabel})
+
+What registers with AOs reading ${teachingCtx.domainLabel} activities:
+${ao.whatRegisters.slice(0, 4).map(w => `- ${w}`).join('\n')}
+
+What AOs see through immediately:
+${ao.whatAOsSeeThrough.slice(0, 3).map(w => `- ${w}`).join('\n')}
+
+Golden question: "${ao.goldenQuestion}"
+Reading context: ${ao.readingTimeContext}`);
+
+  // Traps detected in student's description
+  const detectedTraps = teachingCtx.trapsToAvoid.filter(t => t.inStudentDescription);
+  if (detectedTraps.length > 0) {
+    sections.push(`## NAME-DROP TRAPS DETECTED IN THIS DESCRIPTION
+
+${detectedTraps.map(t => {
+  const trap = t.trap;
+  return `- "${trap.pattern}": ${trap.whyItFails}
+  Better: ${trap.betterAlternative}
+  Before: "${trap.example.nameDrop}" → After: "${trap.example.improved}"`;
+}).join('\n\n')}`);
+  }
+
+  // Power verbs
+  if (teachingCtx.powerVerbs.length > 0) {
+    sections.push(`Power verbs for ${teachingCtx.domainLabel}: ${teachingCtx.powerVerbs.slice(0, 8).join(', ')}`);
+  }
+
+  // Role expectations
+  if (teachingCtx.roleExpectations) {
+    const role = teachingCtx.roleExpectations;
+    sections.push(`## ROLE-SPECIFIC EXPECTATIONS: ${role.role}
+
+What AOs expect: ${role.expectedSignals.slice(0, 3).join('; ')}
+What would impress: ${role.differentiators.slice(0, 2).join('; ')}
+Overclaiming risk: ${role.overclaimingRisks.slice(0, 2).join('; ')}`);
+  }
+
+  return sections.join('\n\n');
+}
+
+/**
  * System prompt for teaching delivery
  *
  * This teaches Claude to deliver feedback the way the best
@@ -122,7 +202,9 @@ You are not a scoring machine. You are an expert reader who understands the HUMA
  */
 export function buildExpertTeachingPrompt(
   expertContext: ExpertKnowledgeContext,
-  depth: 'deep' | 'medium'
+  depth: 'deep' | 'medium',
+  exemplars?: Exemplar[],
+  expertiseTeachingCtx?: ExpertiseTeachingContext,
 ): string {
   const expertKnowledge = formatExpertKnowledgeLite(expertContext);
 
@@ -239,6 +321,24 @@ Every sentence you write must reference the student's actual words or proposed r
 ## EXPERT KNOWLEDGE FOR THIS TEACHING SESSION
 
 ${expertKnowledge}
+${buildExemplarBlock(exemplars)}
+${buildExpertiseTeachingBlock(expertiseTeachingCtx)}
+
+## EXPERTISE SIGNALING PRINCIPLE (CRITICAL)
+
+Every word in a 150-character description must communicate to the ACTUAL reader — an admissions officer, NOT a domain expert.
+
+**The Rule**: Technology names, competition acronyms, and field jargon are FILLER unless they ARE the achievement. AOs care about PROBLEM, SCALE, OUTCOME, and VALIDATION — not tools used.
+
+**Examples across fields**:
+- STEM: "Python/pandas" → costs 13 chars, communicates nothing. Better: "Automated 200-record analysis" → shows WHAT you did
+- Music: "Rachmaninoff Concerto No. 3" → piece name is filler. Better: "Selected from 200 auditions; soloist with symphony"
+- Business: "SEO strategy" → jargon. Better: "Grew traffic 300% → 15 new volunteers/month"
+- Service: "Volunteered at Habitat" → org name is attendance. Better: "Built 4 homes; trained 12 new volunteers"
+
+**Exception**: When the technology/jargon IS the achievement — "USAMO qualifier" (the name conveys selectivity), "Published in Nature" (the journal IS the validation)
+
+When teaching, ALWAYS check: does this word earn its character cost? If an AO wouldn't know what it means or wouldn't care, replace it with the PROBLEM it solved or the OUTCOME it produced.
 
 ## CRITICAL RULES
 
@@ -466,3 +566,4 @@ Before: "${bundle.examples[0]?.before || ''}"
 After: "${bundle.examples[0]?.after || ''}"
 Principle Applied: ${bundle.examples[0]?.principleApplied || ''}`;
 }
+

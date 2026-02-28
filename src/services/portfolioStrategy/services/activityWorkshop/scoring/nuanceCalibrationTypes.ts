@@ -16,6 +16,7 @@
  */
 
 import type { InternalTier } from './types';
+import type { ImpressionAnalysisResult } from './impressivenessCalibration/types';
 
 // ============================================================================
 // ACHIEVEMENT DATABASE TYPES
@@ -174,6 +175,18 @@ export interface NuanceCalibrationInput {
   };
   /** Field-specific calibration data */
   calibration: CalibrationContext;
+  /** Optional expertise signal context — pre-computed by deterministic matcher ($0) */
+  expertiseContext?: {
+    domainId: string;
+    confidence: 'high' | 'medium' | 'low';
+    signalCount: number;
+    trapCount: number;
+    expertiseScore: number;
+    topSignals: string[];
+    topTraps: string[];
+  };
+  /** Optional impression analysis — level explanation, major alignment, depth markers ($0) */
+  impressionContext?: ImpressionAnalysisResult;
 }
 
 /**
@@ -212,12 +225,28 @@ export interface NuanceCalibratedResult {
 }
 
 /**
- * Raw JSON output expected from the Sonnet calibration call.
+ * Raw JSON output expected from the Sonnet calibration call (single activity).
  */
 export interface CalibrationLLMResponse {
   adjustments: Array<{
     component: string;
     adjustedScore: number;
     reason: string;
+  }>;
+}
+
+/**
+ * Raw JSON output expected from the Sonnet BATCH calibration call.
+ * Contains adjustments keyed by activity index (0-based).
+ */
+export interface BatchCalibrationLLMResponse {
+  activities: Array<{
+    /** Activity index (0-based, matching input order) */
+    index: number;
+    adjustments: Array<{
+      component: string;
+      adjustedScore: number;
+      reason: string;
+    }>;
   }>;
 }

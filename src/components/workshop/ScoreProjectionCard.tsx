@@ -1,42 +1,9 @@
-import React, { useEffect, useRef } from "react";
+import React from "react";
 import { motion } from "motion/react";
-import gsap from "gsap";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, ArrowDown } from "lucide-react";
 import type { WorkshopData } from "@/types/workshop";
 
 export const ScoreProjectionCard: React.FC<{ scoreData: WorkshopData["score"] }> = ({ scoreData }) => {
-  const currentRef = useRef<HTMLSpanElement>(null);
-  const projectedRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    const ctx = gsap.context(() => {
-      const tl = gsap.timeline({ defaults: { ease: "power3.out" } });
-
-      tl.fromTo(
-        currentRef.current,
-        { textContent: "0.0" },
-        {
-          textContent: scoreData.current.toFixed(1),
-          duration: 1,
-          snap: { textContent: 0.1 },
-        }
-      ).fromTo(
-        projectedRef.current,
-        { textContent: scoreData.current.toFixed(1) },
-        {
-          textContent: scoreData.projected.toFixed(1),
-          duration: 1.5,
-          snap: { textContent: 0.1 },
-          ease: "elastic.out(1, 0.5)",
-          delay: 0.2,
-        },
-        "<"
-      );
-    });
-
-    return () => ctx.revert();
-  }, [scoreData]);
-
   const gain = (scoreData.projected - scoreData.current).toFixed(1);
 
   return (
@@ -44,47 +11,48 @@ export const ScoreProjectionCard: React.FC<{ scoreData: WorkshopData["score"] }>
       initial={{ opacity: 0, scale: 0.97 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: 0.4, type: "spring", stiffness: 120, damping: 18 }}
-      className="mt-6 rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/[0.03] to-cyan-500/[0.03]"
+      className="mt-8 rounded-xl border border-border bg-card/50 shadow-sm overflow-hidden flex flex-col md:flex-row"
     >
-      <div className="p-5 flex flex-col gap-4">
+      {/* Left Panel — Score Gauge */}
+      <div className="p-6 bg-muted/30 border-b md:border-b-0 md:border-r border-border flex flex-col items-center justify-center text-center shrink-0 min-w-[200px]">
+        <span className="text-lg text-muted-foreground line-through">
+          {scoreData.current.toFixed(1)}
+        </span>
+        <ArrowDown className="w-4 h-4 text-muted-foreground/30 my-1" />
+        <span className="text-5xl font-black tracking-tighter text-foreground">
+          {scoreData.projected.toFixed(1)}
+        </span>
+        <div className="mt-3 px-2 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+          <TrendingUp className="w-3 h-3" />
+          +{gain} Projected
+        </div>
+      </div>
 
-        {/* Score Header */}
-        <div className="flex items-center gap-5">
-          <div className="flex items-baseline gap-2">
-            <span
-              ref={currentRef}
-              className="text-2xl font-bold text-muted-foreground/60 line-through decoration-red-400/40 decoration-1"
-            />
-            <span className="text-base text-muted-foreground/40">&rarr;</span>
-            <span
-              ref={projectedRef}
-              className="text-4xl font-black text-purple-600"
-            />
-          </div>
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 bg-emerald-500/8 border border-emerald-500/20 px-2.5 py-1 rounded-full">
-            <TrendingUp className="w-3.5 h-3.5" />
-            +{gain} projected
-          </div>
+      {/* Right Panel — Analysis Readout */}
+      <div className="p-6 flex-1 flex flex-col justify-between">
+        {/* Narrative */}
+        <div>
+          <h4 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+            Impact Forecast
+          </h4>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            {scoreData.narrative}
+          </p>
         </div>
 
-        {/* Narrative */}
-        <p className="text-[13px] text-foreground/70 leading-relaxed">
-          {scoreData.narrative}
-        </p>
-
-        {/* Dimension Stat Chips */}
+        {/* Stat Chips */}
         {scoreData.dimensions.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-3 border-t border-border/40">
+          <div className="mt-6 flex flex-wrap gap-2">
             {scoreData.dimensions.map((dim, i) => (
               <motion.div
                 key={dim.name}
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8 + i * 0.08 }}
-                className="px-2.5 py-1 rounded-md text-[11px] font-medium flex items-center gap-1.5 border border-purple-500/15 bg-purple-500/[0.03]"
+                transition={{ delay: 0.6 + i * 0.08 }}
+                className="flex items-center gap-2 px-2.5 py-1 rounded-md border border-border bg-background shadow-sm text-xs"
               >
-                <span className="text-muted-foreground">{dim.name}</span>
-                <span className="text-purple-600 font-semibold">+{dim.value.toFixed(1)}</span>
+                <span className="text-muted-foreground font-medium">{dim.name}</span>
+                <span className="text-foreground font-bold">+{dim.value.toFixed(1)}</span>
               </motion.div>
             ))}
           </div>

@@ -45,6 +45,72 @@ function getSeverityStyle(severity: Issue["severity"]) {
 }
 
 // ============================================================================
+// FUZZY SEGMENT MATCHING — handles phrases that aren't verbatim substrings
+// ============================================================================
+
+const MIN_SEGMENT_LENGTH = 8;
+
+/**
+ * Find where a phrase matches within a text. If the phrase isn't a verbatim
+ * substring (common with teaching-style `exampleAfter` fragments), this finds
+ * the longest contiguous matching segments by greedily matching the longest
+ * prefix of the remaining phrase, then recursing on the remainder.
+ *
+ * Example:
+ *   phrase: "Built Python/pandas pipeline for NLP healthcare access analysis"
+ *   text:   "Built Python/pandas pipeline processing 50K patient records for NLP healthcare access analysis; ..."
+ *   → Two ranges: "Built Python/pandas pipeline" and "for NLP healthcare access analysis"
+ */
+function findMatchRanges(
+  text: string,
+  phrase: string,
+  minLen = MIN_SEGMENT_LENGTH,
+): Array<{ start: number; end: number }> {
+  if (!phrase || !text || phrase.length < minLen) return [];
+
+  // Strategy 1: exact substring match
+  const exactIdx = text.indexOf(phrase);
+  if (exactIdx !== -1) return [{ start: exactIdx, end: exactIdx + phrase.length }];
+
+  // Strategy 2: greedy longest-prefix walk
+  const ranges: Array<{ start: number; end: number }> = [];
+  let phraseOffset = 0;
+  let textSearchStart = 0;
+
+  while (phraseOffset < phrase.length) {
+    const remaining = phrase.slice(phraseOffset);
+    if (remaining.length < minLen) break;
+
+    // Find the longest prefix of `remaining` that exists in text after textSearchStart
+    let bestLen = 0;
+    let bestIdx = -1;
+
+    for (let len = remaining.length; len >= minLen; len--) {
+      const sub = remaining.slice(0, len);
+      const foundIdx = text.indexOf(sub, textSearchStart);
+      if (foundIdx !== -1) {
+        bestLen = len;
+        bestIdx = foundIdx;
+        break;
+      }
+    }
+
+    if (bestIdx !== -1) {
+      ranges.push({ start: bestIdx, end: bestIdx + bestLen });
+      phraseOffset += bestLen;
+      textSearchStart = bestIdx + bestLen;
+      // Skip whitespace between segments in the phrase
+      while (phraseOffset < phrase.length && phrase[phraseOffset] === " ") phraseOffset++;
+    } else {
+      // No prefix match found — skip one character and retry
+      phraseOffset++;
+    }
+  }
+
+  return ranges;
+}
+
+// ============================================================================
 // COMPONENT
 // ============================================================================
 
@@ -58,14 +124,21 @@ export const TextUpgradeForge: React.FC<TextUpgradeForgeProps> = ({ data, active
 
   // ── Before text: severity-colored background highlights ──
   const renderBeforeText = (text: string) => {
-    const ranges: { start: number; end: number; issue: typeof data.issues[number] }[] = [];
+    const allRanges: { start: number; end: number; issue: typeof data.issues[number] }[] = [];
     for (const issue of data.issues) {
-      const idx = text.indexOf(issue.highlightedText);
-      if (idx !== -1) {
-        ranges.push({ start: idx, end: idx + issue.highlightedText.length, issue });
+      if (!issue.highlightedText) continue;
+      for (const match of findMatchRanges(text, issue.highlightedText)) {
+        allRanges.push({ start: match.start, end: match.end, issue });
       }
     }
-    ranges.sort((a, b) => a.start - b.start);
+    allRanges.sort((a, b) => a.start - b.start);
+
+    // Deduplicate overlapping ranges (keep first)
+    const ranges: typeof allRanges = [];
+    for (const r of allRanges) {
+      if (ranges.length && r.start < ranges[ranges.length - 1].end) continue;
+      ranges.push(r);
+    }
 
     const elements: React.ReactNode[] = [];
     let cursor = 0;
@@ -91,7 +164,7 @@ export const TextUpgradeForge: React.FC<TextUpgradeForgeProps> = ({ data, active
 
       elements.push(
         <span
-          key={`hl-${range.issue.id}`}
+          key={`hl-${range.issue.id}-${range.start}`}
           className={cn(
             "px-1 py-0.5 rounded border transition-all duration-200",
             isActive
@@ -127,19 +200,18 @@ export const TextUpgradeForge: React.FC<TextUpgradeForgeProps> = ({ data, active
 
   // ── Suggested text: severity-colored solid underlines ──
   const renderSuggestedText = (text: string) => {
-    const ranges: { start: number; end: number; issue: typeof data.issues[number] }[] = [];
+    const allRanges: { start: number; end: number; issue: typeof data.issues[number] }[] = [];
     for (const issue of data.issues) {
       if (!issue.suggestedChangePhrase) continue;
-      const idx = text.indexOf(issue.suggestedChangePhrase);
-      if (idx !== -1) {
-        ranges.push({ start: idx, end: idx + issue.suggestedChangePhrase.length, issue });
+      for (const match of findMatchRanges(text, issue.suggestedChangePhrase)) {
+        allRanges.push({ start: match.start, end: match.end, issue });
       }
     }
-    ranges.sort((a, b) => a.start - b.start);
+    allRanges.sort((a, b) => a.start - b.start);
 
-    // Deduplicate overlapping ranges
-    const merged: typeof ranges = [];
-    for (const r of ranges) {
+    // Deduplicate overlapping ranges (keep first)
+    const merged: typeof allRanges = [];
+    for (const r of allRanges) {
       if (merged.length && r.start < merged[merged.length - 1].end) continue;
       merged.push(r);
     }
@@ -162,7 +234,7 @@ export const TextUpgradeForge: React.FC<TextUpgradeForgeProps> = ({ data, active
 
       elements.push(
         <span
-          key={`su-${range.issue.id}`}
+          key={`su-${range.issue.id}-${range.start}`}
           className={cn(
             "underline decoration-solid decoration-2 transition-all duration-200",
             style.underline,
