@@ -191,6 +191,28 @@ function evaluateTier2Signals(evidence: ExtractedEvidence): TierSignal[] {
     weight: 0.8,
   });
 
+  // [T2-F] Published research: national recognition + verifiable quantified outcomes
+  // Research activities have contributors (not executives), so T2-D won't fire.
+  // This signal recognizes that published research with measurable outcomes is T2-worthy
+  // even when the student's role is "contributor" or "research assistant."
+  const hasPublishedResearch = (
+    hasNationalRecognition &&
+    evidence.impact.hasQuantifiedOutcomes &&
+    evidence.impact.tangibleOutcomes.length > 0 &&
+    evidence.commitment.yearsActive >= 1 &&
+    (evidence.categoryMatch.category === 'stem_research' ||
+     evidence.categoryMatch.category === 'medical_health' ||
+     evidence.overallSignalStrength === 'strong')
+  );
+  signals.push({
+    rule: 'T2_F_PUBLISHED_RESEARCH',
+    matched: hasPublishedResearch,
+    evidence: hasPublishedResearch
+      ? `Published research with national recognition and quantified outcomes (${evidence.impact.tangibleOutcomes.length} outcomes)`
+      : `Recognition: ${hasNationalRecognition}, quantified: ${evidence.impact.hasQuantifiedOutcomes}, outcomes: ${evidence.impact.tangibleOutcomes.length}`,
+    weight: 0.85,
+  });
+
   return signals;
 }
 

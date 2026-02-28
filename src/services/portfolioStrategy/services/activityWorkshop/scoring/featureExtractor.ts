@@ -197,7 +197,15 @@ IMPORTANT:
 - null is fine for optional fields when no data exists.
 - Be conservative with confidence scores — only 0.8+ when evidence is explicit.
 - For recognitions, only mark isVerifiable=true for well-known awards/competitions.
-- For estimatedPeopleReached, only provide a number if explicitly stated or clearly implied.`;
+- For estimatedPeopleReached, only provide a number if explicitly stated or clearly implied.
+
+RECOGNITION GUIDANCE:
+- Published academic papers (IEEE, Nature, Science, journal/conference proceedings) are NATIONAL-level recognitions. Mark isVerifiable=true.
+- Poster presentations at national conferences (AHA, SfN, ACS, AGU) are NATIONAL-level recognitions. Mark isVerifiable=true.
+- Research conducted at named university labs (Stanford, MIT, Johns Hopkins, etc.) implies at minimum REGIONAL scope, usually NATIONAL.
+- AIME qualifier, USAMO, Intel STS, Regeneron STS, Science Olympiad nationals, DECA nationals — these are NATIONAL, isVerifiable=true.
+- Include ACHIEVEMENTS metadata as recognitions even when not mentioned in the description text.
+- When achievements include a "level" field, trust that level classification.`;
 }
 
 /**
