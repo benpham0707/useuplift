@@ -1,41 +1,31 @@
 // @ts-nocheck
 /**
- * Scoring Orchestrator
+ * Scoring Orchestrator — Decomposed Architecture
  *
- * Orchestrates the complete scoring pipeline with intelligent caching.
+ * Orchestrates the complete scoring pipeline:
+ *   1. Description Scoring (Sonnet batch, with caching) — HOW well written
+ *   2. Feature Extraction (Haiku per-activity parallel) — WHAT the activity contains
+ *   3. Tier Classification (deterministic code) — WHERE it sits in the 6-tier system
+ *   4. Activity Rule Scoring (deterministic code) — base component scores from evidence
+ *   5. Nuance Calibration (Sonnet per-activity) — adjust scores within tier bounds
+ *   6. Portfolio Calibration (deterministic code) — cross-activity consistency
+ *   7. Portfolio Scoring (Sonnet) — holistic assessment, always fresh
+ *   8. Teaching Layer (Sonnet) — optional, always fresh
  *
- * API CALL STRUCTURE (BATCH-BASED):
- * 1. Description batch (Sonnet) - All descriptions in ONE call
- * 2. Activity batch (Sonnet) - All activities in ONE call  [PARALLEL with step 1]
- * 3. Portfolio scoring (Sonnet) - Holistic analysis, always fresh
- * 4. Teaching layer (Sonnet) - Optional, always fresh
+ * Steps 1 and 2 run in PARALLEL. Steps 3-6 are sequential but fast.
+ * Fallback: if extraction fails for an activity, legacy single-pass scoring is used.
  *
- * Total: 3-4 API calls regardless of activity count.
- *
- * CACHING STRATEGY (REDUCES BATCH SIZE):
- * - Individual scores are cached per-activity
- * - Cache hits are EXCLUDED from the batch call
- * - If 9/10 activities unchanged, batch only scores 1 activity
- * - Portfolio analysis ALWAYS runs fresh (holistic quality)
- * - Teaching layer ALWAYS runs fresh (depends on portfolio)
- *
- * Returns a complete PortfolioScoreRubric with:
- * - Individual activity scores with rationales
- * - Combined activity scores (70% activity + 30% description)
- * - Overall portfolio score (1-10)
- * - Harvard 1-6 scale equivalent
- * - Detailed breakdowns and recommendations
- * - Cache usage information (what was cached vs fresh)
- *
- * Optionally includes deep teaching content:
- * - Concrete description rewrites
- * - Transformation principles
- * - Research-backed citations
- * - Strategic portfolio guidance
+ * CACHING STRATEGY:
+ * - Description scores cached per-activity (hash of input)
+ * - Activity scores cached per-activity (hash of input) — stores full pipeline result
+ * - Evidence + tier cached alongside score for portfolio calibration
+ * - Portfolio calibration ALWAYS runs fresh (cross-activity, instant, $0)
+ * - Portfolio scoring ALWAYS runs fresh (holistic quality)
+ * - Teaching layer ALWAYS runs fresh
  *
  * COST (10 activities):
- * - First run: ~$0.05-0.08 (scoring) or ~$0.10-0.14 (with teaching)
- * - With caching (1 change): ~$0.03-0.05 (smaller batches = fewer tokens)
+ * - First run: ~$0.03-0.06 (extraction + nuance + descriptions + portfolio)
+ * - With caching (1 change): ~$0.02-0.04 (1 Haiku + 1 Sonnet nuance + portfolio)
  */
 
 import {
@@ -59,6 +49,8 @@ import {
 import {
   PortfolioScoreRubric,
   ActivityScoreRubric,
+  ExtractedEvidence,
+  TierClassification,
 } from './types';
 
 import {
@@ -81,6 +73,16 @@ import {
 } from './scoringCacheTypes';
 
 import { ActivityWorkshopInput, ActivityWorkshopSessionInput } from '../types';
+
+// Decomposed pipeline components
+import { featureExtractorService } from './featureExtractor';
+import type { BatchFeatureExtractionInput, ActivityFeatureExtraction } from './featureTypes';
+import { classifyTier } from './tierClassifier';
+import { activityRuleScorerService } from './activityRuleScorer';
+import { calibrateBatch } from './nuanceCalibrationService';
+import type { NuanceCalibratedResult } from './nuanceCalibrationTypes';
+import { calibratePortfolio } from './portfolioCalibrator';
+import type { CalibrationInput } from './portfolioCalibrator';
 
 // ============================================================================
 // TYPES
@@ -176,9 +178,15 @@ export interface ScoringOrchestratorResult {
 
 export class ScoringOrchestrator {
   private cacheService: ScoringCacheService;
+  /** Evidence + tier cache — stored alongside activity score cache for portfolio calibration */
+  private evidenceCache = new Map<string, { evidence: ExtractedEvidence; tier: TierClassification }>();
 
   constructor(cacheService?: ScoringCacheService) {
     this.cacheService = cacheService || scoringCacheService;
+  }
+
+  private evidenceCacheKey(sessionId: string, activityId: string): string {
+    return `${sessionId}:${activityId}`;
   }
 
   /**
@@ -272,18 +280,19 @@ export class ScoringOrchestrator {
         : undefined;
 
       // ========================================================================
-      // Steps 1 & 2: Score descriptions and activities in PARALLEL (with caching)
+      // Steps 1 & 2: Description scoring + Feature extraction in PARALLEL
       // ========================================================================
       const parallelStart = Date.now();
-      console.log(`[ScoringOrchestrator] Starting parallel description + activity scoring...`);
+      console.log(`[ScoringOrchestrator] Starting parallel description scoring + feature extraction...`);
 
       const [descHelperResult, actHelperResult] = await Promise.all([
         this.scoreDescriptionsWithCache(
           descriptionInputs, enableCache, forceFresh, sessionId,
           input.targetPlatform, descriptionCacheResults
         ),
-        this.scoreActivitiesWithCache(
-          activityInputs, enableCache, forceFresh, sessionId,
+        this.scoreActivitiesDecomposed(
+          input.activities, activityInputs,
+          enableCache, forceFresh, sessionId,
           input.studentContext, activityCacheResults
         ),
       ]);
@@ -725,6 +734,292 @@ export class ScoringOrchestrator {
     console.log(`[ScoringOrchestrator] Activities scored in ${timingMs}ms (${actToScore.length} fresh, ${activityInputs.length - actToScore.length} cached)`);
 
     return { success: true, scores: activityScores, tokensUsed, timingMs };
+  }
+
+  // ========================================================================
+  // Decomposed Activity Scoring Pipeline
+  // ========================================================================
+
+  /**
+   * Score activities using the decomposed pipeline:
+   *   Feature Extraction (Haiku) → Tier Classification (code) →
+   *   Rule Scoring (code) → Nuance Calibration (Sonnet) →
+   *   Portfolio Calibration (code)
+   *
+   * Falls back to legacy single-pass scoring for activities where extraction fails.
+   */
+  private async scoreActivitiesDecomposed(
+    activities: ActivityWorkshopInput[],
+    activityInputs: { id: string; input: ActivityScoringInput }[],
+    enableCache: boolean,
+    forceFresh: boolean,
+    sessionId: string,
+    studentContext: ScoringOrchestratorInput['studentContext'],
+    cacheResults: Map<string, boolean>
+  ): Promise<{
+    success: boolean;
+    scores?: ActivityScore[];
+    tokensUsed?: { input: number; output: number };
+    timingMs?: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+    console.log(`[ScoringOrchestrator] Starting decomposed activity scoring for ${activities.length} activities...`);
+
+    const activityScores: ActivityScore[] = new Array(activities.length);
+    const allEvidence: (ExtractedEvidence | null)[] = new Array(activities.length).fill(null);
+    const allTiers: (TierClassification | null)[] = new Array(activities.length).fill(null);
+    const toExtract: number[] = []; // indices needing fresh pipeline
+
+    // ---- Phase 0: Check cache ----
+    for (let i = 0; i < activities.length; i++) {
+      const { id, input: actInput } = activityInputs[i];
+
+      if (enableCache && !forceFresh) {
+        const cacheResult = this.cacheService.getActivityScore(sessionId, id, actInput);
+        const evKey = this.evidenceCacheKey(sessionId, id);
+        const evCached = this.evidenceCache.get(evKey);
+
+        if (cacheResult.hit && cacheResult.value && evCached) {
+          activityScores[i] = cacheResult.value;
+          allEvidence[i] = evCached.evidence;
+          allTiers[i] = evCached.tier;
+          cacheResults.set(id, true);
+          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): CACHE HIT`);
+          continue;
+        }
+      }
+
+      toExtract.push(i);
+      cacheResults.set(id, false);
+    }
+
+    const cachedCount = activities.length - toExtract.length;
+    console.log(`[ScoringOrchestrator] Cache: ${cachedCount} cached, ${toExtract.length} need fresh scoring`);
+
+    let tokensUsed: { input: number; output: number } | undefined;
+
+    // ---- Phase 1: Feature Extraction (Haiku, parallel per-activity) ----
+    if (toExtract.length > 0) {
+      const extractStart = Date.now();
+
+      const extractionInput: BatchFeatureExtractionInput = {
+        activities: toExtract.map(i => ({
+          id: activities[i].id,
+          title: activities[i].title,
+          description: activities[i].description,
+          role: activities[i].role,
+          category: activities[i].category,
+          organization: activities[i].organization,
+          hoursPerWeek: activities[i].hoursPerWeek,
+          weeksPerYear: activities[i].weeksPerYear,
+          yearsInvolved: activities[i].yearsInvolved,
+          gradeLevels: activities[i].gradeLevels,
+          isPaid: activities[i].isPaid,
+          achievements: activities[i].achievements,
+        })),
+        studentContext: studentContext ? {
+          intendedMajor: studentContext.intendedMajor,
+          gradeLevel: studentContext.gradeLevel,
+        } : undefined,
+      };
+
+      const extractionResult = await featureExtractorService.extractBatch(extractionInput);
+      const extractMs = Date.now() - extractStart;
+      console.log(`[ScoringOrchestrator] Feature extraction: ${extractMs}ms, ${extractionResult.failures.length} failures`);
+
+      tokensUsed = extractionResult.totalTokens
+        ? { input: extractionResult.totalTokens.input, output: extractionResult.totalTokens.output }
+        : undefined;
+
+      // ---- Phase 2: Tier Classification + Phase 3a: Rule Scoring (both instant) ----
+      const ruleStart = Date.now();
+      const nuanceInputs: Array<{
+        index: number;
+        evidence: ExtractedEvidence;
+        tier: TierClassification;
+        activityScore: ActivityScore;
+        meta: { title: string; description: string; type?: string; position?: string };
+      }> = [];
+      const legacyFallbackIndices: number[] = [];
+
+      for (let j = 0; j < toExtract.length; j++) {
+        const i = toExtract[j];
+        const extraction = extractionResult.extractions[j];
+
+        if (!extraction) {
+          // Extraction failed — will fall back to legacy scorer
+          console.warn(`[ScoringOrchestrator] Extraction failed for "${activities[i].title}", using legacy fallback`);
+          legacyFallbackIndices.push(i);
+          continue;
+        }
+
+        // Phase 2: Tier classification (deterministic, ~0ms)
+        const evidence = extraction.activityEvidence;
+        const tier = classifyTier(evidence);
+
+        // Phase 3a: Rule scoring (deterministic, ~0ms)
+        const ruleScore = activityRuleScorerService.scoreActivity(evidence, tier);
+
+        console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): tier=${tier.internalTier}, ruleScore=${ruleScore.total.toFixed(1)}`);
+
+        allEvidence[i] = evidence;
+        allTiers[i] = tier;
+        activityScores[i] = ruleScore;
+
+        // Queue for nuance calibration
+        nuanceInputs.push({
+          index: i,
+          evidence,
+          tier,
+          activityScore: ruleScore,
+          meta: {
+            title: activities[i].title,
+            description: activities[i].description,
+            type: activities[i].category,
+            position: activities[i].role,
+          },
+        });
+      }
+
+      console.log(`[ScoringOrchestrator] Tier + rule scoring: ${Date.now() - ruleStart}ms`);
+
+      // ---- Phase 3b: Nuance Calibration (Sonnet per-activity, concurrent) ----
+      if (nuanceInputs.length > 0) {
+        const nuanceStart = Date.now();
+        console.log(`[ScoringOrchestrator] Starting nuance calibration for ${nuanceInputs.length} activities...`);
+
+        const nuanceResults = await calibrateBatch(
+          nuanceInputs.map(n => ({
+            evidence: n.evidence,
+            tier: n.tier,
+            activityScore: n.activityScore,
+            meta: n.meta,
+          }))
+        );
+
+        for (let k = 0; k < nuanceInputs.length; k++) {
+          const { index } = nuanceInputs[k];
+          const nuance = nuanceResults[k];
+          if (nuance && nuance.calibrationApplied) {
+            this.applyNuanceToActivityScore(activityScores[index], nuance);
+            console.log(`[ScoringOrchestrator] Activity ${index + 1}: nuance adjusted ${activityScores[index].total.toFixed(1)}`);
+          }
+        }
+
+        // Add nuance tokens to total
+        // (nuance calibration uses Sonnet, but token tracking is internal to the service)
+        const nuanceMs = Date.now() - nuanceStart;
+        console.log(`[ScoringOrchestrator] Nuance calibration: ${nuanceMs}ms`);
+      }
+
+      // ---- Legacy fallback for extraction failures ----
+      if (legacyFallbackIndices.length > 0) {
+        console.log(`[ScoringOrchestrator] Running legacy scorer for ${legacyFallbackIndices.length} activities...`);
+        for (const i of legacyFallbackIndices) {
+          const legacyResult = await activityScoringService.scoreActivity(activityInputs[i].input);
+          if (legacyResult.success && legacyResult.score) {
+            activityScores[i] = legacyResult.score;
+            // No evidence/tier for legacy — won't participate in portfolio calibration
+          } else {
+            return {
+              success: false,
+              error: `Activity scoring failed for "${activities[i].title}" (legacy fallback): ${legacyResult.error}`,
+            };
+          }
+        }
+      }
+    }
+
+    // ---- Phase 4: Portfolio Calibration (deterministic, cross-activity, instant) ----
+    // Only calibrate activities that have evidence + tier (skip legacy fallbacks)
+    const calibrationInputs: CalibrationInput[] = [];
+    const calibrationIndexMap: number[] = []; // maps calibration result index → original index
+
+    for (let i = 0; i < activities.length; i++) {
+      if (allEvidence[i] && allTiers[i]) {
+        calibrationInputs.push({
+          activityId: activities[i].id,
+          activityTitle: activities[i].title,
+          score: activityScores[i],
+          tier: allTiers[i]!,
+          evidence: allEvidence[i]!,
+        });
+        calibrationIndexMap.push(i);
+      }
+    }
+
+    if (calibrationInputs.length > 0) {
+      const calibStart = Date.now();
+      const calibrationResult = calibratePortfolio(
+        calibrationInputs,
+        studentContext?.intendedMajor
+      );
+
+      // Apply calibrated scores back
+      for (let c = 0; c < calibrationResult.activities.length; c++) {
+        const originalIndex = calibrationIndexMap[c];
+        activityScores[originalIndex] = calibrationResult.activities[c].score;
+      }
+
+      const calibMs = Date.now() - calibStart;
+      console.log(
+        `[ScoringOrchestrator] Portfolio calibration: ${calibMs}ms, ` +
+        `${calibrationResult.summary.activitiesAdjusted}/${calibrationResult.summary.totalActivities} adjusted, ` +
+        `rules: [${calibrationResult.summary.rulesApplied.join(', ')}]`
+      );
+    }
+
+    // ---- Cache fresh results ----
+    if (enableCache && !forceFresh) {
+      for (const i of toExtract) {
+        if (activityScores[i]) {
+          this.cacheService.setActivityScore(
+            sessionId, activities[i].id, activityInputs[i].input, activityScores[i]
+          );
+          if (allEvidence[i] && allTiers[i]) {
+            this.evidenceCache.set(this.evidenceCacheKey(sessionId, activities[i].id), {
+              evidence: allEvidence[i]!,
+              tier: allTiers[i]!,
+            });
+          }
+        }
+      }
+    }
+
+    const timingMs = Date.now() - startTime;
+    console.log(
+      `[ScoringOrchestrator] Decomposed scoring complete in ${timingMs}ms ` +
+      `(${cachedCount} cached, ${toExtract.length} fresh)`
+    );
+
+    return { success: true, scores: activityScores, tokensUsed, timingMs };
+  }
+
+  /**
+   * Apply nuance calibration adjustments to an ActivityScore.
+   * Mutates the score in place.
+   */
+  private applyNuanceToActivityScore(score: ActivityScore, nuance: NuanceCalibratedResult): void {
+    if (!nuance.calibrationApplied) return;
+
+    const { breakdown } = score;
+    const { adjustedComponents } = nuance;
+
+    // Update component scores
+    breakdown.recognitionLevel.score = adjustedComponents.recognitionScore;
+    breakdown.leadershipImpact.score = adjustedComponents.leadershipScore;
+    breakdown.communityCharacter.score = adjustedComponents.communityScore;
+    breakdown.commitmentProgression.score = adjustedComponents.commitmentScore;
+
+    // Recalculate weighted scores
+    breakdown.recognitionLevel.weightedScore = adjustedComponents.recognitionScore * breakdown.recognitionLevel.weight;
+    breakdown.leadershipImpact.weightedScore = adjustedComponents.leadershipScore * breakdown.leadershipImpact.weight;
+    breakdown.communityCharacter.weightedScore = adjustedComponents.communityScore * breakdown.communityCharacter.weight;
+    breakdown.commitmentProgression.weightedScore = adjustedComponents.commitmentScore * breakdown.commitmentProgression.weight;
+
+    // Update total
+    score.total = nuance.adjustedActivityTotal;
   }
 
   /**

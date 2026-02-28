@@ -199,6 +199,20 @@ export {
   activityRuleScorerService,
 } from './activityRuleScorer';
 
+// Portfolio Calibrator — Cross-activity consistency enforcement
+// Pure code, no LLM — enforces evidence consistency, relative ordering, minimum spread
+export {
+  PortfolioCalibratorService,
+  portfolioCalibratorService,
+  calibratePortfolio,
+  type CalibrationInput,
+  type CalibrationOutput,
+  type CalibrationAdjustment,
+  type CalibrationRule,
+  type MajorRelevanceAnnotation,
+  type PortfolioCalibrationResult,
+} from './portfolioCalibrator';
+
 // Nuance Calibration Types — Layer 4 type definitions
 export * from './nuanceCalibrationTypes';
 
