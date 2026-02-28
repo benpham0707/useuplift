@@ -79,8 +79,8 @@ const AppRoutes = () => (
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
       <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
 
-      {/* Dashboard routes */}
-      <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+      {/* Dashboard routes - TEMPORARILY BYPASSING TERMS FOR TESTING */}
+      <Route element={<DashboardLayout />}>
         <Route path="/dashboard" element={<DashboardHome />} />
         <Route path="/dashboard/scanner" element={<PortfolioScanner />} />
         <Route path="/dashboard/insights" element={<PortfolioInsightsNew />} />

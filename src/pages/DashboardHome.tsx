@@ -11,6 +11,7 @@ import CharacterStatsWidget from '@/components/dashboard/widgets/CharacterStatsW
 import CalendarWidget from '@/components/dashboard/widgets/CalendarWidget';
 import ActivityPortfolioWidget from '@/components/dashboard/widgets/ActivityPortfolioWidget';
 import WritingPortfolioWidget from '@/components/dashboard/widgets/WritingPortfolioWidget';
+import '@/components/dashboard/dashboard-animations.css';
 
 /**
  * Dashboard Home - Main landing page for authenticated users
@@ -74,17 +75,29 @@ export default function DashboardHome() {
       {/* Main Grid Layout */}
       <div className="space-y-6">
         {/* Full-width Quick Actions Bar */}
-        <QuickActionsBar />
+        <div className="dashboard-widget">
+          <QuickActionsBar />
+        </div>
 
         {/* Full-width Daily Quests */}
-        <DailyQuestsWidget />
+        <div className="dashboard-widget">
+          <DailyQuestsWidget />
+        </div>
 
         {/* Two-column grid for remaining widgets */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <CharacterStatsWidget />
-          <CalendarWidget />
-          <ActivityPortfolioWidget />
-          <WritingPortfolioWidget />
+          <div className="dashboard-widget">
+            <CharacterStatsWidget />
+          </div>
+          <div className="dashboard-widget">
+            <CalendarWidget />
+          </div>
+          <div className="dashboard-widget">
+            <ActivityPortfolioWidget />
+          </div>
+          <div className="dashboard-widget">
+            <WritingPortfolioWidget />
+          </div>
         </div>
       </div>
     </div>

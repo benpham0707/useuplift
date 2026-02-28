@@ -6,6 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useDailyQuests, useUserStreak } from '@/hooks/useDashboard';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useState } from 'react';
+import '../dashboard-animations.css';
 
 /**
  * Daily Quests Widget - Gamified task list with credit rewards
@@ -17,6 +19,7 @@ export default function DailyQuestsWidget() {
   const navigate = useNavigate();
   const { quests, completedCount, creditsEarned, loading, completeQuest } = useDailyQuests();
   const { currentStreak, loading: streakLoading } = useUserStreak();
+  const [animatingQuest, setAnimatingQuest] = useState<string | null>(null);
 
   if (loading || streakLoading) {
     return <DailyQuestsWidgetSkeleton />;
@@ -31,8 +34,12 @@ export default function DailyQuestsWidget() {
     }
   };
 
-  const handleCheckboxClick = (e: React.MouseEvent, questId: string) => {
+  const handleCheckboxClick = (e: React.MouseEvent, questId: string, isCompleted: boolean) => {
     e.stopPropagation();
+    if (!isCompleted) {
+      setAnimatingQuest(questId);
+      setTimeout(() => setAnimatingQuest(null), 300);
+    }
     completeQuest(questId);
   };
 
@@ -46,7 +53,7 @@ export default function DailyQuestsWidget() {
             {/* Streak Counter */}
             {currentStreak > 0 && (
               <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/10 rounded-full">
-                <span className="text-lg">🔥</span>
+                <span className="text-lg streak-flame">🔥</span>
                 <span className="text-sm font-semibold text-orange-600">
                   {currentStreak} day{currentStreak !== 1 ? 's' : ''}
                 </span>
@@ -84,13 +91,16 @@ export default function DailyQuestsWidget() {
             >
               {/* Custom Checkbox */}
               <div
-                onClick={(e) => handleCheckboxClick(e, quest.id)}
-                className="mt-0.5"
+                onClick={(e) => handleCheckboxClick(e, quest.id, quest.completed)}
+                className={cn(
+                  "mt-0.5",
+                  animatingQuest === quest.id && "quest-checkbox-complete"
+                )}
               >
                 <Checkbox
                   checked={quest.completed}
                   className={cn(
-                    "h-5 w-5 rounded-full border-2",
+                    "h-5 w-5 rounded-full border-2 transition-all",
                     quest.completed
                       ? "bg-green-500 border-green-500 text-white"
                       : "border-primary hover:border-primary/80"
