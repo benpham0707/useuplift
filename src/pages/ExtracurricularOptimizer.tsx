@@ -458,7 +458,7 @@ const AcademicPlanningIntelligence = () => {
       <div 
         id="academic" 
         data-scroll-section
-        className="transition-all duration-[1500ms] ease-out transform"
+        className="transition-all duration-1000 ease-out transform"
         style={{
           opacity: sectionOpacity.academic || 0,
           transform: `translateY(${20 * (1 - (sectionOpacity.academic || 0))}px)`
@@ -554,7 +554,7 @@ const AcademicPlanningIntelligence = () => {
       <div 
         id="projects" 
         data-scroll-section
-        className="transition-all duration-[1500ms] ease-out transform"
+        className="transition-all duration-1000 ease-out transform"
         style={{
           opacity: sectionOpacity.projects || 0,
           transform: `translateY(${20 * (1 - (sectionOpacity.projects || 0))}px)`
@@ -646,7 +646,7 @@ const AcademicPlanningIntelligence = () => {
       <div 
         id="extracurricular" 
         data-scroll-section
-        className="transition-all duration-[1500ms] ease-out transform"
+        className="transition-all duration-1000 ease-out transform"
         style={{
           opacity: sectionOpacity.extracurricular || 0,
           transform: `translateY(${20 * (1 - (sectionOpacity.extracurricular || 0))}px)`
@@ -738,7 +738,7 @@ const AcademicPlanningIntelligence = () => {
       <div 
         id="skills" 
         data-scroll-section
-        className="transition-all duration-[1500ms] ease-out transform"
+        className="transition-all duration-1000 ease-out transform"
         style={{
           opacity: sectionOpacity.skills || 0,
           transform: `translateY(${20 * (1 - (sectionOpacity.skills || 0))}px)`

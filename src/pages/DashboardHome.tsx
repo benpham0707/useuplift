@@ -3,21 +3,27 @@ import { useAuth } from '@/hooks/useAuth';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDashboardData, needsDashboardSeeding } from '@/lib/seedDashboardData';
 import { useUserStreak } from '@/hooks/useDashboard';
+import {
+  Target, Trophy, BookOpen, TrendingUp, Calendar, Clock,
+  Award, CheckCircle2, AlertCircle, Zap, GraduationCap,
+  Users, ArrowRight, Flame, BarChart3, FileText, Star
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 // Import all widgets
-import QuickActionsBar from '@/components/dashboard/widgets/QuickActionsBar';
-import DailyQuestsWidget from '@/components/dashboard/widgets/DailyQuestsWidget';
 import CharacterStatsWidget from '@/components/dashboard/widgets/CharacterStatsWidget';
-import CalendarWidget from '@/components/dashboard/widgets/CalendarWidget';
+import EnhancedCalendarWidget from '@/components/dashboard/widgets/EnhancedCalendarWidget';
 import ActivityPortfolioWidget from '@/components/dashboard/widgets/ActivityPortfolioWidget';
 import WritingPortfolioWidget from '@/components/dashboard/widgets/WritingPortfolioWidget';
 import '@/components/dashboard/dashboard-animations.css';
+import '@/components/dashboard/dashboard-enhanced-animations.css';
 
 /**
- * Dashboard Home - Main landing page for authenticated users
- *
- * Displays welcome header, user streak, and dashboard widgets in a responsive grid layout.
- * Seeds initial data on first visit.
+ * Optimized Dashboard Home - Efficient space utilization
+ * Minimal scrolling, maximum information density
  */
 export default function DashboardHome() {
   const { user } = useAuth();
@@ -31,10 +37,8 @@ export default function DashboardHome() {
         return;
       }
 
-      // Set user name
       setUserName(user.email?.split('@')[0] || 'there');
 
-      // Check if dashboard needs seeding
       try {
         const needsSeeding = await needsDashboardSeeding(user.id);
         if (needsSeeding) {
@@ -55,49 +59,61 @@ export default function DashboardHome() {
   }
 
   const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric'
   });
 
   return (
-    <div className="flex-1 p-6 space-y-6">
-      {/* Welcome Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Welcome back, {userName}!</h1>
-          <p className="text-muted-foreground mt-1">{currentDate}</p>
-        </div>
-        <StreakBadge />
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Compact Header Bar */}
+      <CompactHeader userName={userName} date={currentDate} />
 
-      {/* Main Grid Layout */}
-      <div className="space-y-6">
-        {/* Full-width Quick Actions Bar */}
-        <div className="dashboard-widget">
-          <QuickActionsBar />
+      {/* Main Dashboard Grid - Maximum Efficiency */}
+      <div className="p-4 max-w-[1600px] mx-auto">
+        {/* Top Priority Section - 3 columns */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
+          {/* Left: Application Progress & Key Metrics */}
+          <div className="xl:col-span-1 space-y-4">
+            <ApplicationProgressCompact />
+            <KeyMetricsGrid />
+          </div>
+
+          {/* Center: AI Recommendations & Actions */}
+          <div className="xl:col-span-1 space-y-4">
+            <AICounselorCompact />
+            <QuickActionsCompact />
+          </div>
+
+          {/* Right: Deadlines & Daily Tasks */}
+          <div className="xl:col-span-1 space-y-4">
+            <DeadlineTrackerCompact />
+            <DailyTasksCompact />
+          </div>
         </div>
 
-        {/* Full-width Daily Quests */}
-        <div className="dashboard-widget">
-          <DailyQuestsWidget />
-        </div>
-
-        {/* Two-column grid for remaining widgets */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="dashboard-widget">
-            <CharacterStatsWidget />
-          </div>
-          <div className="dashboard-widget">
-            <CalendarWidget />
-          </div>
-          <div className="dashboard-widget">
-            <ActivityPortfolioWidget />
-          </div>
-          <div className="dashboard-widget">
+        {/* Secondary Section - 2 columns for portfolio widgets */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Writing Portfolio */}
+          <Card className="p-4 border-gray-200">
             <WritingPortfolioWidget />
-          </div>
+          </Card>
+
+          {/* Activity Portfolio */}
+          <Card className="p-4 border-gray-200">
+            <ActivityPortfolioWidget />
+          </Card>
+
+          {/* Character Stats */}
+          <Card className="p-4 border-gray-200">
+            <CharacterStatsWidget />
+          </Card>
+
+          {/* Calendar */}
+          <Card className="p-4 border-gray-200">
+            <EnhancedCalendarWidget />
+          </Card>
         </div>
       </div>
     </div>
@@ -105,51 +121,366 @@ export default function DashboardHome() {
 }
 
 /**
- * Streak badge component - displays current streak with flame emoji
+ * Compact Header Component
  */
-function StreakBadge() {
+function CompactHeader({ userName, date }: { userName: string; date: string }) {
   const { currentStreak } = useUserStreak();
-
-  if (currentStreak === 0) {
-    return (
-      <div className="flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-full">
-        <span className="text-sm text-muted-foreground">Start your streak!</span>
-      </div>
-    );
-  }
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
-    <div className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500/10 to-red-500/10 rounded-full border border-orange-500/20">
-      <span className="text-xl">🔥</span>
-      <span className="font-semibold text-orange-600">{currentStreak} day streak</span>
+    <div className="bg-white border-b border-gray-200 px-4 py-3">
+      <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+        <div className="flex items-center gap-8">
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">{greeting}, {userName}</h1>
+            <p className="text-xs text-gray-500">{date}</p>
+          </div>
+
+          {/* Inline Critical Metrics */}
+          <div className="hidden md:flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-red-500" />
+              <div>
+                <span className="text-lg font-bold text-gray-900">47</span>
+                <span className="text-xs text-gray-500 ml-1">days left</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-green-500" />
+              <div>
+                <span className="text-lg font-bold text-gray-900">85%</span>
+                <span className="text-xs text-gray-500 ml-1">strength</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-purple-500" />
+              <div>
+                <span className="text-lg font-bold text-gray-900">92</span>
+                <span className="text-xs text-gray-500 ml-1">profile score</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Streak Badge */}
+        {currentStreak > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full">
+            <Flame className="w-4 h-4 text-orange-500" />
+            <span className="text-sm font-medium text-orange-700">{currentStreak} day streak</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
 /**
- * Loading skeleton for Dashboard Home
+ * Compact Application Progress Card
+ */
+function ApplicationProgressCompact() {
+  const sections = [
+    { label: 'Profile', value: 100, color: 'bg-green-500' },
+    { label: 'Essays', value: 58, color: 'bg-blue-500' },
+    { label: 'Activities', value: 75, color: 'bg-purple-500' },
+    { label: 'Recs', value: 50, color: 'bg-orange-500' }
+  ];
+
+  const overallProgress = Math.round(sections.reduce((acc, s) => acc + s.value, 0) / sections.length);
+
+  return (
+    <Card className="p-4 border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900">Application Progress</h3>
+        <span className="text-2xl font-bold text-blue-600">{overallProgress}%</span>
+      </div>
+
+      <div className="space-y-2">
+        {sections.map((section) => (
+          <div key={section.label} className="flex items-center gap-3">
+            <span className="text-xs text-gray-600 w-16">{section.label}</span>
+            <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full ${section.color} transition-all duration-500`}
+                style={{ width: `${section.value}%` }}
+              />
+            </div>
+            <span className="text-xs font-medium text-gray-700 w-10 text-right">
+              {section.value}%
+            </span>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Key Metrics Grid
+ */
+function KeyMetricsGrid() {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <Card className="p-3 border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Essays Done</p>
+            <p className="text-xl font-bold text-gray-900">7/12</p>
+          </div>
+          <BookOpen className="w-5 h-5 text-blue-500" />
+        </div>
+      </Card>
+
+      <Card className="p-3 border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Schools</p>
+            <p className="text-xl font-bold text-gray-900">8</p>
+          </div>
+          <GraduationCap className="w-5 h-5 text-purple-500" />
+        </div>
+      </Card>
+
+      <Card className="p-3 border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Tasks Left</p>
+            <p className="text-xl font-bold text-gray-900">23</p>
+          </div>
+          <Target className="w-5 h-5 text-green-500" />
+        </div>
+      </Card>
+
+      <Card className="p-3 border-gray-200">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-500">Match Score</p>
+            <p className="text-xl font-bold text-gray-900">A+</p>
+          </div>
+          <Award className="w-5 h-5 text-yellow-500" />
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * AI Counselor Compact View
+ */
+function AICounselorCompact() {
+  const recommendations = [
+    {
+      priority: 'urgent',
+      title: 'Complete Common App essay',
+      time: '2 hrs',
+      icon: <FileText className="w-4 h-4" />
+    },
+    {
+      priority: 'high',
+      title: 'Add Science Olympiad details',
+      time: '30 min',
+      icon: <Trophy className="w-4 h-4" />
+    },
+    {
+      priority: 'medium',
+      title: 'Request teacher rec',
+      time: '15 min',
+      icon: <Users className="w-4 h-4" />
+    }
+  ];
+
+  const priorityColors = {
+    urgent: 'bg-red-100 text-red-700',
+    high: 'bg-orange-100 text-orange-700',
+    medium: 'bg-blue-100 text-blue-700'
+  };
+
+  return (
+    <Card className="p-4 border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900">AI Recommendations</h3>
+        <Badge variant="outline" className="text-xs">3 tasks</Badge>
+      </div>
+
+      <div className="space-y-2">
+        {recommendations.map((rec, index) => (
+          <div
+            key={index}
+            className="flex items-center justify-between p-2 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer group"
+          >
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded ${priorityColors[rec.priority as keyof typeof priorityColors]}`}>
+                {rec.icon}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-900">{rec.title}</p>
+                <p className="text-xs text-gray-500">{rec.time}</p>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600" />
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Quick Actions Compact
+ */
+function QuickActionsCompact() {
+  const actions = [
+    { label: 'Write Essay', icon: <BookOpen className="w-4 h-4" />, count: 3, color: 'bg-blue-500' },
+    { label: 'Portfolio Review', icon: <BarChart3 className="w-4 h-4" />, count: 1, color: 'bg-purple-500' },
+    { label: 'Mock Interview', icon: <Users className="w-4 h-4" />, count: 0, color: 'bg-green-500' },
+    { label: 'Find Colleges', icon: <GraduationCap className="w-4 h-4" />, count: 12, color: 'bg-orange-500' }
+  ];
+
+  return (
+    <Card className="p-4 border-gray-200">
+      <h3 className="font-semibold text-gray-900 mb-3">Quick Actions</h3>
+      <div className="grid grid-cols-2 gap-2">
+        {actions.map((action) => (
+          <button
+            key={action.label}
+            className="p-3 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors text-left group"
+          >
+            <div className="flex items-center justify-between mb-1">
+              <div className={`p-1.5 rounded ${action.color} text-white`}>
+                {action.icon}
+              </div>
+              {action.count > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {action.count}
+                </Badge>
+              )}
+            </div>
+            <p className="text-xs font-medium text-gray-700">{action.label}</p>
+          </button>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Deadline Tracker Compact
+ */
+function DeadlineTrackerCompact() {
+  const deadlines = [
+    { school: 'Stanford', type: 'REA', days: 47, status: 'on-track' },
+    { school: 'MIT', type: 'EA', days: 47, status: 'on-track' },
+    { school: 'Harvard', type: 'REA', days: 47, status: 'at-risk' },
+    { school: 'Yale', type: 'REA', days: 47, status: 'on-track' }
+  ];
+
+  const statusColors = {
+    'on-track': 'text-green-600 bg-green-50',
+    'at-risk': 'text-orange-600 bg-orange-50',
+    'behind': 'text-red-600 bg-red-50'
+  };
+
+  return (
+    <Card className="p-4 border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900">Upcoming Deadlines</h3>
+        <Clock className="w-4 h-4 text-gray-400" />
+      </div>
+
+      <div className="space-y-2">
+        {deadlines.map((deadline) => (
+          <div key={deadline.school} className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-1.5 h-1.5 bg-gray-400 rounded-full"></div>
+              <span className="text-sm font-medium text-gray-900">{deadline.school}</span>
+              <Badge variant="outline" className="text-xs">{deadline.type}</Badge>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs px-2 py-0.5 rounded-full ${statusColors[deadline.status as keyof typeof statusColors]}`}>
+                {deadline.days}d
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Daily Tasks Compact
+ */
+function DailyTasksCompact() {
+  const tasks = [
+    { task: 'Review essay feedback', done: true },
+    { task: 'Update activities list', done: false },
+    { task: 'Schedule counselor meeting', done: false },
+    { task: 'Submit test scores', done: false }
+  ];
+
+  const completedCount = tasks.filter(t => t.done).length;
+
+  return (
+    <Card className="p-4 border-gray-200">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="font-semibold text-gray-900">Today's Tasks</h3>
+        <span className="text-xs font-medium text-gray-500">
+          {completedCount}/{tasks.length} done
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {tasks.map((task, index) => (
+          <div key={index} className="flex items-center gap-2">
+            <button
+              className={`w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+                task.done
+                  ? 'bg-blue-500 border-blue-500'
+                  : 'border-gray-300 hover:border-blue-400'
+              }`}
+            >
+              {task.done && <CheckCircle2 className="w-3 h-3 text-white" />}
+            </button>
+            <span className={`text-sm ${task.done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+              {task.task}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <Button size="sm" variant="outline" className="w-full mt-3">
+        View All Tasks
+      </Button>
+    </Card>
+  );
+}
+
+/**
+ * Loading skeleton
  */
 function DashboardHomeSkeleton() {
   return (
-    <div className="flex-1 p-6 space-y-6">
-      {/* Header skeleton */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-2">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-4 w-48" />
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-[1600px] mx-auto">
+          <Skeleton className="h-8 w-48" />
         </div>
-        <Skeleton className="h-10 w-32" />
       </div>
 
-      {/* Grid skeleton */}
-      <div className="space-y-6">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-64 w-full" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Skeleton className="h-80" />
-          <Skeleton className="h-80" />
+      <div className="p-4 max-w-[1600px] mx-auto">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
           <Skeleton className="h-64" />
           <Skeleton className="h-64" />
+          <Skeleton className="h-64" />
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
+          <Skeleton className="h-48" />
         </div>
       </div>
     </div>
