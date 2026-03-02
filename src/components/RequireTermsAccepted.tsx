@@ -62,16 +62,20 @@ const RequireTermsAccepted = ({ children }: RequireTermsAcceptedProps) => {
 
     setIsSubmitting(true);
     try {
-      // Get Clerk JWT token for authenticated Supabase requests
-      const token = await getToken({ template: 'supabase' });
-      if (!token) {
-        console.error('Failed to get auth token');
-        alert('Authentication error. Please try signing out and back in.');
-        return;
+      // Try to get Clerk JWT token for authenticated Supabase requests
+      let authSupabase;
+      try {
+        const token = await getToken({ template: 'supabase' });
+        if (!token) {
+          throw new Error('No token returned');
+        }
+        authSupabase = getAuthenticatedSupabaseClient(token);
+      } catch (tokenError) {
+        console.warn('Failed to get Supabase JWT, using anon client as fallback:', tokenError);
+        // Fall back to using the regular supabase client
+        // This will work if RLS policies allow anon access or if user is already authenticated
+        authSupabase = supabase;
       }
-
-      // Create authenticated Supabase client that passes RLS checks
-      const authSupabase = getAuthenticatedSupabaseClient(token);
       const now = new Date().toISOString();
       
       // First, try to update existing profile
