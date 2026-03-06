@@ -43,3 +43,18 @@ export { generateSummary } from './summaryGenerator';
 export type { SummaryGeneratorInput } from './summaryGenerator';
 export { generateRoadmap } from './improvementRoadmap';
 export type { RoadmapGeneratorInput } from './improvementRoadmap';
+
+// Wave 2: Deep Content Analysis
+export { analyzeEssayStructure } from './structureAnalyzer';
+export { analyzeThemes } from './themeAnalyzer';
+export { analyzeCharacterRevelation } from './characterAnalyzer';
+export { analyzeInsight } from './insightAnalyzer';
+export type {
+  ArcType,
+  EssayBeat,
+  EssayStructureAnalysis,
+  ThemeAnalysisResult,
+  CharacterAnalysisResult,
+  InsightAnalysisResult,
+  DeepContentAnalysis,
+} from './contentAnalysisTypes';

@@ -17,6 +17,7 @@ import type {
   FinalDimensionScore,
 } from '../workshop/shared/types';
 import type { NarrativeAnalysisResult } from '../workshop/scoring/narrativeAnalyzerTypes';
+import type { DeepContentAnalysis } from './contentAnalysisTypes';
 
 // ============================================================================
 // TEXT ANCHORING
@@ -144,7 +145,7 @@ export interface AnnotatedAnalysisResult {
     overallInsight: string;
   };
   /** Prioritized improvement roadmap */
-  roadmap?: ImprovementRoadmap;
+  roadmap: ImprovementRoadmap;
   /** Cost, timing, and token metadata */
   meta: {
     costUSD: number;
@@ -408,6 +409,8 @@ export interface EnrichedFeatures {
   };
   /** Narrative analysis results (deterministic, injected into Sonnet prompt) */
   narrativeAnalysis?: NarrativeAnalysisResult;
+  /** Deep content analysis — structure, theme, character, insight (Wave 2) */
+  deepContentAnalysis?: DeepContentAnalysis;
 }
 
 /** Internal: Phase 4 score derivation input */

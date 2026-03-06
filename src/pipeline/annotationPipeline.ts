@@ -16,7 +16,7 @@ import type { ClaudeResponse } from '../lib/llm/claude';
 import { featureExtractor, essayProfileRegistry, dimensionRegistry } from '../workshop';
 import { promptBuilder } from './promptBuilder';
 import { scoreDeriver } from './scoreDeriver';
-import { validateAnnotations, clamp } from './annotationValidation';
+import { validateAnnotations } from './annotationValidation';
 import { generateSummary } from './summaryGenerator';
 import { generateRoadmap } from './improvementRoadmap';
 import type {
@@ -26,6 +26,11 @@ import type {
   EnrichedFeatures,
   RawLLMAnnotation,
 } from './types';
+import { analyzeEssayStructure } from './structureAnalyzer';
+import { analyzeThemes } from './themeAnalyzer';
+import { analyzeCharacterRevelation } from './characterAnalyzer';
+import { analyzeInsight } from './insightAnalyzer';
+import type { DeepContentAnalysis } from './contentAnalysisTypes';
 
 // ============================================================================
 // CONSTANTS
@@ -73,12 +78,38 @@ export class AnnotationPipeline {
 
     timings.phase12_profileAndFeatures = Date.now() - phase12Start;
 
-    // Build enriched features (features + optional expertise signals)
+    // ------------------------------------------------------------------
+    // Phase 2.1: Deep content analysis (structure, theme, character, insight)
+    // Runs in parallel — each analyzer is deterministic and independent
+    // ------------------------------------------------------------------
+    const phase2Start = Date.now();
+    let deepContentAnalysis: DeepContentAnalysis | undefined;
+    try {
+      const [structure, theme, character, insight] = await Promise.all([
+        Promise.resolve(analyzeEssayStructure(text)),
+        Promise.resolve(analyzeThemes(text)),
+        Promise.resolve(analyzeCharacterRevelation(text)),
+        Promise.resolve(analyzeInsight(text)),
+      ]);
+      deepContentAnalysis = { structure, theme, character, insight };
+    } catch (error) {
+      console.warn(
+        '[AnnotationPipeline] Deep content analysis failed, proceeding without:',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+    timings.phase2_deepContentAnalysis = Date.now() - phase2Start;
+
+    // Build enriched features (features + optional expertise signals + deep content)
     const enrichedFeatures: EnrichedFeatures = {
       features,
-      // Expertise signals are only relevant for activity descriptions
-      // and would be populated by a dedicated expertise extractor in a future phase
+      deepContentAnalysis,
     };
+
+    // ------------------------------------------------------------------
+    // Phase 2.5: Word-count-aware annotation scaling
+    // ------------------------------------------------------------------
+    const effectiveConfig = this.applyAnnotationScaling(text, config);
 
     // ------------------------------------------------------------------
     // Phase 3: Single Sonnet call → raw annotations
@@ -88,7 +119,7 @@ export class AnnotationPipeline {
 
     const phase3Start = Date.now();
     try {
-      const prompt = promptBuilder.buildPrompt(text, config, enrichedFeatures);
+      const prompt = promptBuilder.buildPrompt(text, effectiveConfig, enrichedFeatures);
 
       llmResponse = await this.retryWithBackoff(async () => {
         return callClaude<string>({
@@ -175,6 +206,39 @@ export class AnnotationPipeline {
     if (text.length > 10000) return `Essay too long (${text.length} chars, maximum 10,000)`;
     if (!config.essayType) return 'Essay type is required';
     return null;
+  }
+
+  // ==========================================================================
+  // ANNOTATION SCALING
+  // ==========================================================================
+
+  /**
+   * Scale maxAnnotations based on essay word count if not explicitly set.
+   * Short essays get fewer annotations to avoid feedback overload.
+   * Long essays get more to ensure adequate coverage.
+   */
+  private applyAnnotationScaling(
+    text: string,
+    config: AnnotationPipelineConfig,
+  ): AnnotationPipelineConfig {
+    if (config.maxAnnotations !== undefined) {
+      return config; // caller explicitly set — respect it
+    }
+
+    const wordCount = text.split(/\s+/).filter(w => w.length > 0).length;
+
+    let maxAnnotations: number;
+    if (wordCount < 150) {
+      maxAnnotations = 5;
+    } else if (wordCount < 300) {
+      maxAnnotations = 8;
+    } else if (wordCount < 500) {
+      maxAnnotations = 10;
+    } else {
+      maxAnnotations = 12;
+    }
+
+    return { ...config, maxAnnotations };
   }
 
   // ==========================================================================

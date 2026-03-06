@@ -21,6 +21,7 @@ import type {
   AnnotationSeverity,
 } from './types';
 import type { NarrativeAnalysisResult } from '../workshop/scoring/narrativeAnalyzerTypes';
+import type { DeepContentAnalysis } from './contentAnalysisTypes';
 import { getStructureInsights, getDynamicsInsights, simpleHash } from '../workshop/scoring/narrativeLLMTypes';
 
 // ============================================================================
@@ -308,6 +309,11 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
       parts.push(this.buildNarrativeAnalysisSummary(enrichedFeatures.narrativeAnalysis, essayHash));
     }
 
+    // 2c. Deep content analysis summary (Wave 2 — structure, theme, character, insight)
+    if (enrichedFeatures.deepContentAnalysis) {
+      parts.push(this.buildDeepContentAnalysisSummary(enrichedFeatures.deepContentAnalysis));
+    }
+
     // 3. Expertise match summary (activity essays)
     if (enrichedFeatures.expertiseSignals) {
       parts.push(this.buildExpertiseMatchSummary(enrichedFeatures));
@@ -552,6 +558,65 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
         lines.push(`- Reader takeaway: ${dynamicsInsights.readerTakeaway}`);
       }
     }
+  }
+
+  /**
+   * Build a ~200-token summary of deep content analysis for the Sonnet prompt.
+   * Covers: essay structure, theme signals, character revelation, insight depth.
+   */
+  buildDeepContentAnalysisSummary(analysis: DeepContentAnalysis): string {
+    const lines: string[] = ['## Deep Content Analysis (deterministic)'];
+
+    // Structure
+    const s = analysis.structure;
+    const arcLabel = s.detectedArc.replace(/_/g, ' ');
+    lines.push(`Structure: ${arcLabel} arc (${Math.round(s.arcConfidence * 100)}% conf), ${s.pacing.balance} pacing`);
+    if (s.beats.length > 0) {
+      const beatLabels = s.beats.map(b => `${b.beatType}(P${b.paragraphIndices.join(',P')})`);
+      lines.push(`Beats: ${beatLabels.join(' → ')}`);
+    }
+    if (s.diagnostics.missingBeats.length > 0) {
+      lines.push(`Missing beats: ${s.diagnostics.missingBeats.join(', ')}`);
+    }
+
+    // Theme
+    const t = analysis.theme;
+    lines.push(`Show/tell ratio: ${Math.round(t.showDontTell.showRatio * 100)}% (${t.showDontTell.tellingMarkerCount} telling, ${t.showDontTell.showingMarkerCount} showing)`);
+    if (t.clicheDetection.clicheDetected) {
+      const themes = t.clicheDetection.matchedThemes.map(m => m.label).join(', ');
+      lines.push(`Cliché topic: ${themes} — verdict: ${t.clicheDetection.verdict.replace(/_/g, ' ')}`);
+    }
+    if (t.thematicCoherence.tangentialParagraphs.length > 0) {
+      lines.push(`Tangential paragraphs: P${t.thematicCoherence.tangentialParagraphs.join(', P')} (low thematic overlap)`);
+    }
+    lines.push(`Thematic coherence: ${Math.round(t.thematicCoherence.overallCoherence * 100)}%`);
+
+    // Character
+    const c = analysis.character;
+    lines.push(`Character revelation peak: ${c.peakLevel.replace(/_/g, ' ')} at P${c.peakParagraphIndex}`);
+    if (c.vulnerability.vulnerabilityMarkerCount > 0) {
+      lines.push(`Vulnerability: ${c.vulnerability.isEarned ? 'earned (grounded in detail)' : 'performed (lacks grounding detail)'}`);
+    }
+    if (c.observations.length > 0) {
+      for (const obs of c.observations.slice(0, 2)) {
+        lines.push(`- ${obs}`);
+      }
+    }
+
+    // Insight
+    const i = analysis.insight;
+    lines.push(`Insight depth: ${i.depth.level.replace(/_/g, ' ')} (score ${i.depth.score}/100, location: ${i.depth.insightLocation.replace(/_/g, ' ')})`);
+    if (i.depth.markers.isCliche) {
+      lines.push(`Insight uses cliché language — evaluate whether the surrounding context redeems it`);
+    }
+    if (i.uniqueness.hasCallbackStructure) {
+      lines.push(`Essay has callback structure (final paragraphs echo opening)`);
+    }
+    if (i.depth.strongestPassage) {
+      lines.push(`Strongest insight: "${i.depth.strongestPassage.slice(0, 100)}${i.depth.strongestPassage.length > 100 ? '...' : ''}"`);
+    }
+
+    return lines.join('\n');
   }
 
   private buildInstructions(maxAnnotations: number, includeStrengths: boolean): string {
