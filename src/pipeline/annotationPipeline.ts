@@ -1,0 +1,306 @@
+/**
+ * Annotation Pipeline — Main Orchestrator (Phases 1-4)
+ *
+ * Wires together all pipeline phases into a single analyze() call:
+ *   Phase 1: Resolve essay profile from registry
+ *   Phase 2: Extract deterministic text features
+ *   Phase 3: Single Sonnet call producing inline annotations
+ *   Phase 4: Derive per-dimension scores from annotations + heuristics
+ *
+ * On LLM failure, falls back to heuristic-only scoring (annotations: []).
+ */
+
+import crypto from 'node:crypto';
+import { callClaude, calculateCost } from '../lib/llm/claude';
+import type { ClaudeResponse } from '../lib/llm/claude';
+import { featureExtractor, essayProfileRegistry, dimensionRegistry } from '../workshop';
+import { promptBuilder } from './promptBuilder';
+import { scoreDeriver } from './scoreDeriver';
+import { validateAnnotations, clamp } from './annotationValidation';
+import { generateSummary } from './summaryGenerator';
+import { generateRoadmap } from './improvementRoadmap';
+import type {
+  AnnotatedAnalysisResult,
+  AnnotationPipelineConfig,
+  EssayAnnotation,
+  EnrichedFeatures,
+  RawLLMAnnotation,
+} from './types';
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
+const MAX_TOKENS = 4096;
+
+// ============================================================================
+// ANNOTATION PIPELINE
+// ============================================================================
+
+export class AnnotationPipeline {
+  /**
+   * Analyze an essay through the full 4-phase pipeline.
+   *
+   * @param text - The raw essay text to analyze
+   * @param config - Pipeline configuration (essay type, context, limits)
+   * @returns Complete analysis result with annotations, scores, and metadata
+   */
+  async analyze(
+    text: string,
+    config: AnnotationPipelineConfig,
+  ): Promise<AnnotatedAnalysisResult> {
+    const timings: Record<string, number> = {};
+    const pipelineStart = Date.now();
+
+    // Validate input
+    const validationError = this.validateInput(text, config);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
+    await dimensionRegistry.autoImport();
+
+    // ------------------------------------------------------------------
+    // Phase 1 + 2 (parallel): Resolve profile & extract features
+    // ------------------------------------------------------------------
+    const phase12Start = Date.now();
+
+    const [profile, features] = await Promise.all([
+      Promise.resolve(essayProfileRegistry.getProfile(config.essayType)),
+      Promise.resolve(featureExtractor.extract(text)),
+    ]);
+
+    timings.phase12_profileAndFeatures = Date.now() - phase12Start;
+
+    // Build enriched features (features + optional expertise signals)
+    const enrichedFeatures: EnrichedFeatures = {
+      features,
+      // Expertise signals are only relevant for activity descriptions
+      // and would be populated by a dedicated expertise extractor in a future phase
+    };
+
+    // ------------------------------------------------------------------
+    // Phase 3: Single Sonnet call → raw annotations
+    // ------------------------------------------------------------------
+    let annotations: EssayAnnotation[] = [];
+    let llmResponse: ClaudeResponse<string> | null = null;
+
+    const phase3Start = Date.now();
+    try {
+      const prompt = promptBuilder.buildPrompt(text, config, enrichedFeatures);
+
+      llmResponse = await this.retryWithBackoff(async () => {
+        return callClaude<string>({
+          systemPrompt: prompt.systemPrompt,
+          userPrompt: prompt.userPrompt,
+          model: SONNET_MODEL,
+          maxTokens: MAX_TOKENS,
+          cacheSystemPrompt: true,
+        });
+      });
+
+      // Parse and validate annotations
+      const rawAnnotations = this.parseAnnotations(llmResponse.content);
+      annotations = validateAnnotations(rawAnnotations, text, '[AnnotationPipeline]');
+    } catch (error) {
+      console.error(
+        '[AnnotationPipeline] Phase 3 LLM call failed after retries, falling back to heuristic-only scoring:',
+        error instanceof Error ? error.message : String(error),
+      );
+      // annotations stays [] — Phase 4 will produce heuristic-only scores
+    }
+    timings.phase3_llmAnnotation = Date.now() - phase3Start;
+
+    // ------------------------------------------------------------------
+    // Phase 4: Derive scores from annotations + heuristics
+    // ------------------------------------------------------------------
+    const phase4Start = Date.now();
+
+    const { dimensionScores, eqi, impressionLabel } = scoreDeriver.deriveScores({
+      annotations,
+      features,
+      essayType: config.essayType,
+    });
+
+    timings.phase4_scoreDerivation = Date.now() - phase4Start;
+    timings.totalPipeline = Date.now() - pipelineStart;
+
+    // ------------------------------------------------------------------
+    // Assemble result
+    // ------------------------------------------------------------------
+    const analysisId = crypto.randomUUID();
+    const textHash = crypto.createHash('sha256').update(text).digest('hex');
+
+    // Build summary from annotations (dimension-weighted ranking)
+    const summary = generateSummary({
+      annotations,
+      dimensionScores,
+      eqi,
+      impressionLabel,
+    });
+
+    // Build improvement roadmap (categorized, priority-ranked)
+    const roadmap = generateRoadmap({ annotations, dimensionScores });
+
+    // Build meta with cost, timing, tokens
+    const meta = this.buildMeta(llmResponse, timings);
+
+    return {
+      analysisId,
+      text,
+      textHash,
+      essayType: config.essayType,
+      annotations,
+      dimensionScores,
+      eqi,
+      impressionLabel,
+      summary,
+      roadmap,
+      meta,
+    };
+  }
+
+  // ==========================================================================
+  // INPUT VALIDATION
+  // ==========================================================================
+
+  /**
+   * Validate pipeline inputs before starting analysis.
+   * Returns an error message if invalid, null if valid.
+   */
+  private validateInput(text: string, config: AnnotationPipelineConfig): string | null {
+    if (!text || typeof text !== 'string') return 'Essay text is required';
+    if (text.length < 50) return `Essay too short (${text.length} chars, minimum 50)`;
+    if (text.length > 10000) return `Essay too long (${text.length} chars, maximum 10,000)`;
+    if (!config.essayType) return 'Essay type is required';
+    return null;
+  }
+
+  // ==========================================================================
+  // RETRY LOGIC
+  // ==========================================================================
+
+  /**
+   * Retry an async function with exponential backoff.
+   * Delays: 1000ms, 2000ms, 4000ms (baseDelayMs * 2^(attempt-1))
+   */
+  private async retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxAttempts: number = 3,
+    baseDelayMs: number = 1000,
+  ): Promise<T> {
+    let lastError: Error | undefined;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        if (attempt < maxAttempts) {
+          const delay = baseDelayMs * Math.pow(2, attempt - 1);
+          console.warn(`[AnnotationPipeline] Attempt ${attempt}/${maxAttempts} failed, retrying in ${delay}ms:`, lastError.message);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError;
+  }
+
+  // ==========================================================================
+  // PHASE 3 HELPERS
+  // ==========================================================================
+
+  /**
+   * Parse raw LLM response text into an array of RawLLMAnnotation objects.
+   * Handles markdown ```json fences, plain JSON arrays, and partial JSON recovery.
+   */
+  private parseAnnotations(responseText: string): RawLLMAnnotation[] {
+    let jsonStr = responseText.trim();
+
+    // Strip markdown code fences if present
+    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (fenceMatch) {
+      jsonStr = fenceMatch[1].trim();
+    }
+
+    // Find the JSON array in the response
+    const firstBracket = jsonStr.indexOf('[');
+    const lastBracket = jsonStr.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket > firstBracket) {
+      jsonStr = jsonStr.substring(firstBracket, lastBracket + 1);
+    }
+
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (!Array.isArray(parsed)) throw new Error('Not an array');
+      return parsed as RawLLMAnnotation[];
+    } catch {
+      // Try partial recovery
+      const recovered = this.recoverPartialJSON(jsonStr);
+      if (recovered) return recovered;
+      throw new Error('Failed to parse LLM response as JSON array');
+    }
+  }
+
+  /**
+   * Attempt to recover partial valid JSON from a truncated LLM response.
+   * Finds the last complete object in a truncated array.
+   */
+  private recoverPartialJSON(text: string): RawLLMAnnotation[] | null {
+    // Find the last complete object in a truncated array
+    const lastCloseBrace = text.lastIndexOf('}');
+    if (lastCloseBrace === -1) return null;
+    const truncated = text.substring(0, lastCloseBrace + 1) + ']';
+    try {
+      const parsed = JSON.parse(truncated);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        console.warn(`[AnnotationPipeline] Recovered ${parsed.length} annotations from truncated response`);
+        return parsed;
+      }
+    } catch { /* recovery failed */ }
+    return null;
+  }
+
+  // ==========================================================================
+  // META BUILDER
+  // ==========================================================================
+
+  /**
+   * Build metadata object with cost, timing, and token usage.
+   */
+  private buildMeta(
+    llmResponse: ClaudeResponse<string> | null,
+    timings: Record<string, number>,
+  ): AnnotatedAnalysisResult['meta'] {
+    if (!llmResponse) {
+      return {
+        costUSD: 0,
+        timing: timings,
+        tokens: { input: 0, output: 0 },
+      };
+    }
+
+    const costUSD = calculateCost(llmResponse.usage, SONNET_MODEL);
+
+    return {
+      costUSD,
+      timing: timings,
+      tokens: {
+        input: llmResponse.usage.input_tokens,
+        output: llmResponse.usage.output_tokens,
+        ...(llmResponse.usage.cache_creation_input_tokens
+          ? { cacheCreation: llmResponse.usage.cache_creation_input_tokens }
+          : {}),
+        ...(llmResponse.usage.cache_read_input_tokens
+          ? { cacheRead: llmResponse.usage.cache_read_input_tokens }
+          : {}),
+      },
+    };
+  }
+}
+
+// ============================================================================
+// SINGLETON EXPORT
+// ============================================================================
+
+export const annotationPipeline = new AnnotationPipeline();
