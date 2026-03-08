@@ -11,6 +11,7 @@ import ClerkErrorBoundary from "@/components/ClerkErrorBoundary";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
 import BugReportWidget from "@/components/BugReportWidget";
 import Index from "./pages/Index";
+import DashboardHome from "./pages/DashboardHome";
 import PortfolioScanner from "./pages/PortfolioScanner";
 import ExtracurricularOptimizer from "./pages/ExtracurricularOptimizer";
 import AcademicPlanner from "./pages/AcademicPlanner";
@@ -80,6 +81,14 @@ const AppRoutes = () => (
 
       {/* Dashboard routes */}
       <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+        <Route path="/dashboard" element={<DashboardHome />} />
+        <Route path="/dashboard/scanner" element={<PortfolioScanner />} />
+        <Route path="/dashboard/insights" element={<PortfolioInsightsNew />} />
+        <Route path="/dashboard/workshop" element={<PIQWorkshop />} />
+        <Route path="/dashboard/workshop/:piqNumber" element={<PIQWorkshop />} />
+        <Route path="/dashboard/pricing" element={<Pricing />} />
+        <Route path="/dashboard/settings" element={<Settings />} />
+        {/* Legacy routes for backwards compatibility */}
         <Route path="/portfolio-scanner" element={<PortfolioScanner />} />
         <Route path="/portfolio-insights" element={<PortfolioInsightsNew />} />
         <Route path="/piq-workshop" element={<PIQWorkshop />} />

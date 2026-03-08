@@ -10,7 +10,14 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarSeparator,
+  SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   Home,
   BarChart3,
@@ -20,6 +27,8 @@ import {
   Settings,
   User,
   LogOut,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -64,6 +73,7 @@ export function AppSidebar() {
   const location = useLocation();
   const { user, signOut } = useAuth();
   const [credits, setCredits] = useState<number | null>(null);
+  const { state, toggleSidebar } = useSidebar();
 
   // Load credits
   useEffect(() => {
@@ -105,29 +115,60 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
-        <Link to="/" className="flex items-center gap-2">
-          <img 
-            src="/uplift_logo_lr.png" 
-            alt="Uplift" 
-            className="h-8 w-auto object-contain" 
-          />
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <img
+              src="/uplift_logo_lr.png"
+              alt="Uplift"
+              className="h-8 w-auto object-contain"
+            />
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="h-8 w-8"
+          >
+            {state === 'expanded' ? (
+              <ChevronLeft className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
-              {navItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
+              {navItems.map((item) => {
+                const menuButton = (
                   <SidebarMenuButton asChild isActive={isActive(item.href)}>
                     <Link to={item.href}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+                );
+
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    {state === 'collapsed' ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {menuButton}
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          {item.title}
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      menuButton
+                    )}
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

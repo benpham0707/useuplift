@@ -1,0 +1,104 @@
+/* React Day Picker Styles */
+.rdp {
+  --rdp-cell-size: 36px;
+  --rdp-accent-color: #3b82f6;
+  --rdp-background-color: #e0e7ff;
+  --rdp-accent-color-dark: #2563eb;
+  --rdp-background-color-dark: #c7d2fe;
+  --rdp-outline: 2px solid var(--rdp-accent-color);
+  --rdp-outline-selected: 2px solid rgba(0, 0, 0, 0.75);
+}
+
+.rdp-day_today {
+  font-weight: 600;
+}
+
+.rdp-day {
+  border-radius: 0.375rem;
+}
+
+.rdp-day:hover:not(.rdp-day_selected):not(.rdp-day_outside) {
+  background-color: #f3f4f6;
+}
+
+.rdp-day_selected {
+  background-color: var(--rdp-accent-color) !important;
+  color: white !important;
+}
+
+.rdp-day_selected:hover {
+  background-color: var(--rdp-accent-color-dark) !important;
+}
+
+.rdp-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.rdp-nav {
+  white-space: nowrap;
+}
+
+.rdp-nav_button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border-radius: 0.25rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.rdp-nav_button:hover {
+  color: #111827;
+  background-color: #f3f4f6;
+}
+
+.rdp-nav_button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rdp-head_cell {
+  color: #6b7280;
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-align: center;
+  height: 2rem;
+}
+
+.rdp-tbody {
+  margin-top: 0.25rem;
+}
+
+.rdp-day_outside {
+  opacity: 0.5;
+}
+
+.rdp-day_disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Custom deadline indicator styles */
+.deadline-indicator {
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.deadline-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+}

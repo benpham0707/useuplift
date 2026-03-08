@@ -50,7 +50,7 @@ const ScoreRing = React.memo(function ScoreRing({
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
-          className="transition-[stroke-dashoffset] duration-[800ms] ease-out"
+          className="transition-[stroke-dashoffset] duration-700 ease-out"
         />
       </svg>
       {showLabel && (

@@ -1,0 +1,120 @@
+/* Dashboard Animations and Micro-interactions */
+
+/* Widget entrance animations */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Stagger animation for widgets */
+.dashboard-widget {
+  animation: fadeInUp 0.5s ease-out;
+  animation-fill-mode: both;
+}
+
+.dashboard-widget:nth-child(1) { animation-delay: 0ms; }
+.dashboard-widget:nth-child(2) { animation-delay: 100ms; }
+.dashboard-widget:nth-child(3) { animation-delay: 200ms; }
+.dashboard-widget:nth-child(4) { animation-delay: 300ms; }
+.dashboard-widget:nth-child(5) { animation-delay: 400ms; }
+.dashboard-widget:nth-child(6) { animation-delay: 500ms; }
+
+/* Quest completion animation */
+@keyframes questComplete {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.quest-checkbox-complete {
+  animation: questComplete 0.3s ease-out;
+}
+
+/* Streak flame pulse */
+@keyframes flamePulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.streak-flame {
+  animation: flamePulse 2s ease-in-out infinite;
+}
+
+/* Credit earned celebration */
+@keyframes creditCelebration {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.2) rotate(5deg);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.credits-earned {
+  animation: creditCelebration 1s ease-out;
+}
+
+/* Progress bar fill animation */
+@keyframes progressFill {
+  from {
+    width: 0;
+  }
+}
+
+.progress-animated {
+  animation: progressFill 1s ease-out;
+}
+
+/* Stat change animation */
+@keyframes statChange {
+  0% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(var(--primary), 0.1);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.stat-updated {
+  animation: statChange 1s ease-out;
+}
+
+/* Hover lift effect for cards */
+.hover-lift {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Smooth number transitions */
+.number-transition {
+  transition: all 0.3s ease-out;
+}
