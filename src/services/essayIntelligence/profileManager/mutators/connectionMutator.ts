@@ -18,6 +18,7 @@
 import type {
   EssayProfile,
   Connection,
+  ConnectionScoutOutput,
   MutationType,
 } from '../../profileTypes';
 
@@ -270,38 +271,58 @@ export class ConnectionMutator {
   }
 
   /**
-   * Add scout leads (L2.5 provisional connections with low confidence).
-   * Scout leads are regular connections with low confidence, discovered by L2.5.
+   * Add scout leads from L2.5 categorized ConnectionScoutOutput.
+   * Accepts the categorized format (repeatedElements, tonalShifts, structuralEchoes)
+   * and flattens into provisional connections with low confidence.
    */
   addScoutLeads(
     profile: EssayProfile,
-    leads: Array<{
-      from: [number, number];
-      to: [number, number];
-      type: string;
-      description: string;
-    }>,
+    scout: ConnectionScoutOutput,
   ): MutationType[] {
     const mutations: MutationType[] = [];
 
-    for (const lead of leads) {
-      const result = this.addConnection(profile, {
-        from: lead.from,
-        to: lead.to,
-        type: lead.type,
-        description: lead.description,
-        confidence: 0.3, // Scout leads have low confidence
-        discoveredByLayer: 'L2.5',
-      });
-
-      if (result.connectionId && result.mutations.length > 0) {
-        for (const m of result.mutations) {
-          if (!mutations.includes(m)) {
-            mutations.push(m);
+    // Repeated elements → pairwise connections between occurrences
+    for (const elem of scout.repeatedElements) {
+      for (let i = 0; i < elem.occurrences.length; i++) {
+        for (let j = i + 1; j < elem.occurrences.length; j++) {
+          const from = elem.occurrences[i];
+          const to = elem.occurrences[j];
+          const result = this.addConnection(profile, {
+            from: [from.paragraphIndex, from.sentenceIndex],
+            to: [to.paragraphIndex, to.sentenceIndex],
+            type: 'repeated_element',
+            description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
+            confidence: 0.3,
+            discoveredByLayer: 'L2.5',
+          });
+          if (result.connectionId && result.mutations.length > 0) {
+            for (const m of result.mutations) {
+              if (!mutations.includes(m)) mutations.push(m);
+            }
           }
         }
       }
     }
+
+    // Structural echoes → source-to-echo connections
+    for (const echo of scout.structuralEchoes) {
+      const result = this.addConnection(profile, {
+        from: [echo.source.paragraphIndex, echo.source.sentenceIndex],
+        to: [echo.echo.paragraphIndex, echo.echo.sentenceIndex],
+        type: 'structural_echo',
+        description: `Structural echo: ${echo.echoType}`,
+        confidence: 0.3,
+        discoveredByLayer: 'L2.5',
+      });
+      if (result.connectionId && result.mutations.length > 0) {
+        for (const m of result.mutations) {
+          if (!mutations.includes(m)) mutations.push(m);
+        }
+      }
+    }
+
+    // Tonal shifts are noted but don't create cross-paragraph connections
+    // (they mark a location, not a pair). The coordinator handles these separately.
 
     return mutations;
   }

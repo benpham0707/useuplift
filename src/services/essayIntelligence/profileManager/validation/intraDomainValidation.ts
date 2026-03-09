@@ -346,7 +346,7 @@ function checkIndexConsistency(profile: Readonly<EssayProfile>): ValidationCheck
   }
 
   // Token counts non-negative
-  const tokenEntries = profile.index.sectionTokens;
+  const tokenEntries = profile.index.sectionTokenCounts;
   const namedSections: Array<{ name: string; value: number }> = [
     { name: 'voiceIdentity', value: tokenEntries.voiceIdentity },
     { name: 'voiceMap', value: tokenEntries.voiceMap },
@@ -364,20 +364,20 @@ function checkIndexConsistency(profile: Readonly<EssayProfile>): ValidationCheck
 
   for (const section of namedSections) {
     if (section.value < 0) {
-      issues.push(`sectionTokens.${section.name} is negative (${section.value})`);
+      issues.push(`sectionTokenCounts.${section.name} is negative (${section.value})`);
     }
   }
 
   for (let i = 0; i < tokenEntries.paragraphs.length; i++) {
     if (tokenEntries.paragraphs[i] < 0) {
-      issues.push(`sectionTokens.paragraphs[${i}] is negative (${tokenEntries.paragraphs[i]})`);
+      issues.push(`sectionTokenCounts.paragraphs[${i}] is negative (${tokenEntries.paragraphs[i]})`);
     }
   }
 
   // Paragraph token array length check
   if (tokenEntries.paragraphs.length !== profile.paragraphs.length) {
     issues.push(
-      `sectionTokens.paragraphs length (${tokenEntries.paragraphs.length}) !== paragraph count (${profile.paragraphs.length})`,
+      `sectionTokenCounts.paragraphs length (${tokenEntries.paragraphs.length}) !== paragraph count (${profile.paragraphs.length})`,
     );
   }
 

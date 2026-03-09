@@ -26,8 +26,17 @@ import type {
   VoiceObservation,
   VoiceDimension,
   CodeSwitchEvent,
+  ParagraphLocation,
   MutationType,
 } from '../../profileTypes';
+
+/**
+ * Source tracking for insight-driven mutations.
+ */
+interface InsightSource {
+  source: string;
+  insightId: string;
+}
 
 // ============================================================================
 // VOICE MAP MUTATOR
@@ -219,6 +228,76 @@ export class VoiceMapMutator {
     }
 
     return ['voice_shift_added'];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INSIGHT-DRIVEN CASCADE METHODS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Mark voice shifts at a given location as intentional.
+   *
+   * When a student says "I want to keep that informal voice" (preference insight),
+   * all voice shifts at the specified paragraph are marked as 'deliberate'.
+   * This is the critical distinction between a strength (intentional variation)
+   * and a weakness (unintentional drift).
+   *
+   * Called by: 'preference' insight cascade
+   *
+   * @param dimension - which voice dimension to look for shifts on (e.g., 'register')
+   * @param location - paragraph (and optionally sentence) where the shift occurs
+   * @returns MutationType[] for staleness propagation
+   */
+  markIntentional(
+    profile: EssayProfile,
+    dimension: string,
+    location: ParagraphLocation,
+    _source?: InsightSource,
+  ): MutationType[] {
+    const mutations: MutationType[] = [];
+
+    // Find all shifts at this location (may match multiple dimensions)
+    const matchingShifts = profile.voiceMap.shifts.filter((shift) => {
+      const locationMatch = shift.location.paragraph === location.paragraph &&
+        (location.sentence === undefined || shift.location.sentence === location.sentence);
+
+      // If a specific dimension was requested, also filter by that
+      const dimensionMatch = !dimension || shift.dimensions.includes(dimension as VoiceDimension);
+
+      return locationMatch && dimensionMatch;
+    });
+
+    if (matchingShifts.length === 0) {
+      // No shifts at this location — check if there are ANY shifts at this paragraph
+      // and mark them regardless of dimension (student preference applies broadly)
+      const paragraphShifts = profile.voiceMap.shifts.filter(
+        (s) => s.location.paragraph === location.paragraph,
+      );
+
+      for (const shift of paragraphShifts) {
+        shift.intentionality = {
+          assessment: 'intentional',
+          confidence: 0.95,
+          reasoning: 'Student confirmed this voice choice is deliberate',
+        };
+        if (!mutations.includes('voice_intentionality_updated')) {
+          mutations.push('voice_intentionality_updated');
+        }
+      }
+    } else {
+      for (const shift of matchingShifts) {
+        shift.intentionality = {
+          assessment: 'intentional',
+          confidence: 0.95,
+          reasoning: 'Student confirmed this voice choice is deliberate',
+        };
+        if (!mutations.includes('voice_intentionality_updated')) {
+          mutations.push('voice_intentionality_updated');
+        }
+      }
+    }
+
+    return mutations;
   }
 
   /**

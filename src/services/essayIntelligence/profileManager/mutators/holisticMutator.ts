@@ -25,9 +25,19 @@
 import type {
   EssayProfile,
   HolisticSynthesisOutput,
+  HolisticSectionType,
+  ParagraphLocation,
   NarrativeStrategy,
   MutationType,
 } from '../../profileTypes';
+
+/**
+ * Source tracking for insight-driven mutations.
+ */
+interface InsightSource {
+  source: string;
+  insightId: string;
+}
 
 // ============================================================================
 // HOLISTIC MUTATOR
@@ -211,6 +221,140 @@ export class HolisticMutator {
     }
 
     return changed ? ['holistic_section_updated'] : [];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INSIGHT-DRIVEN CASCADE METHODS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Enrich the emotional topography with student-revealed emotional data.
+   *
+   * When a student says "Reading this back makes me feel anxious" (emotional_reaction),
+   * the system captures this as an observation in the emotional topography. These
+   * are always additive — student emotions NEVER supersede system observations.
+   *
+   * Called by: 'emotional_reaction' insight cascade
+   *
+   * @param emotionalData - location, emotion name, and/or observation text
+   * @returns MutationType[] for staleness propagation
+   */
+  enrichEmotionalTopography(
+    profile: EssayProfile,
+    emotionalData: {
+      location?: ParagraphLocation;
+      emotion?: string;
+      observation?: string;
+    },
+    _source?: InsightSource,
+  ): MutationType[] {
+    // Add to undertones if it's a general emotional observation
+    if (emotionalData.observation) {
+      const undertone = emotionalData.emotion
+        ? `${emotionalData.emotion}: ${emotionalData.observation}`
+        : emotionalData.observation;
+
+      if (!profile.emotionalTopography.undertones.includes(undertone)) {
+        profile.emotionalTopography.undertones.push(undertone);
+      }
+    }
+
+    // If a specific location and emotion were provided, add as a peak moment
+    // (student-identified emotional significance)
+    if (emotionalData.location && emotionalData.emotion) {
+      const paragraph = emotionalData.location.paragraph;
+      const sentence = emotionalData.location.sentence ?? 0;
+
+      // Check if this location already has a peak moment
+      const existing = profile.emotionalTopography.peakMoments.find(
+        (pm) => pm.location[0] === paragraph && pm.location[1] === sentence,
+      );
+
+      if (!existing) {
+        profile.emotionalTopography.peakMoments.push({
+          location: [paragraph, sentence],
+          emotion: emotionalData.emotion,
+          intensity: 'moderate', // Default — student mentioned it, so it's at least moderate
+        });
+      }
+    }
+
+    return ['holistic_section_updated'];
+  }
+
+  /**
+   * Enrich a holistic section with student-provided context.
+   *
+   * Generic enrichment method that adds context strings to the appropriate
+   * holistic section. Used when the student provides background information
+   * that applies to a specific holistic dimension.
+   *
+   * Called by: various insight cascades that need to enrich holistic understanding
+   *
+   * @param sectionType - which holistic section to enrich
+   * @param contextString - the context to add
+   * @returns MutationType[] for staleness propagation
+   */
+  enrichWithContext(
+    profile: EssayProfile,
+    sectionType: HolisticSectionType,
+    contextString: string,
+    _source?: InsightSource,
+  ): MutationType[] {
+    switch (sectionType) {
+      case 'voice_identity':
+        // Add to distinctive patterns
+        if (!profile.voiceIdentity.distinctivePatterns.includes(contextString)) {
+          profile.voiceIdentity.distinctivePatterns.push(contextString);
+        }
+        break;
+
+      case 'emotional_topography':
+        // Add to undertones
+        if (!profile.emotionalTopography.undertones.includes(contextString)) {
+          profile.emotionalTopography.undertones.push(contextString);
+        }
+        break;
+
+      case 'thematic_architecture':
+        // Add to subtext (thematic context that isn't in the essay)
+        if (profile.thematicArchitecture.subtext) {
+          profile.thematicArchitecture.subtext += `; ${contextString}`;
+        } else {
+          profile.thematicArchitecture.subtext = contextString;
+        }
+        break;
+
+      case 'narrative_strategy':
+        // Add to structural choices
+        profile.narrativeStrategy.structuralChoices.push(contextString);
+        break;
+
+      case 'character_revelation':
+        // Add to values revealed
+        if (!profile.characterRevelation.valuesRevealed.includes(contextString)) {
+          profile.characterRevelation.valuesRevealed.push(contextString);
+        }
+        break;
+
+      case 'craft_assessment':
+        // No simple string field — skip
+        break;
+
+      case 'admissions_positioning':
+        // Add to distinctiveness factors
+        if (!profile.admissionsPositioning.distinctivenessFactors.includes(contextString)) {
+          profile.admissionsPositioning.distinctivenessFactors.push(contextString);
+        }
+        break;
+
+      default:
+        // voice_map, moment_earnedness_map, cross_dimension_entanglements
+        // handled by their own mutators
+        break;
+    }
+
+    return ['holistic_section_updated'];
   }
 
   /**

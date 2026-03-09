@@ -1249,7 +1249,7 @@ export interface ProfileIndex {
   confidenceLevel: ConfidenceLevel;
 
   /** Global topics present in the essay */
-  essayTopics: string[];
+  topicTags: string[];
 
   /** One-liner per paragraph — scannable */
   paragraphDigest: Array<{
@@ -1265,7 +1265,7 @@ export interface ProfileIndex {
   }>;
 
   /** Approximate token count per profile section (for token budgeting) */
-  sectionTokens: {
+  sectionTokenCounts: {
     voiceIdentity: number;
     voiceMap: number;
     emotionalTopography: number;
@@ -1300,7 +1300,7 @@ export interface ProfileIndex {
   };
 
   /** Staleness tracking — which sections need refreshing */
-  staleness: {
+  stalenessSnapshot: {
     strongStale: string[];
     moderateStale: string[];
     weakStale: string[];
@@ -1413,26 +1413,37 @@ export interface EssayProfile {
 // LAYER OUTPUT TYPES
 // ============================================================================
 
-/**
- * ParagraphFirstImpression — L1 output per paragraph.
- * Haiku-produced first-read observations. Purely descriptive.
- */
+/** L1 output: Haiku-produced first impressions — simple string classifications.
+ * These are temporary scaffolding; L3 (Sonnet) SUPERSEDES them entirely
+ * with richer ObservationEntry[] when it processes each paragraph.
+ * See "Type Escalation" section for the deepening pattern. */
 export interface ParagraphFirstImpression {
   paragraphIndex: number;
-  /** Initial sentence-level observations */
+
+  // Paragraph-level
+  apparentPurpose: string;
+  emotionalRegister: string;
+  voiceObservation: string;
+  craftNotices: string[];
+  tags: string[];
+
+  // Sentence-level (every sentence mapped)
   sentences: Array<{
     index: number;
-    /** First-impression functions (what this sentence appears to do) */
-    observedFunctions: ObservationEntry[];
-    /** Initial intent guesses */
-    inferredIntents: ObservationEntry[];
-    /** Initial tags */
+    text: string;
+    apparentPurpose: string;
+    rhetoricalFunction: string;
+    toneShift: boolean;
+    notableElements: string[];
     tags: string[];
   }>;
-  /** Initial paragraph role assessment */
-  roleSummary: string;
-  /** Initial tags at paragraph level */
-  tags: string[];
+
+  // Word/phrase level (DESCRIPTIVE ONLY — no strength/weakness judgment)
+  notablePhrases: Array<{
+    phrase: string;
+    sentenceIndex: number;
+    significance: string;
+  }>;
 }
 
 /**
@@ -1442,24 +1453,25 @@ export interface ParagraphFirstImpression {
  */
 export type StructuralCartographyOutput = import('./types').StructuralCartography;
 
-/**
- * ConnectionScoutOutput — L2.5 output. Scout leads for L3 to investigate.
- * Provisional cross-paragraph connections detected by Haiku parallel scan.
- */
+/** L2.5 output: Haiku-produced surface-level connection scouting.
+ * Categorized by pattern type so L3 can ask targeted questions.
+ * These are LEADS for L3 to investigate, not confirmed connections. */
 export interface ConnectionScoutOutput {
-  /** Provisional connections — low-confidence leads for L3 to confirm or reject */
-  leads: Array<{
-    from: [number, number];
-    to: [number, number];
-    type: string;
-    description: string;
-    /** Scout confidence — typically lower than L3-confirmed connections */
-    confidence: number;
+  repeatedElements: Array<{
+    element: string;
+    occurrences: Array<{ paragraphIndex: number; sentenceIndex: number }>;
+    potentialSignificance: string;
   }>;
-  /** Surface-level observations that don't rise to connection level */
-  observations: Array<{
-    location: [number, number];
-    observation: string;
+  tonalShifts: Array<{
+    location: { paragraphIndex: number; sentenceIndex: number };
+    fromTone: string;
+    toTone: string;
+    abruptness: 'gradual' | 'sharp';
+  }>;
+  structuralEchoes: Array<{
+    source: { paragraphIndex: number; sentenceIndex: number };
+    echo: { paragraphIndex: number; sentenceIndex: number };
+    echoType: string;
   }>;
 }
 
@@ -1519,6 +1531,11 @@ export interface UnderstandingWalkOutput {
  * HolisticSynthesisOutput — L3.75 output.
  * Single Sonnet call after walk. Reads all sentence-level understanding,
  * synthesizes ALL holistic sections including voice map and earnedness map.
+ *
+ * Uses the same types as stored profile sections. There is no output-to-profile
+ * transformation step — the LLM writes directly into profile format
+ * (Design Decision: "LLM output IS the profile data"). This means the L3.75
+ * prompt must specify the exact output schema matching the profile types.
  */
 export interface HolisticSynthesisOutput {
   voiceIdentity: VoiceIdentity;
@@ -1736,6 +1753,8 @@ export interface CircuitBreakerState {
   failurePoint: string;
   /** Error details from each attempt */
   attempts: Array<{
+    /** Pipeline position where this failure occurred (e.g., 'L3_walk', 'L1_impressions') */
+    position?: string;
     timestamp: number;
     error: string;
     rawOutput?: string;

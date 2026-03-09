@@ -53,6 +53,11 @@ export const STALENESS_DEPENDENCY_MAP: StalenessDependencyMap = {
       reason: 'Connection descriptions may need updating',
     },
     {
+      target: { type: 'holistic', section: 'moment_earnedness_map' },
+      strength: 'moderate',
+      reason: 'Earned-ness arrows pointing to this sentence may need reassessment — mechanism contribution may have changed',
+    },
+    {
       target: { type: 'holistic', section: 'voice_identity' },
       strength: 'weak',
       reason: 'Voice signature evidence may have shifted',

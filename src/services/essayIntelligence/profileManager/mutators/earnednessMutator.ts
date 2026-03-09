@@ -24,8 +24,17 @@ import type {
   EarnedMoment,
   EarningMechanism,
   EarningMechanismType,
+  ParagraphLocation,
   MutationType,
 } from '../../profileTypes';
+
+/**
+ * Source tracking for insight-driven mutations.
+ */
+interface InsightSource {
+  source: string;
+  insightId: string;
+}
 
 // ============================================================================
 // EARNEDNESS MUTATOR
@@ -241,6 +250,62 @@ export class EarnednessMutator {
   ): MutationType[] {
     profile.momentEarnednessMap.structuralObservation = observation;
     return ['earnedness_arrow_added'];
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // INSIGHT-DRIVEN CASCADE METHODS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Add a new earning mechanism arrow to an existing moment.
+   *
+   * Convenience method for insight-driven cascades. Delegates to addMechanism
+   * after constructing the full EarningMechanism from the simplified input.
+   *
+   * If a momentIndex is provided, uses that to find the moment. Otherwise
+   * uses the first moment found in the profile (for essay-wide insights).
+   *
+   * Called by: various insight cascades that reveal new earning relationships
+   *
+   * @returns MutationType[] for staleness propagation
+   */
+  addArrow(
+    profile: EssayProfile,
+    mechanism: {
+      type: EarningMechanismType;
+      location: ParagraphLocation;
+      contribution: string;
+      momentIndex?: number;
+    },
+    _source?: InsightSource,
+  ): MutationType[] {
+    const moments = profile.momentEarnednessMap.moments;
+    if (moments.length === 0) {
+      console.error('[EarnednessMutator] addArrow: no moments exist to add arrow to');
+      return [];
+    }
+
+    // Find the target moment
+    const targetMomentIdx = mechanism.momentIndex ?? 0;
+    if (targetMomentIdx < 0 || targetMomentIdx >= moments.length) {
+      console.error(
+        `[EarnednessMutator] addArrow: moment index ${targetMomentIdx} out of range [0, ${moments.length - 1}]`,
+      );
+      return [];
+    }
+
+    const moment = moments[targetMomentIdx];
+
+    // Delegate to the existing addMechanism method
+    return this.addMechanism(
+      profile,
+      { paragraph: moment.location.paragraph, sentence: moment.location.sentence },
+      {
+        type: mechanism.type,
+        location: mechanism.location,
+        contribution: mechanism.contribution,
+      },
+    );
   }
 
   /**

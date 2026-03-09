@@ -58,7 +58,6 @@ import type {
   StalenessTarget,
   StalenessStrength,
   ValidationResult,
-  ValidationCheck,
   ReadinessScores,
   ObservationEntry,
   ParagraphFirstImpression,
@@ -109,6 +108,9 @@ import {
   propagateStaleness,
   type PropagationContext,
 } from './dependencyMap';
+
+import { validateQuick as intraDomainValidateQuick } from './validation/intraDomainValidation';
+import { validateFull as crossDomainValidateFull } from './validation/crossDomainValidation';
 
 // ============================================================================
 // MUTATOR INTERFACES
@@ -176,12 +178,41 @@ export interface ISentenceMutator {
     newText: string,
   ): void;
 
-  /** Update inferred intents from student conversation */
+  /** Update inferred intents from student conversation (reinterpretation cascade) */
   updateInferredIntents(
     profile: EssayProfile,
     paragraphIndex: number,
     sentenceIndex: number,
     intents: ObservationEntry[],
+    source?: { source: string; insightId: string },
+  ): MutationType[];
+
+  /** Correct a specific inferred intent (correction cascade) */
+  correctInferredIntent(
+    profile: EssayProfile,
+    paragraphIndex: number,
+    sentenceIndex: number,
+    correctedObservation: string,
+    correctedTo: ObservationEntry,
+    source?: { source: string; insightId: string },
+  ): MutationType[];
+
+  /** Enrich narrative context with student-provided background (new_context cascade) */
+  enrichNarrativeContext(
+    profile: EssayProfile,
+    paragraphIndex: number,
+    sentenceIndex: number,
+    newContext: string,
+    source?: { source: string; insightId: string },
+  ): MutationType[];
+
+  /** Clarify an ambiguous observation without triggering staleness (clarification cascade) */
+  clarifyObservation(
+    profile: EssayProfile,
+    paragraphIndex: number,
+    sentenceIndex: number,
+    clarification: string,
+    source?: { source: string; insightId: string },
   ): MutationType[];
 }
 
@@ -263,6 +294,13 @@ export interface IHolisticMutator {
     profile: EssayProfile,
     cartography: StructuralCartography,
   ): MutationType[];
+
+  /** Enrich emotional topography with student-revealed emotional data (emotional_reaction cascade) */
+  enrichEmotionalTopography(
+    profile: EssayProfile,
+    emotionalData: { location?: { paragraph: number; sentence?: number }; emotion?: string; observation?: string },
+    source?: { source: string; insightId: string },
+  ): MutationType[];
 }
 
 /**
@@ -316,6 +354,14 @@ export interface IVoiceMapMutator {
       confidence: number;
       reasoning: string;
     },
+  ): MutationType[];
+
+  /** Mark voice shifts at a location as intentional (preference cascade) */
+  markIntentional(
+    profile: EssayProfile,
+    dimension: string,
+    location: { paragraph: number; sentence?: number },
+    source?: { source: string; insightId: string },
   ): MutationType[];
 }
 
@@ -385,6 +431,9 @@ class PlaceholderSentenceMutator implements ISentenceMutator {
   addTags(_p: EssayProfile, _pi: number, _si: number, _t: string[]): void {}
   updateSentenceText(_p: EssayProfile, _pi: number, _si: number, _t: string): void {}
   updateInferredIntents(_p: EssayProfile, _pi: number, _si: number, _i: ObservationEntry[]): MutationType[] { return ['sentence_understanding_updated']; }
+  correctInferredIntent(_p: EssayProfile, _pi: number, _si: number, _co: string, _ct: ObservationEntry): MutationType[] { return ['sentence_understanding_updated']; }
+  enrichNarrativeContext(_p: EssayProfile, _pi: number, _si: number, _nc: string): MutationType[] { return ['sentence_understanding_updated']; }
+  clarifyObservation(_p: EssayProfile, _pi: number, _si: number, _c: string): MutationType[] { return []; }
 }
 
 class PlaceholderParagraphMutator implements IParagraphMutator {
@@ -400,6 +449,7 @@ class PlaceholderHolisticMutator implements IHolisticMutator {
   applyFullHolisticSynthesis(_p: EssayProfile, _s: HolisticSynthesisOutput): MutationType[] { return ['holistic_section_updated']; }
   updateCraftAssessment(_p: EssayProfile, _u: any): MutationType[] { return ['holistic_section_updated']; }
   seedNarrativeStrategy(_p: EssayProfile, _c: StructuralCartography): MutationType[] { return ['holistic_section_updated']; }
+  enrichEmotionalTopography(_p: EssayProfile, _d: any): MutationType[] { return ['holistic_section_updated']; }
 }
 
 class PlaceholderConnectionMutator implements IConnectionMutator {
@@ -411,6 +461,7 @@ class PlaceholderConnectionMutator implements IConnectionMutator {
 class PlaceholderVoiceMapMutator implements IVoiceMapMutator {
   applyVoiceMap(_p: EssayProfile, _v: VoiceMap): MutationType[] { return ['voice_shift_added']; }
   updateIntentionality(_p: EssayProfile, _i: number, _intent: any): MutationType[] { return ['voice_intentionality_updated']; }
+  markIntentional(_p: EssayProfile, _d: string, _l: any): MutationType[] { return ['voice_intentionality_updated']; }
 }
 
 class PlaceholderEarnednessMutator implements IEarnednessMutator {
@@ -488,7 +539,7 @@ export function createInitialProfile(input: {
       words: metadata.wordCount,
     },
     confidenceLevel: 'initial',
-    essayTopics: [],
+    topicTags: [],
     paragraphDigest: paragraphTexts.map((_, idx) => ({
       index: idx,
       roleSummary: '',
@@ -500,7 +551,7 @@ export function createInitialProfile(input: {
       connectionCount: 0,
       improvementPriority: 0,
     })),
-    sectionTokens: {
+    sectionTokenCounts: {
       voiceIdentity: 0,
       voiceMap: 0,
       emotionalTopography: 0,
@@ -521,7 +572,7 @@ export function createInitialProfile(input: {
       structuralRoles: [],
       maturity: 'absent',
     },
-    staleness: {
+    stalenessSnapshot: {
       strongStale: [],
       moderateStale: [],
       weakStale: [],
@@ -810,29 +861,34 @@ export class EssayProfileCoordinator {
    */
   applyFirstImpressions(impressions: ParagraphFirstImpression[]): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L1_impressions');
     const allMutations: MutationType[] = [];
 
     for (const impression of impressions) {
-      // SentenceMutator: populate sentence stubs with first-impression understanding
+      // SentenceMutator: map L1's simple string fields into SentenceUnderstanding partials.
+      // L1 (Haiku) produces simple strings; L3 (Sonnet) will later SUPERSEDE these
+      // with richer ObservationEntry[] via the same applySentenceUnderstanding path.
       for (const sentenceImpression of impression.sentences) {
         const mutations = this.sentenceMutator.applySentenceUnderstanding(
           this.profile,
           impression.paragraphIndex,
           sentenceImpression.index,
           {
-            observedFunctions: sentenceImpression.observedFunctions,
-            inferredIntents: sentenceImpression.inferredIntents,
+            // Map L1's simple apparentPurpose string into an ObservationEntry
+            observedFunctions: [{ observation: sentenceImpression.apparentPurpose }],
+            // Map L1's rhetoricalFunction into rhetoricalFunctions array
+            rhetoricalFunctions: [sentenceImpression.rhetoricalFunction],
             tags: sentenceImpression.tags,
           },
         );
         allMutations.push(...mutations);
       }
 
-      // ParagraphMutator: set initial paragraph role
+      // ParagraphMutator: set initial paragraph role from L1's apparentPurpose
       const roleMutations = this.paragraphMutator.updateStructuralRole(
         this.profile,
         impression.paragraphIndex,
-        impression.roleSummary,
+        impression.apparentPurpose,
       );
       allMutations.push(...roleMutations);
 
@@ -852,6 +908,7 @@ export class EssayProfileCoordinator {
    */
   applyStructuralCartography(cartography: StructuralCartography): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L2_cartography');
     const allMutations: MutationType[] = [];
 
     // ParagraphMutator: update paragraph roles with structural context (supersession)
@@ -879,29 +936,79 @@ export class EssayProfileCoordinator {
    */
   applyScoutLeads(scout: ConnectionScoutOutput): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L2_5_scout');
     const allMutations: MutationType[] = [];
 
-    // ConnectionMutator: create provisional connections
+    // Flatten the categorized scout output into provisional connection leads.
+    // Each category maps to a connection type that L3 will later confirm or reject.
+    const flattenedLeads: Array<{
+      from: [number, number];
+      to: [number, number];
+      type: string;
+      description: string;
+      confidence: number;
+      discoveredByLayer: string;
+    }> = [];
+
+    // Repeated elements: create connections between each pair of occurrences
+    for (const elem of scout.repeatedElements) {
+      for (let i = 0; i < elem.occurrences.length; i++) {
+        for (let j = i + 1; j < elem.occurrences.length; j++) {
+          const from = elem.occurrences[i];
+          const to = elem.occurrences[j];
+          flattenedLeads.push({
+            from: [from.paragraphIndex, from.sentenceIndex],
+            to: [to.paragraphIndex, to.sentenceIndex],
+            type: 'repeated_element',
+            description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
+            confidence: 0.3,
+            discoveredByLayer: 'l2_5_scout',
+          });
+        }
+      }
+    }
+
+    // Tonal shifts: create connection between the sentence and the next structural boundary
+    for (const shift of scout.tonalShifts) {
+      flattenedLeads.push({
+        from: [shift.location.paragraphIndex, shift.location.sentenceIndex],
+        to: [shift.location.paragraphIndex, shift.location.sentenceIndex],
+        type: 'tonal_shift',
+        description: `Tonal shift from "${shift.fromTone}" to "${shift.toTone}" (${shift.abruptness})`,
+        confidence: 0.3,
+        discoveredByLayer: 'l2_5_scout',
+      });
+    }
+
+    // Structural echoes: connect source to echo
+    for (const echo of scout.structuralEchoes) {
+      flattenedLeads.push({
+        from: [echo.source.paragraphIndex, echo.source.sentenceIndex],
+        to: [echo.echo.paragraphIndex, echo.echo.sentenceIndex],
+        type: 'structural_echo',
+        description: `Structural echo: ${echo.echoType}`,
+        confidence: 0.3,
+        discoveredByLayer: 'l2_5_scout',
+      });
+    }
+
+    // ConnectionMutator: create provisional connections from flattened leads
     const { mutations: connMutations, connectionIds } = this.connectionMutator.addConnections(
       this.profile,
-      scout.leads.map(lead => ({
-        from: lead.from,
-        to: lead.to,
-        type: lead.type,
-        description: lead.description,
-        confidence: lead.confidence,
-        discoveredByLayer: 'l2_5_scout',
-      })),
+      flattenedLeads,
     );
     allMutations.push(...connMutations);
 
     // SentenceMutator: add scout-tag refs to endpoint sentences
-    for (let i = 0; i < scout.leads.length; i++) {
-      const lead = scout.leads[i];
+    for (let i = 0; i < flattenedLeads.length; i++) {
+      const lead = flattenedLeads[i];
       const connId = connectionIds[i];
       if (connId) {
         this.sentenceMutator.addConnectionRef(this.profile, lead.from[0], lead.from[1], connId);
-        this.sentenceMutator.addConnectionRef(this.profile, lead.to[0], lead.to[1], connId);
+        // Only add ref for 'to' if it's different from 'from' (tonal shifts are self-referencing)
+        if (lead.from[0] !== lead.to[0] || lead.from[1] !== lead.to[1]) {
+          this.sentenceMutator.addConnectionRef(this.profile, lead.to[0], lead.to[1], connId);
+        }
       }
     }
 
@@ -914,6 +1021,7 @@ export class EssayProfileCoordinator {
    */
   applyUnderstandingWalkStep(output: UnderstandingWalkOutput): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L3_walk');
     const allMutations: MutationType[] = [];
 
     // 1. SentenceMutator: store sentence understandings for this paragraph
@@ -987,6 +1095,7 @@ export class EssayProfileCoordinator {
    */
   applyHolisticSynthesis(synthesis: HolisticSynthesisOutput): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L3_75_synthesis');
     const allMutations: MutationType[] = [];
 
     // HolisticMutator: full supersession of all holistic sections
@@ -1012,6 +1121,7 @@ export class EssayProfileCoordinator {
    */
   applyAnalysisPassResult(result: AnalysisPassOutput): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L3_5_analysis');
     const allMutations: MutationType[] = [];
 
     // SentenceMutator: store analysis for each sentence
@@ -1063,6 +1173,7 @@ export class EssayProfileCoordinator {
    */
   applyNorthStar(northStar: NorthStarOutput): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L4_north_star');
 
     const mutations = this.northStarMutator.applyNorthStar(this.profile, northStar);
 
@@ -1074,41 +1185,261 @@ export class EssayProfileCoordinator {
 
   /**
    * L6: Apply a conversation insight from coaching interaction.
+   *
+   * This is the cascade dispatch hub for student insights. The method:
+   * 1. Stores the insight via InsightMutator (always)
+   * 2. Dispatches category-specific cascade effects to domain mutators
+   * 3. Propagates staleness based on which mutations occurred
+   *
+   * Cascade table:
+   * | Category           | Mutators Dispatched                        | Staleness Effect              |
+   * |--------------------|--------------------------------------------|-------------------------------|
+   * | confirmation       | None                                       | None                          |
+   * | reinterpretation   | SentenceMutator (updateInferredIntents)     | sentence_understanding_updated|
+   * | correction         | SentenceMutator (correctInferredIntent)     | sentence_understanding_updated|
+   * | new_context        | SentenceMutator (enrichNarrativeContext)    | sentence_understanding_updated|
+   * | preference         | VoiceMapMutator (markIntentional)           | voice_intentionality_updated  |
+   * | clarification      | SentenceMutator (clarifyObservation)        | None (refines, no staleness)  |
+   * | emotional_reaction | HolisticMutator (enrichEmotionalTopography) | holistic_section_updated      |
+   * | resistance         | None                                       | None                          |
    */
   applyConversationInsight(insight: ConversationInsight): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('L6_insight');
     const allMutations: MutationType[] = [];
+    const insightSource = { source: 'conversation_insight', insightId: insight.id };
 
-    // InsightMutator: always stores the insight
+    // Step 1: InsightMutator always stores the insight
     const iMutations = this.insightMutator.applyInsight(this.profile, insight);
     allMutations.push(...iMutations);
 
-    // Conditional routing based on insight category
+    // Step 2: Dispatch cascade effects based on insight category
     switch (insight.category) {
       case 'confirmation':
+        // No mutations — the stored insight IS the confirmation record.
+        // Confirmations boost confidence in readiness scoring (via the stored insight)
+        // but do not change the profile's understanding/analysis layers.
+        break;
+
       case 'reinterpretation':
-        // SentenceMutator: update inferred intents for affected sentences
-        for (const s of insight.scope.sentences) {
-          if (s.probability >= 0.5) {
-            this.sentenceMutator.updateInferredIntents(
-              this.profile,
-              s.paragraph,
-              s.sentence,
-              [{ observation: insight.sourceText }],
-            );
+        // Student reinterprets meaning. Replace inferredIntents for affected scope.
+        // Use sentence-level scope if available, fall back to paragraph-level.
+        if (insight.scope.sentences.length > 0) {
+          for (const s of insight.scope.sentences) {
+            if (s.probability >= 0.5) {
+              const sMutations = this.sentenceMutator.updateInferredIntents(
+                this.profile,
+                s.paragraph,
+                s.sentence,
+                [{
+                  observation: insight.sourceText,
+                  confidence: 0.8,
+                  evidence: `Student reinterpretation: "${insight.sourceText}"`,
+                }],
+              );
+              allMutations.push(...sMutations);
+            }
+          }
+        } else if (insight.scope.paragraphs.length > 0) {
+          // Fall back to paragraph scope — update all sentences in affected paragraphs
+          for (const ps of insight.scope.paragraphs) {
+            if (ps.probability < 0.5) continue;
+            const para = this.profile.paragraphs[ps.index];
+            if (!para) continue;
+            for (const sent of para.sentences) {
+              if (sent.understanding) {
+                const sMutations = this.sentenceMutator.updateInferredIntents(
+                  this.profile,
+                  ps.index,
+                  sent.index,
+                  [{
+                    observation: insight.sourceText,
+                    confidence: 0.8,
+                    evidence: `Student reinterpretation: "${insight.sourceText}"`,
+                  }],
+                );
+                allMutations.push(...sMutations);
+              }
+            }
+          }
+        }
+        break;
+
+      case 'correction':
+        // Student says "that's wrong". Replace specific observation.
+        // Use sentence scope for precise correction.
+        if (insight.scope.sentences.length > 0) {
+          for (const s of insight.scope.sentences) {
+            if (s.probability >= 0.5) {
+              const cMutations = this.sentenceMutator.correctInferredIntent(
+                this.profile,
+                s.paragraph,
+                s.sentence,
+                insight.sourceText, // what was wrong (or what the student said)
+                {
+                  observation: insight.sourceText,
+                  confidence: 0.9,
+                  evidence: `Student correction: "${insight.sourceText}"`,
+                },
+                insightSource,
+              );
+              allMutations.push(...cMutations);
+            }
+          }
+        } else if (insight.scope.paragraphs.length > 0) {
+          // Fall back to paragraph scope
+          for (const ps of insight.scope.paragraphs) {
+            if (ps.probability < 0.5) continue;
+            const para = this.profile.paragraphs[ps.index];
+            if (!para) continue;
+            for (const sent of para.sentences) {
+              if (sent.understanding) {
+                const cMutations = this.sentenceMutator.correctInferredIntent(
+                  this.profile,
+                  ps.index,
+                  sent.index,
+                  insight.sourceText,
+                  {
+                    observation: insight.sourceText,
+                    confidence: 0.9,
+                    evidence: `Student correction: "${insight.sourceText}"`,
+                  },
+                  insightSource,
+                );
+                allMutations.push(...cMutations);
+              }
+            }
+          }
+        }
+        break;
+
+      case 'new_context':
+        // Student reveals context not in the essay ("My dad was deployed when this happened").
+        // Enrich sentence narrative context for affected scope.
+        if (insight.scope.sentences.length > 0) {
+          for (const s of insight.scope.sentences) {
+            if (s.probability >= 0.5) {
+              const nMutations = this.sentenceMutator.enrichNarrativeContext(
+                this.profile,
+                s.paragraph,
+                s.sentence,
+                insight.sourceText,
+                insightSource,
+              );
+              allMutations.push(...nMutations);
+            }
+          }
+        } else if (insight.scope.paragraphs.length > 0) {
+          for (const ps of insight.scope.paragraphs) {
+            if (ps.probability < 0.5) continue;
+            const para = this.profile.paragraphs[ps.index];
+            if (!para) continue;
+            for (const sent of para.sentences) {
+              if (sent.understanding) {
+                const nMutations = this.sentenceMutator.enrichNarrativeContext(
+                  this.profile,
+                  ps.index,
+                  sent.index,
+                  insight.sourceText,
+                  insightSource,
+                );
+                allMutations.push(...nMutations);
+              }
+            }
           }
         }
         break;
 
       case 'preference':
-      case 'correction':
-        // VoiceMapMutator: may update intentionality assessments
-        // (handled by the voice map mutator based on insight content)
+        // Student expresses writing preference ("I want to keep that informal voice").
+        // Mark relevant voice shifts as intentional.
+        if (insight.scope.paragraphs.length > 0) {
+          for (const ps of insight.scope.paragraphs) {
+            if (ps.probability >= 0.5) {
+              const vMutations = this.voiceMapMutator.markIntentional(
+                this.profile,
+                'register', // Default dimension — preferences most often relate to register
+                { paragraph: ps.index },
+                insightSource,
+              );
+              allMutations.push(...vMutations);
+            }
+          }
+        } else if (insight.scope.sentences.length > 0) {
+          // Use sentence scope to identify paragraph
+          const paragraphSet = new Set<number>();
+          for (const s of insight.scope.sentences) {
+            if (s.probability >= 0.5) {
+              paragraphSet.add(s.paragraph);
+            }
+          }
+          for (const pIdx of paragraphSet) {
+            const vMutations = this.voiceMapMutator.markIntentional(
+              this.profile,
+              'register',
+              { paragraph: pIdx },
+              insightSource,
+            );
+            allMutations.push(...vMutations);
+          }
+        }
         break;
 
-      case 'new_context':
-        // ConnectionMutator: may add new connections based on the context
-        // (would need to be processed by the coaching layer first)
+      case 'clarification':
+        // Student clarifies ambiguity ("When I said 'they', I meant my parents").
+        // Clarifications refine understanding without changing meaning — NO staleness.
+        if (insight.scope.sentences.length > 0) {
+          for (const s of insight.scope.sentences) {
+            if (s.probability >= 0.5) {
+              // clarifyObservation returns empty array (no staleness by design)
+              this.sentenceMutator.clarifyObservation(
+                this.profile,
+                s.paragraph,
+                s.sentence,
+                insight.sourceText,
+                insightSource,
+              );
+            }
+          }
+        } else if (insight.scope.paragraphs.length > 0) {
+          for (const ps of insight.scope.paragraphs) {
+            if (ps.probability < 0.5) continue;
+            const para = this.profile.paragraphs[ps.index];
+            if (!para) continue;
+            for (const sent of para.sentences) {
+              if (sent.understanding) {
+                this.sentenceMutator.clarifyObservation(
+                  this.profile,
+                  ps.index,
+                  sent.index,
+                  insight.sourceText,
+                  insightSource,
+                );
+              }
+            }
+          }
+        }
+        // Clarification does NOT push mutations — no staleness propagation
+        break;
+
+      case 'emotional_reaction':
+        // Student reveals emotional relationship to essay content.
+        // "Reading this back makes me feel anxious"
+        {
+          const eMutations = this.holisticMutator.enrichEmotionalTopography(
+            this.profile,
+            { observation: insight.sourceText },
+            insightSource,
+          );
+          allMutations.push(...eMutations);
+        }
+        break;
+
+      case 'resistance':
+        // Student disagrees. Store but don't mutate.
+        // Coaching handles resistance through dialogue, not by modifying the profile
+        // to match the student's self-assessment (the student might be wrong about
+        // their own essay — a common pattern in writing workshops).
         break;
     }
 
@@ -1129,6 +1460,7 @@ export class EssayProfileCoordinator {
    */
   applyLightTouchUpdate(update: LightTouchUpdate): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('edit_light_touch');
 
     switch (update.type) {
       case 'text_reference':
@@ -1207,6 +1539,7 @@ export class EssayProfileCoordinator {
    */
   applyEditUnderstanding(output: EditUnderstandingOutput): void {
     this.checkSessionBoundary();
+    this.checkCircuitBreaker('edit_understanding');
     const allMutations: MutationType[] = [];
 
     // Apply pre-computed staleness effects from the edit understanding
@@ -1278,149 +1611,18 @@ export class EssayProfileCoordinator {
 
   /**
    * Run quick validation — referential integrity checks only (<1ms target).
+   * Delegates to the dedicated intraDomainValidation module (source of truth).
    */
   validateQuick(): ValidationResult {
-    const checks: ValidationCheck[] = [];
-    const profile = this.profile;
-
-    // Check: paragraph digest length matches actual paragraph count
-    checks.push({
-      name: 'index_paragraph_count',
-      passed: profile.index.paragraphDigest.length === profile.paragraphs.length,
-      severity: 'error',
-      details: profile.index.paragraphDigest.length !== profile.paragraphs.length
-        ? `Index has ${profile.index.paragraphDigest.length} digests but ${profile.paragraphs.length} paragraphs`
-        : undefined,
-    });
-
-    // Check: connection refs point to existing connections
-    const connectionIdSet = new Set(profile.connections.all.map(c => c.id));
-    let orphanedRefs = false;
-    for (const para of profile.paragraphs) {
-      for (const sent of para.sentences) {
-        if (sent.understanding) {
-          for (const ref of sent.understanding.connectionRefs) {
-            if (!connectionIdSet.has(ref)) {
-              orphanedRefs = true;
-              break;
-            }
-          }
-        }
-        if (orphanedRefs) break;
-      }
-      if (orphanedRefs) break;
-    }
-    checks.push({
-      name: 'connection_refs_valid',
-      passed: !orphanedRefs,
-      severity: 'error',
-      details: orphanedRefs ? 'Sentence has connectionRef to non-existent connection' : undefined,
-    });
-
-    // Check: connection endpoints are within range
-    let endpointsValid = true;
-    for (const conn of profile.connections.all) {
-      const [fromP, fromS] = conn.from;
-      const [toP, toS] = conn.to;
-      if (
-        fromP < 0 || fromP >= profile.paragraphs.length ||
-        fromS < 0 || fromS >= (profile.paragraphs[fromP]?.sentences.length ?? 0) ||
-        toP < 0 || toP >= profile.paragraphs.length ||
-        toS < 0 || toS >= (profile.paragraphs[toP]?.sentences.length ?? 0)
-      ) {
-        endpointsValid = false;
-        break;
-      }
-    }
-    checks.push({
-      name: 'connection_endpoints_valid',
-      passed: endpointsValid,
-      severity: 'error',
-      details: endpointsValid ? undefined : 'Connection endpoints reference out-of-range paragraph/sentence indices',
-    });
-
-    // Check: token counts are non-negative
-    const tokens = profile.index.sectionTokens;
-    const allNonNeg = Object.entries(tokens).every(([_, v]) => {
-      if (Array.isArray(v)) return v.every(n => n >= 0);
-      return (v as number) >= 0;
-    });
-    checks.push({
-      name: 'token_counts_non_negative',
-      passed: allNonNeg,
-      severity: 'error',
-      details: allNonNeg ? undefined : 'Negative token count detected in profile index',
-    });
-
-    const errors = checks.filter(c => !c.passed && c.severity === 'error').length;
-    const warnings = checks.filter(c => !c.passed && c.severity === 'warning').length;
-
-    return {
-      valid: errors === 0,
-      checks,
-      summary: {
-        passed: checks.filter(c => c.passed).length,
-        warnings,
-        errors,
-      },
-      validatedAt: Date.now(),
-      tier: 'quick',
-    };
+    return intraDomainValidateQuick(this.profile);
   }
 
   /**
    * Run full validation — semantic coherence checks (more expensive).
+   * Delegates to the dedicated crossDomainValidation module (source of truth).
    */
   validateFull(): ValidationResult {
-    // Start with quick validation results
-    const quickResult = this.validateQuick();
-    const checks = [...quickResult.checks];
-
-    // Check: evaluative language in understanding fields (contamination signal)
-    const evaluativeWords = ['effectively', 'weakly', 'successfully', 'poorly', 'excellently', 'brilliantly'];
-    let foundEvaluative = false;
-    for (const para of this.profile.paragraphs) {
-      if (para.understanding) {
-        const text = JSON.stringify(para.understanding);
-        if (evaluativeWords.some(w => text.toLowerCase().includes(w))) {
-          foundEvaluative = true;
-          break;
-        }
-      }
-    }
-    checks.push({
-      name: 'understanding_no_evaluative_language',
-      passed: !foundEvaluative,
-      severity: 'warning',
-      details: foundEvaluative ? 'Evaluative language found in understanding fields — potential L3 contamination' : undefined,
-    });
-
-    // Check: index completeness — all connections reflected in connectionGraph
-    const graphConnectionCount = this.profile.index.connectionGraph.length;
-    const storeConnectionCount = this.profile.connections.all.length;
-    checks.push({
-      name: 'index_connection_completeness',
-      passed: graphConnectionCount === storeConnectionCount,
-      severity: 'warning',
-      details: graphConnectionCount !== storeConnectionCount
-        ? `Index has ${graphConnectionCount} connections but store has ${storeConnectionCount}`
-        : undefined,
-    });
-
-    const errors = checks.filter(c => !c.passed && c.severity === 'error').length;
-    const warnings = checks.filter(c => !c.passed && c.severity === 'warning').length;
-
-    return {
-      valid: errors === 0,
-      checks,
-      summary: {
-        passed: checks.filter(c => c.passed).length,
-        warnings,
-        errors,
-      },
-      validatedAt: Date.now(),
-      tier: 'full',
-    };
+    return crossDomainValidateFull(this.profile);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1538,7 +1740,7 @@ export class EssayProfileCoordinator {
 
     // Update staleness snapshot in the index
     const snapshot = this.stalenessTracker.getSnapshot();
-    index.staleness = {
+    index.stalenessSnapshot = {
       strongStale: snapshot.strongEntries.map(e => this.targetToString(e.target)),
       moderateStale: snapshot.moderateEntries.map(e => this.targetToString(e.target)),
       weakStale: [], // Weak entries not surfaced in the index (by design)
@@ -1583,6 +1785,81 @@ export class EssayProfileCoordinator {
       // Reset engagement threshold
       this.sessionBoundary.reanalysisThreshold = this.sessionBoundary.defaultThreshold;
       this.sessionBoundary.isFirstSession = false;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CIRCUIT BREAKER
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Prevents infinite retry loops on persistent failures. After maxRetries (3)
+  // failures at the same position, the circuit breaker trips and all further
+  // mutations are blocked for a 5-minute cooldown. All completed work up to
+  // the failure point is preserved at the last checkpoint.
+
+  /**
+   * Check whether the circuit breaker is tripped. If tripped and still in cooldown,
+   * throws an error. If cooldown has expired, resets the breaker.
+   *
+   * Called at the START of every layer dispatch method.
+   *
+   * @param position - identifier for the pipeline position (e.g., 'L1_impressions', 'L3_walk')
+   * @throws Error if circuit breaker is tripped and cooldown hasn't expired
+   */
+  private checkCircuitBreaker(position: string): void {
+    if (!this.circuitBreaker.tripped) return;
+
+    // Check if cooldown has expired
+    if (
+      this.circuitBreaker.cooldownExpiresAt !== null &&
+      Date.now() < this.circuitBreaker.cooldownExpiresAt
+    ) {
+      throw new Error(
+        `[ProfileManager] Circuit breaker tripped at ${this.circuitBreaker.failurePoint}. ` +
+        `Cooldown until ${new Date(this.circuitBreaker.cooldownExpiresAt).toISOString()}. ` +
+        `All work preserved at last checkpoint. Position: ${position}`,
+      );
+    }
+
+    // Cooldown expired — reset the breaker
+    this.circuitBreaker.tripped = false;
+    this.circuitBreaker.retryCount = 0;
+    this.circuitBreaker.attempts = [];
+  }
+
+  /**
+   * Record a failure at a pipeline position. If maxRetries is reached,
+   * trip the circuit breaker and set a 5-minute cooldown.
+   *
+   * @param position - identifier for the pipeline position
+   * @param error - error message from the failure
+   */
+  private recordFailure(position: string, error: string): void {
+    this.circuitBreaker.retryCount++;
+    this.circuitBreaker.failurePoint = position;
+    this.circuitBreaker.attempts.push({
+      position,
+      timestamp: Date.now(),
+      error,
+    });
+
+    if (this.circuitBreaker.retryCount >= this.circuitBreaker.maxRetries) {
+      this.circuitBreaker.tripped = true;
+      this.circuitBreaker.cooldownExpiresAt = Date.now() + 5 * 60 * 1000; // 5 minutes
+      console.error(
+        `[ProfileManager] Circuit breaker TRIPPED at ${position} after ${this.circuitBreaker.maxRetries} failures. ` +
+        `Cooldown: 5 minutes. All completed work preserved at last checkpoint.`,
+      );
+    }
+  }
+
+  /**
+   * Record a success — resets the retry counter if there were any prior failures.
+   * This allows the system to recover from transient errors without tripping.
+   */
+  private recordSuccess(): void {
+    if (this.circuitBreaker.retryCount > 0) {
+      this.circuitBreaker.retryCount = 0;
+      this.circuitBreaker.attempts = [];
     }
   }
 

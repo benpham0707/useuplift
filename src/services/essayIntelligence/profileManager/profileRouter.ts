@@ -8,7 +8,7 @@
  * Connection-driven routing is PRIMARY: the connection graph determines which paragraphs
  * get full detail. Proximity is the FALLBACK for paragraphs without established connections.
  *
- * 12 routing rules, each tailored to a specific call type.
+ * 13 routing rules, each tailored to a specific call type.
  *
  * Consumed by: every layer's prompt builder, coaching service, inline edit service,
  *              re-analysis pipeline, focused analysis pipeline.
@@ -21,6 +21,8 @@ import type {
   EssayProfile,
   ParagraphProfile,
   Connection,
+  EditDiff,
+  StalenessSnapshot,
 } from '../profileTypes';
 
 // ============================================================================
@@ -42,7 +44,8 @@ export type RoutingRule =
   | 'inline_edit_sentence'
   | 'reanalysis_comprehensive'
   | 'focused_understanding'
-  | 'focused_analysis';
+  | 'focused_analysis'
+  | 'impact_classification';
 
 /**
  * Context request — what the caller wants assembled.
@@ -57,6 +60,12 @@ export interface ContextRequest {
   searchTags?: string[];
   /** Approximate token budget for context */
   tokenBudget?: number;
+  /** Edit context for focused analysis / impact classification rules */
+  editContext?: {
+    diff: EditDiff;
+    changedParagraphs: number[];
+    stalenessSnapshot: StalenessSnapshot;
+  };
 }
 
 /**
@@ -284,6 +293,9 @@ export class ProfileRouter {
       case 'focused_analysis':
         sections = this.assembleFocusedAnalysis(profile, request);
         break;
+      case 'impact_classification':
+        sections = this.assembleImpactClassification(profile, request);
+        break;
       default: {
         const _exhaustive: never = request.rule;
         throw new Error(`Unknown routing rule: ${_exhaustive}`);
@@ -364,7 +376,7 @@ export class ProfileRouter {
             .filter((s) => s.understanding)
             .map((s) => ({ index: s.index, understanding: s.understanding })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[connIdx] ?? estimateTokens(para.understanding),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[connIdx] ?? estimateTokens(para.understanding),
         priority: 'connection_driven',
       });
     }
@@ -383,7 +395,7 @@ export class ProfileRouter {
               .filter((s) => s.understanding)
               .map((s) => ({ index: s.index, understanding: s.understanding })),
           },
-          tokenEstimate: profile.index.sectionTokens.paragraphs[prevIdx] ?? estimateTokens(prevPara.understanding),
+          tokenEstimate: profile.index.sectionTokenCounts.paragraphs[prevIdx] ?? estimateTokens(prevPara.understanding),
           priority: 'proximity',
         });
       }
@@ -460,7 +472,7 @@ export class ProfileRouter {
             .filter((s) => s.understanding)
             .map((s) => ({ index: s.index, understanding: s.understanding })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[para.index] ?? estimateTokens(para),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[para.index] ?? estimateTokens(para),
         priority: 'always',
       });
     }
@@ -469,7 +481,7 @@ export class ProfileRouter {
     sections.push({
       name: 'connections',
       content: profile.connections,
-      tokenEstimate: profile.index.sectionTokens.connections,
+      tokenEstimate: profile.index.sectionTokenCounts.connections,
       priority: 'always',
     });
 
@@ -511,7 +523,7 @@ export class ProfileRouter {
             understanding: s.understanding,
           })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[para.index] ?? estimateTokens(para),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[para.index] ?? estimateTokens(para),
         priority: 'always',
       });
     }
@@ -520,22 +532,58 @@ export class ProfileRouter {
     sections.push({
       name: 'connections',
       content: profile.connections,
-      tokenEstimate: profile.index.sectionTokens.connections,
+      tokenEstimate: profile.index.sectionTokenCounts.connections,
       priority: 'always',
     });
 
-    // ALWAYS: Walk's holistic evolution (incremental observations from L3)
-    const holisticEvolution = {
-      voiceIdentity: profile.voiceIdentity,
-      thematicArchitecture: profile.thematicArchitecture,
-      narrativeStrategy: profile.narrativeStrategy,
-    };
-    sections.push({
-      name: 'holisticEvolution',
-      content: holisticEvolution,
-      tokenEstimate: estimateTokens(holisticEvolution),
-      priority: 'always',
-    });
+    // ALWAYS: ALL populated holistic sections (L3.75 needs the full accumulated
+    // holistic observations to synthesize — not just the 3 the walk tracked)
+    const holisticFields = [
+      { name: 'voiceIdentity', data: profile.voiceIdentity },
+      { name: 'voiceMap', data: profile.voiceMap },
+      { name: 'emotionalTopography', data: profile.emotionalTopography },
+      { name: 'momentEarnednessMap', data: profile.momentEarnednessMap },
+      { name: 'thematicArchitecture', data: profile.thematicArchitecture },
+      { name: 'narrativeStrategy', data: profile.narrativeStrategy },
+      { name: 'characterRevelation', data: profile.characterRevelation },
+      { name: 'craftAssessment', data: profile.craftAssessment },
+      { name: 'admissionsPositioning', data: profile.admissionsPositioning },
+    ] as const;
+
+    for (const { name, data } of holisticFields) {
+      if (data) {
+        sections.push({
+          name: `holistic_evolution_${name}`,
+          content: data,
+          tokenEstimate: estimateTokens(data),
+          priority: 'always',
+        });
+      }
+    }
+
+    // ALWAYS: Entanglements (separate because it's an array, not a section object)
+    if (profile.entanglements && profile.entanglements.length > 0) {
+      sections.push({
+        name: 'holistic_evolution_entanglements',
+        content: profile.entanglements,
+        tokenEstimate: estimateTokens(profile.entanglements),
+        priority: 'always',
+      });
+    }
+
+    // NICE_TO_HAVE: North Star summary if available from prior analysis round
+    if (profile.northStar?.throughLineMap || profile.index.northStarSummary) {
+      sections.push({
+        name: 'northStarSummary',
+        content: profile.index.northStarSummary ?? {
+          throughLineSummary: null,
+          structuralRoles: [],
+          maturity: 'initial' as const,
+        },
+        tokenEstimate: estimateTokens(profile.index.northStarSummary ?? {}),
+        priority: 'nice_to_have',
+      });
+    }
 
     // ALWAYS: Scout leads (all — for holistic connection verification)
     const allScoutLeads = profile.connections.all.filter(
@@ -615,7 +663,7 @@ export class ProfileRouter {
     sections.push({
       name: 'connections',
       content: profile.connections,
-      tokenEstimate: profile.index.sectionTokens.connections,
+      tokenEstimate: profile.index.sectionTokenCounts.connections,
       priority: 'nice_to_have',
     });
 
@@ -667,7 +715,7 @@ export class ProfileRouter {
     sections.push({
       name: 'northStar',
       content: profile.northStar,
-      tokenEstimate: profile.index.sectionTokens.northStar,
+      tokenEstimate: profile.index.sectionTokenCounts.northStar,
       priority: 'always',
     });
 
@@ -685,7 +733,7 @@ export class ProfileRouter {
             analysis: s.analysis,
           })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[para.index] ?? estimateTokens(para),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[para.index] ?? estimateTokens(para),
         priority: 'always',
       });
     }
@@ -694,7 +742,7 @@ export class ProfileRouter {
     sections.push({
       name: 'connections',
       content: profile.connections,
-      tokenEstimate: profile.index.sectionTokens.connections,
+      tokenEstimate: profile.index.sectionTokenCounts.connections,
       priority: 'always',
     });
 
@@ -726,14 +774,14 @@ export class ProfileRouter {
     sections.push({
       name: 'voiceIdentity',
       content: profile.voiceIdentity,
-      tokenEstimate: profile.index.sectionTokens.voiceIdentity,
+      tokenEstimate: profile.index.sectionTokenCounts.voiceIdentity,
       priority: 'always',
     });
 
     sections.push({
       name: 'voiceMap',
       content: profile.voiceMap,
-      tokenEstimate: profile.index.sectionTokens.voiceMap,
+      tokenEstimate: profile.index.sectionTokenCounts.voiceMap,
       priority: 'always',
     });
 
@@ -810,7 +858,7 @@ export class ProfileRouter {
             analysis: s.analysis,
           })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[pIdx] ?? estimateTokens(targetPara),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[pIdx] ?? estimateTokens(targetPara),
         priority: 'always',
       });
     }
@@ -942,7 +990,7 @@ export class ProfileRouter {
     sections.push({
       name: 'northStar',
       content: profile.northStar,
-      tokenEstimate: profile.index.sectionTokens.northStar,
+      tokenEstimate: profile.index.sectionTokenCounts.northStar,
       priority: 'always',
     });
 
@@ -1077,7 +1125,7 @@ export class ProfileRouter {
             analysis: s.analysis,
           })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[pIdx] ?? estimateTokens(changedPara),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[pIdx] ?? estimateTokens(changedPara),
         priority: 'always',
       });
     }
@@ -1115,7 +1163,7 @@ export class ProfileRouter {
             analysis: s.analysis,
           })),
         },
-        tokenEstimate: profile.index.sectionTokens.paragraphs[connIdx] ?? estimateTokens(para),
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[connIdx] ?? estimateTokens(para),
         priority: 'connection_driven',
       });
     }
@@ -1309,6 +1357,101 @@ export class ProfileRouter {
     return sections;
   }
 
+  /**
+   * Rule 13: Impact classification — Haiku classifies edit impact scope.
+   *
+   * Intentionally light context — this is a classification call, not analysis.
+   * ALWAYS: ProfileIndex + paragraph digests for changed paragraphs + staleness snapshot
+   * CONNECTION-DRIVEN: Digests for paragraphs connected to changed paragraphs
+   * PROXIMITY: Adjacent paragraph digests
+   * SKIPPED: Full sentence maps, holistic sections (too much for classification)
+   */
+  private assembleImpactClassification(
+    profile: Readonly<EssayProfile>,
+    request: ContextRequest,
+  ): ProfileSection[] {
+    const sections: ProfileSection[] = [];
+    const changedParagraphs = request.editContext?.changedParagraphs ?? [];
+
+    // ALWAYS: ProfileIndex
+    sections.push({
+      name: 'profileIndex',
+      content: profile.index,
+      tokenEstimate: estimateTokens(profile.index),
+      priority: 'always',
+    });
+
+    // ALWAYS: Paragraph digests for changed paragraphs
+    for (const pIdx of changedParagraphs) {
+      const para = profile.paragraphs[pIdx];
+      if (para) {
+        sections.push({
+          name: `changed_paragraph_${pIdx}_digest`,
+          content: buildParagraphDigest(para),
+          tokenEstimate: estimateTokens(buildParagraphDigest(para)),
+          priority: 'always',
+        });
+      }
+    }
+
+    // CONNECTION-DRIVEN: Digests for paragraphs connected to changed paragraphs
+    const connectedParas = new Set<number>();
+    for (const pIdx of changedParagraphs) {
+      const connected = findConnectedParagraphs(profile, pIdx);
+      for (const cp of connected) {
+        if (!changedParagraphs.includes(cp)) {
+          connectedParas.add(cp);
+        }
+      }
+    }
+
+    for (const cpIdx of connectedParas) {
+      const para = profile.paragraphs[cpIdx];
+      if (para) {
+        sections.push({
+          name: `connected_paragraph_${cpIdx}_digest`,
+          content: buildParagraphDigest(para),
+          tokenEstimate: estimateTokens(buildParagraphDigest(para)),
+          priority: 'connection_driven',
+        });
+      }
+    }
+
+    // PROXIMITY: Adjacent paragraph digests
+    for (const pIdx of changedParagraphs) {
+      for (const adjIdx of [pIdx - 1, pIdx + 1]) {
+        if (
+          adjIdx >= 0 &&
+          adjIdx < profile.paragraphs.length &&
+          !changedParagraphs.includes(adjIdx) &&
+          !connectedParas.has(adjIdx)
+        ) {
+          const para = profile.paragraphs[adjIdx];
+          if (para) {
+            sections.push({
+              name: `adjacent_paragraph_${adjIdx}_digest`,
+              content: buildParagraphDigest(para),
+              tokenEstimate: estimateTokens(buildParagraphDigest(para)),
+              priority: 'proximity',
+            });
+          }
+        }
+      }
+    }
+
+    // ALWAYS: Staleness snapshot if available
+    if (request.editContext?.stalenessSnapshot) {
+      sections.push({
+        name: 'stalenessSnapshot',
+        content: request.editContext.stalenessSnapshot,
+        tokenEstimate: estimateTokens(request.editContext.stalenessSnapshot),
+        priority: 'always',
+      });
+    }
+
+    return sections;
+  }
+
   // ════════════════════════════════════════════════════════════════════════════
   // TOKEN BUDGET ENFORCEMENT
   // ════════════════════════════════════════════════════════════════════════════
@@ -1328,6 +1471,18 @@ export class ProfileRouter {
       proximity: 2,
       nice_to_have: 3,
     };
+
+    // Warn if always-priority items alone exceed the budget
+    const alwaysTokens = sections
+      .filter((s) => s.priority === 'always')
+      .reduce((sum, s) => sum + s.tokenEstimate, 0);
+
+    if (alwaysTokens > budget) {
+      console.warn(
+        `[ProfileRouter] Always-priority items (${alwaysTokens} tokens) exceed budget ` +
+        `(${budget} tokens) for ${rule}. LLM context will be larger than intended.`,
+      );
+    }
 
     // Sort by priority (lowest priority number = highest importance)
     const sorted = [...sections].sort(
