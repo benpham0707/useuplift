@@ -26,7 +26,7 @@ function assert(condition: boolean, message: string) {
   }
 }
 
-// Build a long system prompt (> 1024 tokens) to qualify for caching
+// Build a long system prompt (> 4096 tokens) to qualify for caching on Haiku 4.5
 function buildLongSystemPrompt(): string {
   const sections = [
     'You are a college admissions essay writing coach with deep expertise in narrative craft.',
@@ -65,8 +65,8 @@ function buildLongSystemPrompt(): string {
     'Always return valid JSON with the structure:',
     '{ "analysis": string, "score": number }',
     '',
-    // Pad to ensure > 1024 tokens
-    ...Array(20).fill('Additional coaching context: Focus on authentic voice preservation, concrete detail, and transferable writing principles that empower the student to improve independently.'),
+    // Pad to ensure > 4096 tokens (Haiku 4.5 requires 4096+ tokens for prompt caching)
+    ...Array(80).fill('Additional coaching context: Focus on authentic voice preservation, concrete detail, and transferable writing principles that empower the student to improve independently. Remember to consider the essay holistically — each dimension interacts with others, and a strength in one area can compensate for a developing area in another. The best college essays reveal character through specific moments rather than broad claims about personality traits.'),
   ];
   return sections.join('\n');
 }

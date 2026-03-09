@@ -1,0 +1,17 @@
+{
+  "version": "0.0.0",
+  "timestamp": "placeholder",
+  "pipelineVersion": "v1",
+  "results": [],
+  "summary": {
+    "overallMAE": null,
+    "perDimensionMAE": {},
+    "avgAnnotationCount": 0,
+    "avgDimensionCoverage": 0,
+    "avgStrengthRatio": 0,
+    "avgLatencyMs": 0,
+    "avgCostUSD": 0,
+    "totalCostUSD": 0,
+    "note": "Run 'npx tsx tests/calibration/runCalibration.ts --baseline' to populate"
+  }
+}

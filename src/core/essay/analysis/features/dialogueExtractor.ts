@@ -362,11 +362,7 @@ export function getDialogueEvidence(extraction: DialogueExtraction): string[] {
 }
 
 // ============================================================================
-// EXPORTS
+// DEFAULT EXPORT
 // ============================================================================
 
-export {
-  extractDialogue as default,
-  dialogueExtractionToRubricScore,
-  getDialogueEvidence,
-};
+export default extractDialogue;

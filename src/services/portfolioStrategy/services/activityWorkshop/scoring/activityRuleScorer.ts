@@ -44,6 +44,31 @@ import {
 } from './scoringRules';
 
 // ============================================================================
+// HOURS CONTEXT CATEGORIES (Issue 8)
+// Exact canonical category IDs from categoryRegistry.ts
+// ============================================================================
+
+/** Categories where high hours are expected (paid/compensation) — weaker commitment signal */
+const PAID_WORK_CATEGORIES = new Set([
+  'work_family',       // Jobs, internships, family responsibilities
+]);
+
+/** Categories where high hours signal exceptional commitment — strongest signal */
+const INTELLECTUAL_CATEGORIES = new Set([
+  'stem_research',       // Lab research, data science
+  'stem_competition',    // Math/science olympiads (prep-intensive)
+  'medical_health',      // Clinical research, health studies
+  'academic_enrichment', // Independent study, humanities research
+  'writing_journalism',  // Investigative writing, literary work
+  'performing_arts',     // Music practice, theater rehearsal
+  'visual_arts',         // Studio art, design portfolio
+  'technology',          // Coding projects, robotics
+]);
+
+// All other categories (community_service, leadership_government, debate_speech,
+// athletics, entrepreneurship, social_activism, etc.) use the default 1.0x multiplier.
+
+// ============================================================================
 // UTILITY
 // ============================================================================
 
@@ -60,6 +85,18 @@ function round1(n: number): number {
 /** Clamp a component score to its tier constraint range */
 function clampToConstraint(score: number, range: { min: number; max: number }): number {
   return clamp(round1(score), range.min, range.max);
+}
+
+/** Downgrade impact quality by one level (used when validation flags fire) */
+function downgradeImpactQuality(
+  quality: ExtractedEvidence['impact']['impactQuality']
+): ExtractedEvidence['impact']['impactQuality'] {
+  switch (quality) {
+    case 'verified_significant': return 'verified_modest';
+    case 'verified_modest': return 'claimed_vague';
+    case 'claimed_vague': return 'claimed_none';
+    case 'claimed_none': return 'claimed_none';
+  }
 }
 
 // ============================================================================
@@ -193,12 +230,24 @@ function scoreLeadership(
 
   // Impact scope modifier: scale 0-10, then compress to +0-2 bonus
   const scopeLevel = evidence.scope.level;
-  const impactScopeScore = IMPACT_SCOPE_SCORES[scopeLevel] ?? IMPACT_SCOPE_SCORES['individual'] ?? 2;
+  let impactScopeScore = IMPACT_SCOPE_SCORES[scopeLevel] ?? IMPACT_SCOPE_SCORES['individual'] ?? 2;
+  // Reduce scope confidence when scope-commitment mismatch detected
+  if (evidence.validationFlags?.scopeCommitmentMismatch) {
+    impactScopeScore = Math.max(0, impactScopeScore - 3);
+  }
   score += (impactScopeScore / 10) * 2;
 
-  // Bonus: +1 if has quantified impact with verifiable metrics
+  // Bonus: graduated by impact quality
   if (evidence.impact.hasQuantifiedOutcomes && evidence.impact.metrics.some(m => m.isVerifiable)) {
-    score += 1;
+    const effectiveQuality = evidence.validationFlags?.impactCredibilityIssue
+      ? downgradeImpactQuality(evidence.impact.impactQuality)
+      : evidence.impact.impactQuality;
+    switch (effectiveQuality) {
+      case 'verified_significant': score += 1.5; break;
+      case 'verified_modest': score += 1.0; break;
+      case 'claimed_vague': score += 0.0; break;
+      case 'claimed_none': score += 0.0; break;
+    }
   }
 
   // Bonus: +0.5 if estimated people reached >= 50
@@ -312,6 +361,13 @@ function scoreCommunityCharacter(
  * E. Score Commitment & Progression
  *
  * Based on years active, progression, hours intensity, and sustained engagement.
+ *
+ * HOURS CONTEXT-AWARENESS (Issue 8): Hours per week are weighted by activity context.
+ * 20hr/wk at a paid job (expected) is a weaker commitment signal than
+ * 20hr/wk in a voluntary research lab (exceptional). The multiplier:
+ *   - Paid work (employment, job): 0.5x — high hours expected for compensation
+ *   - Voluntary work (volunteering, club): 1.0x — baseline commitment signal
+ *   - Intellectual/creative work (research, writing, art, music): 1.2x — strongest signal
  */
 function scoreCommitment(
   evidence: ExtractedEvidence,
@@ -338,13 +394,41 @@ function scoreCommitment(
   if (showsProgression) score += 1;
   if (progressionArc) score += 0.5;
 
-  // Hours intensity: weekly average across the year
-  const weeklyAvg = weeksPerYear > 0 ? (hoursPerWeek * weeksPerYear) / 52 : 0;
-  if (weeklyAvg >= 20) {
-    score += 1;
-  } else if (weeklyAvg >= 10) {
-    score += 0.5;
+  // Validation flag: cap progression bonus when commitment conflict detected
+  if (evidence.validationFlags?.commitmentConflict) {
+    // Cap the progression bonus at 0.5 (instead of up to 1.5)
+    const progressionBonus = (showsProgression ? 1 : 0) + (progressionArc ? 0.5 : 0);
+    if (progressionBonus > 0.5) {
+      score -= (progressionBonus - 0.5); // Claw back excess
+    }
   }
+
+  // Issue 8: Context-aware hours intensity
+  // Determine hours commitment multiplier based on activity category.
+  // Uses exact canonical category IDs from categoryRegistry.ts — no substring matching.
+  const category = evidence.categoryMatch.category;
+  let hoursMultiplier = 1.0; // Default: voluntary/club
+  let hoursContext = 'voluntary';
+
+  // Paid work: high hours are expected (weaker signal)
+  if (PAID_WORK_CATEGORIES.has(category)) {
+    hoursMultiplier = 0.5;
+    hoursContext = 'paid/expected';
+  }
+  // Intellectual/creative work: high hours are exceptional (strongest signal)
+  else if (INTELLECTUAL_CATEGORIES.has(category)) {
+    hoursMultiplier = 1.2;
+    hoursContext = 'intellectual/creative';
+  }
+
+  // Hours intensity: weekly average across the year, with context multiplier
+  const weeklyAvg = weeksPerYear > 0 ? (hoursPerWeek * weeksPerYear) / 52 : 0;
+  const adjustedHoursBonus = weeklyAvg >= 20
+    ? 1.0 * hoursMultiplier
+    : weeklyAvg >= 10
+      ? 0.5 * hoursMultiplier
+      : 0;
+  score += adjustedHoursBonus;
 
   // Sustained through junior year bonus
   if (sustainedThroughJunior) score += 0.5;
@@ -355,7 +439,9 @@ function scoreCommitment(
   const parts: string[] = [];
   parts.push(`${yearsActive} year(s) active`);
   if (showsProgression) parts.push(`progression${progressionArc ? `: ${progressionArc}` : ''}`);
-  if (hoursPerWeek > 0) parts.push(`${hoursPerWeek} hrs/wk`);
+  if (hoursPerWeek > 0) {
+    parts.push(`${hoursPerWeek} hrs/wk (${hoursContext}, ×${hoursMultiplier})`);
+  }
   if (sustainedThroughJunior) parts.push('sustained through junior year');
 
   return {

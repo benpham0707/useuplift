@@ -1,6 +1,8 @@
 # PLAN: Decomposed Scoring Architecture — Structural Reliability for Activity Scoring
 
-> **Status:** Step 1 COMPLETE ✓ (275/275 tests) — Ready for Step 2
+> **Status:** ALL 7 STEPS COMPLETE ✓ — Pipeline wired, E2E validated, KB + cross-user cache built
+> Steps completed: 1(Tier Classifier) → 2(Rule Scorers) → 3(Portfolio Calibrator) → 4(Nuance Calibration) → 5(Orchestrator Wiring) → 6(E2E Validation) → 7(Knowledge Base + Cross-User Cache)
+> Tests: 279 tier + 59 calibration + 80 rule + 73 desc + 31 E2E + 414 KB = 936 total
 > **Author:** Claude (Technical Lead) + Tue (Product Direction)
 > **Created:** 2026-02-25
 > **Updated:** 2026-02-26 — Expanded from 4-tier to 6-tier internal classification per Tue's feedback

@@ -1,41 +1,31 @@
 // @ts-nocheck
 /**
- * Scoring Orchestrator
+ * Scoring Orchestrator — Decomposed Architecture
  *
- * Orchestrates the complete scoring pipeline with intelligent caching.
+ * Orchestrates the complete scoring pipeline:
+ *   1. Description Scoring (Sonnet batch, with caching) — HOW well written
+ *   2. Feature Extraction (Haiku per-activity parallel) — WHAT the activity contains
+ *   3. Tier Classification (deterministic code) — WHERE it sits in the 6-tier system
+ *   4. Activity Rule Scoring (deterministic code) — base component scores from evidence
+ *   5. Nuance Calibration (Sonnet per-activity) — adjust scores within tier bounds
+ *   6. Portfolio Calibration (deterministic code) — cross-activity consistency
+ *   7. Portfolio Scoring (Sonnet) — holistic assessment, always fresh
+ *   8. Teaching Layer (Sonnet) — optional, always fresh
  *
- * API CALL STRUCTURE (BATCH-BASED):
- * 1. Description batch (Sonnet) - All descriptions in ONE call
- * 2. Activity batch (Sonnet) - All activities in ONE call  [PARALLEL with step 1]
- * 3. Portfolio scoring (Sonnet) - Holistic analysis, always fresh
- * 4. Teaching layer (Sonnet) - Optional, always fresh
+ * Steps 1 and 2 run in PARALLEL. Steps 3-6 are sequential but fast.
+ * Fallback: if extraction fails for an activity, legacy single-pass scoring is used.
  *
- * Total: 3-4 API calls regardless of activity count.
- *
- * CACHING STRATEGY (REDUCES BATCH SIZE):
- * - Individual scores are cached per-activity
- * - Cache hits are EXCLUDED from the batch call
- * - If 9/10 activities unchanged, batch only scores 1 activity
- * - Portfolio analysis ALWAYS runs fresh (holistic quality)
- * - Teaching layer ALWAYS runs fresh (depends on portfolio)
- *
- * Returns a complete PortfolioScoreRubric with:
- * - Individual activity scores with rationales
- * - Combined activity scores (70% activity + 30% description)
- * - Overall portfolio score (1-10)
- * - Harvard 1-6 scale equivalent
- * - Detailed breakdowns and recommendations
- * - Cache usage information (what was cached vs fresh)
- *
- * Optionally includes deep teaching content:
- * - Concrete description rewrites
- * - Transformation principles
- * - Research-backed citations
- * - Strategic portfolio guidance
+ * CACHING STRATEGY:
+ * - Description scores cached per-activity (hash of input)
+ * - Activity scores cached per-activity (hash of input) — stores full pipeline result
+ * - Evidence + tier cached alongside score for portfolio calibration
+ * - Portfolio calibration ALWAYS runs fresh (cross-activity, instant, $0)
+ * - Portfolio scoring ALWAYS runs fresh (holistic quality)
+ * - Teaching layer ALWAYS runs fresh
  *
  * COST (10 activities):
- * - First run: ~$0.05-0.08 (scoring) or ~$0.10-0.14 (with teaching)
- * - With caching (1 change): ~$0.03-0.05 (smaller batches = fewer tokens)
+ * - First run: ~$0.03-0.06 (extraction + nuance + descriptions + portfolio)
+ * - With caching (1 change): ~$0.02-0.04 (1 Haiku + 1 Sonnet nuance + portfolio)
  */
 
 import {
@@ -59,6 +49,8 @@ import {
 import {
   PortfolioScoreRubric,
   ActivityScoreRubric,
+  ExtractedEvidence,
+  TierClassification,
 } from './types';
 
 import {
@@ -81,6 +73,49 @@ import {
 } from './scoringCacheTypes';
 
 import { ActivityWorkshopInput, ActivityWorkshopSessionInput } from '../types';
+
+// Decomposed pipeline components
+import { featureExtractorService } from './featureExtractor';
+import type { BatchFeatureExtractionInput, ActivityFeatureExtraction } from './featureTypes';
+import { classifyTier } from './tierClassifier';
+import { activityRuleScorerService } from './activityRuleScorer';
+import { descriptionRuleScorerService } from './descriptionRuleScorer';
+import { calibrateBatch } from './nuanceCalibrationService';
+import type { NuanceCalibratedResult } from './nuanceCalibrationTypes';
+import { calibratePortfolio } from './portfolioCalibrator';
+import type { CalibrationInput } from './portfolioCalibrator';
+import { crossValidateEvidence } from './crossValidator';
+import { prestigeResearchService, enrichEvidenceWithPrestige } from './prestigeResearchService';
+
+// Expertise Signaling Library — deterministic expertise matching ($0, <1ms)
+import {
+  getExpertiseDomain,
+  getExpertiseDomainWithSubResolution,
+  matchExpertiseSignals,
+  buildExpertiseTeachingContext,
+  batchMatchExpertiseSignals,
+  EXPERTISE_DOMAINS,
+  getExemplarsForDomain,
+} from './expertiseSignaling';
+import type { ExpertiseMatchResult, ExpertiseTeachingContext, Exemplar, DescriptionTransform } from './expertiseSignaling';
+
+// Cross-user cache — Supabase-backed scoring cache shared across users
+import { crossUserCacheService } from './crossUserCacheService';
+import { KB_VERSION } from './knowledge';
+
+// Impressiveness Analyzer — field-specific context ($0, <1ms)
+// Wired to the rich impressivenessCalibration module (12 domains, 5-level ladders, exemplars)
+import { analyzeImpressiveness } from './impressivenessCalibration';
+import type { ImpressionAnalysisResult } from './impressivenessCalibration';
+
+// Telemetry — fire-and-forget scoring decision traces
+import { scoringTelemetryService } from './scoringTelemetryService';
+import type { DomainResolutionTrace, LLMAdjustmentTrace } from './scoringTelemetryTypes';
+import { getCalibrationContextWithTrace, buildDomainResolutionTrace } from './achievementRetrieval';
+import type { CalibrationContextWithTrace } from './achievementRetrieval';
+
+// Expert Counselor Knowledge Base — portfolio-level heuristic context ($0, <1ms)
+import { assembleExpertContext } from '../expertCounselorKnowledgeBase';
 
 // ============================================================================
 // TYPES
@@ -174,11 +209,32 @@ export interface ScoringOrchestratorResult {
 // ORCHESTRATOR
 // ============================================================================
 
+/** M1: Maximum entries in the evidence cache before eviction */
+const MAX_EVIDENCE_CACHE_SIZE = 500;
+
 export class ScoringOrchestrator {
   private cacheService: ScoringCacheService;
+  /** Evidence + tier cache — stored alongside activity score cache for portfolio calibration */
+  private evidenceCache = new Map<string, { evidence: ExtractedEvidence; tier: TierClassification; descriptionScore?: DescriptionScore }>();
 
   constructor(cacheService?: ScoringCacheService) {
     this.cacheService = cacheService || scoringCacheService;
+  }
+
+  private evidenceCacheKey(sessionId: string, activityId: string): string {
+    return `${sessionId}:${activityId}`;
+  }
+
+  /** M1: Evict oldest evidence cache entries when size exceeds limit */
+  private enforceEvidenceCacheSize(): void {
+    if (this.evidenceCache.size <= MAX_EVIDENCE_CACHE_SIZE) return;
+    const excess = this.evidenceCache.size - MAX_EVIDENCE_CACHE_SIZE;
+    const keys = this.evidenceCache.keys();
+    for (let i = 0; i < excess; i++) {
+      const { value: key, done } = keys.next();
+      if (done) break;
+      this.evidenceCache.delete(key);
+    }
   }
 
   /**
@@ -272,39 +328,66 @@ export class ScoringOrchestrator {
         : undefined;
 
       // ========================================================================
-      // Steps 1 & 2: Score descriptions and activities in PARALLEL (with caching)
+      // Steps 1 & 2: Decomposed scoring pipeline
+      //   Feature extraction (Haiku) → Tier + Expertise + Rule scoring (code) →
+      //   Description scoring (code, $0) → Nuance calibration (Sonnet) →
+      //   Portfolio calibration (code)
+      //
+      // Description scoring is now DETERMINISTIC — uses features already extracted
+      // by Haiku, eliminating the separate Sonnet description batch call.
+      // Saves ~$0.01-0.02 per portfolio with identical type output.
       // ========================================================================
-      const parallelStart = Date.now();
-      console.log(`[ScoringOrchestrator] Starting parallel description + activity scoring...`);
+      const pipelineStart = Date.now();
+      console.log(`[ScoringOrchestrator] Starting decomposed scoring pipeline...`);
 
-      const [descHelperResult, actHelperResult] = await Promise.all([
-        this.scoreDescriptionsWithCache(
-          descriptionInputs, enableCache, forceFresh, sessionId,
-          input.targetPlatform, descriptionCacheResults
-        ),
-        this.scoreActivitiesWithCache(
-          activityInputs, enableCache, forceFresh, sessionId,
-          input.studentContext, activityCacheResults
-        ),
-      ]);
+      const actHelperResult = await this.scoreActivitiesDecomposed(
+        input.activities, activityInputs,
+        enableCache, forceFresh, sessionId,
+        input.studentContext, activityCacheResults
+      );
 
-      console.log(`[ScoringOrchestrator] Parallel scoring complete in ${Date.now() - parallelStart}ms`);
-
-      if (!descHelperResult.success) {
-        return { success: false, error: descHelperResult.error };
-      }
       if (!actHelperResult.success) {
         return { success: false, error: actHelperResult.error };
       }
 
-      const descriptionScores = descHelperResult.scores!;
       const activityScores = actHelperResult.scores!;
-      timing.descriptionScoringMs = descHelperResult.timingMs!;
+      const descriptionScores: DescriptionScore[] = actHelperResult.descriptionScores || [];
+
+      // Fall back to LLM description scoring for any activities missing scores
+      // (extraction failures or cache entries from before deterministic scoring)
+      const missingDescIndices: number[] = [];
+      for (let i = 0; i < input.activities.length; i++) {
+        if (!descriptionScores[i]) missingDescIndices.push(i);
+        // Mirror activity cache results for description cache tracking
+        descriptionCacheResults.set(input.activities[i].id, activityCacheResults.get(input.activities[i].id) ?? false);
+      }
+
+      if (missingDescIndices.length > 0) {
+        console.log(`[ScoringOrchestrator] ${missingDescIndices.length} activities need LLM description scoring (extraction fallback)...`);
+        const fallbackInputs = missingDescIndices.map(i => descriptionInputs[i].input);
+        const fallbackResult = await descriptionScoringService.scoreDescriptionsBatch({
+          activities: fallbackInputs,
+          targetPlatform: input.targetPlatform,
+        });
+        if (fallbackResult.success && fallbackResult.scores) {
+          for (let j = 0; j < missingDescIndices.length; j++) {
+            if (fallbackResult.scores[j]) {
+              descriptionScores[missingDescIndices[j]] = fallbackResult.scores[j];
+              descriptionCacheResults.set(input.activities[missingDescIndices[j]].id, false);
+            }
+          }
+          if (fallbackResult.tokensUsed) {
+            tokensUsed.descriptionScoring = fallbackResult.tokensUsed;
+          }
+        }
+      }
+
+      console.log(`[ScoringOrchestrator] Pipeline complete in ${Date.now() - pipelineStart}ms`);
+
+      // Description scoring is deterministic ($0) — included in pipeline timing
+      timing.descriptionScoringMs = 0;
       timing.activityScoringMs = actHelperResult.timingMs!;
 
-      if (descHelperResult.tokensUsed) {
-        tokensUsed.descriptionScoring = descHelperResult.tokensUsed;
-      }
       if (actHelperResult.tokensUsed) {
         tokensUsed.activityScoring = actHelperResult.tokensUsed;
       }
@@ -394,6 +477,41 @@ export class ScoringOrchestrator {
         const teachStart = Date.now();
         console.log(`[ScoringOrchestrator] Generating teaching content (always fresh)...`);
 
+        // Build expert knowledge context for teaching enrichment ($0, heuristic)
+        // Provides: school archetypes, constraint intelligence, narrative arcs,
+        // character traits, advanced issue detection, authenticity assessment
+        const expertContext = assembleExpertContext({
+          activities: input.activities.map(a => ({
+            id: a.id,
+            title: a.title,
+            description: a.description,
+            role: a.role,
+            hoursPerWeek: a.hoursPerWeek,
+            weeksPerYear: a.weeksPerYear,
+            yearsInvolved: a.yearsInvolved || 1,
+            gradeLevels: a.gradeLevels?.map(String),
+          })),
+          studentContext: input.studentContext ? {
+            intendedMajor: input.studentContext.intendedMajor,
+            targetSchools: input.studentContext.targetSchools,
+          } : undefined,
+          analysisResults: (() => {
+            const results: Record<string, { tier: number; greenFlags: string[]; redFlags: string[]; issues: string[] }> = {};
+            for (let i = 0; i < input.activities.length; i++) {
+              const score = activityScores[i];
+              if (score) {
+                results[input.activities[i].id] = {
+                  tier: score.breakdown?.tierAssessment?.tier ?? 3,
+                  greenFlags: [],
+                  redFlags: [],
+                  issues: score.improvementPaths ?? [],
+                };
+              }
+            }
+            return Object.keys(results).length > 0 ? results : undefined;
+          })(),
+        });
+
         const teachingInput: TeachingLayerInput = {
           scoringRubric: portResult.rubric,
           activities: input.activities,
@@ -411,6 +529,23 @@ export class ScoringOrchestrator {
             includeCraftTeaching: input.teachingOptions?.includeCraftTeaching,
             focusActivities: input.teachingOptions?.focusActivities,
           },
+          // Per-activity expertise data for field-specific teaching
+          expertiseData: (() => {
+            const map = new Map();
+            for (let idx = 0; idx < input.activities.length; idx++) {
+              const actId = input.activities[idx].id;
+              if (allTeachingContexts[idx] && actId) {
+                map.set(actId, {
+                  teachingContext: allTeachingContexts[idx],
+                  exemplars: allExemplars[idx] || [],
+                  transforms: allTransforms[idx] || [],
+                });
+              }
+            }
+            return map.size > 0 ? map : undefined;
+          })(),
+          // Portfolio-level expert knowledge context for enriched teaching
+          expertContext,
         };
 
         const teachResult = await activityTeachingLayerService.generateTeaching(teachingInput);
@@ -725,6 +860,650 @@ export class ScoringOrchestrator {
     console.log(`[ScoringOrchestrator] Activities scored in ${timingMs}ms (${actToScore.length} fresh, ${activityInputs.length - actToScore.length} cached)`);
 
     return { success: true, scores: activityScores, tokensUsed, timingMs };
+  }
+
+  // ========================================================================
+  // Decomposed Activity Scoring Pipeline
+  // ========================================================================
+
+  /**
+   * Score activities using the decomposed pipeline:
+   *   Feature Extraction (Haiku) → Tier Classification (code) →
+   *   Rule Scoring (code) → Nuance Calibration (Sonnet) →
+   *   Portfolio Calibration (code)
+   *
+   * Falls back to legacy single-pass scoring for activities where extraction fails.
+   */
+  private async scoreActivitiesDecomposed(
+    activities: ActivityWorkshopInput[],
+    activityInputs: { id: string; input: ActivityScoringInput }[],
+    enableCache: boolean,
+    forceFresh: boolean,
+    sessionId: string,
+    studentContext: ScoringOrchestratorInput['studentContext'],
+    cacheResults: Map<string, boolean>
+  ): Promise<{
+    success: boolean;
+    scores?: ActivityScore[];
+    descriptionScores?: DescriptionScore[];
+    tokensUsed?: { input: number; output: number };
+    timingMs?: number;
+    error?: string;
+  }> {
+    const startTime = Date.now();
+    console.log(`[ScoringOrchestrator] Starting decomposed activity scoring for ${activities.length} activities...`);
+
+    const activityScores: ActivityScore[] = new Array(activities.length);
+    const descriptionScores: (DescriptionScore | null)[] = new Array(activities.length).fill(null);
+    const allEvidence: (ExtractedEvidence | null)[] = new Array(activities.length).fill(null);
+    const allTiers: (TierClassification | null)[] = new Array(activities.length).fill(null);
+    const allImpressions: (ImpressionAnalysisResult | null)[] = new Array(activities.length).fill(null);
+    const allTeachingContexts: Array<ExpertiseTeachingContext | undefined> = new Array(activities.length).fill(undefined);
+    const allExemplars: Array<Exemplar[]> = new Array(activities.length).fill([]);
+    const allTransforms: Array<DescriptionTransform[]> = new Array(activities.length).fill([]);
+    const toExtract: number[] = []; // indices needing fresh pipeline (full scoring)
+    const toExtractEvidenceOnly: number[] = []; // indices with cached scores but needing evidence for portfolio calibration
+
+    // Telemetry tracking arrays — populated during scoring, used for fire-and-forget recording
+    const allRuleScoreTotals: number[] = new Array(activities.length).fill(0);
+    const allResolutionTraces: (DomainResolutionTrace | null)[] = new Array(activities.length).fill(null);
+    const allExpertiseResults: (ExpertiseMatchResult | undefined)[] = new Array(activities.length).fill(undefined);
+
+    // ---- Phase 0: Check cache (2-tier: session cache → cross-user cache) ----
+    let crossUserHits = 0;
+    for (let i = 0; i < activities.length; i++) {
+      const { id, input: actInput } = activityInputs[i];
+
+      if (enableCache && !forceFresh) {
+        // Tier 1: Session cache (fastest, in-memory)
+        const cacheResult = this.cacheService.getActivityScore(sessionId, id, actInput);
+        const evKey = this.evidenceCacheKey(sessionId, id);
+        const evCached = this.evidenceCache.get(evKey);
+
+        if (cacheResult.hit && cacheResult.value && evCached) {
+          activityScores[i] = cacheResult.value;
+          allEvidence[i] = evCached.evidence;
+          allTiers[i] = evCached.tier;
+          if (evCached.descriptionScore) {
+            descriptionScores[i] = evCached.descriptionScore;
+          }
+          cacheResults.set(id, true);
+          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): SESSION CACHE HIT`);
+          continue;
+        }
+
+        // Tier 2: Cross-user cache (Supabase, shared across users)
+        try {
+          const fingerprint = crossUserCacheService.computeFingerprint({
+            description: activities[i].description,
+            role: activities[i].role,
+            category: activities[i].category,
+            title: activities[i].title,
+            hoursPerWeek: activities[i].hoursPerWeek,
+            yearsActive: activities[i].yearsInvolved,
+          });
+          const crossUserResult = await crossUserCacheService.lookup(fingerprint);
+
+          if (crossUserResult && crossUserResult.isValid) {
+            // C1: Cross-user hit — restore full score objects from cache
+            const cachedEntry = crossUserResult.entry;
+
+            // Restore full ActivityScore — breakdown is the complete object, not flat numbers
+            activityScores[i] = {
+              total: cachedEntry.activityScore.total,
+              breakdown: cachedEntry.activityScore.breakdown as unknown as ActivityScore['breakdown'],
+              tierJustification: cachedEntry.activityScore.tierJustification,
+              comparisonBenchmarks: cachedEntry.activityScore.comparisonBenchmarks as unknown as ActivityScore['comparisonBenchmarks'],
+              improvementPaths: cachedEntry.activityScore.improvementPaths,
+              overallRationale: cachedEntry.activityScore.overallRationale,
+            };
+
+            // Restore full DescriptionScore
+            descriptionScores[i] = {
+              total: cachedEntry.descriptionScore.total,
+              breakdown: cachedEntry.descriptionScore.breakdown as unknown as DescriptionScore['breakdown'],
+              strengths: cachedEntry.descriptionScore.strengths,
+              improvements: cachedEntry.descriptionScore.improvements,
+              overallRationale: cachedEntry.descriptionScore.overallRationale,
+            };
+
+            console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): CROSS-USER CACHE HIT (age: ${Math.round(crossUserResult.cacheAge / 3600000)}h, score: ${cachedEntry.activityScore.total.toFixed(1)})`);
+            crossUserHits++;
+            cacheResults.set(id, true);
+
+            // Still need evidence for portfolio calibration — extract features only, skip nuance LLM
+            toExtractEvidenceOnly.push(i);
+            continue;
+          }
+        } catch (err) {
+          // Cross-user cache failure is never fatal — just skip
+          console.warn(`[ScoringOrchestrator] Cross-user cache error for activity ${i + 1}:`, err instanceof Error ? err.message : err);
+        }
+      }
+
+      toExtract.push(i);
+      cacheResults.set(id, false);
+    }
+
+    const cachedCount = activities.length - toExtract.length - toExtractEvidenceOnly.length;
+    console.log(`[ScoringOrchestrator] Cache: ${cachedCount} session cached, ${crossUserHits} cross-user hits, ${toExtractEvidenceOnly.length} evidence-only, ${toExtract.length} need fresh scoring`);
+
+    let tokensUsed: { input: number; output: number } | undefined;
+
+    // Combine indices that need feature extraction (both full pipeline and evidence-only)
+    const allToExtract = [...toExtract, ...toExtractEvidenceOnly];
+    const evidenceOnlySet = new Set(toExtractEvidenceOnly);
+
+    // ---- Phase 1: Feature Extraction (Haiku, parallel per-activity) ----
+    if (allToExtract.length > 0) {
+      const extractStart = Date.now();
+
+      const extractionInput: BatchFeatureExtractionInput = {
+        activities: allToExtract.map(i => ({
+          id: activities[i].id,
+          title: activities[i].title,
+          description: activities[i].description,
+          role: activities[i].role,
+          category: activities[i].category,
+          organization: activities[i].organization,
+          hoursPerWeek: activities[i].hoursPerWeek,
+          weeksPerYear: activities[i].weeksPerYear,
+          yearsInvolved: activities[i].yearsInvolved,
+          gradeLevels: activities[i].gradeLevels,
+          isPaid: activities[i].isPaid,
+          achievements: activities[i].achievements,
+        })),
+        studentContext: studentContext ? {
+          intendedMajor: studentContext.intendedMajor,
+          gradeLevel: studentContext.gradeLevel,
+        } : undefined,
+      };
+
+      const extractionResult = await featureExtractorService.extractBatch(extractionInput);
+      const extractMs = Date.now() - extractStart;
+      console.log(`[ScoringOrchestrator] Feature extraction: ${extractMs}ms, ${extractionResult.failures.length} failures`);
+
+      tokensUsed = extractionResult.totalTokens
+        ? { input: extractionResult.totalTokens.input, output: extractionResult.totalTokens.output }
+        : undefined;
+
+      // ---- Phase 2: Tier Classification + Phase 3a: Rule Scoring (both instant) ----
+      const ruleStart = Date.now();
+      const nuanceInputs: Array<{
+        index: number;
+        evidence: ExtractedEvidence;
+        tier: TierClassification;
+        activityScore: ActivityScore;
+        meta: { title: string; description: string; type?: string; position?: string };
+        expertiseContext?: {
+          domainId: string;
+          confidence: 'high' | 'medium' | 'low';
+          signalCount: number;
+          trapCount: number;
+          expertiseScore: number;
+          topSignals: string[];
+          topTraps: string[];
+        };
+        impressionContext?: ImpressionAnalysisResult;
+      }> = [];
+      const legacyFallbackIndices: number[] = [];
+
+      for (let j = 0; j < allToExtract.length; j++) {
+        const i = allToExtract[j];
+        const isEvidenceOnly = evidenceOnlySet.has(i);
+        const extraction = extractionResult.extractions[j];
+
+        if (!extraction) {
+          if (isEvidenceOnly) {
+            // Evidence-only: extraction failed but we already have cached scores — just skip evidence
+            console.warn(`[ScoringOrchestrator] Evidence extraction failed for "${activities[i].title}" (cross-user cached, skipping evidence)`);
+            continue;
+          }
+          // Extraction failed — will fall back to legacy scorer
+          console.warn(`[ScoringOrchestrator] Extraction failed for "${activities[i].title}", using legacy fallback`);
+          legacyFallbackIndices.push(i);
+          continue;
+        }
+
+        const evidence = extraction.activityEvidence;
+
+        // Phase 1.5a: Cross-validate extraction against structured fields ($0, <1ms)
+        const validationFlags = crossValidateEvidence(evidence, {
+          hoursPerWeek: activities[i].hoursPerWeek,
+          weeksPerYear: activities[i].weeksPerYear,
+          yearsInvolved: activities[i].yearsInvolved,
+          gradeLevels: activities[i].gradeLevels,
+          isPaid: activities[i].isPaid,
+        });
+        evidence.validationFlags = validationFlags;
+        if (validationFlags.flags.length > 0) {
+          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): cross-validation flags: ${validationFlags.flags.join('; ')}`);
+        }
+
+        // Phase 1.5b: Prestige research for unknown entities (Sonnet, cached)
+        try {
+          const prestigeResults = await prestigeResearchService.researchUnknownEntities(
+            evidence,
+            activities[i].description,
+            activities[i].category ?? 'other',
+          );
+          if (prestigeResults.length > 0) {
+            enrichEvidenceWithPrestige(evidence, prestigeResults);
+            console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): prestige research enriched ${prestigeResults.length} entity(s)`);
+          }
+        } catch (err) {
+          console.warn(`[ScoringOrchestrator] Prestige research failed for "${activities[i].title}", continuing without:`, err);
+        }
+
+        // Phase 2: Tier classification (deterministic, ~0ms)
+        const tier = classifyTier(evidence);
+
+        // Phase 2b: Expertise signal matching (deterministic, <1ms, $0)
+        const detectedType = extraction.descriptionFeatures.detectedActivityType;
+        const expertiseDomain = getExpertiseDomainWithSubResolution(
+          detectedType,
+          [activities[i].title, activities[i].role ?? '', activities[i].category ?? ''],
+        );
+        let expertiseResult: ExpertiseMatchResult | undefined;
+        if (expertiseDomain) {
+          expertiseResult = matchExpertiseSignals(
+            activities[i].description,
+            extraction.descriptionFeatures,
+            expertiseDomain,
+            activities[i].role,
+          );
+        }
+
+        // Telemetry: capture expertise result for this activity
+        allExpertiseResults[i] = expertiseResult;
+
+        // Phase 2b-ii: Build teaching context + exemplars (deterministic, <1ms, $0)
+        let teachingCtx: ExpertiseTeachingContext | undefined;
+        let activityExemplars: Exemplar[] = [];
+        let applicableTransforms: DescriptionTransform[] = [];
+        if (expertiseDomain && expertiseResult) {
+          teachingCtx = buildExpertiseTeachingContext(expertiseDomain, expertiseResult, activities[i].role);
+          activityExemplars = getExemplarsForDomain(expertiseDomain.domainId, tier.internalTier) ?? [];
+          applicableTransforms = expertiseResult.applicableTransforms ?? [];
+        }
+        allTeachingContexts[i] = teachingCtx;
+        allExemplars[i] = activityExemplars;
+        allTransforms[i] = applicableTransforms;
+
+        // Phase 2c: Impressiveness analysis (deterministic, <1ms, $0)
+        // Provides field-specific context: WHY this achievement level matters, major alignment, depth markers
+        const impressionResult = analyzeImpressiveness(
+          evidence,
+          tier,
+          expertiseResult,
+          studentContext?.intendedMajor,
+          activities[i].description,
+        );
+        allImpressions[i] = impressionResult;
+
+        // Phase 2c-ii: Enrich exemplars from impressiveness calibration
+        // If the new module found domain-specific exemplars, convert and merge with existing
+        if (impressionResult.exemplars && impressionResult.exemplars.length > 0) {
+          const newExemplars: Exemplar[] = impressionResult.exemplars.map(e => ({
+            domainId: e.domainId,
+            tier: e.targetTier as 1 | 2 | 3 | 4 | 5 | 6,
+            description: e.text,
+            whyItWorks: e.whyItWorks,
+            techniques: e.demonstratesDimensions,
+          }));
+          // Prefer new impressiveness-calibrated exemplars, append any old ones that aren't duplicates
+          const existingIds = new Set(newExemplars.map(e => e.description));
+          const unique = allExemplars[i].filter(e => !existingIds.has(e.description));
+          allExemplars[i] = [...newExemplars, ...unique].slice(0, 5);
+        }
+
+        {
+          const markerNote = (impressionResult.technicalDepthMarkers ?? []).length > 0
+            ? `, ${(impressionResult.technicalDepthMarkers ?? []).length} depth markers`
+            : '';
+          const alignNote = impressionResult.majorAlignment && impressionResult.majorAlignment.relevance !== 'unrelated'
+            ? `, major=${impressionResult.majorAlignment.relevance}(${impressionResult.majorAlignment.boostFactor})`
+            : '';
+          console.log(`[ScoringOrchestrator] Activity ${i + 1}: impression=${impressionResult.percentileRange}${markerNote}${alignNote}`);
+        }
+
+        // For evidence-only indices (cross-user cache hit), store evidence/tier but skip scoring
+        if (isEvidenceOnly) {
+          allEvidence[i] = evidence;
+          allTiers[i] = tier;
+          console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): evidence extracted for cached score (tier=${tier.internalTier})`);
+          continue;
+        }
+
+        // Phase 2d: Description scoring (deterministic, <1ms, $0)
+        // Uses features already extracted by Haiku — no separate LLM call needed
+        const descScore = descriptionRuleScorerService.scoreDescription(
+          extraction.descriptionFeatures, expertiseResult
+        );
+        descriptionScores[i] = descScore;
+
+        // Phase 3a: Rule scoring (deterministic, ~0ms)
+        const ruleScore = activityRuleScorerService.scoreActivity(evidence, tier);
+
+        // Phase 3b: Apply expertise-based scoring adjustments (deterministic, ~0ms)
+        if (expertiseResult && expertiseResult.confidence !== 'low') {
+          const adj = expertiseResult.assessment.scoringAdjustments;
+          // Adjust authenticity component (maps to communityCharacter)
+          if (adj.authenticityModifier !== 0) {
+            const cc = ruleScore.breakdown.communityCharacter;
+            cc.score = Math.max(0, Math.min(10, Math.round((cc.score + adj.authenticityModifier) * 10) / 10));
+            cc.rationale += ` [Expertise: ${adj.authenticityModifier > 0 ? '+' : ''}${adj.authenticityModifier.toFixed(2)} authenticity signal]`;
+          }
+        }
+
+        const expertiseNote = expertiseResult
+          ? `, expertise=${expertiseResult.assessment.expertiseScore.toFixed(1)} (${expertiseResult.detectedSignals.length}sig/${expertiseResult.detectedTraps.length}trap)`
+          : '';
+        console.log(`[ScoringOrchestrator] Activity ${i + 1} (${activities[i].title}): tier=${tier.internalTier}, ruleScore=${ruleScore.total.toFixed(1)}${expertiseNote}`);
+
+        allEvidence[i] = evidence;
+        allTiers[i] = tier;
+        activityScores[i] = ruleScore;
+
+        // Telemetry: capture rule score total + domain resolution trace
+        allRuleScoreTotals[i] = ruleScore.total;
+        {
+          const ctxWithTrace = getCalibrationContextWithTrace(evidence, tier, {
+            title: activities[i].title,
+            type: activities[i].category,
+            description: activities[i].description,
+          });
+          const fp = crossUserCacheService.computeFingerprint({
+            description: activities[i].description,
+            role: activities[i].role,
+            category: activities[i].category,
+            title: activities[i].title,
+            hoursPerWeek: activities[i].hoursPerWeek,
+            yearsActive: activities[i].yearsInvolved,
+          });
+          allResolutionTraces[i] = buildDomainResolutionTrace(fp, ctxWithTrace);
+        }
+
+        // All activities go through Sonnet nuance calibration — LLM is the primary intelligence
+        nuanceInputs.push({
+          index: i,
+          evidence,
+          tier,
+          activityScore: ruleScore,
+          meta: {
+            title: activities[i].title,
+            description: activities[i].description,
+            type: activities[i].category,
+            position: activities[i].role,
+          },
+          expertiseContext: expertiseResult ? {
+            domainId: expertiseResult.domainId,
+            confidence: expertiseResult.confidence,
+            signalCount: expertiseResult.detectedSignals.length,
+            trapCount: expertiseResult.detectedTraps.length,
+            expertiseScore: expertiseResult.assessment.expertiseScore,
+            topSignals: expertiseResult.detectedSignals.slice(0, 3).map(s => s.signal.id),
+            topTraps: expertiseResult.detectedTraps.slice(0, 3).map(t => t.trap.id),
+          } : undefined,
+          impressionContext: impressionResult,
+        });
+      }
+
+      console.log(`[ScoringOrchestrator] Tier + rule + desc scoring: ${Date.now() - ruleStart}ms (${nuanceInputs.length} need nuance, ${toExtractEvidenceOnly.length} evidence-only)`);
+
+      // ---- Phase 3b: Nuance Calibration (Sonnet per-activity, concurrent) ----
+      if (nuanceInputs.length > 0) {
+        const nuanceStart = Date.now();
+        console.log(`[ScoringOrchestrator] Starting nuance calibration for ${nuanceInputs.length} activities...`);
+
+        const nuanceResults = await calibrateBatch(
+          nuanceInputs.map(n => ({
+            evidence: n.evidence,
+            tier: n.tier,
+            activityScore: n.activityScore,
+            meta: n.meta,
+            expertiseContext: n.expertiseContext,
+            impressionContext: n.impressionContext,
+          }))
+        );
+
+        for (let k = 0; k < nuanceInputs.length; k++) {
+          const { index } = nuanceInputs[k];
+          const nuance = nuanceResults[k];
+          if (nuance && nuance.calibrationApplied) {
+            this.applyNuanceToActivityScore(activityScores[index], nuance);
+            console.log(`[ScoringOrchestrator] Activity ${index + 1}: nuance adjusted ${activityScores[index].total.toFixed(1)}`);
+          }
+        }
+
+        // Add nuance tokens to total
+        // (nuance calibration uses Sonnet, but token tracking is internal to the service)
+        const nuanceMs = Date.now() - nuanceStart;
+        console.log(`[ScoringOrchestrator] Nuance calibration: ${nuanceMs}ms`);
+
+        // Fire-and-forget telemetry for each freshly scored activity
+        for (const i of toExtract) {
+          if (!activityScores[i] || !allResolutionTraces[i]) continue;
+          const fp = crossUserCacheService.computeFingerprint({
+            description: activities[i].description,
+            role: activities[i].role,
+            category: activities[i].category,
+            title: activities[i].title,
+            hoursPerWeek: activities[i].hoursPerWeek,
+            yearsActive: activities[i].yearsInvolved,
+          });
+          scoringTelemetryService.record({
+            fingerprint: fp,
+            activityTitle: activities[i].title,
+            activityCategory: activities[i].category ?? 'unknown',
+            scoredAt: new Date().toISOString(),
+            kbVersion: KB_VERSION,
+            modelVersion: 'claude-sonnet-4-5-20250929',
+            internalTier: allTiers[i]?.internalTier ?? 4,
+            domainResolution: allResolutionTraces[i]!,
+            ruleScoreTotal: allRuleScoreTotals[i],
+            llmAdjustmentTrace: this.buildLLMAdjustmentTrace(i, nuanceInputs, nuanceResults),
+            finalScoreTotal: activityScores[i].total,
+            descriptionScoreTotal: descriptionScores[i]?.total ?? 0,
+            expertiseConfidence: allExpertiseResults[i]?.confidence ?? null,
+            expertiseDomain: allExpertiseResults[i]?.domainId ?? null,
+            overallSignalStrength: allEvidence[i]?.overallSignalStrength ?? 'moderate',
+          });
+        }
+      }
+
+      // ---- Legacy fallback for extraction failures ----
+      if (legacyFallbackIndices.length > 0) {
+        console.log(`[ScoringOrchestrator] Running legacy scorer for ${legacyFallbackIndices.length} activities...`);
+        for (const i of legacyFallbackIndices) {
+          const legacyResult = await activityScoringService.scoreActivity(activityInputs[i].input);
+          if (legacyResult.success && legacyResult.score) {
+            activityScores[i] = legacyResult.score;
+            // No evidence/tier for legacy — won't participate in portfolio calibration
+          } else {
+            return {
+              success: false,
+              error: `Activity scoring failed for "${activities[i].title}" (legacy fallback): ${legacyResult.error}`,
+            };
+          }
+        }
+      }
+    }
+
+    // ---- Phase 4: Portfolio Calibration (deterministic, cross-activity, instant) ----
+    // Only calibrate activities that have evidence + tier (skip legacy fallbacks)
+    const calibrationInputs: CalibrationInput[] = [];
+    const calibrationIndexMap: number[] = []; // maps calibration result index → original index
+
+    for (let i = 0; i < activities.length; i++) {
+      if (allEvidence[i] && allTiers[i]) {
+        calibrationInputs.push({
+          activityId: activities[i].id,
+          activityTitle: activities[i].title,
+          score: activityScores[i],
+          tier: allTiers[i]!,
+          evidence: allEvidence[i]!,
+        });
+        calibrationIndexMap.push(i);
+      }
+    }
+
+    if (calibrationInputs.length > 0) {
+      const calibStart = Date.now();
+      const calibrationResult = calibratePortfolio(
+        calibrationInputs,
+        studentContext?.intendedMajor
+      );
+
+      // Apply calibrated scores back
+      for (let c = 0; c < calibrationResult.activities.length; c++) {
+        const originalIndex = calibrationIndexMap[c];
+        activityScores[originalIndex] = calibrationResult.activities[c].score;
+      }
+
+      const calibMs = Date.now() - calibStart;
+      console.log(
+        `[ScoringOrchestrator] Portfolio calibration: ${calibMs}ms, ` +
+        `${calibrationResult.summary.activitiesAdjusted}/${calibrationResult.summary.totalActivities} adjusted, ` +
+        `rules: [${calibrationResult.summary.rulesApplied.join(', ')}]`
+      );
+    }
+
+    // ---- Cache fresh results (session cache + cross-user cache) ----
+    if (enableCache && !forceFresh) {
+      for (const i of toExtract) {
+        if (activityScores[i]) {
+          // Session cache (in-memory, per-session)
+          this.cacheService.setActivityScore(
+            sessionId, activities[i].id, activityInputs[i].input, activityScores[i]
+          );
+          if (allEvidence[i] && allTiers[i]) {
+            this.evidenceCache.set(this.evidenceCacheKey(sessionId, activities[i].id), {
+              evidence: allEvidence[i]!,
+              tier: allTiers[i]!,
+              descriptionScore: descriptionScores[i] ?? undefined,
+            });
+            this.enforceEvidenceCacheSize();
+          }
+
+          // Cross-user cache (Supabase, shared across users) — fire-and-forget
+          try {
+            const fingerprint = crossUserCacheService.computeFingerprint({
+              description: activities[i].description,
+              role: activities[i].role,
+              category: activities[i].category,
+              title: activities[i].title,
+              hoursPerWeek: activities[i].hoursPerWeek,
+              yearsActive: activities[i].yearsInvolved,
+            });
+            const tier = allTiers[i];
+            const descScore = descriptionScores[i];
+            crossUserCacheService.write(fingerprint, {
+              activityScore: {
+                total: activityScores[i].total,
+                breakdown: activityScores[i].breakdown as unknown as Record<string, unknown>,
+                tierJustification: activityScores[i].tierJustification,
+                comparisonBenchmarks: activityScores[i].comparisonBenchmarks as unknown as Record<string, unknown>,
+                improvementPaths: activityScores[i].improvementPaths,
+                overallRationale: activityScores[i].overallRationale,
+              },
+              descriptionScore: {
+                total: descScore?.total ?? 0,
+                breakdown: (descScore?.breakdown ?? {}) as Record<string, unknown>,
+                strengths: descScore?.strengths ?? [],
+                improvements: descScore?.improvements ?? [],
+                overallRationale: descScore?.overallRationale ?? '',
+              },
+              internalTier: (tier?.internalTier ?? 4) as import('./types').InternalTier,
+              externalTier: (tier?.externalTier ?? 3) as (1 | 2 | 3 | 4),
+            }).catch(err => {
+              console.warn(`[ScoringOrchestrator] Cross-user cache write failed for activity ${i + 1}:`, err instanceof Error ? err.message : err);
+            });
+          } catch (err) {
+            // Cross-user cache write failure is never fatal
+          }
+        }
+      }
+    }
+
+    const timingMs = Date.now() - startTime;
+    console.log(
+      `[ScoringOrchestrator] Decomposed scoring complete in ${timingMs}ms ` +
+      `(${cachedCount} session cached, ${crossUserHits} cross-user cached, ${toExtract.length} fresh)`
+    );
+
+    return { success: true, scores: activityScores, descriptionScores: descriptionScores as DescriptionScore[], tokensUsed, timingMs };
+  }
+
+  /**
+   * Apply nuance calibration adjustments to an ActivityScore.
+   * Mutates the score in place.
+   */
+  private applyNuanceToActivityScore(score: ActivityScore, nuance: NuanceCalibratedResult): void {
+    if (!nuance.calibrationApplied) return;
+
+    const { breakdown } = score;
+    const { adjustedComponents } = nuance;
+
+    // Update component scores
+    breakdown.recognitionLevel.score = adjustedComponents.recognitionScore;
+    breakdown.leadershipImpact.score = adjustedComponents.leadershipScore;
+    breakdown.communityCharacter.score = adjustedComponents.communityScore;
+    breakdown.commitmentProgression.score = adjustedComponents.commitmentScore;
+
+    // Recalculate weighted scores
+    breakdown.recognitionLevel.weightedScore = adjustedComponents.recognitionScore * breakdown.recognitionLevel.weight;
+    breakdown.leadershipImpact.weightedScore = adjustedComponents.leadershipScore * breakdown.leadershipImpact.weight;
+    breakdown.communityCharacter.weightedScore = adjustedComponents.communityScore * breakdown.communityCharacter.weight;
+    breakdown.commitmentProgression.weightedScore = adjustedComponents.commitmentScore * breakdown.commitmentProgression.weight;
+
+    // Update total
+    score.total = nuance.adjustedActivityTotal;
+  }
+
+  /**
+   * Build an LLM adjustment trace for telemetry.
+   * Shows the delta between rule-based and LLM-adjusted scores per component.
+   */
+  private buildLLMAdjustmentTrace(
+    activityIndex: number,
+    nuanceInputs: Array<{ index: number; activityScore: ActivityScore; tier: TierClassification }>,
+    nuanceResults: NuanceCalibratedResult[]
+  ): LLMAdjustmentTrace {
+    // Find the nuance input/result for this activity index
+    const nuanceIdx = nuanceInputs.findIndex(n => n.index === activityIndex);
+    if (nuanceIdx === -1 || !nuanceResults[nuanceIdx]) {
+      // Activity was not in nuance batch (shouldn't happen after skip removal, but defensive)
+      const input = nuanceInputs.find(n => n.index === activityIndex);
+      const ruleTotal = input?.activityScore.total ?? 0;
+      return {
+        ruleScoreTotal: ruleTotal,
+        llmScoreTotal: ruleTotal,
+        delta: 0,
+        componentAdjustments: [],
+        calibrationApplied: false,
+        tierRange: input?.tier.scoreRange ?? { min: 0, max: 10 },
+      };
+    }
+
+    const input = nuanceInputs[nuanceIdx];
+    const result = nuanceResults[nuanceIdx];
+    const ruleTotal = input.activityScore.total;
+    const llmTotal = result.adjustedActivityTotal;
+
+    return {
+      ruleScoreTotal: ruleTotal,
+      llmScoreTotal: llmTotal,
+      delta: Math.round((llmTotal - ruleTotal) * 1000) / 1000,
+      componentAdjustments: result.adjustments.map(adj => ({
+        component: adj.component,
+        ruleScore: adj.originalScore,
+        llmScore: adj.adjustedScore,
+        reason: adj.reason,
+      })),
+      calibrationApplied: result.calibrationApplied,
+      tierRange: input.tier.scoreRange,
+    };
   }
 
   /**

@@ -672,6 +672,31 @@ export function getTierName(tier: 1 | 2 | 3 | 4): string {
 // ============================================================================
 
 /**
+ * Canonical category identifiers — the 18 activity categories recognized by the scoring pipeline.
+ * Using a union type instead of `string` catches hardcoded mismatches at compile time.
+ * (e.g., the 'coding_engineering' bug in RESEARCH_CATEGORIES would have been caught.)
+ */
+export type CanonicalCategory =
+  | 'stem_research'
+  | 'stem_competition'
+  | 'debate_speech'
+  | 'performing_arts'
+  | 'athletics'
+  | 'community_service'
+  | 'leadership_government'
+  | 'technology'
+  | 'writing_journalism'
+  | 'entrepreneurship'
+  | 'academic_enrichment'
+  | 'visual_arts'
+  | 'medical_health'
+  | 'social_activism'
+  | 'work_family'
+  | 'religious_cultural'
+  | 'international'
+  | 'media_digital';
+
+/**
  * Internal 6-tier classification (more granular than external 4-tier).
  * Used by the tier classifier to constrain scoring ranges.
  */
@@ -754,6 +779,17 @@ export const TIER_ASSESSMENT_SCORES: Record<InternalTier, { base: number; strong
 } as const;
 
 /**
+ * Cross-validation flags from comparing extracted evidence against structured fields.
+ * Detects conflicts between description claims and Common App metadata.
+ */
+export interface ValidationFlags {
+  commitmentConflict: boolean;
+  scopeCommitmentMismatch: boolean;
+  impactCredibilityIssue: boolean;
+  flags: string[];
+}
+
+/**
  * Structured evidence extracted from activity description and metadata.
  * Contains ONLY facts — no judgments, no scores, no tiers.
  * Produced by Phase 1 (Evidence Extraction via Haiku).
@@ -793,6 +829,7 @@ export interface ExtractedEvidence {
     }>;
     estimatedPeopleReached: number | null;
     tangibleOutcomes: string[];
+    impactQuality: 'verified_significant' | 'verified_modest' | 'claimed_vague' | 'claimed_none';
   };
 
   /** Commitment signals */
@@ -815,12 +852,21 @@ export interface ExtractedEvidence {
 
   /** Category match from benchmarks library */
   categoryMatch: {
-    category: string;                // Key from BENCHMARKS_BY_CATEGORY
+    category: CanonicalCategory;      // Key from BENCHMARKS_BY_CATEGORY
     confidence: 'high' | 'medium' | 'low';
+    /** 2nd/3rd best category guesses when confidence is medium/low */
+    similarDomains: string[];
+    /** Most specific subcategory if identifiable (e.g., "bench_science", "policy_debate") */
+    subcategoryGuess: string | null;
+    /** Haiku's reasoning about what makes this activity notable/typical within its field */
+    domainSpecificContext: string | null;
   };
 
   /** Raw extraction confidence — how much useful signal was in the description */
   overallSignalStrength: 'strong' | 'moderate' | 'weak';
+
+  /** Cross-validation flags from comparing extraction against structured Common App fields */
+  validationFlags?: ValidationFlags;
 }
 
 /**

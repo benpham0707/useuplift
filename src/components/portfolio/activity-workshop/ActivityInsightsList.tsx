@@ -14,8 +14,12 @@
 
 import React, { useState, useCallback, useMemo } from 'react';
 import type { ActivityInsightData } from './insightTypes';
-import { InsightSummaryCard } from './InsightSummaryCard';
+import { TIER_LABELS, getRoleConfig } from './insightTypes';
+import { ActivityCard } from '../../dashboard/ActivityCard';
+import type { ActivityData } from '../../dashboard/ActivityCard';
 import { InsightDetailView } from './InsightDetailView';
+import { DiagnosticCard } from './DiagnosticCard';
+import { transformToDiagnosticCard } from './diagnosticTransform';
 // IssuesDashboard removed from list view — per-activity context is now in InsightDetailView
 import type { ActivityWorkshopPipelineResult } from '../../../services/portfolioStrategy/services/activityWorkshop/types';
 import { activityTitles } from './mockData';
@@ -303,9 +307,33 @@ function buildInsights(data: ActivityWorkshopPipelineResult): ActivityInsightDat
   });
 }
 
+/** Map canonical insight data → ActivityCard display props */
+function toActivityData(item: ActivityInsightData, idx: number): ActivityData {
+  const roleCfg = getRoleConfig(item.storyRole);
+  const isEssayWorthy = item.essayWorthiness === 'excellent' || item.essayWorthiness === 'good';
+
+  return {
+    id: item.activityId,
+    index: idx,
+    title: item.title,
+    score: item.combinedScore,
+    tier: TIER_LABELS[item.tier] || 'T4 Basic',
+    category: roleCfg.label,
+    description: item.celebrationHeadline || item.quickCelebration || item.summaryOneLiner || '',
+    hours: item.totalHours,
+    essays: isEssayWorthy ? 1 : 0,
+    checks: item.greenFlags.length,
+    insights: item.improvementTeaching.length,
+  };
+}
+
+type ViewMode = 'classic' | 'diagnostic';
+
 export function ActivityInsightsList({ data }: ActivityInsightsListProps) {
   const insights = useMemo(() => buildInsights(data), [data]);
+  const diagnosticCards = useMemo(() => insights.map(transformToDiagnosticCard), [insights]);
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('diagnostic');
 
   const handleSelect = useCallback((id: string) => {
     setSelectedActivityId(id);
@@ -324,16 +352,56 @@ export function ActivityInsightsList({ data }: ActivityInsightsListProps) {
     return <InsightDetailView data={selectedInsight} onBack={handleBack} />;
   }
 
-  // List view — summary cards
+  // List view
   return (
-    <div className="space-y-2">
-      {insights.map((item) => (
-        <InsightSummaryCard
-          key={item.activityId}
-          data={item}
-          onSelect={handleSelect}
-        />
-      ))}
+    <div className="space-y-3">
+      {/* View mode toggle */}
+      <div className="flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={() => setViewMode('classic')}
+          className={`rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+            viewMode === 'classic'
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Classic
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('diagnostic')}
+          className={`rounded-md px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider transition-colors ${
+            viewMode === 'diagnostic'
+              ? 'bg-foreground text-background'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          Diagnostic
+        </button>
+      </div>
+
+      {viewMode === 'classic' ? (
+        <div className="space-y-1">
+          {insights.map((item, idx) => (
+            <ActivityCard
+              key={item.activityId}
+              onClick={() => handleSelect(item.activityId)}
+              data={toActivityData(item, idx)}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {diagnosticCards.map((card) => (
+            <DiagnosticCard
+              key={card.activityId}
+              card={card}
+              onSelect={handleSelect}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

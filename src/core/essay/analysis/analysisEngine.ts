@@ -658,10 +658,10 @@ export async function analyzeEssay(input: AnalysisEngineInput): Promise<Analysis
     { dimension_name: 'character_interiority_vulnerability', ...scoreInteriority(interiority) },
     { dimension_name: 'reflection_meaning_making', ...scoreReflection(interiority, elite_patterns) },
     { dimension_name: 'show_dont_tell_craft', ...scoreShowDontTell(scenes, dialogue) },
-    { dimension_name: 'dialogue_action_texture', ...scoreDialogueAction(dialogue, scenes) },
+    { dimension_name: 'intellectual_vitality_curiosity', ...scoreDialogueAction(dialogue, scenes) },
     { dimension_name: 'originality_specificity_voice', ...scoreOriginality(essay_text, elite_patterns, interiority) },
     { dimension_name: 'structure_pacing_coherence', ...scoreStructure(essay_text, elite_patterns) },
-    { dimension_name: 'sentence_level_craft', ...scoreSentenceCraft(essay_text) },
+    { dimension_name: 'word_economy_craft', ...scoreSentenceCraft(essay_text) },
     { dimension_name: 'context_constraints_disclosure', ...scoreContextConstraints(essay_text, elite_patterns) },
     { dimension_name: 'school_program_fit', ...scoreSchoolFit(essay_text, essay_type) },
     { dimension_name: 'ethical_awareness_humility', ...scoreEthicalAwareness(essay_text, interiority) }

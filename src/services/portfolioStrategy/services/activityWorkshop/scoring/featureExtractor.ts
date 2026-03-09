@@ -43,6 +43,36 @@ const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 /** Estimated cost per Haiku call for budgeting */
 const ESTIMATED_COST_PER_CALL = 0.001;
 
+/**
+ * Maps legacy/old category names to canonical 18-category IDs.
+ * Applied during parsing to handle both old Haiku responses and new ones.
+ */
+const LEGACY_CATEGORY_MAP: Record<string, string> = {
+  'coding_engineering': 'technology',
+  'work_employment': 'work_family',
+  'family_responsibility': 'work_family',
+  'family_obligations': 'work_family',
+  'arts_creative': 'performing_arts',
+  'academic': 'academic_enrichment',
+  'academic_clubs': 'academic_enrichment',
+  'leadership': 'leadership_government',
+};
+
+/** All 18 canonical category IDs + 'other' */
+const CANONICAL_CATEGORIES = new Set([
+  'stem_research', 'stem_competition', 'debate_speech', 'performing_arts',
+  'athletics', 'community_service', 'leadership_government', 'technology',
+  'writing_journalism', 'entrepreneurship', 'academic_enrichment', 'visual_arts',
+  'medical_health', 'social_activism', 'work_family', 'religious_cultural',
+  'international', 'media_digital', 'other',
+]);
+
+/** Normalize a category string: apply legacy mapping and validate */
+function normalizeCategory(raw: string): string {
+  const mapped = LEGACY_CATEGORY_MAP[raw] ?? raw;
+  return CANONICAL_CATEGORIES.has(mapped) ? mapped : 'other';
+}
+
 // ============================================================================
 // EXTRACTION PROMPT
 // ============================================================================
@@ -135,7 +165,7 @@ OUTPUT FORMAT (strict JSON):
       "authenticityMarkers": ["<specific details suggesting genuine experience>"],
       "readsAsAIGenerated": <true if description has hallmarks of AI resume bullets>
     },
-    "detectedActivityType": "<one of: stem_research, stem_competition, coding_engineering, leadership_government, community_service, work_employment, family_responsibility, arts_creative, athletics, academic, other>"
+    "detectedActivityType": "<one of: stem_research, stem_competition, debate_speech, performing_arts, athletics, community_service, leadership_government, technology, writing_journalism, entrepreneurship, academic_enrichment, visual_arts, medical_health, social_activism, work_family, religious_cultural, international, media_digital, other>"
   },
   "activityEvidence": {
     "scope": {
@@ -168,7 +198,8 @@ OUTPUT FORMAT (strict JSON):
         }
       ],
       "estimatedPeopleReached": <number or null>,
-      "tangibleOutcomes": ["<concrete results>"]
+      "tangibleOutcomes": ["<concrete results>"],
+      "impactQuality": "<verified_significant|verified_modest|claimed_vague|claimed_none — verified_significant: specific large-scale externally verifiable outcomes like published paper, $10K+ raised, 500+ people served, measurable policy change. verified_modest: specific real outcomes at smaller scale like taught 15 students, organized 3 events, raised $500. claimed_vague: vague claims without specifics like 'helped many people', 'made an impact'. claimed_none: no impact claims or purely self-focused outcomes>"
     },
     "commitment": {
       "yearsActive": <from metadata or description>,
@@ -185,19 +216,60 @@ OUTPUT FORMAT (strict JSON):
       "paddingSignals": ["<red flags suggesting resume inflation>"]
     },
     "categoryMatch": {
-      "category": "<best matching category from: stem_research, leadership, community_service, work_employment, family_obligations, arts_creative, athletics, academic_clubs, entrepreneurship>",
-      "confidence": "<high|medium|low>"
+      "category": "<best matching category — see CATEGORY REFERENCE below>",
+      "confidence": "<high|medium|low>",
+      "subcategoryGuess": "<most specific subcategory if identifiable — see CATEGORY REFERENCE>",
+      "similarDomains": ["<2nd best category if confidence is medium/low, else empty>", "<3rd best if applicable>"],
+      "domainSpecificContext": "<1-2 sentences: what makes this activity notable or typical within its specific field>"
     },
     "overallSignalStrength": "<strong|moderate|weak>"
   }
 }
+
+CATEGORY REFERENCE — Use these EXACT category keys:
+- stem_research: Lab research, science projects, research assistantships, independent research
+- stem_competition: Math olympiads, science fairs, coding competitions (USAMO, ISEF, Science Olympiad, MATHCOUNTS)
+- debate_speech: Policy/LD/PF debate, Model UN, Mock Trial, speech & forensics, public speaking
+- performing_arts: Music (instrumental, vocal, choir), theater, dance, film production
+- athletics: Varsity/JV/club sports, individual athletics, coaching, sports-adjacent (team manager)
+- community_service: Volunteering, nonprofits, tutoring/mentoring, food banks, community organizing
+- leadership_government: Student government, class officer, club president (when leadership IS the activity, not just a role within another)
+- technology: Software development, robotics (FRC, VEX), app building, hackathons, hardware projects
+- writing_journalism: School newspaper, literary magazine, creative writing, blogging, published writing
+- entrepreneurship: Startups, business competitions (DECA, FBLA), social enterprises, freelance businesses
+- academic_enrichment: Honor societies (NHS), academic clubs (Quiz Bowl, Science Olympiad academic events), summer programs, independent study
+- visual_arts: Drawing, painting, sculpture, graphic design, photography, digital art, portfolio work
+- medical_health: Hospital volunteering, clinical shadowing, health advocacy, EMT/CPR, medical research
+- social_activism: Advocacy campaigns, political organizing, environmental activism, social justice work
+- work_family: Paid employment, family business, caregiving responsibilities, household management
+- religious_cultural: Church/mosque/temple activities, cultural organizations, heritage language school
+- international: Exchange programs, international volunteering, Model UN (if primary focus is international affairs)
+- media_digital: Content creation (YouTube, podcast, blog), social media management, esports, digital marketing
+
+SUBCATEGORY EXAMPLES (use as guidance for subcategoryGuess, not exhaustive):
+- stem_research → bench_science, computational, clinical, field, engineering
+- stem_competition → math, informatics, physics, biology, chemistry, science_olympiad, science_fair
+- debate_speech → policy_debate, ld_debate, public_forum, model_un, mock_trial
+- performing_arts → instrumental, theater, dance, choir, film
+- athletics → varsity_team, club_sport, individual_competitive, recreational
+- community_service → local_nonprofit, national_org, tutoring_mentoring, fundraising, environmental
+- technology → software, robotics, hardware, hackathon, app_development
+- academic_enrichment → honor_societies, quiz_bowl, summer_programs, independent_study
 
 IMPORTANT:
 - Empty arrays [] are fine when nothing matches.
 - null is fine for optional fields when no data exists.
 - Be conservative with confidence scores — only 0.8+ when evidence is explicit.
 - For recognitions, only mark isVerifiable=true for well-known awards/competitions.
-- For estimatedPeopleReached, only provide a number if explicitly stated or clearly implied.`;
+- For estimatedPeopleReached, only provide a number if explicitly stated or clearly implied.
+
+RECOGNITION GUIDANCE:
+- Published academic papers (IEEE, Nature, Science, journal/conference proceedings) are NATIONAL-level recognitions. Mark isVerifiable=true.
+- Poster presentations at national conferences (AHA, SfN, ACS, AGU) are NATIONAL-level recognitions. Mark isVerifiable=true.
+- Research conducted at named university labs (Stanford, MIT, Johns Hopkins, etc.) implies at minimum REGIONAL scope, usually NATIONAL.
+- AIME qualifier, USAMO, Intel STS, Regeneron STS, Science Olympiad nationals, DECA nationals — these are NATIONAL, isVerifiable=true.
+- Include ACHIEVEMENTS metadata as recognitions even when not mentioned in the description text.
+- When achievements include a "level" field, trust that level classification.`;
 }
 
 /**
@@ -385,12 +457,7 @@ function parseDescriptionFeatures(
   };
 
   const detectedType = String(desc.detectedActivityType ?? 'other');
-  const validTypes = [
-    'stem_research', 'stem_competition', 'coding_engineering',
-    'leadership_government', 'community_service', 'work_employment',
-    'family_responsibility', 'arts_creative', 'athletics', 'academic', 'other',
-  ];
-  const detectedActivityType = validTypes.includes(detectedType) ? detectedType : 'other';
+  const detectedActivityType = normalizeCategory(detectedType);
 
   return {
     activityId,
@@ -494,6 +561,13 @@ function parseActivityEvidence(
         ? Number(rawImpact.estimatedPeopleReached)
         : null,
       tangibleOutcomes: asStringArray(rawImpact.tangibleOutcomes),
+      impactQuality: (() => {
+        const valid = ['verified_significant', 'verified_modest', 'claimed_vague', 'claimed_none'] as const;
+        const raw = rawImpact.impactQuality;
+        return valid.includes(raw as typeof valid[number])
+          ? (raw as typeof valid[number])
+          : 'claimed_none';
+      })(),
     },
     commitment: {
       yearsActive,
@@ -510,8 +584,11 @@ function parseActivityEvidence(
       paddingSignals: asStringArray(rawCharacter.paddingSignals),
     },
     categoryMatch: {
-      category: String(rawCategory.category ?? 'other'),
+      category: normalizeCategory(String(rawCategory.category ?? 'other')) as import('./types').CanonicalCategory,
       confidence: categoryConfidence,
+      similarDomains: asStringArray(rawCategory.similarDomains),
+      subcategoryGuess: typeof rawCategory.subcategoryGuess === 'string' ? rawCategory.subcategoryGuess : null,
+      domainSpecificContext: typeof rawCategory.domainSpecificContext === 'string' ? rawCategory.domainSpecificContext : null,
     },
     overallSignalStrength,
   };

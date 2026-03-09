@@ -236,15 +236,15 @@ export const ActivityScoreDashboard: React.FC<ActivityScoreDashboardProps> = ({ 
       initial={{ opacity: 0, scale: 0.98 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="w-full flex flex-col lg:flex-row gap-4 items-start"
+      className="w-full flex flex-col lg:flex-row gap-4 lg:items-stretch"
     >
-      {/* Left Column: Holographic Score Card — fixed width, stable during view swaps */}
+      {/* Left Column: Holographic Score Card — fixed width, sets the row height */}
       <div className="w-full lg:w-[340px] flex-shrink-0">
         <OverviewPanel data={data} />
       </div>
 
-      {/* Right Column: Metrics with Master-Detail Takeover */}
-      <div className="flex-1 min-w-0">
+      {/* Right Column: Metrics — stretches to match left panel height */}
+      <div className="flex-1 min-w-0 flex flex-col">
         <MetricsPanel
           activityStats={activityStats}
           narrativeStats={narrativeStats}

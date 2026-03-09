@@ -377,11 +377,7 @@ export function getSceneEvidence(detection: SceneDetection): string[] {
 }
 
 // ============================================================================
-// EXPORTS
+// DEFAULT EXPORT
 // ============================================================================
 
-export {
-  detectScenes as default,
-  sceneDetectionToRubricScore,
-  getSceneEvidence,
-};
+export default detectScenes;

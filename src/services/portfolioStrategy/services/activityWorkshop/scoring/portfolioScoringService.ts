@@ -595,6 +595,45 @@ export class PortfolioScoringService {
       },
     };
 
+    // ISSUE 5 FIX: Always recalculate overallScore.total from breakdown components
+    // using the canonical formula. This ensures a single consistent 0-10 scale
+    // regardless of what the LLM returned as its "total". The LLM-provided total
+    // is used only as a sanity check — if it diverges > 1.0, the recalculated
+    // value takes precedence.
+    const recalculatedTotal = Math.round((
+      breakdown.tierDistribution.score * 0.25 +
+      breakdown.spikeDetection.score * 0.25 +
+      breakdown.coherence.score * 0.20 +
+      breakdown.majorAlignment.score * 0.15 +
+      breakdown.presentationQuality.score * 0.15
+    ) * 10) / 10;
+
+    const llmTotal = overallScore.total;
+    const totalDivergence = Math.abs(recalculatedTotal - llmTotal);
+    if (totalDivergence > 1.0) {
+      console.warn(
+        `[PortfolioScoringService] LLM total (${llmTotal}) diverges from formula (${recalculatedTotal}) by ${totalDivergence.toFixed(1)}. Using recalculated value.`
+      );
+    }
+    // Always use recalculated total for consistency
+    overallScore.total = Math.min(10, Math.max(1, recalculatedTotal));
+
+    // Also reconcile the Harvard scale rating with the recalculated total
+    // to ensure the competitive tier label matches the actual score
+    const scoreToHarvardRating = (score: number): 1 | 2 | 3 | 4 | 5 | 6 => {
+      if (score >= 9.0) return 1;
+      if (score >= 7.5) return 2;
+      if (score >= 6.0) return 3;
+      if (score >= 4.0) return 4;
+      if (score >= 2.5) return 5;
+      return 6;
+    };
+    const recalculatedRating = scoreToHarvardRating(overallScore.total);
+    if (recalculatedRating !== harvardScale.rating) {
+      harvardScale.rating = recalculatedRating;
+      harvardScale.description = HARVARD_SCALE_DEFINITIONS[recalculatedRating];
+    }
+
     // Normalize narrative
     const narrativeData = d.narrative as Record<string, unknown> | undefined;
     const narrative: PortfolioNarrative = {

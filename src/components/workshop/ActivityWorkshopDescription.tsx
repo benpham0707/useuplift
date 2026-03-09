@@ -57,7 +57,6 @@ export interface ActivityWorkshopDescriptionProps {
 /** Extract short quoted phrases from a text for inline highlighting. */
 function extractQuotes(teaching: ImprovementIssue): string[] {
   const quotes: string[] = [];
-  // Pull from references first (most accurate)
   if (teaching.references?.length) {
     for (const ref of teaching.references) {
       if (ref.quotedText && ref.quotedText.length > 3 && ref.quotedText.length < 80) {
@@ -65,7 +64,6 @@ function extractQuotes(teaching: ImprovementIssue): string[] {
       }
     }
   }
-  // Fall back to exampleBefore if no quotes found
   if (quotes.length === 0 && teaching.exampleBefore) {
     quotes.push(teaching.exampleBefore);
   }
@@ -86,17 +84,28 @@ function adaptToWorkshopData(props: ActivityWorkshopDescriptionProps): WorkshopD
       actionable: teaching.howToFix || "",
       quotes: extractQuotes(teaching),
     },
-    severity: (teaching.priority?.toLowerCase() === "high" ? "high" : "medium") as "high" | "medium",
+    severity: (
+      teaching.priority?.toLowerCase() === "high" ? "high"
+      : teaching.priority?.toLowerCase() === "low" ? "low"
+      : "medium"
+    ) as "high" | "medium" | "low",
     highlightedText: teaching.exampleBefore || "",
+    suggestedChangePhrase: teaching.exampleAfter || "",
   }));
 
   const totalGain = projectedScore - currentScore;
   const components = scoreProjection?.improvingComponents ?? [];
   const perDimGain = components.length > 0 ? totalGain / components.length : 0;
-  const dimensions = components.map((name) => ({
-    name,
-    value: Math.round(perDimGain * 10) / 10,
-  }));
+
+  // Parse dimension names and values. Pipeline may produce "name (+1.5)" format
+  // or clean names — handle both gracefully.
+  const dimensions = components.map((raw) => {
+    const match = raw.match(/^(.+?)\s*\(\+?([\d.]+)\)$/);
+    if (match) {
+      return { name: match[1].trim(), value: parseFloat(match[2]) };
+    }
+    return { name: raw, value: Math.round(perDimGain * 10) / 10 };
+  });
 
   return {
     beforeText: optimization.original,
@@ -140,7 +149,7 @@ function ActivityWorkshopDescriptionInner(props: ActivityWorkshopDescriptionProp
           {hasIssues && (
             <div className="relative">
               {/* Separator — horizontal line with rounded top corners curving into the outer border */}
-              <div className="mx-[-2px] h-3 border-t-2 border-l-2 border-r-2 border-border/80 rounded-t-xl transition-colors duration-200 group-hover:border-purple-500/30" />
+              <div className="mx-[-2px] h-3 border-t-2 border-l-2 border-r-2 border-border/80 rounded-t-xl transition-colors duration-200 group-hover:border-t-purple-500/30 group-hover:border-l-purple-500/30 group-hover:border-r-purple-500/30" />
               <CritiqueAccordion issues={workshopData.issues} setActiveIssueId={setActiveIssueId} />
             </div>
           )}

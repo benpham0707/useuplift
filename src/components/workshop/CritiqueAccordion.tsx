@@ -14,6 +14,22 @@ interface CritiqueAccordionProps {
   setActiveIssueId: (id: string | null) => void;
 }
 
+// ============================================================================
+// SEVERITY TINTS for expanded backgrounds — very subtle
+// ============================================================================
+
+const EXPANDED_TINTS: Record<string, string> = {
+  high: "bg-red-50/30",
+  medium: "bg-amber-50/30",
+  low: "bg-blue-50/30",
+};
+
+const LEFT_BORDER_COLORS: Record<string, string> = {
+  high: "border-l-red-400/40",
+  medium: "border-l-amber-400/40",
+  low: "border-l-blue-400/40",
+};
+
 /**
  * Renders a text string with any matching `quotes` wrapped in an inline
  * code-style pill for scannability.
@@ -65,20 +81,12 @@ function RichText({ text, quotes }: { text: string; quotes: string[] }) {
   return <>{elements}</>;
 }
 
-/**
- * CritiqueAccordion — Expandable teaching points displayed on the tether line.
- *
- * The tether line is rendered per-item: each non-last item gets a vertical
- * segment that runs from its badge down to just before the next badge.
- * The last item has NO line below it — the tether terminates at its circle.
- */
 export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, setActiveIssueId }) => {
   const [expandedId, setExpandedId] = useState<string | null>(issues[0]?.id || null);
 
   const toggleExpand = (id: string) => {
     const next = expandedId === id ? null : id;
     setExpandedId(next);
-    // When expanding, lock the highlight on; when collapsing, clear it
     setActiveIssueId(next);
   };
 
@@ -97,44 +105,45 @@ export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, se
             transition={{ delay: 0.12 + index * 0.06, type: "spring", stiffness: 140, damping: 20 }}
             onMouseEnter={() => setActiveIssueId(issue.id)}
             onMouseLeave={() => {
-              // Only clear if this issue isn't the expanded one
               if (expandedId !== issue.id) setActiveIssueId(expandedId);
             }}
             className="relative"
           >
             {/* ── Trigger Row ── */}
-            <button
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => toggleExpand(issue.id)}
-              className="w-full flex items-center gap-0 text-left focus:outline-none group"
+              onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleExpand(issue.id); } }}
+              className={cn(
+                "group w-full flex items-center gap-0 text-left cursor-pointer rounded-md mx-1 mr-2 transition-colors duration-150",
+                isExpanded ? "bg-muted/40" : "hover:bg-slate-50"
+              )}
             >
               {/* Badge region — badge sits on the tether line */}
               <div className="relative flex-shrink-0 w-10 flex items-center justify-center self-stretch">
-                {/*
-                  Tether line segment: runs from top of this badge region to
-                  bottom — but ONLY for non-last items. This means the line
-                  connects badge N to badge N+1 but stops at the last circle.
-                */}
                 {!isLast && (
-                  <div className="absolute left-[19px] top-1/2 bottom-0 w-px bg-border" />
+                  <div className="absolute left-[19px] top-1/2 -bottom-1 w-px bg-border" />
                 )}
-                {/* Connecting segment from previous item — top half of non-first items */}
                 {index > 0 && (
-                  <div className="absolute left-[19px] top-0 bottom-1/2 w-px bg-border" />
+                  <div className="absolute left-[19px] -top-1 bottom-1/2 w-px bg-border" />
                 )}
 
                 <div className={cn(
                   "relative z-10 flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold border bg-white transition-colors duration-150",
-                  isExpanded
+                  isExpanded || isHigh
                     ? isHigh ? "border-red-400 text-red-500" : "border-amber-400 text-amber-500"
                     : isHigh ? "border-red-300/60 text-red-400" : "border-amber-300/60 text-amber-400",
-                  "group-hover:border-purple-400 group-hover:text-purple-500"
+                  isHigh
+                    ? "group-hover:border-red-400"
+                    : "group-hover:border-amber-400"
                 )}>
                   {index + 1}
                 </div>
               </div>
 
-              {/* Title + severity */}
-              <div className="flex-1 flex items-center justify-between py-2.5 pr-4 min-w-0">
+              {/* Title + severity + chevron */}
+              <div className="flex-1 flex items-center justify-between py-2.5 pr-3 min-w-0">
                 <span className="text-[13px] font-medium text-foreground truncate">{issue.title}</span>
                 <div className="flex items-center gap-2 shrink-0 ml-3">
                   <span className={cn(
@@ -145,12 +154,14 @@ export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, se
                   )}>
                     {isHigh ? "High" : "Medium"}
                   </span>
-                  <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.15 }}>
-                    <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/50" />
-                  </motion.div>
+                  <div className="p-1 rounded-md transition-colors duration-150 group-hover:bg-foreground/5">
+                    <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.15 }}>
+                      <ChevronDown className="w-3.5 h-3.5 text-muted-foreground transition-colors duration-150 group-hover:text-foreground" />
+                    </motion.div>
+                  </div>
                 </div>
               </div>
-            </button>
+            </div>
 
             {/* ── Expanded Content ── */}
             <AnimatePresence>
@@ -162,13 +173,16 @@ export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, se
                   transition={{ type: "spring", stiffness: 140, damping: 22 }}
                   className="relative"
                 >
-                  {/* Continue tether line through expanded content for non-last items */}
                   {!isLast && (
                     <div className="absolute left-[19px] top-0 bottom-0 w-px bg-border" />
                   )}
 
-                  <div className="ml-10 mr-4 mb-3 rounded-lg bg-muted/30 border border-border/30 p-3.5 space-y-3">
-                    {/* Why this matters */}
+                  {/* Severity-tinted content with colored left indent */}
+                  <div className={cn(
+                    "ml-10 mr-4 mb-2 rounded-lg p-3.5 pl-4 space-y-3 border-l-2",
+                    EXPANDED_TINTS[issue.severity] ?? EXPANDED_TINTS.medium,
+                    LEFT_BORDER_COLORS[issue.severity] ?? LEFT_BORDER_COLORS.medium,
+                  )}>
                     <div>
                       <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
                         Why this matters
@@ -178,7 +192,6 @@ export const CritiqueAccordion: React.FC<CritiqueAccordionProps> = ({ issues, se
                       </p>
                     </div>
 
-                    {/* How to fix it */}
                     {issue.description.actionable && (
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">

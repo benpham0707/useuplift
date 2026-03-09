@@ -987,7 +987,7 @@ export default function ActivityWorkshop() {
     if (newPromptId !== selectedPromptId) {
       setSelectedPromptId(newPromptId);
     }
-  }, [piqNumber, selectedPromptId]);
+  }, [piqNumber]); // eslint-disable-line react-hooks/exhaustive-deps -- selectedPromptId intentionally excluded to prevent infinite loop
 
   // ============================================================================
   // HANDLERS
@@ -1645,23 +1645,7 @@ export default function ActivityWorkshop() {
             onExpand={() => setIsChatOpen(true)}
           >
             <div className="h-full flex flex-col overflow-hidden">
-              {/* Chat Panel Header */}
-              <div className="flex-shrink-0 border-b bg-muted/30 px-4 py-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageCircle className="h-4 w-4 text-purple-600" />
-                  <span className="text-sm font-medium">AI Coach</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleToggleChat}
-                  className="h-7 w-7 p-0"
-                >
-                  <PanelRightClose className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Chat Content */}
+              {/* Chat Content - header is built into the chat component */}
               <div className="flex-1 overflow-hidden">
                 <ContextualWorkshopChat
                   mode="piq"

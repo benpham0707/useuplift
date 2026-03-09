@@ -36,6 +36,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
 import DashboardLayout from "./layouts/DashboardLayout";
+import { ChatPanel } from "./components/chat/ChatPanel";
 import { CLERK_PUBLISHABLE_KEY, hasClerkKey } from "@/config/clerk";
 import { ConfigError } from "@/components/ConfigError";
 
@@ -75,6 +76,7 @@ const AppRoutes = () => (
       {/* Test/demo routes */}
       <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
       <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
+      <Route path="/chat-demo" element={<div className="flex h-screen"><div className="flex-1 bg-slate-50" /><div className="w-[480px] shrink-0"><ChatPanel /></div></div>} />
       <Route path="/workshop-demo" element={<WorkshopDemo />} />
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
       <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />

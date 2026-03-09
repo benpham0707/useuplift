@@ -346,6 +346,24 @@ export interface TeachingLayerInput {
     /** Focus on specific activities by ID */
     focusActivities?: string[];
   };
+  /**
+   * Per-activity expertise data for field-specific teaching guidance.
+   * Keyed by activity ID. Provides domain-specific AO expectations,
+   * name-drop trap warnings, power verbs, exemplars, and transforms.
+   * Cost: $0.00 (all pre-computed from static data)
+   */
+  expertiseData?: Map<string, {
+    teachingContext: import('./expertiseSignaling/types').ExpertiseTeachingContext;
+    exemplars: import('./expertiseSignaling/types').Exemplar[];
+    transforms: import('./expertiseSignaling/types').DescriptionTransform[];
+  }>;
+  /**
+   * Expert knowledge context for portfolio-level insights.
+   * Provides school archetypes, constraint intelligence, narrative arcs,
+   * character traits, advanced issue detection, and authenticity assessment.
+   * Built by assembleExpertContext() in the orchestrator, cost: $0 (heuristic).
+   */
+  expertContext?: import('../expertCounselorKnowledgeBase').ExpertKnowledgeContext;
 }
 
 /**

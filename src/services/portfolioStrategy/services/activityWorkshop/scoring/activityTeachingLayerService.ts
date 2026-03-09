@@ -44,6 +44,28 @@ import {
 import { PortfolioScoreRubric, ActivityScoreRubric } from './types';
 import { ActivityWorkshopInput, ApplicationPlatform, getDescriptionCharLimit, getPlatformName } from '../types';
 
+// Teaching Sophistication Router — adaptive teaching depth by description score
+import {
+  type TeachingSophistication,
+  type SophisticationMap,
+  buildSophisticationMap,
+  getDominantSophistication,
+  getSophisticationPromptBlock,
+  getSystemSophisticationDirective,
+} from './teachingSophisticationRouter';
+
+// Robust JSON parser with jsonrepair fallback
+import { parseClaudeJSON } from '../../../../commonAppWorkshop/utils/jsonParser';
+
+// Expertise teaching formatters for prompt injection
+import {
+  buildExpertiseTeachingBlock,
+  buildExemplarBlock,
+  getAdvancedTeachingBundle,
+  buildActivityExpertContext,
+} from '../expertSystemPrompts';
+import type { ExpertKnowledgeContext } from '../expertCounselorKnowledgeBase';
+
 // Import knowledge databases for research backing
 import {
   SPIKE_DEFINITIONS,
@@ -168,6 +190,16 @@ export class ActivityTeachingLayerService {
 
       console.log(`[TeachingLayer] Transforming ${activitiesToTransform.length} activities`);
 
+      // Build sophistication map from description scores
+      const sophisticationMap = buildSophisticationMap(
+        activitiesToTransform.map(a => ({
+          activityId: a.activityId,
+          descriptionScoreTotal: a.descriptionScore.total,
+        }))
+      );
+      const dominantSophistication = getDominantSophistication(sophisticationMap);
+      console.log(`[TeachingLayer] Sophistication: dominant=${dominantSophistication}, map=${[...sophisticationMap.entries()].map(([id, c]) => `${id}=${c.level}`).join(', ')}`);
+
       // Build the teaching prompt
       const prompt = this.buildTeachingPrompt(
         scoringRubric,
@@ -175,17 +207,20 @@ export class ActivityTeachingLayerService {
         activitiesToTransform,
         studentContext,
         options,
-        input.targetPlatform
+        input.targetPlatform,
+        sophisticationMap,
+        input.expertiseData,
+        input.expertContext
       );
 
       // Call Claude Sonnet for quality teaching (with 1 retry on empty/parse-failed result)
       const callOpts = {
-        systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform),
+        systemPrompt: this.getSystemPrompt(studentContext?.currentGrade, input.targetPlatform, dominantSophistication),
         model: 'claude-sonnet-4-5-20250929' as const,
         cacheSystemPrompt: true,
-        maxTokens: 8000,
+        maxTokens: 12000, // 5 activities × complex JSON schema; may truncate at tail, jsonrepair recovers gracefully
         temperature: 0.3,
-        timeoutMs: 180000, // 3 min — teaching layer with 8K output needs more than default 120s
+        timeoutMs: 300000, // 5 min — 12K structured JSON + prompt processing (~268s observed)
       };
 
       let teaching: TeachingLayerOutput | null = null;
@@ -202,6 +237,11 @@ export class ActivityTeachingLayerService {
             continue;
           }
           return { success: false, error: 'Failed to generate teaching content after 2 attempts' };
+        }
+
+        // Truncation detection — stopReason 'max_tokens' means JSON is incomplete
+        if (response.stopReason === 'max_tokens') {
+          console.warn(`[TeachingLayer] Response TRUNCATED (stop_reason=max_tokens, ${response.usage?.output_tokens} tokens). Ends with: "${response.content.slice(-80)}"`);
         }
 
         // parseTeachingResponse catches errors internally and returns minimal output
@@ -298,10 +338,13 @@ export class ActivityTeachingLayerService {
   /**
    * Build the system prompt for teaching generation
    */
-  private getSystemPrompt(currentGrade?: number, targetPlatform?: ApplicationPlatform): string {
+  private getSystemPrompt(currentGrade?: number, targetPlatform?: ApplicationPlatform, dominantSophistication?: TeachingSophistication): string {
     const gradeContext = this.getGradeContext(currentGrade, targetPlatform);
     const charLimit = getDescriptionCharLimit(targetPlatform);
     const platformName = getPlatformName(targetPlatform);
+    const sophisticationDirective = dominantSophistication
+      ? getSystemSophisticationDirective(dominantSophistication)
+      : '';
 
     return `You are an elite college admissions essay coach with 20+ years of experience helping students get into Harvard, Stanford, MIT, and other top schools.
 
@@ -314,7 +357,7 @@ IMPORTANT:
 - Use second person ("you/your") throughout. Speak directly to the student.
 - Focus on what the student can actually CONTROL or AIM FOR.
 - Don't repeat information from the scoring layer — extend it with actionable guidance.
-
+${sophisticationDirective ? `\n## TEACHING SOPHISTICATION LEVEL\n${sophisticationDirective}\n` : ''}
 ## GRADE-LEVEL TIMELINE AWARENESS
 ${gradeContext}
 
@@ -527,6 +570,135 @@ Respond in valid JSON matching the requested structure exactly.`;
   }
 
   /**
+   * Build a shared reference block with full sophistication prompt blocks.
+   *
+   * Emits each distinct level's full getSophisticationPromptBlock() ONCE,
+   * avoiding repetition when multiple activities share a level.
+   * Per-activity labels then reference these blocks by level name.
+   */
+  private buildSophisticationReferenceBlock(sophisticationMap: SophisticationMap | undefined): string {
+    if (!sophisticationMap || sophisticationMap.size === 0) return '';
+
+    // Collect distinct levels present, ordered: foundational → intermediate → advanced
+    const levelOrder: TeachingSophistication[] = ['foundational', 'intermediate', 'advanced'];
+    const distinctLevels = new Set<TeachingSophistication>();
+    for (const classification of sophisticationMap.values()) {
+      distinctLevels.add(classification.level);
+    }
+    const orderedLevels = levelOrder.filter(l => distinctLevels.has(l));
+
+    if (orderedLevels.length === 0) return '';
+
+    const blocks = orderedLevels.map(level => getSophisticationPromptBlock(level));
+
+    const preamble = orderedLevels.length > 1
+      ? 'This portfolio has activities at DIFFERENT writing levels. Apply the specific depth for each activity as labeled below.\n\n'
+      : '';
+
+    return `## TEACHING DEPTH REFERENCE\n\n${preamble}${blocks.join('\n\n---\n\n')}`;
+  }
+
+  /**
+   * Detect advanced issues in a description and return psychology-backed teaching bundles.
+   * Issues: overclaiming (inflated numbers), tone (consultant jargon),
+   * leadership-without-evidence, growth arc failure.
+   * Cost: $0 (static data lookup)
+   */
+  private detectAndBuildIssueBundles(description: string, role?: string): string {
+    const bundles: string[] = [];
+    const desc = description.toLowerCase();
+
+    // Overclaiming: 4+ digit numbers suggesting inflated metrics
+    if (/\d{4,}/.test(description)) {
+      const bundle = getAdvancedTeachingBundle('overclaiming');
+      if (bundle) bundles.push(bundle);
+    }
+
+    // Tone/voice: consultant jargon that reads as inauthentic
+    const consultantWords = ['spearheaded', 'synergized', 'leveraged', 'facilitated'];
+    if (consultantWords.some(w => desc.includes(w))) {
+      const bundle = getAdvancedTeachingBundle('toneVoiceIssues');
+      if (bundle) bundles.push(bundle);
+    }
+
+    // Leadership without evidence: role implies leadership but description may lack specifics
+    const leadershipRoles = ['president', 'captain', 'leader', 'head', 'chair', 'founder', 'director'];
+    if (role && leadershipRoles.some(r => role.toLowerCase().includes(r))) {
+      const bundle = getAdvancedTeachingBundle('leadershipWithoutEvidence');
+      if (bundle) bundles.push(bundle);
+    }
+
+    // Growth arc failure: long involvement without progression language
+    if (/\b[3-4]\s*(years?|yrs?)\b/i.test(description) && !/grew|advanced|promoted|expanded|scaled|built on/i.test(description)) {
+      const bundle = getAdvancedTeachingBundle('growthArcFailure');
+      if (bundle) bundles.push(bundle);
+    }
+
+    return bundles.length > 0
+      ? `\n### ISSUE-SPECIFIC TEACHING (psychology-backed)\n${bundles.join('\n')}`
+      : '';
+  }
+
+  /**
+   * Build portfolio-level strategy section from expert knowledge context.
+   * Injects: school-specific strategy, T-shape analysis, character gaps,
+   * narrative arc, authenticity notes.
+   * Cost: $0 (pre-computed heuristic data)
+   */
+  private buildPortfolioStrategySection(expertContext: ExpertKnowledgeContext | undefined, rubric: PortfolioScoreRubric): string {
+    if (!expertContext) return '';
+
+    const sections: string[] = [];
+
+    sections.push(`## PORTFOLIO STRATEGY FRAMEWORK
+
+Think about this portfolio as a STRATEGIC DOCUMENT, not a list:
+- Do positions 1-3 immediately communicate the student's spike?
+- Is the portfolio T-shaped? (deep spike + breadth of engagement)
+- Would an AO know WHO this person is from activities alone?
+- The 90-second pitch: What would an AO say to their committee about this student?`);
+
+    // School-specific strategy
+    if (expertContext.schoolArchetypes.length > 0) {
+      sections.push(`### TARGET SCHOOL STRATEGY
+${expertContext.schoolArchetypes.map(arch =>
+  `**${arch.name}** values: ${arch.whatTheyValue.primary}\nIdeal spike: ${arch.idealSpike}\nDescription advice: ${arch.descriptionAdvice}`
+).join('\n\n')}`);
+    }
+
+    // Character trait gaps
+    if (expertContext.characterTraits.missing.length > 0) {
+      sections.push(`### CHARACTER GAPS
+Portfolio demonstrates: ${expertContext.characterTraits.demonstrated.join(', ')}
+Missing evidence of: ${expertContext.characterTraits.missing.join(', ')}
+Consider: Can any existing activity descriptions surface these missing traits?`);
+    }
+
+    // Narrative arc
+    if (expertContext.narrativeArc) {
+      sections.push(`### NARRATIVE ARC: "${expertContext.narrativeArc.name}"
+Strengthen by ensuring descriptions across activities reinforce this arc.`);
+    }
+
+    // Constraint intelligence
+    if (expertContext.constraintLevel) {
+      sections.push(`### CONSTRAINT CONTEXT
+Level ${expertContext.constraintLevel.level}: ${expertContext.constraintLevel.name}
+${expertContext.constraintLevel.evaluationNote}
+Factor this into teaching — what's impressive GIVEN their constraints.`);
+    }
+
+    // Authenticity
+    if (expertContext.authenticityAssessment.redFlags.length > 0) {
+      sections.push(`### AUTHENTICITY NOTES
+${expertContext.authenticityAssessment.redFlags.map(f => `- ${f}`).join('\n')}
+Guide toward honest, specific claims rather than inflated ones.`);
+    }
+
+    return sections.join('\n\n');
+  }
+
+  /**
    * Build the main teaching prompt
    */
   private buildTeachingPrompt(
@@ -535,13 +707,17 @@ Respond in valid JSON matching the requested structure exactly.`;
     activitiesToTransform: ActivityScoreRubric[],
     studentContext?: TeachingLayerInput['studentContext'],
     options?: TeachingLayerInput['options'],
-    targetPlatform?: ApplicationPlatform
+    targetPlatform?: ApplicationPlatform,
+    sophisticationMap?: SophisticationMap,
+    expertiseData?: TeachingLayerInput['expertiseData'],
+    expertContext?: ExpertKnowledgeContext
   ): string {
     const charLimit = getDescriptionCharLimit(targetPlatform);
     const platformName = getPlatformName(targetPlatform);
-    // Build activity context
+    // Build activity context with per-activity sophistication level
     const activityContext = activitiesToTransform.map((score) => {
       const activity = activities.find((a) => a.id === score.activityId);
+      const sophistication = sophisticationMap?.get(score.activityId);
       return {
         id: score.activityId,
         title: score.activityTitle,
@@ -549,6 +725,7 @@ Respond in valid JSON matching the requested structure exactly.`;
         currentScore: score.combinedScore.total,
         descriptionScore: score.descriptionScore.total,
         activityScore: score.activityScore.total,
+        teachingSophistication: sophistication?.level || 'foundational',
         issues: [
           ...score.descriptionScore.improvements,
           ...(score.activityScore.improvementPaths || []),
@@ -557,6 +734,50 @@ Respond in valid JSON matching the requested structure exactly.`;
         tierClassification: score.activityScore.breakdown.tierAssessment.tier,
       };
     });
+
+    // Build per-activity expertise blocks for prompt injection
+    // Combines: field-specific teaching context, exemplars, transforms,
+    // issue-specific psychology bundles (Step 2), and expert context (Step 3)
+    let expertiseBlocks = '';
+    {
+      const blocks: string[] = [];
+      for (const score of activitiesToTransform) {
+        const activity = activities.find(a => a.id === score.activityId);
+        const blockParts: string[] = [];
+
+        // Field-specific expertise data (existing)
+        const expData = expertiseData?.get(score.activityId);
+        if (expData) {
+          const teachingBlock = buildExpertiseTeachingBlock(expData.teachingContext);
+          const exemplarBlock = buildExemplarBlock(expData.exemplars);
+          const transformBlock = expData.transforms.length > 0
+            ? `\n## FIELD-SPECIFIC IMPROVEMENTS FOR "${score.activityTitle}"\n${expData.transforms.slice(0, 3).map(t => `Before: "${t.before}"\nAfter: "${t.after}"\nWhy: ${t.explanation}`).join('\n\n')}`
+            : '';
+          if (teachingBlock) blockParts.push(teachingBlock);
+          if (exemplarBlock) blockParts.push(exemplarBlock);
+          if (transformBlock) blockParts.push(transformBlock);
+        }
+
+        // Step 2: Issue-specific psychology-backed teaching bundles
+        if (activity) {
+          const issueBundles = this.detectAndBuildIssueBundles(activity.description, activity.role);
+          if (issueBundles) blockParts.push(issueBundles);
+        }
+
+        // Step 3: Expert context per activity (school context, constraints, character gaps)
+        if (expertContext && activity) {
+          const actExpCtx = buildActivityExpertContext(expertContext, score.activityId, activity.description);
+          if (actExpCtx) blockParts.push(actExpCtx);
+        }
+
+        if (blockParts.length > 0) {
+          blocks.push(`### EXPERTISE CONTEXT: ${score.activityTitle}\n${blockParts.join('\n\n')}`);
+        }
+      }
+      if (blocks.length > 0) {
+        expertiseBlocks = `\n\n## FIELD-SPECIFIC EXPERTISE GUIDANCE (pre-computed, $0)\n\n${blocks.join('\n\n---\n\n')}`;
+      }
+    }
 
     // Build spike context from actual rubric fields
     const spikeContext = {
@@ -589,6 +810,18 @@ Gaps needing attention: ${rubric.keyGaps.join('; ')}
 
 ## ACTIVITIES NEEDING TRANSFORMATION:
 ${JSON.stringify(activityContext, null, 2)}
+
+${this.buildSophisticationReferenceBlock(sophisticationMap)}
+
+## PER-ACTIVITY TEACHING DEPTH:
+${activitiesToTransform.map(score => {
+  const sophistication = sophisticationMap?.get(score.activityId);
+  if (!sophistication) return '';
+  return `- ${score.activityTitle}: Apply ${sophistication.level.toUpperCase()} depth (description score: ${sophistication.descriptionScore.toFixed(1)}/10)`;
+}).filter(Boolean).join('\n')}
+${expertiseBlocks}
+
+${this.buildPortfolioStrategySection(expertContext, rubric)}
 
 ## YOUR TASK: PROVIDE THE PRESCRIPTION
 
@@ -747,27 +980,9 @@ Respond in this JSON structure:
     targetPlatform?: ApplicationPlatform
   ): TeachingLayerOutput {
     try {
-      // Extract JSON from response using brace-depth matching (not greedy regex)
-      let depth = 0;
-      let start = -1;
-      let lastValidJson = '';
-      for (let i = 0; i < content.length; i++) {
-        if (content[i] === '{') {
-          if (depth === 0) start = i;
-          depth++;
-        } else if (content[i] === '}') {
-          depth--;
-          if (depth === 0 && start >= 0) {
-            lastValidJson = content.substring(start, i + 1);
-          }
-        }
-      }
-      const jsonMatch = lastValidJson ? [lastValidJson] : null;
-      if (!jsonMatch) {
-        throw new Error('No JSON found in response');
-      }
-
-      const parsed = JSON.parse(jsonMatch[0]);
+      // Use robust JSON parser with jsonrepair fallback (handles code fences,
+      // truncated JSON, unescaped quotes, trailing commas, etc.)
+      const parsed = parseClaudeJSON<any>(content, 'TeachingLayer');
 
       // Normalize spike reinforcement from streamlined format to full format
       const spikeReinforcement = this.normalizeSpikeReinforcement(

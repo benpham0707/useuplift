@@ -199,6 +199,20 @@ export {
   activityRuleScorerService,
 } from './activityRuleScorer';
 
+// Portfolio Calibrator — Cross-activity consistency enforcement
+// Pure code, no LLM — enforces evidence consistency, relative ordering, minimum spread
+export {
+  PortfolioCalibratorService,
+  portfolioCalibratorService,
+  calibratePortfolio,
+  type CalibrationInput,
+  type CalibrationOutput,
+  type CalibrationAdjustment,
+  type CalibrationRule,
+  type MajorRelevanceAnnotation,
+  type PortfolioCalibrationResult,
+} from './portfolioCalibrator';
+
 // Nuance Calibration Types — Layer 4 type definitions
 export * from './nuanceCalibrationTypes';
 
@@ -225,9 +239,23 @@ export {
 
 // Nuance Calibration Service — Layer 4 Sonnet-powered score adjustment
 // Hybrid: rule scorer bounds + Sonnet nuance within those bounds
+// Batch optimization: single Sonnet call for all activities, fallback to individual
 export {
   NuanceCalibrationService,
   nuanceCalibrationService,
   calibrateActivity,
   calibrateBatch,
 } from './nuanceCalibrationService';
+
+// Teaching Sophistication Router — adaptive teaching depth by description score
+// Pure code, no LLM — routes foundational/intermediate/advanced teaching
+export {
+  type TeachingSophistication,
+  type SophisticationClassification,
+  type SophisticationMap,
+  classifyTeachingSophistication,
+  buildSophisticationMap,
+  getDominantSophistication,
+  getSophisticationPromptBlock,
+  getSystemSophisticationDirective,
+} from './teachingSophisticationRouter';

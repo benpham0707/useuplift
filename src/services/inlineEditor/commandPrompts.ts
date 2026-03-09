@@ -10,7 +10,8 @@
  * when available, falling back to the short description.
  */
 
-import type { EditingCommand } from './types';
+import type { BuiltInEditingCommand } from './types';
+import type { CommandManifest } from '../../workshop/shared/types';
 
 // ============================================================================
 // TYPES
@@ -172,7 +173,7 @@ ${OUTPUT_FORMAT}`;
 // COMMAND DEFINITIONS
 // ============================================================================
 
-const COMMAND_CONFIGS: Record<EditingCommand, CommandConfig> = {
+const COMMAND_CONFIGS: Record<BuiltInEditingCommand, CommandConfig> = {
   make_concrete: {
     description: 'Replace vague, abstract language with specific, concrete details. Add names, numbers, places, sensory details.',
     detailedPrompt: `Replace vague, abstract language with specific, concrete details.
@@ -624,21 +625,63 @@ Primary = replace clichés with plain, specific language grounded in what the st
 // ============================================================================
 
 /**
+ * Convert a CommandManifest (from the registry) to the internal CommandConfig shape.
+ * Registry commands use sonnet by default (they are analytical/rhetorical commands
+ * that benefit from higher-quality reasoning).
+ */
+function manifestToConfig(manifest: CommandManifest): CommandConfig {
+  return {
+    description: manifest.description,
+    detailedPrompt: manifest.detailedPrompt,
+    model: 'sonnet',
+  };
+}
+
+/**
  * Get the prompt template for a given editing command.
+ *
+ * Resolution order:
+ * 1. Check built-in hardcoded commands (COMMAND_CONFIGS) — instant, no I/O
+ * 2. Fall through to the command registry (auto-imports *.cmd.ts files on first call)
+ * 3. Throw if the command is not found anywhere
+ *
  * Uses the expanded `detailedPrompt` when available for richer LLM instructions,
  * falling back to the short `description` for commands that haven't been expanded yet.
  *
- * @param command - The editing command to retrieve
+ * @param command - The editing command to retrieve (built-in ID or registry ID)
  * @param ragContext - Optional RAG-sourced example fragments to inject into the system prompt.
  */
-export function getCommandPrompt(command: EditingCommand, ragContext?: string): CommandPromptTemplate {
-  const config = COMMAND_CONFIGS[command];
-  const promptInstruction = config.detailedPrompt ?? config.description;
-  return {
-    systemPrompt: buildSystemPrompt(promptInstruction, true, ragContext),
-    commandDescription: config.description,
-    model: config.model,
-  };
+export async function getCommandPrompt(command: string, ragContext?: string): Promise<CommandPromptTemplate> {
+  // 1. Check hardcoded built-in commands first (fast path)
+  const builtInConfig = COMMAND_CONFIGS[command as BuiltInEditingCommand];
+  if (builtInConfig) {
+    const promptInstruction = builtInConfig.detailedPrompt ?? builtInConfig.description;
+    return {
+      systemPrompt: buildSystemPrompt(promptInstruction, true, ragContext),
+      commandDescription: builtInConfig.description,
+      model: builtInConfig.model,
+    };
+  }
+
+  // 2. Fall through to the command registry
+  const { commandRegistry } = await import('../../workshop');
+  await commandRegistry.autoImport();
+  const manifest = commandRegistry.getCommand(command);
+  if (manifest) {
+    const config = manifestToConfig(manifest);
+    const promptInstruction = config.detailedPrompt ?? config.description;
+    return {
+      systemPrompt: buildSystemPrompt(promptInstruction, true, ragContext),
+      commandDescription: config.description,
+      model: config.model,
+    };
+  }
+
+  // 3. Not found anywhere
+  throw new Error(
+    `[getCommandPrompt] Unknown command: "${command}". ` +
+    `Not found in built-in commands or command registry.`
+  );
 }
 
 // ============================================================================
