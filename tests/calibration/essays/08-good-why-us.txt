@@ -1,0 +1,11 @@
+Last March I emailed Professor Rachel Kim in MIT's Sociotechnical Systems Research Center with a question about her paper on algorithmic fairness in pretrial risk assessment tools. I expected no response, or maybe a polite form letter. Instead she wrote back a six-paragraph reply explaining why COMPAS recidivism scores encode the same racial biases they claim to eliminate, and she attached three papers I hadn't found on my own.
+
+That exchange crystallized something I had been circling for two years. Since building a sentiment analysis tool for my school newspaper that consistently misclassified articles about protests as "negative," I have been obsessed with a question: Who decides what an algorithm considers normal?
+
+MIT's Course 6-4 is where I want to wrestle with that question. Not because it is the most prestigious CS program, though it is, but because it is one of the few places where the technical and the ethical share a curriculum. The required ethics module in 6.4900 treats fairness constraints as engineering problems rather than afterthoughts. That framing matters to me because I have seen what happens when ethics is a footnote.
+
+I am specifically drawn to the work in CSAIL's Data-Driven Inference Group, where Professor Stefanie Jegelka's research on graph neural network expressivity intersects with the distributional robustness problems I encountered in my own project. My sentiment classifier failed because the training data over-represented certain speech patterns. Jegelka's framework for handling distribution shift could have caught that failure mode before deployment.
+
+Beyond the lab, I want to contribute to MIT's Undergraduate Research Opportunities Program as early as freshman year. The 12-unit UROP structure means I would not have to choose between coursework and research, which is a false choice I refuse to accept.
+
+I also plan to write for The Tech. A CS program that doesn't talk to the campus newspaper is a CS program that doesn't talk to the public, and I think that conversation is overdue.

@@ -162,18 +162,26 @@ export interface ExtractedDescriptionFeatures {
   /** Authenticity signals */
   authenticity: AuthenticitySignals;
 
-  /** Activity type detected from description content */
+  /** Activity type detected from description content (18 canonical categories) */
   detectedActivityType:
     | 'stem_research'
     | 'stem_competition'
-    | 'coding_engineering'
-    | 'leadership_government'
-    | 'community_service'
-    | 'work_employment'
-    | 'family_responsibility'
-    | 'arts_creative'
+    | 'debate_speech'
+    | 'performing_arts'
     | 'athletics'
-    | 'academic'
+    | 'community_service'
+    | 'leadership_government'
+    | 'technology'
+    | 'writing_journalism'
+    | 'entrepreneurship'
+    | 'academic_enrichment'
+    | 'visual_arts'
+    | 'medical_health'
+    | 'social_activism'
+    | 'work_family'
+    | 'religious_cultural'
+    | 'international'
+    | 'media_digital'
     | 'other';
 }
 

@@ -34,7 +34,7 @@ export type WorkshopEssayType =
   | 'other';
 
 /** Scoring tier — determines how a dimension is scored */
-export type ScoringTier = 'heuristic' | 'heuristic+haiku' | 'heuristic+sonnet';
+export type ScoringTier = 'heuristic' | 'heuristic+haiku' | 'heuristic+sonnet' | 'haiku+sonnet';
 
 /** Impression label bands for EQI */
 export type ImpressionLabel =
@@ -109,6 +109,28 @@ export interface ExtractedFeatures {
 
   /** Raw text for LLM fallback */
   rawText: string;
+
+  /** Essay type, when known (e.g. 'personal_statement', 'uc_piq', 'activity_to_essay') */
+  essayType?: string;
+
+  /** Pre-analysis from Haiku (internal, populated by pipeline for haiku+sonnet dimensions) */
+  _preAnalysis?: Record<string, string>;
+
+  /** Paragraph function classifications — simple enum values */
+  paragraphFunctions?: import('../scoring/narrativeAnalyzerTypes').ParagraphFunction[];
+
+  /** Full paragraph function analysis with confidence and signals (from paragraphFunctionClassifier).
+   *  Populated once by pipeline; consumed by heuristic scorers and Haiku prompt builders. */
+  paragraphFunctionAnalysis?: import('../scoring/narrativeAnalyzerTypes').ParagraphFunctionAnalysis[];
+
+  /** Structural pattern summary (from structuralPatternDetector) */
+  structuralPatternSummary?: {
+    tenseShiftCount: number;
+    personShiftCount: number;
+    parallelConstructionCount: number;
+    shortSentenceClusterCount: number;
+    pacingVariation: number;
+  };
 }
 
 // ============================================================================
@@ -149,6 +171,21 @@ export interface LLMScoreResult {
     inputTokens: number;
     outputTokens: number;
   };
+
+  /** Rich structured response data (dimension-specific, preserved for downstream consumers) */
+  richResponse?: Record<string, unknown>;
+}
+
+/** Metadata from the score fusion process (for calibration & debugging) */
+export interface FusionMetadata {
+  /** Absolute divergence between LLM and heuristic scores */
+  divergence: number;
+  /** Which confidence tier was applied */
+  confidenceTier: 'high' | 'moderate' | 'low' | 'very_low';
+  /** Which divergence tier was applied */
+  divergenceTier: 'none' | 'soft' | 'medium' | 'heavy';
+  /** Score after confidence blend but before divergence anchoring */
+  preAnchorScore: number;
 }
 
 /** Final fused score for a single dimension */
@@ -170,6 +207,9 @@ export interface FinalDimensionScore {
 
   /** Evidence summary */
   evidence: string[];
+
+  /** Fusion process metadata (only present when LLM was used) */
+  fusionMetadata?: FusionMetadata;
 }
 
 /** Complete scoring result for an essay */
@@ -265,11 +305,27 @@ export interface DimensionManifest {
   /** Build the LLM prompt for deep scoring */
   buildLLMPrompt: (text: string, features: ExtractedFeatures) => string;
 
-  /** Parse the LLM response into a score */
-  parseLLMResponse: (raw: string) => LLMScoreResult;
+  /** Parse the LLM response into a score.
+   *  @param raw - Raw LLM response string
+   *  @param essayHash - Hash of the essay text, used as cache key for rich response data */
+  parseLLMResponse: (raw: string, essayHash?: string) => LLMScoreResult;
 
   /** Fuse heuristic and optional LLM scores into final score */
   fuseScores: (heuristic: HeuristicResult, llm?: LLMScoreResult) => FinalDimensionScore;
+
+  /** For haiku+sonnet tier: build the Haiku pre-analysis prompt.
+   *  Haiku reads the essay first, producing structured observations.
+   *  Its output is passed to buildLLMPrompt via features._preAnalysis. */
+  buildPreAnalysisPrompt?: (text: string, features: ExtractedFeatures) => string;
+
+  /** Custom system prompt for this dimension's main LLM call (Sonnet).
+   *  If not provided, pipeline uses a generic fallback.
+   *  Tip: put the role/persona here — system prompts are cacheable across calls. */
+  systemPrompt?: string;
+
+  /** Custom system prompt for the Haiku pre-analysis call (haiku+sonnet tier only).
+   *  If not provided, pipeline uses a generic reading-analyst fallback. */
+  preAnalysisSystemPrompt?: string;
 }
 
 // ============================================================================
@@ -352,6 +408,133 @@ export interface EQIResult {
 
   /** Whether essay-type overrides were applied */
   overridesApplied: boolean;
+}
+
+// ============================================================================
+// WRITING STRATEGY MANIFEST
+// ============================================================================
+
+/** A teaching example demonstrating a writing strategy in action */
+export interface StrategyExample {
+  /** Short title identifying what this example shows */
+  title: string;
+  /** Brief excerpt from a real or illustrative essay */
+  excerpt: string;
+  /** Analysis explaining how the strategy is used in this excerpt */
+  analysis: string;
+}
+
+/** Teaching content for a writing strategy */
+export interface StrategyTeaching {
+  /** Clear, jargon-free explanation of what this strategy is */
+  explanation: string;
+  /** When and why to use this strategy */
+  howToUse: string;
+  /** Common mistakes or misapplications to avoid */
+  pitfalls: string[];
+}
+
+/** Detection signals for identifying this strategy in text */
+export interface StrategyDetection {
+  /** Language/structural signals that suggest this strategy is in use */
+  signals: string[];
+  /** Proportion of signals that must match (0-1) to flag the strategy as detected */
+  threshold: number;
+}
+
+/** Defines a named writing strategy with teaching content and detection logic */
+export interface StrategyManifest {
+  /** Unique strategy ID, e.g. 'montage_technique' */
+  id: string;
+
+  /** Human-readable name */
+  displayName: string;
+
+  /** One-line description of the strategy */
+  description: string;
+
+  /** Which essay types this strategy is most effective for */
+  bestFor: WorkshopEssayType[];
+
+  /** How to detect whether this strategy is (or should be) applied */
+  detection: StrategyDetection;
+
+  /** Teaching content for this strategy */
+  teaching: StrategyTeaching;
+
+  /** Illustrative examples showing the strategy in action */
+  examples: StrategyExample[];
+}
+
+// ============================================================================
+// ESSAY PATTERN MANIFEST
+// ============================================================================
+
+/** Which structural role the pattern plays */
+export type PatternCategory = 'opening' | 'transition' | 'closing' | 'technique';
+
+/** Before/after example demonstrating the pattern's transformation */
+export interface PatternBeforeAfter {
+  /** The weak or unimproved version */
+  before: string;
+  /** The improved version demonstrating the pattern */
+  after: string;
+}
+
+/** Defines a detectable prose pattern with teaching content */
+export interface PatternManifest {
+  /** Unique pattern ID, e.g. 'action_opening' */
+  id: string;
+
+  /** Structural role of this pattern */
+  category: PatternCategory;
+
+  /** Human-readable name */
+  displayName: string;
+
+  /**
+   * Detection logic. Either a RegExp tested against the full essay text,
+   * or a function returning true if the pattern is present.
+   * Receives the raw essay text as input.
+   */
+  detection: RegExp | ((text: string) => boolean);
+
+  /** Teaching content: what the pattern is and how to apply it */
+  teaching: string;
+
+  /** A before/after demonstration of this pattern in action */
+  beforeAfter: PatternBeforeAfter;
+}
+
+// ============================================================================
+// QUALITY SIGNAL MANIFEST
+// ============================================================================
+
+/** Defines a single computable quality signal that feeds a dimension's score */
+export interface QualitySignalManifest {
+  /** Unique signal ID, e.g. 'show_dont_tell' */
+  id: string;
+
+  /** Which dimension this signal feeds into */
+  dimensionId: string;
+
+  /** Human-readable signal name */
+  displayName: string;
+
+  /**
+   * Compute function: takes extracted features and raw text,
+   * returns a value between 0.0 and 1.0 (clamped by registry).
+   * Higher = better quality on this signal.
+   */
+  compute: (features: ExtractedFeatures, text: string) => number;
+
+  /**
+   * Weight of this signal within its dimension's signal set.
+   * Used by computeForDimension to produce a weighted average.
+   * Does not need to sum to any particular value across all signals —
+   * relative weighting only within a dimension's signal group.
+   */
+  weight: number;
 }
 
 // ============================================================================

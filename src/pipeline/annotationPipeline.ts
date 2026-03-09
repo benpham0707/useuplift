@@ -13,7 +13,14 @@
 import crypto from 'node:crypto';
 import { callClaude, calculateCost } from '../lib/llm/claude';
 import type { ClaudeResponse } from '../lib/llm/claude';
-import { featureExtractor, essayProfileRegistry, dimensionRegistry } from '../workshop';
+import {
+  featureExtractor,
+  essayProfileRegistry,
+  dimensionRegistry,
+  strategyRegistry,
+  patternRegistry,
+  signalRegistry,
+} from '../workshop';
 import { promptBuilder } from './promptBuilder';
 import { scoreDeriver } from './scoreDeriver';
 import { validateAnnotations } from './annotationValidation';
@@ -64,7 +71,12 @@ export class AnnotationPipeline {
       throw new Error(validationError);
     }
 
-    await dimensionRegistry.autoImport();
+    await Promise.all([
+      dimensionRegistry.autoImport(),
+      strategyRegistry.autoImport(),
+      patternRegistry.autoImport(),
+      signalRegistry.autoImport(),
+    ]);
 
     // ------------------------------------------------------------------
     // Phase 1 + 2 (parallel): Resolve profile & extract features
@@ -100,10 +112,43 @@ export class AnnotationPipeline {
     }
     timings.phase2_deepContentAnalysis = Date.now() - phase2Start;
 
-    // Build enriched features (features + optional expertise signals + deep content)
+    // ------------------------------------------------------------------
+    // Phase 2.2: Pattern & strategy detection (heuristic, ~1ms)
+    // Detects essay patterns (openings, transitions, closings, techniques)
+    // and writing strategies from structure analysis.
+    // ------------------------------------------------------------------
+    const detectedPatterns = patternRegistry.detectAll(text);
+    let detectedStrategy = undefined;
+    if (deepContentAnalysis) {
+      const arc = deepContentAnalysis.structure.detectedArc;
+      const strategies = strategyRegistry.getAll();
+      // Match detected arc to strategy — find best match by checking detection signals
+      for (const strategy of strategies) {
+        const { signals, threshold } = strategy.detection;
+        const matchCount = signals.filter(signal => {
+          // Simple substring/keyword check against essay text + structure
+          const signalLower = signal.toLowerCase();
+          const textLower = text.toLowerCase();
+          if (textLower.includes(signalLower.slice(0, 30))) return true;
+          // Check arc-specific matches
+          if (arc === 'montage' && strategy.id === 'montage_technique') return true;
+          if (arc === 'in_medias_res' && strategy.id === 'in_medias_res') return true;
+          if (arc === 'circular' && strategy.id === 'bracket_structure') return true;
+          return false;
+        }).length;
+        if (matchCount / signals.length >= threshold) {
+          detectedStrategy = strategy;
+          break;
+        }
+      }
+    }
+
+    // Build enriched features (features + deep content + patterns + strategy)
     const enrichedFeatures: EnrichedFeatures = {
       features,
       deepContentAnalysis,
+      detectedPatterns: detectedPatterns.length > 0 ? detectedPatterns : undefined,
+      detectedStrategy,
     };
 
     // ------------------------------------------------------------------

@@ -33,7 +33,7 @@ You are a **world-class senior engineer and technical lead** working as a full p
 **Every piece of code must meet production standards.**
 
 - **Type Safety:** Full TypeScript strict mode. No `any` types except when absolutely necessary (and documented why).
-- **Error Handling:** Every function that can fail must handle failures gracefully. No silent failures.
+- **Error Handling:** Every function that can fail must handle failures explicitly — log, retry if transient, return a clear error. No silent failures. No degraded fallbacks that return fake/hardcoded results.
 - **Edge Cases:** Consider null, undefined, empty arrays, network failures, race conditions.
 - **Security:** Validate inputs, sanitize outputs, never trust user data, protect against injection.
 - **Performance:** Avoid N+1 queries, unnecessary re-renders, memory leaks.
@@ -116,7 +116,7 @@ An AI-powered college application platform: essay analysis (11-dimension rubric)
 2. **Haiku for diagnosis, Sonnet for teaching** — speed where it matters, quality where it counts.
 3. **Zero-tolerance fraud** — immediate flag, block all actions, no second chances.
 4. **Credits deducted atomically** — prevent race conditions, maintain billing integrity.
-5. **Heuristic fallbacks** — graceful degradation when API unavailable.
+5. **No degraded fallbacks** — if a service fails, return a clear error. Never return hardcoded/heuristic results as a substitute for real functionality.
 6. **Full data preservation** — never compress or truncate research data.
 
 ### Service Architecture Map
@@ -219,7 +219,7 @@ const tracker = new CostTracker();
 
 **Prompt engineering:** Clear role/context, explicit output format (especially JSON), examples for complex outputs, prompt caching for repeated prefixes, token usage tracking.
 
-**Fallback strategy:** Primary model → exponential backoff on rate limit → heuristic fallback on API error → always return something useful.
+**Reliability:** Retry with exponential backoff on transient errors. On persistent failure, return a clear error. Never build degraded fallback paths that return fake/hardcoded results — make the real path reliable instead.
 
 ---
 

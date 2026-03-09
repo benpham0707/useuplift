@@ -11,7 +11,7 @@
  */
 
 import { callClaude, calculateCost } from '@/lib/llm/claude';
-import { voiceProfileService, styleConsistencyService } from '@/services/voiceProfile';
+import { styleConsistencyService } from '@/services/voiceProfile';
 import { sessionContextService } from '@/services/sessionContext';
 import { ragService } from '@/services/rag';
 import { getCommandPrompt, SUGGEST_COMMANDS_PROMPT } from './commandPrompts';
@@ -48,7 +48,7 @@ export class InlineEditorService {
    * calls the appropriate model, and returns two alternatives with teaching feedback.
    */
   async applyCommand(request: InlineEditRequest): Promise<InlineEditResult> {
-    const { selectedText, fullDocument, selectionStart, selectionEnd, command, voiceProfile, essayType, additionalContext, sessionId, ragContext } = request;
+    const { selectedText, fullDocument, selectionStart, selectionEnd, command, voiceProfile, essayType: requestEssayType, additionalContext, sessionId, ragContext, collegeId } = request;
 
     // Auto-retrieve RAG transformations when not explicitly provided
     let effectiveRagContext = ragContext;
@@ -66,18 +66,23 @@ export class InlineEditorService {
       }
     }
 
-    // Get prompt template for this command (with optional ragContext injection)
-    const template = getCommandPrompt(command, effectiveRagContext);
+    // Get prompt template for this command (with optional ragContext injection).
+    // Checks built-in commands first, then falls through to the command registry.
+    const template = await getCommandPrompt(command, effectiveRagContext);
 
-    // Build surrounding context (100 chars before/after selection)
-    const contextBefore = fullDocument.slice(Math.max(0, selectionStart - 100), selectionStart);
-    const contextAfter = fullDocument.slice(selectionEnd, selectionEnd + 100);
+    // Build surrounding context — provide full paragraph context (up to 500 chars) so the LLM
+    // can see paragraph structure, preceding arguments, and the essay's narrative arc.
+    // 100 chars was too narrow to produce coherent edits that connect to surrounding text.
+    const contextBefore = fullDocument.slice(Math.max(0, selectionStart - 500), selectionStart);
+    const contextAfter = fullDocument.slice(selectionEnd, Math.min(fullDocument.length, selectionEnd + 500));
 
     // Build system prompt with optional voice constraint
+    // Uses buildVoiceConstraintBlock (directive: MUST/BANNED) over getPromptSummary (descriptive).
+    // Directive constraints produce measurably better voice preservation in LLM output.
     let systemPrompt = template.systemPrompt;
     if (voiceProfile) {
-      const voiceSummary = voiceProfileService.getPromptSummary(voiceProfile);
-      systemPrompt = systemPrompt.replace('{VOICE_SUMMARY}', voiceSummary);
+      const voiceConstraints = styleConsistencyService.buildVoiceConstraintBlock(voiceProfile);
+      systemPrompt = systemPrompt.replace('{VOICE_SUMMARY}', voiceConstraints);
     } else {
       systemPrompt = systemPrompt.replace('\n\n{VOICE_SUMMARY}', '');
     }
@@ -95,14 +100,26 @@ export class InlineEditorService {
       }
     }
 
+    // Inject admissions intelligence context (non-blocking, no LLM)
+    try {
+      const { buildAdmissionsContext } = await import('./admissionsContext');
+      const admissionsCtx = buildAdmissionsContext(requestEssayType, collegeId);
+      if (admissionsCtx) {
+        systemPrompt += '\n\n## Admissions Intelligence\n' + admissionsCtx;
+      }
+    } catch (error) {
+      console.warn('[InlineEditor] Admissions context injection failed:', error instanceof Error ? error.message : String(error));
+      // Continue without admissions context — non-blocking
+    }
+
     // Build user prompt
     const userPromptParts: string[] = [
       `CONTEXT BEFORE: "${contextBefore}"`,
       `SELECTED TEXT: "${selectedText}"`,
       `CONTEXT AFTER: "${contextAfter}"`,
     ];
-    if (essayType) {
-      userPromptParts.push(`ESSAY TYPE: ${essayType}`);
+    if (requestEssayType) {
+      userPromptParts.push(`ESSAY TYPE: ${requestEssayType}`);
     }
     if (additionalContext) {
       userPromptParts.push(`ADDITIONAL CONTEXT: ${additionalContext}`);

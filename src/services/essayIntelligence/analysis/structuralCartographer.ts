@@ -1,236 +1,157 @@
 /**
- * Layer 2: Structural Cartographer
+ * Layer 2: Structural Cartographer (V2)
  *
- * Single Haiku call that maps the essay's structural architecture.
- * Takes full essay text + Layer 1 deterministic data and produces
- * a StructuralCartography — paragraph roles, transitions, thematic
- * through-line, arc verification, and pacing assessment.
+ * Single Sonnet call that maps the essay's structural architecture.
+ * UPGRADED from V1's Haiku — the structural map is L3's reading guide,
+ * so accuracy matters. Sonnet produces deeper structural understanding,
+ * better transition quality assessment, more nuanced arc detection,
+ * and theme progression tracking with gap identification.
  *
- * Falls back to heuristic construction from Layer 1 data if Haiku fails.
+ * The cartography identifies ARCHITECTURAL ROLES, not just topics.
+ * "The frame of risk" not "the college scene." "The fulcrum where stakes flip"
+ * not "the turning point paragraph."
+ *
+ * Runs in PARALLEL with L2.5 (Connection Scout) — no dependency between them.
+ *
+ * Output type: StructuralCartographyOutput (alias for StructuralCartography from types.ts)
+ * Consumed by: L3 sequential deep walk, L4 crystallization, profile router
  */
 
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
-import type {
-  StructuralCartography,
-  EssayUnderstanding,
-  TransitionQuality,
-} from '../types';
-import type { NarrativeArcType, ParagraphFunction } from '../../../workshop/scoring/narrativeAnalyzerTypes';
+import type { StructuralCartography, TransitionQuality } from '../types';
+import type { NarrativeArcType } from '../../../workshop/scoring/narrativeAnalyzerTypes';
+import type { ParagraphFirstImpression } from '../profileTypes';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
-const TEMPERATURE = 0.2;
-const MAX_TOKENS = 2000;
+const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
+const TEMPERATURE = 0.3;
+const MAX_TOKENS = 3000;
+
+// ============================================================================
+// RESULT TYPE
+// ============================================================================
+
+export interface StructuralCartographyResult {
+  cartography: StructuralCartography;
+  cost: number;
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
+  timingMs: number;
+}
 
 // ============================================================================
 // SYSTEM PROMPT (static, cacheable)
 // ============================================================================
 
-const SYSTEM_PROMPT = `You are an expert structural analyst for college application essays. You specialize in narrative architecture — understanding how each paragraph contributes to the whole, how transitions connect ideas, and how thematic threads weave through the essay.
+/**
+ * V2 system prompt is significantly deeper than V1. Key improvements:
+ * - Demands ARCHITECTURAL ROLES, not topic labels
+ * - Requires transition mechanism specificity (not just "functional")
+ * - Tracks theme progression with explicit gap identification
+ * - Asks for structural necessity ("what breaks if this paragraph is removed?")
+ * - Distinguishes between arc shape and arc execution
+ */
+const SYSTEM_PROMPT = `You are an expert structural architect for college application essays. You specialize in understanding how essays are BUILT — not what they say, but how each piece serves the whole.
 
-Your task: Given an essay with paragraph markers and per-paragraph metrics from a deterministic analysis layer, produce a structural map as JSON.
+YOUR TASK: Given an essay with paragraph markers and L1 first impressions, produce a structural map that serves as L3's reading guide.
+
+CRITICAL DISTINCTION: You identify ARCHITECTURAL ROLES, not topics.
+  BAD: "role": "describes the college visit" (topic label)
+  GOOD: "role": "frame of risk — establishes the stakes that the rest of the essay tests" (architectural role)
+
+  BAD: "narrativeFunction": "provides backstory"
+  GOOD: "narrativeFunction": "anchors the reader in a specific physical moment so that the abstract reflection in P3 has a sensory home to return to"
+
+  BAD: "weaknessFlag": "could be more specific"
+  GOOD: "weaknessFlag": "carries the essay's only concrete scene but compresses it into 2 sentences — the architecture needs this to breathe"
 
 You MUST return valid JSON matching this exact schema:
 
 {
   "paragraphRoles": [
     {
-      "index": <number>,
-      "role": "<short label: hook, setup, escalation, turning-point, climax, reflection, resolution, coda, etc.>",
-      "narrativeFunction": "<1-sentence: what this paragraph accomplishes in the narrative>",
-      "strengthContribution": "<1-sentence: what this paragraph adds to the essay's impact>",
-      "weaknessFlag": "<1-sentence issue, or null if no weakness>"
+      "index": <number, 0-indexed>,
+      "role": "<ARCHITECTURAL role: what this paragraph IS in the essay's structure — 'frame of risk', 'value system establishment', 'fulcrum where stakes flip', 'the callback that closes the loop', etc.>",
+      "narrativeFunction": "<What this paragraph accomplishes in the narrative arc — how it advances the story/argument/reflection>",
+      "strengthContribution": "<What this paragraph contributes that NO other paragraph does — its unique structural necessity>",
+      "weaknessFlag": "<Specific structural concern, or null. Frame as architectural: 'the essay's weight-bearing wall is load-bearing too much' not 'this paragraph is too long'>"
     }
   ],
   "arcType": "<man_in_hole | cinderella | icarus | quest | rags_to_riches | ambiguous>",
   "arcConfidence": <0.0-1.0>,
-  "arcVerification": "<1-sentence: whether the heuristic arc detection was accurate and why>",
+  "arcVerification": "<Assess whether the essay follows a clean arc or defies standard arc classification. If ambiguous, explain what's happening structurally instead of forcing an arc type.>",
   "transitions": [
     {
-      "fromParagraph": <number>,
-      "toParagraph": <number>,
+      "fromParagraph": <number, 0-indexed>,
+      "toParagraph": <number, 0-indexed>,
       "quality": "<seamless | functional | abrupt | missing>",
-      "mechanism": "<how the transition works: thematic echo, temporal shift, contrast, continuation, etc.>"
+      "mechanism": "<Specific mechanism: 'temporal shift from present to flashback via sensory trigger', 'emotional contrast — contemplative register snaps to urgent action', 'thematic callback to P1's central image', etc. NOT generic labels like 'continuation'.>"
     }
   ],
-  "centralTheme": "<the essay's core thematic through-line in one sentence>",
-  "themeProgression": "<how the theme develops from start to finish>",
-  "thematicGaps": ["<any thematic threads introduced but not resolved>"],
-  "pacingNotes": "<overall pacing assessment: where the essay rushes, lingers, or stalls>",
-  "flatSpots": [<paragraph indices where momentum drops>]
+  "centralTheme": "<The essay's core thematic through-line as a TENSION, not a topic. Not 'family' but 'the gap between inherited values and market values'. Not 'identity' but 'the cost of code-switching between two selves'.>",
+  "themeProgression": "<How the theme develops: where it's introduced, where it deepens, where it transforms, where it resolves (or doesn't). Map the progression across specific paragraphs.>",
+  "thematicGaps": ["<Threads introduced but not resolved, themes implied but never explored, promises made to the reader that go unfulfilled. Be specific: 'P2 introduces the mother's silence but it never reappears after P3.'>"],
+  "pacingNotes": "<Where the essay rushes (compressing important moments), lingers (spending time proportional to significance), or stalls (circling without advancing). Reference specific paragraphs.>",
+  "flatSpots": [<paragraph indices (0-indexed) where narrative momentum drops — where the reader's engagement dips>]
 }
 
-Guidelines:
-- paragraphRoles MUST have exactly one entry per paragraph, in order by index
-- transitions should cover every consecutive paragraph pair (P0→P1, P1→P2, etc.)
-- Be specific and evidence-based — reference actual content, not generic observations
-- arcType should match one of the six allowed values exactly
-- flatSpots should reference paragraph indices where tension/engagement drops
-- weaknessFlag should be null for strong paragraphs, not an empty string`;
+RULES:
+- paragraphRoles MUST have exactly one entry per paragraph, in index order
+- transitions MUST cover every consecutive paragraph pair
+- Be specific: reference actual content, not generic observations
+- arcType must match one of the six allowed values exactly
+- weaknessFlag should be null for structurally sound paragraphs, not an empty string
+- Flat spots are paragraphs where the ARCHITECTURE stalls — not just where the content is less exciting
+- Theme must be framed as a TENSION or QUESTION, not a topic word`;
 
 // ============================================================================
-// PROMPT BUILDERS
+// PROMPT BUILDER
 // ============================================================================
 
-function buildUserPrompt(essayText: string, understanding: EssayUnderstanding): string {
+function buildUserPrompt(
+  essayText: string,
+  impressions: ParagraphFirstImpression[],
+): string {
   const paragraphs = essayText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
 
-  // Build essay text with [P1], [P2], etc. markers
+  // Build essay text with markers
   const markedEssay = paragraphs
     .map((p, i) => `[P${i + 1}] ${p.trim()}`)
     .join('\n\n');
 
-  // Build per-paragraph metrics from Layer 1 data
-  const paragraphMetrics = understanding.paragraphs.map((pu, i) => {
-    const func = pu.functionAnalysis;
-    const funcStr = func
-      ? `function=${func.detectedFunction} (confidence=${func.confidence.toFixed(2)})`
-      : 'function=unknown';
+  // Build L1 impressions summary
+  const impressionsSummary = impressions.map((imp, i) => {
+    const sentenceCount = imp.sentences.length;
+    const toneShifts = imp.sentences.filter(s => s.toneShift).length;
+    const notableCount = imp.notablePhrases.length;
 
-    const specificityStr = `specificity=${pu.specificityScore}/100`;
-    const sceneStr = `scene/summary=${pu.sceneOrSummary}`;
-
-    // Get tension level from narrative analysis if available
-    let tensionStr = 'tension=N/A';
-    if (understanding.narrativeAnalysis?.tensionCurve) {
-      const tensionPara = understanding.narrativeAnalysis.tensionCurve.paragraphs.find(
-        tp => tp.index === i
-      );
-      if (tensionPara) {
-        tensionStr = `tension=${tensionPara.tensionLevel}/10 (${tensionPara.trend})`;
-      }
-    }
-
-    return `  P${i + 1}: ${funcStr}, ${specificityStr}, ${sceneStr}, ${tensionStr}`;
+    return `  P${i + 1}: purpose="${imp.apparentPurpose}" | emotion="${imp.emotionalRegister}" | voice="${imp.voiceObservation}" | sentences=${sentenceCount} | tone_shifts=${toneShifts} | notable_phrases=${notableCount} | tags=[${imp.tags.join(', ')}]`;
   }).join('\n');
 
-  // Narrative arc from Layer 1
-  let arcStr = 'Not detected';
-  if (understanding.narrativeAnalysis?.narrativeArc) {
-    const arc = understanding.narrativeAnalysis.narrativeArc;
-    arcStr = `${arc.detectedArc} (confidence=${arc.confidence.toFixed(2)})`;
-  }
+  // Build craft observations
+  const craftSummary = impressions.map((imp, i) => {
+    if (imp.craftNotices.length === 0) return null;
+    return `  P${i + 1}: ${imp.craftNotices.join('; ')}`;
+  }).filter(Boolean).join('\n');
 
-  // Emotional journey summary from Layer 1
-  let emotionalStr = 'Not analyzed';
-  if (understanding.narrativeAnalysis?.emotionalJourney) {
-    const ej = understanding.narrativeAnalysis.emotionalJourney;
-    const trajectory = ej.trajectory;
-    const paraEmotions = ej.paragraphs
-      .map(p => `P${p.index + 1}: ${p.dominantEmotions.join('/')} (intensity=${p.intensity.toFixed(2)})`)
-      .join(', ');
-    emotionalStr = `pattern=${trajectory.pattern}, variety=${trajectory.varietyScore.toFixed(2)}, journey=[${paraEmotions}]`;
-  }
-
-  return `ESSAY:
+  return `ESSAY TEXT (${paragraphs.length} paragraphs):
 ${markedEssay}
 
-LAYER 1 PARAGRAPH METRICS:
-${paragraphMetrics}
+L1 FIRST IMPRESSIONS:
+${impressionsSummary}
 
-NARRATIVE ARC (heuristic): ${arcStr}
+CRAFT OBSERVATIONS:
+${craftSummary || '  (none recorded)'}
 
-EMOTIONAL JOURNEY: ${emotionalStr}
-
-Produce the structural map as JSON.`;
-}
-
-// ============================================================================
-// HEURISTIC FALLBACK
-// ============================================================================
-
-function buildHeuristicFallback(essayText: string, understanding: EssayUnderstanding): StructuralCartography {
-  const paragraphs = essayText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-  const paragraphCount = paragraphs.length;
-
-  // Map paragraph functions to structural roles
-  function functionToRole(func: ParagraphFunction, index: number, total: number): string {
-    if (index === 0) return 'hook';
-    if (index === total - 1) return 'resolution';
-
-    const roleMap: Record<ParagraphFunction, string> = {
-      grounding: 'setup',
-      characterization: 'characterization',
-      escalation: 'escalation',
-      intimacy: 'turning-point',
-      contrast: 'contrast',
-      release: 'resolution',
-      reflection: 'reflection',
-      transition: 'bridge',
-      exposition: 'exposition',
-      ambiguous: 'development',
-    };
-    return roleMap[func] || 'development';
-  }
-
-  // Build paragraph roles from Layer 1 function analysis
-  const paragraphRoles = understanding.paragraphs.map((pu, i) => {
-    const func = pu.functionAnalysis?.detectedFunction ?? 'ambiguous';
-    return {
-      index: i,
-      role: functionToRole(func, i, paragraphCount),
-      narrativeFunction: `Serves as ${func} in the narrative sequence`,
-      strengthContribution: pu.specificityScore >= 60
-        ? 'Contributes concrete detail to the essay'
-        : 'Provides necessary narrative scaffolding',
-      weaknessFlag: pu.specificityScore < 30
-        ? 'Low specificity — paragraph relies on abstract language'
-        : null,
-    };
-  });
-
-  // Build transitions — estimate quality from adjacent paragraph data
-  const transitions: StructuralCartography['transitions'] = [];
-  for (let i = 0; i < paragraphCount - 1; i++) {
-    const fromFunc = understanding.paragraphs[i]?.functionAnalysis?.detectedFunction;
-    const toFunc = understanding.paragraphs[i + 1]?.functionAnalysis?.detectedFunction;
-
-    let quality: TransitionQuality = 'functional';
-    if (fromFunc === toFunc) {
-      quality = 'functional'; // Same function = likely smooth
-    } else if (fromFunc === 'transition' || toFunc === 'transition') {
-      quality = 'seamless'; // Explicit transition paragraph
-    }
-
-    transitions.push({
-      fromParagraph: i,
-      toParagraph: i + 1,
-      quality,
-      mechanism: 'continuation',
-    });
-  }
-
-  // Arc from Layer 1
-  const arcType: NarrativeArcType = understanding.narrativeAnalysis?.narrativeArc?.detectedArc ?? 'ambiguous';
-  const arcConfidence = understanding.narrativeAnalysis?.narrativeArc?.confidence ?? 0.3;
-
-  // Flat spots from tension curve
-  const flatSpots: number[] = [];
-  if (understanding.narrativeAnalysis?.tensionCurve) {
-    const tc = understanding.narrativeAnalysis.tensionCurve;
-    for (const fs of tc.curve.flatSpots) {
-      for (let p = fs.startParagraph; p <= fs.endParagraph; p++) {
-        flatSpots.push(p);
-      }
-    }
-  }
-
-  return {
-    paragraphRoles,
-    arcType,
-    arcConfidence,
-    arcVerification: 'Heuristic fallback — arc type taken directly from Layer 1 detection without LLM verification',
-    transitions,
-    centralTheme: 'Unable to determine — heuristic fallback',
-    themeProgression: 'Unable to determine — heuristic fallback',
-    thematicGaps: [],
-    pacingNotes: 'Unable to assess — heuristic fallback',
-    flatSpots,
-  };
+Produce the structural map as JSON. Remember: ARCHITECTURAL ROLES, not topic labels.`;
 }
 
 // ============================================================================
@@ -249,17 +170,17 @@ function validateCartography(
   raw: Record<string, unknown>,
   expectedParagraphCount: number,
 ): StructuralCartography {
+  // -- Validate paragraph roles --
   const roles = raw.paragraphRoles as Array<Record<string, unknown>> | undefined;
   if (!Array.isArray(roles)) {
     throw new Error('paragraphRoles is not an array');
   }
 
-  // Validate paragraph roles count
+  // Adjust count if mismatched
   if (roles.length !== expectedParagraphCount) {
     console.warn(
-      `[StructuralCartographer] paragraphRoles count mismatch: got ${roles.length}, expected ${expectedParagraphCount}. Adjusting.`
+      `[StructuralCartographer] paragraphRoles count mismatch: got ${roles.length}, expected ${expectedParagraphCount}. Adjusting.`,
     );
-    // Trim excess or pad missing
     while (roles.length > expectedParagraphCount) {
       roles.pop();
     }
@@ -275,7 +196,6 @@ function validateCartography(
     }
   }
 
-  // Normalize paragraph roles
   const validatedRoles = roles.map((r, i) => ({
     index: i,
     role: typeof r.role === 'string' ? r.role : 'development',
@@ -286,19 +206,19 @@ function validateCartography(
       : null,
   }));
 
-  // Validate arc type
+  // -- Validate arc type --
   let arcType = raw.arcType as NarrativeArcType;
   if (!VALID_ARC_TYPES.includes(arcType)) {
     arcType = 'ambiguous';
   }
 
-  // Validate arc confidence
+  // -- Validate arc confidence --
   let arcConfidence = Number(raw.arcConfidence);
   if (isNaN(arcConfidence) || arcConfidence < 0 || arcConfidence > 1) {
     arcConfidence = 0.5;
   }
 
-  // Validate transitions
+  // -- Validate transitions --
   const rawTransitions = raw.transitions as Array<Record<string, unknown>> | undefined;
   const transitions: StructuralCartography['transitions'] = [];
   if (Array.isArray(rawTransitions)) {
@@ -320,7 +240,23 @@ function validateCartography(
     }
   }
 
-  // Validate flat spots
+  // Ensure all consecutive pairs have transitions
+  for (let i = 0; i < expectedParagraphCount - 1; i++) {
+    const hasTransition = transitions.some(t => t.fromParagraph === i && t.toParagraph === i + 1);
+    if (!hasTransition) {
+      transitions.push({
+        fromParagraph: i,
+        toParagraph: i + 1,
+        quality: 'functional',
+        mechanism: 'not assessed',
+      });
+    }
+  }
+
+  // Sort transitions by fromParagraph
+  transitions.sort((a, b) => a.fromParagraph - b.fromParagraph);
+
+  // -- Validate flat spots --
   const rawFlatSpots = raw.flatSpots;
   const flatSpots: number[] = [];
   if (Array.isArray(rawFlatSpots)) {
@@ -332,7 +268,7 @@ function validateCartography(
     }
   }
 
-  // Validate thematic gaps
+  // -- Validate thematic gaps --
   const rawGaps = raw.thematicGaps;
   const thematicGaps: string[] = [];
   if (Array.isArray(rawGaps)) {
@@ -358,68 +294,120 @@ function validateCartography(
 }
 
 // ============================================================================
+// JSON PARSING WITH FALLBACK
+// ============================================================================
+
+function parseJsonResponse(raw: unknown): Record<string, unknown> {
+  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+
+  if (typeof raw === 'string') {
+    let jsonString = raw.trim();
+
+    // Direct parse
+    try {
+      return JSON.parse(jsonString) as Record<string, unknown>;
+    } catch {
+      // noop
+    }
+
+    // Extract from code blocks
+    const codeBlockMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch) {
+      jsonString = codeBlockMatch[1].trim();
+      try {
+        return JSON.parse(jsonString) as Record<string, unknown>;
+      } catch {
+        // noop
+      }
+    }
+
+    // Extract largest JSON object
+    const firstBrace = jsonString.indexOf('{');
+    const lastBrace = jsonString.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(jsonString.substring(firstBrace, lastBrace + 1)) as Record<string, unknown>;
+      } catch {
+        // noop
+      }
+    }
+
+    throw new Error(`Failed to parse JSON from structural cartography response. First 200 chars: ${jsonString.substring(0, 200)}`);
+  }
+
+  throw new Error(`Unexpected response type from structural cartography: ${typeof raw}`);
+}
+
+// ============================================================================
 // SERVICE
 // ============================================================================
 
-export class StructuralCartographer {
-  async analyzeStructure(
+export class StructuralCartographerService {
+  /**
+   * Run L2 structural cartography on the essay.
+   *
+   * Takes the full essay text and L1 first impressions.
+   * Produces a structural map with architectural roles, transitions,
+   * theme progression, arc assessment, and pacing analysis.
+   *
+   * Uses Sonnet (upgraded from V1's Haiku) because the structural map
+   * is L3's reading guide — accuracy matters.
+   */
+  async analyze(
     essayText: string,
-    understanding: EssayUnderstanding,
-  ): Promise<{
-    cartography: StructuralCartography;
-    cost: number;
-    timingMs: number;
-    tokenUsage: { inputTokens: number; outputTokens: number };
-  }> {
+    impressions: ParagraphFirstImpression[],
+  ): Promise<StructuralCartographyResult> {
     const startTime = Date.now();
     const paragraphs = essayText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
     const paragraphCount = paragraphs.length;
 
-    try {
-      const userPrompt = buildUserPrompt(essayText, understanding);
-
-      const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
-        {
-          model: HAIKU_MODEL,
-          systemPrompt: SYSTEM_PROMPT,
-          userPrompt,
-          maxTokens: MAX_TOKENS,
-          temperature: TEMPERATURE,
-          useJsonMode: true,
-          cacheSystemPrompt: true,
-        },
-      );
-
-      const cartography = validateCartography(response.content, paragraphCount);
-      const cost = calculateCost(response.usage, HAIKU_MODEL);
-      const timingMs = Date.now() - startTime;
-
-      return {
-        cartography,
-        cost,
-        timingMs,
-        tokenUsage: {
-          inputTokens: response.usage.input_tokens,
-          outputTokens: response.usage.output_tokens,
-        },
-      };
-    } catch (error) {
-      console.warn(
-        '[StructuralCartographer] Haiku call failed, using heuristic fallback:',
-        error instanceof Error ? error.message : String(error),
-      );
-
-      const cartography = buildHeuristicFallback(essayText, understanding);
-      const timingMs = Date.now() - startTime;
-
-      return {
-        cartography,
-        cost: 0,
-        timingMs,
-        tokenUsage: { inputTokens: 0, outputTokens: 0 },
-      };
+    if (paragraphCount === 0) {
+      throw new Error('[StructuralCartographer] Essay text is empty — no paragraphs found');
     }
+
+    const userPrompt = buildUserPrompt(essayText, impressions);
+
+    const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
+      {
+        model: SONNET_MODEL,
+        systemPrompt: SYSTEM_PROMPT,
+        userPrompt,
+        maxTokens: MAX_TOKENS,
+        temperature: TEMPERATURE,
+        useJsonMode: true,
+        cacheSystemPrompt: true,
+      },
+    );
+
+    const parsed = parseJsonResponse(response.content);
+    const cartography = validateCartography(parsed, paragraphCount);
+    const cost = calculateCost(response.usage, SONNET_MODEL);
+    const timingMs = Date.now() - startTime;
+
+    return {
+      cartography,
+      cost,
+      tokenUsage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
+      timingMs,
+    };
   }
 }
 
-export const structuralCartographer = new StructuralCartographer();
+export const structuralCartographerService = new StructuralCartographerService();
+
+// ============================================================================
+// BACKWARD COMPATIBILITY
+// ============================================================================
+
+/**
+ * Legacy export for V1 consumers that import `StructuralCartographer` (class name).
+ * New consumers should use `StructuralCartographerService`.
+ */
+export const StructuralCartographer = StructuralCartographerService;

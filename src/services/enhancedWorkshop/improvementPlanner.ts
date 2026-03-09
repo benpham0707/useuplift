@@ -32,6 +32,35 @@ import type { EditingCommand } from '../inlineEditor/types';
 import type { EssaySnapshot, ImprovementAction, ImprovementPlan } from './types';
 
 // ============================================================================
+// NEW PIPELINE SUPPORT (lazy-loaded to avoid circular deps)
+// ============================================================================
+
+let _newRubricWeights: Record<string, number> | null = null;
+let _expandedValidCommands: ReadonlySet<string> | null = null;
+
+async function getNewRubricWeights(): Promise<Record<string, number>> {
+  if (!_newRubricWeights) {
+    const { getNewRubricWeights: fn } = await import('./workshopBridge');
+    _newRubricWeights = fn();
+  }
+  return _newRubricWeights;
+}
+
+async function getExpandedValidCommands(): Promise<ReadonlySet<string>> {
+  if (!_expandedValidCommands) {
+    const { getExpandedValidCommands: fn } = await import('./workshopBridge');
+    _expandedValidCommands = fn();
+  }
+  return _expandedValidCommands;
+}
+
+async function getProfileContext(essayType?: string): Promise<string> {
+  if (!essayType) return '';
+  const { buildProfileContext } = await import('./workshopBridge');
+  return buildProfileContext(essayType);
+}
+
+// ============================================================================
 // RUBRIC WEIGHTS (v1.0.1)
 // ============================================================================
 
@@ -82,6 +111,13 @@ const PLANNING_SYSTEM_PROMPT = `You are a college admissions essay writing coach
 ## Your Role
 Read the essay carefully and identify specific passages that need improvement. For each passage, choose the single most effective editing command based on what that passage actually needs — not based on a generic lookup table.
 
+## Admissions Officer Reality (inform every recommendation)
+- AOs spend 8-15 SECONDS on an opening paragraph. If the hook doesn't work, the rest barely matters. Weight opening improvements heavily.
+- The "Committee Pitch Test": after reading, can the AO say in one sentence what makes this student memorable? If not, the essay needs MORE specificity, not more polish.
+- AUTHENTICITY > POLISH. A rough but genuine voice always beats a polished but generic one. Never recommend changes that sand down authentic voice in favor of "better" writing.
+- AOs read 30-50 essays per day. They notice patterns: the "ever since I was young" opener, the challenge→growth→lesson arc, the gratitude conclusion. Flag and fix these.
+- Specificity is the #1 differentiator. "I organized a food drive" loses to "I convinced 47 restaurant owners to donate leftover bread every Tuesday."
+
 ## Available Editing Commands
 Each command is a targeted text transformation. Choose the one that best fits what the passage needs:
 
@@ -108,6 +144,8 @@ Each command is a targeted text transformation. Choose the one that best fits wh
 4. Focus on the dimensions with the highest ROI (provided in the priority ranking). Don't spread recommendations across too many dimensions.
 5. Your rationale should explain WHY this specific passage needs this specific command — reference what you observed in the text.
 6. Keep targetPassage to 1-3 sentences. Don't quote entire paragraphs.
+7. PROTECT strong dimensions. If a passage is working well (contributes to a dimension scoring 7+), do NOT target it unless another dimension desperately needs it.
+8. Prioritize the opening if it scores poorly — AOs decide in 8-15 seconds whether to read carefully.
 
 ## Output Format
 Return a JSON array of objects, each with these fields:
@@ -227,8 +265,9 @@ function buildUserPrompt(
   const { essayType, maxActions = 5, focusDimensions } = options;
 
   // Format dimension scores with human-readable labels
-  const scoreLines = Object.entries(snapshot.dimensionScores)
-    .sort(([, a], [, b]) => a - b) // Weakest first
+  const scoreEntries = Object.entries(snapshot.dimensionScores)
+    .sort(([, a], [, b]) => a - b); // Weakest first
+  const scoreLines = scoreEntries
     .map(([dim, score]) => {
       const label = score <= 3 ? 'WEAK' : score <= 5 ? 'Below Average' : score <= 7 ? 'Good' : 'Strong';
       const weight = RUBRIC_WEIGHTS[dim];
@@ -236,6 +275,12 @@ function buildUserPrompt(
       return `  ${dim}: ${score.toFixed(1)}/10 [${label}] ${weightPct}`;
     })
     .join('\n');
+
+  // Identify strong dimensions to PROTECT (score >= 7)
+  const strongDimensions = scoreEntries
+    .filter(([, score]) => score >= 7)
+    .map(([dim, score]) => `${dim} (${score.toFixed(1)})`)
+    .join(', ');
 
   // Format ROI priorities
   const priorityLines = priorities.ranked_dimensions
@@ -259,9 +304,27 @@ function buildUserPrompt(
     ? `\n\nFOCUS CONSTRAINT: Only recommend actions for these dimensions: ${focusDimensions.join(', ')}`
     : '';
 
-  // Essay type context
-  const essayTypeNote = essayType
-    ? `\nEssay Type: ${essayType}\nConsider what matters most for this type of essay. For example, "Why Us" essays need school_program_fit, not vulnerability. Common App essays need narrative_arc and reflection.`
+  // Essay type context with word count targets
+  let essayTypeNote = '';
+  if (essayType) {
+    const wordCountTargets: Record<string, { target: number; label: string }> = {
+      'common_app': { target: 650, label: 'Common App (max 650)' },
+      'personal_statement': { target: 650, label: 'Personal Statement (max 650)' },
+      'piq': { target: 350, label: 'UC PIQ (max 350)' },
+      'why_us': { target: 400, label: '"Why Us" Supplement (typically 250-400)' },
+      'activity': { target: 150, label: 'Activity Description (max 150)' },
+      'additional_info': { target: 650, label: 'Additional Information (max 650)' },
+    };
+    const wcTarget = wordCountTargets[essayType];
+    const wcNote = wcTarget
+      ? `\nWord Count Target: ${wcTarget.label}. Current: ${snapshot.wordCount}/${wcTarget.target} (${snapshot.wordCount >= wcTarget.target ? 'AT LIMIT — prefer compress/cut_filler' : `${wcTarget.target - snapshot.wordCount} words remaining`}).`
+      : '';
+    essayTypeNote = `\nEssay Type: ${essayType}${wcNote}\nConsider what matters most for this type of essay. "Why Us" essays need school_program_fit, not vulnerability. Common App essays need narrative_arc and reflection. PIQs need conciseness and specificity.`;
+  }
+
+  // Strengths to protect
+  const strengthsNote = strongDimensions
+    ? `\n\n## STRENGTHS TO PROTECT (do NOT degrade these)\n${strongDimensions}\nThese dimensions are working well. Your improvements MUST NOT sacrifice these strengths.`
     : '';
 
   return `## Essay to Analyze
@@ -273,7 +336,7 @@ Overall Impression: ${snapshot.impressionLabel}
 Word Count: ${snapshot.wordCount}
 Weakest Dimensions: ${snapshot.weakestDimensions.join(', ')}
 ${snapshot.flags.length > 0 ? `Flags: ${snapshot.flags.join(', ')}` : ''}
-${essayTypeNote}
+${essayTypeNote}${strengthsNote}
 
 ## Dimension Scores
 ${scoreLines}
@@ -314,15 +377,21 @@ export async function planImprovements(
     essayType?: string;
     focusDimensions?: string[];
     maxActions?: number;
+    useNewScoringPipeline?: boolean;
   } = {}
 ): Promise<ImprovementPlan> {
-  const { maxActions = 5 } = options;
+  const { maxActions = 5, useNewScoringPipeline = true } = options;
 
   // ── Step 1: Computational layer — ROI ranking (<1ms) ──────────────────
 
+  // Use new 13-dim weights or legacy 12-dim weights
+  const weights = useNewScoringPipeline
+    ? await getNewRubricWeights()
+    : RUBRIC_WEIGHTS;
+
   const priorities = generateRevisionPriorities(
     snapshot.dimensionScores,
-    RUBRIC_WEIGHTS,
+    weights,
     snapshot.wordCount
   );
 
@@ -339,8 +408,17 @@ export async function planImprovements(
 
   const userPrompt = buildUserPrompt(snapshot, priorities, options);
 
+  // In new pipeline mode, inject essay profile context into the system prompt
+  let systemPrompt = PLANNING_SYSTEM_PROMPT;
+  if (useNewScoringPipeline) {
+    const profileContext = await getProfileContext(options.essayType);
+    if (profileContext) {
+      systemPrompt = systemPrompt + '\n\n' + profileContext;
+    }
+  }
+
   const response = await callClaude<LLMPlanningAction[]>({
-    systemPrompt: PLANNING_SYSTEM_PROMPT,
+    systemPrompt,
     userPrompt,
     model: 'claude-haiku-4-5-20251001',
     temperature: 0.3,
@@ -356,6 +434,11 @@ export async function planImprovements(
 
   // ── Step 3: Validate and enrich LLM output ────────────────────────────
 
+  // Use expanded command set in new pipeline mode
+  const validCommands = useNewScoringPipeline
+    ? await getExpandedValidCommands()
+    : VALID_COMMANDS;
+
   const actions: ImprovementAction[] = [];
   const usedPassages = new Set<string>();
 
@@ -363,7 +446,7 @@ export async function planImprovements(
     if (actions.length >= maxActions) break;
 
     // Validate command is a known EditingCommand
-    if (!VALID_COMMANDS.has(raw.command)) {
+    if (!validCommands.has(raw.command)) {
       console.warn(`[ImprovementPlanner] LLM returned unknown command "${raw.command}" — skipping action`);
       continue;
     }

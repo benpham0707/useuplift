@@ -1,0 +1,587 @@
+{
+  "calibrationVersion": "1.0",
+  "dimensionSystem": "v2-10dim",
+  "dimensions": [
+    { "id": "voice_originality_irreplaceability", "weight": 0.14, "displayName": "Voice, Originality & Irreplaceability" },
+    { "id": "thematic_depth_self_awareness", "weight": 0.13, "displayName": "Thematic Depth & Self-Awareness" },
+    { "id": "emotional_resonance_vulnerability", "weight": 0.11, "displayName": "Emotional Resonance & Vulnerability" },
+    { "id": "intellectual_vitality_curiosity", "weight": 0.11, "displayName": "Intellectual Vitality & Curiosity" },
+    { "id": "memorability_committee_impact", "weight": 0.10, "displayName": "Memorability & Committee Impact" },
+    { "id": "narrative_craft_scene_construction", "weight": 0.10, "displayName": "Narrative Craft & Scene Construction" },
+    { "id": "agency_initiative", "weight": 0.09, "displayName": "Agency & Initiative" },
+    { "id": "structural_coherence_flow", "weight": 0.08, "displayName": "Structural Coherence & Flow" },
+    { "id": "clarity_of_purpose_throughline", "weight": 0.08, "displayName": "Clarity of Purpose & Throughline" },
+    { "id": "word_economy_craft", "weight": 0.06, "displayName": "Word Economy & Craft" }
+  ],
+  "qualityTiers": {
+    "poor": { "eqiRange": [15, 35], "description": "Common mistakes: cliches, telling-not-showing, generic insights, weak structure" },
+    "below_average": { "eqiRange": [35, 55], "description": "Some genuine moments buried in mediocrity, occasional glimpses of potential. May include essays with polished surface but hollow content." },
+    "average": { "eqiRange": [55, 70], "description": "Competent but unremarkable, decent craft but forgettable" },
+    "good": { "eqiRange": [70, 85], "description": "Strong voice, clear structure, genuine insight, memorable moments" },
+    "excellent": { "eqiRange": [85, 100], "description": "Exceptional — would stand out in committee, unforgettable, deep self-awareness" }
+  },
+  "essays": [
+    {
+      "id": "01-poor-personal-statement",
+      "filename": "01-poor-personal-statement.txt",
+      "essayType": "personal_statement",
+      "wordCount": 340,
+      "qualityTier": "poor",
+      "expectedEQI": 21,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 15,
+          "rationale": "Completely generic voice. 'I have always been passionate about soccer' is the most common opening in college essays. No line in this essay could only have been written by this student. Every sentence could be copy-pasted into any sports-injury essay."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 20,
+          "rationale": "'I learned that I am stronger than I thought I was' and 'hard work, perseverance, and dedication are the keys to success' are surface-level platitudes, not insight. No evidence of genuine self-examination or reframing."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 22,
+          "rationale": "Emotions are told ('I felt really sad and frustrated') rather than shown. No vulnerability beyond the surface injury narrative. No inner conflict visible."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 15,
+          "rationale": "No intellectual curiosity whatsoever. No questions asked, no ideas explored, no connections made between the experience and anything beyond sports."
+        },
+        "memorability_committee_impact": {
+          "score": 12,
+          "rationale": "An AO reading this essay would not remember it five minutes later. Sports injury -> recovery -> 'I learned perseverance' is one of the most common essay structures."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 20,
+          "rationale": "No scene construction at all. Entire essay is summary and telling. No dialogue, no sensory details, no moment is expanded or lived in."
+        },
+        "agency_initiative": {
+          "score": 25,
+          "rationale": "The student is acted upon throughout: injury happens to them, recovery happens to them. The only agency is 'pushed through' physical therapy, which is the minimum expected response."
+        },
+        "structural_coherence_flow": {
+          "score": 35,
+          "rationale": "Basic chronological structure that is easy to follow. But transitions are mechanical ('Then in sophomore year', 'During my recovery') and there is no structural sophistication."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 30,
+          "rationale": "The throughline is clear (sports -> injury -> recovery -> life lesson) but generic. The purpose is undermined by the essay's inability to distinguish this student from any other injured athlete."
+        },
+        "word_economy_craft": {
+          "score": 30,
+          "rationale": "Significant bloat. 'Really' appears 7 times. 'I learned' appears 3 times. Sentences are uniformly mid-length with no variety. No memorable phrasing."
+        }
+      },
+      "arcType": "linear",
+      "hookStrength": "weak_cliche",
+      "keyStrengths": ["Basic grammatical competence", "Clear chronological structure"],
+      "keyWeaknesses": ["Cliche topic with zero fresh treatment", "Telling not showing throughout", "Generic voice", "Platitude insights", "No sensory detail or scene construction", "Weak cliche opening"],
+      "memorabilityTest": "Would not be remembered. AO has read this essay 500 times.",
+      "trapNote": null
+    },
+    {
+      "id": "02-poor-activity-description",
+      "filename": "02-poor-activity-description.txt",
+      "essayType": "activity_description",
+      "wordCount": 107,
+      "qualityTier": "poor",
+      "expectedEQI": 21,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 18,
+          "rationale": "Resume-speak voice. 'Led our team of dedicated members' and 'responsible for coordinating meetings, delegating tasks' reads like a job description, not a student's voice."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 20,
+          "rationale": "'Being president taught me the importance of leadership, teamwork, and making a difference' is a content-free sentence. No reflection on what was difficult or what they learned about themselves."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 10,
+          "rationale": "Zero emotional content. No vulnerability, no challenge described, no personal stakes. The essay is entirely functional and external."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 15,
+          "rationale": "No curiosity about environmental issues is demonstrated. 'Passionate about environmental sustainability' is asserted, never shown."
+        },
+        "memorability_committee_impact": {
+          "score": 15,
+          "rationale": "Completely generic. An AO reading this would learn nothing distinctive about this student."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 10,
+          "rationale": "No narrative whatsoever. Pure listing of responsibilities and outcomes. No scene, no moment, no dialogue."
+        },
+        "agency_initiative": {
+          "score": 35,
+          "rationale": "The student did lead and organize, which shows basic agency. However, everything described is what any club president would do."
+        },
+        "structural_coherence_flow": {
+          "score": 40,
+          "rationale": "For the short form, the structure is adequate: responsibilities -> outcomes -> reflection. But the flow is mechanical and list-like."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 30,
+          "rationale": "Purpose is vague. The essay tries to convey 'I was a good leader' but never gets specific about what kind of leader."
+        },
+        "word_economy_craft": {
+          "score": 25,
+          "rationale": "For 107 words, enormous waste. 'Various activities to help the environment' says nothing. 'Which was very successful' uses 4 words to say nothing."
+        }
+      },
+      "arcType": "none",
+      "hookStrength": "none",
+      "keyStrengths": ["Includes one concrete metric (10 to 25 members)"],
+      "keyWeaknesses": ["Resume-speak instead of personal voice", "Lists responsibilities instead of showing impact", "No specific outcomes beyond membership growth", "Wastes words on generic claims", "Zero emotional or intellectual engagement"],
+      "memorabilityTest": "Would not be remembered. Reads like a resume bullet point stretched into a paragraph.",
+      "trapNote": null
+    },
+    {
+      "id": "03-below-avg-piq",
+      "filename": "03-below-avg-piq.txt",
+      "essayType": "uc_piq",
+      "wordCount": 289,
+      "qualityTier": "below_average",
+      "expectedEQI": 40,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 38,
+          "rationale": "Common topic (first-gen immigrant identity), but flashes of authentic voice: 'I worried they would think our house smelled weird from my mom's cooking' is specific and real."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 40,
+          "rationale": "'Being bilingual was actually a strength, not a weakness' is genuine but predictable insight. The essay gestures toward complexity but never goes deeper than acknowledging tensions exist."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 48,
+          "rationale": "The embarrassment about cooking smell and feeling caught between worlds are genuinely vulnerable moments. But they are presented quickly rather than sat with."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 30,
+          "rationale": "The sociology interest is stated but not demonstrated through intellectual engagement. No questions about culture or identity are explored."
+        },
+        "memorability_committee_impact": {
+          "score": 35,
+          "rationale": "The grandmother-translator dynamic has potential but is underdeveloped. The cooking-smell detail is memorable. Overall would blur with similar essays."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 35,
+          "rationale": "Some scene elements (grandmother at grocery store, friends coming over) but none are developed. No dialogue. No sustained moment."
+        },
+        "agency_initiative": {
+          "score": 40,
+          "rationale": "The translator role shows real responsibility but was thrust upon them by circumstance. The shift from embarrassment to appreciation is internal growth, not initiative."
+        },
+        "structural_coherence_flow": {
+          "score": 50,
+          "rationale": "Competent five-paragraph structure with logical progression: setup -> grandmother -> embarrassment -> appreciation -> future."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 45,
+          "rationale": "The throughline (dual identity as strength) is clear but predictable. The essay knows what it wants to say but says it the expected way."
+        },
+        "word_economy_craft": {
+          "score": 42,
+          "rationale": "At 289 words, the word budget is not stretched. Some waste, but generally adequate. No memorable phrasing. Sentences are uniformly constructed."
+        }
+      },
+      "arcType": "linear",
+      "hookStrength": "weak_cliche",
+      "keyStrengths": ["Genuine vulnerability moment (cooking smell)", "Real-life detail (grandmother as translator)", "Within PIQ word limit"],
+      "keyWeaknesses": ["Common topic without fresh angle", "Predictable arc", "Surface-level insight", "No intellectual depth", "Tells emotions rather than showing"],
+      "memorabilityTest": "Partially memorable. The cooking-smell detail would stick, but the overall arc would not.",
+      "trapNote": "Contains genuine moments that a craft-only scorer might miss. The cooking-smell vulnerability is real."
+    },
+    {
+      "id": "04-below-avg-why-us",
+      "filename": "04-below-avg-why-us.txt",
+      "essayType": "why_us",
+      "wordCount": 220,
+      "qualityTier": "below_average",
+      "expectedEQI": 37,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 28,
+          "rationale": "Generic applicant voice throughout. 'I have always dreamed of attending' is the quintessential weak opening. However, the prose is grammatically clean and reads fluently, which gives it a polished surface."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 35,
+          "rationale": "No genuine self-awareness about why this school fits THIS student. The journalism-CS intersection is named but never explored. However, there is an attempt at thematic coherence around interdisciplinary learning."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 30,
+          "rationale": "No real emotional content or vulnerability. Performative eagerness ('I am really excited') substitutes for genuine enthusiasm. The campus visit had potential for real emotion but is wasted."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 38,
+          "rationale": "The journalism-CS intersection is potentially interesting but named and abandoned. No specific courses, research, or intellectual questions engaged with. The Medill mention shows awareness but not engagement."
+        },
+        "memorability_committee_impact": {
+          "score": 25,
+          "rationale": "Hits every generic note without a single moment of specificity. Would be forgotten before the next essay is opened."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 28,
+          "rationale": "No narrative elements. The campus visit is mentioned but not shown. However, the prose flows adequately sentence to sentence."
+        },
+        "agency_initiative": {
+          "score": 35,
+          "rationale": "Passive throughout. 'Was drawn to' and 'was impressed by.' The campus visit shows some initiative. But no evidence of independent research, emailing professors, or deeper exploration."
+        },
+        "structural_coherence_flow": {
+          "score": 65,
+          "rationale": "This is the essay's strongest dimension. Organized into clear paragraphs (academics, community, diversity, conclusion). Each paragraph has a topic sentence. Transitions work. The structure is paint-by-numbers but functional."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 48,
+          "rationale": "The purpose ('I want to attend Northwestern') is clear, but the 'why ME' dimension is missing. The essay makes a case for the school, not for the fit. A throughline exists but is generic."
+        },
+        "word_economy_craft": {
+          "score": 52,
+          "rationale": "Grammar is clean and sentences are well-formed. However, 'incredibly appealing to me' and 'I am eager to contribute my passion, creativity, and work ethic' are filler. The polish masks the emptiness."
+        }
+      },
+      "arcType": "none",
+      "hookStrength": "weak_cliche",
+      "keyStrengths": ["Mentions a specific school (Medill)", "Organized paragraph structure"],
+      "keyWeaknesses": ["Reverse-brochure anti-pattern", "No specific programs or professors beyond Medill name-drop", "Campus visit mentioned but not shown", "Generic praise", "'I have always dreamed of attending' anti-pattern"],
+      "memorabilityTest": "Would not be remembered. Most common type of Why Us essay AOs encounter.",
+      "trapNote": "TRAP: Grammar and organization are adequate, which might fool a surface-level scorer. But an experienced AO sees through the polish immediately. Pipeline should score this lower than its prose polish suggests."
+    },
+    {
+      "id": "05-average-personal-statement",
+      "filename": "05-average-personal-statement.txt",
+      "essayType": "personal_statement",
+      "wordCount": 340,
+      "qualityTier": "average",
+      "expectedEQI": 61,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 62,
+          "rationale": "'Loneliness is a universal language' and 'belonging is something you build, one awkward conversation at a time' show genuine voice. The Black-student-in-Oregon perspective is specific. But some lines are less distinctive."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 65,
+          "rationale": "The distinction between 'the worst thing' and 'just the hardest' shows real self-awareness. The essay moves beyond before/after to active belonging-construction. However, the insight doesn't truly surprise."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 68,
+          "rationale": "The bathroom-stall moment and hair-touching incident are genuinely vulnerable. The loneliness is felt, not just reported. Slightly undermined by the neat resolution."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 45,
+          "rationale": "No intellectual curiosity on display. The essay is entirely experiential and emotional. No questions asked about race, belonging, or identity in an intellectual way."
+        },
+        "memorability_committee_impact": {
+          "score": 60,
+          "rationale": "The bathroom-stall scene and final line are memorable. An AO would remember this student's specific situation. But the overall arc is familiar."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 58,
+          "rationale": "Some good scene elements (bathroom stall, running trails, stretching with Eliza) but none fully developed into sustained scenes. More summary than showing."
+        },
+        "agency_initiative": {
+          "score": 60,
+          "rationale": "Juneteenth celebration is genuine initiative. Joining cross-country shows adaptability. But much of the essay describes things happening to the student."
+        },
+        "structural_coherence_flow": {
+          "score": 70,
+          "rationale": "Well-organized chronological structure with a clear arc. Good paragraph breaks. Closing lands effectively. Transitions feel natural."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 68,
+          "rationale": "Clear throughline: displacement -> isolation -> building belonging. Purpose comes through consistently. Final paragraphs crystallize the argument."
+        },
+        "word_economy_craft": {
+          "score": 60,
+          "rationale": "Mostly clean prose with some strong moments ('pine-scented air', 'one awkward conversation at a time'). Good sentence variety."
+        }
+      },
+      "arcType": "linear_with_twist",
+      "hookStrength": "moderate",
+      "keyStrengths": ["Specific grounded experience", "Genuine vulnerability", "Strong closing insight", "Natural voice", "Real agency (Juneteenth)"],
+      "keyWeaknesses": ["Predictable arc", "Scenes summarized rather than developed", "Low intellectual vitality", "Resolution wraps up neatly"],
+      "memorabilityTest": "Moderately memorable. AO would remember the specific details but the arc is familiar.",
+      "trapNote": null
+    },
+    {
+      "id": "06-average-community",
+      "filename": "06-average-community.txt",
+      "essayType": "community",
+      "wordCount": 244,
+      "qualityTier": "average",
+      "expectedEQI": 61,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 65,
+          "rationale": "'Good soil smells like rain. Dead soil smells like nothing' is a line with real voice. The service-hours honesty is refreshing. Avoids savior language."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 62,
+          "rationale": "Closing line gestures at a real definition of community without over-explaining. Honesty about motivation evolving shows self-awareness. But reflection stays at the surface."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 55,
+          "rationale": "Service-hours admission is mildly vulnerable. The essay is warm but not deeply emotional. No real struggle or conflict presented."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 52,
+          "rationale": "Grant proposal shows initiative-driven learning. Soil observation shows openness. But no intellectual questions about food systems are explored."
+        },
+        "memorability_committee_impact": {
+          "score": 60,
+          "rationale": "Mrs. Okafor and the soil-smelling detail are memorable. Specific people create vivid cast. But pleasant rather than striking."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 50,
+          "rationale": "Vignette-style rather than scene-based. Evokes setting but never dwells in a specific moment long enough. Mrs. Okafor teaching about soil could be a scene but is compressed."
+        },
+        "agency_initiative": {
+          "score": 65,
+          "rationale": "Grant proposal is real initiative. Managing seed library and training volunteers shows growing responsibility. Good for community essay."
+        },
+        "structural_coherence_flow": {
+          "score": 68,
+          "rationale": "Clean structure: motivation -> specific role -> grant -> broader meaning -> reflection. Good pacing for 244 words."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 65,
+          "rationale": "The throughline (obligatory volunteer -> genuine community member) is clear and well-executed. Closing crystallizes the theme."
+        },
+        "word_economy_craft": {
+          "score": 68,
+          "rationale": "Efficient for its length. 'Twelve raised beds feed about forty families' packs information tightly. Few wasted words."
+        }
+      },
+      "arcType": "vignette_mosaic",
+      "hookStrength": "moderate",
+      "keyStrengths": ["Named community members create texture", "Honest about motivation", "Strong word economy", "Grant proposal shows agency", "Evocative closing"],
+      "keyWeaknesses": ["Scenes compressed rather than developed", "Narrow emotional range", "Limited intellectual engagement", "Surface-level reflection"],
+      "memorabilityTest": "Moderately memorable. Mrs. Okafor and the soil detail would stick. Pleasant read but not a file-marker.",
+      "trapNote": null
+    },
+    {
+      "id": "07-good-personal-statement",
+      "filename": "07-good-personal-statement.txt",
+      "essayType": "personal_statement",
+      "wordCount": 520,
+      "qualityTier": "good",
+      "expectedEQI": 80,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 85,
+          "rationale": "Unmistakable voice. 'I didn't know the word for deductible. I made one up. It worked.' — only this student could write this. The mother's three questions are distinctive and specific."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 82,
+          "rationale": "'Language is not just communication. It is power.' This is a genuine, earned insight. The essay connects personal experience to systemic understanding without being preachy."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 80,
+          "rationale": "The laminated list is a powerful emotional anchor. Vulnerability distributed across multiple moments. Emotion shown through detail, not stated."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 72,
+          "rationale": "Linguistics interest well-motivated by experience. 'I love grammar diagrams, though I do' is specific. But intellectual content could go deeper into linguistics."
+        },
+        "memorability_committee_impact": {
+          "score": 85,
+          "rationale": "The laminated list stays with an AO. 'Because it reminds me of the day I decided to stay' hits. This essay would be discussed in committee."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 78,
+          "rationale": "Strong use of concrete objects as narrative anchors (laminated list, lavender detergent, bleach). Clinic scene is vivid. Dialogue used effectively."
+        },
+        "agency_initiative": {
+          "score": 75,
+          "rationale": "Enormous responsibility as family interpreter. Code-switching across systems. However, much is reactive (responding to family need) rather than self-initiated."
+        },
+        "structural_coherence_flow": {
+          "score": 80,
+          "rationale": "Elegant circular structure: opens with list, expands to story, pivots to insight, closes with list. Callback creates structural resonance."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 82,
+          "rationale": "Crystal clear: laminated list -> language as survival -> language as power -> linguistics. Every paragraph serves the central argument."
+        },
+        "word_economy_craft": {
+          "score": 76,
+          "rationale": "Strong prose with memorable phrasing ('creases have worn the lamination soft as cloth'). A few areas could be tighter. Good sentence variety."
+        }
+      },
+      "arcType": "circular",
+      "hookStrength": "strong",
+      "keyStrengths": ["Unforgettable central image (laminated list)", "Earned insight about language and power", "Circular structure with callback", "Distinctive voice", "Vulnerability through detail"],
+      "keyWeaknesses": ["Could push intellectual depth further", "Some scenes compressed", "Interpreter-duty listing risks resume feel"],
+      "memorabilityTest": "Would be remembered and discussed in committee. The laminated list is an image that stays.",
+      "trapNote": null
+    },
+    {
+      "id": "08-good-why-us",
+      "filename": "08-good-why-us.txt",
+      "essayType": "why_us",
+      "wordCount": 275,
+      "qualityTier": "good",
+      "expectedEQI": 74,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 78,
+          "rationale": "Strong intellectual voice. 'Who decides what an algorithm considers normal?' is distinctive. COMPAS reference and sentiment analysis project are specific to this student."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 75,
+          "rationale": "Connection between personal project failure and systemic question shows genuine depth. Student sees own coding mistake as microcosm of larger problem."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 52,
+          "rationale": "Limited emotional content, appropriate for Why Us. Frustration with sentiment tool failure is implied. Essay is cerebral rather than emotional."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 90,
+          "rationale": "Exceptional. Emailing a professor and getting substantive response shows initiative. Specific engagement with COMPAS, Jegelka's GNN research, Course 6-4, and 6.4900 demonstrates deep research."
+        },
+        "memorability_committee_impact": {
+          "score": 75,
+          "rationale": "The professor email anecdote is strong. The sentiment analysis project is specific. An MIT AO would appreciate genuine program engagement."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 45,
+          "rationale": "Minimal narrative craft, appropriate for genre. Professor email exchange is closest to a scene. Essay is argumentative rather than narrative."
+        },
+        "agency_initiative": {
+          "score": 88,
+          "rationale": "Proactive throughout: emailed professor, built sentiment tool, researched specific courses and faculty, plans for UROP and The Tech."
+        },
+        "structural_coherence_flow": {
+          "score": 78,
+          "rationale": "Strong argument structure: hook -> question -> why MIT answers it -> specific resources -> extracurricular fit. Each paragraph builds the case."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 85,
+          "rationale": "Exceptionally clear: algorithmic fairness question -> MIT's unique resources. Every sentence serves the 'why MIT for ME' argument."
+        },
+        "word_economy_craft": {
+          "score": 72,
+          "rationale": "Efficient use of 275 words. Specific names and course numbers pack information tightly. Dense reference-packing occasionally sacrifices readability."
+        }
+      },
+      "arcType": "argument",
+      "hookStrength": "strong",
+      "keyStrengths": ["Professor email shows initiative", "Specific courses, labs, faculty", "Personal project connects to school resources", "Exceptional intellectual vitality", "Clear why-me-at-this-school intersection"],
+      "keyWeaknesses": ["Limited emotional range", "Dense references sometimes hurt readability", "Could show more personal voice beyond intellectual", "Minimal narrative craft"],
+      "memorabilityTest": "Would be remembered. 'The student who emailed Professor Kim about COMPAS' is a concrete identifier.",
+      "trapNote": null
+    },
+    {
+      "id": "09-excellent-activity-description",
+      "filename": "09-excellent-activity-description.txt",
+      "essayType": "activity_description",
+      "wordCount": 131,
+      "qualityTier": "excellent",
+      "expectedEQI": 78,
+      "expectedGenreAdjustedEQI": 88,
+      "genreNote": "Generic EQI is 78 because emotional_resonance (45) and narrative_craft (55) are appropriately low for activity descriptions. With activity-description weights, this essay scores ~88. This gap IS the trap: pipelines must account for genre when interpreting EQI.",
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 82,
+          "rationale": "'Environmental change is not an awareness problem. It is a design problem.' This insight is distinctive and shows original thinking. 'People will do the right thing if you make the right thing the easy thing' is memorable."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 80,
+          "rationale": "The reframing from 'awareness problem' to 'design problem' is genuine insight demonstrating intellectual maturity. Student understands behavior change requires system design."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 45,
+          "rationale": "Minimal emotional content, appropriate for activity description. Student does not perform emotion. Impact speaks for itself."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 85,
+          "rationale": "Approach is inherently intellectual: observed problem, quantified it (83%), designed solution, measured results (19%). Closing insight shows behavioral design thinking."
+        },
+        "memorability_committee_impact": {
+          "score": 85,
+          "rationale": "The 83% to 19% number is striking. 'Standing next to the bins during lunch, counting' is memorable. District-wide adoption (4.2 tons) is genuinely impressive."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 55,
+          "rationale": "For 131 words, surprising scene presence: 'standing next to the bins during lunch, counting.' But primarily functional and outcome-focused."
+        },
+        "agency_initiative": {
+          "score": 95,
+          "rationale": "Exceptional. Student identified problem independently, designed solution, trained volunteers, partnered with district, achieved adoption across 7 schools. Every verb is active."
+        },
+        "structural_coherence_flow": {
+          "score": 82,
+          "rationale": "Masterful for 131 words. Problem -> observation -> solution -> result -> scale -> insight. No wasted transitions."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 90,
+          "rationale": "Crystal clear. Every sentence advances: I saw a problem, I solved it with evidence and design, and it scaled. Closing insight elevates throughline."
+        },
+        "word_economy_craft": {
+          "score": 92,
+          "rationale": "Near-perfect. 131 words contain: problem, observation period, multi-part solution, quantified results, district adoption, tonnage impact, AND concluding insight. Zero filler."
+        }
+      },
+      "arcType": "problem_solution",
+      "hookStrength": "strong",
+      "keyStrengths": ["Every claim backed by numbers", "Clear problem -> solution -> result arc", "Insight elevates from activity to worldview", "District-wide adoption shows scale", "Perfect word economy", "Exceptional agency"],
+      "keyWeaknesses": ["Limited emotional dimension", "Could include brief personal motivation", "Functional rather than lyrical prose"],
+      "memorabilityTest": "Would be remembered. '83% to 19%, adopted by 7 schools' is the kind of specificity AOs flag.",
+      "trapNote": "TRAP: No lyrical prose, no emotional vulnerability, no narrative craft. Surface-level scorer might rate it as merely competent. But experienced AO would recognize exceptional quantified impact, system thinking, and initiative. Pipeline must score this high despite lack of 'literary' qualities."
+    },
+    {
+      "id": "10-excellent-personal-statement",
+      "filename": "10-excellent-personal-statement.txt",
+      "essayType": "personal_statement",
+      "wordCount": 530,
+      "qualityTier": "excellent",
+      "expectedEQI": 92,
+      "dimensions": {
+        "voice_originality_irreplaceability": {
+          "score": 95,
+          "rationale": "Unmistakable voice from sentence one. 'Not because I was squeamish but because I had named him. Gerald.' — only this student writes this way. Every paragraph has unreproducible lines."
+        },
+        "thematic_depth_self_awareness": {
+          "score": 92,
+          "rationale": "'The distance between caring and doing is not bridged by passion. Everyone is passionate. It is bridged by tedium.' This rejects the very language most college essays traffic in. Exceptional self-awareness."
+        },
+        "emotional_resonance_vulnerability": {
+          "score": 90,
+          "rationale": "Frog-naming vulnerability is disarming and real. Shared textbook with Dawn and Phil is quietly devastating. 2 AM chromatography frustration is palpable. Vulnerability shown through accumulated detail."
+        },
+        "intellectual_vitality_curiosity": {
+          "score": 95,
+          "rationale": "Drips with genuine curiosity. Dissolved oxygen levels, phosphate concentrations, organic chemistry at community college, water sampling. Curiosity demonstrated through action, not assertion."
+        },
+        "memorability_committee_impact": {
+          "score": 96,
+          "rationale": "Gerald. An AO will never forget Gerald. The frog's name becomes synecdoche for the essay's argument. Closing lines would be quoted in committee."
+        },
+        "narrative_craft_scene_construction": {
+          "score": 88,
+          "rationale": "'I think about it' refrain creates structural/narrative device. Frog dissection is fully realized opening scene. Bus ride with Dawn/Phil is vivid vignette. Dialogue used sparingly but effectively."
+        },
+        "agency_initiative": {
+          "score": 92,
+          "rationale": "Extraordinary self-directed agency. Monthly biodiversity surveys, community college chemistry, water sampling, county environmental officer partnership — all self-initiated. Agency persists without external validation."
+        },
+        "structural_coherence_flow": {
+          "score": 90,
+          "rationale": "'I think about it' refrain creates non-chronological structure that works beautifully. Opens and closes with Gerald (circular frame). Structural sophistication matches intellectual sophistication."
+        },
+        "clarity_of_purpose_throughline": {
+          "score": 93,
+          "rationale": "As clear as it is original: feeling leads to counting, counting leads to knowledge, knowledge demands action. 'I do not look away' distills entire essay into five words."
+        },
+        "word_economy_craft": {
+          "score": 88,
+          "rationale": "Exceptional prose craft. Short sentences punch ('Gerald mattered.'). Long sentences breathe. Rhythm controlled throughout. Very few wasted words."
+        }
+      },
+      "arcType": "refrain_spiral",
+      "hookStrength": "exceptional",
+      "keyStrengths": ["Unforgettable hook (named frog)", "Unique structural device ('I think about it' refrain)", "Earned non-cliche insight about passion vs tedium", "Exceptional intellectual engagement through action", "Specific scientific details", "Circular structure", "Irreplaceable voice", "Agency without boasting"],
+      "keyWeaknesses": ["Dawn/Phil section could be slightly tighter", "Environmental concern could connect more to specific field", "Ending might read as slightly self-aggrandizing to some"],
+      "memorabilityTest": "Would be remembered and discussed in committee. Gerald would become shorthand. 'Did you read the Gerald essay?' This is a file-marker.",
+      "trapNote": null
+    }
+  ]
+}

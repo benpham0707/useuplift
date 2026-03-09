@@ -108,7 +108,11 @@ class DimensionRegistry {
     try {
       const fs = await import('fs');
       const path = await import('path');
-      const dimensionsDir = path.join(__dirname, '..', 'dimensions');
+      const { fileURLToPath } = await import('url');
+      const currentDir = typeof __dirname !== 'undefined'
+        ? __dirname
+        : path.dirname(fileURLToPath(import.meta.url));
+      const dimensionsDir = path.join(currentDir, '..', 'dimensions');
 
       if (!fs.existsSync(dimensionsDir)) return;
 

@@ -11,6 +11,7 @@
 
 import { callClaude } from '@/lib/llm/claude';
 import type { StudentVoiceProfile } from './types';
+import type { DriftSignal, VoiceDriftAnalysis } from './voiceDriftTypes';
 
 // ============================================================================
 // TYPES
@@ -198,6 +199,188 @@ Return STRICTLY VALID JSON:
     }
   }
 
+  /**
+   * Compare text against a voice profile baseline. Returns detailed drift analysis.
+   * Pure deterministic — NO LLM, <10ms.
+   *
+   * Checks 5 dimensions:
+   * 1. Sentence length (avg) vs profile baseline
+   * 2. Vocabulary level (long word ratio) vs profile
+   * 3. Formality (casual/formal marker balance) vs profile
+   * 4. Contraction rate vs profile baseline
+   * 5. Energy level (exclamation frequency, short sentences)
+   */
+  compareToBaseline(text: string, profile: StudentVoiceProfile): VoiceDriftAnalysis {
+    const signals: DriftSignal[] = [];
+
+    // Shared text analysis
+    const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
+    const words = text.split(/\s+/).filter(w => w.length > 0);
+    const wordCount = words.length;
+    const lowerText = text.toLowerCase();
+
+    // 1. Sentence length drift
+    const sentenceLengths = sentences.map(s => s.trim().split(/\s+/).length);
+    const avgSentenceLength = sentenceLengths.length > 0
+      ? sentenceLengths.reduce((a, b) => a + b, 0) / sentenceLengths.length
+      : 0;
+    const sentLenBaseline = profile.linguistics.averageSentenceLength;
+    const sentLenDeviation = sentLenBaseline > 0
+      ? Math.abs(avgSentenceLength - sentLenBaseline) / sentLenBaseline
+      : 0;
+    signals.push({
+      dimension: 'sentence_length',
+      baseline: sentLenBaseline,
+      current: Math.round(avgSentenceLength * 10) / 10,
+      deviation: Math.round(sentLenDeviation * 100) / 100,
+      severity: toSeverity(sentLenDeviation),
+      explanation: sentLenDeviation < 0.1
+        ? 'Sentence length matches profile'
+        : `Average sentence length is ${avgSentenceLength.toFixed(1)} words vs profile baseline of ${sentLenBaseline} words`,
+    });
+
+    // 2. Vocabulary level drift
+    const longWords = words.filter(w => {
+      const clean = w.replace(/[^a-zA-Z]/g, '').toLowerCase();
+      return clean.length > 8 && !LONG_WORD_EXCEPTIONS.has(clean);
+    });
+    const longRatio = wordCount > 0 ? longWords.length / wordCount : 0;
+    const vocabBaselineMap: Record<string, number> = {
+      sophisticated: 0.20,
+      clear: 0.12,
+      simple: 0.05,
+    };
+    const vocabBaseline = vocabBaselineMap[profile.linguistics.vocabularyLevel] ?? 0.12;
+    const vocabDeviation = vocabBaseline > 0
+      ? Math.abs(longRatio - vocabBaseline) / vocabBaseline
+      : 0;
+    signals.push({
+      dimension: 'vocabulary_level',
+      baseline: vocabBaseline,
+      current: Math.round(longRatio * 100) / 100,
+      deviation: Math.round(vocabDeviation * 100) / 100,
+      severity: toSeverity(vocabDeviation),
+      explanation: vocabDeviation < 0.1
+        ? 'Vocabulary level matches profile'
+        : `Long word ratio is ${(longRatio * 100).toFixed(0)}% vs expected ${(vocabBaseline * 100).toFixed(0)}% for "${profile.linguistics.vocabularyLevel}" vocabulary`,
+    });
+
+    // 3. Formality drift
+    let casualCount = 0;
+    for (const marker of CASUAL_MARKERS) {
+      if (lowerText.includes(marker.toLowerCase())) casualCount++;
+    }
+    let formalCount = 0;
+    for (const marker of FORMAL_MARKERS) {
+      if (lowerText.includes(marker.toLowerCase())) formalCount++;
+    }
+    // Map to numeric: casual=0, semi-formal=1, formal=2
+    const formalityBaselineMap: Record<string, number> = {
+      casual: 0,
+      'semi-formal': 1,
+      formal: 2,
+    };
+    const formalityBaseline = formalityBaselineMap[profile.linguistics.formality] ?? 1;
+    let detectedFormality: number;
+    if (formalCount > casualCount + 2) {
+      detectedFormality = 2;
+    } else if (casualCount > formalCount + 2) {
+      detectedFormality = 0;
+    } else {
+      detectedFormality = 1;
+    }
+    const formalityDeviation = Math.abs(detectedFormality - formalityBaseline) / 2; // Normalize to 0-1
+    signals.push({
+      dimension: 'formality',
+      baseline: formalityBaseline,
+      current: detectedFormality,
+      deviation: Math.round(formalityDeviation * 100) / 100,
+      severity: toSeverity(formalityDeviation),
+      explanation: formalityDeviation < 0.1
+        ? 'Formality level matches profile'
+        : `Text formality is ${['casual', 'semi-formal', 'formal'][detectedFormality]} vs profile "${profile.linguistics.formality}"`,
+    });
+
+    // 4. Contraction rate drift
+    // Match contractions but exclude possessives (word's where 's is possessive)
+    const contractionPattern = /\b(?:can't|won't|don't|didn't|doesn't|isn't|aren't|wasn't|weren't|couldn't|wouldn't|shouldn't|haven't|hasn't|hadn't|I'm|I've|I'd|I'll|we're|we've|we'd|we'll|they're|they've|they'd|they'll|you're|you've|you'd|you'll|he's|she's|it's|that's|there's|here's|who's|what's|let's)\b/gi;
+    const contractions = text.match(contractionPattern) || [];
+    const contractionRate = wordCount > 0 ? contractions.length / wordCount : 0;
+    // Derive baseline contraction rate from formality
+    const contractionBaselineMap: Record<string, number> = {
+      casual: 0.08,
+      'semi-formal': 0.04,
+      formal: 0.01,
+    };
+    const contractionBaseline = contractionBaselineMap[profile.linguistics.formality] ?? 0.04;
+    const contractionDeviation = contractionBaseline > 0
+      ? Math.abs(contractionRate - contractionBaseline) / contractionBaseline
+      : 0;
+    signals.push({
+      dimension: 'contraction_rate',
+      baseline: contractionBaseline,
+      current: Math.round(contractionRate * 1000) / 1000,
+      deviation: Math.round(contractionDeviation * 100) / 100,
+      severity: toSeverity(contractionDeviation),
+      explanation: contractionDeviation < 0.1
+        ? 'Contraction usage matches profile'
+        : `Contraction rate is ${(contractionRate * 100).toFixed(1)}% vs expected ${(contractionBaseline * 100).toFixed(1)}% for "${profile.linguistics.formality}" writing`,
+    });
+
+    // 5. Energy drift
+    const exclamationCount = (text.match(/!/g) || []).length;
+    const exclamationRate = sentences.length > 0 ? exclamationCount / sentences.length : 0;
+    const shortSentences = sentenceLengths.filter(l => l <= 5).length;
+    const shortSentenceRate = sentenceLengths.length > 0 ? shortSentences / sentenceLengths.length : 0;
+    // Combine into energy score: 0 = low, 0.5 = medium, 1 = high
+    const detectedEnergy = Math.min(1, (exclamationRate * 2 + shortSentenceRate) / 2);
+    const energyBaselineMap: Record<string, number> = {
+      high: 0.7,
+      medium: 0.35,
+      low: 0.1,
+    };
+    const energyBaseline = energyBaselineMap[profile.personality.energy] ?? 0.35;
+    const energyDeviation = energyBaseline > 0
+      ? Math.abs(detectedEnergy - energyBaseline) / energyBaseline
+      : 0;
+    signals.push({
+      dimension: 'energy',
+      baseline: energyBaseline,
+      current: Math.round(detectedEnergy * 100) / 100,
+      deviation: Math.round(energyDeviation * 100) / 100,
+      severity: toSeverity(energyDeviation),
+      explanation: energyDeviation < 0.1
+        ? 'Energy level matches profile'
+        : `Detected energy is ${detectedEnergy < 0.25 ? 'low' : detectedEnergy < 0.55 ? 'medium' : 'high'} vs profile "${profile.personality.energy}"`,
+    });
+
+    // Calculate overall drift score (weighted average mapped to 0-100)
+    const weights: Record<DriftSignal['dimension'], number> = {
+      sentence_length: 0.25,
+      vocabulary_level: 0.25,
+      formality: 0.20,
+      contraction_rate: 0.15,
+      energy: 0.15,
+    };
+    const severityToNumeric: Record<DriftSignal['severity'], number> = {
+      none: 0,
+      low: 25,
+      medium: 55,
+      high: 90,
+    };
+    const driftScore = Math.round(
+      signals.reduce((sum, s) => sum + severityToNumeric[s.severity] * weights[s.dimension], 0)
+    );
+    const isAcceptable = driftScore < 40;
+
+    return {
+      driftScore,
+      signals,
+      isAcceptable,
+      summary: buildDriftSummary(signals, driftScore),
+    };
+  }
+
   // ============================================================================
   // HELPERS
   // ============================================================================
@@ -267,6 +450,41 @@ Return STRICTLY VALID JSON:
 
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Map relative deviation (0-1+) to severity bucket */
+function toSeverity(deviation: number): DriftSignal['severity'] {
+  if (deviation < 0.1) return 'none';
+  if (deviation < 0.25) return 'low';
+  if (deviation < 0.5) return 'medium';
+  return 'high';
+}
+
+/** Build a human-readable drift summary */
+function buildDriftSummary(signals: DriftSignal[], driftScore: number): string {
+  const drifted = signals.filter(s => s.severity !== 'none');
+  if (drifted.length === 0) {
+    return 'Text is consistent with the student\'s voice profile.';
+  }
+
+  const highDrift = drifted.filter(s => s.severity === 'high');
+  const medDrift = drifted.filter(s => s.severity === 'medium');
+
+  const parts: string[] = [];
+  parts.push(`Voice drift score: ${driftScore}/100.`);
+
+  if (highDrift.length > 0) {
+    parts.push(`High drift in: ${highDrift.map(s => s.dimension.replace(/_/g, ' ')).join(', ')}.`);
+  }
+  if (medDrift.length > 0) {
+    parts.push(`Moderate drift in: ${medDrift.map(s => s.dimension.replace(/_/g, ' ')).join(', ')}.`);
+  }
+
+  if (driftScore >= 40) {
+    parts.push('Consider revising to better match the student\'s authentic voice.');
+  }
+
+  return parts.join(' ');
 }
 
 // ============================================================================

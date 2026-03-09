@@ -1,25 +1,19 @@
 /**
  * Contextual Workshop Chat
  *
- * AI chat assistant with full context of student's portfolio, analysis,
- * teaching issues, version history, and progress.
- *
- * Connects to the chat service backend for intelligent, context-aware
- * coaching conversations.
+ * Professional AI coaching chat interface with full context of student's
+ * portfolio, analysis, teaching issues, version history, and progress.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import GradientText from '@/components/ui/GradientText';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { MessageCircle, Send, RefreshCw, Loader2, Sparkles, Lightbulb, ChevronLeft, ChevronRight, Zap } from 'lucide-react';
+import { Send, Loader2, Sparkles, RefreshCw, Zap, ArrowUp, GraduationCap } from 'lucide-react';
 import { ExtracurricularItem } from '@/components/portfolio/extracurricular/ExtracurricularCard';
 import { AnalysisResult } from '../backendTypes';
 import { TeachingCoachingOutput } from '../teachingTypes';
@@ -99,6 +93,68 @@ interface ContextualWorkshopChatProps {
 }
 
 // ============================================================================
+// HELPER: Simple markdown-like rendering for assistant messages
+// ============================================================================
+
+function renderMessageContent(content: string) {
+  // Split into paragraphs
+  const paragraphs = content.split('\n\n');
+
+  return paragraphs.map((para, pIdx) => {
+    // Handle single line breaks within paragraph
+    const lines = para.split('\n');
+
+    return (
+      <p key={pIdx} className={pIdx > 0 ? 'mt-3' : ''}>
+        {lines.map((line, lIdx) => {
+          // Bold: **text**
+          const parts = line.split(/(\*\*[^*]+\*\*)/g);
+          const rendered = parts.map((part, partIdx) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+              return (
+                <strong key={partIdx} className="font-semibold">
+                  {part.slice(2, -2)}
+                </strong>
+              );
+            }
+            return <span key={partIdx}>{part}</span>;
+          });
+
+          return (
+            <React.Fragment key={lIdx}>
+              {lIdx > 0 && <br />}
+              {rendered}
+            </React.Fragment>
+          );
+        })}
+      </p>
+    );
+  });
+}
+
+// ============================================================================
+// TYPING DOTS ANIMATION
+// ============================================================================
+
+function TypingIndicator() {
+  return (
+    <div className="flex items-end gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* AI Avatar */}
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+        <GraduationCap className="w-3.5 h-3.5 text-white" />
+      </div>
+      <div className="bg-muted/60 rounded-2xl rounded-bl-md px-4 py-3">
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-[bounce_1.4s_ease-in-out_infinite]" />
+          <div className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+          <div className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -130,15 +186,11 @@ export default function ContextualWorkshopChat({
   // STATE
   // ============================================================================
 
-  // Use external messages if provided, otherwise use internal state
   const [internalMessages, setInternalMessages] = useState<ChatMessage[]>([]);
   const chatMessages = externalMessages ?? internalMessages;
-  
-  // Helper to update messages (handles both internal and external state)
+
   const updateMessages = (newMessages: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
     if (onMessagesChange) {
-      // Pass the function or value directly to the parent setter
-      // This ensures we always work with the latest state in async flows
       onMessagesChange(newMessages);
     } else {
       setInternalMessages(newMessages);
@@ -148,8 +200,6 @@ export default function ContextualWorkshopChat({
   const [userInput, setUserInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [recommendations, setRecommendations] = useState<ChatRecommendation[]>([]);
-  const [currentRecommendationIndex, setCurrentRecommendationIndex] = useState(0);
-  const [currentStarterIndex, setCurrentStarterIndex] = useState(0);
 
   // Credits modal state
   const [showInsufficientCreditsModal, setShowInsufficientCreditsModal] = useState(false);
@@ -157,27 +207,22 @@ export default function ContextualWorkshopChat({
 
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-  const [stackHeight, setStackHeight] = useState<number>(44);
 
   // ============================================================================
   // INITIALIZATION
   // ============================================================================
 
-  // Load cached conversation or create welcome message
-  // Skip if external messages are provided (parent manages state)
   useEffect(() => {
-    // If external messages are provided, don't load from cache
     if (externalMessages !== undefined) return;
 
     const cacheKey = mode === 'piq' && piqPromptId ? piqPromptId : activity?.id;
-    if (!cacheKey) return; // Skip if no valid cache key
-    
+    if (!cacheKey) return;
+
     const cached = mode === 'piq' ? getPIQCachedConversation(cacheKey) : getCachedConversation(cacheKey);
 
     if (cached && cached.length > 0) {
       updateMessages(cached);
     } else if (analysisResult) {
-      // Create welcome message once analysis is ready
       if (mode === 'piq' && piqPromptId && piqPromptText && piqPromptTitle) {
         const context = buildPIQContextObject();
         const welcome = createPIQWelcomeMessage(context);
@@ -190,7 +235,6 @@ export default function ContextualWorkshopChat({
     }
   }, [activity?.id, analysisResult, mode, piqPromptId, externalMessages]);
 
-  // Create welcome message when external messages are empty but analysis is ready
   useEffect(() => {
     if (externalMessages !== undefined && externalMessages.length === 0 && analysisResult) {
       if (mode === 'piq' && piqPromptId && piqPromptText && piqPromptTitle) {
@@ -205,15 +249,13 @@ export default function ContextualWorkshopChat({
     }
   }, [externalMessages, analysisResult, mode, piqPromptId]);
 
-  // Cache conversation on changes (only if using internal state)
   useEffect(() => {
-    // Skip caching if external messages are provided (parent handles persistence)
     if (externalMessages !== undefined) return;
 
     if (chatMessages.length > 0) {
       const cacheKey = mode === 'piq' && piqPromptId ? piqPromptId : activity?.id;
-      if (!cacheKey) return; // Skip if no valid cache key
-      
+      if (!cacheKey) return;
+
       if (mode === 'piq') {
         cachePIQConversation(cacheKey, chatMessages);
       } else {
@@ -230,7 +272,7 @@ export default function ContextualWorkshopChat({
         scrollElement.scrollTop = scrollElement.scrollHeight;
       }
     }
-  }, [chatMessages]);
+  }, [chatMessages, isLoading]);
 
   // ============================================================================
   // CONTEXT BUILDING
@@ -269,7 +311,7 @@ export default function ContextualWorkshopChat({
         initialScore,
         hasUnsavedChanges,
         needsReanalysis,
-        versionHistory: versionHistory || [], // Use passed version history or empty array
+        versionHistory: versionHistory || [],
       }
     );
   };
@@ -288,19 +330,16 @@ export default function ContextualWorkshopChat({
       const token = await getToken({ template: 'supabase' });
       if (token) {
         const creditCheck = await canSendChatMessage(userId, token);
-        
+
         if (!creditCheck.hasEnough) {
           setCurrentCreditBalance(creditCheck.currentBalance);
           setShowInsufficientCreditsModal(true);
           return;
         }
-        
-        // Deduct credit IMMEDIATELY before sending
+
         const promptName = mode === 'piq' ? piqPromptTitle : activity?.name;
         const deductResult = await deductForChatMessage(userId, token, promptName);
-        if (deductResult.success) {
-        } else {
-          // Don't proceed if deduction fails
+        if (!deductResult.success) {
           return;
         }
       }
@@ -313,28 +352,21 @@ export default function ContextualWorkshopChat({
       timestamp: Date.now(),
     };
 
-    // Add user message immediately
     updateMessages((prev) => [...prev, userMessage]);
     setUserInput('');
     setIsLoading(true);
 
     try {
       if (mode === 'piq' && piqPromptId && piqPromptText && piqPromptTitle) {
-        // PIQ mode
         const context = buildPIQContextObject();
-
         const response = await sendPIQChatMessage({
           userMessage: userMessage.content,
           context,
           conversationHistory: chatMessages,
         });
-
-        // Add assistant message
         updateMessages((prev) => [...prev, response.message]);
       } else {
-        // Extracurricular mode
         const context = buildContextObject();
-
         const response = await sendChatMessage({
           userMessage: userMessage.content,
           context,
@@ -344,29 +376,22 @@ export default function ContextualWorkshopChat({
             includeRecommendations: true,
           },
         });
-
-        // Add assistant message
         updateMessages((prev) => [...prev, response.message]);
 
-        // Update recommendations (extracurricular only)
         if (response.recommendations && response.recommendations.length > 0) {
           setRecommendations(response.recommendations);
-          setCurrentRecommendationIndex(0);
         }
       }
     } catch (error) {
-
-      // Add error message with details
       const errorMessage: ChatMessage = {
         id: `msg-${Date.now()}-error`,
         role: 'assistant',
         content:
           error instanceof Error
-            ? `Error: ${error.message}. Please check the console for details.`
+            ? `I'm having trouble connecting right now. Please try again. (${error.message})`
             : "I'm having trouble connecting right now. Please try again.",
         timestamp: Date.now(),
       };
-
       updateMessages((prev) => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
@@ -380,13 +405,11 @@ export default function ContextualWorkshopChat({
           onToggleCategory(rec.actionData.categoryKey as string);
         }
         break;
-
       case 'start_reflection':
         if (onLoadReflectionPrompts && rec.actionData?.issueId) {
           onLoadReflectionPrompts(rec.actionData.issueId as string);
         }
         break;
-
       case 'regenerate_draft':
         if (onTriggerReanalysis) {
           onTriggerReanalysis();
@@ -394,44 +417,11 @@ export default function ContextualWorkshopChat({
         break;
     }
 
-    // Clear recommendation after clicking
-    setRecommendations((prev) => {
-      const filtered = prev.filter((r) => r !== rec);
-      // Reset index if we removed current item
-      if (filtered.length > 0 && currentRecommendationIndex >= filtered.length) {
-        setCurrentRecommendationIndex(filtered.length - 1);
-      }
-      return filtered;
-    });
-  };
-
-  const handleNextRecommendation = () => {
-    if (currentRecommendationIndex < recommendations.length - 1) {
-      setCurrentRecommendationIndex(currentRecommendationIndex + 1);
-    }
-  };
-
-  const handlePrevRecommendation = () => {
-    if (currentRecommendationIndex > 0) {
-      setCurrentRecommendationIndex(currentRecommendationIndex - 1);
-    }
-  };
-
-  const handleNextStarter = () => {
-    if (currentStarterIndex < conversationStarters.length - 1) {
-      setCurrentStarterIndex(currentStarterIndex + 1);
-    }
-  };
-
-  const handlePrevStarter = () => {
-    if (currentStarterIndex > 0) {
-      setCurrentStarterIndex(currentStarterIndex - 1);
-    }
+    setRecommendations((prev) => prev.filter((r) => r !== rec));
   };
 
   const handleQuickQuestion = (question: string) => {
     setUserInput(question);
-    // Focus input so user can send or edit
     inputRef.current?.focus();
   };
 
@@ -443,40 +433,11 @@ export default function ContextualWorkshopChat({
     const el = inputRef.current;
     if (!el) return;
 
-    const MIN_ROWS = 1;
-    const MAX_ROWS = 4;
-
-    el.rows = MIN_ROWS;
     el.style.height = 'auto';
-
-    const computed = window.getComputedStyle(el);
-    const lineHeight = parseFloat(computed.lineHeight || '20');
-    const paddingTop = parseFloat(computed.paddingTop || '0');
-    const paddingBottom = parseFloat(computed.paddingBottom || '0');
-    const borderTop = parseFloat(computed.borderTopWidth || '0');
-    const borderBottom = parseFloat(computed.borderBottomWidth || '0');
-
-    const maxHeight =
-      lineHeight * MAX_ROWS + paddingTop + paddingBottom + borderTop + borderBottom;
-    const newHeight = Math.min(el.scrollHeight, maxHeight);
-
-    el.style.height = `${newHeight}px`;
+    const maxHeight = 120; // ~5 lines
+    el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
-    setStackHeight(el.getBoundingClientRect().height);
   }, [userInput]);
-
-  useEffect(() => {
-    const handler = () => {
-      const el = inputRef.current;
-      if (!el) return;
-      setStackHeight(el.getBoundingClientRect().height);
-    };
-    window.addEventListener('resize', handler);
-    return () => window.removeEventListener('resize', handler);
-  }, []);
-
-  const gapPx = 8;
-  const buttonSize = Math.max(28, Math.floor((stackHeight - gapPx) / 2));
 
   // ============================================================================
   // CONVERSATION STARTERS
@@ -493,224 +454,227 @@ export default function ContextualWorkshopChat({
   // RENDER
   // ============================================================================
 
+  const isWaitingForAnalysis = !analysisResult;
+
   return (
-    <div className="w-full flex flex-col border-2 border-purple-300 dark:border-purple-700 rounded-lg bg-card relative overflow-hidden h-full min-h-[400px]">
-      {/* Header */}
-      <div className="relative z-20 p-4 bg-card rounded-b-xl shadow-sm flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="w-5 h-5 text-purple-700" />
-          <GradientText
-            className="text-xl font-semibold"
-            colors={["#7c3aed", "#8b5cf6", "#7c3aed"]}
-          >
-            AI Essay Coach
-          </GradientText>
+    <div className="w-full flex flex-col bg-card relative overflow-hidden h-full min-h-[400px]">
+
+      {/* ================================================================ */}
+      {/* HEADER                                                           */}
+      {/* ================================================================ */}
+      <div className="flex-shrink-0 px-4 py-3 border-b border-border/50 bg-card">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="relative">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm">
+                <GraduationCap className="w-4 h-4 text-white" />
+              </div>
+              {/* Online indicator */}
+              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-card" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground leading-tight">
+                Uplift Coach
+              </h3>
+              <p className="text-[11px] text-muted-foreground leading-tight">
+                {isWaitingForAnalysis ? 'Analyzing...' : 'Ready to help'}
+              </p>
+            </div>
+          </div>
+
+          {/* Reanalyze button */}
+          {onTriggerReanalysis && (
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={onTriggerReanalysis}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p className="text-xs">Re-analyze with latest edits</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Ask me anything about your {mode === 'piq' ? piqPromptTitle || 'PIQ' : activity?.name || 'essay'} narrative
-        </p>
-        {/* Gradient Curtain */}
-        <div className="absolute -bottom-6 left-0 right-0 h-6 bg-gradient-to-b from-card to-transparent pointer-events-none" />
       </div>
 
-      {/* Messages */}
-      <ScrollArea className="flex-1 p-4 overflow-y-auto" ref={scrollAreaRef}>
-        <div className="space-y-4">
-          {chatMessages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
+      {/* ================================================================ */}
+      {/* MESSAGES                                                         */}
+      {/* ================================================================ */}
+      <ScrollArea className="flex-1 overflow-y-auto" ref={scrollAreaRef}>
+        <div className="px-4 py-4 space-y-5">
+
+          {/* Empty state when waiting for analysis */}
+          {isWaitingForAnalysis && chatMessages.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 px-4 text-center animate-in fade-in duration-500">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-100 to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 flex items-center justify-center mb-4">
+                <Sparkles className="w-6 h-6 text-purple-500" />
+              </div>
+              <p className="text-sm font-medium text-foreground/80 mb-1">
+                Preparing your coach
+              </p>
+              <p className="text-xs text-muted-foreground max-w-[220px]">
+                Analyzing your essay to provide personalized coaching...
+              </p>
+              <div className="flex gap-1 mt-4">
+                <div className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-[bounce_1.4s_ease-in-out_infinite]" />
+                <div className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-[bounce_1.4s_ease-in-out_0.2s_infinite]" />
+                <div className="w-1.5 h-1.5 bg-purple-400/60 rounded-full animate-[bounce_1.4s_ease-in-out_0.4s_infinite]" />
+              </div>
+            </div>
+          )}
+
+          {chatMessages.map((message, index) => {
+            const isUser = message.role === 'user';
+            const isFirstAssistant = !isUser && (index === 0 || chatMessages[index - 1]?.role === 'user');
+
+            return (
               <div
-                className={`max-w-[85%] p-3 rounded-lg text-sm ${
-                  message.role === 'user'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-muted text-foreground'
-                }`}
+                key={message.id}
+                className={`flex ${isUser ? 'justify-end' : 'items-end gap-3'} animate-in fade-in slide-in-from-bottom-1 duration-200`}
               >
-                {message.role === 'assistant' && (
-                  <div className="flex items-center gap-1 mb-1 text-purple-600">
-                    <Sparkles className="h-3 w-3" />
-                    <span className="text-xs font-medium">Coach</span>
+                {/* AI Avatar - only for first message in a group */}
+                {!isUser && (
+                  <div className={`flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-sm ${!isFirstAssistant ? 'invisible' : ''}`}>
+                    <GraduationCap className="w-3.5 h-3.5 text-white" />
                   </div>
                 )}
-                <div className="whitespace-pre-wrap">{message.content}</div>
-              </div>
-            </div>
-          ))}
 
-          {/* Loading indicator */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="max-w-[85%] p-3 rounded-lg bg-muted flex items-center gap-2">
-                <Loader2 className="h-4 w-4 animate-spin text-purple-600" />
-                <span className="text-sm text-muted-foreground">Thinking...</span>
-              </div>
-            </div>
-          )}
+                {/* Message bubble */}
+                <div
+                  className={`max-w-[85%] ${
+                    isUser
+                      ? 'bg-foreground text-background rounded-2xl rounded-br-md px-4 py-2.5'
+                      : 'bg-muted/60 text-foreground rounded-2xl rounded-bl-md px-4 py-3'
+                  }`}
+                >
+                  {/* Message content */}
+                  <div className={`text-[13px] leading-relaxed ${isUser ? '' : 'text-foreground/90'}`}>
+                    {isUser ? message.content : renderMessageContent(message.content)}
+                  </div>
 
-          {/* Conversation starters - Single with Navigation */}
+                  {/* Timestamp - subtle */}
+                  <div
+                    className={`text-[10px] mt-1.5 ${
+                      isUser ? 'text-background/40' : 'text-muted-foreground/50'
+                    }`}
+                  >
+                    {new Date(message.timestamp).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+
+          {/* Typing indicator */}
+          {isLoading && <TypingIndicator />}
+
+          {/* Conversation starters */}
           {conversationStarters.length > 0 && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Lightbulb className="h-3.5 w-3.5 text-purple-500" />
-                  <span className="font-medium text-purple-600 dark:text-purple-400">
-                    Suggested question {currentStarterIndex + 1} of {conversationStarters.length}
-                  </span>
-                </p>
-                {conversationStarters.length > 1 && (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePrevStarter}
-                      disabled={currentStarterIndex === 0}
-                      className="h-6 w-6 p-0"
-                    >
-                      <ChevronLeft className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleNextStarter}
-                      disabled={currentStarterIndex === conversationStarters.length - 1}
-                      className="h-6 w-6 p-0"
-                    >
-                      <ChevronRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
+            <div className="pt-2 space-y-2">
+              <p className="text-[11px] text-muted-foreground/70 font-medium uppercase tracking-wider pl-10">
+                Suggested questions
+              </p>
+              <div className="flex flex-col gap-1.5 pl-10">
+                {conversationStarters.slice(0, 3).map((starter, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleQuickQuestion(starter)}
+                    className="group text-left text-[13px] px-3.5 py-2 rounded-xl bg-muted/40 hover:bg-muted/80 border border-border/50 hover:border-border text-foreground/80 hover:text-foreground transition-all duration-150"
+                  >
+                    <span className="flex items-center gap-2">
+                      <Sparkles className="w-3 h-3 text-purple-500/70 flex-shrink-0" />
+                      <span className="line-clamp-2">{starter}</span>
+                    </span>
+                  </button>
+                ))}
               </div>
-              <button
-                onClick={() => handleQuickQuestion(conversationStarters[currentStarterIndex])}
-                className="block w-full text-left text-sm px-3.5 py-2.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all"
-              >
-                <span className="text-purple-900 dark:text-purple-100">{conversationStarters[currentStarterIndex]}</span>
-              </button>
             </div>
           )}
 
-          {/* Recommendations - Single with Navigation */}
+          {/* Recommendations */}
           {recommendations.length > 0 && (
-            <div className="mt-4">
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-purple-500" />
-                  <span className="font-medium text-purple-600 dark:text-purple-400">
-                    Recommended action {currentRecommendationIndex + 1} of {recommendations.length}
-                  </span>
-                </p>
-                {recommendations.length > 1 && (
-                  <div className="flex items-center gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handlePrevRecommendation}
-                      disabled={currentRecommendationIndex === 0}
-                      className="h-6 w-6 p-0"
-                    >
-                      <ChevronLeft className="h-3 w-3" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleNextRecommendation}
-                      disabled={currentRecommendationIndex === recommendations.length - 1}
-                      className="h-6 w-6 p-0"
-                    >
-                      <ChevronRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
+            <div className="pt-2 space-y-2">
+              <p className="text-[11px] text-muted-foreground/70 font-medium uppercase tracking-wider pl-10">
+                Recommended actions
+              </p>
+              <div className="flex flex-col gap-1.5 pl-10">
+                {recommendations.slice(0, 3).map((rec, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleRecommendationClick(rec)}
+                    className="group text-left px-3.5 py-2.5 rounded-xl bg-purple-50 dark:bg-purple-950/20 hover:bg-purple-100 dark:hover:bg-purple-950/40 border border-purple-200/60 dark:border-purple-800/40 hover:border-purple-300 dark:hover:border-purple-700 transition-all duration-150"
+                  >
+                    <div className="text-[13px] font-medium text-foreground/90">
+                      {rec.title}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      {rec.description}
+                    </div>
+                  </button>
+                ))}
               </div>
-              <button
-                onClick={() => handleRecommendationClick(recommendations[currentRecommendationIndex])}
-                className="block w-full text-left px-3.5 py-2.5 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/30 dark:to-blue-950/30 border border-purple-200 dark:border-purple-800 hover:border-purple-300 dark:hover:border-purple-700 hover:shadow-sm transition-all"
-              >
-                <div className="text-sm font-medium text-purple-900 dark:text-purple-100">
-                  {recommendations[currentRecommendationIndex].title}
-                </div>
-                <div className="text-xs text-purple-700 dark:text-purple-300 mt-1">
-                  {recommendations[currentRecommendationIndex].description}
-                </div>
-              </button>
             </div>
           )}
         </div>
       </ScrollArea>
 
-      {/* Input */}
-      <div className="p-3 border-t flex-shrink-0">
-        <div className="flex gap-2 items-end">
-          <Textarea
+      {/* ================================================================ */}
+      {/* INPUT AREA                                                       */}
+      {/* ================================================================ */}
+      <div className="flex-shrink-0 p-3 border-t border-border/50">
+        <div className="relative flex items-end gap-2 bg-muted/40 rounded-2xl border border-border/60 focus-within:border-purple-400/60 focus-within:bg-muted/20 transition-all duration-200">
+          <textarea
             ref={inputRef}
             value={userInput}
             onChange={(e) => setUserInput(e.target.value)}
             placeholder={
-              analysisResult
-                ? 'Ask me about your score, issues, or how to improve...'
-                : 'Analyzing your essay...'
+              isWaitingForAnalysis
+                ? 'Waiting for analysis...'
+                : 'Ask about your essay...'
             }
-            disabled={!analysisResult || isLoading}
+            disabled={isWaitingForAnalysis || isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleSendMessage();
               }
             }}
-            className="flex-1 resize-none text-sm leading-5 overflow-y-hidden"
+            className="flex-1 resize-none bg-transparent text-[13px] leading-relaxed py-2.5 pl-4 pr-2 placeholder:text-muted-foreground/50 focus:outline-none disabled:opacity-50 max-h-[120px]"
             rows={1}
           />
-          <div className="flex flex-col gap-2" style={{ height: stackHeight }}>
-            <Button
+          <div className="flex-shrink-0 p-1.5">
+            <button
               onClick={handleSendMessage}
-              disabled={!userInput.trim() || !analysisResult || isLoading}
-              className="bg-purple-600 hover:bg-purple-700 p-0"
-              aria-label="Send message"
-              style={{ height: buttonSize, width: buttonSize }}
+              disabled={!userInput.trim() || isWaitingForAnalysis || isLoading}
+              className="flex items-center justify-center w-8 h-8 rounded-xl bg-foreground text-background hover:bg-foreground/90 disabled:opacity-30 disabled:hover:bg-foreground transition-all duration-150"
             >
               {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Send className="h-4 w-4" />
+                <ArrowUp className="w-4 h-4" />
               )}
-            </Button>
-            <TooltipProvider delayDuration={120}>
-              <Tooltip disableHoverableContent>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="p-0"
-                    onClick={() => {
-                      if (onTriggerReanalysis) {
-                        onTriggerReanalysis();
-                      }
-                    }}
-                    disabled={!onTriggerReanalysis}
-                    aria-label="Regenerate analysis"
-                    style={{ height: buttonSize, width: buttonSize }}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="left" className="max-w-sm">
-                  <p className="text-sm">
-                    Regenerate analysis based on our conversation and your latest edits
-                  </p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            </button>
           </div>
         </div>
-        <div className="flex items-center justify-between mt-1">
-          <p className="text-[11px] text-muted-foreground">
-            Press Enter to send, Shift+Enter for new line
+
+        {/* Footer info */}
+        <div className="flex items-center justify-between mt-1.5 px-1">
+          <p className="text-[10px] text-muted-foreground/50">
+            Enter to send
           </p>
           {userId && (
-            <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <Zap className="w-3 h-3 text-primary/60" />
-              <span>{CREDIT_COSTS.CHAT_MESSAGE} credit per message</span>
+            <p className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
+              <Zap className="w-2.5 h-2.5" />
+              {CREDIT_COSTS.CHAT_MESSAGE} credit/msg
             </p>
           )}
         </div>

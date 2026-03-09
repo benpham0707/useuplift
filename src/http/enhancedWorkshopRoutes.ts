@@ -5,7 +5,8 @@
  * inline editing, authenticity checking, and analytics capabilities.
  *
  * Mounted at /enhanced/* — completely separate from existing workshop routes.
- * Kill switch: ENABLE_ENHANCED_WORKSHOP=false → routes don't mount (handled in routes.ts).
+ * Circuit breaker protected: 5 consecutive 500s in 60s -> auto-disable for 5min.
+ * Kill switch: ENABLE_ENHANCED_WORKSHOP=false -> force-disable.
  *
  * All routes require authentication via Clerk JWT (requireAuth middleware).
  * All routes return { success: boolean, data?: T, error?: string }.
@@ -13,6 +14,7 @@
 
 import { Router, Request, Response } from 'express';
 import { requireAuth } from './middleware/auth';
+import { enhancedWorkshopConfig } from '@/services/enhancedWorkshop/config';
 import type {
   StartEnhancedSessionInput,
   EnhancedInlineEditRequest,
@@ -27,6 +29,19 @@ import type {
 } from '@/services/enhancedWorkshop/types';
 
 const enhancedWorkshopRouter = Router();
+
+// ============================================================================
+// CIRCUIT BREAKER MIDDLEWARE — gates all routes
+// ============================================================================
+enhancedWorkshopRouter.use((_req: Request, res: Response, next) => {
+  if (!enhancedWorkshopConfig.isEnabled()) {
+    return res.status(503).json({
+      success: false,
+      error: 'Enhanced workshop temporarily disabled (circuit breaker tripped). Retry in a few minutes.',
+    });
+  }
+  next();
+});
 
 // ============================================================================
 // POST /session/start — Start an enhanced editing session
@@ -117,7 +132,7 @@ enhancedWorkshopRouter.post('/session/end', requireAuth, async (req: Request, re
 
     const { sessionContextService } = await import('@/services/sessionContext');
 
-    const session = sessionContextService.getSession(sessionId);
+    const session = await sessionContextService.getSession(sessionId);
     if (!session) {
       return res.status(404).json({ success: false, error: 'Session not found' });
     }
@@ -189,11 +204,11 @@ enhancedWorkshopRouter.post('/inline-edit', requireAuth, async (req: Request, re
       console.warn('[enhanced/inline-edit] Failed to load voice profile:', error instanceof Error ? error.message : error);
     }
 
-    // Get session's essay type if available
+    // Get session's essay type if available (with ownership check)
     let essayType = undefined;
     if (input.sessionId) {
-      const session = sessionContextService.getSession(input.sessionId);
-      if (session) {
+      const session = await sessionContextService.getSession(input.sessionId);
+      if (session && session.userId === userId) {
         essayType = session.essayType;
       }
     }
@@ -210,8 +225,10 @@ enhancedWorkshopRouter.post('/inline-edit', requireAuth, async (req: Request, re
       sessionId: input.sessionId,
     });
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: result });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/inline-edit] Error:', error);
     return res.status(500).json({
       success: false,
@@ -249,6 +266,7 @@ enhancedWorkshopRouter.post('/suggest-commands', requireAuth, async (req: Reques
 
     return res.json({ success: true, data: suggestions });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/suggest-commands] Error:', error);
     return res.status(500).json({
       success: false,
@@ -295,8 +313,10 @@ enhancedWorkshopRouter.post('/voice-profile', requireAuth, async (req: Request, 
     // Persist
     await voiceProfileService.save(profile);
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: profile });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/voice-profile] Error:', error);
     return res.status(500).json({
       success: false,
@@ -400,10 +420,12 @@ enhancedWorkshopRouter.post('/pre-analyze', requireAuth, async (req: Request, re
 
     const { preAnalyze } = await import('@/services/enhancedWorkshop/preAnalyzer');
 
-    const snapshot = await preAnalyze(input.text, input.essayType);
+    const snapshot = await preAnalyze(input.text, input.essayType, input.useNewScoringPipeline ?? true);
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: snapshot });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/pre-analyze] Error:', error);
     return res.status(500).json({
       success: false,
@@ -434,15 +456,18 @@ enhancedWorkshopRouter.post('/plan-improvements', requireAuth, async (req: Reque
     const { preAnalyze } = await import('@/services/enhancedWorkshop/preAnalyzer');
     const { planImprovements } = await import('@/services/enhancedWorkshop/improvementPlanner');
 
-    const snapshot = await preAnalyze(input.text, input.essayType);
+    const snapshot = await preAnalyze(input.text, input.essayType, input.useNewScoringPipeline ?? true);
     const plan = await planImprovements(snapshot, {
       focusDimensions: input.focusDimensions,
       maxActions: input.maxActions,
       essayType: input.essayType,
+      useNewScoringPipeline: input.useNewScoringPipeline ?? true,
     });
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: plan });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/plan-improvements] Error:', error);
     return res.status(500).json({
       success: false,
@@ -474,8 +499,10 @@ enhancedWorkshopRouter.post('/regression-check', requireAuth, async (req: Reques
 
     const result = await checkRegressionStandalone(input.beforeText, input.afterText, input.essayType);
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: result });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/regression-check] Error:', error);
     return res.status(500).json({
       success: false,
@@ -507,15 +534,92 @@ enhancedWorkshopRouter.post('/enhance', requireAuth, async (req: Request, res: R
       '@/services/enhancedWorkshop/writingEnhancementOrchestrator'
     );
 
-    const result = await writingEnhancementOrchestrator.enhance(input);
+    const result = await writingEnhancementOrchestrator.enhance({
+      ...input,
+      useNewScoringPipeline: input.useNewScoringPipeline ?? true,
+    });
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: result });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/enhance] Error:', error);
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Enhancement failed',
     });
+  }
+});
+
+// ============================================================================
+// POST /enhance/stream — SSE streaming enhancement loop
+// ============================================================================
+enhancedWorkshopRouter.post('/enhance/stream', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const input: EnhanceRequest = req.body;
+
+    if (!input.text) {
+      return res.status(400).json({ success: false, error: 'Missing required field: text' });
+    }
+
+    // SSE headers
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+
+    // Track client disconnect to stop wasting LLM credits
+    let clientDisconnected = false;
+    req.on('close', () => { clientDisconnected = true; });
+
+    const { writingEnhancementOrchestrator } = await import(
+      '@/services/enhancedWorkshop/writingEnhancementOrchestrator'
+    );
+
+    await writingEnhancementOrchestrator.enhanceStreaming(
+      { ...input, useNewScoringPipeline: input.useNewScoringPipeline ?? true },
+      (event) => {
+        if (!clientDisconnected && !res.destroyed) {
+          try { res.write(`data: ${JSON.stringify(event)}\n\n`); } catch { /* socket closed */ }
+        }
+      }
+    );
+
+    // Final close
+    if (!clientDisconnected && !res.destroyed) {
+      try {
+        res.write(`data: [DONE]\n\n`);
+        res.end();
+      } catch { /* socket closed */ }
+    }
+
+    enhancedWorkshopConfig.recordSuccess();
+  } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
+    console.error('[enhanced/enhance/stream] Error:', error);
+    // If headers already sent, send error event
+    if (res.headersSent) {
+      try {
+        res.write(`data: ${JSON.stringify({
+          type: 'error',
+          data: { message: error instanceof Error ? error.message : 'Enhancement failed' },
+          timestamp: new Date().toISOString(),
+        })}\n\n`);
+        res.end();
+      } catch { /* socket already closed */ }
+    } else {
+      res.status(500).json({
+        success: false,
+        error: error instanceof Error ? error.message : 'Enhancement failed',
+      });
+    }
   }
 });
 
@@ -549,14 +653,141 @@ enhancedWorkshopRouter.post('/apply-improvement', requireAuth, async (req: Reque
       maxSteps: 1,
       sessionId,
       focusDimensions: [action.dimension],
+      useNewScoringPipeline: req.body.useNewScoringPipeline ?? true,
     });
 
+    enhancedWorkshopConfig.recordSuccess();
     return res.json({ success: true, data: result });
   } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
     console.error('[enhanced/apply-improvement] Error:', error);
     return res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Improvement application failed',
+    });
+  }
+});
+
+// ============================================================================
+// POST /portfolio-analyze — Cross-essay portfolio intelligence
+// ============================================================================
+enhancedWorkshopRouter.post('/portfolio-analyze', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const { essays, targetTier, collegeId } = req.body;
+
+    if (!essays || !Array.isArray(essays) || essays.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: essays (must be a non-empty array)',
+      });
+    }
+
+    const { portfolioIntelligenceService } = await import(
+      '@/services/portfolioIntelligence'
+    );
+
+    const analysis = await portfolioIntelligenceService.analyzePortfolio({
+      essays,
+      targetTier,
+      collegeId,
+    });
+
+    enhancedWorkshopConfig.recordSuccess();
+    return res.json({ success: true, data: analysis });
+  } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
+    console.error('[enhanced/portfolio-analyze] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Portfolio analysis failed',
+    });
+  }
+});
+
+// ============================================================================
+// POST /voice-drift — Check voice drift against baseline profile
+// ============================================================================
+enhancedWorkshopRouter.post('/voice-drift', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const { text } = req.body;
+
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: text',
+      });
+    }
+
+    const { voiceProfileService, styleConsistencyService } = await import(
+      '@/services/voiceProfile'
+    );
+
+    // Load voice profile for this user
+    const profile = await voiceProfileService.load(userId);
+    if (!profile) {
+      return res.status(404).json({
+        success: false,
+        error: 'No voice profile found. Build one first via /enhanced/voice-profile.',
+      });
+    }
+
+    const driftAnalysis = styleConsistencyService.compareToBaseline(text, profile);
+
+    enhancedWorkshopConfig.recordSuccess();
+    return res.json({ success: true, data: driftAnalysis });
+  } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
+    console.error('[enhanced/voice-drift] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Voice drift analysis failed',
+    });
+  }
+});
+
+// ============================================================================
+// POST /competitive-analysis — Detect overused phrases and AO fatigue patterns
+// ============================================================================
+enhancedWorkshopRouter.post('/competitive-analysis', requireAuth, async (req: Request, res: Response) => {
+  try {
+    const userId = req.auth?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, error: 'Not authenticated' });
+    }
+
+    const { text, essayType } = req.body;
+
+    if (!text) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required field: text',
+      });
+    }
+
+    const { competitiveIntelligenceService } = await import(
+      '@/services/competitiveIntelligence'
+    );
+
+    const analysis = competitiveIntelligenceService.analyze({ text, essayType });
+
+    enhancedWorkshopConfig.recordSuccess();
+    return res.json({ success: true, data: analysis });
+  } catch (error) {
+    enhancedWorkshopConfig.recordFailure();
+    console.error('[enhanced/competitive-analysis] Error:', error);
+    return res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Competitive analysis failed',
     });
   }
 });

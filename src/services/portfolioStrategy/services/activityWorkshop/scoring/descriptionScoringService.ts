@@ -1,4 +1,3 @@
-// @ts-nocheck
 /**
  * Description Scoring Service (SONNET-POWERED)
  *
@@ -283,6 +282,55 @@ CALIBRATION EXAMPLES
 - Action Precision: 5/10 ("organized", "led", "managed" acceptable but generic)
 - Quantification: 5/10 ($3,000 provides some scale, but only one number)
 **Weighted Total: 7*0.25 + 2*0.25 + 2*0.20 + 5*0.15 + 5*0.15 = 4.2 → 5** (rounded up: title gives credit)
+
+### EXAMPLE 4: Research — JARGON vs VALUE (Critical Calibration)
+
+IMPORTANT: Technical vocabulary is NOT the same as communicating value to an AO.
+Listing tools/techniques without outcomes is the #1 research description mistake.
+AOs don't care WHAT tools you used — they care WHAT you found/built/changed.
+
+**Score: 5/10 (Jargon without outcome — should NOT score higher)**
+"Used Python and pandas for data analysis on cancer genomics research dataset. Applied machine learning algorithms and statistical methods."
+
+- Role Ownership: 5/10 (unclear what THIS student contributed vs lab's work)
+- Evidence of Impact: 2/10 (no outcome — what did the analysis FIND?)
+- Differentiation: 2/10 (any research intern could write this)
+- Action Precision: 5/10 ("used", "applied" are generic — the tools don't make it specific)
+- Quantification: 1/10 (no numbers at all)
+**Weighted Total: 5*0.25 + 2*0.25 + 2*0.20 + 5*0.15 + 1*0.15 = 3.1 → 5** (generous — tool names give false impression of specificity)
+
+**Score: 4/10 (Pure technique listing — even lower)**
+"Implemented machine learning algorithms in TensorFlow. Conducted PCR, gel electrophoresis, and Western blot assays in molecular biology lab."
+
+- Role Ownership: 3/10 (describes lab techniques, not student's contribution)
+- Evidence of Impact: 1/10 (no outcomes, no results, no findings)
+- Differentiation: 1/10 (every bio/CS research student lists these exact things)
+- Action Precision: 6/10 ("implemented", "conducted" are decent verbs)
+- Quantification: 0/10 (none)
+**Weighted Total: 3*0.25 + 1*0.25 + 1*0.20 + 6*0.15 + 0*0.15 = 2.1 → 4** (verb quality saves it from lower, but substance is empty)
+
+**Score: 8/10 (Technical + outcome — THIS is how research should score)**
+"Built NLP pipeline processing 50K patient records; identified 3 novel symptom clusters; co-authored paper accepted to AMIA conference"
+
+- Role Ownership: 9/10 (crystal clear — THEY built the pipeline and identified clusters)
+- Evidence of Impact: 8/10 (50K records processed, novel findings, paper accepted)
+- Differentiation: 8/10 (specific pipeline, specific findings, conference acceptance)
+- Action Precision: 8/10 ("built", "identified", "co-authored" all strong)
+- Quantification: 8/10 (50K, 3 clusters — meaningful with context)
+**Weighted Total: 9*0.25 + 8*0.25 + 8*0.20 + 8*0.15 + 8*0.15 = 8.3 → 8**
+
+**Score: 9/10 (Outcome-driven research with impact — highest tier)**
+"Designed data visualization dashboard analyzing school air quality; used by 3 departments; reduced facility report generation time 60%; presented at county board"
+
+- Role Ownership: 10/10 (unmistakable individual contribution)
+- Evidence of Impact: 9/10 (adoption by departments, 60% time reduction, board presentation)
+- Differentiation: 9/10 (specific project, specific impact, external adoption)
+- Action Precision: 9/10 ("designed", "presented" — precise and powerful)
+- Quantification: 9/10 (3 departments, 60% reduction — meaningful percentages with context)
+**Weighted Total: 10*0.25 + 9*0.25 + 9*0.20 + 9*0.15 + 9*0.15 = 9.3 → 9**
+
+KEY TAKEAWAY: Technical jargon (Python, TensorFlow, PCR, ML) earns 0 differentiation points.
+OUTCOME is what scores: what you FOUND, what CHANGED, who USED it, what was ADOPTED.
 
 ═══════════════════════════════════════════════════════════════════════════════
 ADDITIONAL DIAGNOSTIC CHECKS
@@ -601,8 +649,20 @@ export class DescriptionScoringService {
         };
       }
 
+      // Clamp all scores to valid ranges (safety net for LLM output)
+      parsed.total = Math.max(1, Math.min(10, Math.round(parsed.total * 10) / 10));
+      if (parsed.breakdown) {
+        for (const key of Object.keys(parsed.breakdown)) {
+          const component = parsed.breakdown[key as keyof DescriptionScoreBreakdown];
+          if (component && typeof component.score === 'number') {
+            component.score = Math.max(0, Math.min(10, Math.round(component.score * 10) / 10));
+          }
+        }
+      }
+
       // Post-LLM calibration (constraint satisfaction + revision priorities)
       if (parsed && preAnalysis) {
+        // Map parsed breakdown fields → calibration dimension names
         const scores: Record<string, number> = {
           role_ownership: parsed.breakdown.specificity.score,
           evidence_of_impact: parsed.breakdown.impactClarity.score,
@@ -610,7 +670,7 @@ export class DescriptionScoringService {
           action_precision: parsed.breakdown.actionLanguage.score,
           strategic_quantification: parsed.breakdown.quantification.score,
         };
-        const weights = {
+        const weights: Record<string, number> = {
           role_ownership: 0.25,
           evidence_of_impact: 0.25,
           differentiation_signal: 0.20,
@@ -625,16 +685,40 @@ export class DescriptionScoringService {
         );
         if (calibration.hasAdjustments && calibration.adjustedScores) {
           console.log('[DescriptionScoring] Constraint calibration applied:', calibration.constraintCheck.violations_found, 'violations fixed');
-          // TODO: Wire post-LLM calibration score adjustments back into parsed result
-          // when scoring result shape is standardized. Currently logging only to avoid
-          // breaking existing score output contracts.
+
+          // Apply adjusted scores back to parsed breakdown
+          // Calibration keys → parsed breakdown fields:
+          //   role_ownership → specificity
+          //   evidence_of_impact → impactClarity
+          //   differentiation_signal → authenticityVoice
+          //   action_precision → actionLanguage
+          //   strategic_quantification → quantification
+          const adj = calibration.adjustedScores;
+          if (adj.role_ownership !== undefined) parsed.breakdown.specificity.score = adj.role_ownership;
+          if (adj.evidence_of_impact !== undefined) parsed.breakdown.impactClarity.score = adj.evidence_of_impact;
+          if (adj.differentiation_signal !== undefined) parsed.breakdown.authenticityVoice.score = adj.differentiation_signal;
+          if (adj.action_precision !== undefined) parsed.breakdown.actionLanguage.score = adj.action_precision;
+          if (adj.strategic_quantification !== undefined) parsed.breakdown.quantification.score = adj.strategic_quantification;
+
+          // Recalculate total from adjusted breakdown scores using weights
+          const recalculatedTotal =
+            parsed.breakdown.specificity.score * 0.25 +
+            parsed.breakdown.impactClarity.score * 0.25 +
+            parsed.breakdown.authenticityVoice.score * 0.20 +
+            parsed.breakdown.actionLanguage.score * 0.15 +
+            parsed.breakdown.quantification.score * 0.15;
+
+          parsed.total = Math.max(1, Math.min(10, Math.round(recalculatedTotal * 10) / 10));
         }
       }
 
       return {
         success: true,
         score: parsed,
-        tokensUsed: response.usage,
+        tokensUsed: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+        },
       };
     } catch (error) {
       console.error('[DescriptionScoringService] Error scoring description:', error);
@@ -720,7 +804,10 @@ export class DescriptionScoringService {
       return {
         success: true,
         scores: parsed,
-        tokensUsed: response.usage,
+        tokensUsed: {
+          input: response.usage.input_tokens,
+          output: response.usage.output_tokens,
+        },
       };
     } catch (error) {
       console.error('[DescriptionScoringService] Error scoring descriptions batch:', error);

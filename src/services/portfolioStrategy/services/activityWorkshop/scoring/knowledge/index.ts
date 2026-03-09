@@ -63,6 +63,7 @@ export {
   getCategoryKeywordIndex,
   getCategoryCount,
   getCategoryAliases,
+  getSimilarDomains,
 } from './categoryRegistry';
 
 // ============================================================================
@@ -91,7 +92,7 @@ import type { KnowledgeBaseVersion } from './types';
 /**
  * Current KB version. Increment on data changes for cache invalidation.
  */
-export const KB_VERSION = '2.0.0';
+export const KB_VERSION = '2.3.0';
 
 /**
  * Get full KB version metadata.
@@ -100,7 +101,7 @@ export function getKnowledgeBaseVersion(): KnowledgeBaseVersion {
   const expertiseStats = getLibraryStats();
   return {
     version: KB_VERSION,
-    lastUpdated: '2026-02-28',
+    lastUpdated: '2026-03-04',
     categoryCount: getCategoryCount(),
     recognitionCount: getRecognitionCount(),
     totalBenchmarks: getTotalEntryCount(),

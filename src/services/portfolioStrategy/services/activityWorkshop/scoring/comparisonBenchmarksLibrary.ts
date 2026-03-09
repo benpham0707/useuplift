@@ -424,6 +424,133 @@ export const BENCHMARKS_BY_CATEGORY: Record<string, CategoryBenchmarks> = {
       ],
     },
   },
+
+  medical_health: {
+    label: 'Medical & Health',
+    keywords: ['medical', 'health', 'hospital', 'clinical', 'emt', 'nursing', 'patient', 'shadowing', 'pre-med', 'public health', 'epidemiology'],
+    tiers: {
+      1: [
+        { activity: 'NIH Summer Internship', scoreRange: [9, 10], context: '<200 HS students selected nationally for biomedical research' },
+        { activity: 'Medical journal co-author', scoreRange: [9, 10], context: 'HS student publishing in medical literature is extremely rare' },
+        { activity: 'Emergency Medical Technician certification + active service', scoreRange: [8, 9], context: 'Professional certification + active emergency response' },
+      ],
+      2: [
+        { activity: '500+ hour hospital volunteer with patient interaction', scoreRange: [7, 8], context: 'Sustained clinical volunteering with direct patient contact' },
+        { activity: 'Clinical research assistant at university', scoreRange: [7, 8], context: 'University-affiliated clinical research with mentorship' },
+        { activity: 'CNA certification + regular work', scoreRange: [7, 8], context: 'Professional nursing assistant credential as HS student' },
+      ],
+      3: [
+        { activity: 'Regular hospital volunteer (100+ hours)', scoreRange: [4, 6], context: 'Consistent medical volunteering; common among pre-med applicants' },
+        { activity: 'Clinical shadowing 50+ hours', scoreRange: [4, 5], context: 'Observation experience; valuable but doesn\'t demonstrate direct contribution' },
+        { activity: 'Health fair organizer', scoreRange: [5, 6], context: 'Community health initiative shows leadership in medical interest' },
+      ],
+      4: [
+        { activity: 'One-time hospital visit/shadowing', scoreRange: [1, 2], context: 'Single observation day without sustained engagement' },
+        { activity: 'Listed \'wants to be a doctor\' without clinical experience', scoreRange: [1, 2], context: 'Aspiration without action' },
+      ],
+    },
+  },
+
+  academic_enrichment: {
+    label: 'Academic Enrichment',
+    keywords: ['academic', 'honor society', 'nhs', 'tutoring', 'decathlon', 'quiz bowl', 'academic team', 'national honor society', 'mu alpha theta', 'tri-m'],
+    tiers: {
+      1: [
+        { activity: 'National Academic Decathlon champion', scoreRange: [9, 10], context: 'Top team nationally in 10-event academic competition' },
+        { activity: 'Congressional Award Gold Medal', scoreRange: [9, 10], context: 'Highest civilian award for youth; requires 400+ hours across categories' },
+        { activity: 'National Merit Finalist', scoreRange: [8, 9], context: 'Top ~1% of PSAT takers; demonstrates strong academic foundation' },
+      ],
+      2: [
+        { activity: 'State Academic Decathlon medalist', scoreRange: [7, 8], context: 'Top individual scorer across 10 subjects at state level' },
+        { activity: 'Tutoring program founder serving 50+ students', scoreRange: [7, 8], context: 'Created sustained educational initiative with measurable impact' },
+        { activity: 'Quiz Bowl nationals qualifier', scoreRange: [7, 8], context: 'Top teams from state-level competition' },
+      ],
+      3: [
+        { activity: 'NHS officer with active projects', scoreRange: [5, 6], context: 'Leadership role with tangible initiatives; distinguishes from passive membership' },
+        { activity: 'Honor society member with tutoring hours', scoreRange: [4, 5], context: 'Standard involvement; quantify student outcomes' },
+        { activity: 'Academic team member with regional awards', scoreRange: [5, 6], context: 'Regular competition participation with some recognition' },
+      ],
+      4: [
+        { activity: 'NHS membership only', scoreRange: [1, 3], context: 'One of the most common resume-padding activities; membership alone is Tier 4' },
+        { activity: 'Honor roll listing', scoreRange: [1, 2], context: 'Academic achievement, not an extracurricular activity' },
+      ],
+    },
+  },
+
+  religious_cultural: {
+    label: 'Religious & Cultural Activities',
+    keywords: ['religious', 'church', 'mosque', 'temple', 'synagogue', 'faith', 'cultural', 'heritage', 'tradition', 'interfaith', 'ministry'],
+    tiers: {
+      1: [
+        { activity: 'Interfaith initiative with policy/institutional impact', scoreRange: [9, 10], context: 'Created lasting cross-community dialogue with measurable outcomes' },
+        { activity: 'Founded cultural preservation project with national reach', scoreRange: [9, 10], context: 'Sustained effort preserving endangered cultural practices with documented impact' },
+      ],
+      2: [
+        { activity: 'Youth group leader for 2+ years with programs created', scoreRange: [7, 8], context: 'Sustained spiritual leadership with tangible community programs' },
+        { activity: 'Cultural education program founder', scoreRange: [7, 8], context: 'Created educational programs sharing cultural heritage with broader community' },
+        { activity: 'Interfaith dialogue organizer (multi-event series)', scoreRange: [7, 8], context: 'Organized sustained cross-faith engagement beyond one-off events' },
+      ],
+      3: [
+        { activity: 'Regular youth group participation + specific role', scoreRange: [4, 6], context: 'Active faith community involvement with defined responsibilities' },
+        { activity: 'Cultural club officer', scoreRange: [4, 5], context: 'Leadership in cultural organization; needs specific achievements' },
+        { activity: 'Sunday school / religious education teaching', scoreRange: [5, 6], context: 'Teaching role shows commitment; quantify students and duration' },
+      ],
+      4: [
+        { activity: 'Passive congregation membership', scoreRange: [1, 2], context: 'Attendance without active contribution or leadership' },
+        { activity: 'One-time cultural event participation', scoreRange: [1, 2], context: 'Single event without sustained engagement' },
+      ],
+    },
+  },
+
+  international: {
+    label: 'International Experience',
+    keywords: ['exchange', 'international', 'study abroad', 'cultural exchange', 'rotary', 'afs', 'nsli-y', 'language immersion', 'global'],
+    tiers: {
+      1: [
+        { activity: 'Competitive exchange with project outcomes (NSLI-Y, YES)', scoreRange: [9, 10], context: 'Highly selective government-sponsored exchange with language/cultural deliverables' },
+        { activity: 'International competition representative', scoreRange: [9, 10], context: 'Representing country in academic/cultural competition abroad' },
+      ],
+      2: [
+        { activity: 'AFS/Rotary year-long exchange program', scoreRange: [7, 8], context: 'Full academic year immersion in another culture; significant maturity signal' },
+        { activity: 'Language immersion program with certification', scoreRange: [7, 8], context: 'Intensive language study with measurable proficiency outcomes' },
+        { activity: 'International service project with sustained impact', scoreRange: [7, 8], context: 'Meaningful contribution abroad beyond voluntourism' },
+      ],
+      3: [
+        { activity: 'Short-term cultural exchange (2-4 weeks)', scoreRange: [4, 6], context: 'Brief but structured international experience; value depends on engagement' },
+        { activity: 'School-organized international trip with project', scoreRange: [4, 5], context: 'Group travel with academic component; distinguish personal contribution' },
+        { activity: 'Language study abroad (summer)', scoreRange: [4, 5], context: 'Summer language immersion; common among applicants to selective schools' },
+      ],
+      4: [
+        { activity: 'Family vacation reframed as cultural experience', scoreRange: [1, 2], context: 'Travel without structured learning or service component' },
+        { activity: 'Tourist trip listed as international experience', scoreRange: [1, 2], context: 'No academic, service, or cultural immersion component' },
+      ],
+    },
+  },
+
+  media_digital: {
+    label: 'Media & Digital Content',
+    keywords: ['youtube', 'podcast', 'social media', 'content creation', 'blog', 'streaming', 'video', 'digital media', 'influencer', 'tiktok', 'instagram'],
+    tiers: {
+      1: [
+        { activity: '100K+ audience across platforms with consistent content', scoreRange: [9, 10], context: 'Building large audience requires content strategy, consistency, and real engagement' },
+        { activity: 'National media award or recognition', scoreRange: [9, 10], context: 'External validation of content quality at national level' },
+      ],
+      2: [
+        { activity: '10K+ followers with consistent, quality content', scoreRange: [7, 8], context: 'Meaningful audience built through sustained effort and content quality' },
+        { activity: 'School media production lead (TV/radio/podcast)', scoreRange: [7, 8], context: 'Leading school media production with regular output' },
+        { activity: 'Monetized content creation with real revenue', scoreRange: [7, 8], context: 'Revenue validates audience engagement beyond vanity metrics' },
+      ],
+      3: [
+        { activity: 'School media club active member', scoreRange: [4, 6], context: 'Regular contribution to school media productions' },
+        { activity: 'Personal content creation with small but engaged audience', scoreRange: [4, 5], context: 'Consistent output shows dedication; distinguish by quality and engagement' },
+        { activity: 'Podcast/YouTube with 20+ episodes', scoreRange: [5, 6], context: 'Sustained content production shows commitment to craft' },
+      ],
+      4: [
+        { activity: 'Personal social media account', scoreRange: [1, 2], context: 'Having social media isn\'t an extracurricular activity' },
+        { activity: 'Single video/post that went viral', scoreRange: [1, 2], context: 'One-time virality without sustained content creation' },
+      ],
+    },
+  },
 };
 
 // ============================================================================

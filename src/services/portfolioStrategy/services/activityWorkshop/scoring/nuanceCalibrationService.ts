@@ -10,8 +10,9 @@
  * - Total adjustment magnitude capped at ±1.5 from rule scorer output
  * - If Sonnet returns scores outside bounds, code clamps them
  *
- * Graceful degradation: If calibration context is low confidence (no matching
- * category), the service skips the LLM call and returns pure rule scorer output.
+ * All activities go through Sonnet nuance calibration — the LLM is the primary
+ * intelligence. When no direct calibration data exists, proxy or universal
+ * fallback context is injected so Sonnet always has scoring guidance.
  *
  * BATCH OPTIMIZATION: calibrateBatch() sends ALL activities in a single Sonnet
  * call (~$0.006-0.009 for 10 activities vs ~$0.02-0.03 with individual calls).
@@ -29,7 +30,9 @@ import type {
   BatchCalibrationLLMResponse,
   ScoreAdjustment,
 } from './nuanceCalibrationTypes';
-import { getCalibrationContext } from './achievementRetrieval';
+import { getCalibrationContextWithTrace } from './achievementRetrieval';
+import type { CalibrationContextWithTrace } from './achievementRetrieval';
+import { STANDARD_WEIGHTS, NO_LEADERSHIP_WEIGHTS } from './scoringRules';
 import { resolveCategory } from './knowledge/categoryRegistry';
 
 // ============================================================================
@@ -49,14 +52,22 @@ const VALID_COMPONENTS = new Set(['recognition', 'leadership', 'community', 'com
  * Build a focused calibration prompt for a single activity.
  * Compact (~600 tokens input) with only the data needed for nuanced adjustment.
  */
-function buildCalibrationPrompt(input: NuanceCalibrationInput): string {
-  return buildActivitySection(input, 0);
+function buildCalibrationPrompt(
+  input: NuanceCalibrationInput,
+  resolutionContext?: { resolutionMethod: 'direct' | 'proxy' | 'universal'; proxyDomainUsed: string | null; domainSpecificContext: string | null }
+): string {
+  return buildActivitySection(input, 0, resolutionContext);
 }
 
 /**
  * Build a section for one activity within a batch prompt.
+ * Optionally injects proxy/universal context when domain resolution used a fallback.
  */
-function buildActivitySection(input: NuanceCalibrationInput, index: number): string {
+function buildActivitySection(
+  input: NuanceCalibrationInput,
+  index: number,
+  resolutionContext?: { resolutionMethod: 'direct' | 'proxy' | 'universal'; proxyDomainUsed: string | null; domainSpecificContext: string | null }
+): string {
   const { activity, preliminaryScores, tierRange, calibration } = input;
 
   const entriesSection = calibration.calibrationEntries
@@ -119,6 +130,31 @@ ${ctx.topTraps.length > 0 ? `- Name-drop traps: ${ctx.topTraps.join(', ')}` : ''
     }
   }
 
+  // Build resolution context block for proxy/universal fallback
+  let resolutionBlock = '';
+  if (resolutionContext) {
+    if (resolutionContext.resolutionMethod === 'proxy' && resolutionContext.proxyDomainUsed) {
+      resolutionBlock = `\n[PROXY CONTEXT WARNING: This activity type has NO direct calibration data.
+Benchmarks below are from the PROXY domain "${resolutionContext.proxyDomainUsed}" and may NOT directly apply.
+CRITICAL: Do NOT assume this activity matches the proxy domain's prestige levels or benchmarks.
+Score based on the activity's OWN evidence (scope, impact, recognition, commitment) — not the proxy domain's typical achievements.
+Proxy benchmarks are reference points for STRUCTURE (what tier looks like), not CONTENT (what specific achievements mean).]`;
+    } else if (resolutionContext.resolutionMethod === 'universal') {
+      resolutionBlock = `\n[UNIVERSAL SCORING — No field-specific benchmarks available for this activity type.
+Score based on these universal achievement signals:
+- SCALE: How many people are impacted? (10 = local/personal, 100+ = significant, 1000+ = impressive)
+- SELECTIVITY: How hard is it to get this role/recognition? (open to all = low, competitive selection = high)
+- DURATION: How sustained is commitment? (< 1yr = developing, 2-3yr = committed, 4yr = dedicated)
+- PROGRESSION: Is there growth in responsibility/impact? (static role = lower, growing role = higher)
+- EXTERNAL VALIDATION: Awards, published work, grants, media coverage, institutional recognition
+- ORIGINALITY: Did the student create something new vs participate in existing programs?
+Use the tier range and component constraints as bounds. Score conservatively for unknown domains.]`;
+    }
+    if (resolutionContext.domainSpecificContext) {
+      resolutionBlock += `\nHAIKU DOMAIN ANALYSIS: ${resolutionContext.domainSpecificContext}`;
+    }
+  }
+
   return `--- ACTIVITY ${index} ---
 ACTIVITY: ${activity.title}
 DESCRIPTION: ${activity.description}
@@ -129,7 +165,7 @@ PRELIMINARY SCORES (from deterministic rules):
 - Components: recognition ${preliminaryScores.components.recognitionScore}, leadership ${preliminaryScores.components.leadershipScore}, community ${preliminaryScores.components.communityScore}, commitment ${preliminaryScores.components.commitmentScore}
 
 FIELD: ${calibration.categoryMatch.category} → ${prestigeSection}
-
+${resolutionBlock}
 CALIBRATION BENCHMARKS:
 ${entriesSection || '  No matching benchmarks found'}
 
@@ -161,13 +197,39 @@ AO EXPECTATIONS (${resolution.category.label}):
  * Build a batch calibration prompt combining ALL activities into one Sonnet call.
  * Cross-activity context enables comparative scoring (e.g., research > grocery).
  */
-function buildBatchCalibrationPrompt(inputs: NuanceCalibrationInput[]): string {
-  const activitySections = inputs.map((input, idx) => buildActivitySection(input, idx)).join('\n\n');
+function buildBatchCalibrationPrompt(
+  inputs: NuanceCalibrationInput[],
+  resolutionContexts?: Array<{ resolutionMethod: 'direct' | 'proxy' | 'universal'; proxyDomainUsed: string | null; domainSpecificContext: string | null } | undefined>
+): string {
+  const activitySections = inputs.map((input, idx) =>
+    buildActivitySection(input, idx, resolutionContexts?.[idx])
+  ).join('\n\n');
 
   return `You are calibrating ${inputs.length} activity scores with field-specific context.
 Your job: adjust component scores WITHIN each activity's tier bounds to reflect nuance that deterministic rules missed.
 Return ONLY adjustments where the preliminary score clearly misses context.
 Consider activities comparatively — if one is clearly stronger/weaker than another, ensure scores reflect that.
+
+## SELECTIVITY CONTEXT PRINCIPLES
+Selectivity of the SETTING dramatically affects impressiveness. The same activity in different settings is NOT the same achievement:
+- University research lab > school science club (even for the same hours/role)
+- Selective program acceptance (e.g., RSI, SIMR, SSP) is itself evidence of distinction
+- "Research assistant" at MIT ≠ "research assistant" at local library
+- Working with published professors/PhDs signals a selective environment that vetted the student
+- Scale of dataset/project at a university (50K records, NLP pipeline) signals real institutional research
+
+## COMPARATIVE CALIBRATION: Activities of genuinely different quality MUST score differently
+- Research with co-authored paper + university setting + large dataset >> peer tutoring at school
+- State competition winner >> club participant with same hours
+- Founded nonprofit with 501(c)(3) >> "volunteered at food bank"
+- Ensure at least 1.5-point spread between activities of clearly different quality within the same tier
+
+## CALIBRATION EXAMPLES (use these as anchors):
+1. ML Research Assistant at university lab, co-authored paper, analyzed 50K+ records, built NLP pipeline → recognition 7-8, commitment 7-8. This is NOT the same as school-level tutoring.
+2. Math Tutor at school, 3 hrs/wk for 2 years, helped 15 students → recognition 3-4, commitment 5-6. Solid but common.
+3. Founded coding nonprofit, 200+ students served, $5K grant → recognition 6-7, leadership 7-8, community 7-8.
+4. Varsity basketball, team captain, led to state semifinals → recognition 5-6, leadership 6-7.
+5. Occasional food bank volunteer, 50 hours total, no defined role → recognition 1-2, commitment 2-3.
 
 ${activitySections}
 
@@ -179,6 +241,7 @@ RULES:
 5. Focus on: selectivity gradient, role nuance, subcategory prestige, progression arc
 6. Consider relative strength across activities — stronger activities should score higher
 7. Major alignment: If "critical" or "core" for intended major, this activity carries extra admissions weight — consider bumping recognition/community by up to +0.5 if evidence supports the alignment. If "complementary" or "unrelated," do not boost for major fit.
+8. Mid-range discrimination: Scores 4.0-6.9 should NOT cluster. If two mid-tier activities are genuinely different in quality, ensure their scores are at least 1.0 apart. Use the full range within each tier band.
 
 Return JSON only. CRITICAL REQUIREMENTS:
 - The "activities" array MUST have EXACTLY ${inputs.length} entries
@@ -266,6 +329,7 @@ function applyAdjustments(
     let adjustedScore = round1(adj.adjustedScore);
     const delta = adjustedScore - originalScore;
     if (Math.abs(delta) > MAX_COMPONENT_ADJUSTMENT) {
+      console.warn(`[NuanceCalibration] Component "${component}" adjustment capped: requested ${round1(delta)} → applied ${Math.sign(delta) * MAX_COMPONENT_ADJUSTMENT} for activity`);
       adjustedScore = round1(originalScore + Math.sign(delta) * MAX_COMPONENT_ADJUSTMENT);
     }
 
@@ -304,10 +368,7 @@ function calculateAdjustedTotal(
   leadershipApplicable: boolean,
   tierRange: { min: number; max: number }
 ): number {
-  // Standard weights (from scoringRules.ts)
-  const weights = leadershipApplicable
-    ? { tier: 0.30, recognition: 0.25, leadership: 0.125, community: 0.15, commitment: 0.175 }
-    : { tier: 0.343, recognition: 0.286, leadership: 0.0, community: 0.171, commitment: 0.20 };
+  const weights = leadershipApplicable ? STANDARD_WEIGHTS : NO_LEADERSHIP_WEIGHTS;
 
   const rawTotal =
     tierScore * weights.tier +
@@ -358,6 +419,9 @@ function processActivityAdjustments(
 
   // Cap total adjustment magnitude
   const totalDelta = adjustedTotal - activityScore.total;
+  if (Math.abs(totalDelta) > MAX_ADJUSTMENT_MAGNITUDE) {
+    console.warn(`[NuanceCalibration] Total adjustment capped: requested ${round1(totalDelta)} → applied ${Math.sign(totalDelta) * MAX_ADJUSTMENT_MAGNITUDE} for activity "${input.activity.title}"`);
+  }
   const finalTotal = Math.abs(totalDelta) > MAX_ADJUSTMENT_MAGNITUDE
     ? round1(activityScore.total + Math.sign(totalDelta) * MAX_ADJUSTMENT_MAGNITUDE)
     : adjustedTotal;
@@ -378,8 +442,8 @@ function processActivityAdjustments(
 /**
  * Calibrate an activity's scores using Sonnet and field-specific context.
  *
- * GRACEFUL DEGRADATION: If calibration context is low confidence with no
- * matching entries, skips the LLM call and returns uncalibrated scores.
+ * Always calls Sonnet — the LLM is the primary intelligence for nuance.
+ * Uses proxy/universal fallback when no direct calibration data is available.
  */
 export async function calibrateActivity(
   evidence: ExtractedEvidence,
@@ -389,16 +453,9 @@ export async function calibrateActivity(
   expertiseContext?: NuanceCalibrationInput['expertiseContext'],
   impressionContext?: NuanceCalibrationInput['impressionContext']
 ): Promise<NuanceCalibratedResult> {
-  // Assemble calibration context
-  const calibration = getCalibrationContext(evidence, tier, activityMeta);
-
-  // Graceful degradation: no calibration data = skip LLM call
-  if (
-    calibration.calibrationEntries.length === 0 ||
-    calibration.categoryMatch.confidence === 'low'
-  ) {
-    return buildUncalibratedResult(activityScore);
-  }
+  // Assemble calibration context with proxy/universal fallback — never returns empty
+  const calibrationWithTrace = getCalibrationContextWithTrace(evidence, tier, activityMeta);
+  const calibration = calibrationWithTrace as CalibrationContext;
 
   // Build input for the calibration prompt
   const input: NuanceCalibrationInput = {
@@ -421,12 +478,26 @@ export async function calibrateActivity(
     impressionContext,
   };
 
+  // Build resolution context for prompt enrichment
+  const resolutionContext = {
+    resolutionMethod: calibrationWithTrace.resolutionMethod,
+    proxyDomainUsed: calibrationWithTrace.proxyDomainUsed,
+    domainSpecificContext: calibrationWithTrace.domainSpecificContext,
+  };
+
   // Build prompt and call Sonnet
   const prompt = `You are calibrating activity scores with field-specific context.
 Your job: adjust component scores WITHIN the given tier bounds to reflect nuance that deterministic rules missed.
 Return ONLY adjustments where the preliminary score clearly misses context.
 
-${buildCalibrationPrompt(input)}
+## SELECTIVITY CONTEXT PRINCIPLES
+- University research lab > school science club (same hours, different tier)
+- Selective program acceptance is itself evidence of distinction
+- Scale of project (50K+ records, NLP pipeline) signals real institutional research
+- Working with published professors/PhDs signals selective environment
+- "Founded" at scale (200+ served, grant funding) >> "member" with same hours
+
+${buildCalibrationPrompt(input, resolutionContext)}
 
 RULES:
 1. Only adjust components where the preliminary score clearly under- or over-values based on the calibration data
@@ -435,6 +506,7 @@ RULES:
 4. Return empty adjustments array if preliminary scores are already well-calibrated
 5. Focus on: selectivity gradient, role nuance, subcategory prestige, progression arc
 6. Major alignment: If "critical" or "core" for intended major, this activity carries extra admissions weight — consider bumping recognition/community by up to +0.5 if evidence supports the alignment. If "complementary" or "unrelated," do not boost for major fit.
+7. Mid-range scores (4.0-6.9) need discrimination: use the full range within tier bands, not just the midpoint.
 
 Return JSON only:
 {"adjustments":[{"component":"recognition|leadership|community|commitment","adjustedScore":N,"reason":"brief reason"}]}`;
@@ -443,7 +515,7 @@ Return JSON only:
     model: SONNET_MODEL,
     temperature: 0.1,  // Low temperature for consistent calibration
     maxTokens: 500,    // Small output — just adjustments JSON
-    systemPrompt: 'You are a precise activity scoring calibrator. Return ONLY valid JSON with score adjustments. No explanation outside JSON.',
+    systemPrompt: 'You are a precise activity scoring calibrator for college admissions. You understand that selectivity of setting (university lab vs school club), scale of impact (50K records vs 15 students), and external validation (co-authored paper vs participation certificate) create LARGE score differences even within the same tier. Return ONLY valid JSON with score adjustments. No explanation outside JSON.',
     useJsonMode: true,
   };
 
@@ -493,8 +565,8 @@ type BatchActivityInput = {
  * Calibrate a batch of activities in a SINGLE Sonnet call.
  *
  * Strategy:
- * 1. Pre-filter: skip activities with low-confidence calibration context (no LLM needed)
- * 2. Batch: combine all remaining activities into ONE Sonnet call
+ * 1. Build calibration context for ALL activities (proxy/universal fallback, no skip)
+ * 2. Batch: combine all activities into ONE Sonnet call
  * 3. Parse: extract per-activity adjustments from batch JSON response
  * 4. Fallback: if batch JSON parse fails, retry with individual calls
  *
@@ -506,21 +578,18 @@ export async function calibrateBatch(
   // Initialize ALL slots with uncalibrated defaults — ensures no undefined slots escape
   const results: NuanceCalibratedResult[] = activities.map(a => buildUncalibratedResult(a.activityScore));
 
-  // Phase 1: Pre-filter — skip activities with low-confidence calibration context
-  const needsCalibration: Array<{ originalIndex: number; input: NuanceCalibrationInput }> = [];
+  // Phase 1: Build calibration inputs for ALL activities (no skip — LLM is primary intelligence)
+  // Uses getCalibrationContextWithTrace for proxy/universal fallback when direct match fails
+  const needsCalibration: Array<{
+    originalIndex: number;
+    input: NuanceCalibrationInput;
+    resolutionContext: { resolutionMethod: 'direct' | 'proxy' | 'universal'; proxyDomainUsed: string | null; domainSpecificContext: string | null };
+  }> = [];
 
   for (let i = 0; i < activities.length; i++) {
     const a = activities[i];
-    const calibration = getCalibrationContext(a.evidence, a.tier, a.meta);
-
-    if (
-      calibration.calibrationEntries.length === 0 ||
-      calibration.categoryMatch.confidence === 'low'
-    ) {
-      // No calibration data — use uncalibrated scores
-      results[i] = buildUncalibratedResult(a.activityScore);
-      continue;
-    }
+    const calibrationWithTrace = getCalibrationContextWithTrace(a.evidence, a.tier, a.meta);
+    const calibration = calibrationWithTrace as CalibrationContext;
 
     needsCalibration.push({
       originalIndex: i,
@@ -543,6 +612,11 @@ export async function calibrateBatch(
         expertiseContext: a.expertiseContext,
         impressionContext: a.impressionContext,
       },
+      resolutionContext: {
+        resolutionMethod: calibrationWithTrace.resolutionMethod,
+        proxyDomainUsed: calibrationWithTrace.proxyDomainUsed,
+        domainSpecificContext: calibrationWithTrace.domainSpecificContext,
+      },
     });
   }
 
@@ -564,7 +638,8 @@ export async function calibrateBatch(
   console.log(`[NuanceCalibration] Batch calibrating ${needsCalibration.length} activities in single Sonnet call...`);
 
   const batchInputs = needsCalibration.map(n => n.input);
-  const batchPrompt = buildBatchCalibrationPrompt(batchInputs);
+  const batchResolutionContexts = needsCalibration.map(n => n.resolutionContext);
+  const batchPrompt = buildBatchCalibrationPrompt(batchInputs, batchResolutionContexts);
 
   // Scale maxTokens: ~250 tokens per activity (adjustments JSON + reasons)
   // Cap at 8000 to avoid extremely long outputs; for 20+ activities the

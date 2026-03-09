@@ -1,24 +1,19 @@
 /**
  * Teaching Sophistication Router — Score-Driven Adaptive Teaching
  *
- * Routes teaching depth by description score level. Stops giving basic writing
- * tips to advanced writers.
+ * Routes teaching into completely separate paradigms by description score.
+ * Each level is a different LENS, not a filtered version of the same advice.
  *
- * Three sophistication tiers:
- * - Foundational (descScore < 4.0): Full writing principles — active verbs,
- *   quantification, impact framing. Current system behavior.
- * - Intermediate (4.0-6.5): Strategic framing, competitive differentiation,
- *   narrative connection, committee pitch. SKIP basic writing tips.
- * - Advanced (> 6.5): Word-level mastery, information density audit,
- *   school-specific optimization, alternative framings.
+ * Three teaching paradigms:
+ * - Foundational (descScore < 5.0): WRITING MECHANICS — teach how to write
+ *   (active verbs, quantification, impact framing, structure templates)
+ * - Intermediate (5.0-8.0): STRATEGIC POSITIONING — teach how to frame
+ *   (committee pitch, competitive differentiation, narrative threading)
+ * - Advanced (> 8.0): CHARACTER-LEVEL OPTIMIZATION — surgical word-level
+ *   (info density audit, first-three-words framing, school-specific variants)
  *
- * BANNED for intermediate/advanced:
- * - "Use active verbs instead of passive"
- * - "Add specific numbers and metrics"
- * - "Show impact, not just duties"
- * - "Lead with your strongest achievement"
- * - "Replace 'help' with ownership verbs"
- * - "Reorder to put leadership first"
+ * No ban lists. Higher levels don't suppress lower-level content — they
+ * focus on entirely different concerns, naturally excluding basics.
  *
  * Cost: $0 (pure TypeScript logic, no LLM calls)
  */
@@ -50,15 +45,17 @@ export type SophisticationMap = Map<string, SophisticationClassification>;
  * Threshold boundaries for sophistication tiers (1-10 scale).
  *
  * The description rule scorer produces scores clamped to [1, 10].
- * Boundaries:
- * - Foundational: < 4.0 (scores 1.0-3.9)
- * - Intermediate: 4.0-6.5 inclusive (scores 4.0-6.5)
- * - Advanced: > 6.5 (scores 6.6-10.0)
+ * NOTE: The rule scorer tends to reward clarity/ownership/numbers even for
+ * simple descriptions — basic-but-clear descriptions often score 7-8/10.
+ * Thresholds are calibrated accordingly:
+ * - Foundational: < 5.0 (truly weak descriptions — passive, vague, no numbers)
+ * - Intermediate: 5.0-8.0 inclusive (competent writing with basic clarity)
+ * - Advanced: > 8.0 (genuinely exceptional — rich detail, strong verbs, deep insight)
  */
 const THRESHOLDS = {
-  foundational: { max: 4.0 },    // exclusive upper bound
-  intermediate: { min: 4.0, max: 6.5 }, // inclusive lower, inclusive upper
-  advanced: { min: 6.5 },        // exclusive lower bound
+  foundational: { max: 5.0 },    // exclusive upper bound
+  intermediate: { min: 5.0, max: 8.0 }, // inclusive lower, inclusive upper
+  advanced: { min: 8.0 },        // exclusive lower bound
 } as const;
 
 /**
@@ -150,82 +147,93 @@ export function getDominantSophistication(map: SophisticationMap): TeachingSophi
 // ============================================================================
 
 /**
- * Content BANNED from intermediate and advanced teaching.
- * These are commoditized tips that waste characters for competent writers.
- */
-const BANNED_CONTENT = [
-  'use active verbs instead of passive',
-  'add specific numbers and metrics',
-  'show impact, not just duties',
-  'lead with your strongest achievement',
-  "replace 'help' with ownership verbs",
-  'reorder to put leadership first',
-  'use strong action verbs',
-  'quantify your achievements',
-  'avoid passive voice',
-  'start with a verb',
-] as const;
-
-/**
- * Get the sophistication-specific prompt block to inject into the teaching prompt.
- * This controls WHAT kind of teaching the model provides for each activity.
+ * Three completely separate teaching paradigms — not variations of the same
+ * prompt with a ban list, but fundamentally different lenses.
+ *
+ * Foundational: WRITING MECHANICS — teach HOW to write a good description
+ * Intermediate: STRATEGIC POSITIONING — teach how to FRAME for admissions
+ * Advanced: CHARACTER-LEVEL OPTIMIZATION — every word earns its place
+ *
+ * Each level operates independently. Higher levels don't reference or suppress
+ * lower-level content — they simply focus on entirely different concerns.
  */
 export function getSophisticationPromptBlock(level: TeachingSophistication): string {
   switch (level) {
     case 'foundational':
-      return `TEACHING DEPTH: FOUNDATIONAL
-This student's description needs fundamental improvement. Provide:
-- Full writing principle explanations (active verbs, quantification, impact framing)
-- Step-by-step guidance on transforming weak descriptions
-- Before/after examples showing each principle in action
-- Basic structure templates they can follow
-- Explain WHY each change matters (they may not know)`;
+      return `TEACHING LENS: WRITING MECHANICS
+This student needs to learn HOW to write a strong activity description. Your job is to teach the craft.
+
+FOCUS AREAS:
+1. Verb power — Replace passive/weak verbs with ownership verbs that show agency
+   Teach: "Helped with" → "Designed", "Was responsible for" → "Led", "Worked on" → "Built"
+2. Quantification — Every claim needs a number or concrete scope
+   Teach: "Many students" → "47 students", "Raised money" → "Raised $2,400", "Led team" → "Led team of 8"
+3. Impact framing — Move from duties to outcomes
+   Teach: "Organized events" → "Organized 6 campus events reaching 200+ students"
+4. Description structure — Semicolon-separated fragments that maximize info density
+   Teach: Fragment format packs 2-3x more information than flowing sentences
+5. Principle explanations — Explain WHY each change matters to admissions officers
+   They may not know that AOs spend ~30 seconds per activity list
+
+TEACHING STYLE: Patient, educational, step-by-step. Show before/after for every principle. Provide templates they can follow.`;
 
     case 'intermediate':
-      return `TEACHING DEPTH: INTERMEDIATE
-This student already writes competently — DO NOT waste their time with basics.
-BANNED content (never include any of these):
-${BANNED_CONTENT.map(b => `  - "${b}"`).join('\n')}
+      return `TEACHING LENS: STRATEGIC POSITIONING
+This student writes clearly. Your job shifts entirely: teach them to POSITION their activities for competitive admissions.
 
-Instead focus on:
-- Strategic framing for target school committees
-- Competitive differentiation (what makes THIS student's version unique)
-- Narrative connection across activities (spike reinforcement)
-- Tier-crossing specifics (what separates a 5 from a 7)
-- Committee pitch sentence (the one line an AO would quote)
-- How to frame this activity for THEIR specific intended major/schools`;
+FOCUS AREAS:
+1. Committee framing — How would an AO describe this activity to the admissions committee?
+   Craft the one sentence an AO would quote when advocating for this student
+2. Competitive differentiation — Thousands of applicants have similar activities
+   What makes THIS student's version unique? What detail would an AO remember?
+3. Narrative threading — How does this activity connect to their spike/intended major?
+   Each description should reinforce the portfolio story, not stand alone
+4. Tier-crossing specifics — What concrete changes move a description from "good" to "compelling"?
+   Identify the specific gap between their current score and the next tier
+5. School-specific framing — The same activity reads differently for MIT vs. Stanford vs. UChicago
+   How should they adjust emphasis for their target schools' values?
+6. AO psychology — What makes an admissions officer pause and re-read?
+   The description should create a mental image, not just list facts
+
+TEACHING STYLE: Strategic, analytical. Assume writing competence. Focus on the "so what?" — why should the committee care about THIS version?`;
 
     case 'advanced':
-      return `TEACHING DEPTH: ADVANCED — WORD-LEVEL MASTERY
-This student writes well. Every character must be intentional.
-BANNED content (never include any of these):
-${BANNED_CONTENT.map(b => `  - "${b}"`).join('\n')}
+      return `TEACHING LENS: CHARACTER-LEVEL OPTIMIZATION
+This student writes well. Your job is surgical: optimize every character for maximum admissions impact.
 
-Focus exclusively on:
-- Word-by-word audit: what impression does each word create?
-- First-three-words cognitive frame analysis (what does the reader assume?)
-- Information density audit: identify wasted characters and missing high-value info
-- School-specific optimization (different rewrites for different school priorities)
-- Competitive landscape positioning (what do OTHER applicants in this niche write?)
-- Committee advocacy sentence (craft the exact sentence an AO would use to champion this student)
-- Alternative framings with explicit trade-off analysis
-- "Stop and re-read" test: would an AO pause and re-read this? If not, rewrite until they would`;
+FOCUS AREAS:
+1. First-three-words audit — What cognitive frame do the opening words create?
+   The reader forms an impression in <1 second. Optimize that first impression
+2. Information density — Identify every wasted character. What high-value info is missing?
+   At 150 characters, every word must earn its place. Find the dead weight
+3. Word-level impression audit — What does each specific word choice signal?
+   "Managed" vs "Orchestrated" vs "Scaled" — each creates a different applicant image
+4. Competitive landscape — What do other top applicants in this niche typically write?
+   Position this student's description to stand out from that specific competitive set
+5. Alternative framings — Provide 2-3 rewrites with explicit trade-off analysis
+   Different framings emphasize different strengths. Let the student choose strategically
+6. School-specific variants — Different rewrites optimized for different institutional priorities
+   Research-focused schools vs. community-focused vs. innovation-focused
+7. The "stop and re-read" test — Would a tired AO on application #47 pause here?
+   If not, the description isn't done. Rewrite until it demands attention
+
+TEACHING STYLE: Precise, surgical. Treat each character as precious real estate. No general advice — only specific word-level interventions with explicit reasoning.`;
   }
 }
 
 /**
  * Get a system-level sophistication directive based on the dominant level.
- * Injected into the system prompt to set overall tone.
+ * Injected into the system prompt to set overall tone for the entire response.
  */
 export function getSystemSophisticationDirective(dominant: TeachingSophistication): string {
   switch (dominant) {
     case 'foundational':
-      return `Most activities need fundamental description improvement. Teach writing principles clearly and show step-by-step transformations.`;
+      return `This student needs to learn writing mechanics. Teach principles patiently — active verbs, quantification, impact framing, description structure. Show step-by-step transformations with clear before/after examples.`;
 
     case 'intermediate':
-      return `This student writes competently. Skip basic writing tips entirely — they know to use active verbs and add numbers. Focus on strategic framing, competitive differentiation, and narrative cohesion that separates good from great.`;
+      return `This student writes competently. Shift your entire focus to strategic positioning — committee framing, competitive differentiation, narrative threading, and school-specific emphasis. Assume they already know how to write clearly.`;
 
     case 'advanced':
-      return `This student is a strong writer. Your teaching must match their level — word-level precision, information density optimization, school-specific framing, and competitive positioning. Basic writing advice would insult their intelligence and waste their time.`;
+      return `This student is a strong writer. Operate surgically at the character level — word choice impressions, information density, competitive landscape positioning, and school-specific optimization. Every piece of advice must be specific to their exact words, not general writing guidance.`;
   }
 }

@@ -242,6 +242,8 @@ export interface EnhanceRequest {
   sessionId?: string;
   /** Specific dimensions to focus on (optional) */
   focusDimensions?: string[];
+  /** Use the new 13-dimension hybrid scoring pipeline (default: true) */
+  useNewScoringPipeline?: boolean;
 }
 
 /** Output of the full enhance flow */
@@ -270,6 +272,8 @@ export interface EnhanceResult {
 export interface PreAnalyzeRequest {
   text: string;
   essayType?: string;
+  /** Use the new 13-dimension hybrid scoring pipeline (default: true) */
+  useNewScoringPipeline?: boolean;
 }
 
 /** Input for plan-improvements endpoint */
@@ -278,6 +282,8 @@ export interface PlanImprovementsRequest {
   essayType?: string;
   focusDimensions?: string[];
   maxActions?: number;
+  /** Use the new 13-dimension hybrid scoring pipeline (default: true) */
+  useNewScoringPipeline?: boolean;
 }
 
 /** Input for regression-check endpoint */
@@ -286,6 +292,67 @@ export interface RegressionCheckRequest {
   afterText: string;
   essayType?: string;
 }
+
+// ============================================================================
+// STREAMING EVENTS
+// ============================================================================
+
+/** SSE event types for the streaming enhancement endpoint */
+export type EnhancementEventType =
+  | 'pre_analysis'
+  | 'plan'
+  | 'edit_applied'
+  | 'edit_rejected'
+  | 'complete'
+  | 'error';
+
+/** Base event shape */
+interface BaseEnhancementEvent {
+  type: EnhancementEventType;
+  timestamp: string;
+  stepIndex?: number;
+}
+
+export interface PreAnalysisEvent extends BaseEnhancementEvent {
+  type: 'pre_analysis';
+  data: EssaySnapshot;
+}
+
+export interface PlanEvent extends BaseEnhancementEvent {
+  type: 'plan';
+  data: {
+    action: ImprovementAction;
+    totalPlanned: number;
+  };
+}
+
+export interface EditAppliedEvent extends BaseEnhancementEvent {
+  type: 'edit_applied';
+  data: EnhancementStepResult;
+}
+
+export interface EditRejectedEvent extends BaseEnhancementEvent {
+  type: 'edit_rejected';
+  data: EnhancementStepResult;
+}
+
+export interface CompleteEvent extends BaseEnhancementEvent {
+  type: 'complete';
+  data: EnhanceResult;
+}
+
+export interface ErrorEvent extends BaseEnhancementEvent {
+  type: 'error';
+  data: { message: string };
+}
+
+export type EnhancementEvent =
+  | PreAnalysisEvent
+  | PlanEvent
+  | EditAppliedEvent
+  | EditRejectedEvent
+  | CompleteEvent
+  | ErrorEvent;
 
 // ============================================================================
 // RE-EXPORTS (convenience)

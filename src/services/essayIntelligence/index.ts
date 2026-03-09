@@ -83,6 +83,13 @@ export { ContextBuilder, contextBuilder } from './contextBuilder';
 export { StructuralCartographer, structuralCartographer } from './analysis/structuralCartographer';
 export { SequentialDeepWalk, sequentialDeepWalk } from './analysis/sequentialDeepWalk';
 export { RunningUnderstandingManager, runningUnderstandingManager } from './analysis/runningUnderstandingManager';
-export { Crystallizer, crystallizer } from './analysis/crystallizer';
+export { CrystallizerService, crystallizerService } from './analysis/crystallizer';
+export type {
+  ParagraphScoreEntry,
+  ParagraphScoreMatrix as L4ParagraphScoreMatrix,
+  CoherenceIssue,
+  CoherenceReport,
+  L4CrystallizationResult,
+} from './analysis/crystallizer';
 export { DeepAnnotationService, deepAnnotationService } from './analysis/deepAnnotationService';
 export { AnalysisOrchestrator, analysisOrchestrator } from './analysis/analysisOrchestrator';

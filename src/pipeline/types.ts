@@ -15,10 +15,11 @@ import type {
   ImpressionLabel,
   ExtractedFeatures,
   FinalDimensionScore,
+  PatternManifest,
+  StrategyManifest,
 } from '../workshop/shared/types';
 import type { NarrativeAnalysisResult } from '../workshop/scoring/narrativeAnalyzerTypes';
 import type { DeepContentAnalysis } from './contentAnalysisTypes';
-
 // ============================================================================
 // TEXT ANCHORING
 // ============================================================================
@@ -411,6 +412,10 @@ export interface EnrichedFeatures {
   narrativeAnalysis?: NarrativeAnalysisResult;
   /** Deep content analysis — structure, theme, character, insight (Wave 2) */
   deepContentAnalysis?: DeepContentAnalysis;
+  /** Detected essay patterns from pattern registry (Wave 3) */
+  detectedPatterns?: PatternManifest[];
+  /** Detected writing strategy from structure analysis (Wave 3) */
+  detectedStrategy?: StrategyManifest;
 }
 
 /** Internal: Phase 4 score derivation input */

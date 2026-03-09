@@ -58,15 +58,22 @@ export type ActivityFingerprint = string;
  * These mirror the scoring pipeline output structure.
  */
 export interface CachedScoreComponents {
-  /** Description score breakdown */
+  /** Description score — full DescriptionScore object round-tripped through JSONB */
   descriptionScore: {
     total: number;
     breakdown: Record<string, unknown>;
+    strengths: string[];
+    improvements: string[];
+    overallRationale: string;
   };
-  /** Activity score breakdown */
+  /** Activity score — full ActivityScore object round-tripped through JSONB */
   activityScore: {
     total: number;
-    components: Record<string, unknown>;
+    breakdown: Record<string, unknown>;
+    tierJustification: string;
+    comparisonBenchmarks: Record<string, unknown>;
+    improvementPaths: string[];
+    overallRationale: string;
   };
   /** Tier classification */
   tierClassification: {
@@ -84,15 +91,22 @@ export interface CrossUserCacheEntry {
   id: string;
   /** SHA-256 fingerprint of the activity input */
   fingerprint: ActivityFingerprint;
-  /** Cached description score (total + breakdown) */
+  /** Cached description score — full object round-tripped through JSONB */
   descriptionScore: {
     total: number;
     breakdown: Record<string, unknown>;
+    strengths: string[];
+    improvements: string[];
+    overallRationale: string;
   };
-  /** Cached activity score (total + components) */
+  /** Cached activity score — full object round-tripped through JSONB */
   activityScore: {
     total: number;
-    components: Record<string, unknown>;
+    breakdown: Record<string, unknown>;
+    tierJustification: string;
+    comparisonBenchmarks: Record<string, unknown>;
+    improvementPaths: string[];
+    overallRationale: string;
   };
   /** Cached tier classification */
   tierClassification: {
@@ -191,10 +205,17 @@ export interface ActivityScoringCacheRow {
   description_score: {
     total: number;
     breakdown: Record<string, unknown>;
+    strengths: string[];
+    improvements: string[];
+    overallRationale: string;
   };
   activity_score: {
     total: number;
-    components: Record<string, unknown>;
+    breakdown: Record<string, unknown>;
+    tierJustification: string;
+    comparisonBenchmarks: Record<string, unknown>;
+    improvementPaths: string[];
+    overallRationale: string;
   };
   tier_classification: {
     internalTier: InternalTier;

@@ -188,9 +188,9 @@ function generateOverallInsight(
   if (eqi >= 70) {
     const guidance =
       strongest === weakest
-        ? 'targeted revision of your weaker passages would make a meaningful difference'
-        : `${weakest} is where focused revision would make the biggest difference`;
-    return `This is a strong essay with clear strengths in ${strongest}. To elevate further, focus on ${guidance}.`;
+        ? 'Targeted revision of your weaker passages would make a meaningful difference.'
+        : `Focused revision on ${weakest} would make the biggest difference.`;
+    return `This is a strong essay with clear strengths in ${strongest}. ${guidance}`;
   }
 
   if (eqi >= 55) {

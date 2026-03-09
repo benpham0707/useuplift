@@ -4,10 +4,15 @@
  * Wraps the existing analyzeEssay() engine to produce a lightweight
  * EssaySnapshot suitable for improvement planning and regression guarding.
  *
- * PERFORMANCE: ~50-200ms (deterministic feature detection + rubric scoring,
- * no LLM calls). Designed to run ~100x per LLM call in the enhancement loop.
+ * Supports two modes:
+ *   1. Legacy (default): 12-dimension analyzeEssay() engine (~50-200ms)
+ *   2. New pipeline: 13-dimension hybrid scoring system (~2ms heuristic-only)
  *
- * Dependencies: analyzeEssay (core analysis engine)
+ * The new pipeline is activated via useNewScoringPipeline=true flag.
+ *
+ * PERFORMANCE: ~50-200ms legacy, ~2ms new pipeline (both deterministic, no LLM)
+ *
+ * Dependencies: analyzeEssay (core analysis engine), workshopBridge (new pipeline)
  */
 
 import type { EssaySnapshot } from './types';
@@ -15,14 +20,22 @@ import type { EssaySnapshot } from './types';
 /**
  * Pre-analyze essay text and return a quality snapshot.
  *
- * Uses the full 12-dimension rubric scorer (deterministic, no LLM)
- * to produce dimension scores, EQI, and identify weakest areas.
+ * @param text - Full essay text
+ * @param essayType - Optional essay type for context
+ * @param useNewPipeline - Use the new 13-dimension hybrid scoring pipeline
  */
 export async function preAnalyze(
   text: string,
-  essayType?: string
+  essayType?: string,
+  useNewPipeline?: boolean
 ): Promise<EssaySnapshot> {
-  // Lazy import to avoid circular dependencies
+  // New 13-dimension hybrid pipeline (heuristic-only mode)
+  if (useNewPipeline) {
+    const { preAnalyzeWithNewPipeline } = await import('./workshopBridge');
+    return preAnalyzeWithNewPipeline(text, essayType);
+  }
+
+  // Legacy 12-dimension analyzeEssay() engine
   const { analyzeEssay } = await import('@/core/essay/analysis/analysisEngine');
 
   const report = await analyzeEssay({

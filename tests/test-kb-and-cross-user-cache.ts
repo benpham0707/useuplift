@@ -418,12 +418,23 @@ async function testCacheDisabled(): Promise<void> {
 
   // 6b. Write returns false when disabled
   const wrote = await cache.write('abc123', {
-    descriptionTotal: 7.5,
-    descriptionBreakdown: {},
-    activityTotal: 8.0,
-    activityComponents: {},
+    activityScore: {
+      total: 8.0,
+      breakdown: {},
+      tierJustification: 'Test',
+      comparisonBenchmarks: {},
+      improvementPaths: [],
+      overallRationale: 'Test',
+    },
+    descriptionScore: {
+      total: 7.5,
+      breakdown: {},
+      strengths: [],
+      improvements: [],
+      overallRationale: 'Test',
+    },
     internalTier: 2 as InternalTier,
-    externalTier: 'Strong' as ExternalTier,
+    externalTier: 2 as ExternalTier,
   });
   assert(wrote === false, 'Write should return false when disabled');
 }
@@ -665,6 +676,20 @@ function testC3DomainMappingFixes(): void {
   );
   assert(hasWorkPattern === true, 'work_family should have work-related expertise signals (from work_employment domain)');
   assert(hasFamilyPattern === true, 'work_family should have family-related expertise signals (merged from family_responsibility)');
+
+  // C3d: medical_health should now map to medical_health expertise domain (was null)
+  const medicalCat = getCategory('medical_health');
+  assert(medicalCat !== undefined, 'medical_health category should exist');
+  assert(
+    medicalCat?.expertiseDomainId === 'medical_health',
+    `medical_health should map to "medical_health" expertise domain, got "${medicalCat?.expertiseDomainId}"`,
+  );
+  assert(medicalCat?.aoExpectations !== null, 'medical_health should have AO expectations from medical_health domain');
+  assert(
+    (medicalCat?.realExpertiseSignals.length ?? 0) > 0,
+    'medical_health should have expertise signals from medical_health domain',
+  );
+  console.log(`  medical_health signals: ${medicalCat?.realExpertiseSignals.length}`);
 }
 
 // ============================================================================
@@ -882,12 +907,23 @@ async function testH4ScoreValidation(): Promise<void> {
   // the public interface behaves correctly.
 
   const validResult = await cache.write('test-fp-valid', {
-    descriptionTotal: 7.5,
-    descriptionBreakdown: {},
-    activityTotal: 8.0,
-    activityComponents: {},
+    activityScore: {
+      total: 8.0,
+      breakdown: {},
+      tierJustification: 'Test',
+      comparisonBenchmarks: {},
+      improvementPaths: [],
+      overallRationale: 'Test',
+    },
+    descriptionScore: {
+      total: 7.5,
+      breakdown: {},
+      strengths: [],
+      improvements: [],
+      overallRationale: 'Test',
+    },
     internalTier: 2 as InternalTier,
-    externalTier: 'Strong' as ExternalTier,
+    externalTier: 2 as ExternalTier,
   });
   assert(validResult === false, 'Write with valid scores should return false (cache disabled)');
 
@@ -951,19 +987,19 @@ function testM6LibraryStatsDeduplication(): void {
 function testKBVersionBump(): void {
   section('KB Version Bump');
 
-  // KB_VERSION should be 2.0.0 after all fixes
+  // KB_VERSION should be 2.1.0 after cache shape fix + medical_health mapping
   assert(
-    KB_VERSION === '2.0.0',
-    `KB_VERSION should be "2.0.0" after fixes, got "${KB_VERSION}"`,
+    KB_VERSION === '2.1.0',
+    `KB_VERSION should be "2.1.0" after fixes, got "${KB_VERSION}"`,
   );
 
   const meta = getKnowledgeBaseVersion();
   assert(
-    meta.version === '2.0.0',
-    `Version metadata should report "2.0.0", got "${meta.version}"`,
+    meta.version === '2.1.0',
+    `Version metadata should report "2.1.0", got "${meta.version}"`,
   );
 
-  console.log(`  KB_VERSION: ${KB_VERSION} (bumped from 1.0.0)`);
+  console.log(`  KB_VERSION: ${KB_VERSION} (bumped from 2.0.0)`);
 }
 
 // ============================================================================

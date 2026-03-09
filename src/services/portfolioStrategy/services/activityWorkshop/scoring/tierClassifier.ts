@@ -33,6 +33,24 @@ import { BENCHMARKS_BY_CATEGORY, type BenchmarkEntry } from './comparisonBenchma
 import { findRecognitionsInText } from './knowledge/recognitionIndex';
 
 // ============================================================================
+// RESEARCH CATEGORY SET — all activity categories that represent research
+// ============================================================================
+
+/**
+ * Categories where research-depth signals (T2_G, T3_F) should apply.
+ * Includes STEM AND non-STEM research: social science, humanities, health.
+ * Uses exact canonical category IDs from categoryRegistry.ts.
+ */
+const RESEARCH_CATEGORIES = new Set([
+  'stem_research',      // Physics, chemistry, biology, CS research
+  'medical_health',     // Clinical research, public health studies
+  'technology',         // Software/hardware research, systems research
+  'social_activism',    // Policy research, social science fieldwork
+  'academic_enrichment', // Humanities research, independent study
+  'writing_journalism', // Investigative journalism, literary research
+]);
+
+// ============================================================================
 // TIER CLASSIFICATION RULES
 // ============================================================================
 
@@ -66,6 +84,7 @@ function evaluateTier1Signals(evidence: ExtractedEvidence): TierSignal[] {
     (evidence.scope.level === 'national' || evidence.scope.level === 'international') &&
     evidence.scope.confidence >= 0.7 &&
     evidence.impact.hasQuantifiedOutcomes &&
+    evidence.impact.impactQuality === 'verified_significant' &&
     (evidence.impact.estimatedPeopleReached ?? 0) >= 1000
   );
   signals.push({
@@ -167,6 +186,7 @@ function evaluateTier2Signals(evidence: ExtractedEvidence): TierSignal[] {
   // [T2-C] Impact reaching 500+ people with verifiable quantified outcomes
   const hasSignificantImpact = (
     evidence.impact.hasQuantifiedOutcomes &&
+    (evidence.impact.impactQuality === 'verified_significant' || evidence.impact.impactQuality === 'verified_modest') &&
     (evidence.impact.estimatedPeopleReached ?? 0) >= 500 &&
     evidence.impact.metrics.some(m => m.isVerifiable)
   );
@@ -238,6 +258,33 @@ function evaluateTier2Signals(evidence: ExtractedEvidence): TierSignal[] {
       ? `Published research with national recognition and quantified outcomes (${evidence.impact.tangibleOutcomes.length} outcomes)`
       : `Recognition: ${hasNationalRecognition}, quantified: ${evidence.impact.hasQuantifiedOutcomes}, outcomes: ${evidence.impact.tangibleOutcomes.length}`,
     weight: 0.85,
+  });
+
+  // [T2-G] Research with institutional setting + quantified outcomes + technical depth
+  // Catches research assistants at university labs who have co-authored papers,
+  // worked with large datasets, or built analysis pipelines — even WITHOUT
+  // a formal "national" recognition tag. University setting + quantified outcomes
+  // + research category is inherently T2-worthy (vs school tutoring which is T3-4).
+  // Covers ALL research domains: STEM, social science, humanities, health, etc.
+  const isResearchCategory = RESEARCH_CATEGORIES.has(evidence.categoryMatch.category);
+  const hasUniversityOrLabSetting = (
+    evidence.scope.level === 'national' || evidence.scope.level === 'international' ||
+    evidence.scope.level === 'regional' ||
+    evidence.recognitions.some(r => r.isVerifiable && (r.level === 'national' || r.level === 'state'))
+  );
+  const hasSubstantialResearchOutput = (
+    evidence.impact.hasQuantifiedOutcomes &&
+    evidence.impact.tangibleOutcomes.length >= 2 &&
+    evidence.commitment.yearsActive >= 1
+  );
+  const hasResearchDepth = isResearchCategory && hasUniversityOrLabSetting && hasSubstantialResearchOutput;
+  signals.push({
+    rule: 'T2_G_RESEARCH_DEPTH',
+    matched: hasResearchDepth,
+    evidence: hasResearchDepth
+      ? `Research in ${evidence.categoryMatch.category} with institutional setting, ${evidence.impact.tangibleOutcomes.length} quantified outcomes, ${evidence.commitment.yearsActive}yr commitment`
+      : `Category: ${evidence.categoryMatch.category}, scope: ${evidence.scope.level}, outcomes: ${evidence.impact.tangibleOutcomes.length}`,
+    weight: 0.8,
   });
 
   return signals;
@@ -317,6 +364,27 @@ function evaluateTier3Signals(evidence: ExtractedEvidence): TierSignal[] {
     evidence: benchmarkMatch.matched
       ? `Matches benchmark: ${benchmarkMatch.benchmarkName}`
       : 'No Tier 3 benchmark match',
+    weight: 0.7,
+  });
+
+  // [T3-F] Research activity with quantified outcomes + commitment
+  // Ensures any research activity with real outcomes lands at LEAST Tier 3,
+  // even if scope/recognition signals are weak. Research with tangible outputs
+  // (co-authored paper, dataset analysis, pipeline built) is inherently above
+  // basic school participation (Tier 4-5).
+  // Covers ALL research domains: STEM, social science, humanities, health, etc.
+  const isResearchWithOutputs = (
+    RESEARCH_CATEGORIES.has(evidence.categoryMatch.category) &&
+    evidence.impact.hasQuantifiedOutcomes &&
+    evidence.impact.tangibleOutcomes.length > 0 &&
+    evidence.commitment.yearsActive >= 1
+  );
+  signals.push({
+    rule: 'T3_F_RESEARCH_WITH_OUTPUTS',
+    matched: isResearchWithOutputs,
+    evidence: isResearchWithOutputs
+      ? `Research with ${evidence.impact.tangibleOutcomes.length} quantified outcome(s) over ${evidence.commitment.yearsActive}yr`
+      : `Category: ${evidence.categoryMatch.category}, outcomes: ${evidence.impact.tangibleOutcomes.length}`,
     weight: 0.7,
   });
 
@@ -684,10 +752,46 @@ export function classifyTier(evidence: ExtractedEvidence): TierClassification {
     reasoning += ' [Low signal strength — sparse description]';
   }
 
-  // Compute tier score from signal count
-  const matchedCount = allSignals.filter(s => s.matched).length;
+  // Compute tier score from signal count AND weighted signal strength.
+  // Issue 9 fix: binary base/strong creates mid-tier clustering.
+  // Instead, interpolate within the tier score range based on signal count
+  // and total weight of matched signals for finer sub-discrimination.
+  const matchedSignals = allSignals.filter(s => s.matched);
+  const matchedCount = matchedSignals.length;
+  const totalMatchedWeight = matchedSignals.reduce((sum, s) => sum + s.weight, 0);
+  const totalPossibleWeight = allSignals.reduce((sum, s) => sum + s.weight, 0);
+  const weightRatio = totalPossibleWeight > 0 ? totalMatchedWeight / totalPossibleWeight : 0;
+
   const tierScores = TIER_ASSESSMENT_SCORES[internalTier];
-  const tierScore = matchedCount >= 3 ? tierScores.strong : tierScores.base;
+  // Interpolate between base and strong using weight ratio for finer granularity.
+  // This means 2 signals at high weight can score differently from 2 signals at low weight.
+  // For Tier 3: base=6.0, strong=6.5 → a weighted ratio of 0.6 → 6.3 (not just 6.0 or 6.5)
+  // For Tier 4: base=4.5, strong=5.0 → a weighted ratio of 0.4 → 4.7 (not just 4.5 or 5.0)
+  let tierScore: number;
+  if (matchedCount >= 3) {
+    tierScore = tierScores.strong;
+  } else {
+    tierScore = tierScores.base + (tierScores.strong - tierScores.base) * weightRatio;
+  }
+  // Also account for cross-tier signal strength: if an activity barely qualifies
+  // for its tier but has strong signals from the tier below, score toward the
+  // lower end. If it almost qualifies for the tier above, score toward upper end.
+  // This creates additional spread within each tier band.
+  if (internalTier === 3 || internalTier === 4) {
+    // Check adjacent tier signals for sub-discrimination
+    const adjacentAboveCount = internalTier === 3 ? tier2Matched.length : tier3Matched.length;
+    const adjacentBelowCount = internalTier === 3 ? tier4Matched.length : tier5Matched.length;
+
+    if (adjacentAboveCount >= 1 && matchedCount >= 2) {
+      // Has some higher-tier signals → push toward upper end of range
+      tierScore = Math.min(tierScores.strong, tierScore + 0.2);
+    }
+    if (adjacentBelowCount >= 3 && matchedCount <= 2) {
+      // Many lower-tier signals, barely qualifies → push toward lower end
+      tierScore = Math.max(tierScores.base, tierScore - 0.2);
+    }
+  }
+  tierScore = Math.round(tierScore * 10) / 10;
 
   // Build classification result
   const scoreRange = TIER_SCORE_RANGES[internalTier];

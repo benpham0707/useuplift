@@ -10,10 +10,23 @@
  */
 
 // Registries
-export { commandRegistry, dimensionRegistry, essayProfileRegistry } from './registry';
+export {
+  commandRegistry,
+  dimensionRegistry,
+  essayProfileRegistry,
+  strategyRegistry,
+  patternRegistry,
+  signalRegistry,
+} from './registry';
+
+// Essay Profiles (import triggers self-registration)
+import './essay-profiles';
 
 // Scoring
-export { eqiCalculator } from './scoring';
+export { eqiCalculator, featureExtractor, hybridScoringPipeline } from './scoring';
+
+// Orchestrator
+export { strategySelector, MACRO_STRATEGIES } from './orchestrator';
 
 // Types (re-export for convenience)
 export type {
@@ -29,8 +42,17 @@ export type {
   HeuristicResult,
   LLMScoreResult,
   FinalDimensionScore,
+  FusionMetadata,
   ScoringResult,
   EQIInput,
   EQIResult,
   HybridScoringConfig,
+  StrategyExample,
+  StrategyTeaching,
+  StrategyDetection,
+  StrategyManifest,
+  PatternCategory,
+  PatternBeforeAfter,
+  PatternManifest,
+  QualitySignalManifest,
 } from './shared/types';

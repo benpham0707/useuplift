@@ -38,7 +38,7 @@ const CATEGORY_TO_EXPERTISE: Record<string, string | null> = {
   entrepreneurship: 'entrepreneurship',
   academic_enrichment: 'academic',
   visual_arts: 'visual_arts',
-  medical_health: null,                          // no expertise domain
+  medical_health: 'medical_health',               // domain exists in expertiseSignaling
   social_activism: null,                         // no expertise domain
   work_family: 'work_employment',
   religious_cultural: null,                      // no expertise domain
@@ -299,6 +299,10 @@ export function resolveCategory(
   if (activityType) {
     const typeMatch = getCategoryByAlias(activityType);
     if (typeMatch) {
+      // Log when 'other' category silently resolves to academic_enrichment
+      if (activityType.toLowerCase() === 'other') {
+        console.warn(`[KB] resolveCategory: 'other' category resolved to '${typeMatch.categoryId}' via alias — activity may be miscategorized. Text: "${text.substring(0, 60)}..."`);
+      }
       const subcategory = resolveSubcategory(typeMatch, searchText);
       return {
         category: typeMatch,
@@ -413,4 +417,42 @@ export function getCategoryCount(): number {
  */
 export function getCategoryAliases(): Readonly<Record<string, string>> {
   return CATEGORY_ALIASES;
+}
+
+// ============================================================================
+// SIMILAR DOMAINS MAP
+// ============================================================================
+
+/**
+ * Maps each canonical category to its 2-3 most similar domains.
+ * Used for proxy-based calibration fallback when no direct match exists.
+ * Order matters — first entry is the closest proxy.
+ */
+const SIMILAR_DOMAINS_MAP: Record<string, string[]> = {
+  stem_research:        ['stem_competition', 'technology', 'medical_health'],
+  stem_competition:     ['stem_research', 'academic_enrichment', 'technology'],
+  debate_speech:        ['leadership_government', 'writing_journalism', 'academic_enrichment'],
+  performing_arts:      ['visual_arts', 'writing_journalism', 'media_digital'],
+  athletics:            ['leadership_government', 'community_service'],
+  community_service:    ['leadership_government', 'social_activism', 'medical_health'],
+  leadership_government:['community_service', 'debate_speech', 'entrepreneurship'],
+  technology:           ['stem_research', 'stem_competition', 'entrepreneurship'],
+  writing_journalism:   ['performing_arts', 'visual_arts', 'media_digital'],
+  entrepreneurship:     ['technology', 'leadership_government', 'work_family'],
+  academic_enrichment:  ['stem_research', 'stem_competition', 'debate_speech'],
+  visual_arts:          ['performing_arts', 'writing_journalism', 'media_digital'],
+  medical_health:       ['stem_research', 'community_service'],
+  social_activism:      ['community_service', 'leadership_government'],
+  work_family:          ['community_service', 'entrepreneurship'],
+  religious_cultural:   ['community_service', 'social_activism'],
+  international:        ['leadership_government', 'community_service', 'academic_enrichment'],
+  media_digital:        ['writing_journalism', 'visual_arts', 'entrepreneurship'],
+};
+
+/**
+ * Get the similar/proxy domains for a given category.
+ * Returns an empty array if the category is unknown.
+ */
+export function getSimilarDomains(categoryId: string): string[] {
+  return SIMILAR_DOMAINS_MAP[categoryId] ?? [];
 }

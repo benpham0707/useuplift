@@ -19,6 +19,7 @@ import type {
   AchievementEntry,
   SubcategoryProfile,
 } from './nuanceCalibrationTypes';
+import type { DomainResolutionTrace } from './scoringTelemetryTypes';
 import {
   ACHIEVEMENT_DATABASE,
   getCategoryKeywordIndex,
@@ -27,6 +28,7 @@ import {
   getSubcategoryProfile,
   getEntriesForTier,
 } from './achievementIntelligence';
+import { getSimilarDomains } from './knowledge/categoryRegistry';
 
 // ============================================================================
 // STAGE 1: CATEGORY MATCHING
@@ -337,6 +339,177 @@ export function getCalibrationContext(
 }
 
 // ============================================================================
+// CALIBRATION WITH TRACE (proxy fallback)
+// ============================================================================
+
+/**
+ * Extended calibration context with domain resolution trace for telemetry.
+ * Adds proxy/universal fallback when direct category match yields no entries.
+ */
+export interface CalibrationContextWithTrace extends CalibrationContext {
+  /** How the domain was resolved: direct match, proxy from similar domain, or universal fallback */
+  resolutionMethod: 'direct' | 'proxy' | 'universal';
+  /** If proxy method was used, which domain served as proxy */
+  proxyDomainUsed: string | null;
+  /** Similar domains that were considered during resolution */
+  similarDomainsConsidered: string[];
+  /** The keyword or term that triggered the match */
+  matchedTerm: string | null;
+  /** Number of calibration entries found */
+  calibrationEntriesFound: number;
+  /** Domain-specific context from Haiku extraction */
+  domainSpecificContext: string | null;
+}
+
+/**
+ * Universal calibration anchors — generic entries that apply to any activity
+ * when no domain-specific or proxy calibration data is available.
+ * These provide basic tier-appropriate comparisons to prevent empty context.
+ */
+function getUniversalAnchors(tier: TierClassification): AchievementEntry[] {
+  const tierLabels: Record<InternalTier, { activity: string; context: string; scoreRange: [number, number] }[]> = {
+    1: [
+      { activity: 'National/international award winner in any field', context: 'Top <1% nationally in their domain; externally validated excellence', scoreRange: [9.0, 10.0] },
+      { activity: 'Recruited athlete or published researcher', context: 'Institutional recognition at highest level; rare achievement', scoreRange: [9.0, 10.0] },
+    ],
+    2: [
+      { activity: 'State-level recognition or competitive distinction', context: 'Top 5% regionally; clear impact beyond school', scoreRange: [7.0, 8.9] },
+      { activity: 'Significant organizational leadership with measurable outcomes', context: 'Founded or led initiative with quantifiable results', scoreRange: [7.0, 8.9] },
+    ],
+    3: [
+      { activity: 'Regional distinction or strong school-level leadership', context: 'Recognized at district/regional level; active contributor', scoreRange: [5.5, 6.9] },
+      { activity: 'Multi-year commitment with progression and local impact', context: 'Sustained involvement with clear growth trajectory', scoreRange: [5.5, 6.9] },
+    ],
+    4: [
+      { activity: 'Active school-level participant with emerging distinction', context: 'Regular involvement; beginning to stand out', scoreRange: [4.0, 5.4] },
+      { activity: 'Club officer or team contributor with solid commitment', context: 'Responsible role but limited external recognition', scoreRange: [4.0, 5.4] },
+    ],
+    5: [
+      { activity: 'Regular participant in school activity', context: 'Consistent attendance; limited leadership or distinction', scoreRange: [2.5, 3.9] },
+      { activity: 'Member of school club or team without defined role', context: 'Participation-level involvement', scoreRange: [2.5, 3.9] },
+    ],
+    6: [
+      { activity: 'Minimal or one-time activity', context: 'Little evidence of sustained engagement or impact', scoreRange: [1.0, 2.4] },
+      { activity: 'Briefly joined a club or attended a few events', context: 'No meaningful commitment or development', scoreRange: [1.0, 2.4] },
+    ],
+  };
+
+  const entries = tierLabels[tier.internalTier] ?? tierLabels[5];
+  return entries.map(e => ({
+    ...e,
+    subcategory: 'universal',
+    fieldPrestige: 3 as const,
+    keyDifferentiator: 'Universal anchor — no field-specific calibration available',
+  }));
+}
+
+/**
+ * Assemble calibration context with full domain resolution trace.
+ *
+ * 3-tier fallback strategy:
+ * 1. DIRECT — normal category match yields entries → resolutionMethod: 'direct'
+ * 2. PROXY — no entries or low confidence → try similar domains → resolutionMethod: 'proxy'
+ * 3. UNIVERSAL — still no entries → universal tier anchors → resolutionMethod: 'universal'
+ *
+ * NEVER returns empty calibrationEntries — always has at least universal anchors.
+ * Backward compatible: getCalibrationContext() still works unchanged.
+ */
+export function getCalibrationContextWithTrace(
+  evidence: ExtractedEvidence,
+  tier: TierClassification,
+  activityMeta: { title: string; type?: string; description?: string }
+): CalibrationContextWithTrace {
+  // Step 1: Try direct resolution (existing logic)
+  const directContext = getCalibrationContext(evidence, tier, activityMeta);
+
+  // Build the list of similar domains to consider
+  const evidenceSimilarDomains = evidence.categoryMatch.similarDomains ?? [];
+  const registrySimilarDomains = getSimilarDomains(directContext.categoryMatch.category);
+  // Deduplicate: evidence first (from Haiku), then registry fallback
+  const allSimilarDomains = [...new Set([...evidenceSimilarDomains, ...registrySimilarDomains])];
+
+  // If direct match yielded entries with reasonable confidence, return as 'direct'
+  if (
+    directContext.calibrationEntries.length >= 2 &&
+    directContext.categoryMatch.confidence !== 'low'
+  ) {
+    return {
+      ...directContext,
+      resolutionMethod: 'direct',
+      proxyDomainUsed: null,
+      similarDomainsConsidered: allSimilarDomains,
+      matchedTerm: directContext.categoryMatch.category,
+      calibrationEntriesFound: directContext.calibrationEntries.length,
+      domainSpecificContext: evidence.categoryMatch.domainSpecificContext ?? null,
+    };
+  }
+
+  // Step 2: Try proxy domains
+  for (const proxyDomain of allSimilarDomains) {
+    if (!ACHIEVEMENT_DATABASE[proxyDomain]) continue;
+
+    const proxyEntries = selectCalibrationEntries(proxyDomain, null, tier);
+    if (proxyEntries.length >= 2) {
+      // Found usable proxy entries
+      const proxyCategory = getAchievementCategory(proxyDomain);
+      return {
+        categoryMatch: {
+          category: directContext.categoryMatch.category, // Keep original category
+          subcategory: directContext.categoryMatch.subcategory,
+          confidence: directContext.categoryMatch.confidence,
+        },
+        calibrationEntries: proxyEntries,
+        achievementLadder: proxyCategory?.achievementLadder ?? directContext.achievementLadder,
+        roleHierarchy: proxyCategory?.roleHierarchy ?? directContext.roleHierarchy,
+        subcategoryPrestige: directContext.subcategoryPrestige,
+        selectivityContext: extractSelectivityContext(proxyEntries),
+        resolutionMethod: 'proxy',
+        proxyDomainUsed: proxyDomain,
+        similarDomainsConsidered: allSimilarDomains,
+        matchedTerm: directContext.categoryMatch.category,
+        calibrationEntriesFound: proxyEntries.length,
+        domainSpecificContext: evidence.categoryMatch.domainSpecificContext ?? null,
+      };
+    }
+  }
+
+  // Step 3: Universal fallback — always returns entries
+  const universalEntries = getUniversalAnchors(tier);
+  return {
+    ...directContext,
+    calibrationEntries: universalEntries,
+    resolutionMethod: 'universal',
+    proxyDomainUsed: null,
+    similarDomainsConsidered: allSimilarDomains,
+    matchedTerm: null,
+    calibrationEntriesFound: universalEntries.length,
+    domainSpecificContext: evidence.categoryMatch.domainSpecificContext ?? null,
+  };
+}
+
+/**
+ * Build a DomainResolutionTrace from a CalibrationContextWithTrace.
+ * Used by the telemetry system to persist resolution decisions.
+ */
+export function buildDomainResolutionTrace(
+  fingerprint: string,
+  ctx: CalibrationContextWithTrace
+): DomainResolutionTrace {
+  return {
+    fingerprint,
+    resolvedCategory: ctx.categoryMatch.category,
+    resolvedSubcategory: ctx.categoryMatch.subcategory === 'unknown' ? null : ctx.categoryMatch.subcategory,
+    resolutionConfidence: ctx.categoryMatch.confidence,
+    resolutionMethod: ctx.resolutionMethod,
+    similarDomains: ctx.similarDomainsConsidered,
+    proxyDomainUsed: ctx.proxyDomainUsed,
+    calibrationEntriesCount: ctx.calibrationEntriesFound,
+    matchedTerm: ctx.matchedTerm,
+    domainSpecificContext: ctx.domainSpecificContext,
+  };
+}
+
+// ============================================================================
 // SERVICE CLASS (singleton pattern per codebase convention)
 // ============================================================================
 
@@ -347,6 +520,14 @@ export class AchievementRetrievalService {
     activityMeta: { title: string; type?: string; description?: string }
   ): CalibrationContext {
     return getCalibrationContext(evidence, tier, activityMeta);
+  }
+
+  getCalibrationContextWithTrace(
+    evidence: ExtractedEvidence,
+    tier: TierClassification,
+    activityMeta: { title: string; type?: string; description?: string }
+  ): CalibrationContextWithTrace {
+    return getCalibrationContextWithTrace(evidence, tier, activityMeta);
   }
 }
 

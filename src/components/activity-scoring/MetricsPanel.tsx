@@ -242,50 +242,24 @@ function DetailOverlay({
 // ============================================================================
 
 function StatColumn({
-  title,
-  weight,
   stats,
-  color,
   onSelectStat,
 }: {
-  title: string;
-  weight: string;
   stats: StatItem[];
-  color: string;
   onSelectStat: (stat: StatItem) => void;
 }) {
   return (
-    <div className="flex flex-col w-full max-w-2xl mx-auto py-2">
-      <div className="flex items-center justify-between pb-3 mb-1 border-b-2 border-foreground/5">
-        <div className="flex flex-col">
-          <h3
-            className="font-extrabold tracking-tight text-lg leading-none"
-            style={{ color }}
-          >
-            {title}
-          </h3>
-          <span className="text-[10px] uppercase tracking-widest text-foreground/30 font-bold mt-1">
-            Assessment Categories
-          </span>
+    <div className="flex flex-col w-full max-w-2xl mx-auto">
+      {stats.map((stat) => (
+        <div
+          key={stat.id}
+          onClick={() => onSelectStat(stat)}
+          className="group cursor-pointer py-[18px] border-b border-foreground/5 last:border-0 relative overflow-hidden w-full"
+        >
+          <div className="absolute inset-0 bg-foreground/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg -mx-2 pointer-events-none" />
+          <StatBar stat={stat} />
         </div>
-        <div className="flex items-baseline gap-1 text-foreground/40 shrink-0 tabular-nums">
-          <span className="text-lg font-bold">{weight}</span>
-          <span className="text-xs uppercase tracking-widest font-semibold mt-1">Weight</span>
-        </div>
-      </div>
-
-      <div className="flex flex-col w-full">
-        {stats.map((stat) => (
-          <div
-            key={stat.id}
-            onClick={() => onSelectStat(stat)}
-            className="group cursor-pointer py-[18px] border-b border-foreground/5 last:border-0 relative overflow-hidden w-full"
-          >
-            <div className="absolute inset-0 bg-foreground/[0.03] opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg -mx-2 pointer-events-none" />
-            <StatBar stat={stat} />
-          </div>
-        ))}
-      </div>
+      ))}
     </div>
   );
 }
@@ -313,9 +287,21 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
         }}
       />
 
-      {/* ── Tab selector ── */}
-      <div className="w-full flex justify-center mb-5 relative z-10">
+      {/* ── Tab selector + weight annotation ── */}
+      <div className="w-full flex flex-col items-center mb-5 relative z-10 gap-2">
         <StatTabs activeTab={activeTab} onTabChange={setActiveTab} />
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={activeTab}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            className="text-[11px] font-semibold text-foreground/35 tabular-nums"
+          >
+            {activeTab === 'activity' ? '70%' : '30%'} of total score
+          </motion.span>
+        </AnimatePresence>
       </div>
 
       {/* ── Active column — full width, animated transitions ── */}
@@ -331,18 +317,12 @@ export const MetricsPanel: React.FC<MetricsPanelProps> = ({
             >
               {activeTab === 'activity' ? (
                 <StatColumn
-                  title="Activity Strength"
-                  weight="70%"
                   stats={activityStats}
-                  color={CATEGORY_COLOR.activity}
                   onSelectStat={setSelectedStat}
                 />
               ) : (
                 <StatColumn
-                  title="Narrative & Detail"
-                  weight="30%"
                   stats={narrativeStats}
-                  color={CATEGORY_COLOR.narrative}
                   onSelectStat={setSelectedStat}
                 />
               )}

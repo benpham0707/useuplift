@@ -50,19 +50,6 @@ const SEVERITY_MULTIPLIER: Record<AnnotationSeverity, number> = {
 };
 
 /**
- * Dimension IDs that represent narrative/structural concerns.
- * Annotations for these dimensions at critical/important severity
- * are classified as deep_work (structural rework required).
- */
-const NARRATIVE_DIMENSION_IDS = new Set<string>([
-  'narrative_structure',
-  'narrative_dynamics',
-  'thematic_depth',
-  'growth_transformation',
-  'structural_coherence',
-]);
-
-/**
  * Dimension IDs where suggestion-level annotations with rewrite examples
  * are classified as quick_wins (sentence-level fixes).
  */
@@ -114,14 +101,19 @@ function buildDisplayNameMap(dimensionScores: DerivedDimensionScore[]): Map<stri
  * Classify a non-strength annotation into a roadmap category.
  *
  * Classification rules:
- * 1. quick_win: suggestion severity AND (has rewriteExample OR dimension is word_economy/tonal_sophistication)
- * 2. deep_work: critical/important severity AND dimension is narrative-related
- * 3. polish: everything else (suggestion-level craft improvements)
+ * 1. critical/important severity → deep_work (always — these are significant issues regardless of dimension)
+ * 2. suggestion severity + (has rewriteExample OR quick-win dimension) → quick_win
+ * 3. suggestion severity without rewrite → polish (low-effort craft refinements)
  */
 function classifyAnnotation(annotation: EssayAnnotation): ImprovementStep['category'] {
   const { severity, dimensionId, rewriteExample } = annotation;
 
-  // Rule 1: Quick wins — low-effort, high-value sentence-level fixes
+  // Rule 1: Any critical or important issue is deep work — severity trumps dimension
+  if (severity === 'critical' || severity === 'important') {
+    return 'deep_work';
+  }
+
+  // Rule 2: Quick wins — suggestion-level with concrete rewrite or on quick-win dimensions
   if (severity === 'suggestion') {
     const hasRewrite = rewriteExample !== undefined && rewriteExample.length > 0;
     if (hasRewrite || QUICK_WIN_DIMENSION_IDS.has(dimensionId)) {
@@ -129,18 +121,7 @@ function classifyAnnotation(annotation: EssayAnnotation): ImprovementStep['categ
     }
   }
 
-  // Rule 2: Deep work — structural/thematic/narrative rework
-  if (
-    (severity === 'critical' || severity === 'important') &&
-    NARRATIVE_DIMENSION_IDS.has(dimensionId)
-  ) {
-    return 'deep_work';
-  }
-
-  // Rule 3: Polish — everything else
-  // This includes:
-  // - critical/important annotations on non-narrative dimensions (still important, but more focused)
-  // - suggestion annotations without rewrite examples on non-quick-win dimensions
+  // Rule 3: Polish — suggestion-level without rewrite on non-quick-win dimensions
   return 'polish';
 }
 

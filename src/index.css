@@ -18,6 +18,14 @@
                 0 0 40px rgba(147, 51, 234, 0.2),
                 0 0 60px rgba(147, 51, 234, 0.1);
   }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 

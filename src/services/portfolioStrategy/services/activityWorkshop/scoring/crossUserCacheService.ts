@@ -240,10 +240,21 @@ export class CrossUserCacheService {
   async write(
     fingerprint: ActivityFingerprint,
     scores: {
-      descriptionTotal: number;
-      descriptionBreakdown: Record<string, unknown>;
-      activityTotal: number;
-      activityComponents: Record<string, unknown>;
+      activityScore: {
+        total: number;
+        breakdown: Record<string, unknown>;
+        tierJustification: string;
+        comparisonBenchmarks: Record<string, unknown>;
+        improvementPaths: string[];
+        overallRationale: string;
+      };
+      descriptionScore: {
+        total: number;
+        breakdown: Record<string, unknown>;
+        strengths: string[];
+        improvements: string[];
+        overallRationale: string;
+      };
       internalTier: InternalTier;
       externalTier: ExternalTier;
     }
@@ -256,12 +267,12 @@ export class CrossUserCacheService {
     if (
       !this.validateScores({
         activityScore: {
-          total: scores.activityTotal,
-          components: scores.activityComponents,
+          total: scores.activityScore.total,
+          breakdown: scores.activityScore.breakdown,
         },
         descriptionScore: {
-          total: scores.descriptionTotal,
-          breakdown: scores.descriptionBreakdown,
+          total: scores.descriptionScore.total,
+          breakdown: scores.descriptionScore.breakdown,
         },
         tierClassification: {
           internalTier: scores.internalTier,
@@ -277,14 +288,8 @@ export class CrossUserCacheService {
 
       const row = {
         fingerprint,
-        description_score: {
-          total: scores.descriptionTotal,
-          breakdown: scores.descriptionBreakdown,
-        },
-        activity_score: {
-          total: scores.activityTotal,
-          components: scores.activityComponents,
-        },
+        description_score: scores.descriptionScore,
+        activity_score: scores.activityScore,
         tier_classification: {
           internalTier: scores.internalTier,
           externalTier: scores.externalTier,

@@ -4,10 +4,16 @@
  * Constructs a single Sonnet call that produces inline text annotations.
  * System prompt is structured so the first ~80% is static (cacheable).
  *
+ * V2 Architecture:
+ * - Dimensions organized into 3 interconnected clusters (Structure, Craft, Character)
+ * - Deep content analysis findings (heuristic) integrated per-cluster
+ * - Annotation budget distributed across clusters (not a flat count)
+ *
  * Integration points:
- * - dimensionRegistry: 13 scoring dimensions with weights
+ * - dimensionRegistry: 15 scoring dimensions with weights
  * - essayProfileRegistry: essay-type-specific weight overrides, anti-patterns, tone
  * - featureExtractor output: deterministic text features for feature summary
+ * - Wave 2 analyzers: deep content analysis (structure, theme, character, insight)
  */
 
 import { dimensionRegistry, essayProfileRegistry } from '../workshop';
@@ -22,13 +28,14 @@ import type {
 } from './types';
 import type { NarrativeAnalysisResult } from '../workshop/scoring/narrativeAnalyzerTypes';
 import type { DeepContentAnalysis } from './contentAnalysisTypes';
+import type { PatternManifest, StrategyManifest } from '../workshop/shared/types';
 import { getStructureInsights, getDynamicsInsights, simpleHash } from '../workshop/scoring/narrativeLLMTypes';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-const DEFAULT_MAX_ANNOTATIONS = 12;
+const DEFAULT_MAX_ANNOTATIONS = 15;
 
 /** Severity definitions included in the system prompt */
 const SEVERITY_DEFINITIONS: Record<AnnotationSeverity, string> = {
@@ -43,17 +50,69 @@ const SEVERITY_DEFINITIONS: Record<AnnotationSeverity, string> = {
 };
 
 // ============================================================================
+// DIMENSION CLUSTERS
+// ============================================================================
+
+interface DimensionCluster {
+  name: string;
+  focusQuestion: string;
+  dimensionIds: string[];
+  annotationBudget: number;
+  interconnectionGuidance: string;
+}
+
+const DIMENSION_CLUSTERS: DimensionCluster[] = [
+  {
+    name: 'Structure & Arc',
+    focusQuestion: 'How is this essay BUILT? What does the architecture reveal about the writer?',
+    dimensionIds: [
+      'narrative_structure',
+      'structural_coherence_flow',
+      'narrative_dynamics',
+      'opening_hook_engagement',
+      'closing_impact_resolution',
+    ],
+    annotationBudget: 5,
+    interconnectionGuidance:
+      'Consider how these dimensions interact: Does the opening set up what the closing resolves? Do transitions create narrative momentum? Is pacing proportional to emotional importance? Does the arc create meaning beyond chronology?',
+  },
+  {
+    name: 'Craft & Voice',
+    focusQuestion: 'How does this essay SOUND? What does the language reveal about the writer?',
+    dimensionIds: [
+      'originality_voice_authenticity',
+      'tonal_sophistication',
+      'word_economy_craft',
+      'narrative_craft_storytelling',
+    ],
+    annotationBudget: 5,
+    interconnectionGuidance:
+      'Consider how these dimensions interact: Does word choice reveal the writer\'s identity (voice as craft)? Are tonal shifts deliberate choices serving the story? Does showing vs telling reflect trust in the reader? Is the language tight AND evocative?',
+  },
+  {
+    name: 'Character & Meaning',
+    focusQuestion: 'What does this essay reveal about WHO this person is? What would an AO take away?',
+    dimensionIds: [
+      'thematic_depth_reflection',
+      'authenticity_specificity_detail',
+      'emotional_resonance_vulnerability',
+      'growth_transformation_arc',
+      'intellectual_vitality_curiosity',
+      'argument_rhetorical_craft',
+    ],
+    annotationBudget: 5,
+    interconnectionGuidance:
+      'Consider how these dimensions interact: Does authentic detail support emotional resonance? Is growth shown through specific changed behavior (not stated)? Does intellectual curiosity drive the personal narrative? Is the implicit argument earned through lived experience?',
+  },
+];
+
+// ============================================================================
 // PROMPT BUILDER
 // ============================================================================
 
 export class PromptBuilder {
   /**
    * Build the assembled prompt for the annotation pipeline.
-   *
-   * @param text - The essay text to analyze
-   * @param config - Pipeline configuration (essay type, context, etc.)
-   * @param enrichedFeatures - Extracted features + expertise signals
-   * @returns AssembledPrompt with system/user prompts and token estimates
    */
   buildPrompt(
     text: string,
@@ -68,7 +127,6 @@ export class PromptBuilder {
 
     const systemTokens = estimateTokens(systemPrompt);
     const userTokens = estimateTokens(userPrompt);
-    // Estimate ~150 tokens per annotation for output
     const expectedOutput = maxAnnotations * 150;
 
     return {
@@ -95,8 +153,8 @@ export class PromptBuilder {
     // 1. Role definition (static, cacheable)
     parts.push(this.buildRoleDefinition());
 
-    // 2. Dimension reference (static after startup, cacheable)
-    parts.push(this.buildDimensionReference());
+    // 2. Clustered dimension reference (static after startup, cacheable)
+    parts.push(this.buildClusteredDimensionReference());
 
     // 3. Annotation JSON schema (static, cacheable)
     parts.push(this.buildAnnotationSchema());
@@ -137,27 +195,49 @@ Your annotations must:
 - Provide insight (what you observe + why it matters) and concrete suggestions
 - Use a natural mentor voice — warm but direct, never condescending
 - Include rewrite examples when they would clarify the suggestion
-- Cover different dimensions of writing quality, not just grammar`;
+- Cover different dimensions of writing quality across three interconnected clusters`;
   }
 
-  private buildDimensionReference(): string {
+  /**
+   * Build dimension reference organized into 3 clusters.
+   * Each cluster has a focus question, its dimensions with weights,
+   * and guidance on how dimensions within the cluster interact.
+   */
+  private buildClusteredDimensionReference(): string {
     const dimensions = dimensionRegistry.getAll();
+    const dimMap = new Map(dimensions.map(d => [d.id, d]));
 
-    const dimLines = dimensions.map(
-      (d) => `- ${d.id}: ${d.displayName} (weight: ${(d.weight * 100).toFixed(0)}%)`,
-    );
+    const clusterBlocks: string[] = [];
 
-    return `## Scoring Dimensions (13 total)
+    for (const cluster of DIMENSION_CLUSTERS) {
+      const lines: string[] = [];
+      lines.push(`### ${cluster.name}`);
+      lines.push(`*${cluster.focusQuestion}*`);
+      lines.push('');
 
-Your annotations should cover these writing quality dimensions. Weight indicates relative importance in the overall Essay Quality Index (EQI):
+      for (const dimId of cluster.dimensionIds) {
+        const dim = dimMap.get(dimId);
+        if (dim) {
+          lines.push(`- **${dim.displayName}** (${dimId}, weight: ${(dim.weight * 100).toFixed(0)}%)`);
+        }
+      }
 
-${dimLines.join('\n')}
+      lines.push('');
+      lines.push(cluster.interconnectionGuidance);
 
-Distribute your annotations across multiple dimensions. Do not cluster all feedback on a single dimension.`;
+      clusterBlocks.push(lines.join('\n'));
+    }
+
+    return `## Scoring Dimensions — Three Interconnected Clusters
+
+Your annotations should be organized across these three clusters. Each cluster represents a different lens for evaluating the essay. Annotations within a cluster should reflect how its dimensions interact.
+
+${clusterBlocks.join('\n\n')}
+
+Distribute your annotations across ALL three clusters. Do not concentrate feedback in a single cluster.`;
   }
 
   private buildAnnotationSchema(): string {
-    // Describe the RawLLMAnnotation shape the LLM must produce
     return `## Output Schema
 
 Return a JSON array of annotation objects. Each annotation must match this exact schema:
@@ -170,7 +250,7 @@ Return a JSON array of annotation objects. Each annotation must match this exact
     "endOffset": 42,
     "paragraphIndex": 0
   },
-  "dimensionId": "one of the 13 dimension IDs listed above",
+  "dimensionId": "one of the dimension IDs listed above",
   "severity": "critical | important | suggestion | strength",
   "isStrength": false,
   "insight": "What you observe and why it matters. 1-3 sentences, mentor voice.",
@@ -185,7 +265,7 @@ Field rules:
 - \`span.text\`: Must be an EXACT substring of the essay text. The system will verify this.
 - \`span.startOffset\` / \`span.endOffset\`: Character offsets (0-indexed, end exclusive). Must match where \`span.text\` appears.
 - \`span.paragraphIndex\`: 0-indexed paragraph number (paragraphs are separated by blank lines).
-- \`dimensionId\`: Must be one of the 13 dimension IDs listed above.
+- \`dimensionId\`: Must be one of the dimension IDs listed above.
 - \`severity\`: "strength" when \`isStrength\` is true; "critical", "important", or "suggestion" when \`isStrength\` is false.
 - \`isStrength\`: true for positive feedback, false for issues/improvements.
 - \`confidence\`: Your confidence in this annotation, 0.0 to 1.0.
@@ -208,27 +288,27 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
   private buildFewShotExamples(): string {
     return `## Annotation Examples
 
-**Good annotation (strength):**
+**Good annotation (strength — Structure & Arc cluster):**
 \`\`\`json
 {
   "span": { "text": "The fluorescent lights hummed above as I slid my grandmother's ring across the pawnshop counter", "startOffset": 0, "endOffset": 91, "paragraphIndex": 0 },
-  "dimensionId": "authenticity_specificity",
+  "dimensionId": "opening_hook_engagement",
   "severity": "strength",
   "isStrength": true,
-  "insight": "This opening grounds the reader in a vivid, specific moment. The fluorescent lights and grandmother's ring create immediate sensory context while signaling emotional weight — we understand something precious is being given up before you say it directly.",
-  "suggestion": "This is effective because it SHOWS the sacrifice rather than telling us about it. The specific detail of the pawnshop counter makes this feel real and lived-in.",
+  "insight": "This opening grounds the reader in a vivid, specific moment. The fluorescent lights and grandmother's ring create immediate sensory context while signaling emotional weight — we understand something precious is being given up before you say it directly. It also establishes the pawnshop as a physical and metaphorical space that the essay can return to.",
+  "suggestion": "This works because it drops the reader into a world only YOU inhabit. The AO is already curious: why is this person at a pawnshop? What's the story behind the ring? That's a strong curiosity gap.",
   "confidence": 0.92
 }
 \`\`\`
 
-**Good annotation (issue):**
+**Good annotation (issue — Character & Meaning cluster):**
 \`\`\`json
 {
   "span": { "text": "This experience taught me the importance of perseverance and hard work", "startOffset": 1205, "endOffset": 1273, "paragraphIndex": 4 },
-  "dimensionId": "thematic_depth",
+  "dimensionId": "thematic_depth_reflection",
   "severity": "important",
   "isStrength": false,
-  "insight": "This conclusion falls into the 'lesson statement' trap — it tells the reader what to think instead of letting the story's meaning emerge naturally. Admissions officers read thousands of essays that end with 'I learned perseverance.' This generic takeaway undercuts the specific, personal story you've built.",
+  "insight": "This conclusion falls into the 'lesson statement' trap — it tells the reader what to think instead of letting the story's meaning emerge naturally. Admissions officers read thousands of essays that end with 'I learned perseverance.' This generic takeaway undercuts the specific, personal story you've built and fails the portability test: this lesson could come from anyone's essay.",
   "suggestion": "Instead of stating the lesson, show how this experience changed your behavior or perspective in a specific way. What do you do differently now? What small moment captures the shift?",
   "rewriteExample": "Now when I face a problem set that seems impossible, I think of that pawnshop counter — and I slide my work forward anyway.",
   "confidence": 0.88
@@ -239,7 +319,6 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
   private buildProfileBlock(profile: EssayProfileManifest): string {
     const parts: string[] = [`## Essay Type: ${profile.displayName}`];
 
-    // Weight overrides
     const overrides = Object.entries(profile.dimensionWeightOverrides);
     if (overrides.length > 0) {
       const overrideLines = overrides.map(
@@ -251,14 +330,12 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
       );
     }
 
-    // Anti-patterns
     if (profile.antiPatterns.length > 0) {
       parts.push(
         `Common mistakes for this essay type — flag these if detected:\n${profile.antiPatterns.map((ap) => `- ${ap}`).join('\n')}`,
       );
     }
 
-    // Teaching tone
     if (profile.teachingTone) {
       const tone = profile.teachingTone;
       parts.push(
@@ -299,33 +376,38 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
     // 1. Full essay text with paragraph markers
     parts.push(this.buildMarkedEssay(text));
 
-    // 2. Feature summary
+    // 2. Feature summary (deterministic stats)
     parts.push(this.buildFeatureSummary(enrichedFeatures));
 
-    // 2b. Narrative analysis summary (if available)
-    // Pass essay hash so cached LLM insights from scoring pipeline can be injected.
+    // 3. Narrative analysis summary (if available from scoring pipeline)
     if (enrichedFeatures.narrativeAnalysis) {
       const essayHash = simpleHash(text);
       parts.push(this.buildNarrativeAnalysisSummary(enrichedFeatures.narrativeAnalysis, essayHash));
     }
 
-    // 2c. Deep content analysis summary (Wave 2 — structure, theme, character, insight)
-    if (enrichedFeatures.deepContentAnalysis) {
-      parts.push(this.buildDeepContentAnalysisSummary(enrichedFeatures.deepContentAnalysis));
+    // 4. Deep content analysis section (heuristic findings per cluster)
+    parts.push(this.buildClusteredPreAnalysisSection(
+      enrichedFeatures.deepContentAnalysis,
+    ));
+
+    // 5. Detected patterns and strategy (Wave 3 registry findings)
+    const registryBlock = this.buildRegistryFindings(enrichedFeatures);
+    if (registryBlock) {
+      parts.push(registryBlock);
     }
 
-    // 3. Expertise match summary (activity essays)
+    // 7. Expertise match summary (activity essays)
     if (enrichedFeatures.expertiseSignals) {
       parts.push(this.buildExpertiseMatchSummary(enrichedFeatures));
     }
 
-    // 4. College context (why_us essays)
+    // 8. College context (why_us essays)
     const collegeBlock = this.buildCollegeContext(config);
     if (collegeBlock) {
       parts.push(collegeBlock);
     }
 
-    // 5. Instructions
+    // 9. Instructions with cluster-based annotation budget
     const includeStrengths = config.includeStrengths !== false;
     parts.push(this.buildInstructions(maxAnnotations, includeStrengths));
 
@@ -354,7 +436,6 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
       `Passive voice ratio: ${(f.passiveVoiceRatio * 100).toFixed(0)}%`,
     ];
 
-    // Only include non-zero detection counts
     if (f.clicheCount > 0) signals.push(`Cliches detected: ${f.clicheCount}`);
     if (f.bannedTermCount > 0) signals.push(`AI-sounding terms: ${f.bannedTermCount}`);
     if (f.fillerPhraseCount > 0) signals.push(`Filler phrases: ${f.fillerPhraseCount}`);
@@ -448,12 +529,10 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
   /**
    * Build a ~250-token summary of the deterministic narrative analysis results.
    * Injected into the user prompt to give the Sonnet annotator structural context.
-   * Now includes function-based analysis and explicit heuristic limitations.
    */
   buildNarrativeAnalysisSummary(result: NarrativeAnalysisResult, essayHash?: string): string {
     const lines: string[] = ['## Narrative Analysis (deterministic)'];
 
-    // Function flow
     if (result.paragraphFunctions.length > 0) {
       const flow = result.narrativeFlow.functionSequence.join(' → ');
       lines.push(`Function flow: ${flow}`);
@@ -463,30 +542,21 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
       lines.push(`Function diversity: ${Math.round(result.narrativeFlow.functionDiversity * 100)}%`);
     }
 
-    // Arc
     const arcLabel = result.narrativeArc.detectedArc.replace(/_/g, ' ');
     lines.push(`Arc: ${arcLabel} (${Math.round(result.narrativeArc.confidence * 100)}% confidence)`);
-
-    // Scene/Summary
     lines.push(`Scene ratio: ${Math.round(result.sceneVsSummary.sceneRatio * 100)}% (ideal: 50-75%)`);
 
-    // Show/Tell — now with context
     if (result.showVsTell.tellOpportunities.length > 0) {
       lines.push(`Tell-not-show: ${result.showVsTell.tellOpportunities.length} — evaluate whether each is appropriate in context`);
     }
 
-    // Emotional journey
     lines.push(`Emotional trajectory: ${result.emotionalJourney.trajectory.pattern}, variety ${Math.round(result.emotionalJourney.trajectory.varietyScore * 100)}%`);
-
-    // Tension
     lines.push(`Tension: peak ${result.tensionCurve.curve.peakTension}/10 at P${result.tensionCurve.curve.peakParagraph}, ${result.tensionCurve.evaluation.flatSpotCount} flat spot(s)`);
 
-    // Specificity
     if (result.specificity.overallScore < 40) {
       lines.push(`Specificity: weak (${Math.round(result.specificity.overallScore)}/100) — paragraph ${result.specificity.weakestParagraph} most abstract`);
     }
 
-    // Heuristic limitations — explicit about what LLM should evaluate
     if (result.llmEvaluationNeeded.length > 0) {
       lines.push('');
       lines.push('Heuristic limitations (evaluate with LLM):');
@@ -495,7 +565,6 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
       }
     }
 
-    // Top issues (max 3)
     if (result.topIssues.length > 0) {
       lines.push('');
       lines.push('Key narrative issues:');
@@ -504,7 +573,6 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
       }
     }
 
-    // Inject LLM-derived insights if available from the scoring pipeline cache
     if (essayHash) {
       this.appendLLMInsights(lines, essayHash);
     }
@@ -512,11 +580,6 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
     return lines.join('\n');
   }
 
-  /**
-   * Append cached LLM narrative insights from the Haiku+Sonnet scoring pipeline.
-   * These enrich the annotation pipeline's Sonnet prompt with deep understanding.
-   * Uses essay-hash-keyed cache lookup to avoid cross-essay contamination.
-   */
   private appendLLMInsights(lines: string[], essayHash: string): void {
     const structureInsights = getStructureInsights(essayHash);
     const dynamicsInsights = getDynamicsInsights(essayHash);
@@ -560,17 +623,41 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
     }
   }
 
-  /**
-   * Build a ~200-token summary of deep content analysis for the Sonnet prompt.
-   * Covers: essay structure, theme signals, character revelation, insight depth.
-   */
-  buildDeepContentAnalysisSummary(analysis: DeepContentAnalysis): string {
-    const lines: string[] = ['## Deep Content Analysis (deterministic)'];
+  // ==========================================================================
+  // CLUSTERED PRE-ANALYSIS SECTION
+  // ==========================================================================
 
-    // Structure
-    const s = analysis.structure;
-    const arcLabel = s.detectedArc.replace(/_/g, ' ');
-    lines.push(`Structure: ${arcLabel} arc (${Math.round(s.arcConfidence * 100)}% conf), ${s.pacing.balance} pacing`);
+  /**
+   * Build a cluster-organized pre-analysis section from Wave 2 heuristic
+   * deep content analysis. Each cluster gets findings relevant to its
+   * focus area, giving Sonnet targeted context for annotations.
+   */
+  buildClusteredPreAnalysisSection(
+    deepContent?: DeepContentAnalysis,
+  ): string {
+    if (!deepContent) return '';
+
+    const sections: string[] = ['## Pre-Analysis Findings (organized by cluster)'];
+
+    // ---- Structure & Arc ----
+    sections.push(this.buildStructureClusterFindings(deepContent));
+
+    // ---- Craft & Voice ----
+    sections.push(this.buildCraftClusterFindings(deepContent));
+
+    // ---- Character & Meaning ----
+    sections.push(this.buildCharacterClusterFindings(deepContent));
+
+    return sections.join('\n\n');
+  }
+
+  private buildStructureClusterFindings(
+    deepContent: DeepContentAnalysis,
+  ): string {
+    const lines: string[] = ['### Structure & Arc'];
+
+    const s = deepContent.structure;
+    lines.push(`Arc: ${s.detectedArc.replace(/_/g, ' ')} (${Math.round(s.arcConfidence * 100)}% conf)`);
     if (s.beats.length > 0) {
       const beatLabels = s.beats.map(b => `${b.beatType}(P${b.paragraphIndices.join(',P')})`);
       lines.push(`Beats: ${beatLabels.join(' → ')}`);
@@ -578,51 +665,127 @@ Balance: aim for roughly 30-40% strengths and 60-70% issues across your annotati
     if (s.diagnostics.missingBeats.length > 0) {
       lines.push(`Missing beats: ${s.diagnostics.missingBeats.join(', ')}`);
     }
+    lines.push(`Pacing: ${s.pacing.balance} (setup: ${Math.round(s.pacing.setupRatio * 100)}%, payoff: ${Math.round(s.pacing.payoffRatio * 100)}%)`);
 
-    // Theme
-    const t = analysis.theme;
-    lines.push(`Show/tell ratio: ${Math.round(t.showDontTell.showRatio * 100)}% (${t.showDontTell.tellingMarkerCount} telling, ${t.showDontTell.showingMarkerCount} showing)`);
-    if (t.clicheDetection.clicheDetected) {
-      const themes = t.clicheDetection.matchedThemes.map(m => m.label).join(', ');
-      lines.push(`Cliché topic: ${themes} — verdict: ${t.clicheDetection.verdict.replace(/_/g, ' ')}`);
-    }
+    // Thematic coherence (tangential paragraphs affect structure)
+    const t = deepContent.theme;
     if (t.thematicCoherence.tangentialParagraphs.length > 0) {
-      lines.push(`Tangential paragraphs: P${t.thematicCoherence.tangentialParagraphs.join(', P')} (low thematic overlap)`);
-    }
-    lines.push(`Thematic coherence: ${Math.round(t.thematicCoherence.overallCoherence * 100)}%`);
-
-    // Character
-    const c = analysis.character;
-    lines.push(`Character revelation peak: ${c.peakLevel.replace(/_/g, ' ')} at P${c.peakParagraphIndex}`);
-    if (c.vulnerability.vulnerabilityMarkerCount > 0) {
-      lines.push(`Vulnerability: ${c.vulnerability.isEarned ? 'earned (grounded in detail)' : 'performed (lacks grounding detail)'}`);
-    }
-    if (c.observations.length > 0) {
-      for (const obs of c.observations.slice(0, 2)) {
-        lines.push(`- ${obs}`);
-      }
-    }
-
-    // Insight
-    const i = analysis.insight;
-    lines.push(`Insight depth: ${i.depth.level.replace(/_/g, ' ')} (score ${i.depth.score}/100, location: ${i.depth.insightLocation.replace(/_/g, ' ')})`);
-    if (i.depth.markers.isCliche) {
-      lines.push(`Insight uses cliché language — evaluate whether the surrounding context redeems it`);
-    }
-    if (i.uniqueness.hasCallbackStructure) {
-      lines.push(`Essay has callback structure (final paragraphs echo opening)`);
-    }
-    if (i.depth.strongestPassage) {
-      lines.push(`Strongest insight: "${i.depth.strongestPassage.slice(0, 100)}${i.depth.strongestPassage.length > 100 ? '...' : ''}"`);
+      lines.push(`Tangential paragraphs: P${t.thematicCoherence.tangentialParagraphs.join(', P')} (low thematic overlap with essay core)`);
     }
 
     return lines.join('\n');
   }
 
+  private buildCraftClusterFindings(
+    deepContent: DeepContentAnalysis,
+  ): string {
+    const lines: string[] = ['### Craft & Voice'];
+
+    const t = deepContent.theme;
+    lines.push(`Show/tell ratio: ${Math.round(t.showDontTell.showRatio * 100)}% showing (${t.showDontTell.tellingMarkerCount} telling markers, ${t.showDontTell.showingMarkerCount} showing markers)`);
+
+    return lines.join('\n');
+  }
+
+  private buildCharacterClusterFindings(
+    deepContent: DeepContentAnalysis,
+  ): string {
+    const lines: string[] = ['### Character & Meaning'];
+
+    const c = deepContent.character;
+    lines.push(`Character revelation peak: ${c.peakLevel.replace(/_/g, ' ')} at P${c.peakParagraphIndex}`);
+    if (c.vulnerability.vulnerabilityMarkerCount > 0) {
+      lines.push(`Vulnerability: ${c.vulnerability.isEarned ? 'earned (grounded in detail)' : 'performed (lacks grounding)'}`);
+    }
+
+    const i = deepContent.insight;
+    lines.push(`Insight depth: ${i.depth.level} (location: ${i.depth.insightLocation.replace(/_/g, ' ')})`);
+    if (i.depth.markers.isCliche) {
+      lines.push(`Insight uses cliche language — evaluate whether context redeems it`);
+    }
+    if (i.uniqueness.hasCallbackStructure) {
+      lines.push(`Callback structure: final paragraphs echo opening`);
+    }
+
+    const t = deepContent.theme;
+    if (t.clicheDetection.clicheDetected) {
+      const themes = t.clicheDetection.matchedThemes.map(m => m.label).join(', ');
+      lines.push(`Cliche topic: ${themes} — verdict: ${t.clicheDetection.verdict.replace(/_/g, ' ')}`);
+    }
+    lines.push(`Thematic coherence: ${Math.round(t.thematicCoherence.overallCoherence * 100)}%`);
+
+    return lines.join('\n');
+  }
+
+  // ==========================================================================
+  // REGISTRY FINDINGS (Wave 3)
+  // ==========================================================================
+
+  /**
+   * Build a section summarizing detected patterns and writing strategy.
+   * Patterns are detected heuristically by the pattern registry.
+   * Strategy is matched from structure analysis + strategy detection signals.
+   */
+  private buildRegistryFindings(enrichedFeatures: EnrichedFeatures): string | null {
+    const patterns = enrichedFeatures.detectedPatterns;
+    const strategy = enrichedFeatures.detectedStrategy;
+
+    if ((!patterns || patterns.length === 0) && !strategy) return null;
+
+    const lines: string[] = ['## Detected Patterns & Strategy'];
+
+    if (strategy) {
+      lines.push('');
+      lines.push(`**Detected writing strategy: ${strategy.displayName}**`);
+      lines.push(strategy.description);
+      lines.push('');
+      lines.push('When annotating, consider whether the writer is using this strategy intentionally and effectively:');
+      for (const pitfall of strategy.teaching.pitfalls.slice(0, 3)) {
+        lines.push(`- Watch for: ${pitfall}`);
+      }
+    }
+
+    if (patterns && patterns.length > 0) {
+      lines.push('');
+      lines.push('**Detected prose patterns:**');
+
+      const byCategory = new Map<string, PatternManifest[]>();
+      for (const p of patterns) {
+        const list = byCategory.get(p.category) ?? [];
+        list.push(p);
+        byCategory.set(p.category, list);
+      }
+
+      for (const [category, categoryPatterns] of byCategory) {
+        for (const p of categoryPatterns) {
+          lines.push(`- ${category}: **${p.displayName}** — recognize as a strength if executed well, flag if underutilized`);
+        }
+      }
+    }
+
+    return lines.join('\n');
+  }
+
+  // ==========================================================================
+  // INSTRUCTIONS
+  // ==========================================================================
+
   private buildInstructions(maxAnnotations: number, includeStrengths: boolean): string {
     const strengthNote = includeStrengths
       ? 'Include both strengths and issues. Aim for ~35% strength annotations and ~65% issues.'
       : 'Focus on issues and improvements only.';
+
+    // Calculate per-cluster budgets
+    const totalBudget = maxAnnotations;
+    const clusterBudgets = DIMENSION_CLUSTERS.map(c => {
+      const scaled = Math.round((c.annotationBudget / 15) * totalBudget);
+      return Math.max(3, scaled);
+    });
+    // Adjust to hit exact total
+    const sum = clusterBudgets.reduce((a, b) => a + b, 0);
+    if (sum > totalBudget) {
+      clusterBudgets[clusterBudgets.length - 1] -= (sum - totalBudget);
+    }
 
     return `## Instructions
 
@@ -630,19 +793,23 @@ Analyze this essay and produce ${maxAnnotations} annotations as a JSON array.
 
 ${strengthNote}
 
-Annotation distribution:
-- Cover at least 4 different dimensions across your annotations
-- Spread annotations across different parts of the essay (opening, middle, closing)
-- Include at least 1 annotation about the opening and 1 about the closing
-- For issues, vary severity levels — not everything is "important"
+Annotation distribution by cluster:
+- **Structure & Arc**: ~${clusterBudgets[0]} annotations (opening, closing, transitions, pacing, arc)
+- **Craft & Voice**: ~${clusterBudgets[1]} annotations (voice, tone, word choice, narrative technique)
+- **Character & Meaning**: ~${clusterBudgets[2]} annotations (theme, authenticity, emotion, growth, insight)
+
+Within each cluster, cover multiple dimensions — don't collapse everything into one dimension.
+Spread annotations across different parts of the essay (opening, middle, closing).
+For each cluster, include at least 1 strength annotation.
 
 Requirements:
 1. Each \`span.text\` must be an EXACT substring of the essay text above.
 2. Character offsets must be accurate — count from the start of the raw essay text (not including [P0] markers).
 3. Prioritize the most impactful feedback first.
-4. For issues, provide actionable suggestions. For strengths, explain WHY it works.
+4. For issues, provide actionable suggestions. For strengths, explain WHY it works in the context of the essay's overall goals.
 5. Include rewrite examples for non-obvious improvements.
 6. Match your teaching tone to the sophistication level indicated above.
+7. Use the pre-analysis findings to inform your annotations — the heuristic and pattern detection data gives you a running start. Build on it, don't just repeat it.
 
 Return ONLY the JSON array. No markdown fencing, no explanation text.`;
   }

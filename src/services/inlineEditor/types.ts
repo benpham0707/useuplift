@@ -6,8 +6,8 @@
 import type { StudentVoiceProfile } from '../voiceProfile/types';
 import type { QuickVoiceCheckResult } from '../voiceProfile/styleConsistencyService';
 
-/** Available editing commands for inline text transformation */
-export type EditingCommand =
+/** Well-known editing commands (hardcoded in commandPrompts.ts) */
+export type BuiltInEditingCommand =
   | 'make_concrete'        // Replace vague language with specific details
   | 'show_dont_tell'       // Convert telling to showing (scene, dialogue, sensory)
   | 'clarify_learning'     // Deepen reflection/insight
@@ -23,6 +23,13 @@ export type EditingCommand =
   | 'compress'             // Say the same thing in fewer words
   | 'add_dialogue'         // Convert summary to scene with dialogue
   | 'remove_cliche';       // Replace clichéd language
+
+/**
+ * Any editing command — built-in (hardcoded) or from the command registry.
+ * The `(string & {})` trick preserves autocomplete for known commands
+ * while allowing any registry command ID at runtime.
+ */
+export type EditingCommand = BuiltInEditingCommand | (string & {});
 
 /** Request to apply an inline editing command */
 export interface InlineEditRequest {
@@ -45,6 +52,8 @@ export interface InlineEditRequest {
   sessionId?: string;
   /** RAG-sourced example fragments to inject into the system prompt */
   ragContext?: string;
+  /** Target college ID for admissions-specific context */
+  collegeId?: string;
 }
 
 /** Result from applying an inline editing command */

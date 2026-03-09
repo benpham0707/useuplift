@@ -357,6 +357,13 @@ export interface TeachingLayerInput {
     exemplars: import('./expertiseSignaling/types').Exemplar[];
     transforms: import('./expertiseSignaling/types').DescriptionTransform[];
   }>;
+  /**
+   * Expert knowledge context for portfolio-level insights.
+   * Provides school archetypes, constraint intelligence, narrative arcs,
+   * character traits, advanced issue detection, and authenticity assessment.
+   * Built by assembleExpertContext() in the orchestrator, cost: $0 (heuristic).
+   */
+  expertContext?: import('../expertCounselorKnowledgeBase').ExpertKnowledgeContext;
 }
 
 /**

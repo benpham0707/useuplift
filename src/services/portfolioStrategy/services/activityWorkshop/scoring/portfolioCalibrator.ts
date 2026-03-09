@@ -417,6 +417,11 @@ function enforceRelativeOrdering(
  * Enforce minimum score spread across the portfolio.
  * If all scores cluster within ±1.0, scale outward to ±2.0 minimum.
  * Preserves relative ordering and tier range constraints.
+ *
+ * Issue 9 fix: Also enforces minimum pairwise spread between activities
+ * in different tiers — activities of genuinely different quality should be
+ * at least 1.5 points apart. Mid-tier activities (Tiers 3-4) are most
+ * susceptible to clustering because their bands are adjacent (4.0-6.9).
  */
 function enforceMinimumSpread(
   inputs: CalibrationInput[]
@@ -431,7 +436,10 @@ function enforceMinimumSpread(
 
   const MINIMUM_SPREAD = 2.0;
 
-  if (range >= MINIMUM_SPREAD) return adjustments; // Spread is adequate
+  if (range >= MINIMUM_SPREAD) {
+    // Overall spread is adequate, but check mid-tier pairwise spread
+    return enforceMidTierPairwiseSpread(inputs);
+  }
 
   // Compute the median as the anchor point
   const sortedScores = [...scores].sort((a, b) => a - b);
@@ -463,6 +471,109 @@ function enforceMinimumSpread(
         reason: `Score spread was ${range.toFixed(1)} (< ${MINIMUM_SPREAD} minimum). Scaled from median ${median.toFixed(1)}: ${original.toFixed(1)} → ${scaled.toFixed(1)}.`,
       });
       input.score.total = scaled;
+    }
+  }
+
+  // After overall spread, also check mid-tier pairwise
+  adjustments.push(...enforceMidTierPairwiseSpread(inputs));
+
+  return adjustments;
+}
+
+/**
+ * Enforce minimum pairwise spread between mid-tier activities (Tiers 3-4).
+ * Activities in different tiers that score within 1.0 of each other
+ * get pushed apart to at least 1.5 points.
+ *
+ * This specifically targets Issue 9: mid-tier clustering where a Tier 3
+ * research activity and a Tier 4 tutoring activity both end up at ~5.5.
+ */
+function enforceMidTierPairwiseSpread(
+  inputs: CalibrationInput[]
+): CalibrationAdjustment[] {
+  const adjustments: CalibrationAdjustment[] = [];
+
+  // Only check pairs where one is Tier 3 and the other is Tier 4
+  const tier3Activities = inputs.filter(i => i.tier.internalTier === 3);
+  const tier4Activities = inputs.filter(i => i.tier.internalTier === 4);
+
+  if (tier3Activities.length === 0 || tier4Activities.length === 0) return adjustments;
+
+  const MIN_CROSS_TIER_GAP = 1.5;
+  const range3 = TIER_SCORE_RANGES[3]; // 5.5-6.9
+  const range4 = TIER_SCORE_RANGES[4]; // 4.0-5.4
+
+  // Use the lowest Tier 3 score and highest Tier 4 score as the critical pair.
+  // If we fix this pair, all other cross-tier pairs are guaranteed to have >= gap.
+  // This avoids the oscillation problem from pairwise iteration.
+  const lowestT3 = tier3Activities.reduce((min, a) => a.score.total < min.score.total ? a : min, tier3Activities[0]);
+  const highestT4 = tier4Activities.reduce((max, a) => a.score.total > max.score.total ? a : max, tier4Activities[0]);
+
+  const gap = lowestT3.score.total - highestT4.score.total;
+  if (gap < MIN_CROSS_TIER_GAP) {
+    const deficit = MIN_CROSS_TIER_GAP - gap;
+    const halfDeficit = deficit / 2;
+
+    // Push the lowest Tier 3 up
+    const t3New = Math.min(range3.max, Math.round((lowestT3.score.total + halfDeficit) * 10) / 10);
+    if (t3New !== lowestT3.score.total) {
+      adjustments.push({
+        rule: 'MINIMUM_SPREAD',
+        field: 'total',
+        from: lowestT3.score.total,
+        to: t3New,
+        reason: `Mid-tier gap between "${lowestT3.activityTitle}" (Tier 3: ${lowestT3.score.total}) and "${highestT4.activityTitle}" (Tier 4: ${highestT4.score.total}) was ${gap.toFixed(1)} (< ${MIN_CROSS_TIER_GAP}). Pushed Tier 3 up.`,
+      });
+      lowestT3.score.total = t3New;
+    }
+
+    // Push the highest Tier 4 down
+    const t4New = Math.max(range4.min, Math.round((highestT4.score.total - halfDeficit) * 10) / 10);
+    if (t4New !== highestT4.score.total) {
+      adjustments.push({
+        rule: 'MINIMUM_SPREAD',
+        field: 'total',
+        from: highestT4.score.total,
+        to: t4New,
+        reason: `Mid-tier gap enforcement: pushed "${highestT4.activityTitle}" (Tier 4) down from ${highestT4.score.total} to ${t4New}.`,
+      });
+      highestT4.score.total = t4New;
+    }
+
+    // After cross-tier fix, ensure same-tier ordering is preserved:
+    // No Tier 3 activity should score below the adjusted lowest Tier 3
+    for (const t3 of tier3Activities) {
+      if (t3 !== lowestT3 && t3.score.total < lowestT3.score.total) {
+        // This activity was originally lower-scoring within Tier 3 but the
+        // lowest got pushed up past it — swap their relative positions
+        const swapScore = Math.min(range3.max, Math.round((lowestT3.score.total + 0.1) * 10) / 10);
+        if (swapScore !== t3.score.total && swapScore <= range3.max) {
+          adjustments.push({
+            rule: 'MINIMUM_SPREAD',
+            field: 'total',
+            from: t3.score.total,
+            to: swapScore,
+            reason: `Same-tier consistency: "${t3.activityTitle}" adjusted to maintain ordering within Tier 3 after spread enforcement.`,
+          });
+          t3.score.total = swapScore;
+        }
+      }
+    }
+    // Same for Tier 4: no activity should score above the adjusted highest
+    for (const t4 of tier4Activities) {
+      if (t4 !== highestT4 && t4.score.total > highestT4.score.total) {
+        const swapScore = Math.max(range4.min, Math.round((highestT4.score.total - 0.1) * 10) / 10);
+        if (swapScore !== t4.score.total && swapScore >= range4.min) {
+          adjustments.push({
+            rule: 'MINIMUM_SPREAD',
+            field: 'total',
+            from: t4.score.total,
+            to: swapScore,
+            reason: `Same-tier consistency: "${t4.activityTitle}" adjusted to maintain ordering within Tier 4 after spread enforcement.`,
+          });
+          t4.score.total = swapScore;
+        }
+      }
     }
   }
 

@@ -10,7 +10,7 @@
  * Default weights are 0.4 heuristic / 0.6 annotation, with per-dimension
  * overrides for dimensions where one signal is stronger (e.g., authenticity
  * leans 0.3/0.7 toward annotations; structural_coherence leans 0.55/0.45
- * toward heuristics). Configurable at runtime via setCalibration().
+ * toward heuristics). Calibration is passed per-call, not stored on the singleton.
  *
  * The annotation signal captures what the LLM actually observed in the text
  * (strengths and issues per dimension), while heuristics provide a stable
@@ -73,41 +73,30 @@ const PENALTY_CAP = 40;
 // ============================================================================
 
 export class ScoreDeriver {
-  /** Calibration config — per-dimension heuristic/annotation weights */
-  private calibration: ScoreCalibrationConfig = { ...DEFAULT_CALIBRATION };
-
-  /**
-   * Override calibration weights at runtime.
-   * Merges with existing calibration (partial updates are fine).
-   */
-  setCalibration(config: Partial<ScoreCalibrationConfig>): void {
-    if (config.heuristicWeight !== undefined) {
-      this.calibration.heuristicWeight = config.heuristicWeight;
-    }
-    if (config.annotationWeight !== undefined) {
-      this.calibration.annotationWeight = config.annotationWeight;
-    }
-    if (config.dimensionSignalWeights) {
-      this.calibration.dimensionSignalWeights = {
-        ...this.calibration.dimensionSignalWeights,
-        ...config.dimensionSignalWeights,
-      };
-    }
-  }
-
   /**
    * Derive dimension scores from annotations + heuristic features.
    *
    * @param input - Annotations from Phase 3, extracted features, and essay type
+   * @param calibration - Optional calibration overrides (defaults used if not provided)
    * @returns Per-dimension scores, EQI, and impression label
    */
-  deriveScores(input: ScoreDerivationInput): {
+  deriveScores(input: ScoreDerivationInput, calibration?: Partial<ScoreCalibrationConfig>): {
     dimensionScores: DerivedDimensionScore[];
     eqi: number;
     impressionLabel: ImpressionLabel;
   } {
     const { annotations, features, essayType } = input;
     const dimensions = dimensionRegistry.getAll();
+
+    // Merge caller overrides with defaults (no singleton state)
+    const effectiveCalibration: ScoreCalibrationConfig = {
+      ...DEFAULT_CALIBRATION,
+      ...calibration,
+      dimensionSignalWeights: {
+        ...DEFAULT_CALIBRATION.dimensionSignalWeights,
+        ...calibration?.dimensionSignalWeights,
+      },
+    };
 
     if (dimensions.length === 0) {
       console.warn('[ScoreDeriver] No dimensions registered. Returning empty scores.');
@@ -138,9 +127,9 @@ export class ScoreDeriver {
         this.computeAnnotationSignal(dimAnnotations);
 
       // Step 3: Fuse scores with per-dimension calibration
-      const dimCalibration = this.calibration.dimensionSignalWeights?.[dimension.id];
-      const hWeight = dimCalibration?.heuristic ?? this.calibration.heuristicWeight;
-      const aWeight = dimCalibration?.annotation ?? this.calibration.annotationWeight;
+      const dimCalibration = effectiveCalibration.dimensionSignalWeights?.[dimension.id];
+      const hWeight = dimCalibration?.heuristic ?? effectiveCalibration.heuristicWeight;
+      const aWeight = dimCalibration?.annotation ?? effectiveCalibration.annotationWeight;
 
       const fusedScore = clamp(
         Math.round(heuristicScore * hWeight + signalScore * aWeight),
