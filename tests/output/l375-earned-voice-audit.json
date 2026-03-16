@@ -1,0 +1,833 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-12T05:26:11.440Z",
+    "withL2": false,
+    "essayParagraphs": 7,
+    "costs": {
+      "l1": 0.054400000000000004,
+      "l3": 0.9009,
+      "l375": 0.45520000000000005
+    },
+    "timings": {
+      "l1": 13312,
+      "l3": 884786,
+      "l375": 228800
+    }
+  },
+  "momentEarnednessMap": {
+    "moments": [
+      {
+        "location": {
+          "paragraph": 0,
+          "sentence": 1
+        },
+        "momentType": "intellectual",
+        "description": "The constraint-possibility paradox: 'With just seven notes, I could weave melodies that tell stories, evoke emotions, and connect deeply with others'",
+        "payload": "The intellectual insight that limitation enables rather than prevents expressive possibility—the essay's central epistemological claim",
+        "mechanisms": [
+          {
+            "type": "sensory_grounding",
+            "location": {
+              "paragraph": 0,
+              "sentence": 0
+            },
+            "contribution": "The opening phrase 'fingers first danced across the piano keys' grounds the abstract claim in physical practice. The kinesthetic image establishes that the insight comes from embodied experience, not pure theory. However, this is the only concrete sensory detail in P0—the rest operates through abstraction."
+          }
+        ],
+        "gaps": [
+          "No temporal specificity showing when or how this insight was discovered—the 'From the moment' framing positions it as immediate rather than earned through sustained practice",
+          "No demonstration of the claim through specific example—we're told seven notes create worlds but not shown a specific instance where this happened",
+          "The tricolon 'tell stories, evoke emotions, and connect deeply' remains abstract—no specific story, emotion, or connection is demonstrated"
+        ]
+      },
+      {
+        "location": {
+          "paragraph": 1,
+          "sentence": 1
+        },
+        "momentType": "intellectual",
+        "description": "The discovery that 'minor adjustments transformed a piece's mood'—the disproportionate cause-effect relationship",
+        "payload": "The fascination with leverage points where small changes produce large effects, demonstrating the constraint-creativity principle in action",
+        "mechanisms": [
+          {
+            "type": "emotional_setup",
+            "location": {
+              "paragraph": 1,
+              "sentence": 1
+            },
+            "contribution": "The time investment 'spent hours experimenting' establishes sustained engagement as the precondition for discovery. The hours spent create the context where the fascination becomes credible—this isn't casual observation but earned insight from repeated practice."
+          },
+          {
+            "type": "intellectual_scaffolding",
+            "location": {
+              "paragraph": 1,
+              "sentence": 0
+            },
+            "contribution": "The puzzle metaphor in S0 ('Composing is like solving a puzzle; each note and chord must align perfectly') establishes that composition involves precision and iteration, making the 'minor adjustments' observation feel like a natural extension of the puzzle-solving framework."
+          }
+        ],
+        "gaps": [
+          "No specific example of what minor adjustment was made or how it transformed mood—the claim remains at the level of summary",
+          "No demonstration of the fascination through description of the discovery moment—we're told about fascination but not shown the moment of recognition"
+        ]
+      },
+      {
+        "location": {
+          "paragraph": 2,
+          "sentence": 1
+        },
+        "momentType": "intellectual",
+        "description": "The genre fusion claim: 'I blended them with contemporary jazz rhythms to create a fusion honoring tradition while embracing innovation'",
+        "payload": "The assertion that the narrator successfully synthesized classical and jazz traditions in a way that respects both",
+        "mechanisms": [
+          {
+            "type": "thematic_preparation",
+            "location": {
+              "paragraph": 0,
+              "sentence": 2
+            },
+            "contribution": "P0S2's 'blend of expression and analytical thinking' establishes blending as the narrator's core methodology, making P2's genre blending feel like a consistent approach rather than isolated experiment."
+          },
+          {
+            "type": "intellectual_scaffolding",
+            "location": {
+              "paragraph": 1,
+              "sentence": 1
+            },
+            "contribution": "P1's experimentation with chord progressions establishes the narrator as someone who works iteratively with musical materials, making the genre fusion claim more credible—it's consistent with established practice."
+          }
+        ],
+        "gaps": [
+          "No sensory description of what the fusion sounds like—we don't hear the blend of Chopin and jazz",
+          "No specific example of how tradition is honored or innovation is embraced—the parallel structure is rhetorically polished but conceptually thin",
+          "The Chopin reference functions as credibility marker but isn't developed—we don't learn what specifically about the Nocturnes inspired the fusion or how their characteristics manifest in the result",
+          "No demonstration that the fusion was successful beyond the narrator's assertion—no external validation, no description of how it was received"
+        ]
+      },
+      {
+        "location": {
+          "paragraph": 3,
+          "sentence": 0
+        },
+        "momentType": "intellectual",
+        "description": "The discovery of music-coding parallels: 'Delving deeper into music, I noticed parallels with another interest: coding'",
+        "payload": "The recognition that music and coding share underlying structure—both require 'logic layered with creativity'",
+        "mechanisms": [
+          {
+            "type": "intellectual_scaffolding",
+            "location": {
+              "paragraph": 0,
+              "sentence": 2
+            },
+            "contribution": "P0S2's 'blend of expression and analytical thinking' establishes that music involves both creative and logical dimensions, making the music-coding parallel credible—if music already involves logic, then the connection to coding (which also involves logic) becomes natural."
+          },
+          {
+            "type": "intellectual_scaffolding",
+            "location": {
+              "paragraph": 1,
+              "sentence": 0
+            },
+            "contribution": "P1's puzzle metaphor positions composition as problem-solving, which shares conceptual territory with coding. The puzzle frame prepares the reader to accept that music and coding might be structurally similar."
+          },
+          {
+            "type": "thematic_preparation",
+            "location": {
+              "paragraph": 3,
+              "sentence": 0
+            },
+            "contribution": "The phrase 'Delving deeper into music' establishes that the parallel emerged from sustained engagement, not superficial observation. The depth investment makes the discovery feel earned rather than forced."
+          }
+        ],
+        "gaps": [
+          "No specific moment of recognition—we're told the parallel was noticed but not shown when or how the recognition occurred",
+          "The parallel construction in S1 ('Just as I used notes and chords to compose, I could use code to create projects') demonstrates grammatical equivalence but doesn't demonstrate actual similarity—the form argues but doesn't prove",
+          "No concrete example of a coding project that revealed the parallel—the discovery remains abstract"
+        ]
+      },
+      {
+        "location": {
+          "paragraph": 4,
+          "sentence": 3
+        },
+        "momentType": "emotional",
+        "description": "The validation moment: 'Seeing users smile as the AI DJ captured their emotions reaffirmed my belief in the connection between technology and human emotion'",
+        "payload": "The emotional confirmation that the music-coding synthesis works not just technically but humanly—it affects people",
+        "mechanisms": [
+          {
+            "type": "sensory_grounding",
+            "location": {
+              "paragraph": 4,
+              "sentence": 3
+            },
+            "contribution": "The concrete image 'users smile' grounds the abstract claim in observable behavior. This is the essay's only moment of showing emotion through physical evidence rather than telling through abstract vocabulary. The smile is evidence that the technology succeeded emotionally, not just technically."
+          },
+          {
+            "type": "stakes_establishment",
+            "location": {
+              "paragraph": 4,
+              "sentence": 2
+            },
+            "contribution": "The description of the AI DJ project ('artificially intelligent disc jockey that generated tracks tailored to users' moods') establishes what was at stake: creating technology that could understand and respond to human emotion. This makes the smile meaningful—it's evidence the project achieved its emotional goal."
+          },
+          {
+            "type": "intellectual_scaffolding",
+            "location": {
+              "paragraph": 3,
+              "sentence": 1
+            },
+            "contribution": "P3S1's claim that both music and coding involve 'logic layered with creativity' and enable 'transforming abstract ideas into tangible experiences' establishes that the narrator believes technology can create meaningful human experiences. The smile confirms this belief."
+          },
+          {
+            "type": "thematic_preparation",
+            "location": {
+              "paragraph": 0,
+              "sentence": 1
+            },
+            "contribution": "P0S1's claim that music can 'evoke emotions, and connect deeply with others' establishes emotional connection as a value from the opening. The smile moment demonstrates this value transferring from music to technology."
+          }
+        ],
+        "gaps": [
+          "No description of the narrator's own emotional response to seeing the smile—we're told it 'reaffirmed belief' but not shown what that reaffirmation felt like physically or emotionally",
+          "No specificity about what emotion the AI captured or what track it generated—the moment remains at the level of summary (users smiled) rather than specific scene (this user smiled when the AI played this track that captured this emotion)",
+          "The belief being reaffirmed ('connection between technology and human emotion') is stated rather than demonstrated—we don't see earlier moments where this belief was formed or tested"
+        ]
+      },
+      {
+        "location": {
+          "paragraph": 6,
+          "sentence": 2
+        },
+        "momentType": "emotional",
+        "description": "The aspirational closing: 'I look forward to continuing this journey, crafting experiences that resonate with others and make a meaningful difference—much like composing a timeless melody'",
+        "payload": "The forward projection of identity and intention—the narrator as someone who will continue creating meaningful experiences",
+        "mechanisms": [
+          {
+            "type": "thematic_preparation",
+            "location": {
+              "paragraph": 4,
+              "sentence": 3
+            },
+            "contribution": "P4S3's 'users smile' moment establishes that the narrator values creating experiences that affect others emotionally. P6S2's aspiration to 'craft experiences that resonate with others' extends this established value into future intention."
+          },
+          {
+            "type": "emotional_setup",
+            "location": {
+              "paragraph": 6,
+              "sentence": 1
+            },
+            "contribution": "P6S1's claim that 'Music opened my mind to the beauty of innovation and coding extends that passion' establishes the narrator's ongoing engagement with creation, making the forward projection ('I look forward to continuing') feel like natural continuation rather than sudden aspiration."
+          }
+        ],
+        "gaps": [
+          "No specific vision of what experiences will be crafted or how they will resonate—the aspiration remains entirely abstract",
+          "No acknowledgment of difficulty, complication, or uncertainty—the forward projection is purely optimistic without recognizing obstacles or questions",
+          "The 'timeless melody' simile returns to P0's musical vocabulary but doesn't deepen or complicate it—it's circular return without transformation",
+          "The phrase 'meaningful difference' is conventional impact language without specificity about what difference or why it would be meaningful"
+        ]
+      }
+    ],
+    "structuralObservation": "The essay's setup-payoff architecture is front-loaded: P0 establishes the constraint-creativity principle, P1-P2 demonstrate it through musical practice, P3 reveals it applies to coding, P4 provides the concrete proof (AI DJ project + users smile). This creates a clear arrow pattern: P0 sets up → P1-P2 demonstrate → P3 extends → P4 proves. However, P5-P6 don't advance this architecture—they restate what P4 already proved. P5 returns to explain how the AI DJ worked (but through abstraction, not concrete detail), and P6 projects forward (but through aspirational language, not specific vision). The result is an essay where the setup-payoff architecture is complete by P4, and P5-P6 feel like elaboration without progression. The essay's strongest earned moment is P4S3's 'users smile'—it has four converging mechanisms (sensory grounding, stakes establishment, intellectual scaffolding, thematic preparation) that make the validation feel genuinely earned. The essay's weakest moments are P2S1's genre fusion claim and P6S2's aspirational closing—both make assertions without sufficient grounding in specific detail or concrete demonstration. The essay demonstrates sophisticated understanding of how to earn intellectual insights (through scaffolding and thematic preparation) but struggles to earn emotional claims (which require sensory grounding and temporal specificity that the essay increasingly abandons after P1)."
+  },
+  "voiceMap": {
+    "register": {
+      "baseline": "Analytical-reflective with pedagogical intent—explaining discovered patterns to an audience",
+      "observations": [
+        {
+          "location": {
+            "paragraph": 0,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Opens in lyrical-philosophical register: sensory metaphor ('danced', 'weave') in service of conceptual claims. The vocabulary shifts within three sentences from kinesthetic ('danced') to abstract ('analytical thinking', 'constraints'), enacting the movement from embodied experience to theoretical understanding.",
+          "dimensions": [
+            "register"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 1,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Shifts to explanatory-analytical register through the puzzle metaphor and precision vocabulary ('align perfectly', 'must'). The voice is teaching the reader how to understand composition as problem-solving, not just expression.",
+          "dimensions": [
+            "register"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 2,
+            "sentenceRange": [
+              0,
+              1
+            ]
+          },
+          "observation": "Moves toward resume-declarative register: 'became my favorite endeavor' is accomplishment reporting. The proper nouns (Chopin, jazz) function as credibility markers rather than sensory anchors. The voice is listing what was done, not exploring how it felt to do it.",
+          "dimensions": [
+            "register"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 5,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Operates in pure abstraction: technical explanation without concrete detail. Every sentence makes claims about methodology ('guided me', 'was like composing', 'required innovative solutions') without demonstrating through specific example. The voice has become entirely summary-level.",
+          "dimensions": [
+            "register"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 6,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Shifts to aspirational-declarative register: identity claims ('I'm driven to create'), causal assertions ('Music opened my mind'), future projections ('I look forward'). The voice is announcing conclusions rather than exploring process. This is the voice of someone who has figured things out and is reporting their findings.",
+          "dimensions": [
+            "register"
+          ]
+        }
+      ]
+    },
+    "vocabularyFingerprint": {
+      "baseline": "Moves from kinesthetic-sensory vocabulary to abstract-conceptual vocabulary to technical-aspirational vocabulary",
+      "observations": [
+        {
+          "location": {
+            "paragraph": 0,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Kinesthetic and metaphorical vocabulary: 'danced', 'weave', 'captivated', 'worlds'. The vocabulary is sensory and active, grounding abstract claims in physical practice and vivid imagery.",
+          "dimensions": [
+            "vocabulary"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 1,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Shifts to geometric and precision vocabulary: 'puzzle', 'align', 'perfectly', 'minor adjustments', 'transformed'. The vocabulary becomes spatial and technical, describing composition as arrangement and calibration.",
+          "dimensions": [
+            "vocabulary"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 3,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Introduces abstract equivalence vocabulary: 'parallels', 'logic layered with creativity', 'abstract ideas', 'tangible experiences'. The vocabulary operates at the level of pattern and principle, not sensory experience.",
+          "dimensions": [
+            "vocabulary"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 5,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Technical-abstract vocabulary dominates: 'integrating', 'preferences', 'fine-tuning', 'interpret', 'subtle cues', 'innovative solutions', 'expertise'. No concrete nouns, no sensory verbs—pure conceptual description.",
+          "dimensions": [
+            "vocabulary"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 6,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Aspirational and identity vocabulary: 'driven', 'limitless possibilities', 'beauty of innovation', 'passion', 'journey', 'meaningful difference', 'timeless melody'. The vocabulary is conventional college essay language—inspirational but generic.",
+          "dimensions": [
+            "vocabulary"
+          ]
+        }
+      ],
+      "domains": [
+        {
+          "domain": "kinesthetic-embodied",
+          "exampleWords": [
+            "danced",
+            "fingers",
+            "weave",
+            "fingertips"
+          ],
+          "paragraphs": [
+            0,
+            6
+          ]
+        },
+        {
+          "domain": "geometric-spatial",
+          "exampleWords": [
+            "align",
+            "layered",
+            "parallels",
+            "harmonizing"
+          ],
+          "paragraphs": [
+            1,
+            3,
+            5
+          ]
+        },
+        {
+          "domain": "transformation-process",
+          "exampleWords": [
+            "became",
+            "transformed",
+            "crystallized",
+            "opened",
+            "extends"
+          ],
+          "paragraphs": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            6
+          ]
+        },
+        {
+          "domain": "constraint-structure",
+          "exampleWords": [
+            "constraints",
+            "puzzle",
+            "rules",
+            "parameters",
+            "tradition"
+          ],
+          "paragraphs": [
+            0,
+            1,
+            2
+          ]
+        },
+        {
+          "domain": "synthesis-integration",
+          "exampleWords": [
+            "blend",
+            "blending",
+            "fusion",
+            "integrating",
+            "harmonizing"
+          ],
+          "paragraphs": [
+            0,
+            2,
+            3,
+            5
+          ]
+        },
+        {
+          "domain": "technical-abstract",
+          "exampleWords": [
+            "code",
+            "debugging",
+            "AI",
+            "software components",
+            "fine-tuning"
+          ],
+          "paragraphs": [
+            3,
+            4,
+            5
+          ]
+        },
+        {
+          "domain": "aspirational-identity",
+          "exampleWords": [
+            "driven",
+            "passion",
+            "journey",
+            "meaningful",
+            "timeless"
+          ],
+          "paragraphs": [
+            6
+          ]
+        }
+      ]
+    },
+    "sentenceRhythm": {
+      "baseline": "Balanced compound structures with explanatory pauses (em-dashes, semicolons, colons) that create teaching moments",
+      "observations": [
+        {
+          "location": {
+            "paragraph": 0,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Opens with flowing 20-word sentence mimicking the 'dance' it describes, then maintains similar length (19, 22 words) but increases density through em-dash interruption and abstract vocabulary shift. The rhythm moves from fluid to structured, mirroring the movement from 'dance' to 'constraints'.",
+          "dimensions": [
+            "rhythm"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 1,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Consistent 17-19 word sentences create measured, methodical rhythm matching the patient, iterative process being described. The participial phrase in S1 ('fascinated by...') creates mid-sentence pause that mimics the observational moment it describes.",
+          "dimensions": [
+            "rhythm"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 4,
+            "sentenceRange": [
+              0,
+              3
+            ]
+          },
+          "observation": "Escalating length (15, 17, 19, 21 words) creates logical progression from principle to proof to significance. Each sentence builds on the previous, creating momentum toward the emotional validation in S3.",
+          "dimensions": [
+            "rhythm"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 6,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Escalating length (19, 15, 26 words) builds toward the final simile, but the rhythm feels more like accumulation than progression. The longest sentence comes last but doesn't reveal anything new—it returns to opening language without deepening it.",
+          "dimensions": [
+            "rhythm"
+          ]
+        }
+      ]
+    },
+    "perspectiveDistance": {
+      "baseline": "Retrospective analytical distance—looking back at completed experiences to extract principles",
+      "observations": [
+        {
+          "location": {
+            "paragraph": 0,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Opens with 'From the moment' framing that positions what follows as origin story, not current experience. The narrator stands at temporal distance, looking back at the beginning to understand what it meant. Even the opening's sensory language is retrospective, not immediate.",
+          "dimensions": [
+            "perspective"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 1,
+            "sentenceRange": [
+              1,
+              1
+            ]
+          },
+          "observation": "Brief moment of closer perspective through 'spent hours experimenting'—the time investment and iterative process suggest we're closer to the experience itself. But the observation ('fascinated by how minor adjustments transformed') immediately pulls back to analytical distance.",
+          "dimensions": [
+            "perspective"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 4,
+            "sentenceRange": [
+              3,
+              3
+            ]
+          },
+          "observation": "Single moment of immediate presence: 'Seeing users smile' puts us in the observational moment through the gerund. This is the essay's closest approach to real-time experience. But the sentence immediately retreats to retrospective analysis ('reaffirmed my belief').",
+          "dimensions": [
+            "perspective"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 5,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Maximum analytical distance: pure summary of what was done without temporal specificity or experiential detail. The narrator stands far enough from the experience that only abstract methodology remains visible, not the texture of doing the work.",
+          "dimensions": [
+            "perspective"
+          ]
+        }
+      ]
+    },
+    "tonalDisposition": {
+      "baseline": "Earnest intellectual satisfaction—the tone of someone who has discovered organizing principles and takes quiet pride in that discovery",
+      "observations": [
+        {
+          "location": {
+            "paragraph": 0,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Reverent wonder tempered by intellectual satisfaction. The tone is not performative enthusiasm but genuine appreciation for the constraint-creativity paradox. The wonder is in the principle itself, not in the narrator's relationship to it.",
+          "dimensions": [
+            "tonal_disposition"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 1,
+            "sentenceRange": [
+              1,
+              1
+            ]
+          },
+          "observation": "Absorbed fascination—the tone of someone describing a process that genuinely captured their attention. The fascination is cognitive, not emotional: it's about the discovery that small changes produce large effects.",
+          "dimensions": [
+            "tonal_disposition"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 2,
+            "sentenceRange": [
+              0,
+              1
+            ]
+          },
+          "observation": "Quiet satisfaction without performative enthusiasm. The tone is assured and matter-of-fact, describing established practice rather than exciting discovery. This is retrospective pride, not in-the-moment excitement.",
+          "dimensions": [
+            "tonal_disposition"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 4,
+            "sentenceRange": [
+              3,
+              3
+            ]
+          },
+          "observation": "Quiet validation—satisfaction of seeing abstract principle proven through concrete application. The tone is confirmed belief rather than triumphant discovery. The 'reaffirmed' verb choice reveals this: the belief existed before, and the experience strengthened it.",
+          "dimensions": [
+            "tonal_disposition"
+          ]
+        },
+        {
+          "location": {
+            "paragraph": 6,
+            "sentenceRange": [
+              0,
+              2
+            ]
+          },
+          "observation": "Aspirational determination—forward-looking confidence without doubt or complication. The tone is declarative and certain, making identity claims and projecting future intention. But the certainty feels abstract, lacking the grounded specificity of earlier paragraphs.",
+          "dimensions": [
+            "tonal_disposition"
+          ]
+        }
+      ],
+      "dominantQualities": [
+        "earnestness",
+        "self_awareness"
+      ]
+    },
+    "stabilityRegions": [
+      {
+        "paragraphs": [
+          1,
+          2
+        ],
+        "voiceCharacter": "Analytical-explanatory voice describing compositional practice through puzzle-solving metaphor and experimentation narrative. Maintains consistent retrospective distance and pedagogical intent. Vocabulary stays within music domain (chord progressions, Chopin, jazz) while building the constraint-creativity framework through specific examples."
+      },
+      {
+        "paragraphs": [
+          3,
+          4
+        ],
+        "voiceCharacter": "Abstract-equivalence voice establishing music-coding parallel through systems-thinking vocabulary and skill-transfer claims. Operates at the level of principle and pattern, using parallel grammatical structures to demonstrate conceptual similarity. Maintains pedagogical register but loses sensory grounding."
+      }
+    ],
+    "shifts": [
+      {
+        "location": {
+          "paragraph": 0,
+          "sentence": 2,
+          "boundary": "mid_paragraph"
+        },
+        "dimensions": [
+          "vocabulary",
+          "register"
+        ],
+        "fromDescription": "Kinesthetic, sensory vocabulary ('danced', 'weave') in lyrical-philosophical register",
+        "toDescription": "Abstract, conceptual vocabulary ('analytical thinking', 'innovate', 'constraints') in pedagogical register",
+        "intentionality": {
+          "assessment": "intentional",
+          "confidence": 0.75,
+          "reasoning": "The shift from sensory to conceptual vocabulary within P0 enacts the paragraph's argument: that music is both embodied practice ('fingers danced') and intellectual framework ('analytical thinking'). The em-dash before 'a blend of expression and analytical thinking' marks the shift explicitly, suggesting the writer is deliberately moving from experience to theory. The shift serves the paragraph's purpose: to establish that music taught a way of thinking, not just a way of doing."
+        },
+        "servesFunction": "Establishes the essay's epistemology: understanding emerges from embodied practice but becomes transferable principle"
+      },
+      {
+        "location": {
+          "paragraph": 3,
+          "boundary": "paragraph_boundary"
+        },
+        "dimensions": [
+          "perspective",
+          "vocabulary",
+          "register"
+        ],
+        "fromDescription": "Music-domain vocabulary with some concrete practice detail ('chord progressions', 'spent hours experimenting')",
+        "toDescription": "Abstract equivalence vocabulary introducing coding domain ('parallels', 'logic layered with creativity', 'abstract ideas')",
+        "intentionality": {
+          "assessment": "intentional",
+          "confidence": 0.85,
+          "reasoning": "The shift occurs at a clear structural boundary (paragraph break) and is explicitly marked by the discovery narrative ('Delving deeper into music, I noticed parallels'). The writer signals the pivot through temporal framing ('Delving deeper') and observational verb ('noticed'), positioning this as the moment when the music-coding connection became visible. The shift serves the essay's structural purpose: P0-P2 establish the constraint-creativity principle through music, P3 reveals it applies to coding too."
+        },
+        "servesFunction": "Pivots the essay from music-as-subject to music-as-epistemology, expanding scope from single domain to transferable principle"
+      },
+      {
+        "location": {
+          "paragraph": 4,
+          "sentence": 3,
+          "boundary": "mid_paragraph"
+        },
+        "dimensions": [
+          "perspective",
+          "tonal_disposition"
+        ],
+        "fromDescription": "Retrospective analytical distance explaining skill transfer through abstract claims",
+        "toDescription": "Brief moment of immediate presence through concrete observation ('Seeing users smile'), then retreat to retrospective analysis",
+        "intentionality": {
+          "assessment": "intentional",
+          "confidence": 0.7,
+          "reasoning": "The shift to immediate perspective through the gerund 'Seeing users smile' is the essay's only moment of real-time observation, suggesting intentional deployment of concrete detail at the moment of emotional payoff. The sentence structure (gerund observation → abstract conclusion) suggests the writer is deliberately grounding the abstract claim ('reaffirmed my belief') in specific sensory evidence. However, the immediate retreat to abstraction suggests the writer may not fully trust the concrete moment to carry meaning without explanation."
+        },
+        "servesFunction": "Provides concrete human evidence for the abstract music-coding connection, showing the principle matters not just intellectually but emotionally"
+      },
+      {
+        "location": {
+          "paragraph": 5,
+          "boundary": "paragraph_boundary"
+        },
+        "dimensions": [
+          "register",
+          "perspective"
+        ],
+        "fromDescription": "Concrete project demonstration with single sensory anchor ('users smile')",
+        "toDescription": "Pure abstract explanation of methodology without temporal or sensory specificity",
+        "intentionality": {
+          "assessment": "ambiguous",
+          "confidence": 0.5,
+          "reasoning": "The shift to pure abstraction in P5 could be intentional elaboration (explaining how the project worked after demonstrating its impact) or unintentional loss of grounding (retreating to safe summary language). The paragraph's three sentences all restate the music-technology synthesis through different vocabulary without adding new information, suggesting the writer may be filling space rather than advancing understanding. No clear textual evidence indicates the shift serves a deliberate rhetorical purpose."
+        }
+      },
+      {
+        "location": {
+          "paragraph": 6,
+          "boundary": "paragraph_boundary"
+        },
+        "dimensions": [
+          "register",
+          "tonal_disposition",
+          "vocabulary"
+        ],
+        "fromDescription": "Technical-abstract explanation of project methodology",
+        "toDescription": "Aspirational-declarative identity claims and future projections using conventional college essay language",
+        "intentionality": {
+          "assessment": "intentional",
+          "confidence": 0.8,
+          "reasoning": "The shift to aspirational register in P6 is clearly intentional as closing rhetoric—the paragraph uses standard college essay closure moves (identity declaration, future projection, circular return to opening metaphor). The 'Whether at a piano or a computer' parallel structure explicitly synthesizes the essay's two domains. However, the shift introduces vocabulary ('limitless possibilities') that contradicts the essay's established epistemology, suggesting the writer is reaching for conventional inspirational language without recognizing it undermines the more sophisticated constraint-creativity argument."
+        },
+        "servesFunction": "Provides conventional college essay closure through identity synthesis and forward projection, but at the cost of the essay's conceptual coherence"
+      }
+    ],
+    "codeSwitching": []
+  },
+  "voiceIdentity": {
+    "signature": "A philosophical-pedagogical voice that moves from embodied discovery to abstract assertion. Opens with kinesthetic immediacy ('fingers first danced') but progressively ascends into conceptual vocabulary, losing sensory grounding as it gains theoretical altitude. The voice's signature move is the explanatory pause—the em-dash or semicolon that says 'here is what this means'—revealing a mind that experiences the world through pattern recognition and then teaches those patterns to others. By P6-P7, the voice has become almost entirely declarative, making identity claims ('I'm driven to create') and causal assertions ('Music opened my mind') without the sensory or temporal specificity that grounded earlier paragraphs. The voice is confident in its understanding but increasingly distant from the experiences that produced that understanding.",
+    "register": "Analytical-reflective with lyrical undertones in opening, shifting toward resume-declarative in closing",
+    "distinctivePatterns": [
+      "Explanatory punctuation (em-dashes, semicolons, colons) that create teaching moments: 'here is the observation, and here is what it means'",
+      "Transformation verbs tracking identity formation: 'became' appears three times (P0S2, P2S0, P3S2), each marking a moment when something external became internal",
+      "'Blend/blending' as signature methodology appearing across P0S2, P2S1, P5S2—the essay's consistent answer to apparent binaries",
+      "Parallel grammatical structures used as argument: P3S1's 'Just as I used X to Y, I could use A to B' makes form demonstrate content",
+      "Progressive abstraction: P0 has 'fingers danced across keys,' P1 has 'chord progressions,' P3 has only genre labels, P6 has no concrete images at all"
+    ],
+    "evolution": "Opens with embodied, kinesthetic language (P0: 'fingers danced', 'weave melodies') that grounds abstract claims in physical practice. P1-P2 maintain some concrete vocabulary ('chord progressions', 'spent hours experimenting') while building theoretical framework. P3 pivots to proper nouns and cultural references (Chopin, jazz) as credibility markers, losing sensory detail. P4 introduces the music-coding parallel through abstract equivalence ('parallels', 'logic layered with creativity'). P5 briefly returns to concrete impact ('users smile') before P6 retreats into pure abstraction ('emotionally resonant', 'innovative solutions'). P7 operates entirely through declarative assertion and aspirational language, having lost all connection to the sensory grounding that opened the essay. The arc is: embodied discovery → theoretical framework → abstract application → declarative summary. Voice gains confidence and loses specificity in parallel.",
+    "authenticVsPerformed": [
+      {
+        "location": [
+          0,
+          0
+        ],
+        "assessment": "performed",
+        "reasoning": "The opening sentence's lyricism ('fingers first danced across the piano keys') feels rehearsed rather than discovered. The metaphor is polished but conventional—it's how one is supposed to describe musical awakening in college essays. The phrase 'create worlds through sound' is expansive but generic, lacking the specificity that would make it feel personally discovered rather than borrowed from the discourse of artistic ambition."
+      },
+      {
+        "location": [
+          1,
+          1
+        ],
+        "assessment": "authentic",
+        "reasoning": "The time investment ('spent hours experimenting') and the specific observation ('how minor adjustments transformed a piece's mood') feel genuinely discovered through practice. The fascination is named rather than performed—the narrator is reporting what captured their attention, not trying to capture the reader's attention. The disproportionate cause-effect relationship (small changes → large transformations) reads as a real insight from compositional practice."
+      },
+      {
+        "location": [
+          2,
+          1
+        ],
+        "assessment": "performed",
+        "reasoning": "The Chopin reference and the phrase 'honoring tradition while embracing innovation' feel like credibility performance. Chopin's Nocturnes are recognizable enough to signal cultural literacy but not specific enough to reveal genuine engagement. The parallel structure of the final phrase is rhetorically polished but conceptually thin—it's the kind of both-and formulation that sounds sophisticated without requiring specific insight."
+      },
+      {
+        "location": [
+          4,
+          3
+        ],
+        "assessment": "authentic",
+        "reasoning": "The single concrete image in P5—'users smile'—breaks through the abstraction with genuine observational specificity. The narrator isn't claiming the project was successful; they're reporting what they saw: users smiled. This specificity, combined with the verb 'reaffirmed' (not 'proved' or 'showed' but 'reaffirmed'), suggests the moment genuinely mattered to the narrator as confirmation of existing belief."
+      },
+      {
+        "location": [
+          6,
+          0
+        ],
+        "assessment": "performed",
+        "reasoning": "The phrase 'limitless possibilities at my fingertips' is conventional college essay language that contradicts the essay's established epistemology. P0-P5 argued creation happens through constraint; P7S0 suddenly claims possibilities are limitless. This reversal suggests the writer is reaching for inspirational closure rhetoric without recognizing it undermines the essay's more sophisticated insight."
+      }
+    ]
+  }
+}

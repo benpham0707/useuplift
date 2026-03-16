@@ -1,0 +1,199 @@
+═══════════════════════════════════════════════════════════════════
+L3.75 EARNED-NESS & VOICE INTENTIONALITY AUDIT
+═══════════════════════════════════════════════════════════════════
+
+COST & TIMING:
+  L1:    $0.0544 (13312ms)
+  L3:    $0.9009 (884786ms)
+  L3.75: $0.4552 (228800ms)
+  TOTAL: $1.4105
+
+L3.75 complete: true
+
+═══════════════════════════════════════════════════════════════════
+SECTION 1: MOMENT EARNED-NESS MAP
+═══════════════════════════════════════════════════════════════════
+
+Total moments identified: 6
+By type: intellectual=4, emotional=2
+Moments with gaps: 6
+Moments with 2+ mechanisms: 5
+
+── MOMENT 1: P0S1 (intellectual) ──
+  Description: The constraint-possibility paradox: 'With just seven notes, I could weave melodies that tell stories, evoke emotions, and connect deeply with others'
+  Payload: The intellectual insight that limitation enables rather than prevents expressive possibility—the essay's central epistemological claim
+
+  Earning mechanisms (1):
+    → [sensory_grounding] from P0S0
+      "The opening phrase 'fingers first danced across the piano keys' grounds the abstract claim in physical practice. The kinesthetic image establishes that the insight comes from embodied experience, not pure theory. However, this is the only concrete sensory detail in P0—the rest operates through abstraction."
+
+  GAPS (3):
+    ✗ No temporal specificity showing when or how this insight was discovered—the 'From the moment' framing positions it as immediate rather than earned through sustained practice
+    ✗ No demonstration of the claim through specific example—we're told seven notes create worlds but not shown a specific instance where this happened
+    ✗ The tricolon 'tell stories, evoke emotions, and connect deeply' remains abstract—no specific story, emotion, or connection is demonstrated
+
+── MOMENT 2: P1S1 (intellectual) ──
+  Description: The discovery that 'minor adjustments transformed a piece's mood'—the disproportionate cause-effect relationship
+  Payload: The fascination with leverage points where small changes produce large effects, demonstrating the constraint-creativity principle in action
+
+  Earning mechanisms (2):
+    → [emotional_setup] from P1S1
+      "The time investment 'spent hours experimenting' establishes sustained engagement as the precondition for discovery. The hours spent create the context where the fascination becomes credible—this isn't casual observation but earned insight from repeated practice."
+    → [intellectual_scaffolding] from P1S0
+      "The puzzle metaphor in S0 ('Composing is like solving a puzzle; each note and chord must align perfectly') establishes that composition involves precision and iteration, making the 'minor adjustments' observation feel like a natural extension of the puzzle-solving framework."
+
+  GAPS (2):
+    ✗ No specific example of what minor adjustment was made or how it transformed mood—the claim remains at the level of summary
+    ✗ No demonstration of the fascination through description of the discovery moment—we're told about fascination but not shown the moment of recognition
+
+── MOMENT 3: P2S1 (intellectual) ──
+  Description: The genre fusion claim: 'I blended them with contemporary jazz rhythms to create a fusion honoring tradition while embracing innovation'
+  Payload: The assertion that the narrator successfully synthesized classical and jazz traditions in a way that respects both
+
+  Earning mechanisms (2):
+    → [thematic_preparation] from P0S2
+      "P0S2's 'blend of expression and analytical thinking' establishes blending as the narrator's core methodology, making P2's genre blending feel like a consistent approach rather than isolated experiment."
+    → [intellectual_scaffolding] from P1S1
+      "P1's experimentation with chord progressions establishes the narrator as someone who works iteratively with musical materials, making the genre fusion claim more credible—it's consistent with established practice."
+
+  GAPS (4):
+    ✗ No sensory description of what the fusion sounds like—we don't hear the blend of Chopin and jazz
+    ✗ No specific example of how tradition is honored or innovation is embraced—the parallel structure is rhetorically polished but conceptually thin
+    ✗ The Chopin reference functions as credibility marker but isn't developed—we don't learn what specifically about the Nocturnes inspired the fusion or how their characteristics manifest in the result
+    ✗ No demonstration that the fusion was successful beyond the narrator's assertion—no external validation, no description of how it was received
+
+── MOMENT 4: P3S0 (intellectual) ──
+  Description: The discovery of music-coding parallels: 'Delving deeper into music, I noticed parallels with another interest: coding'
+  Payload: The recognition that music and coding share underlying structure—both require 'logic layered with creativity'
+
+  Earning mechanisms (3):
+    → [intellectual_scaffolding] from P0S2
+      "P0S2's 'blend of expression and analytical thinking' establishes that music involves both creative and logical dimensions, making the music-coding parallel credible—if music already involves logic, then the connection to coding (which also involves logic) becomes natural."
+    → [intellectual_scaffolding] from P1S0
+      "P1's puzzle metaphor positions composition as problem-solving, which shares conceptual territory with coding. The puzzle frame prepares the reader to accept that music and coding might be structurally similar."
+    → [thematic_preparation] from P3S0
+      "The phrase 'Delving deeper into music' establishes that the parallel emerged from sustained engagement, not superficial observation. The depth investment makes the discovery feel earned rather than forced."
+
+  GAPS (3):
+    ✗ No specific moment of recognition—we're told the parallel was noticed but not shown when or how the recognition occurred
+    ✗ The parallel construction in S1 ('Just as I used notes and chords to compose, I could use code to create projects') demonstrates grammatical equivalence but doesn't demonstrate actual similarity—the form argues but doesn't prove
+    ✗ No concrete example of a coding project that revealed the parallel—the discovery remains abstract
+
+── MOMENT 5: P4S3 (emotional) ──
+  Description: The validation moment: 'Seeing users smile as the AI DJ captured their emotions reaffirmed my belief in the connection between technology and human emotion'
+  Payload: The emotional confirmation that the music-coding synthesis works not just technically but humanly—it affects people
+
+  Earning mechanisms (4):
+    → [sensory_grounding] from P4S3
+      "The concrete image 'users smile' grounds the abstract claim in observable behavior. This is the essay's only moment of showing emotion through physical evidence rather than telling through abstract vocabulary. The smile is evidence that the technology succeeded emotionally, not just technically."
+    → [stakes_establishment] from P4S2
+      "The description of the AI DJ project ('artificially intelligent disc jockey that generated tracks tailored to users' moods') establishes what was at stake: creating technology that could understand and respond to human emotion. This makes the smile meaningful—it's evidence the project achieved its emotional goal."
+    → [intellectual_scaffolding] from P3S1
+      "P3S1's claim that both music and coding involve 'logic layered with creativity' and enable 'transforming abstract ideas into tangible experiences' establishes that the narrator believes technology can create meaningful human experiences. The smile confirms this belief."
+    → [thematic_preparation] from P0S1
+      "P0S1's claim that music can 'evoke emotions, and connect deeply with others' establishes emotional connection as a value from the opening. The smile moment demonstrates this value transferring from music to technology."
+
+  GAPS (3):
+    ✗ No description of the narrator's own emotional response to seeing the smile—we're told it 'reaffirmed belief' but not shown what that reaffirmation felt like physically or emotionally
+    ✗ No specificity about what emotion the AI captured or what track it generated—the moment remains at the level of summary (users smiled) rather than specific scene (this user smiled when the AI played this track that captured this emotion)
+    ✗ The belief being reaffirmed ('connection between technology and human emotion') is stated rather than demonstrated—we don't see earlier moments where this belief was formed or tested
+
+── MOMENT 6: P6S2 (emotional) ──
+  Description: The aspirational closing: 'I look forward to continuing this journey, crafting experiences that resonate with others and make a meaningful difference—much like composing a timeless melody'
+  Payload: The forward projection of identity and intention—the narrator as someone who will continue creating meaningful experiences
+
+  Earning mechanisms (2):
+    → [thematic_preparation] from P4S3
+      "P4S3's 'users smile' moment establishes that the narrator values creating experiences that affect others emotionally. P6S2's aspiration to 'craft experiences that resonate with others' extends this established value into future intention."
+    → [emotional_setup] from P6S1
+      "P6S1's claim that 'Music opened my mind to the beauty of innovation and coding extends that passion' establishes the narrator's ongoing engagement with creation, making the forward projection ('I look forward to continuing') feel like natural continuation rather than sudden aspiration."
+
+  GAPS (4):
+    ✗ No specific vision of what experiences will be crafted or how they will resonate—the aspiration remains entirely abstract
+    ✗ No acknowledgment of difficulty, complication, or uncertainty—the forward projection is purely optimistic without recognizing obstacles or questions
+    ✗ The 'timeless melody' simile returns to P0's musical vocabulary but doesn't deepen or complicate it—it's circular return without transformation
+    ✗ The phrase 'meaningful difference' is conventional impact language without specificity about what difference or why it would be meaningful
+
+── STRUCTURAL OBSERVATION ──
+  The essay's setup-payoff architecture is front-loaded: P0 establishes the constraint-creativity principle, P1-P2 demonstrate it through musical practice, P3 reveals it applies to coding, P4 provides the concrete proof (AI DJ project + users smile). This creates a clear arrow pattern: P0 sets up → P1-P2 demonstrate → P3 extends → P4 proves. However, P5-P6 don't advance this architecture—they restate what P4 already proved. P5 returns to explain how the AI DJ worked (but through abstraction, not concrete detail), and P6 projects forward (but through aspirational language, not specific vision). The result is an essay where the setup-payoff architecture is complete by P4, and P5-P6 feel like elaboration without progression. The essay's strongest earned moment is P4S3's 'users smile'—it has four converging mechanisms (sensory grounding, stakes establishment, intellectual scaffolding, thematic preparation) that make the validation feel genuinely earned. The essay's weakest moments are P2S1's genre fusion claim and P6S2's aspirational closing—both make assertions without sufficient grounding in specific detail or concrete demonstration. The essay demonstrates sophisticated understanding of how to earn intellectual insights (through scaffolding and thematic preparation) but struggles to earn emotional claims (which require sensory grounding and temporal specificity that the essay increasingly abandons after P1).
+
+═══════════════════════════════════════════════════════════════════
+SECTION 2: VOICE SHIFTS WITH INTENTIONALITY REASONING
+═══════════════════════════════════════════════════════════════════
+
+Total shifts: 5
+Intentional: 4, Unintentional: 0, Ambiguous: 1
+Shifts with substantive reasoning (>50 chars): 5/5
+
+── SHIFT 1: P0S2 (mid_paragraph) ──
+  Dimensions: vocabulary, register
+  From: "Kinesthetic, sensory vocabulary ('danced', 'weave') in lyrical-philosophical register"
+  To:   "Abstract, conceptual vocabulary ('analytical thinking', 'innovate', 'constraints') in pedagogical register"
+  Assessment: intentional (confidence: 0.75)
+  Reasoning: "The shift from sensory to conceptual vocabulary within P0 enacts the paragraph's argument: that music is both embodied practice ('fingers danced') and intellectual framework ('analytical thinking'). The em-dash before 'a blend of expression and analytical thinking' marks the shift explicitly, suggesting the writer is deliberately moving from experience to theory. The shift serves the paragraph's purpose: to establish that music taught a way of thinking, not just a way of doing."
+  Serves: Establishes the essay's epistemology: understanding emerges from embodied practice but becomes transferable principle
+
+── SHIFT 2: P3 boundary (paragraph_boundary) ──
+  Dimensions: perspective, vocabulary, register
+  From: "Music-domain vocabulary with some concrete practice detail ('chord progressions', 'spent hours experimenting')"
+  To:   "Abstract equivalence vocabulary introducing coding domain ('parallels', 'logic layered with creativity', 'abstract ideas')"
+  Assessment: intentional (confidence: 0.85)
+  Reasoning: "The shift occurs at a clear structural boundary (paragraph break) and is explicitly marked by the discovery narrative ('Delving deeper into music, I noticed parallels'). The writer signals the pivot through temporal framing ('Delving deeper') and observational verb ('noticed'), positioning this as the moment when the music-coding connection became visible. The shift serves the essay's structural purpose: P0-P2 establish the constraint-creativity principle through music, P3 reveals it applies to coding too."
+  Serves: Pivots the essay from music-as-subject to music-as-epistemology, expanding scope from single domain to transferable principle
+
+── SHIFT 3: P4S3 (mid_paragraph) ──
+  Dimensions: perspective, tonal_disposition
+  From: "Retrospective analytical distance explaining skill transfer through abstract claims"
+  To:   "Brief moment of immediate presence through concrete observation ('Seeing users smile'), then retreat to retrospective analysis"
+  Assessment: intentional (confidence: 0.70)
+  Reasoning: "The shift to immediate perspective through the gerund 'Seeing users smile' is the essay's only moment of real-time observation, suggesting intentional deployment of concrete detail at the moment of emotional payoff. The sentence structure (gerund observation → abstract conclusion) suggests the writer is deliberately grounding the abstract claim ('reaffirmed my belief') in specific sensory evidence. However, the immediate retreat to abstraction suggests the writer may not fully trust the concrete moment to carry meaning without explanation."
+  Serves: Provides concrete human evidence for the abstract music-coding connection, showing the principle matters not just intellectually but emotionally
+
+── SHIFT 4: P5 boundary (paragraph_boundary) ──
+  Dimensions: register, perspective
+  From: "Concrete project demonstration with single sensory anchor ('users smile')"
+  To:   "Pure abstract explanation of methodology without temporal or sensory specificity"
+  Assessment: ambiguous (confidence: 0.50)
+  Reasoning: "The shift to pure abstraction in P5 could be intentional elaboration (explaining how the project worked after demonstrating its impact) or unintentional loss of grounding (retreating to safe summary language). The paragraph's three sentences all restate the music-technology synthesis through different vocabulary without adding new information, suggesting the writer may be filling space rather than advancing understanding. No clear textual evidence indicates the shift serves a deliberate rhetorical purpose."
+
+── SHIFT 5: P6 boundary (paragraph_boundary) ──
+  Dimensions: register, tonal_disposition, vocabulary
+  From: "Technical-abstract explanation of project methodology"
+  To:   "Aspirational-declarative identity claims and future projections using conventional college essay language"
+  Assessment: intentional (confidence: 0.80)
+  Reasoning: "The shift to aspirational register in P6 is clearly intentional as closing rhetoric—the paragraph uses standard college essay closure moves (identity declaration, future projection, circular return to opening metaphor). The 'Whether at a piano or a computer' parallel structure explicitly synthesizes the essay's two domains. However, the shift introduces vocabulary ('limitless possibilities') that contradicts the essay's established epistemology, suggesting the writer is reaching for conventional inspirational language without recognizing it undermines the more sophisticated constraint-creativity argument."
+  Serves: Provides conventional college essay closure through identity synthesis and forward projection, but at the cost of the essay's conceptual coherence
+
+═══════════════════════════════════════════════════════════════════
+SECTION 3: VOICE MAP BASELINES
+═══════════════════════════════════════════════════════════════════
+
+  Register: Analytical-reflective with pedagogical intent—explaining discovered patterns to an audience
+  Vocabulary: Moves from kinesthetic-sensory vocabulary to abstract-conceptual vocabulary to technical-aspirational vocabulary
+  Rhythm: Balanced compound structures with explanatory pauses (em-dashes, semicolons, colons) that create teaching moments
+  Perspective: Retrospective analytical distance—looking back at completed experiences to extract principles
+  Tonal disposition: Earnest intellectual satisfaction—the tone of someone who has discovered organizing principles and takes quiet pride in that discovery
+  Dominant qualities: earnestness, self_awareness
+
+Code-switching events: none
+
+═══════════════════════════════════════════════════════════════════
+SECTION 4: QUALITY ASSESSMENT
+═══════════════════════════════════════════════════════════════════
+
+  ✓ At least 3 moments identified
+    Found 6
+  ✓ At least 2 moments have gaps
+    Found 6 with gaps
+  ✓ At least 1 mechanism per moment on average
+    Avg: 2.3
+  ✓ Structural observation is substantive (>100 chars)
+    1427 chars
+  ✓ Voice shifts have reasoning-backed assessments
+    5/5 have substantive reasoning
+  ✓ Multiple mechanism types used
+    Types used: sensory_grounding, emotional_setup, intellectual_scaffolding, thematic_preparation, stakes_establishment
+  ✓ Piano essay: identifies unearned claim (tech-emotion connection)
+    At least one gap targets this area
+
+Quality score: 7/7 checks passed
