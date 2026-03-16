@@ -1,0 +1,766 @@
+═══════════════════════════════════════════════════════════════
+L3 DEPTH AUDIT — OBSERVATION CLASSIFICATION REPORT
+═══════════════════════════════════════════════════════════════
+
+DEPTH DISTRIBUTION:
+  SURFACE:       0/129 (0.0%)
+  STRUCTURAL:    65/129 (50.4%)
+  ARCHITECTURAL: 64/129 (49.6%)
+
+COST & TIMING:
+  L1: $0.0560 (14722ms)
+  L2: $0.0555 (71615ms)
+  L2.5: $0.0120 (13580ms)
+  L3: $0.9066 (848123ms)
+  TOTAL: $1.0301
+
+═══════════════════════════════════════════════════════════════
+PER-PARAGRAPH BREAKDOWN
+═══════════════════════════════════════════════════════════════
+
+── PARAGRAPH 1 ──
+   S: 0  STR: 8  ARCH: 9  Total: 17
+
+   [  ★★ STR] P1S1.observedFunctions
+      "Establishes the essay's origin point — not a specific moment in time but the threshold moment when a practice became identity-defining. The 'from the moment' construction frames everything that follows as consequence of this initial encounter."
+      Evidence: "'From the moment my fingers first danced across the piano keys'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P1S1.observedFunctions
+      "Constructs the narrator's relationship to music as one of receptivity-to-power rather than skill-acquisition. The passive construction 'I was captivated' positions the narrator as acted-upon, establishing music as an external force that reorganizes the self."
+      Evidence: "'I was captivated by the power to create worlds through sound'"
+      (Matches architectural pattern: the\s+narrator['']?s?\s+relationship\s+t)
+
+   [  ★★ STR] P1S1.observedFunctions
+      "Introduces the essay's central metaphor: music-making as world-building. This isn't music as performance or self-expression but as ontological practice — the creation of realities. This metaphor will later accommodate coding (another world-building practice)."
+      Evidence: "'the power to create worlds through sound'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P1S1.observedFunctions
+      "Uses personification ('fingers danced') to transform mechanical action into artistic expression, signaling that this essay will treat technical practice as inherently creative. The verb 'danced' imports movement vocabulary into a description of stillness (sitting at piano), suggesting the narrator experiences music-making as embodied motion."
+      Evidence: "'my fingers first danced across the piano keys'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P1S1.inferredIntents
+      "To establish music as the essay's governing metaphor from the first sentence — not just the topic but the conceptual framework through which all subsequent content will be understood."
+      Evidence: "The sentence doesn't describe learning piano or playing a piece; it describes discovering 'the power to create worlds.' This is metaphor-first thinking."
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P1S1.inferredIntents
+      "To position the narrator as someone who experiences creative practice at a philosophical level — not 'I learned piano' but 'I discovered the power to create worlds.' This signals intellectual ambition and sets the essay's register."
+      Evidence: "The scale of the claim ('create worlds') in the opening sentence establishes that this essay will operate at the level of ideas, not just activities."
+      (Matches architectural pattern: creative\s+practice)
+
+   [★★★ ARCH] P1S1.narrativeContributions
+      "Establishes the essay's temporal structure: a retrospective narration that begins at the origin point and will move forward chronologically through the narrator's evolving relationship with creative practice."
+      Evidence: "'From the moment' signals a before/after structure — there was a time before this moment, and everything after is shaped by it."
+      (Matches architectural pattern: creative\s+practice)
+
+   [  ★★ STR] P1S2.observedFunctions
+      "Establishes the constraint-possibility paradox as the essay's foundational logic: creativity operates within limits ('just seven notes') but those limits enable rather than restrict creation ('weave melodies'). This paradox becomes the through-line connecting music to coding — both are practices of innovation within constraint."
+      Evidence: "'With just seven notes, I could weave melodies' — the 'just' emphasizes limitation, the 'could weave' emphasizes generative power"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P1S2.observedFunctions
+      "Introduces the relational dimension of creation ('connect deeply with others') that the essay struggles to develop. P6S2's 'harmonizing with its audience' is the essay's first attempt to fulfill this promise, but it arrives 5 paragraphs later and remains metaphorical rather than concrete."
+      Evidence: "P1S2 promises connection with others, P6S2 delivers 'harmonizing with its audience' as the only development of this thread"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P1S2.observedFunctions
+      "The sentence's triadic structure (create worlds, tell stories, evoke emotions, connect with others) establishes music's multiple functions, but the essay only develops the first three. The 'connect deeply with others' element remains underdeveloped until P6's audience metaphor."
+      Evidence: "Three of four functions get concrete development (P2 on evoking emotions, P3 on telling stories through fusion), but connection with others only appears abstractly in P6"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P1S2.inferredIntents
+      "To establish the constraint-as-generative-force principle that will later justify the music-to-coding bridge. If seven notes can create infinite melodies, then limited syntax can create infinite programs — the logic is identical."
+      Evidence: "The 'just seven notes' specificity isn't musical detail for its own sake; it's establishing a principle about how creativity works within constraints."
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P1S2.inferredIntents
+      "To position music as a communicative practice (stories, emotions, connection) rather than a technical skill, justifying the 'music as language' metaphor that arrives in S3."
+      Evidence: "All three infinitive phrases describe communication functions — music isn't presented as sound-for-its-own-sake but as a medium for meaning-making."
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P1S2.narrativeContributions
+      "Establishes the essay's central tension: creation as both self-expression and communication with others. P6's 'harmonizing with its audience' attempts to resolve this tension by framing creation as dialogic rather than solitary, but the resolution remains conceptual."
+      Evidence: "P1S2 sets up expression vs. connection, P6S2 attempts synthesis through 'harmonizing' metaphor"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [★★★ ARCH] P1S3.observedFunctions
+      "Establishes the constraint-possibility paradox that becomes the essay's central claim about creative practice: limited inputs (seven notes) produce unlimited outputs (infinite melodies). This isn't just a feature of music; P4 reveals this is the essay's definition of how ALL creative practice works — whether in music or code."
+      Evidence: "'With just seven notes, I could weave melodies that tell stories' — the 'just...could' structure establishes constraint-as-enabler"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [★★★ ARCH] P1S3.observedFunctions
+      "The phrase 'blend of expression and analytical thinking' is the essay's first articulation of dual-mode creativity, which P4 refines into 'logic layered with creativity.' P1S3 introduces the concept abstractly; P4S2 gives it precise language and demonstrates that it applies across domains."
+      Evidence: "'a blend of expression and analytical thinking' (P1S3) becomes 'logic layered with creativity' (P4S2)"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P1S3.inferredIntents
+      "To establish that creativity isn't freedom from constraints but freedom within constraints — the 'just seven notes' framing is crucial because it prevents the reader from imagining music as unconstrained self-expression"
+      Evidence: "just seven notes, I could weave melodies"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P1S3.narrativeContributions
+      "Introduces the constraint-possibility dialectic that will structure the entire essay. P2 demonstrates this dialectic in compositional practice (chord progressions as puzzle-solving). P3 demonstrates it in tradition-innovation synthesis (Chopin as constraint and inspiration). P4-P6 will apply the same dialectic to coding."
+      Evidence: "P1S2 → P2 (puzzle-solving) → P3 (tradition-innovation) → P4-P6 (coding parallels)"
+      (Matches architectural pattern: p\d.*p\d)
+
+
+── PARAGRAPH 2 ──
+   S: 0  STR: 8  ARCH: 7  Total: 15
+
+   [  ★★ STR] P2S1.observedFunctions
+      "Establishes the paragraph's controlling metaphor — composing as puzzle-solving — which reframes music from expressive art to analytical practice. This metaphor does architectural work: it prepares the reader to accept coding as a parallel domain in P4, because if music is already puzzle-solving, then coding (also puzzle-solving) isn't a departure but a continuation."
+      Evidence: "Composing is like solving a puzzle"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P2S1.observedFunctions
+      "The semicolon creates structural equivalence between two ideas: the general principle (composing = puzzle) and the specific constraint (notes/chords must align perfectly). This syntactic choice signals that the narrator thinks in terms of systems and rules, not just intuitive expression."
+      Evidence: "Composing is like solving a puzzle; each note and chord must align perfectly"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P2S1.observedFunctions
+      "Introduces the essay's first explicit constraint language ('must align perfectly') since P1's 'seven notes.' This continues the constraint-as-structure thread: creativity operates within boundaries, and those boundaries aren't limitations but the conditions that make meaning possible."
+      Evidence: "each note and chord must align perfectly to convey the intended emotion"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P2S1.inferredIntents
+      "The writer appears to be pre-justifying the music-to-coding bridge by establishing that music is already an analytical practice. If the reader accepts that composing is puzzle-solving, then the later claim that coding is also puzzle-solving becomes less of a leap."
+      Evidence: "The puzzle metaphor appears here in P2, and 'logic' appears in P4S2 when coding is introduced — the same problem-solving vocabulary"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P2S1.narrativeContributions
+      "Advances the essay's epistemological argument: the narrator doesn't just feel music, they analyze it. This is the first concrete evidence that P1's 'analytical thinking' claim wasn't empty rhetoric. The puzzle metaphor will be the conceptual bridge to coding."
+      Evidence: "P1S3 claims music is 'a blend of expression and analytical thinking' — this sentence demonstrates what the analytical half looks like"
+      (Matches architectural pattern: epistemolog)
+
+   [★★★ ARCH] P2S2.observedFunctions
+      "Provides concrete evidence of the puzzle-solving process claimed in S1. The 'spent hours' temporal marker and 'experimenting' verb demonstrate iterative, analytical practice — this is what puzzle-solving looks like in compositional practice."
+      Evidence: "I spent hours experimenting with chord progressions"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P2S2.observedFunctions
+      "The 'minor adjustments transformed' juxtaposition is the paragraph's most compressed articulation of analytical sensitivity. The narrator notices small changes and tracks their large effects — this is evidence of the 'analytical thinking' claimed in P1. This detail will become crucial in P5 when the narrator describes 'fine-tuning the AI to interpret subtle cues.'"
+      Evidence: "how minor adjustments transformed a piece's mood"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P2S2.observedFunctions
+      "The participial phrase 'fascinated by' locates emotion in the process of discovery, not in the final product. The narrator's satisfaction comes from observing cause-and-effect relationships ('how minor adjustments transformed'), which is an analytical pleasure, not an expressive one."
+      Evidence: "fascinated by how minor adjustments transformed a piece's mood"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P2S2.inferredIntents
+      "The writer appears to be establishing credibility as someone who has done deep, sustained work in music. 'Spent hours' signals commitment, and 'experimenting' signals a scientific approach. This is building the case that the narrator's musical practice is rigorous enough to transfer to technical domains."
+      Evidence: "The temporal marker 'hours' and the verb 'experimenting' both signal sustained, methodical practice"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P2S2.narrativeContributions
+      "This is the essay's only window into the narrator's actual creative process before the pivot to coding. The 'minor adjustments transformed mood' detail is the clearest evidence that the narrator possesses the analytical sensitivity that will later be applied to coding. This sentence is doing critical architectural work: it's the proof that the music-coding parallel isn't forced."
+      Evidence: "P5S3 will describe 'fine-tuning the AI to interpret subtle cues' — the same attention to small changes and their effects"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [  ★★ STR] P2S3.observedFunctions
+      "Demonstrates what 'analytical thinking' (claimed in P1S3) looks like in practice — tracking cause and effect ('minor adjustments transformed a piece's mood'), experimenting systematically, attending to the relationship between variables"
+      Evidence: "experimenting with chord progressions, fascinated by how minor adjustments transformed a piece's mood"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P2S3.observedFunctions
+      "Establishes the narrator as someone who thinks about their creative process while doing it — not just composing but observing how composition works. This meta-awareness is what makes the music-coding bridge credible."
+      Evidence: "fascinated by how minor adjustments transformed — the 'how' signals analytical observation"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P2S3.observedFunctions
+      "P3 reveals that this experimental process produces actual artifacts (Chopin-jazz fusion), not just abstract understanding. The 'hours experimenting' in P2 led to the 'favorite endeavor' in P3."
+      Evidence: "P2S2 'spent hours experimenting' → P3S1 'became my favorite endeavor'"
+      (Matches architectural pattern: reveals?\s+(that|how|what)\s+(the\s+)?(e)
+
+   [  ★★ STR] P2S3.inferredIntents
+      "To show the reader that the narrator's compositional practice is already analytical and systematic — preparing the ground for the music-coding parallel in P4"
+      Evidence: "experimenting, fascinated by how — vocabulary of scientific inquiry applied to artistic practice"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P2S3.narrativeContributions
+      "This sentence is the essay's only window into the narrator's actual creative process before the pivot to coding. It establishes that the narrator thinks like a problem-solver within music, which makes the claim that coding is 'like' music credible."
+      Evidence: "P2S2 establishes analytical thinking in music → P4 claims music and coding are parallel → credibility depends on P2S2"
+      (Matches architectural pattern: p\d.*p\d)
+
+
+── PARAGRAPH 3 ──
+   S: 0  STR: 8  ARCH: 5  Total: 13
+
+   [★★★ ARCH] P3S1.observedFunctions
+      "Introduces a specific creative practice that exemplifies P2's general compositional process — shifts from 'I composed' (abstract) to 'I reimagined classical pieces' (concrete category of work)"
+      Evidence: "Reimagining classical pieces by infusing modern elements became my favorite endeavor"
+      (Matches architectural pattern: creative\s+practice)
+
+   [  ★★ STR] P3S1.observedFunctions
+      "The gerund construction ('Reimagining...') frames this as an ongoing practice rather than a one-time project, suggesting sustained engagement over time"
+      Evidence: "Reimagining classical pieces by infusing modern elements became"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P3S1.observedFunctions
+      "Establishes the tradition-innovation dialectic that will structure the essay's second half — 'classical pieces' (tradition) + 'modern elements' (innovation) = the fusion principle"
+      Evidence: "classical pieces by infusing modern elements"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P3S1.inferredIntents
+      "To provide a category label for the work before naming a specific instance — preparing the reader for the Chopin example in S2"
+      Evidence: "S1 describes the general practice, S2 provides the specific case"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P3S1.inferredIntents
+      "To signal that this isn't just technical exercise but personally meaningful work — 'favorite endeavor' is the essay's first explicit statement of preference"
+      Evidence: "became my favorite endeavor"
+      (Matches architectural pattern: isn['']t\s+just\s+.{5,}(it['']?s?|this\s)
+
+   [★★★ ARCH] P3S1.narrativeContributions
+      "Advances the essay's central claim that creativity operates within constraints by showing that 'constraints' can include entire musical traditions — the narrator isn't constrained by Chopin, they're working within and against Chopin simultaneously"
+      Evidence: "Reimagining classical pieces — the verb 'reimagining' implies working with existing material rather than creating from scratch"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [  ★★ STR] P3S2.observedFunctions
+      "Provides the specific case study that validates S1's general claim — names the exact classical source (Chopin's Nocturnes) and modern element (contemporary jazz rhythms)"
+      Evidence: "Inspired by Chopin's Nocturnes, I blended them with contemporary jazz rhythms"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P3S2.observedFunctions
+      "Articulates the essay's central creative principle through the parallel structure 'honoring tradition while embracing innovation' — this is the clearest statement of the narrator's artistic philosophy"
+      Evidence: "honoring tradition while embracing innovation"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P3S2.observedFunctions
+      "Establishes 'fusion' as the essay's organizing metaphor — not choosing between domains but synthesizing them. This will reappear when music and coding are fused in the AI DJ project."
+      Evidence: "create a fusion honoring tradition while embracing innovation — the word 'fusion' names the synthesis principle"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P3S2.inferredIntents
+      "To provide memorable, concrete details that anchor the abstract claims in P1-P2 — Chopin and jazz are specific enough to be visualized"
+      Evidence: "Chopin's Nocturnes, contemporary jazz rhythms — proper nouns and genre names"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P3S2.inferredIntents
+      "To establish the narrator's artistic values (tradition + innovation) before the essay pivots to coding — this frame will justify why the AI DJ project matters"
+      Evidence: "honoring tradition while embracing innovation — this phrase will echo in P5-P6's description of the AI DJ"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P3S2.narrativeContributions
+      "Provides the essay's first concrete artifact — the Chopin-jazz fusion is something the reader can imagine hearing, unlike the abstract 'chord progressions' in P2"
+      Evidence: "Chopin's Nocturnes, I blended them with contemporary jazz rhythms"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P3S2.narrativeContributions
+      "Plants the 'tradition + innovation' frame that will structure the essay's second half — the AI DJ will 'honor' musical principles while 'embracing' technical possibility"
+      Evidence: "honoring tradition while embracing innovation — this exact duality will reappear in the AI DJ description"
+      (Medium-length observation with evidence but no architectural markers)
+
+
+── PARAGRAPH 4 ──
+   S: 0  STR: 18  ARCH: 8  Total: 26
+
+   [  ★★ STR] P4S1.observedFunctions
+      "Opens with a present participle ('Delving deeper') that signals ongoing intellectual movement rather than completed action — the narrator is still in the process of exploring music when the coding connection emerges. This makes the discovery feel organic rather than retrospectively imposed."
+      Evidence: "'Delving deeper into music' — the present participle creates a sense of active exploration"
+      (Matches structural pattern: creates?\s+(a sense|an? |the )?(sense|fe)
+
+   [  ★★ STR] P4S1.observedFunctions
+      "The phrase 'Delving deeper into music' creates reader expectation that the paragraph will continue discussing music, but the sentence immediately pivots to coding. This micro-betrayal of expectation mirrors the narrator's own surprise at discovering the connection — the reader experiences the same cognitive shift the narrator did."
+      Evidence: "'Delving deeper into music, I noticed parallels with another interest: coding' — the sentence structure promises music content but delivers coding"
+      (Matches structural pattern: mirrors?\s+(the|a|an))
+
+   [  ★★ STR] P4S1.observedFunctions
+      "The colon after 'coding' is the essay's only mid-sentence colon and creates a structural hinge. Everything before the colon is observation ('I noticed parallels'), everything after (in S2-S3) is explanation. The colon enacts the moment of cognitive shift from noticing to understanding."
+      Evidence: "'another interest: coding' — the colon creates a pause and signals that explanation will follow"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S1.observedFunctions
+      "Uses the plural 'parallels' rather than singular 'parallel', suggesting the narrator perceives multiple connection points rather than a single similarity. This sets up S2's job: to enumerate what those parallels are."
+      Evidence: "'I noticed parallels' — plural form suggests multiple points of connection"
+      (Matches structural pattern: parallels?\s+(the|a|an))
+
+   [  ★★ STR] P4S1.inferredIntents
+      "The writer wants the music-to-coding bridge to feel like discovery rather than contrivance. The 'I noticed' construction positions the connection as emergent (something the narrator observed) rather than predetermined (something the narrator set out to prove)."
+      Evidence: "'I noticed parallels' — the verb 'noticed' implies observation rather than construction"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S1.inferredIntents
+      "The 'Delving deeper' opening attempts to create continuity with P3 (still talking about music) while pivoting to a new subject (coding). The writer is trying to make the domain shift feel like a natural extension of musical exploration rather than an abrupt topic change."
+      Evidence: "'Delving deeper into music' followed immediately by 'coding' — the phrase bridges the two domains"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S1.narrativeContributions
+      "Marks the essay's structural pivot point — the moment where music stops being the subject and becomes the lens. Everything before this sentence is about music; everything after is about the relationship between music and coding."
+      Evidence: "This is the first sentence in the essay that introduces coding as a subject"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P4S1.narrativeContributions
+      "Introduces the essay's second major domain (coding) in a way that positions it as equivalent to music ('another interest') rather than subordinate. This equivalence is crucial for the essay's argument that these are parallel practices, not hierarchical ones."
+      Evidence: "'another interest' — the word 'another' creates equivalence rather than hierarchy"
+      (Matches architectural pattern: the\s+essay['']?s?\s+(definition|argumen)
+
+   [  ★★ STR] P4S2.observedFunctions
+      "Uses parallel grammatical structure ('Just as I used X to Y, I could use A to B') to mirror the conceptual parallel being described. The syntax enacts the argument: if the sentence structure is parallel, the practices must be parallel too. This is form-follows-content at the sentence level."
+      Evidence: "'Just as I used notes and chords to compose, I could use code to create projects' — parallel clauses mirror parallel practices"
+      (Matches structural pattern: mirrors?\s+(the|a|an))
+
+   [  ★★ STR] P4S2.observedFunctions
+      "The modal verb 'could' (rather than 'can' or 'do') positions coding as realized possibility rather than current practice. This suggests the discovery is recent or ongoing — the narrator has recognized the potential and is in the process of actualizing it."
+      Evidence: "'I could use code' — modal verb suggests possibility rather than established practice"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S2.observedFunctions
+      "The dash before 'both requiring logic layered with creativity' creates a parenthetical insertion that reads like a real-time insight. The sentence's main structure is complete ('I could use code to create projects'), and the dash adds the crucial observation about what makes these practices parallel. This mimics the cognitive process of discovery: first the observation, then the understanding of why."
+      Evidence: "'—both requiring logic layered with creativity' — dash creates parenthetical insertion of insight"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P4S2.observedFunctions
+      "The phrase 'logic layered with creativity' is the essay's first explicit articulation of what makes these practices parallel. It's not just that both involve creation, but that both require the same dual-mode thinking: analytical structure (logic) combined with expressive freedom (creativity). This becomes the essay's definition of creative practice."
+      Evidence: "'both requiring logic layered with creativity' — this phrase defines the shared characteristic"
+      (Matches architectural pattern: the\s+essay['']?s?\s+(definition|argumen)
+
+   [  ★★ STR] P4S2.observedFunctions
+      "The spatial metaphor 'layered' suggests that logic and creativity aren't mixed or blended but stacked or overlaid — they remain distinct but work together. This is a more sophisticated model than 'combining' or 'balancing' because it preserves the integrity of each mode while showing how they interact."
+      Evidence: "'logic layered with creativity' — spatial metaphor suggests stacking or overlaying"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S2.inferredIntents
+      "The writer wants to demonstrate the parallel through syntax, not just assert it through content. The parallel grammatical structure is a rhetorical proof: if the sentence can hold both practices in the same syntactic frame, they must share underlying structure."
+      Evidence: "The 'Just as...I could' construction creates syntactic equivalence"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S2.inferredIntents
+      "The dash insertion ('—both requiring logic layered with creativity') is meant to feel like the narrator is thinking through the connection in real time, adding the crucial insight as it emerges. This makes the discovery feel authentic rather than pre-packaged."
+      Evidence: "The dash creates a pause where the insight is inserted"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P4S2.narrativeContributions
+      "Provides the essay's clearest definition of creative practice: not pure expression, not pure problem-solving, but 'logic layered with creativity.' This definition will govern how the essay talks about both music and coding going forward."
+      Evidence: "'both requiring logic layered with creativity' — this becomes the essay's working definition"
+      (Matches architectural pattern: creative\s+practice)
+
+   [  ★★ STR] P4S2.narrativeContributions
+      "Establishes the specific terms of the parallel: not just that music and coding are both creative, but that they require the same dual-mode thinking. This makes the parallel more precise and defensible than a vague claim about 'creativity.'"
+      Evidence: "'logic layered with creativity' — specifies what the parallel consists of"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P4S3.observedFunctions
+      "Shifts from past-tense discovery ('I noticed', 'I could use') to past-tense transformation ('became'), marking coding's integration into the narrator's identity. This isn't just a parallel the narrator observed; it's a medium the narrator now inhabits."
+      Evidence: "'Coding became another medium' — past tense marks completed transformation"
+      (Matches architectural pattern: isn['']t\s+just\s+.{5,}(it['']?s?|this\s)
+
+   [★★★ ARCH] P4S3.observedFunctions
+      "The word 'medium' elevates coding to the same category as music — not a tool or skill but a medium for artistic/creative expression. This is the essay's clearest statement that coding isn't subordinate to music but equivalent."
+      Evidence: "'another medium' — positions coding as equivalent to music in category"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P4S3.observedFunctions
+      "The phrase 'transforming abstract ideas into tangible experiences' describes the outcome of creative work in both domains. This is the essay's first explicit statement about what creative practice produces: not just artifacts (songs, programs) but experiences for others."
+      Evidence: "'transforming abstract ideas into tangible experiences' — describes outcome of creative work"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [  ★★ STR] P4S3.observedFunctions
+      "The sentence moves from subject (coding) to action (build and innovate) to outcome (transforming ideas into experiences). This progression mirrors the creative process itself: medium → practice → result. The sentence's structure enacts what it describes."
+      Evidence: "Sentence structure: 'Coding became [medium] to build and innovate [practice], transforming [outcome]'"
+      (Matches structural pattern: mirrors?\s+(the|a|an))
+
+   [  ★★ STR] P4S3.observedFunctions
+      "Uses the present participle 'transforming' to describe an ongoing process rather than a completed action. This suggests that the transformation from abstract to tangible is continuous, not a one-time event — every creative act performs this transformation."
+      Evidence: "'transforming abstract ideas into tangible experiences' — present participle suggests ongoing process"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P4S3.inferredIntents
+      "The writer wants to establish coding as a legitimate creative medium, not just a technical skill. The word 'medium' is doing heavy lifting here — it's the term used for artistic expression (painting, sculpture, music), and applying it to coding elevates coding to that category."
+      Evidence: "'another medium' — borrows vocabulary from artistic discourse"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P4S3.inferredIntents
+      "The 'abstract ideas into tangible experiences' phrase attempts to describe what creative work does at the most general level, creating a definition that applies to both music and coding. This is the essay's attempt to articulate the shared outcome that justifies treating these as parallel practices."
+      Evidence: "'transforming abstract ideas into tangible experiences' — general definition of creative outcome"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [  ★★ STR] P4S3.narrativeContributions
+      "Completes the paragraph's arc from observation (S1: 'I noticed parallels') to understanding (S2: 'both requiring logic layered with creativity') to integration (S3: 'became another medium'). The paragraph enacts a discovery process: noticing, analyzing, incorporating."
+      Evidence: "The three sentences move from observation → analysis → integration"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P4S3.narrativeContributions
+      "Introduces the concept of 'tangible experiences' as the outcome of creative work, which will become important in P5 when the essay describes users smiling at the AI DJ. This sentence plants the seed for the essay's later claim that creative work has human impact."
+      Evidence: "'tangible experiences' — this concept will be developed in P5's 'users smile' moment"
+      (Matches architectural pattern: p\d.*p\d)
+
+
+── PARAGRAPH 5 ──
+   S: 0  STR: 11  ARCH: 12  Total: 23
+
+   [  ★★ STR] P5S1.observedFunctions
+      "Opens the paragraph with a direct structural equivalence between two practices from different domains, using 'mirrors' to suggest not just similarity but symmetrical relationship — each practice reflects the other's essential structure."
+      Evidence: "'Practicing scales mirrors debugging code'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P5S1.observedFunctions
+      "Establishes the paragraph's initial register: analytical-comparative, using parallel structure (both X and Y demand Z) to construct logical equivalence. This is the same register P4 used to introduce the music-coding parallel."
+      Evidence: "'both demand patience and attention to detail'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P5S1.observedFunctions
+      "Introduces the essay's first explicit claim about shared cognitive demands across domains — not just that the practices are similar, but that they require identical mental qualities (patience, attention to detail). This is more specific than P4's 'logic layered with creativity.'"
+      Evidence: "'both demand patience and attention to detail'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P5S1.inferredIntents
+      "The writer appears to be building credibility for the music-coding parallel by starting with a low-stakes, easily-accepted equivalence (practicing scales = debugging) before moving to higher-stakes claims. Scales and debugging are both repetitive, detail-oriented practices — the comparison is intuitive."
+      Evidence: "The sentence opens the paragraph rather than leading with the AI DJ project, suggesting the writer wants to establish the parallel's validity before introducing the artifact"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P5S1.narrativeContributions
+      "Advances the essay's central argument by providing the first concrete example of how musical practice transfers to coding practice. P4 asserted the parallel existed ('I noticed parallels'), this sentence demonstrates what that parallel looks like in specific practices."
+      Evidence: "'Practicing scales mirrors debugging code'"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [  ★★ STR] P5S2.observedFunctions
+      "Escalates from the first sentence's practice-level parallel (scales/debugging) to a higher-order cognitive skill (anticipating interactions). This sentence claims that musical training doesn't just teach patience but develops transferable analytical capability."
+      Evidence: "'Composing taught me to anticipate how elements interact—a skill invaluable when integrating software components'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P5S2.observedFunctions
+      "Uses the dash to create a two-part structure: first half names the skill learned through music, second half demonstrates its application in coding. The dash functions as an equals sign: musical skill = coding skill."
+      Evidence: "The dash separates 'anticipate how elements interact' from 'a skill invaluable when integrating software components'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P5S2.observedFunctions
+      "Introduces the essay's most specific claim about skill transfer: not just that music and coding are similar, but that musical training directly equipped the narrator with a capability useful for technical work. This is causal language ('taught me'), not just comparative."
+      Evidence: "'Composing taught me to anticipate'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P5S2.inferredIntents
+      "The writer appears to be establishing that the music-coding connection isn't just metaphorical but functional — musical training produced cognitive skills that directly apply to coding challenges. This sets up the AI DJ as evidence: if composing taught anticipation, and anticipation is needed for software integration, then the AI DJ (which required software integration) is proof of successful skill transfer."
+      Evidence: "The sentence's causal structure ('taught me') and the dash's application structure ('invaluable when') create a logic chain that the AI DJ will validate"
+      (Matches architectural pattern: isn['']t\s+just\s+.{5,}(it['']?s?|this\s)
+
+   [★★★ ARCH] P5S2.narrativeContributions
+      "Advances the essay's central thesis by naming the specific cognitive skill that bridges music and coding: systems thinking (anticipating how elements interact). This is the essay's clearest articulation of what 'logic layered with creativity' means in practice — it means understanding how parts relate to wholes."
+      Evidence: "'anticipate how elements interact' describes systems thinking, which applies to both chord progressions (P2) and software architecture"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P5S3.observedFunctions
+      "Establishes skill-transfer as the essay's central claim about the music-coding relationship. P6 attempts to demonstrate this transfer in action ('musical background guided me', 'blending musical intuition with technical expertise'), but the demonstration remains abstract — the reader never sees specific musical principles solving specific technical problems."
+      Evidence: "P5S2 claims 'Composing taught me to anticipate how elements interact', P6S3 claims this skill enabled 'Fine-tuning the AI to interpret subtle cues', but the connection between anticipation and interpretation is asserted, not shown"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [★★★ ARCH] P5S3.observedFunctions
+      "The phrase 'a skill invaluable when integrating software components' creates a promissory note that P6 attempts to cash with 'Integrating AI with user preferences was like composing a song harmonizing with its audience.' The simile is meant to show HOW the skill transferred, but it operates at the level of metaphor rather than concrete demonstration."
+      Evidence: "P5S2 promises the skill is 'invaluable when integrating', P6S2 provides a simile about integration, but no concrete example of the skill in action"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P5S3.inferredIntents
+      "The writer appears to be positioning the AI DJ as proof that the music-coding parallel isn't just conceptual but generative — it produced a novel artifact that wouldn't exist without the cross-domain thinking. The project's design (music generation based on emotional input) directly embodies the essay's thesis about music as emotional language."
+      Evidence: "The project combines the essay's two domains (music, code) and its central theme (emotion) into a single artifact"
+      (Matches architectural pattern: isn['']t\s+just\s+.{5,}(it['']?s?|this\s)
+
+   [★★★ ARCH] P5S3.narrativeContributions
+      "Advances the essay's quest arc from discovery (P4: 'I noticed') to synthesis (P5: 'I developed'). The AI DJ is the artifact that proves the narrator didn't just observe a parallel but acted on it to create something new. This is the essay's climactic moment — the point where all previous claims converge into a single project."
+      Evidence: "'I developed an artificially intelligent disc jockey' — past tense completion, specific artifact, synthesis of music + code + emotion"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P5S3.narrativeContributions
+      "Partially fulfills P1's unfulfilled promise to 'connect deeply with others' by introducing a project designed for users (plural). The AI DJ is the essay's first mention of creating something for an audience beyond the self."
+      Evidence: "P1S2: 'connect deeply with others' → P5S3: 'tracks tailored to users' moods' — both describe relational dimension of creative work"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P5S4.observedFunctions
+      "Provides the essay's only moment of external validation — 'users smile' is the only evidence that the narrator's work affected others. This shifts the essay from solitary practice (P1-P4) to relational impact."
+      Evidence: "'Seeing users smile'"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P5S4.observedFunctions
+      "Introduces the essay's only concrete sensory image in P5 — the smile. Everything else in the paragraph is abstract (mirrors, anticipate, crystallized, integrate). The smile is the paragraph's only observable, physical evidence that the AI DJ worked."
+      Evidence: "'users smile' is the only visual image in a paragraph otherwise composed of conceptual language"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P5S4.observedFunctions
+      "Creates a callback to P1's unfulfilled promise to 'connect deeply with others' by showing the narrator observing human response to their work. The smile is evidence of connection — not deep connection (the essay doesn't describe conversation or relationship), but observable emotional response."
+      Evidence: "P1S2: 'connect deeply with others' → P5S4: 'Seeing users smile' — both describe relational dimension of creative work"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P5S4.observedFunctions
+      "Shifts from past tense narration (S3: 'I developed') to present tense reflection ('reaffirmed my belief'). This moves the paragraph from completed action to ongoing conviction, positioning the AI DJ not just as a past project but as evidence supporting a current worldview."
+      Evidence: "'reaffirmed my belief' — present tense, indicating the belief exists now, not just in the past"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P5S4.observedFunctions
+      "Articulates the essay's most explicit claim about the relationship between technology and humanity: that they can be connected through emotion. This is the essay's clearest statement of values — technology isn't just a tool for the narrator, it's a medium for human connection."
+      Evidence: "'the connection between technology and human emotion'"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P5S4.inferredIntents
+      "The writer appears to be using the 'users smile' moment to demonstrate that the music-coding synthesis isn't just intellectually interesting but humanly meaningful. The smile serves as proof that technical work can have emotional impact, validating the essay's central claim that creativity (whether musical or technical) is about connecting with others."
+      Evidence: "The sentence structure moves from sensory observation ('Seeing users smile') to interpretive claim ('reaffirmed my belief'), suggesting the writer is using the observed response to validate a pre-existing conviction"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [  ★★ STR] P5S4.narrativeContributions
+      "Provides the essay's only evidence of impact beyond the self, partially fulfilling P1's promise to 'connect deeply with others.' The AI DJ project becomes not just a technical achievement but a relational one — it affected users' emotional states in observable ways."
+      Evidence: "'users smile as the AI DJ captured their emotions' — observable human response to the narrator's work"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P5S4.narrativeContributions
+      "Introduces the essay's most explicit values statement: the narrator believes in 'the connection between technology and human emotion.' This positions the narrator as someone who sees technology not as an end in itself but as a medium for human connection, which aligns with P1's framing of music as a language for connection."
+      Evidence: "'reaffirmed my belief in the connection between technology and human emotion'"
+      (Matches structural pattern: positions?\s+(the\s+narrator|the\s+write)
+
+
+── PARAGRAPH 6 ──
+   S: 0  STR: 8  ARCH: 7  Total: 15
+
+   [★★★ ARCH] P6S1.observedFunctions
+      "Establishes causal relationship between musical training and technical achievement — positions music as the TOOL that enabled the coding project, not just a parallel interest. This is the essay's most explicit claim that the two domains aren't separate but hierarchically related (music → coding)."
+      Evidence: "'My musical background guided me in creating' — the verb 'guided' makes music the active agent, coding the result"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [  ★★ STR] P6S1.observedFunctions
+      "Introduces 'emotionally resonant' as the AI DJ's defining quality, but the phrase remains abstract — no concrete evidence of what makes it resonant or how that resonance manifests. This creates a gap between claim and proof that the rest of the paragraph doesn't fill."
+      Evidence: "'emotionally resonant AI DJ' — the descriptor appears without supporting detail"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P6S1.observedFunctions
+      "Re-introduces the AI DJ project after P5 has already presented it, creating architectural redundancy. The reader has already met this project and seen its impact ('users smile'). This sentence positions the paragraph as retrospective analysis rather than new information."
+      Evidence: "P5S3 introduces 'artificially intelligent disc jockey', P6S1 re-introduces 'AI DJ' — same project, different framing"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P6S1.inferredIntents
+      "The writer appears to be attempting to demonstrate that musical thinking was the METHOD of technical problem-solving, not just a metaphor for it. The 'guided me' construction suggests music provided actual procedural knowledge that transferred to coding."
+      Evidence: "The causal verb 'guided' implies music provided direction or methodology, not just inspiration"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P6S1.narrativeContributions
+      "Attempts to fulfill P4's promise that music and coding 'both require logic layered with creativity' by showing music's logic directly informing coding practice. However, the sentence asserts this relationship without demonstrating it — the reader still doesn't see HOW musical background guided technical work."
+      Evidence: "P4S2 claims parallel structure, P6S1 claims causal relationship, but neither provides concrete mechanism"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P6S2.observedFunctions
+      "Deploys simile to translate technical work (AI integration) into musical terms (song composition), making the music-coding parallel explicit and visual. The simile's structure ('X was like Y') creates equivalence between the two domains."
+      Evidence: "'Integrating AI with user preferences was like composing a song harmonizing with its audience'"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P6S2.observedFunctions
+      "Introduces 'harmonizing with its audience' as the defining metaphor for user-centered design — the AI's job is to achieve resonance between its output and user preferences, just as a song achieves resonance between its structure and listener expectations. This is the essay's clearest articulation of creation as relational practice (maker ↔ receiver)."
+      Evidence: "'harmonizing with its audience' — musical term applied to technical relationship"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [  ★★ STR] P6S2.observedFunctions
+      "The simile operates at the level of process (integrating = composing) rather than product (AI = song). This reveals the essay's focus: it's more interested in HOW things are made than in WHAT is made. The parallel is methodological, not artifactual."
+      Evidence: "The comparison is between 'Integrating' (gerund, ongoing process) and 'composing' (gerund, ongoing process), not between 'AI DJ' (finished product) and 'song' (finished product)"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P6S2.inferredIntents
+      "The writer appears to be attempting to make the music-coding connection concrete and visual through simile, after P4-P5 established it conceptually. The simile is meant to help the reader SEE the parallel, not just accept it as assertion."
+      Evidence: "The 'like' construction invites the reader to visualize one process through the lens of another"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P6S2.narrativeContributions
+      "Develops P1's 'connect deeply with others' promise by framing creation as inherently relational — the song harmonizes WITH its audience, the AI integrates WITH user preferences. This is the essay's first explicit acknowledgment that creation isn't solitary but dialogic."
+      Evidence: "P1S2 mentions 'connect deeply with others' but never develops it; P6S2's 'harmonizing with its audience' finally addresses the relational dimension"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P6S3.observedFunctions
+      "Compounds multiple abstract nouns ('Fine-tuning', 'subtle cues', 'innovative solutions', 'musical intuition', 'technical expertise') into a single claim about methodology. The sentence's density of abstraction creates a sense of complexity but provides no concrete entry point for the reader to understand what actually happened."
+      Evidence: "Five abstract noun phrases in one 16-word sentence, zero concrete examples"
+      (Matches structural pattern: creates?\s+(a sense|an? |the )?(sense|fe)
+
+   [  ★★ STR] P6S3.observedFunctions
+      "Introduces 'blending musical intuition with technical expertise' as the essay's most explicit articulation of its central thesis — that these domains aren't just similar but integrated in practice. The verb 'blending' (not 'combining' or 'using') suggests fusion rather than juxtaposition."
+      Evidence: "'blending musical intuition with technical expertise' — the gerund 'blending' emphasizes ongoing integration"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P6S3.observedFunctions
+      "The phrase 'interpret subtle cues' suggests sophisticated AI work (not just matching explicit preferences but reading implicit signals), but the abstraction prevents the reader from understanding what this looked like in practice. What cues? How did the AI interpret them? What made the solutions innovative?"
+      Evidence: "'interpret subtle cues' and 'innovative solutions' both remain undefined"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [  ★★ STR] P6S3.inferredIntents
+      "The writer appears to be attempting to convey technical sophistication and methodological integration simultaneously — to show both that the work was complex ('subtle cues', 'innovative solutions') and that it required dual-mode thinking ('blending musical intuition with technical expertise')."
+      Evidence: "The sentence's compound structure tries to hold multiple claims at once: complexity + integration + innovation"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P6S3.narrativeContributions
+      "Attempts to demonstrate P1's 'blend of expression and analytical thinking' in action by showing it operating in a technical context. The 'blending musical intuition with technical expertise' phrase is meant to prove that the dual-mode thinking isn't just a feature of music but a transferable methodology."
+      Evidence: "P1S3 claims music is 'a blend of expression and analytical thinking', P6S3 shows that blend operating in coding context"
+      (Matches architectural pattern: p\d.*p\d)
+
+
+── PARAGRAPH 7 ──
+   S: 0  STR: 4  ARCH: 16  Total: 20
+
+   [★★★ ARCH] P7S1.observedFunctions
+      "Creates structural and thematic closure by returning to P1S1's opening image ('fingers danced across piano keys') but transforming it: the literal physical action (fingers on keys) becomes abstract metaphor ('possibilities at my fingertips'). This transformation mirrors the essay's arc — from music as embodied practice to music as conceptual framework for understanding creativity across domains."
+      Evidence: "P1S1: 'my fingers first danced across the piano keys' → P7S1: 'limitless possibilities at my fingertips'"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P7S1.observedFunctions
+      "Establishes explicit equivalence between music and coding through parallel structure ('Whether at a piano or a computer'). The grammatical parallelism (prepositional phrase + noun) creates syntactic equality that reinforces the essay's central claim: these aren't just similar practices, they're interchangeable contexts for the same creative identity."
+      Evidence: "'Whether at a piano or a computer' — identical grammatical structure positions both domains as equal alternatives"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [  ★★ STR] P7S1.observedFunctions
+      "Shifts the essay's temporal orientation from past accomplishment to present identity ('I'm driven') — the present tense assertion positions creativity not as something the narrator did but as something the narrator IS. This is identity-claim rather than narrative-claim."
+      Evidence: "'I'm driven to create' — present tense, active voice, declarative mood"
+      (Medium-length observation with evidence but no architectural markers)
+
+   [★★★ ARCH] P7S1.observedFunctions
+      "The phrase 'limitless possibilities' introduces unbounded language that contrasts with the essay's earlier emphasis on constraint-bound creativity ('just seven notes', 'rhythm and harmony's constraints'). This creates a tension: the essay has argued that creativity operates WITHIN constraints, but the conclusion celebrates limitlessness. The tension is unresolved."
+      Evidence: "P1S2: 'innovate within rhythm and harmony's constraints' vs P7S1: 'limitless possibilities'"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P7S1.inferredIntents
+      "The parallel structure is designed to demonstrate synthesis — to show the reader that the music-coding connection isn't just an intellectual observation but has become the narrator's lived reality. The 'whether...or' construction suggests genuine equivalence: the narrator is equally at home in both domains."
+      Evidence: "The choice to open the conclusion with this structure rather than bury it mid-paragraph signals its importance to the essay's argument"
+      (Matches architectural pattern: isn['']t\s+just\s+.{5,}(it['']?s?|this\s)
+
+   [  ★★ STR] P7S1.inferredIntents
+      "The shift to present tense ('I'm driven') attempts to position the narrator as someone whose identity is stable and ongoing rather than someone describing a past phase. This serves the college essay's implicit question: 'Who will you be on our campus?' The answer: someone driven to create."
+      Evidence: "All previous paragraphs used past tense to describe accomplishments; P7 shifts to present/future to describe identity and intention"
+      (Matches structural pattern: positions?\s+(the\s+narrator|the\s+write)
+
+   [★★★ ARCH] P7S1.narrativeContributions
+      "Closes the essay's image-arc: P1S1 opened with fingers on piano keys (literal, sensory, grounded), P7S1 closes with possibilities at fingertips (metaphorical, abstract, expansive). The transformation from concrete to abstract mirrors the essay's intellectual movement from specific practice (music) to general principle (creativity operates across domains)."
+      Evidence: "P1S1: 'fingers first danced across the piano keys' → P7S1: 'possibilities at my fingertips'"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P7S2.observedFunctions
+      "Establishes a causal relationship between music and coding ('Music opened my mind...and coding extends that passion') that positions music as the origin point and coding as the continuation. This is the essay's clearest articulation of temporal sequence: music came first, coding followed, but both serve the same underlying drive."
+      Evidence: "'Music opened my mind to the beauty of innovation and coding extends that passion'"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P7S2.observedFunctions
+      "Introduces 'the beauty of innovation' as the conceptual link between music and coding — this is what music taught the narrator to value, and what coding allows them to continue pursuing. However, 'beauty of innovation' is abstract language that hasn't been defined or demonstrated elsewhere in the essay. The phrase appears here for the first time, creating a sense that the conclusion is reaching for synthesis through new vocabulary rather than consolidating established themes."
+      Evidence: "'the beauty of innovation' appears only in P7S2, not in any earlier paragraph"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P7S2.observedFunctions
+      "Uses simple coordination ('and') to connect two independent clauses, creating a sense of straightforward logical progression. The sentence's structure mirrors its content: music → coding, first clause → second clause. The simplicity of the syntax reinforces the essay's claim that this connection is natural and obvious."
+      Evidence: "Subject-verb-object, coordinating conjunction, subject-verb-object — the simplest possible compound sentence structure"
+      (Matches architectural pattern: the\s+essay['']?s?\s+(definition|argumen)
+
+   [★★★ ARCH] P7S2.inferredIntents
+      "The sentence attempts to resolve the essay's central question: 'Why does this music-to-coding bridge matter?' The answer: music wasn't just a parallel to coding, it was the CAUSE of the narrator's ability to see coding as creative practice. This positions music as epistemologically foundational — it taught the narrator how to think about innovation."
+      Evidence: "The causal language ('opened my mind', 'extends that passion') positions music as the enabling condition for the narrator's approach to coding"
+      (Matches architectural pattern: essay['']?s?\s+(central|core|fundamental)
+
+   [★★★ ARCH] P7S2.narrativeContributions
+      "Provides the essay's most explicit statement of its central claim: music and coding aren't just similar, they're connected by a causal relationship where music provides the conceptual framework ('beauty of innovation') that coding then applies. This is the thesis crystallization the essay has been building toward."
+      Evidence: "The sentence's causal structure ('opened...extends') makes explicit what earlier paragraphs implied"
+      (Matches architectural pattern: central\s+(tension|argument|claim))
+
+   [  ★★ STR] P7S3.observedFunctions
+      "Shifts the essay's temporal orientation from past and present to future ('I look forward to continuing this journey'), satisfying the college essay genre's implicit requirement to demonstrate forward-looking intention. The shift from accomplishment-narrative to intention-statement positions the narrator as someone whose story is ongoing rather than complete."
+      Evidence: "'I look forward to continuing this journey' — future-oriented language"
+      (Matches structural pattern: positions?\s+(the\s+narrator|the\s+write)
+
+   [★★★ ARCH] P7S3.observedFunctions
+      "Introduces 'make a meaningful difference' as the essay's ultimate stakes, but this language hasn't been earned by the essay's architecture. The AI DJ made users smile (P5S4), but the essay hasn't built a case for impact at scale or demonstrated what 'meaningful difference' would look like. This creates a gap between the conclusion's aspirational language and the essay's demonstrated scope."
+      Evidence: "P5S4: 'Seeing users smile' (specific, small-scale impact) vs P7S3: 'make a meaningful difference' (abstract, large-scale impact)"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [★★★ ARCH] P7S3.observedFunctions
+      "Returns to the essay's foundational metaphor ('much like composing a timeless melody') to create structural closure. The simile positions all future creative work — whether musical or technical — as equivalent to musical composition. This is the essay's final move to collapse the music-coding distinction: even when describing future coding work, the narrator uses musical language."
+      Evidence: "'crafting experiences that resonate with others and make a meaningful difference—much like composing a timeless melody'"
+      (Matches architectural pattern: this\s+is\s+(the\s+essay['']?s?|why|how|)
+
+   [★★★ ARCH] P7S3.observedFunctions
+      "The em-dash before 'much like composing a timeless melody' creates a pause that signals the simile is the sentence's conceptual payoff. The dash says: 'here's what all of this means.' The simile isn't just decorative comparison — it's the essay's final interpretive frame."
+      Evidence: "The em-dash separates the literal statement ('crafting experiences') from the metaphorical interpretation ('much like composing a timeless melody')"
+      (Matches architectural pattern: isn['']t\s+just\s+.{5,}(it['']?s?|this\s)
+
+   [★★★ ARCH] P7S3.observedFunctions
+      "The phrase 'resonate with others' is the essay's second and final reference to music as relational practice (the first was P1S2's 'connect deeply with others'). Both moments gesture toward music as communication between people, but neither develops this dimension. The essay remains focused on the narrator's internal creative process rather than the social or communicative aspects of artistic practice."
+      Evidence: "P1S2: 'connect deeply with others' and P7S3: 'resonate with others' — both brief mentions without elaboration"
+      (Matches architectural pattern: p\d.*p\d)
+
+   [  ★★ STR] P7S3.inferredIntents
+      "The 'timeless melody' simile attempts to elevate the stakes of the narrator's future work by connecting it to artistic permanence. 'Timeless' suggests work that transcends its moment, that endures beyond its creator. This is aspirational language designed to position the narrator's ambitions as significant rather than merely personal."
+      Evidence: "The choice of 'timeless' over 'beautiful' or 'meaningful' emphasizes duration and cultural impact"
+      (Matches structural pattern: positions?\s+(the\s+narrator|the\s+write)
+
+   [★★★ ARCH] P7S3.inferredIntents
+      "The future orientation ('I look forward to continuing this journey') is designed to answer the college essay's implicit question: 'What will you do with the education we provide?' The answer: continue the creative practice established in this essay, but with greater scope ('meaningful difference') and reach ('resonate with others')."
+      Evidence: "The shift to future tense and the introduction of impact-language ('meaningful difference') both serve the college essay genre's forward-looking requirement"
+      (Matches architectural pattern: creative\s+practice)
+
+   [★★★ ARCH] P7S3.narrativeContributions
+      "Closes the essay's metaphorical loop: P1S1 opened with music as world-creation ('create worlds through sound'), P7S3 closes with music as the model for all future creation ('much like composing a timeless melody'). The essay begins and ends with music as the organizing metaphor, but the scope has expanded — what started as literal musical practice has become the conceptual framework for understanding all creative work."
+      Evidence: "P1S1: 'create worlds through sound' → P7S3: 'much like composing a timeless melody'"
+      (Matches architectural pattern: p\d.*p\d)
+
+═══════════════════════════════════════════════════════════════
+PARAGRAPH-LEVEL UNDERSTANDING
+═══════════════════════════════════════════════════════════════
+
+── P1 ──
+   Role: Establishes the essay's epistemological framework — creativity as constraint-bound practice. Music enters not as hobby or accomplishment but as the narrator's primary mode of knowing and communicating. This paragraph's job is to construct the conceptual architecture that will later accommodate coding as a parallel domain.
+   Function: To position music as both subject and method — the thing the narrator does AND the lens through which they understand all creative practice. The paragraph moves from sensory immediacy (fingers, keys, sound) to abstract claim (music as language) to philosophical principle (innovation within constraints). This upward abstraction establishes the essay's intellectual register.
+   Narrative contribution: Opens the essay's central argument: that creative practice is defined by working productively within constraints. The 'seven notes' specificity and the 'rhythm and harmony's constraints' framing establish constraint-as-generative-force, which will become the bridge to coding in P4. The 'connect deeply with others' phrase introduces a relational dimension that the essay never fulfills — this is a promise the architecture doesn't keep.
+   Emotional register: Reverent wonder — the emotion of discovering a practice that reorganizes one's relationship to the world
+   Show vs Tell: Mixed register. 'Captivated' tells the emotion directly. 'Create worlds through sound' shows the emotion through the scale of the claim — the narrator's wonder is visible in the ambition of the metaphor. 'Became my language' tells the transformation but the em-dash elaboration ('a blend of expression and analytical thinking') shows what that transformation means in practice.
+   Rhythm: Opens with a 22-word compound sentence that mimics the physical motion it describes — 'From the moment' creates forward momentum, 'danced across' extends the movement, 'captivated by' arrests it. Second sentence is 20 words with three parallel infinitive phrases creating a triadic rhythm (tell/evoke/connect). Third sentence is 24 words split by an em-dash into two balanced halves (11 words + 13 words), creating a hinge structure that mirrors the conceptual pivot from identity claim to definition.
+   Image usage: Opens with kinesthetic imagery ('fingers danced across piano keys') that grounds the reader in physical sensation. Immediately abstracts to auditory-spatial metaphor ('create worlds through sound'). The 'seven notes' image is the paragraph's only concrete musical detail — it functions as an anchor preventing the metaphors from floating free. No visual imagery; the paragraph constructs its world through sound, touch, and conceptual metaphor.
+
+── P2 ──
+   Role: Epistemological demonstration — shows the reader what 'analytical thinking' (claimed in P1) looks like in practice. This paragraph's job is to make the music-coding bridge credible by establishing that the narrator already thinks like a problem-solver within music.
+   Function: To translate P1's abstract claim ('analytical thinking') into observable compositional behavior, establishing the puzzle-solving epistemology that will later justify treating coding as a parallel domain. The paragraph must convince the reader that music is already an analytical practice, not just an expressive one.
+   Narrative contribution: Advances the essay's central argument by demonstrating that the narrator's relationship to music is already dual-mode (expression + analysis). This is the evidence that P1's 'blend of expression and analytical thinking' wasn't just rhetoric. Carries forward the constraint-as-structure thread from P1 ('seven notes') by showing how constraints operate in practice ('each note and chord must align perfectly').
+   Emotional register: Absorbed fascination — the emotion of someone lost in iterative problem-solving, where small discoveries ('minor adjustments transformed') produce outsized satisfaction
+   Show vs Tell: S1 tells (simile announces the comparison rather than letting the reader discover it). S2 shows (the 'minor adjustments transformed' detail is concrete evidence of analytical attention). S3 tells ('expressing a part of myself' is abstract self-interpretation without specific evidence).
+   Rhythm: Opens with a 17-word compound sentence (two independent clauses joined by semicolon) that establishes equivalence between composing and puzzle-solving. S2 is a 16-word sentence with embedded participial phrase ('fascinated by...') that creates a rhythm of action-then-reflection. S3 is a 17-word sentence with contrastive structure ('wasn't just... but') that creates a pivot from technical to personal. All three sentences are nearly identical in length (16-17 words), creating a steady, measured rhythm that mirrors the careful, iterative process being described.
+   Image usage: The 'puzzle' image does conceptual work — it imports a problem-solving frame into a domain (music) typically associated with pure expression. No sensory images appear; the paragraph operates entirely in the conceptual register. This is a paragraph about thinking, not about physical experience. The absence of sensory detail (what did the piano feel like? what did the room sound like?) signals that the narrator's relationship to music is primarily intellectual.
+
+── P3 ──
+   Role: Concrete exemplar — shifts from abstract process description (P2) to named artifact. Introduces the tradition-innovation dialectic that will structure the essay's second half.
+   Function: To provide evidence that the narrator's compositional practice isn't hypothetical — they've produced something specific. Also to establish 'fusion' as the essay's organizing principle: not choosing between domains but synthesizing them.
+   Narrative contribution: Advances the thesis by demonstrating that constraint-based creativity (P1's 'seven notes') produces actual work. The Chopin-jazz fusion is the first concrete proof of the narrator's creative capability. Also plants the 'tradition + innovation' frame that will reappear when the AI DJ 'honors' musical principles while 'embracing' technical possibility.
+   Emotional register: Quiet pride in craft — the emotion of someone describing work they're genuinely invested in, without performative enthusiasm
+   Show vs Tell: Mostly tell — the paragraph summarizes a project rather than showing the reader inside it. 'Blended them with contemporary jazz rhythms' describes an outcome but not the process. The reader doesn't see the narrator at the piano, doesn't hear the fusion, doesn't witness the discovery moment.
+   Rhythm: Two sentences, both relatively long (14 words, 22 words), creating a compressed, summary-like rhythm. The first sentence uses a gerund phrase as subject ('Reimagining classical pieces'), which creates a sense of ongoing action. The second sentence is a single flowing clause with multiple prepositional phrases, mimicking the fusion it describes — classical and jazz elements flowing together without hard breaks.
+   Image usage: Two proper nouns anchor the abstraction: 'Chopin's Nocturnes' (classical tradition) and 'contemporary jazz rhythms' (modern innovation). These aren't just examples — they're the essay's only named musical references, making them carry significant weight. The fusion image will echo in P5-P6 when the AI DJ 'harmonizes' with users.
+
+── P4 ──
+   Role: Structural pivot — the essay's fulcrum where music stops being the subject and becomes the lens through which coding is understood. This paragraph's job is to introduce the second domain (coding) and establish the conceptual framework (parallel creative practices) that will organize the essay's second half.
+   Function: To reframe the essay's architecture from single-domain exploration (music) to comparative synthesis (music as model for understanding coding). The paragraph must make the leap from music to coding feel like discovery rather than contrivance — hence the 'I noticed parallels' construction, which positions the connection as emergent rather than predetermined.
+   Narrative contribution: Advances the essay's central thesis by expanding its scope: if P1-P3 established that creativity operates through constraint within music, P4 claims this principle applies across domains. The 'logic layered with creativity' phrase becomes the essay's definition of creative practice — not pure expression, not pure problem-solving, but their synthesis. This paragraph also shifts the essay's temporal register: P1-P3 describe past musical practice, P4 opens the door to present/ongoing coding work.
+   Emotional register: Intellectual excitement born of pattern recognition — the satisfaction of discovering that two seemingly separate interests share underlying structure. Not celebratory or triumphant, but quietly energized by the act of noticing.
+   Show vs Tell: Mostly shown through structural choices: the colon after 'coding' enacts the moment of connection, the parallel syntax in S2 mirrors the conceptual parallel being described. The phrase 'I noticed' is the only explicit emotional marker, and it's understated — discovery presented as observation rather than revelation.
+   Rhythm: Opens with a 13-word sentence that uses a present participle ('Delving') to signal ongoing intellectual movement, creating forward momentum. S2 is the paragraph's longest (24 words) and most structurally complex — parallel clauses, modal verb, parenthetical dash — mirroring the complexity of the connection being articulated. S3 returns to simpler syntax (15 words, single main clause) to consolidate the discovery into a clean statement of outcome.
+   Image usage: No sensory images — this paragraph operates entirely in the conceptual register. The only quasi-visual element is the spatial metaphor 'layered' (logic layered with creativity), which suggests vertical stacking or transparency overlays. The absence of sensory grounding marks this as the essay's most abstract moment, appropriate for a paragraph whose job is to establish a conceptual framework rather than evoke experience.
+
+── P5 ──
+   Role: Evidence anchor and impact demonstration — shifts the essay from theoretical parallel (P4's 'I noticed') to concrete proof (P5's 'I developed'). This paragraph's job is to show that the music-coding connection isn't just conceptually interesting but practically productive: it generated a real artifact that affected real people.
+   Function: To validate the essay's central claim through a specific project that demonstrates both technical sophistication and human impact. The AI DJ serves as the essay's second major artifact (after the Chopin-jazz fusion in P3), proving that the narrator doesn't just think across domains but creates across them.
+   Narrative contribution: Advances the essay's quest arc from discovery (P4: 'I noticed parallels') to application (P5: 'I developed'). Carries forward the 'creativity within constraints' thread from P1 by showing how musical principles (anticipating element interactions) transfer to technical problem-solving (integrating software components). Introduces the essay's only moment of external validation — 'users smile' — which partially fulfills P1's unfulfilled promise to 'connect deeply with others.' The AI DJ project becomes the essay's climactic artifact, the synthesis of everything claimed in P1-P4.
+   Emotional register: Quiet satisfaction born of validated belief — the emotion of seeing a hypothesis confirmed through practice. Not triumphant or celebratory, but affirmed.
+   Show vs Tell: S1-S3 operate in tell mode — they assert parallels and describe the project abstractly. S4 shifts to show mode: 'Seeing users smile' is a concrete sensory moment that embodies the abstract claim about technology-emotion connection. The smile is the only image in the paragraph; everything else is conceptual language.
+   Rhythm: Opens with two parallel-structure sentences (S1-S2) that use semicolons and dashes to create balanced, analytical rhythm — both sentences follow the pattern: [domain A] [linking verb] [domain B]; [shared quality]. S3 breaks this pattern with a longer, narrative sentence that introduces the project. S4 returns to compound structure but shifts from analytical to reflective register. The rhythm mirrors the paragraph's conceptual movement: from abstract equivalence to concrete evidence to emotional validation.
+   Image usage: The paragraph is almost entirely abstract until S4's 'users smile' — the only sensory image. This creates stark contrast: three sentences of conceptual language (mirrors, anticipate, crystallized, integrate, tailored) followed by one moment of physical observation. The 'smile' image does heavy lifting: it's the paragraph's only concrete proof that the AI DJ worked, and it activates the essay's dormant relational dimension (P1's 'connect deeply with others'). The image also creates a callback structure: P1 promised music would 'connect deeply with others,' P5 delivers that connection through code.
+
+── P6 ──
+   Role: Retrospective synthesis — re-examines the AI DJ project (already introduced in P5) through an explicitly musical lens, attempting to demonstrate that musical thinking wasn't just analogous to the technical work but was the METHOD of the technical work
+   Function: To show that the music-coding parallel isn't merely conceptual but operational — that the narrator actively deployed musical principles as problem-solving tools in technical contexts. This is the essay's bid to prove integration rather than just similarity.
+   Narrative contribution: Attempts to close the loop on the essay's central claim (creativity as dual-mode practice) by showing musical intuition functioning as technical methodology. However, the paragraph arrives after P5 has already introduced the AI DJ and its impact, creating architectural redundancy. The 'musical background guided me' framing positions music as instrumental to coding success, which is the essay's thesis, but the lack of concrete examples (what specific musical principles? what specific technical problems?) leaves the claim abstract.
+   Emotional register: Quiet professional satisfaction — the tone of someone explaining a completed project's methodology rather than discovering something in real time
+   Show vs Tell: Pure tell — every sentence makes claims about qualities (resonant, harmonizing, subtle, innovative) without grounding them in observable detail. Compare to P5S4's 'Seeing users smile as the AI DJ captured their emotions' — that sentence SHOWS impact. P6 only describes it.
+   Rhythm: Three sentences of escalating length (11 words → 14 words → 16 words) and escalating abstraction. S1 is a simple declarative. S2 adds a simile. S3 compounds multiple abstract nouns into a single claim. The rhythm creates a sense of building complexity, but because each sentence operates at the same level of abstraction, the escalation feels more like accumulation than development.
+   Image usage: The paragraph contains one explicit image: 'composing a song harmonizing with its audience' (S2). This is a metaphorical image — the reader doesn't visualize an actual song or audience but understands the comparison. No concrete sensory images appear. The 'subtle cues' in S3 could be a doorway to specificity (what cues? how did the AI interpret them?) but remains abstract. The paragraph's image-poverty is striking given that it's describing a project meant to be 'emotionally resonant.'
+
+── P7 ──
+   Role: Structural closure and identity synthesis — attempts to resolve the essay's dual-domain architecture by collapsing the distinction between music and coding into a unified creative identity, then projects that identity forward into future intention
+   Function: To demonstrate that the music-coding parallel isn't just an intellectual observation but has become the narrator's operational identity ('Whether at a piano or a computer' — the domains are now interchangeable contexts for the same creative drive). The paragraph's secondary function is to satisfy the college essay genre requirement: shift from past accomplishments to future potential.
+   Narrative contribution: Closes the essay's central arc: P1 established music as primary identity, P4 introduced coding as parallel domain, P7 synthesizes them into a unified creative practice. The 'timeless melody' callback to P1S1 creates structural closure — the essay begins and ends with music as the organizing metaphor. However, the introduction of 'make a meaningful difference' attempts to escalate stakes beyond what the essay has demonstrated (the AI DJ made users smile, but the essay hasn't built a case for impact at scale).
+   Emotional register: Aspirational confidence — the narrator speaks from a position of established identity ('I'm driven') looking toward future possibility ('I look forward'). The emotion is forward-facing optimism grounded in past accomplishment.
+   Show vs Tell: Pure tell. Every sentence asserts rather than demonstrates. S1 tells us the narrator is 'driven to create' without showing what that drive looks like. S2 tells us music 'opened my mind' without showing the moment of opening. S3 tells us the narrator will 'make a meaningful difference' without showing what that difference might be or how it would be achieved. The paragraph's architecture is declarative rather than evidentiary.
+   Rhythm: Three sentences of escalating length and complexity: S1 is a 19-word compound sentence with parallel structure creating balanced rhythm. S2 is a 13-word compound sentence with simple coordination ('and') creating forward momentum. S3 is a 24-word complex sentence with embedded participial phrase and extended simile, creating a sense of expansion and closure. The rhythm moves from balanced assertion (S1) to simple connection (S2) to elaborate synthesis (S3).
+   Image usage: The paragraph operates almost entirely in abstract language. The only concrete image is 'at a piano or a computer' (S1), which functions more as symbolic shorthand than sensory detail — the reader doesn't see, hear, or feel either instrument. The 'timeless melody' in S3 is invoked as metaphor rather than described as sound. The 'fingertips' reference in S1 echoes P1S1's 'fingers danced across piano keys' but strips away the sensory specificity (no 'danced', no 'keys' — just the abstract 'possibilities'). This image-poverty is strategic: the paragraph's job is synthesis rather than scene-setting, but it creates a tonal shift from the essay's earlier moments of sensory grounding.
+
+═══════════════════════════════════════════════════════════════
+HOLISTIC EVOLUTION (final state)
+═══════════════════════════════════════════════════════════════
+  Central thesis: Creative practice is defined by the productive tension between expression and analytical thinking ('logic layered with creativity'), and this dual-mode thinking operates identically across different media (music, code). Music provides the epistemological framework — the way of understanding what innovation IS — that then extends to coding. The two domains aren't just parallel; music is causally prior, teaching the narrator to see 'the beauty of innovation' that coding then allows them to continue pursuing. P7 attempts to synthesize this into a unified creative identity where the distinction between music and coding collapses entirely ('Whether at a piano or a computer'), but the synthesis operates at such a high level of abstraction that it feels asserted rather than demonstrated.
+  Thesis confidence: 0.85
+  Voice signature: Dual-register voice that operates simultaneously in lyrical-metaphorical and analytical-precise modes, but P7 leans almost entirely toward the analytical-declarative register. The only moment of lyrical language is the 'timeless melody' simile in S3, which creates a brief return to the essay's opening voice before closure. The paragraph's voice is the voice of synthesis and summary — someone stepping back from lived experience to articulate what it all means.
+  Arc momentum: releasing
