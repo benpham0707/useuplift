@@ -44,7 +44,7 @@ import type { DeepContentAnalysis } from './contentAnalysisTypes';
 // ============================================================================
 
 const SONNET_MODEL = 'claude-sonnet-4-5-20250929';
-const MAX_TOKENS = 4096;
+const MAX_TOKENS = 8192;
 
 // ============================================================================
 // ANNOTATION PIPELINE
