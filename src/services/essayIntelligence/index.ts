@@ -1,95 +1,281 @@
 /**
- * Essay Intelligence System — Barrel Exports
+ * Essay Intelligence System — Barrel Exports (V2)
  *
- * Unified 6-layer essay understanding system:
- *   Layer 1: Deterministic foundation (features, narrative, sentence, word)
- *   Layer 2: Structural cartography (Haiku)
- *   Layer 3: Sequential deep walk (Sonnet × N paragraphs)
- *   Layer 4: Crystallization (Essay DNA + Paragraph Score Matrix)
- *   Layer 5: Targeted annotation
- *   Layer 6: Conversation-driven deepening
+ * The V2 system is organized into:
+ *   - Profile Types: complete type system for the EssayProfile
+ *   - Profile Manager: coordinator, checkpoint stores, mutators, router
+ *   - Analysis Pipeline: L1→L2→L2.5→L3→L3.75→L3.5→L4+L5 layers
+ *   - Edit Understanding: classifies what an edit means in context
+ *   - Focused Analyzer: surgical re-analysis for small changes
+ *   - Reanalysis Orchestrator: edit lifecycle management (focused vs comprehensive)
+ *   - Coaching Service: L6 student conversation → coaching response
+ *   - Version Tracker: tracks edits, staleness, triggers re-analysis
  */
 
-// ── Types ──
+// ============================================================================
+// PROFILE TYPES (the type system that everything else consumes)
+// ============================================================================
+
 export type {
-  // Core hierarchy
-  EssayUnderstanding,
+  // Core profile
+  EssayProfile,
+  ProfileIndex,
+  EssayNorthStar,
+
+  // Paragraph-level
+  ParagraphProfile,
+  SentenceProfile,
+
+  // Understanding layer (descriptive — what the essay IS)
+  ObservationEntry,
   ParagraphUnderstanding,
   SentenceUnderstanding,
-  WordAnnotation,
 
-  // Layer 2
-  StructuralCartography,
+  // Analysis layer (evaluative — how well it works)
+  ParagraphAnalysis,
+  AnalysisPassOutput,
 
-  // Layer 3
-  RunningUnderstanding,
-  ParagraphDeepAnalysis,
+  // Holistic sections
+  VoiceIdentity,
+  VoiceMap,
+  EmotionalTopography,
+  MomentEarnednessMap,
+  ThematicArchitecture,
+  NarrativeStrategy,
+  CharacterRevelation,
+  CraftAssessment,
+  AdmissionsPositioning,
 
-  // Layer 4
-  EssayDNA,
-  ParagraphScoreMatrix,
+  // Connections (V2: bidirectional, strength-aware connection graph)
+  Connection,
+  ConnectionEndpoint,
+  ConnectionRoutingTag,
+  ConnectionStrengthCategory,
+  ConnectionDirectionality,
+  ConnectionSource,
+  ProfileConnections,
 
-  // Layer 5
-  DeepAnnotation,
-
-  // Conversation
+  // Conversation insights
   ConversationInsight,
-  ConversationFocus,
-  ContextSlice,
-  ContextRoute,
-  AssembledContext,
+  PatternInsight,
 
-  // Diff
-  DiffResult,
-  MeaningfulDiffResult,
+  // Edit understanding types
+  EditDiff,
+  EditUnderstanding,
+  EditUnderstandingOutput,
+  StalenessEffect,
+  EditChangeType,
 
-  // Analysis
-  AnalysisInput,
-  AnalysisResult,
-  AnalysisConfig,
-  AnalysisPass,
+  // Version tracking
+  VersionRecord,
+  ReanalysisBrief,
 
-  // Metrics
-  SentenceMetrics,
-  WordFlag,
+  // Improvement phase
+  ImprovementPhase,
+  ImprovementPhaseLevel,
 
-  // Enums
-  ReadinessLevel,
-  ParagraphVerdict,
-  ImpactLevel,
-  WeaknessSeverity,
-  WordVerdict,
-  TransitionQuality,
-  ThreadStrength,
-  ArcMomentum,
-  ConnectionType,
-  AnnotationGranularity,
-  WordFlagCategory,
-  SentenceRhythm,
-  SentenceType,
-  AnalysisLayer,
-} from './types';
+  // Checkpoint
+  CheckpointStore,
 
-export { DEFAULT_ANALYSIS_CONFIG } from './types';
+  // Finding lifecycle types
+  Finding,
+  FindingMaturity,
+  FindingCoachingValue,
+  FindingSource,
+  FindingScope,
+  FindingEvidence,
+  FindingLineageEntry,
 
-// ── Services ──
+  // Enums & unions
+  HolisticDimension,
+  HolisticSectionType,
+  EssayType,
+  InsightCategory,
+  ConfidenceLevel,
+  NorthStarConfidence,
+  StalenessStrength,
+  MutationType,
+  StructuralWeight,
+
+  // Coaching intelligence (Improvement 6)
+  CognitiveAssessment,
+  CoachingSessionMemory,
+  LearningStyleObservations,
+  CoachingQualitySignals,
+
+  // Version branching (Improvement 10)
+  SnapshotSource,
+  SnapshotUnderstanding,
+  EssaySnapshot,
+  SnapshotComparison,
+} from './profileTypes';
+
+// ============================================================================
+// PROFILE MANAGER (coordinator, router, checkpoint stores)
+// ============================================================================
+
+export {
+  EssayProfileCoordinator,
+  createInitialProfile,
+} from './profileManager/essayProfileManager';
+
+export { ProfileRouter } from './profileManager/profileRouter';
+export type { AssembledProfileContext } from './profileManager/profileRouter';
+
+export {
+  InMemoryCheckpointStore,
+  NoOpCheckpointStore,
+} from './profileManager/checkpointStore';
+
+// ============================================================================
+// CONNECTION GRAPH (V2: bidirectional, strength-aware)
+// ============================================================================
+
+export {
+  ConnectionGraph,
+  createConnection,
+  buildHolisticConnectionContext,
+  buildParagraphConnectionContext,
+  buildScoutLeadContext,
+  buildRevalidationContext,
+  buildCompactConnectionContext,
+} from './connections';
+
+// ============================================================================
+// ANALYSIS PIPELINE (L1 → L5)
+// ============================================================================
+
+// L1: First impressions + sentence/word analysis
 export { EssayUnderstandingService, essayUnderstandingService } from './essayUnderstandingService';
-export { DiffEngine, diffEngine } from './diffEngine';
-export { SentenceAnalyzer, sentenceAnalyzer } from './sentenceAnalyzer';
-export { WordAnalyzer, wordAnalyzer } from './wordAnalyzer';
-export { ContextBuilder, contextBuilder } from './contextBuilder';
 
-// ── Analysis layers ──
+// L2: Structural cartography (Haiku)
 export { StructuralCartographer, structuralCartographer } from './analysis/structuralCartographer';
+
+// L3: Sequential deep walk (Sonnet × N paragraphs)
 export { SequentialDeepWalk, sequentialDeepWalk } from './analysis/sequentialDeepWalk';
-export { RunningUnderstandingManager, runningUnderstandingManager } from './analysis/runningUnderstandingManager';
+
+// L3.75: Holistic synthesis (Sonnet, single call after walk)
+export { holisticSynthesisService } from './analysis/holisticSynthesis';
+
+// L3.5: Analysis pass (Sonnet, parallel per paragraph)
+// Phase assessment (LLM-assessed via Sonnet — replaces deterministic computeImprovementPhase)
+export { assessPhase } from './analysis/phaseAssessment';
+export type { PhaseAssessmentInput, PhaseAssessmentResult } from './analysis/phaseAssessment';
+
+// L4+L5: Crystallization + deep annotation
 export { CrystallizerService, crystallizerService } from './analysis/crystallizer';
-export type {
-  ParagraphScoreEntry,
-  ParagraphScoreMatrix as L4ParagraphScoreMatrix,
-  CoherenceIssue,
-  CoherenceReport,
-  L4CrystallizationResult,
-} from './analysis/crystallizer';
+export type { L4CrystallizationResult } from './analysis/crystallizer';
 export { DeepAnnotationService, deepAnnotationService } from './analysis/deepAnnotationService';
-export { AnalysisOrchestrator, analysisOrchestrator } from './analysis/analysisOrchestrator';
+
+// Pipeline orchestrator (runs L1→L5 in sequence)
+export {
+  AnalysisOrchestrator,
+  analysisOrchestrator,
+  analyzeEssay,
+} from './analysis/analysisOrchestrator';
+export type {
+  PipelineInput,
+  PipelineResult,
+  LayerCost,
+  TokenUsage,
+  CostSummary,
+} from './analysis/analysisOrchestrator';
+
+// ============================================================================
+// FINDING LIFECYCLE (graduated evolution — append-only finding store)
+// ============================================================================
+
+export {
+  FindingStore,
+  COACHING_VALUE_ORDER,
+  buildFindingContext,
+  buildCompactFindingContext,
+  buildParagraphFindingContext,
+  buildFindingReferenceContext,
+  deriveSentenceParticipation,
+} from './findings';
+
+export type { FindingContextOptions } from './findings';
+
+// ============================================================================
+// EDIT UNDERSTANDING (classifies what an edit means)
+// ============================================================================
+
+export {
+  EditUnderstandingService,
+  editUnderstandingService,
+} from './analysis/editUnderstandingService';
+export type { EditUnderstandingResult } from './analysis/editUnderstandingService';
+
+// ============================================================================
+// FOCUSED ANALYZER (surgical re-analysis for small edits)
+// ============================================================================
+
+export {
+  FocusedAnalyzer,
+  focusedAnalyzer,
+} from './analysis/focusedAnalyzer';
+export type {
+  FocusedUnderstandingDelta,
+  FocusedAnalysisDelta,
+  FocusedAnalysisResult,
+} from './analysis/focusedAnalyzer';
+
+// ============================================================================
+// REANALYSIS ORCHESTRATOR (edit lifecycle: focused vs comprehensive)
+// ============================================================================
+
+export {
+  ReanalysisOrchestrator,
+  createReanalysisOrchestrator,
+} from './analysis/reanalysisOrchestrator';
+export type {
+  EditProcessResult,
+  CoachingTurnResult,
+  ReanalysisResult,
+  ReanalysisSuggestion,
+  ConversationTurn,
+} from './analysis/reanalysisOrchestrator';
+
+// ============================================================================
+// COACHING SERVICE (L6: student conversation → coaching response)
+// ============================================================================
+
+export {
+  CoachingService,
+  coachingService,
+} from './coaching/coachingService';
+export type {
+  CoachingResult,
+  Stage4Verdict,
+} from './coaching/coachingService';
+
+// ============================================================================
+// VERSION TRACKER (tracks edits, staleness, triggers re-analysis)
+// ============================================================================
+
+export {
+  VersionTracker,
+  createVersionTracker,
+  serializeStalenessAccumulator,
+} from './versionTracker';
+export type { ReanalysisTrigger } from './versionTracker';
+
+// ============================================================================
+// VERSION BRANCHING (Improvement #10: Snapshot + Compare)
+// ============================================================================
+
+export {
+  SnapshotManager,
+  compareToSnapshot,
+  hashCurrentState,
+  shouldAutoSnapshotForEdit,
+  shouldAutoSnapshotForMilestone,
+} from './versioning';
+export type {
+  SnapshotSummary,
+  CurrentEssayState,
+  EditEvent,
+  AutoSnapshotDecision,
+  MilestoneEvent,
+} from './versioning';

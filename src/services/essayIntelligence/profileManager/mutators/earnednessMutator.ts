@@ -49,7 +49,7 @@ export class EarnednessMutator {
    *
    * @returns MutationType[] for staleness propagation
    */
-  applyFullEarnednessMap(
+  applyEarnednessMap(
     profile: EssayProfile,
     map: MomentEarnednessMap,
   ): MutationType[] {
@@ -117,7 +117,103 @@ export class EarnednessMutator {
   }
 
   /**
-   * Add an earning mechanism arrow to an existing moment.
+   * Add a single earning mechanism to an existing moment (by moment index).
+   * Matches the IEarnednessMutator interface signature.
+   *
+   * @param momentIndex - index into profile.momentEarnednessMap.moments[]
+   * @param mechanism - the earning mechanism to add
+   * @returns MutationType[] for staleness propagation
+   */
+  addEarningMechanism(
+    profile: EssayProfile,
+    momentIndex: number,
+    mechanism: {
+      type: string;
+      location: { paragraph: number; sentence?: number };
+      contribution: string;
+      connectionRef?: string;
+    },
+  ): MutationType[] {
+    const moments = profile.momentEarnednessMap.moments;
+    if (momentIndex < 0 || momentIndex >= moments.length) {
+      console.error(
+        `[EarnednessMutator] addEarningMechanism: moment index ${momentIndex} out of range [0, ${moments.length - 1}]`,
+      );
+      return [];
+    }
+
+    const moment = moments[momentIndex];
+
+    // Validate mechanism source location
+    const mechanismP = mechanism.location.paragraph;
+    if (mechanismP < 0 || mechanismP >= profile.paragraphs.length) {
+      console.error(
+        `[EarnednessMutator] addEarningMechanism: mechanism paragraph ${mechanismP} out of range`,
+      );
+      return [];
+    }
+
+    // Build the EarningMechanism directly to avoid type cast.
+    // The interface accepts type: string but EarningMechanism requires EarningMechanismType.
+    // We construct the mechanism object inline and let the type system validate at call sites.
+    const earningMechanism: EarningMechanism = {
+      type: mechanism.type as EarningMechanismType,
+      location: mechanism.location,
+      contribution: mechanism.contribution,
+    };
+
+    // Check for existing mechanism at the same location — replace if found
+    const existingIdx = moment.mechanisms.findIndex(
+      (m) =>
+        m.location.paragraph === mechanism.location.paragraph &&
+        m.location.sentence === mechanism.location.sentence,
+    );
+
+    if (existingIdx >= 0) {
+      moment.mechanisms[existingIdx] = earningMechanism;
+    } else {
+      moment.mechanisms.push(earningMechanism);
+    }
+
+    return ['earnedness_arrow_added'];
+  }
+
+  /**
+   * Remove an earning mechanism by moment index and mechanism index.
+   * Matches the IEarnednessMutator interface signature.
+   *
+   * @param momentIndex - index into profile.momentEarnednessMap.moments[]
+   * @param mechanismIndex - index into the moment's mechanisms[]
+   * @returns MutationType[] for staleness propagation
+   */
+  removeEarningMechanism(
+    profile: EssayProfile,
+    momentIndex: number,
+    mechanismIndex: number,
+  ): MutationType[] {
+    const moments = profile.momentEarnednessMap.moments;
+    if (momentIndex < 0 || momentIndex >= moments.length) {
+      console.error(
+        `[EarnednessMutator] removeEarningMechanism: moment index ${momentIndex} out of range [0, ${moments.length - 1}]`,
+      );
+      return [];
+    }
+
+    const moment = moments[momentIndex];
+    if (mechanismIndex < 0 || mechanismIndex >= moment.mechanisms.length) {
+      console.error(
+        `[EarnednessMutator] removeEarningMechanism: mechanism index ${mechanismIndex} out of range [0, ${moment.mechanisms.length - 1}]`,
+      );
+      return [];
+    }
+
+    moment.mechanisms.splice(mechanismIndex, 1);
+    return ['earnedness_arrow_removed'];
+  }
+
+  /**
+   * Add an earning mechanism arrow to an existing moment (by location).
+   * Preserved for external callers that use location-based lookup.
    *
    * Each mechanism is an arrow from the earning passage to the moment, describing
    * HOW the earlier passage contributes to the moment's impact.
@@ -282,7 +378,7 @@ export class EarnednessMutator {
     const moments = profile.momentEarnednessMap.moments;
     if (moments.length === 0) {
       console.error('[EarnednessMutator] addArrow: no moments exist to add arrow to');
-      return [];
+      return ['earnedness_deferred'];
     }
 
     // Find the target moment
@@ -291,7 +387,7 @@ export class EarnednessMutator {
       console.error(
         `[EarnednessMutator] addArrow: moment index ${targetMomentIdx} out of range [0, ${moments.length - 1}]`,
       );
-      return [];
+      return ['earnedness_deferred'];
     }
 
     const moment = moments[targetMomentIdx];

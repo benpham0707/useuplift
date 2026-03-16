@@ -29,7 +29,36 @@ import type {
   ParagraphLocation,
   NarrativeStrategy,
   MutationType,
+  DeltaSynthesisOutput,
 } from '../../profileTypes';
+
+/**
+ * Minimal StructuralCartography shape needed by the holistic mutator.
+ * Matches the definition in the coordinator.
+ */
+interface StructuralCartography {
+  paragraphRoles: Array<{
+    index: number;
+    role: string;
+    narrativeFunction: string;
+    strengthContribution: string;
+    weaknessFlag: string | null;
+  }>;
+  arcType: string;
+  arcConfidence: number;
+  arcVerification: string;
+  transitions: Array<{
+    fromParagraph: number;
+    toParagraph: number;
+    quality: string;
+    mechanism: string;
+  }>;
+  centralTheme: string;
+  themeProgression: string;
+  thematicGaps: string[];
+  pacingNotes: string;
+  flatSpots: number[];
+}
 
 /**
  * Source tracking for insight-driven mutations.
@@ -55,7 +84,7 @@ export class HolisticMutator {
    *
    * @returns MutationType[] for staleness propagation
    */
-  mergeIncremental(
+  mergeHolisticEvolution(
     profile: EssayProfile,
     evolution: {
       centralThesis?: string;
@@ -106,15 +135,18 @@ export class HolisticMutator {
    *
    * @returns MutationType[] for staleness propagation
    */
-  applyFullSupersession(
+  applyFullHolisticSynthesis(
     profile: EssayProfile,
     synthesis: HolisticSynthesisOutput,
   ): MutationType[] {
-    // Replace ALL holistic sections wholesale — L3.75 is authoritative
+    // Replace the 8 holistic sections that the HolisticMutator owns.
+    // voiceMap and momentEarnednessMap are NOT written here — they are owned
+    // by VoiceMapMutator and EarnednessMutator respectively. The coordinator
+    // dispatches to those mutators separately during L3.75 application, which
+    // also ensures the correct mutation types (voice_shift_added, earnedness_arrow_added)
+    // are emitted for the staleness dependency map.
     profile.voiceIdentity = synthesis.voiceIdentity;
-    profile.voiceMap = synthesis.voiceMap;
     profile.emotionalTopography = synthesis.emotionalTopography;
-    profile.momentEarnednessMap = synthesis.momentEarnednessMap;
     profile.thematicArchitecture = synthesis.thematicArchitecture;
     profile.narrativeStrategy = synthesis.narrativeStrategy;
     profile.characterRevelation = synthesis.characterRevelation;
@@ -182,14 +214,71 @@ export class HolisticMutator {
 
   /**
    * Seed narrative strategy from L2 structural cartography.
+   * Matches the IHolisticMutator interface signature.
    *
    * L2 produces a structural skeleton that provides initial hypotheses about
-   * narrative strategy. This is a SEED, not a full replacement — only provided
-   * fields are set.
+   * narrative strategy. This extracts narrative-relevant data from the
+   * cartography and seeds the narrative strategy section.
    *
    * @returns MutationType[] for staleness propagation
    */
   seedNarrativeStrategy(
+    profile: EssayProfile,
+    cartography: StructuralCartography,
+  ): MutationType[] {
+    let changed = false;
+
+    // Extract primary strategy from arc type
+    if (cartography.arcType) {
+      profile.narrativeStrategy.primaryStrategy = cartography.arcType;
+      changed = true;
+    }
+
+    // Extract strategy rationale from arc verification
+    if (cartography.arcVerification) {
+      profile.narrativeStrategy.strategyRationale = cartography.arcVerification;
+      changed = true;
+    }
+
+    // Extract pivot points from transitions
+    if (cartography.transitions.length > 0) {
+      profile.narrativeStrategy.pivotPoints = cartography.transitions.map(t => ({
+        location: { paragraph: t.fromParagraph },
+        description: `Transition to P${t.toParagraph}: ${t.mechanism} (${t.quality})`,
+      }));
+      changed = true;
+    }
+
+    // Extract pacing analysis from pacing notes + flat spots
+    if (cartography.pacingNotes) {
+      const flatSpotNote = cartography.flatSpots.length > 0
+        ? ` Flat spots at paragraphs: ${cartography.flatSpots.join(', ')}.`
+        : '';
+      profile.narrativeStrategy.pacingAnalysis = cartography.pacingNotes + flatSpotNote;
+      changed = true;
+    }
+
+    // Extract structural choices from paragraph roles
+    if (cartography.paragraphRoles.length > 0) {
+      const choices = cartography.paragraphRoles
+        .filter(r => r.narrativeFunction)
+        .map(r => `P${r.index}: ${r.role} — ${r.narrativeFunction}`);
+      if (choices.length > 0) {
+        profile.narrativeStrategy.structuralChoices = choices;
+        changed = true;
+      }
+    }
+
+    return changed ? ['holistic_section_updated'] : [];
+  }
+
+  /**
+   * Seed narrative strategy from a partial NarrativeStrategy object directly.
+   * Preserved for external callers that have pre-structured narrative data.
+   *
+   * @returns MutationType[] for staleness propagation
+   */
+  seedNarrativeStrategyDirect(
     profile: EssayProfile,
     seed: Partial<NarrativeStrategy>,
   ): MutationType[] {
@@ -355,6 +444,98 @@ export class HolisticMutator {
     }
 
     return ['holistic_section_updated'];
+  }
+
+  /**
+   * SECTION-LEVEL MERGE — during W5 delta synthesis.
+   *
+   * Only replaces holistic sections that are listed in `updatedSections`.
+   * All other sections remain untouched. This is the merge primitive for
+   * delta synthesis: when a contradiction or coaching supersession affects
+   * only 2-3 holistic sections, we re-synthesize only those sections
+   * instead of running full L3.75.
+   *
+   * @param profile - The essay profile to update (mutated in place)
+   * @param partial - Partial holistic synthesis output containing only re-synthesized sections
+   * @param updatedSections - Which sections to replace (others are left untouched)
+   * @returns MutationType[] for staleness propagation
+   */
+  applySectionLevelMerge(
+    profile: EssayProfile,
+    partial: Partial<HolisticSynthesisOutput>,
+    updatedSections: HolisticSectionType[],
+  ): MutationType[] {
+    let changed = false;
+
+    for (const section of updatedSections) {
+      switch (section) {
+        case 'voice_identity':
+          if (partial.voiceIdentity) {
+            profile.voiceIdentity = partial.voiceIdentity;
+            changed = true;
+          }
+          break;
+        case 'voice_map':
+          if (partial.voiceMap) {
+            profile.voiceMap = partial.voiceMap;
+            changed = true;
+          }
+          break;
+        case 'emotional_topography':
+          if (partial.emotionalTopography) {
+            profile.emotionalTopography = partial.emotionalTopography;
+            changed = true;
+          }
+          break;
+        case 'moment_earnedness_map':
+          if (partial.momentEarnednessMap) {
+            profile.momentEarnednessMap = partial.momentEarnednessMap;
+            changed = true;
+          }
+          break;
+        case 'thematic_architecture':
+          if (partial.thematicArchitecture) {
+            profile.thematicArchitecture = partial.thematicArchitecture;
+            changed = true;
+          }
+          break;
+        case 'narrative_strategy':
+          if (partial.narrativeStrategy) {
+            profile.narrativeStrategy = partial.narrativeStrategy;
+            changed = true;
+          }
+          break;
+        case 'character_revelation':
+          if (partial.characterRevelation) {
+            profile.characterRevelation = partial.characterRevelation;
+            changed = true;
+          }
+          break;
+        case 'craft_assessment':
+          if (partial.craftAssessment) {
+            profile.craftAssessment = partial.craftAssessment;
+            changed = true;
+          }
+          break;
+        case 'cross_dimension_entanglements':
+          if (partial.entanglements) {
+            profile.entanglements = partial.entanglements;
+            changed = true;
+          }
+          break;
+        case 'admissions_positioning':
+          if (partial.admissionsPositioning) {
+            profile.admissionsPositioning = partial.admissionsPositioning;
+            changed = true;
+          }
+          break;
+        default:
+          // Unknown section type — skip
+          break;
+      }
+    }
+
+    return changed ? ['holistic_section_updated'] : [];
   }
 
   /**

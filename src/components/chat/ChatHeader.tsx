@@ -16,7 +16,6 @@ export function ChatHeader() {
             className="absolute inset-0 rounded-full border border-dashed border-purple-300/50"
           />
           <Sparkles className="w-5 h-5 text-cyan-600 drop-shadow-sm" />
-          {/* Subtle cloud accent on the icon */}
           <Cloud className="absolute -bottom-1 -right-1 w-4 h-4 text-purple-500 opacity-80" />
         </div>
 

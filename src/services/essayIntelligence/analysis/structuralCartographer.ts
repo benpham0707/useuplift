@@ -17,8 +17,9 @@
  * Consumed by: L3 sequential deep walk, L4 crystallization, profile router
  */
 
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
+import { parseLlmJsonOutput } from './llmJsonParser';
 import type { StructuralCartography, TransitionQuality } from '../types';
 import type { NarrativeArcType } from '../../../workshop/scoring/narrativeAnalyzerTypes';
 import type { ParagraphFirstImpression } from '../profileTypes';
@@ -103,6 +104,9 @@ You MUST return valid JSON matching this exact schema:
   "flatSpots": [<paragraph indices (0-indexed) where narrative momentum drops — where the reader's engagement dips>]
 }
 
+BANNED ROLE LABELS (too generic — always use essay-specific structural metaphors instead):
+"introduction", "body paragraph", "development", "conclusion", "provides context", "establishes", "discusses", "explores", "transitions", "wraps up", "summarizes"
+
 RULES:
 - paragraphRoles MUST have exactly one entry per paragraph, in index order
 - transitions MUST cover every consecutive paragraph pair
@@ -178,8 +182,8 @@ function validateCartography(
 
   // Adjust count if mismatched
   if (roles.length !== expectedParagraphCount) {
-    console.warn(
-      `[StructuralCartographer] paragraphRoles count mismatch: got ${roles.length}, expected ${expectedParagraphCount}. Adjusting.`,
+    console.error(
+      `[StructuralCartographer] paragraphRoles count mismatch: got ${roles.length}, expected ${expectedParagraphCount}. L2 output is incomplete — padding with unassessed placeholders.`,
     );
     while (roles.length > expectedParagraphCount) {
       roles.pop();
@@ -188,9 +192,9 @@ function validateCartography(
       const idx = roles.length;
       roles.push({
         index: idx,
-        role: 'development',
-        narrativeFunction: 'Continuation of narrative',
-        strengthContribution: 'Contributes to overall structure',
+        role: '[STRUCTURAL ROLE NOT ASSESSED — L2 paragraph count mismatch]',
+        narrativeFunction: '[Not assessed — paragraph was missing from L2 output]',
+        strengthContribution: '[Not assessed — requires L2 re-analysis]',
         weaknessFlag: null,
       });
     }
@@ -198,7 +202,7 @@ function validateCartography(
 
   const validatedRoles = roles.map((r, i) => ({
     index: i,
-    role: typeof r.role === 'string' ? r.role : 'development',
+    role: typeof r.role === 'string' ? r.role : '[STRUCTURAL ROLE NOT ASSESSED — L2 role value missing]',
     narrativeFunction: typeof r.narrativeFunction === 'string' ? r.narrativeFunction : '',
     strengthContribution: typeof r.strengthContribution === 'string' ? r.strengthContribution : '',
     weaknessFlag: typeof r.weaknessFlag === 'string' && r.weaknessFlag.length > 0
@@ -294,53 +298,6 @@ function validateCartography(
 }
 
 // ============================================================================
-// JSON PARSING WITH FALLBACK
-// ============================================================================
-
-function parseJsonResponse(raw: unknown): Record<string, unknown> {
-  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw as Record<string, unknown>;
-  }
-
-  if (typeof raw === 'string') {
-    let jsonString = raw.trim();
-
-    // Direct parse
-    try {
-      return JSON.parse(jsonString) as Record<string, unknown>;
-    } catch {
-      // noop
-    }
-
-    // Extract from code blocks
-    const codeBlockMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch) {
-      jsonString = codeBlockMatch[1].trim();
-      try {
-        return JSON.parse(jsonString) as Record<string, unknown>;
-      } catch {
-        // noop
-      }
-    }
-
-    // Extract largest JSON object
-    const firstBrace = jsonString.indexOf('{');
-    const lastBrace = jsonString.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        return JSON.parse(jsonString.substring(firstBrace, lastBrace + 1)) as Record<string, unknown>;
-      } catch {
-        // noop
-      }
-    }
-
-    throw new Error(`Failed to parse JSON from structural cartography response. First 200 chars: ${jsonString.substring(0, 200)}`);
-  }
-
-  throw new Error(`Unexpected response type from structural cartography: ${typeof raw}`);
-}
-
-// ============================================================================
 // SERVICE
 // ============================================================================
 
@@ -369,7 +326,7 @@ export class StructuralCartographerService {
 
     const userPrompt = buildUserPrompt(essayText, impressions);
 
-    const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
+    const response: ClaudeResponse<Record<string, unknown>> = await callClaude<Record<string, unknown>>(
       {
         model: SONNET_MODEL,
         systemPrompt: SYSTEM_PROMPT,
@@ -381,9 +338,12 @@ export class StructuralCartographerService {
       },
     );
 
-    const parsed = parseJsonResponse(response.content);
+    const parsed = parseLlmJsonOutput(response.content, 'L2 structuralCartographer');
     const cartography = validateCartography(parsed, paragraphCount);
     const cost = calculateCost(response.usage, SONNET_MODEL);
+    console.log(
+      `[EssayIntelligence] L2: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
     const timingMs = Date.now() - startTime;
 
     return {

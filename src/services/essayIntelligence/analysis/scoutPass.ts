@@ -19,7 +19,7 @@
  * Consumed by: L3 understanding walk (as investigation leads)
  */
 
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import type {
   ConnectionScoutOutput,
@@ -368,7 +368,7 @@ export class ScoutPassService {
 
     const userPrompt = buildUserPrompt(essayText, impressions);
 
-    const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
+    const response: ClaudeResponse<Record<string, unknown>> = await callClaude<Record<string, unknown>>(
       {
         model: HAIKU_MODEL,
         systemPrompt: SYSTEM_PROMPT,
@@ -383,6 +383,9 @@ export class ScoutPassService {
     const parsed = parseJsonResponse(response.content);
     const scoutOutput = validateScoutOutput(parsed, paragraphs.length);
     const cost = calculateCost(response.usage, HAIKU_MODEL);
+    console.log(
+      `[EssayIntelligence] L2.5: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
     const timingMs = Date.now() - startTime;
 
     // Log summary for diagnostics
