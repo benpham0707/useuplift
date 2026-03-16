@@ -8,7 +8,7 @@
  * Connection-driven routing is PRIMARY: the connection graph determines which paragraphs
  * get full detail. Proximity is the FALLBACK for paragraphs without established connections.
  *
- * 13 routing rules, each tailored to a specific call type.
+ * 16 routing rules, each tailored to a specific call type.
  *
  * Consumed by: every layer's prompt builder, coaching service, inline edit service,
  *              re-analysis pipeline, focused analysis pipeline.
@@ -23,7 +23,19 @@ import type {
   Connection,
   EditDiff,
   StalenessSnapshot,
+  ReadingStrategy,
 } from '../profileTypes';
+
+import type {
+  DeclaredContextRequest,
+  ContextSectionSpec,
+  ContextRelevanceTracker,
+  ContextDiagnosticStats,
+} from './routerTypes';
+import { InMemoryRelevanceTracker } from './routerTypes';
+
+// Re-export declared context types for consumers
+export type { DeclaredContextRequest, ContextSectionSpec, ContextDiagnosticStats } from './routerTypes';
 
 // ============================================================================
 // ROUTING RULE TYPES
@@ -36,6 +48,7 @@ export type RoutingRule =
   | 'l3_understanding_walk'
   | 'l3_5_analysis_pass'
   | 'l3_75_holistic_synthesis'
+  | 'l3_75_synthesis_iteration'
   | 'l4_crystallization'
   | 'l5_feedback_annotations'
   | 'l6_coaching_voice'
@@ -45,7 +58,9 @@ export type RoutingRule =
   | 'reanalysis_comprehensive'
   | 'focused_understanding'
   | 'focused_analysis'
-  | 'impact_classification';
+  | 'impact_classification'
+  | 'deep_dive'
+  | 'full_context_reread';
 
 /**
  * Context request — what the caller wants assembled.
@@ -66,6 +81,10 @@ export interface ContextRequest {
     changedParagraphs: number[];
     stalenessSnapshot: StalenessSnapshot;
   };
+  /** Required context section names for deep_dive rule (from prompt template) */
+  requiredContext?: string[];
+  /** Context priorities for ReadingStrategy-aware section ordering (most important first) */
+  contextPriorities?: string[];
 }
 
 /**
@@ -77,7 +96,7 @@ export interface AssembledProfileContext {
   /** Estimated total tokens */
   estimatedTokens: number;
   /** Which routing rule was applied */
-  appliedRule: RoutingRule;
+  appliedRule: RoutingRule | 'declared';
   /** Any sections that were dropped due to token budget */
   droppedSections: string[];
 }
@@ -93,10 +112,247 @@ export interface ProfileSection {
 }
 
 // ============================================================================
+// ADAPTIVE OVERLAY SYSTEM (W8.1)
+// ============================================================================
+
+/**
+ * Adaptive overlay — context adjustments computed from task + profile state.
+ * ADDITIVE: when no overlay applies, all 13 rules work exactly as before.
+ */
+export interface AdaptiveOverlay {
+  /** Additional profile sections to include beyond what the rule normally assembles */
+  additionalSections: string[];
+  /** Sections that should be promoted to higher priority in budget enforcement */
+  prioritySections: string[];
+  /** Override the computed token budget (takes precedence over per-rule budgets) */
+  tokenBudgetOverride?: number;
+  /** Why this overlay was applied — for diagnostics */
+  reason: string;
+}
+
+/**
+ * Examine the task context and profile state to compute an adaptive overlay.
+ * Returns an overlay with adjustments, or a no-op overlay (empty arrays, no override).
+ */
+function computeAdaptiveOverlay(
+  profile: Readonly<EssayProfile>,
+  request: ContextRequest,
+): AdaptiveOverlay {
+  const additionalSections: string[] = [];
+  const prioritySections: string[] = [];
+  let tokenBudgetOverride: number | undefined;
+  const reasons: string[] = [];
+
+  // Multi-dimensional connections at target paragraph → include both narrative + voice sections
+  if (request.paragraphIndex !== undefined) {
+    const pIdx = request.paragraphIndex;
+    const connectionsForPara = getConnectionsForParagraph(profile, pIdx);
+    const routingTagsAtPara = new Set<string>();
+    for (const conn of connectionsForPara) {
+      for (const tag of conn.routingTags) {
+        routingTagsAtPara.add(tag);
+      }
+    }
+
+    // Multi-dimensional: connections spanning 2+ routing tag types at this paragraph
+    if (routingTagsAtPara.size >= 2) {
+      additionalSections.push('narrativeStrategy', 'voiceIdentity');
+      reasons.push(
+        `Multi-dimensional connections at P${pIdx} (${[...routingTagsAtPara].join(', ')}) — including narrative + voice`,
+      );
+    }
+
+    // High connection density (>4 active connections) on focused_analysis → expand budget
+    if (request.rule === 'focused_analysis' && connectionsForPara.length > 4) {
+      tokenBudgetOverride = 12000;
+      reasons.push(
+        `High connection density (${connectionsForPara.length} connections) at P${pIdx} for focused_analysis — expanding budget to 12K`,
+      );
+    }
+  }
+
+  // All coaching rules → always prioritize NorthStar
+  if (request.rule.startsWith('l6_coaching')) {
+    prioritySections.push('northStar', 'northStarSummary', 'throughLineContext');
+    reasons.push('Coaching rule — prioritizing NorthStar context');
+  }
+
+  return {
+    additionalSections,
+    prioritySections,
+    tokenBudgetOverride,
+    reason: reasons.length > 0 ? reasons.join('; ') : 'no overlay',
+  };
+}
+
+// ============================================================================
+// ADAPTIVE TOKEN BUDGETING (W8.2)
+// ============================================================================
+
+/** Per-rule base token budgets — tuned to each rule's typical context needs */
+const RULE_BASE_BUDGETS: Record<RoutingRule, number> = {
+  l3_understanding_walk: 8000,
+  l3_5_analysis_pass: 8000,
+  l3_75_holistic_synthesis: 8000,
+  l3_75_synthesis_iteration: 14000,
+  l4_crystallization: 8000,
+  l5_feedback_annotations: 8000,
+  l6_coaching_voice: 8000,
+  l6_coaching_paragraph: 6000,
+  l6_coaching_overview: 4000,
+  inline_edit_sentence: 8000,
+  reanalysis_comprehensive: 12000,
+  focused_understanding: 8000,
+  focused_analysis: 8000,
+  impact_classification: 8000,
+  deep_dive: 8000,
+  full_context_reread: 8000,
+};
+
+/** Hard cap — no rule can exceed this regardless of scaling or overlay */
+const TOKEN_BUDGET_HARD_CAP = 16000;
+
+/**
+ * Compute the effective token budget for a given rule + profile + overlay.
+ *
+ * 1. Start with per-rule base budget
+ * 2. Apply profile density scaling (more connections = more context needed)
+ * 3. Apply overlay override if set (takes precedence)
+ * 4. Enforce hard cap
+ */
+function computeTokenBudget(
+  rule: RoutingRule,
+  profile: Readonly<EssayProfile>,
+  overlay: AdaptiveOverlay,
+): number {
+  // Overlay override takes precedence when set
+  if (overlay.tokenBudgetOverride !== undefined) {
+    return Math.min(overlay.tokenBudgetOverride, TOKEN_BUDGET_HARD_CAP);
+  }
+
+  // Start with per-rule base
+  let budget = RULE_BASE_BUDGETS[rule];
+
+  // Profile density scaling: +1K per 5 active connections, capped at +4K
+  const activeConnectionCount = profile.index.connectionGraph.filter(
+    (c) => c.status === 'active',
+  ).length;
+  const densityBonus = Math.min(
+    Math.floor(activeConnectionCount / 5) * 1000,
+    4000,
+  );
+  budget += densityBonus;
+
+  // Enforce hard cap
+  return Math.min(budget, TOKEN_BUDGET_HARD_CAP);
+}
+
+// ============================================================================
+// TASK PRIORITY REWEIGHTING (W8.3)
+// ============================================================================
+
+/**
+ * Priority weight for a profile section — higher = more important for this task.
+ * Used to influence section ordering/truncation when budget is tight.
+ */
+export interface TaskPriorityWeights {
+  [sectionName: string]: number; // 0-10 scale, 5 = neutral/default
+}
+
+/**
+ * Compute task-specific priority weights for profile sections based on routing rule.
+ * Sections not listed get the default weight of 5 (balanced).
+ *
+ * Used by applyTokenBudget to break ties within the same priority tier
+ * and to influence which sections survive truncation.
+ */
+function getTaskPriorities(rule: RoutingRule): TaskPriorityWeights {
+  switch (rule) {
+    // Voice coaching → prioritize voice sections
+    case 'l6_coaching_voice':
+      return {
+        voiceIdentity: 10,
+        voiceMap: 10,
+        voiceContext: 9,
+        emotionalTopography: 6,
+        craftAssessment: 6,
+      };
+
+    // Paragraph coaching → prioritize local understanding/analysis/connections
+    case 'l6_coaching_paragraph':
+      return {
+        // Dynamic keys (paragraph_P*_full, connected_P*_sentences) get boosted
+        // via the _paragraph prefix match in resolveTaskWeight
+        _paragraphLocal: 10,
+        _connectedSentences: 9,
+        voiceContext: 7,
+        thematicContext: 7,
+        throughLineContext: 8,
+        structuralContext: 8,
+      };
+
+    // Overview coaching → prioritize holistic + northStar
+    case 'l6_coaching_overview':
+      return {
+        holisticFull: 10,
+        northStar: 10,
+        paragraphDigests: 4,
+      };
+
+    // Focused analysis → prioritize sentence-level + connections
+    case 'focused_analysis':
+      return {
+        _sentenceFull: 10,
+        _paragraphAnalysis: 9,
+        _connectedAnalysis: 8,
+      };
+
+    // Default: balanced (all sections get equal weight = 5)
+    default:
+      return {};
+  }
+}
+
+/**
+ * Resolve the effective weight for a section name given task priorities.
+ * Supports both exact matches and prefix-based matching for dynamic section names.
+ */
+function resolveTaskWeight(sectionName: string, weights: TaskPriorityWeights): number {
+  const DEFAULT_WEIGHT = 5;
+
+  // Exact match first
+  if (weights[sectionName] !== undefined) return weights[sectionName];
+
+  // Prefix-based matching for dynamic section names:
+  // _paragraphLocal matches paragraph_P*_full, paragraph_P*_understanding, etc.
+  if (weights._paragraphLocal !== undefined && sectionName.startsWith('paragraph_P')) {
+    return weights._paragraphLocal;
+  }
+  // _connectedSentences matches connected_P*_sentences
+  if (weights._connectedSentences !== undefined && sectionName.startsWith('connected_P') && sectionName.includes('_sentences')) {
+    return weights._connectedSentences;
+  }
+  // _sentenceFull matches sentence_P*S*_full
+  if (weights._sentenceFull !== undefined && sectionName.startsWith('sentence_P') && sectionName.includes('_full')) {
+    return weights._sentenceFull;
+  }
+  // _paragraphAnalysis matches paragraph_P*_analysis
+  if (weights._paragraphAnalysis !== undefined && sectionName.startsWith('paragraph_P') && sectionName.includes('_analysis')) {
+    return weights._paragraphAnalysis;
+  }
+  // _connectedAnalysis matches connected_P*S*_analysis
+  if (weights._connectedAnalysis !== undefined && sectionName.startsWith('connected_P') && sectionName.includes('_analysis')) {
+    return weights._connectedAnalysis;
+  }
+
+  return DEFAULT_WEIGHT;
+}
+
+// ============================================================================
 // INTERNAL HELPERS
 // ============================================================================
 
-/** Default token budget when none specified (generous — most calls fit within this) */
+/** Default token budget — fallback only (per-rule budgets via computeTokenBudget preferred) */
 const DEFAULT_TOKEN_BUDGET = 8000;
 
 /** Rough tokens-per-character ratio for estimating content size */
@@ -139,10 +395,11 @@ function findConnectedParagraphs(
 ): Set<number> {
   const connected = new Set<number>();
   for (const entry of profile.index.connectionGraph) {
-    if (entry.from[0] === paragraphIndex) {
-      connected.add(entry.to[0]);
-    } else if (entry.to[0] === paragraphIndex) {
-      connected.add(entry.from[0]);
+    if (entry.status !== 'active') continue;
+    if (entry.from.paragraph === paragraphIndex) {
+      connected.add(entry.to.paragraph);
+    } else if (entry.to.paragraph === paragraphIndex) {
+      connected.add(entry.from.paragraph);
     }
   }
   connected.delete(paragraphIndex); // Don't include self
@@ -157,11 +414,12 @@ function findConnectedSentences(
   profile: Readonly<EssayProfile>,
   paragraphIndex: number,
   sentenceIndex: number,
-): Array<{ from: [number, number]; to: [number, number]; type: string }> {
+): typeof profile.index.connectionGraph {
   return profile.index.connectionGraph.filter(
     (entry) =>
-      (entry.from[0] === paragraphIndex && entry.from[1] === sentenceIndex) ||
-      (entry.to[0] === paragraphIndex && entry.to[1] === sentenceIndex),
+      entry.status === 'active' &&
+      ((entry.from.paragraph === paragraphIndex && entry.from.sentence === sentenceIndex) ||
+      (entry.to.paragraph === paragraphIndex && entry.to.sentence === sentenceIndex)),
   );
 }
 
@@ -173,7 +431,7 @@ function getConnectionsForParagraph(
   paragraphIndex: number,
 ): Connection[] {
   return profile.connections.all.filter(
-    (conn) => conn.from[0] === paragraphIndex || conn.to[0] === paragraphIndex,
+    (conn) => conn.status === 'active' && (conn.from.paragraph === paragraphIndex || conn.to.paragraph === paragraphIndex),
   );
 }
 
@@ -231,9 +489,10 @@ function getScoutLeadsForParagraph(
 ): Connection[] {
   return profile.connections.all.filter(
     (conn) =>
-      conn.confidence < 0.5 &&
-      conn.discoveredByLayer === 'l2.5' &&
-      (conn.from[0] === paragraphIndex || conn.to[0] === paragraphIndex),
+      conn.status === 'active' &&
+      conn.discoveredBy === 'scout' &&
+      conn.strengthCategory === 'tentative' &&
+      (conn.from.paragraph === paragraphIndex || conn.to.paragraph === paragraphIndex),
   );
 }
 
@@ -242,6 +501,12 @@ function getScoutLeadsForParagraph(
 // ============================================================================
 
 export class ProfileRouter {
+  private relevanceTracker: ContextRelevanceTracker;
+
+  constructor() {
+    this.relevanceTracker = new InMemoryRelevanceTracker();
+  }
+
   /**
    * Assemble context for an LLM call based on the routing rule.
    *
@@ -252,7 +517,16 @@ export class ProfileRouter {
     profile: Readonly<EssayProfile>,
     request: ContextRequest,
   ): AssembledProfileContext {
-    const budget = request.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
+    // W8.1: Compute adaptive overlay from task context + profile state
+    const overlay = computeAdaptiveOverlay(profile, request);
+
+    // W8.2: Compute effective token budget (per-rule base + density scaling + overlay override)
+    // Caller-specified budget takes precedence over computed budget
+    const computedBudget = computeTokenBudget(request.rule, profile, overlay);
+    const budget = request.tokenBudget ?? computedBudget;
+
+    // W8.3: Get task-specific priority weights for section ordering/truncation
+    const taskPriorities = getTaskPriorities(request.rule);
 
     let sections: ProfileSection[];
 
@@ -265,6 +539,9 @@ export class ProfileRouter {
         break;
       case 'l3_75_holistic_synthesis':
         sections = this.assembleL375HolisticSynthesis(profile);
+        break;
+      case 'l3_75_synthesis_iteration':
+        sections = this.assembleL375SynthesisIteration(profile);
         break;
       case 'l4_crystallization':
         sections = this.assembleL4Crystallization(profile);
@@ -296,14 +573,42 @@ export class ProfileRouter {
       case 'impact_classification':
         sections = this.assembleImpactClassification(profile, request);
         break;
+      case 'deep_dive':
+        sections = this.assembleDeepDive(profile, request);
+        break;
+      case 'full_context_reread':
+        sections = this.assembleFullContextReread(profile, request);
+        break;
       default: {
         const _exhaustive: never = request.rule;
         throw new Error(`Unknown routing rule: ${_exhaustive}`);
       }
     }
 
-    // Apply token budget — drop lowest priority sections first
-    return this.applyTokenBudget(sections, budget, request.rule);
+    // W8.1: Apply overlay — add additional sections from profile if not already present
+    sections = this.applyAdaptiveOverlay(sections, profile, overlay);
+
+    // W8.1: Promote priority sections from overlay (boost their priority tier)
+    sections = this.applyOverlayPriorityPromotions(sections, overlay);
+
+    // ReadingStrategy-aware context ordering: if contextPriorities are provided,
+    // reorder sections so the most important ones come first (cache efficiency).
+    if (request.contextPriorities && request.contextPriorities.length > 0) {
+      sections = this.applyContextPriorityOrdering(sections, request.contextPriorities);
+    }
+
+    // Apply token budget with task-priority-aware ordering (W8.3)
+    const result = this.applyTokenBudget(sections, budget, request.rule, taskPriorities);
+
+    // Track what was assembled (bookkeeping — Rule 6)
+    this.relevanceTracker.recordAssembly({
+      source: request.rule,
+      sectionsProvided: result.sections.map(s => s.name),
+      totalTokens: result.estimatedTokens,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -315,7 +620,7 @@ export class ProfileRouter {
    *
    * ALWAYS: ProfileIndex + holistic understanding (incremental so far) + scout leads for P
    * CONNECTION-DRIVEN: FULL understanding for paragraphs connected to P (from connectionGraph)
-   * PROXIMITY: P(N-1) full understanding
+   * PROXIMITY: P(N-1) and P(N-2) full understanding (2-paragraph sliding window)
    * FALLBACK: earlier paragraphs get digests only
    * NEVER: analysis (understanding-only layer), future paragraphs
    */
@@ -381,28 +686,34 @@ export class ProfileRouter {
       });
     }
 
-    // PROXIMITY: P(N-1) full understanding (if not already included as connection-driven)
-    const prevIdx = pIdx - 1;
-    if (prevIdx >= 0 && !connectedParas.has(prevIdx)) {
-      const prevPara = profile.paragraphs[prevIdx];
-      if (prevPara?.understanding) {
+    // PROXIMITY: P(N-1) and P(N-2) full understanding (if not already included as connection-driven)
+    // Two-paragraph sliding window: during the walk, the connection graph is still being
+    // built — we don't yet know what connects to the current paragraph. A wider proximity
+    // window lets the LLM discover deep connections (e.g., P1→P3 returning themes) that
+    // the connection graph can't signal yet and scout leads may have missed.
+    const proximityWindow = [pIdx - 1, pIdx - 2];
+    for (const proxIdx of proximityWindow) {
+      if (proxIdx < 0 || connectedParas.has(proxIdx)) continue;
+      const proxPara = profile.paragraphs[proxIdx];
+      if (proxPara?.understanding) {
         sections.push({
-          name: `proximity_P${prevIdx}_understanding`,
+          name: `proximity_P${proxIdx}_understanding`,
           content: {
-            index: prevIdx,
-            understanding: prevPara.understanding,
-            sentences: prevPara.sentences
+            index: proxIdx,
+            understanding: proxPara.understanding,
+            sentences: proxPara.sentences
               .filter((s) => s.understanding)
               .map((s) => ({ index: s.index, understanding: s.understanding })),
           },
-          tokenEstimate: profile.index.sectionTokenCounts.paragraphs[prevIdx] ?? estimateTokens(prevPara.understanding),
+          tokenEstimate: profile.index.sectionTokenCounts.paragraphs[proxIdx] ?? estimateTokens(proxPara.understanding),
           priority: 'proximity',
         });
       }
     }
 
     // FALLBACK: Earlier paragraphs get digests only
-    for (let i = 0; i < prevIdx; i++) {
+    const earliestProximity = Math.max(0, pIdx - 2);
+    for (let i = 0; i < earliestProximity; i++) {
       if (connectedParas.has(i)) continue; // Already included as full
       const para = profile.paragraphs[i];
       if (!para) continue;
@@ -587,7 +898,7 @@ export class ProfileRouter {
 
     // ALWAYS: Scout leads (all — for holistic connection verification)
     const allScoutLeads = profile.connections.all.filter(
-      (c) => c.confidence < 0.5 && c.discoveredByLayer === 'l2.5',
+      (c) => c.status === 'active' && c.discoveredBy === 'scout' && c.strengthCategory === 'tentative',
     );
     if (allScoutLeads.length > 0) {
       sections.push({
@@ -891,6 +1202,67 @@ export class ProfileRouter {
       }
     }
 
+    // HOLISTIC CONTEXT: compact voice, thematic, and through-line context
+    // Enough for the coach to connect paragraph-level observations to essay-wide patterns.
+
+    // Compact voice identity — just enough for the coach to reference voice patterns
+    // Only add voiceContext if there's actual content
+    if (profile.voiceIdentity.signature || profile.voiceIdentity.distinctivePatterns.length > 0) {
+      sections.push({
+        name: 'voiceContext',
+        content: {
+          signature: profile.voiceIdentity.signature,
+          register: profile.voiceMap.register.baseline,
+          distinctivePatterns: profile.voiceIdentity.distinctivePatterns,
+        },
+        tokenEstimate: estimateTokens(profile.voiceIdentity.signature) + 50,
+        priority: 'always',
+      });
+    }
+
+    // Compact thematic architecture — thesis + threads without full evidence arrays
+    // Only add thematicContext if there are threads
+    if (profile.thematicArchitecture.centralThesis || profile.thematicArchitecture.threads.length > 0) {
+      sections.push({
+        name: 'thematicContext',
+        content: {
+          centralThesis: profile.thematicArchitecture.centralThesis,
+          thesisConfidence: profile.thematicArchitecture.thesisConfidence,
+          threads: profile.thematicArchitecture.threads.map(t => ({
+            thread: t.thread,
+            strength: t.strength,
+          })),
+        },
+        tokenEstimate: estimateTokens(profile.thematicArchitecture.centralThesis) + 80,
+        priority: 'always',
+      });
+    }
+
+    // North Star through-line — only if present (personal statements only)
+    if (profile.northStar.throughLineMap) {
+      sections.push({
+        name: 'throughLineContext',
+        content: {
+          centralElement: profile.northStar.throughLineMap.centralElement,
+          transformation: profile.northStar.throughLineMap.transformation,
+        },
+        tokenEstimate: 80,
+        priority: 'always',
+      });
+    }
+
+    // Structural role for this paragraph — what it IS in the essay's architecture
+    const relevantRoles = profile.northStar.structuralRolesMap
+      ?.filter(r => r.paragraphs.includes(pIdx));
+    if (relevantRoles && relevantRoles.length > 0) {
+      sections.push({
+        name: 'structuralContext',
+        content: relevantRoles.map(r => ({ role: r.role, weight: r.weight })),
+        tokenEstimate: estimateTokens(relevantRoles) + 20,
+        priority: 'always',
+      });
+    }
+
     // CONNECTION-DRIVEN: connected paragraphs' full understanding + analysis for connected sentences
     const connectedParas = findConnectedParagraphs(profile, pIdx);
     for (const connIdx of connectedParas) {
@@ -900,10 +1272,11 @@ export class ProfileRouter {
       // Find which specific sentences are connected to target paragraph
       const connectedSentenceIndices = new Set<number>();
       for (const conn of profile.connections.all) {
-        if (conn.from[0] === pIdx && conn.to[0] === connIdx) {
-          connectedSentenceIndices.add(conn.to[1]);
-        } else if (conn.to[0] === pIdx && conn.from[0] === connIdx) {
-          connectedSentenceIndices.add(conn.from[1]);
+        if (conn.status !== 'active') continue;
+        if (conn.from.paragraph === pIdx && conn.to.paragraph === connIdx) {
+          if (conn.to.sentence !== undefined) connectedSentenceIndices.add(conn.to.sentence);
+        } else if (conn.to.paragraph === pIdx && conn.from.paragraph === connIdx) {
+          if (conn.from.sentence !== undefined) connectedSentenceIndices.add(conn.from.sentence);
         }
       }
 
@@ -1063,18 +1436,18 @@ export class ProfileRouter {
     // CONNECTION-DRIVEN: All sentences connected to this sentence
     const connectedEntries = findConnectedSentences(profile, pIdx, sIdx);
     for (const entry of connectedEntries) {
-      const otherLoc = entry.from[0] === pIdx && entry.from[1] === sIdx
+      const otherLoc = entry.from.paragraph === pIdx && entry.from.sentence === sIdx
         ? entry.to
         : entry.from;
-      const otherPara = profile.paragraphs[otherLoc[0]];
-      const otherSentence = otherPara?.sentences[otherLoc[1]];
+      const otherPara = profile.paragraphs[otherLoc.paragraph];
+      const otherSentence = otherLoc.sentence !== undefined ? otherPara?.sentences[otherLoc.sentence] : undefined;
       if (!otherSentence) continue;
 
       sections.push({
-        name: `connected_P${otherLoc[0]}S${otherLoc[1]}`,
+        name: `connected_P${otherLoc.paragraph}S${otherLoc.sentence}`,
         content: {
-          paragraphIndex: otherLoc[0],
-          sentenceIndex: otherLoc[1],
+          paragraphIndex: otherLoc.paragraph,
+          sentenceIndex: otherLoc.sentence,
           text: otherSentence.text,
           understanding: otherSentence.understanding,
           analysis: otherSentence.analysis,
@@ -1241,18 +1614,18 @@ export class ProfileRouter {
     // CONNECTION-DRIVEN: Connected sentences' understanding
     const connectedEntries = findConnectedSentences(profile, pIdx, sIdx);
     for (const entry of connectedEntries) {
-      const otherLoc = entry.from[0] === pIdx && entry.from[1] === sIdx
+      const otherLoc = entry.from.paragraph === pIdx && entry.from.sentence === sIdx
         ? entry.to
         : entry.from;
-      const otherPara = profile.paragraphs[otherLoc[0]];
-      const otherSentence = otherPara?.sentences[otherLoc[1]];
+      const otherPara = profile.paragraphs[otherLoc.paragraph];
+      const otherSentence = otherLoc.sentence !== undefined ? otherPara?.sentences[otherLoc.sentence] : undefined;
       if (!otherSentence?.understanding) continue;
 
       sections.push({
-        name: `connected_P${otherLoc[0]}S${otherLoc[1]}_understanding`,
+        name: `connected_P${otherLoc.paragraph}S${otherLoc.sentence}_understanding`,
         content: {
-          paragraphIndex: otherLoc[0],
-          sentenceIndex: otherLoc[1],
+          paragraphIndex: otherLoc.paragraph,
+          sentenceIndex: otherLoc.sentence,
           text: otherSentence.text,
           understanding: otherSentence.understanding,
         },
@@ -1333,18 +1706,18 @@ export class ProfileRouter {
     // CONNECTION-DRIVEN: Connected sentences' analysis
     const connectedEntries = findConnectedSentences(profile, pIdx, sIdx);
     for (const entry of connectedEntries) {
-      const otherLoc = entry.from[0] === pIdx && entry.from[1] === sIdx
+      const otherLoc = entry.from.paragraph === pIdx && entry.from.sentence === sIdx
         ? entry.to
         : entry.from;
-      const otherPara = profile.paragraphs[otherLoc[0]];
-      const otherSentence = otherPara?.sentences[otherLoc[1]];
+      const otherPara = profile.paragraphs[otherLoc.paragraph];
+      const otherSentence = otherLoc.sentence !== undefined ? otherPara?.sentences[otherLoc.sentence] : undefined;
       if (!otherSentence?.analysis) continue;
 
       sections.push({
-        name: `connected_P${otherLoc[0]}S${otherLoc[1]}_analysis`,
+        name: `connected_P${otherLoc.paragraph}S${otherLoc.sentence}_analysis`,
         content: {
-          paragraphIndex: otherLoc[0],
-          sentenceIndex: otherLoc[1],
+          paragraphIndex: otherLoc.paragraph,
+          sentenceIndex: otherLoc.sentence,
           text: otherSentence.text,
           understanding: otherSentence.understanding,
           analysis: otherSentence.analysis,
@@ -1453,17 +1826,467 @@ export class ProfileRouter {
   }
 
   // ════════════════════════════════════════════════════════════════════════════
+  // L3.75 GROWTH CYCLE ROUTING RULES
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Rule 14: L3.75 synthesis iteration N
+   *
+   * Context for L3.75 iteration N (needs prior synthesis + new findings).
+   * This is the most expensive context assembly — L3.75 needs everything.
+   *
+   * ALWAYS: ProfileIndex + all paragraph understandings + all holistic sections +
+   *         connections graph + finding summary
+   */
+  private assembleL375SynthesisIteration(
+    profile: Readonly<EssayProfile>,
+  ): ProfileSection[] {
+    const sections: ProfileSection[] = [];
+
+    // ALWAYS: ProfileIndex
+    sections.push({
+      name: 'profileIndex',
+      content: profile.index,
+      tokenEstimate: estimateTokens(profile.index),
+      priority: 'always',
+    });
+
+    // ALWAYS: All paragraph understandings (L3.75 needs full picture)
+    for (const para of profile.paragraphs) {
+      sections.push({
+        name: `paragraph_P${para.index}_full`,
+        content: {
+          index: para.index,
+          text: para.text,
+          understanding: para.understanding,
+          sentences: para.sentences.map((s) => ({
+            index: s.index,
+            text: s.text,
+            understanding: s.understanding,
+          })),
+        },
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[para.index] ?? estimateTokens(para),
+        priority: 'always',
+      });
+    }
+
+    // ALWAYS: All holistic sections (for iteration > 0, the prior synthesis is passed separately)
+    const holisticFields = [
+      { name: 'voiceIdentity', data: profile.voiceIdentity },
+      { name: 'voiceMap', data: profile.voiceMap },
+      { name: 'emotionalTopography', data: profile.emotionalTopography },
+      { name: 'momentEarnednessMap', data: profile.momentEarnednessMap },
+      { name: 'thematicArchitecture', data: profile.thematicArchitecture },
+      { name: 'narrativeStrategy', data: profile.narrativeStrategy },
+      { name: 'characterRevelation', data: profile.characterRevelation },
+      { name: 'craftAssessment', data: profile.craftAssessment },
+      { name: 'admissionsPositioning', data: profile.admissionsPositioning },
+    ] as const;
+
+    for (const { name, data } of holisticFields) {
+      if (data) {
+        sections.push({
+          name: `holistic_${name}`,
+          content: data,
+          tokenEstimate: estimateTokens(data),
+          priority: 'always',
+        });
+      }
+    }
+
+    // ALWAYS: Entanglements (separate because it's an array, not a section object)
+    if (profile.entanglements && profile.entanglements.length > 0) {
+      sections.push({
+        name: 'holistic_entanglements',
+        content: profile.entanglements,
+        tokenEstimate: estimateTokens(profile.entanglements),
+        priority: 'always',
+      });
+    }
+
+    // ALWAYS: Connections graph
+    sections.push({
+      name: 'connections',
+      content: profile.connections,
+      tokenEstimate: profile.index.sectionTokenCounts.connections,
+      priority: 'always',
+    });
+
+    // ALWAYS: Finding summary (compact finding summary from ProfileIndex)
+    if (profile.index.findingSummary) {
+      sections.push({
+        name: 'findingSummary',
+        content: profile.index.findingSummary,
+        tokenEstimate: estimateTokens(profile.index.findingSummary),
+        priority: 'always',
+      });
+    }
+
+    return sections;
+  }
+
+  /**
+   * Rule 15: Deep dive prompt — context varies by prompt's requiredContext
+   *
+   * Only includes the sections listed in requiredContext from the prompt template.
+   * ALWAYS: ProfileIndex + essay text markers
+   * DYNAMIC: Only sections listed in requiredContext
+   *
+   * Example: if requiredContext = ['voiceIdentity', 'voiceMap', 'paragraphs'],
+   * only those sections are included (plus profileIndex always).
+   */
+  private assembleDeepDive(
+    profile: Readonly<EssayProfile>,
+    request: ContextRequest,
+  ): ProfileSection[] {
+    const sections: ProfileSection[] = [];
+    const requiredContext = request.requiredContext ?? [];
+
+    // ALWAYS: ProfileIndex
+    sections.push({
+      name: 'profileIndex',
+      content: profile.index,
+      tokenEstimate: estimateTokens(profile.index),
+      priority: 'always',
+    });
+
+    // Map of section names to profile data extractors for deep dive
+    const sectionExtractors: Record<string, () => { content: unknown; tokenEstimate: number } | null> = {
+      voiceIdentity: () => profile.voiceIdentity ? {
+        content: profile.voiceIdentity,
+        tokenEstimate: profile.index.sectionTokenCounts.voiceIdentity,
+      } : null,
+      voiceMap: () => profile.voiceMap ? {
+        content: profile.voiceMap,
+        tokenEstimate: profile.index.sectionTokenCounts.voiceMap,
+      } : null,
+      emotionalTopography: () => profile.emotionalTopography ? {
+        content: profile.emotionalTopography,
+        tokenEstimate: profile.index.sectionTokenCounts.emotionalTopography,
+      } : null,
+      momentEarnednessMap: () => profile.momentEarnednessMap ? {
+        content: profile.momentEarnednessMap,
+        tokenEstimate: estimateTokens(profile.momentEarnednessMap),
+      } : null,
+      thematicArchitecture: () => profile.thematicArchitecture ? {
+        content: profile.thematicArchitecture,
+        tokenEstimate: estimateTokens(profile.thematicArchitecture),
+      } : null,
+      narrativeStrategy: () => profile.narrativeStrategy ? {
+        content: profile.narrativeStrategy,
+        tokenEstimate: estimateTokens(profile.narrativeStrategy),
+      } : null,
+      characterRevelation: () => profile.characterRevelation ? {
+        content: profile.characterRevelation,
+        tokenEstimate: profile.index.sectionTokenCounts.characterRevelation,
+      } : null,
+      craftAssessment: () => profile.craftAssessment ? {
+        content: profile.craftAssessment,
+        tokenEstimate: profile.index.sectionTokenCounts.craftAssessment,
+      } : null,
+      admissionsPositioning: () => profile.admissionsPositioning ? {
+        content: profile.admissionsPositioning,
+        tokenEstimate: estimateTokens(profile.admissionsPositioning),
+      } : null,
+      entanglements: () => (profile.entanglements && profile.entanglements.length > 0) ? {
+        content: profile.entanglements,
+        tokenEstimate: estimateTokens(profile.entanglements),
+      } : null,
+      connections: () => ({
+        content: profile.connections,
+        tokenEstimate: profile.index.sectionTokenCounts.connections,
+      }),
+      northStar: () => profile.northStar ? {
+        content: profile.northStar,
+        tokenEstimate: profile.index.sectionTokenCounts.northStar,
+      } : null,
+      findingSummary: () => profile.index.findingSummary ? {
+        content: profile.index.findingSummary,
+        tokenEstimate: estimateTokens(profile.index.findingSummary),
+      } : null,
+    };
+
+    // DYNAMIC: Include only sections listed in requiredContext
+    for (const sectionName of requiredContext) {
+      // Special case: 'paragraphs' means include all paragraph understandings
+      if (sectionName === 'paragraphs') {
+        for (const para of profile.paragraphs) {
+          sections.push({
+            name: `paragraph_P${para.index}_full`,
+            content: {
+              index: para.index,
+              text: para.text,
+              understanding: para.understanding,
+              sentences: para.sentences.map((s) => ({
+                index: s.index,
+                text: s.text,
+                understanding: s.understanding,
+              })),
+            },
+            tokenEstimate: profile.index.sectionTokenCounts.paragraphs[para.index] ?? estimateTokens(para),
+            priority: 'always',
+          });
+        }
+        continue;
+      }
+
+      const extractor = sectionExtractors[sectionName];
+      if (!extractor) continue;
+
+      const extracted = extractor();
+      if (!extracted) continue;
+
+      sections.push({
+        name: sectionName,
+        content: extracted.content,
+        tokenEstimate: extracted.tokenEstimate,
+        priority: 'always',
+      });
+    }
+
+    return sections;
+  }
+
+  /**
+   * Rule 16: Full context re-read for a targeted paragraph
+   *
+   * Context for re-reading a paragraph with full essay awareness.
+   * ALWAYS: ProfileIndex + target paragraph's current understanding +
+   *         connections involving target paragraph + neighbor understandings (±1)
+   * Essay text is passed externally (not from profile), not assembled here.
+   */
+  private assembleFullContextReread(
+    profile: Readonly<EssayProfile>,
+    request: ContextRequest,
+  ): ProfileSection[] {
+    const pIdx = request.paragraphIndex ?? 0;
+    const sections: ProfileSection[] = [];
+
+    // ALWAYS: ProfileIndex
+    sections.push({
+      name: 'profileIndex',
+      content: profile.index,
+      tokenEstimate: estimateTokens(profile.index),
+      priority: 'always',
+    });
+
+    // ALWAYS: Target paragraph's current understanding
+    const targetPara = profile.paragraphs[pIdx];
+    if (targetPara) {
+      sections.push({
+        name: `paragraph_P${pIdx}_full`,
+        content: {
+          index: targetPara.index,
+          text: targetPara.text,
+          understanding: targetPara.understanding,
+          sentences: targetPara.sentences.map((s) => ({
+            index: s.index,
+            text: s.text,
+            understanding: s.understanding,
+          })),
+        },
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[pIdx] ?? estimateTokens(targetPara),
+        priority: 'always',
+      });
+    }
+
+    // ALWAYS: Connections involving the target paragraph
+    const connectionsForTarget = getConnectionsForParagraph(profile, pIdx);
+    if (connectionsForTarget.length > 0) {
+      sections.push({
+        name: `connections_P${pIdx}`,
+        content: connectionsForTarget,
+        tokenEstimate: estimateTokens(connectionsForTarget),
+        priority: 'always',
+      });
+    }
+
+    // ALWAYS: Neighbor paragraph understandings (±1 paragraph)
+    for (const neighborIdx of [pIdx - 1, pIdx + 1]) {
+      if (neighborIdx < 0 || neighborIdx >= profile.paragraphs.length) continue;
+      const neighborPara = profile.paragraphs[neighborIdx];
+      if (!neighborPara?.understanding) continue;
+
+      sections.push({
+        name: `neighbor_P${neighborIdx}_understanding`,
+        content: {
+          index: neighborPara.index,
+          text: neighborPara.text,
+          understanding: neighborPara.understanding,
+          sentences: neighborPara.sentences
+            .filter((s) => s.understanding)
+            .map((s) => ({ index: s.index, text: s.text, understanding: s.understanding })),
+        },
+        tokenEstimate: profile.index.sectionTokenCounts.paragraphs[neighborIdx] ?? estimateTokens(neighborPara),
+        priority: 'proximity',
+      });
+    }
+
+    return sections;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CONTEXT PRIORITY ORDERING (ReadingStrategy-aware)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Reorder sections based on ReadingStrategy contextPriorities.
+   * Sections matching priorities come first (in priority order), then remaining
+   * sections in their original order. This improves prompt cache hit rates by
+   * placing the most important sections earliest in the context window.
+   *
+   * Does NOT change priority tiers — only positional ordering within the array.
+   */
+  private applyContextPriorityOrdering(
+    sections: ProfileSection[],
+    contextPriorities: string[],
+  ): ProfileSection[] {
+    if (contextPriorities.length === 0) return sections;
+
+    // Build priority index map: section name → priority position (lower = more important)
+    const priorityIndex = new Map<string, number>();
+    for (let i = 0; i < contextPriorities.length; i++) {
+      priorityIndex.set(contextPriorities[i], i);
+    }
+
+    // Partition sections into prioritized (matched by name) and non-prioritized
+    const prioritized: Array<{ section: ProfileSection; order: number }> = [];
+    const remaining: ProfileSection[] = [];
+
+    for (const section of sections) {
+      const matchedPriority = priorityIndex.get(section.name);
+      if (matchedPriority !== undefined) {
+        prioritized.push({ section, order: matchedPriority });
+      } else {
+        remaining.push(section);
+      }
+    }
+
+    // Sort prioritized sections by their priority order (most important first)
+    prioritized.sort((a, b) => a.order - b.order);
+
+    // Prioritized sections first, then remaining in original order
+    return [...prioritized.map((p) => p.section), ...remaining];
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ADAPTIVE OVERLAY APPLICATION (W8.1)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Apply adaptive overlay — inject additional profile sections that the overlay
+   * determined are needed but the base rule didn't include.
+   * Only adds sections not already present (by name).
+   */
+  private applyAdaptiveOverlay(
+    sections: ProfileSection[],
+    profile: Readonly<EssayProfile>,
+    overlay: AdaptiveOverlay,
+  ): ProfileSection[] {
+    if (overlay.additionalSections.length === 0) return sections;
+
+    const existingNames = new Set(sections.map((s) => s.name));
+    const result = [...sections];
+
+    // Map of overlay section names to profile data extractors
+    const sectionExtractors: Record<string, () => { content: unknown; tokenEstimate: number } | null> = {
+      narrativeStrategy: () => profile.narrativeStrategy ? {
+        content: profile.narrativeStrategy,
+        tokenEstimate: estimateTokens(profile.narrativeStrategy),
+      } : null,
+      voiceIdentity: () => profile.voiceIdentity ? {
+        content: profile.voiceIdentity,
+        tokenEstimate: profile.index.sectionTokenCounts.voiceIdentity,
+      } : null,
+      voiceMap: () => profile.voiceMap ? {
+        content: profile.voiceMap,
+        tokenEstimate: profile.index.sectionTokenCounts.voiceMap,
+      } : null,
+      emotionalTopography: () => profile.emotionalTopography ? {
+        content: profile.emotionalTopography,
+        tokenEstimate: profile.index.sectionTokenCounts.emotionalTopography,
+      } : null,
+      thematicArchitecture: () => profile.thematicArchitecture ? {
+        content: profile.thematicArchitecture,
+        tokenEstimate: estimateTokens(profile.thematicArchitecture),
+      } : null,
+      characterRevelation: () => profile.characterRevelation ? {
+        content: profile.characterRevelation,
+        tokenEstimate: profile.index.sectionTokenCounts.characterRevelation,
+      } : null,
+      craftAssessment: () => profile.craftAssessment ? {
+        content: profile.craftAssessment,
+        tokenEstimate: profile.index.sectionTokenCounts.craftAssessment,
+      } : null,
+      northStar: () => profile.northStar ? {
+        content: profile.northStar,
+        tokenEstimate: profile.index.sectionTokenCounts.northStar,
+      } : null,
+    };
+
+    for (const sectionName of overlay.additionalSections) {
+      // Skip if already present (check both exact name and common aliases)
+      if (existingNames.has(sectionName)) continue;
+      // Also check for sections that embed this data under different names
+      // e.g., 'voiceIdentity' might be in a section named 'voiceContext'
+      if (sectionName === 'voiceIdentity' && existingNames.has('voiceContext')) continue;
+      if (sectionName === 'narrativeStrategy' && existingNames.has('holisticUnderstanding')) continue;
+      if (sectionName === 'narrativeStrategy' && existingNames.has('holisticFull')) continue;
+      if (sectionName === 'voiceIdentity' && existingNames.has('holisticFull')) continue;
+
+      const extractor = sectionExtractors[sectionName];
+      if (!extractor) continue;
+
+      const extracted = extractor();
+      if (!extracted) continue;
+
+      result.push({
+        name: sectionName,
+        content: extracted.content,
+        tokenEstimate: extracted.tokenEstimate,
+        priority: 'nice_to_have', // Overlay additions start as nice_to_have
+      });
+      existingNames.add(sectionName);
+    }
+
+    return result;
+  }
+
+  /**
+   * Promote sections listed in the overlay's prioritySections to 'always' priority.
+   * This ensures overlay-important sections survive budget enforcement.
+   */
+  private applyOverlayPriorityPromotions(
+    sections: ProfileSection[],
+    overlay: AdaptiveOverlay,
+  ): ProfileSection[] {
+    if (overlay.prioritySections.length === 0) return sections;
+
+    const prioritySet = new Set(overlay.prioritySections);
+
+    return sections.map((section) => {
+      if (prioritySet.has(section.name) && section.priority !== 'always') {
+        return { ...section, priority: 'always' as const };
+      }
+      return section;
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
   // TOKEN BUDGET ENFORCEMENT
   // ════════════════════════════════════════════════════════════════════════════
 
   /**
    * Apply token budget by dropping lowest-priority sections first.
    * Priority order: always > connection_driven > proximity > nice_to_have.
+   * Within the same priority tier, task-specific weights (W8.3) break ties —
+   * higher-weighted sections are kept, lower-weighted sections are dropped first.
    */
   private applyTokenBudget(
     sections: ProfileSection[],
     budget: number,
     rule: RoutingRule,
+    taskPriorities: TaskPriorityWeights = {},
   ): AssembledProfileContext {
     const priorityOrder: Record<ProfileSection['priority'], number> = {
       always: 0,
@@ -1484,10 +2307,16 @@ export class ProfileRouter {
       );
     }
 
-    // Sort by priority (lowest priority number = highest importance)
-    const sorted = [...sections].sort(
-      (a, b) => priorityOrder[a.priority] - priorityOrder[b.priority],
-    );
+    // Sort by priority tier first (lowest number = highest importance),
+    // then by task weight within the same tier (higher weight = more important)
+    const sorted = [...sections].sort((a, b) => {
+      const tierDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+      if (tierDiff !== 0) return tierDiff;
+      // Within same tier: higher task weight comes first
+      const weightA = resolveTaskWeight(a.name, taskPriorities);
+      const weightB = resolveTaskWeight(b.name, taskPriorities);
+      return weightB - weightA; // descending — higher weight = higher priority
+    });
 
     const included: ProfileSection[] = [];
     const dropped: string[] = [];
@@ -1512,5 +2341,570 @@ export class ProfileRouter {
       appliedRule: rule,
       droppedSections: dropped,
     };
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // DECLARED CONTEXT ASSEMBLY (Adaptive Router)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * New entry point — declared context assembly.
+   * Used by deep dives, growth cycle iterations, re-reads, and any future
+   * consumer that knows what context it needs.
+   *
+   * Exists alongside assembleContext() — zero breaking changes.
+   * All 16 existing rules continue to work unchanged.
+   */
+  assembleDeclared(
+    profile: Readonly<EssayProfile>,
+    request: DeclaredContextRequest,
+  ): AssembledProfileContext {
+    const sections: ProfileSection[] = [];
+
+    // ── Step 1: Resolve required sections ──
+    for (const spec of request.required) {
+      const resolved = this.resolveSection(profile, spec);
+      if (resolved) {
+        resolved.priority = 'always';
+        sections.push(resolved);
+      }
+    }
+
+    // ── Step 2: Resolve desired sections ──
+    for (const spec of request.desired) {
+      const resolved = this.resolveSection(profile, spec);
+      if (resolved) {
+        resolved.priority = spec.priority ?? 'nice_to_have';
+        sections.push(resolved);
+      }
+    }
+
+    // ── Step 3: Apply Reading Strategy ordering ──
+    if (request.readingStrategy) {
+      this.applyReadingStrategyOrderingForDeclared(sections, request.readingStrategy);
+    }
+
+    // ── Step 4: Apply token budget with compression ──
+    const droppedSections: string[] = [];
+    const result = this.applyTokenBudgetWithCompression(
+      sections,
+      request.tokenBudget,
+      request.purpose,
+      droppedSections,
+    );
+
+    // Track assembly (bookkeeping — Rule 6)
+    this.relevanceTracker.recordAssembly({
+      source: `declared:${request.purpose}`,
+      sectionsProvided: result.sections.map(s => s.name),
+      totalTokens: result.estimatedTokens,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+  }
+
+  /**
+   * Record which sections the LLM actually used in its response.
+   * Called by the caller after parsing the LLM's output.
+   *
+   * This enables three-layer diagnostics:
+   * 1. What was provided (logged at assembly time)
+   * 2. What was referenced (logged here from output scanning)
+   * 3. What was missing (logged here from "I would need X" phrases)
+   */
+  recordContextUsage(
+    source: string,
+    referenced: string[],
+    missing: string[],
+  ): void {
+    this.relevanceTracker.recordUsage(source, referenced, missing);
+  }
+
+  /**
+   * Get diagnostic statistics about context usage patterns.
+   *
+   * Example usage:
+   *   const stats = router.getContextDiagnostics();
+   *   // "voiceMap provided 12 times, referenced 11 times" — high utility
+   *   // "admissionsPositioning provided 12 times, referenced 2 times" — low utility
+   *   // "essayText requested 3 times but not provided" — context gap
+   */
+  getContextDiagnostics(): ContextDiagnosticStats {
+    return this.relevanceTracker.getStats();
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // SECTION RESOLUTION (for declared context)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Resolve a ContextSectionSpec into a ProfileSection.
+   * Handles named sections, paragraph-scoped, sentence-scoped,
+   * connection-scoped, and free-form selectors.
+   */
+  private resolveSection(
+    profile: Readonly<EssayProfile>,
+    spec: ContextSectionSpec,
+  ): ProfileSection | null {
+    const { section, presentation } = spec;
+
+    // ── Named holistic sections ──
+    const NAMED_SECTIONS: Record<string, unknown> = {
+      profileIndex: profile.index,
+      voiceIdentity: profile.voiceIdentity,
+      voiceMap: profile.voiceMap,
+      emotionalTopography: profile.emotionalTopography,
+      momentEarnednessMap: profile.momentEarnednessMap,
+      thematicArchitecture: profile.thematicArchitecture,
+      narrativeStrategy: profile.narrativeStrategy,
+      characterRevelation: profile.characterRevelation,
+      craftAssessment: profile.craftAssessment,
+      admissionsPositioning: profile.admissionsPositioning,
+      entanglements: profile.entanglements,
+      northStar: profile.northStar,
+      connections: profile.connections,
+      findingSummary: profile.index.findingSummary,
+    };
+
+    if (section in NAMED_SECTIONS) {
+      const content = NAMED_SECTIONS[section];
+      if (content === null || content === undefined) return null;
+
+      const presentedContent = presentation === 'summary'
+        ? this.summarizeSectionContent(section, content)
+        : content;
+
+      return {
+        name: section,
+        content: presentedContent,
+        tokenEstimate: estimateTokens(presentedContent),
+        priority: 'always',
+      };
+    }
+
+    // ── Paragraph-scoped: 'paragraph:3' or 'paragraph:3:understanding' or 'paragraph:3:analysis' ──
+    const paraMatch = section.match(/^paragraph:(\d+)(?::(\w+))?$/);
+    if (paraMatch) {
+      const pIdx = parseInt(paraMatch[1]);
+      const aspect = paraMatch[2]; // 'understanding', 'analysis', or undefined (full)
+      const para = profile.paragraphs[pIdx];
+      if (!para) return null;
+
+      let content: unknown;
+      if (aspect === 'understanding') {
+        content = {
+          index: pIdx,
+          text: para.text,
+          understanding: para.understanding,
+          sentences: para.sentences
+            .filter(s => s.understanding)
+            .map(s => ({ index: s.index, text: s.text, understanding: s.understanding })),
+        };
+      } else if (aspect === 'analysis') {
+        content = {
+          index: pIdx,
+          analysis: para.analysis,
+          sentences: para.sentences
+            .filter(s => s.analysis)
+            .map(s => ({ index: s.index, analysis: s.analysis })),
+        };
+      } else {
+        content = {
+          index: pIdx,
+          text: para.text,
+          understanding: para.understanding,
+          analysis: para.analysis,
+          sentences: para.sentences.map(s => ({
+            index: s.index,
+            text: s.text,
+            understanding: s.understanding,
+            analysis: s.analysis,
+          })),
+        };
+      }
+
+      if (presentation === 'digest') {
+        content = buildParagraphDigest(para);
+      }
+
+      return {
+        name: `paragraph_P${pIdx}${aspect ? '_' + aspect : ''}`,
+        content,
+        tokenEstimate: estimateTokens(content),
+        priority: 'always',
+      };
+    }
+
+    // ── Sentence-scoped: 'sentence:3:2' ──
+    const sentMatch = section.match(/^sentence:(\d+):(\d+)$/);
+    if (sentMatch) {
+      const pIdx = parseInt(sentMatch[1]);
+      const sIdx = parseInt(sentMatch[2]);
+      const sentence = profile.paragraphs[pIdx]?.sentences[sIdx];
+      if (!sentence) return null;
+
+      return {
+        name: `sentence_P${pIdx}S${sIdx}`,
+        content: {
+          paragraphIndex: pIdx,
+          sentenceIndex: sIdx,
+          text: sentence.text,
+          understanding: sentence.understanding,
+          analysis: sentence.analysis,
+        },
+        tokenEstimate: estimateTokens(sentence),
+        priority: 'always',
+      };
+    }
+
+    // ── Connection-scoped: 'connections:paragraph:3' ──
+    const connMatch = section.match(/^connections:paragraph:(\d+)$/);
+    if (connMatch) {
+      const pIdx = parseInt(connMatch[1]);
+      const conns = getConnectionsForParagraph(profile, pIdx);
+      if (conns.length === 0) return null;
+
+      return {
+        name: `connections_P${pIdx}`,
+        content: conns,
+        tokenEstimate: estimateTokens(conns),
+        priority: 'connection_driven',
+      };
+    }
+
+    // ── All paragraphs: 'paragraphs:all' or 'paragraphs:all:digests' ──
+    if (section === 'paragraphs:all' || section === 'paragraphs:all:digests') {
+      const isDigest = section.endsWith(':digests');
+      const content = profile.paragraphs.map(p =>
+        isDigest
+          ? buildParagraphDigest(p)
+          : {
+              index: p.index,
+              text: p.text,
+              understanding: p.understanding,
+              sentences: p.sentences.map(s => ({
+                index: s.index,
+                text: s.text,
+                understanding: s.understanding,
+              })),
+            },
+      );
+      return {
+        name: isDigest ? 'paragraphs_digests' : 'paragraphs_full',
+        content,
+        tokenEstimate: estimateTokens(content),
+        priority: 'always',
+      };
+    }
+
+    // ── Essay text: 'essayText' (reconstructed from paragraph texts) ──
+    if (section === 'essayText') {
+      const essayText = profile.paragraphs.map(p => p.text).join('\n\n');
+      return {
+        name: 'essayText',
+        content: essayText,
+        tokenEstimate: estimateTokens(essayText),
+        priority: 'always',
+      };
+    }
+
+    // ── Essay text for specific paragraph: 'essayText:paragraph:3' ──
+    const essayParaMatch = section.match(/^essayText:paragraph:(\d+)$/);
+    if (essayParaMatch) {
+      const pIdx = parseInt(essayParaMatch[1]);
+      const text = profile.paragraphs[pIdx]?.text ?? '';
+      if (!text) return null;
+
+      return {
+        name: `essayText_P${pIdx}`,
+        content: text,
+        tokenEstimate: estimateTokens(text),
+        priority: 'always',
+      };
+    }
+
+    // ── Unknown section: log warning, return null ──
+    console.warn(`[ProfileRouter] Unknown section spec: '${section}' — skipping`);
+    return null;
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // READING STRATEGY ORDERING (for declared context)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Reorder sections based on ReadingStrategy's contextPriorities.
+   *
+   * L3.75 produces contextPriorities as an explicit routing signal —
+   * no keyword matching, no closed taxonomy (Rules 3 & 7).
+   *
+   * Guard rail: required sections ('always' priority) precede desired
+   * sections. The strategy reorders WITHIN tiers, not across them.
+   * This prevents a strategy emphasizing voice from pushing essential
+   * structural data after the token budget cutoff.
+   */
+  private applyReadingStrategyOrderingForDeclared(
+    sections: ProfileSection[],
+    strategy: ReadingStrategy,
+  ): void {
+    if (!strategy.contextPriorities?.length) return;
+
+    const priorityIndex = new Map(
+      strategy.contextPriorities.map((name, i) => [name, i]),
+    );
+
+    sections.sort((a, b) => {
+      // 'always' priority stays first
+      if (a.priority === 'always' && b.priority !== 'always') return -1;
+      if (a.priority !== 'always' && b.priority === 'always') return 1;
+
+      // Within same priority tier, sort by L3.75's contextPriorities ordering
+      const aIdx = priorityIndex.get(a.name) ?? 999;
+      const bIdx = priorityIndex.get(b.name) ?? 999;
+      return aIdx - bIdx;
+    });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // TOKEN BUDGET WITH COMPRESSION (for declared context)
+  // ════════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Apply token budget by compressing before dropping (Rule 2).
+   *
+   * When budget is tight, the choice is: fewer sections at full fidelity
+   * OR more sections at compressed fidelity. The DeclaredContextRequest's
+   * 'presentation' field handles per-section decisions. This method handles
+   * budget overflow by progressively compressing lowest-priority sections.
+   *
+   * Compression order: nice_to_have → proximity → connection_driven → always
+   * Only drops sections that cannot be compressed further AND are not 'always'.
+   */
+  private applyTokenBudgetWithCompression(
+    sections: ProfileSection[],
+    budget: number,
+    _purpose: string,
+    droppedSections: string[],
+  ): AssembledProfileContext {
+    let totalTokens = sections.reduce((sum, s) => sum + s.tokenEstimate, 0);
+
+    if (totalTokens <= budget) {
+      return {
+        sections,
+        estimatedTokens: totalTokens,
+        appliedRule: 'declared',
+        droppedSections: [],
+      };
+    }
+
+    // Progressive compression: compress lowest-priority sections first
+    const compressionOrder: ProfileSection['priority'][] = [
+      'nice_to_have',
+      'proximity',
+      'connection_driven',
+      'always',
+    ];
+
+    for (const tier of compressionOrder) {
+      if (totalTokens <= budget) break;
+
+      // Collect indices of sections in this tier (iterate backward for safe splice)
+      const tierIndices: number[] = [];
+      for (let i = 0; i < sections.length; i++) {
+        if (sections[i].priority === tier) {
+          tierIndices.push(i);
+        }
+      }
+
+      // Process in reverse order to maintain valid indices during splice
+      for (let j = tierIndices.length - 1; j >= 0; j--) {
+        if (totalTokens <= budget) break;
+        const idx = tierIndices[j];
+        const section = sections[idx];
+
+        const compressed = this.compressSection(section);
+        if (compressed) {
+          const saved = section.tokenEstimate - compressed.tokenEstimate;
+          totalTokens -= saved;
+          sections[idx] = compressed;
+        } else if (section.priority !== 'always') {
+          // Can't compress further and not required — drop
+          totalTokens -= section.tokenEstimate;
+          sections.splice(idx, 1);
+          droppedSections.push(section.name);
+        }
+      }
+    }
+
+    return {
+      sections,
+      estimatedTokens: totalTokens,
+      appliedRule: 'declared',
+      droppedSections,
+    };
+  }
+
+  /**
+   * Compress a section by summarizing its content.
+   * Returns null if the section is already at minimum fidelity.
+   */
+  private compressSection(section: ProfileSection): ProfileSection | null {
+    const content = section.content;
+    if (typeof content === 'string') return null; // Already minimal
+    if (content === null || content === undefined) return null;
+
+    const summary = this.summarizeSectionContent(section.name, content);
+    if (!summary || summary === content) return null;
+
+    const newEstimate = estimateTokens(summary);
+    // Only compress if it actually saves tokens
+    if (newEstimate >= section.tokenEstimate) return null;
+
+    return {
+      ...section,
+      content: summary,
+      tokenEstimate: newEstimate,
+    };
+  }
+
+  /**
+   * Produce a compact summary of a profile section.
+   * Used for compression and for 'summary' presentation mode.
+   *
+   * Section-specific strategies preserve the most important signals
+   * while reducing token footprint. Each summary includes a _note
+   * indicating that full data is available (Rule 2: never discard).
+   */
+  private summarizeSectionContent(name: string, content: unknown): unknown {
+    if (!content || typeof content !== 'object') return content;
+
+    const obj = content as Record<string, unknown>;
+
+    switch (name) {
+      case 'voiceMap': {
+        // Keep baselines and shift locations, drop individual observations
+        const register = obj['register'] as Record<string, unknown> | undefined;
+        const vocabFp = obj['vocabularyFingerprint'] as Record<string, unknown> | undefined;
+        const rhythm = obj['sentenceRhythm'] as Record<string, unknown> | undefined;
+        const perspective = obj['perspectiveDistance'] as Record<string, unknown> | undefined;
+        const tonal = obj['tonalDisposition'] as Record<string, unknown> | undefined;
+        return {
+          register: register ? { baseline: register['baseline'] } : null,
+          vocabularyFingerprint: vocabFp ? { baseline: vocabFp['baseline'] } : null,
+          sentenceRhythm: rhythm ? { baseline: rhythm['baseline'] } : null,
+          perspectiveDistance: perspective ? { baseline: perspective['baseline'] } : null,
+          tonalDisposition: tonal ? { baseline: tonal['baseline'] } : null,
+          shifts: obj['shifts'],
+          _compressed: true,
+          _note: 'Full voice map observations available — summary shows baselines + shifts only',
+        };
+      }
+
+      case 'connections': {
+        // Keep count, graph summary, and high-confidence connections only
+        const all = (obj['all'] as Array<Record<string, unknown>>) ?? [];
+        const highConf = all.filter(c =>
+          c['strengthCategory'] === 'foundational' || c['strengthCategory'] === 'significant',
+        );
+        return {
+          connectionCount: all.length,
+          graphSummary: obj['graphSummary'],
+          highConfidence: highConf,
+          _compressed: true,
+          _note: `${all.length} total connections — showing ${highConf.length} foundational/significant only`,
+        };
+      }
+
+      case 'voiceIdentity': {
+        return {
+          signature: obj['signature'],
+          register: obj['register'],
+          distinctivePatterns: obj['distinctivePatterns'],
+          _compressed: true,
+          _note: 'Full voice identity available — summary omits authenticVsPerformed + evolution',
+        };
+      }
+
+      case 'emotionalTopography': {
+        return {
+          arcTrajectory: obj['arcTrajectory'],
+          peakMoments: obj['peakMoments'],
+          authenticityAssessment: obj['authenticityAssessment'],
+          _compressed: true,
+          _note: 'Full emotional topography available — summary omits undertones, progression, showVsTell',
+        };
+      }
+
+      case 'thematicArchitecture': {
+        return {
+          centralThesis: obj['centralThesis'],
+          thesisConfidence: obj['thesisConfidence'],
+          threads: Array.isArray(obj['threads'])
+            ? (obj['threads'] as Array<Record<string, unknown>>).map(t => ({
+                thread: t['thread'],
+                strength: t['strength'],
+              }))
+            : [],
+          _compressed: true,
+          _note: 'Full thematic architecture available — summary omits subtext, contradictions, thread spans',
+        };
+      }
+
+      case 'narrativeStrategy': {
+        return {
+          primaryStrategy: obj['primaryStrategy'],
+          arcType: obj['arcType'],
+          arcMomentum: obj['arcMomentum'],
+          turningPoint: obj['turningPoint'],
+          _compressed: true,
+          _note: 'Full narrative strategy available — summary omits pivotPoints, pacingAnalysis, structuralChoices',
+        };
+      }
+
+      case 'characterRevelation': {
+        return {
+          writerPortrait: obj['writerPortrait'],
+          valuesRevealed: obj['valuesRevealed'],
+          growthArc: obj['growthArc'],
+          _compressed: true,
+          _note: 'Full character revelation available — summary omits intellectualFingerprint, blindSpots, revealedQualities',
+        };
+      }
+
+      case 'craftAssessment': {
+        return {
+          strengthSignatures: obj['strengthSignatures'],
+          imageSystem: obj['imageSystem'],
+          _compressed: true,
+          _note: 'Full craft assessment available — summary omits growthEdges, sentencePatterns, wordPatterns',
+        };
+      }
+
+      case 'admissionsPositioning': {
+        return {
+          tellabilitySummary: obj['tellabilitySummary'],
+          distinctivenessFactors: obj['distinctivenessFactors'],
+          memorability: obj['memorability'],
+          _compressed: true,
+          _note: 'Full admissions positioning available — summary omits institutionalFit, redFlags, portfolioPosition, aoTakeaway',
+        };
+      }
+
+      default: {
+        // Generic: keep scalars, truncate large arrays
+        const summary: Record<string, unknown> = { _compressed: true };
+        for (const [key, val] of Object.entries(obj)) {
+          if (typeof val === 'string' || typeof val === 'number' || typeof val === 'boolean') {
+            summary[key] = val;
+          } else if (Array.isArray(val) && val.length <= 3) {
+            summary[key] = val;
+          } else if (Array.isArray(val)) {
+            summary[key] = `[${val.length} items]`;
+          }
+        }
+        return summary;
+      }
+    }
   }
 }

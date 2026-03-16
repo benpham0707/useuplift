@@ -15,8 +15,9 @@
  * Output type: ParagraphFirstImpression[] (from profileTypes.ts)
  */
 
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
-import type { ClaudeResponse } from '../../../lib/llm/claude';
+import { callClaude, calculateCost, classifyError } from '../../../lib/llm/claude';
+import type { ClaudeResponse, LayerError } from '../../../lib/llm/claude';
+import { parseLlmJsonOutput } from './llmJsonParser';
 import type {
   ParagraphFirstImpression,
   ProfileIndex,
@@ -95,6 +96,19 @@ FOR EACH SENTENCE in the paragraph:
 4. notableElements: Specific elements worth noting (a metaphor, a proper noun, a number, a direct quote, a question, an unusual word, etc.)
 5. tags: 2-3 content tags for this sentence
 
+FIELD-SPECIFIC EXAMPLES (correct vs incorrect):
+
+apparentPurpose:
+  CORRECT: "This paragraph introduces a physical setting through sensory details — the sound of a cash register, the smell of leather — and places the narrator inside a specific location."
+  WRONG: "This paragraph effectively establishes the scene and draws the reader in with vivid sensory language." (evaluative: "effectively", "vivid", "draws the reader in")
+
+voiceObservation:
+  CORRECT: "The narrator uses short declarative sentences, avoids adjectives, and addresses the reader in second person. The rhythm is staccato."
+  WRONG: "The narrator's voice is refreshingly direct and achieves a compelling conversational tone." (evaluative: "refreshingly", "compelling", "achieves")
+
+tags:
+  Tags should be CONTENT labels (what is discussed) not QUALITY labels. Use "family-dinner", "violin-practice", "code-switching" — NOT "powerful-moment", "vivid-scene", "strong-opening".
+
 FOR NOTABLE PHRASES (words/phrases that stand out):
 1. phrase: The exact text
 2. sentenceIndex: Which sentence it appears in
@@ -138,61 +152,24 @@ function buildUserPrompt(
   paragraphText: string,
   paragraphIndex: number,
   totalParagraphs: number,
+  allParagraphs: string[],
 ): string {
-  return `PARAGRAPH ${paragraphIndex + 1} OF ${totalParagraphs}:
+  // PLAN.md: each L1 call receives the full essay text (for context) + the target paragraph
+  const markedEssay = allParagraphs
+    .map((p, i) => {
+      const marker = i === paragraphIndex ? `>>> [P${i + 1}] <<<` : `[P${i + 1}]`;
+      return `${marker} ${p.trim()}`;
+    })
+    .join('\n\n');
 
+  return `FULL ESSAY (${totalParagraphs} paragraphs — you are observing paragraph ${paragraphIndex + 1}, marked with >>>):
+
+${markedEssay}
+
+TARGET PARAGRAPH ${paragraphIndex + 1}:
 ${paragraphText}
 
-Produce the observation JSON for this paragraph. Remember: describe WHAT IS, never HOW WELL.`;
-}
-
-// ============================================================================
-// JSON PARSING WITH FALLBACK
-// ============================================================================
-
-function parseJsonResponse(raw: unknown): Record<string, unknown> {
-  // If already parsed as object (from useJsonMode)
-  if (raw !== null && typeof raw === 'object' && !Array.isArray(raw)) {
-    return raw as Record<string, unknown>;
-  }
-
-  // If string, try parsing
-  if (typeof raw === 'string') {
-    let jsonString = raw.trim();
-
-    // Try direct parse
-    try {
-      return JSON.parse(jsonString) as Record<string, unknown>;
-    } catch {
-      // noop
-    }
-
-    // Extract from markdown code blocks
-    const codeBlockMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (codeBlockMatch) {
-      jsonString = codeBlockMatch[1].trim();
-      try {
-        return JSON.parse(jsonString) as Record<string, unknown>;
-      } catch {
-        // noop
-      }
-    }
-
-    // Extract largest JSON object
-    const firstBrace = jsonString.indexOf('{');
-    const lastBrace = jsonString.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace > firstBrace) {
-      try {
-        return JSON.parse(jsonString.substring(firstBrace, lastBrace + 1)) as Record<string, unknown>;
-      } catch {
-        // noop
-      }
-    }
-
-    throw new Error(`Failed to parse JSON from string response. First 200 chars: ${jsonString.substring(0, 200)}`);
-  }
-
-  throw new Error(`Unexpected response type: ${typeof raw}`);
+Produce the observation JSON for the target paragraph. Remember: describe WHAT IS, never HOW WELL.`;
 }
 
 // ============================================================================
@@ -407,12 +384,11 @@ function buildInitialProfileIndex(
     reasoning: 'Initial L1 pass — deeper analysis needed to determine improvement phase',
     focusAreas: ['thesis clarity', 'structural coherence', 'narrative arc'],
     deferredAreas: ['sentence-level craft', 'word-level polish', 'distinction markers'],
-    readiness: {
-      essayLevel: 0,
-      paragraphLevel: 0,
-      sentenceLevel: 0,
-      wordLevel: 0,
-    },
+    readinessAssessment: 'Initial analysis — essay has not yet been scored at the paragraph level.',
+    legacyReadiness: { essayLevel: 0, paragraphLevel: 0, sentenceLevel: 0, wordLevel: 0 },
+    dimensionPhases: [],
+    coachingLens: 'Initial analysis in progress. Full phase assessment will be determined after paragraph-level scoring.',
+    transition: null,
   };
 
   return {
@@ -492,6 +468,7 @@ export class FirstImpressionsService {
         paragraphText,
         index,
         paragraphs.length,
+        paragraphs,
       ).then(result => {
         // Accumulate tokens and cost
         totalInputTokens += result.tokenUsage.inputTokens;
@@ -547,6 +524,7 @@ export class FirstImpressionsService {
     paragraphText: string,
     paragraphIndex: number,
     totalParagraphs: number,
+    allParagraphs: string[],
   ): Promise<{
     impression: ParagraphFirstImpression;
     cost: number;
@@ -560,9 +538,9 @@ export class FirstImpressionsService {
   }> {
     const startTime = Date.now();
 
-    const userPrompt = buildUserPrompt(paragraphText, paragraphIndex, totalParagraphs);
+    const userPrompt = buildUserPrompt(paragraphText, paragraphIndex, totalParagraphs, allParagraphs);
 
-    const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
+    const response: ClaudeResponse<Record<string, unknown>> = await callClaude<Record<string, unknown>>(
       {
         model: HAIKU_MODEL,
         systemPrompt: SYSTEM_PROMPT,
@@ -574,9 +552,12 @@ export class FirstImpressionsService {
       },
     );
 
-    const parsed = parseJsonResponse(response.content);
+    const parsed = parseLlmJsonOutput(response.content, `L1 firstImpressions P${paragraphIndex}`);
     const impression = validateImpression(parsed, paragraphIndex, paragraphText);
     const cost = calculateCost(response.usage, HAIKU_MODEL);
+    console.log(
+      `[EssayIntelligence] L1 P${paragraphIndex}: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
 
     return {
       impression,

@@ -28,7 +28,7 @@ export const ChatWidget: React.FC = () => {
         transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         className="flex h-[800px] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-white/60 bg-white/90 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05),0_0_80px_-20px_rgba(124,58,237,0.1)] ring-1 ring-slate-900/5 backdrop-blur-3xl"
       >
-        <ChatHeader isAnalyzing={isAnalyzing} onReset={handleReset} />
+        <ChatHeader />
 
         {/* Message Area (Placeholder structure ready for actual messages) */}
         <div className="relative flex-1 overflow-y-auto bg-slate-50/50">

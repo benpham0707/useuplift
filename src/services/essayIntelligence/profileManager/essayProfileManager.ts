@@ -26,6 +26,8 @@ import type {
   EssayType,
   ConfidenceLevel,
   ImprovementPhaseLevel,
+  ImprovementPhase,
+  PatternInsight,
   ProfileIndex,
   ParagraphProfile,
   SentenceProfile,
@@ -46,6 +48,7 @@ import type {
   EssayNorthStar,
   ProfileConnections,
   Connection,
+  ConnectionEndpoint,
   ConversationInsight,
   MutationType,
   CheckpointReason,
@@ -69,7 +72,16 @@ import type {
   LightTouchUpdate,
   EditUnderstandingOutput,
   StalenessEffect,
+  ParagraphScoreMatrix,
+  CoherenceReport,
+  Finding,
+  FindingMaturity,
+  FindingCoachingValue,
+  DeltaSynthesisOutput,
+  HolisticSectionType,
 } from '../profileTypes';
+
+import { FindingStore } from '../findings/findingStore';
 
 /**
  * Minimal StructuralCartography shape needed by the coordinator for dispatch.
@@ -111,6 +123,16 @@ import {
 
 import { validateQuick as intraDomainValidateQuick } from './validation/intraDomainValidation';
 import { validateFull as crossDomainValidateFull } from './validation/crossDomainValidation';
+
+// ── Real mutator implementations ──
+import { SentenceMutator } from './mutators/sentenceMutator';
+import { ParagraphMutator } from './mutators/paragraphMutator';
+import { HolisticMutator } from './mutators/holisticMutator';
+import { ConnectionMutator } from './mutators/connectionMutator';
+import { VoiceMapMutator } from './mutators/voiceMapMutator';
+import { EarnednessMutator } from './mutators/earnednessMutator';
+import { NorthStarMutator } from './mutators/northStarMutator';
+import { InsightMutator } from './mutators/insightMutator';
 
 // ============================================================================
 // MUTATOR INTERFACES
@@ -301,6 +323,13 @@ export interface IHolisticMutator {
     emotionalData: { location?: { paragraph: number; sentence?: number }; emotion?: string; observation?: string },
     source?: { source: string; insightId: string },
   ): MutationType[];
+
+  /** W5.2: Section-level merge for delta synthesis — replace only listed sections */
+  applySectionLevelMerge(
+    profile: EssayProfile,
+    partial: Partial<HolisticSynthesisOutput>,
+    updatedSections: import('../profileTypes').HolisticSectionType[],
+  ): MutationType[];
 }
 
 /**
@@ -308,16 +337,20 @@ export interface IHolisticMutator {
  * Owns: connections.all[], imageRecurrences, narrativeArcMap, redundancies.
  */
 export interface IConnectionMutator {
-  /** Add connections (from L3 walk, L2.5 scout, or conversation) */
+  /** Add V2 connections (from L3 walk, L2.5 scout, or conversation) */
   addConnections(
     profile: EssayProfile,
     connections: Array<{
-      from: [number, number];
-      to: [number, number];
-      type: string;
+      from: ConnectionEndpoint;
+      to: ConnectionEndpoint;
       description: string;
-      confidence?: number;
-      discoveredByLayer?: string;
+      reverseIllumination: string | null;
+      significance: string;
+      strengthCategory: import('../profileTypes').ConnectionStrengthCategory;
+      directionality: import('../profileTypes').ConnectionDirectionality;
+      discoveredBy: import('../profileTypes').ConnectionSource;
+      routingTags?: import('../profileTypes').ConnectionRoutingTag[];
+      relatedFindings?: string[];
     }>,
   ): { mutations: MutationType[]; connectionIds: string[] };
 
@@ -415,13 +448,21 @@ export interface IInsightMutator {
     profile: EssayProfile,
     insight: ConversationInsight,
   ): MutationType[];
+
+  /** Store a detected pattern insight from coaching */
+  addPatternInsight(
+    profile: EssayProfile,
+    pattern: PatternInsight,
+  ): void;
 }
 
 // ============================================================================
-// PLACEHOLDER MUTATORS (no-op implementations for compilation)
+// DEPRECATED: PLACEHOLDER MUTATORS (no-op implementations)
 // ============================================================================
-// These will be replaced by real implementations from Agents 3 & 4.
-// They exist so the coordinator compiles and tests can exercise the dispatch flow.
+// These are DEPRECATED — real implementations in mutators/ are now wired by default.
+// Kept for reference and for test overrides where a no-op is intentionally desired.
+// Real mutators: SentenceMutator, ParagraphMutator, HolisticMutator,
+// ConnectionMutator, VoiceMapMutator, EarnednessMutator, NorthStarMutator, InsightMutator.
 
 class PlaceholderSentenceMutator implements ISentenceMutator {
   applySentenceUnderstanding(_p: EssayProfile, _pi: number, _si: number, _u: Partial<SentenceUnderstanding>): MutationType[] { return ['sentence_understanding_updated']; }
@@ -450,6 +491,7 @@ class PlaceholderHolisticMutator implements IHolisticMutator {
   updateCraftAssessment(_p: EssayProfile, _u: any): MutationType[] { return ['holistic_section_updated']; }
   seedNarrativeStrategy(_p: EssayProfile, _c: StructuralCartography): MutationType[] { return ['holistic_section_updated']; }
   enrichEmotionalTopography(_p: EssayProfile, _d: any): MutationType[] { return ['holistic_section_updated']; }
+  applySectionLevelMerge(_p: EssayProfile, _partial: any, _sections: any[]): MutationType[] { return ['holistic_section_updated']; }
 }
 
 class PlaceholderConnectionMutator implements IConnectionMutator {
@@ -476,6 +518,113 @@ class PlaceholderNorthStarMutator implements INorthStarMutator {
 
 class PlaceholderInsightMutator implements IInsightMutator {
   applyInsight(_p: EssayProfile, _i: ConversationInsight): MutationType[] { return ['conversation_insight_applied']; }
+  addPatternInsight(_p: EssayProfile, _pattern: PatternInsight): void {}
+}
+
+// ============================================================================
+// FINDING ↔ SENTENCE SYNC — W3.2 Bidirectional Sync
+// ============================================================================
+
+/**
+ * Recompute `findingRefs` on SentenceUnderstanding from the FindingStore.
+ *
+ * This is the FindingStore → sentence sync direction. When findings are added,
+ * superseded, or evolved, the sentence-level `findingRefs` arrays must reflect
+ * the current set of active findings that scope to each sentence.
+ *
+ * The function REPLACES `findingRefs` entirely (not additive) because the
+ * FindingStore is the source of truth — stale refs from superseded findings
+ * must be removed, and new findings must appear.
+ *
+ * Scoping rules:
+ * - A finding with `scope.paragraph === P` and `scope.sentences` including `S`
+ *   → applies to sentence P:S
+ * - A finding with `scope.paragraph === P` and no `scope.sentences` (or empty)
+ *   → applies to ALL sentences in paragraph P
+ * - A finding with `scope.paragraphs` including `P` (cross_paragraph)
+ *   → applies to ALL sentences in paragraph P
+ * - A finding with `scope.type === 'essay_level'`
+ *   → NOT pushed to individual sentences (too noisy; use FindingStore queries)
+ *
+ * @param profile - The essay profile to update
+ * @param findingStore - The FindingStore to read active findings from
+ * @param affectedParagraphs - If provided, only recompute for these paragraphs (optimization)
+ */
+function recomputeFindingRefsForSentences(
+  profile: EssayProfile,
+  findingStore: FindingStore,
+  affectedParagraphs?: number[],
+): void {
+  const activeFindings = findingStore.getActive();
+  if (activeFindings.length === 0) {
+    // Fast path: clear all findingRefs if no active findings
+    const paragraphs = affectedParagraphs
+      ? profile.paragraphs.filter(p => affectedParagraphs.includes(p.index))
+      : profile.paragraphs;
+    for (const para of paragraphs) {
+      for (const sent of para.sentences) {
+        if (sent.understanding) {
+          sent.understanding.findingRefs = [];
+        }
+      }
+    }
+    return;
+  }
+
+  // Pre-index findings by paragraph for O(F + P*S) instead of O(F * P * S)
+  // Map<paragraphIndex, Finding[]> — findings that scope to each paragraph
+  const findingsByParagraph = new Map<number, Finding[]>();
+  // Findings that scope to all paragraphs (cross-paragraph with explicit paragraphs list)
+  // We skip essay_level scope — too broad for sentence-level refs
+
+  for (const f of activeFindings) {
+    if (f.scope.type === 'essay_level') continue;
+
+    if (f.scope.paragraph !== undefined) {
+      const bucket = findingsByParagraph.get(f.scope.paragraph) ?? [];
+      bucket.push(f);
+      findingsByParagraph.set(f.scope.paragraph, bucket);
+    }
+
+    if (f.scope.paragraphs) {
+      for (const pIdx of f.scope.paragraphs) {
+        // Avoid double-adding if paragraph === one of paragraphs[]
+        if (pIdx === f.scope.paragraph) continue;
+        const bucket = findingsByParagraph.get(pIdx) ?? [];
+        bucket.push(f);
+        findingsByParagraph.set(pIdx, bucket);
+      }
+    }
+  }
+
+  const paragraphs = affectedParagraphs
+    ? profile.paragraphs.filter(p => affectedParagraphs.includes(p.index))
+    : profile.paragraphs;
+
+  for (const para of paragraphs) {
+    const paraFindings = findingsByParagraph.get(para.index) ?? [];
+
+    for (const sent of para.sentences) {
+      if (!sent.understanding) continue;
+
+      const refs: string[] = [];
+      for (const f of paraFindings) {
+        // Check if finding scopes to this specific sentence
+        if (f.scope.sentences && f.scope.sentences.length > 0) {
+          // Finding has explicit sentence scope — only match if this sentence is listed
+          if (f.scope.paragraph === para.index && f.scope.sentences.includes(sent.index)) {
+            refs.push(f.id);
+          }
+        } else {
+          // Finding scopes to the paragraph broadly (no sentence restriction) —
+          // applies to all sentences in the paragraph
+          refs.push(f.id);
+        }
+      }
+
+      sent.understanding.findingRefs = refs;
+    }
+  }
 }
 
 // ============================================================================
@@ -584,7 +733,11 @@ export function createInitialProfile(input: {
       reasoning: 'Initial profile — no analysis has been performed yet',
       focusAreas: [],
       deferredAreas: [],
-      readiness: { essayLevel: 0, paragraphLevel: 0, sentenceLevel: 0, wordLevel: 0 },
+      readinessAssessment: 'No analysis has been performed yet.',
+      legacyReadiness: { essayLevel: 0, paragraphLevel: 0, sentenceLevel: 0, wordLevel: 0 },
+      dimensionPhases: [],
+      coachingLens: 'Initial profile. Full phase assessment will be determined after analysis.',
+      transition: null,
     },
     fullAnalysisCount: 0,
     lastComprehensiveAt: null,
@@ -608,6 +761,7 @@ export function createInitialProfile(input: {
       sentenceRhythm: { baseline: '', observations: [] },
       perspectiveDistance: { baseline: '', observations: [] },
       tonalDisposition: { baseline: '', observations: [], dominantQualities: [] },
+      stabilityRegions: [],
       shifts: [],
       codeSwitching: [],
     },
@@ -659,6 +813,17 @@ export function createInitialProfile(input: {
       redFlags: [],
       memorability: '',
       portfolioPosition: '',
+      aoTakeaway: '',
+    },
+
+    // Essay Understanding — empty (Gap 1)
+    essayUnderstanding: {
+      prose: '',
+      centralTension: '',
+      confirmedInsights: [],
+      activeHypotheses: [],
+      maturity: 'initial',
+      growthLog: [],
     },
 
     // North Star — empty, scaled by essay type
@@ -698,6 +863,8 @@ export function createInitialProfile(input: {
     // Connections — empty
     connections: {
       all: [],
+      graphSummary: '',
+      structuralIslands: [],
       imageRecurrences: [],
       narrativeArcMap: [],
       redundancies: [],
@@ -705,6 +872,12 @@ export function createInitialProfile(input: {
 
     // Edit history — empty
     editHistory: [],
+
+    // Findings — empty (W1.2)
+    findings: [],
+
+    // Persistent question queue — empty (Gap 2)
+    questionQueue: [],
 
     // Conversation insights — empty
     conversationInsights: [],
@@ -737,6 +910,9 @@ export class EssayProfileCoordinator {
   private checkpointStore: CheckpointStore;
   private circuitBreaker: CircuitBreakerState;
   private sessionBoundary: SessionBoundaryState;
+
+  // ── FindingStore (W1.2) ──
+  private findingStore: FindingStore;
 
   // ── Domain mutators ──
   private sentenceMutator: ISentenceMutator;
@@ -783,15 +959,36 @@ export class EssayProfileCoordinator {
       isFirstSession: true,
     };
 
-    // Inject mutators — use placeholders if not provided
-    this.sentenceMutator = mutators?.sentence ?? new PlaceholderSentenceMutator();
-    this.paragraphMutator = mutators?.paragraph ?? new PlaceholderParagraphMutator();
-    this.holisticMutator = mutators?.holistic ?? new PlaceholderHolisticMutator();
-    this.connectionMutator = mutators?.connection ?? new PlaceholderConnectionMutator();
-    this.voiceMapMutator = mutators?.voiceMap ?? new PlaceholderVoiceMapMutator();
-    this.earnednessMutator = mutators?.earnedness ?? new PlaceholderEarnednessMutator();
-    this.northStarMutator = mutators?.northStar ?? new PlaceholderNorthStarMutator();
-    this.insightMutator = mutators?.insight ?? new PlaceholderInsightMutator();
+    // W1.2: Initialize FindingStore from persisted findings (or empty)
+    if (profile.findings.length > 0) {
+      // Determine nextId from existing findings
+      let maxId = 0;
+      for (const f of profile.findings) {
+        const num = parseInt(f.id.replace('F', ''), 10);
+        if (!isNaN(num) && num > maxId) maxId = num;
+      }
+      this.findingStore = FindingStore.deserialize({
+        findings: profile.findings,
+        nextId: maxId + 1,
+      });
+    } else {
+      this.findingStore = new FindingStore();
+    }
+
+    // Inject mutators — use real implementations by default, allow overrides for testing
+    const realSentenceMutator = new SentenceMutator();
+    this.sentenceMutator = mutators?.sentence ?? realSentenceMutator;
+    this.paragraphMutator = mutators?.paragraph ?? new ParagraphMutator();
+    this.holisticMutator = mutators?.holistic ?? new HolisticMutator();
+    // ConnectionMutator requires a SentenceMutator for referential integrity
+    // (adding/removing connectionRefs on endpoint sentences).
+    // If the sentence mutator was overridden, the connection mutator still uses the real one
+    // for its internal ref management — this is intentional (connection refs are mechanical).
+    this.connectionMutator = mutators?.connection ?? new ConnectionMutator(realSentenceMutator);
+    this.voiceMapMutator = mutators?.voiceMap ?? new VoiceMapMutator();
+    this.earnednessMutator = mutators?.earnedness ?? new EarnednessMutator();
+    this.northStarMutator = mutators?.northStar ?? new NorthStarMutator();
+    this.insightMutator = mutators?.insight ?? new InsightMutator();
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -875,7 +1072,7 @@ export class EssayProfileCoordinator {
           sentenceImpression.index,
           {
             // Map L1's simple apparentPurpose string into an ObservationEntry
-            observedFunctions: [{ observation: sentenceImpression.apparentPurpose }],
+            observedFunctions: [{ observation: sentenceImpression.apparentPurpose, confidence: 0.5, evidence: '' }],
             // Map L1's rhetoricalFunction into rhetoricalFunctions array
             rhetoricalFunctions: [sentenceImpression.rhetoricalFunction],
             tags: sentenceImpression.tags,
@@ -911,12 +1108,19 @@ export class EssayProfileCoordinator {
     this.checkCircuitBreaker('L2_cartography');
     const allMutations: MutationType[] = [];
 
-    // ParagraphMutator: update paragraph roles with structural context (supersession)
+    // ParagraphMutator: update paragraph roles with FULL structural context (supersession).
+    // Uses updateStructuralRoleRich to pass narrativeFunction, strengthContribution, weaknessFlag
+    // from L2 — not just the role string. This gives L3 richer structural context.
     for (const role of cartography.paragraphRoles) {
-      const mutations = this.paragraphMutator.updateStructuralRole(
+      const mutations = this.paragraphMutator.updateStructuralRoleRich(
         this.profile,
         role.index,
-        role.role,
+        {
+          role: role.role,
+          narrativeFunction: role.narrativeFunction,
+          strengthContribution: role.strengthContribution,
+          weaknessFlag: role.weaknessFlag,
+        },
       );
       allMutations.push(...mutations);
     }
@@ -939,15 +1143,17 @@ export class EssayProfileCoordinator {
     this.checkCircuitBreaker('L2_5_scout');
     const allMutations: MutationType[] = [];
 
-    // Flatten the categorized scout output into provisional connection leads.
-    // Each category maps to a connection type that L3 will later confirm or reject.
+    // Flatten the categorized scout output into provisional V2 connection leads.
+    // Each category maps to a connection that L3 will later confirm or reject.
     const flattenedLeads: Array<{
-      from: [number, number];
-      to: [number, number];
-      type: string;
+      from: ConnectionEndpoint;
+      to: ConnectionEndpoint;
       description: string;
-      confidence: number;
-      discoveredByLayer: string;
+      reverseIllumination: string | null;
+      significance: string;
+      strengthCategory: 'tentative';
+      directionality: 'forward';
+      discoveredBy: 'scout';
     }> = [];
 
     // Repeated elements: create connections between each pair of occurrences
@@ -957,62 +1163,64 @@ export class EssayProfileCoordinator {
           const from = elem.occurrences[i];
           const to = elem.occurrences[j];
           flattenedLeads.push({
-            from: [from.paragraphIndex, from.sentenceIndex],
-            to: [to.paragraphIndex, to.sentenceIndex],
-            type: 'repeated_element',
+            from: { paragraph: from.paragraphIndex, sentence: from.sentenceIndex, label: `P${from.paragraphIndex}S${from.sentenceIndex}` } as ConnectionEndpoint,
+            to: { paragraph: to.paragraphIndex, sentence: to.sentenceIndex, label: `P${to.paragraphIndex}S${to.sentenceIndex}` } as ConnectionEndpoint,
             description: `Repeated element "${elem.element}": ${elem.potentialSignificance}`,
-            confidence: 0.3,
-            discoveredByLayer: 'l2_5_scout',
+            reverseIllumination: null,
+            significance: elem.potentialSignificance,
+            strengthCategory: 'tentative' as const,
+            directionality: 'forward' as const,
+            discoveredBy: 'scout' as const,
           });
         }
       }
     }
 
-    // Tonal shifts: create connection between the sentence and the next structural boundary
+    // Tonal shifts: create connection from the shift point to the START of the next paragraph.
+    // A tonal shift is a between-paragraph signal — it connects the sentence where voice
+    // changes to what comes after it. Self-connections (from===to) are meaningless.
     for (const shift of scout.tonalShifts) {
-      flattenedLeads.push({
-        from: [shift.location.paragraphIndex, shift.location.sentenceIndex],
-        to: [shift.location.paragraphIndex, shift.location.sentenceIndex],
-        type: 'tonal_shift',
-        description: `Tonal shift from "${shift.fromTone}" to "${shift.toTone}" (${shift.abruptness})`,
-        confidence: 0.3,
-        discoveredByLayer: 'l2_5_scout',
-      });
+      const fromPara = shift.location.paragraphIndex;
+      const nextPara = fromPara + 1;
+      // Only create the connection if the next paragraph exists
+      if (nextPara < this.profile.paragraphs.length) {
+        flattenedLeads.push({
+          from: { paragraph: fromPara, sentence: shift.location.sentenceIndex, label: `P${fromPara}S${shift.location.sentenceIndex}` } as ConnectionEndpoint,
+          to: { paragraph: nextPara, sentence: 0, label: `P${nextPara}S0` } as ConnectionEndpoint,
+          description: `Tonal shift from "${shift.fromTone}" to "${shift.toTone}" (${shift.abruptness})`,
+          reverseIllumination: null,
+          significance: `Tonal shift: ${shift.fromTone} → ${shift.toTone}`,
+          strengthCategory: 'tentative' as const,
+          directionality: 'forward' as const,
+          discoveredBy: 'scout' as const,
+        });
+      }
     }
 
     // Structural echoes: connect source to echo
     for (const echo of scout.structuralEchoes) {
       flattenedLeads.push({
-        from: [echo.source.paragraphIndex, echo.source.sentenceIndex],
-        to: [echo.echo.paragraphIndex, echo.echo.sentenceIndex],
-        type: 'structural_echo',
+        from: { paragraph: echo.source.paragraphIndex, sentence: echo.source.sentenceIndex, label: `P${echo.source.paragraphIndex}S${echo.source.sentenceIndex}` } as ConnectionEndpoint,
+        to: { paragraph: echo.echo.paragraphIndex, sentence: echo.echo.sentenceIndex, label: `P${echo.echo.paragraphIndex}S${echo.echo.sentenceIndex}` } as ConnectionEndpoint,
         description: `Structural echo: ${echo.echoType}`,
-        confidence: 0.3,
-        discoveredByLayer: 'l2_5_scout',
+        reverseIllumination: null,
+        significance: `Structural echo detected: ${echo.echoType}`,
+        strengthCategory: 'tentative' as const,
+        directionality: 'forward' as const,
+        discoveredBy: 'scout' as const,
       });
     }
 
     // ConnectionMutator: create provisional connections from flattened leads
-    const { mutations: connMutations, connectionIds } = this.connectionMutator.addConnections(
+    // Note: addConnections internally adds connectionRefs to both endpoint sentences —
+    // no manual connectionRef loop needed here (that would double-add).
+    const { mutations: connMutations } = this.connectionMutator.addConnections(
       this.profile,
       flattenedLeads,
     );
     allMutations.push(...connMutations);
 
-    // SentenceMutator: add scout-tag refs to endpoint sentences
-    for (let i = 0; i < flattenedLeads.length; i++) {
-      const lead = flattenedLeads[i];
-      const connId = connectionIds[i];
-      if (connId) {
-        this.sentenceMutator.addConnectionRef(this.profile, lead.from[0], lead.from[1], connId);
-        // Only add ref for 'to' if it's different from 'from' (tonal shifts are self-referencing)
-        if (lead.from[0] !== lead.to[0] || lead.from[1] !== lead.to[1]) {
-          this.sentenceMutator.addConnectionRef(this.profile, lead.to[0], lead.to[1], connId);
-        }
-      }
-    }
-
-    this.afterMutation(allMutations, { connectionIds });
+    this.afterMutation(allMutations, {});
   }
 
   /**
@@ -1024,12 +1232,14 @@ export class EssayProfileCoordinator {
     this.checkCircuitBreaker('L3_walk');
     const allMutations: MutationType[] = [];
 
+    // Use explicit paragraph index from the walk output (not heuristic)
+    const pIdx = output.paragraphIndex;
+
     // 1. SentenceMutator: store sentence understandings for this paragraph
     for (const su of output.sentenceUnderstandings) {
       const mutations = this.sentenceMutator.applySentenceUnderstanding(
         this.profile,
-        // Derive paragraph index from the paragraph understanding's position
-        this.findParagraphIndexForWalkOutput(output),
+        pIdx,
         su.index,
         su.understanding,
       );
@@ -1037,7 +1247,6 @@ export class EssayProfileCoordinator {
     }
 
     // 2. ParagraphMutator: store paragraph understanding
-    const pIdx = this.findParagraphIndexForWalkOutput(output);
     const pMutations = this.paragraphMutator.applyParagraphUnderstanding(
       this.profile,
       pIdx,
@@ -1052,25 +1261,23 @@ export class EssayProfileCoordinator {
     }
 
     // 4. ConnectionMutator: add new connections
+    // Note: addConnections internally adds connectionRefs to both endpoint sentences —
+    // no manual connectionRef loop needed here (that would double-add).
     if (output.newConnections.length > 0) {
-      const { mutations: connMutations, connectionIds } = this.connectionMutator.addConnections(
+      const { mutations: connMutations } = this.connectionMutator.addConnections(
         this.profile,
         output.newConnections.map(conn => ({
-          ...conn,
-          discoveredByLayer: 'l3_walk',
+          from: conn.from,
+          to: conn.to,
+          description: conn.description,
+          reverseIllumination: conn.reverseIllumination,
+          significance: conn.significance,
+          strengthCategory: conn.strengthCategory,
+          directionality: conn.directionality,
+          discoveredBy: 'walk' as const,
         })),
       );
       allMutations.push(...connMutations);
-
-      // Add connection refs to endpoint sentences
-      for (let i = 0; i < output.newConnections.length; i++) {
-        const conn = output.newConnections[i];
-        const connId = connectionIds[i];
-        if (connId) {
-          this.sentenceMutator.addConnectionRef(this.profile, conn.from[0], conn.from[1], connId);
-          this.sentenceMutator.addConnectionRef(this.profile, conn.to[0], conn.to[1], connId);
-        }
-      }
     }
 
     // 5. HolisticMutator: merge incremental holistic evolution
@@ -1081,6 +1288,66 @@ export class EssayProfileCoordinator {
       );
       allMutations.push(...hMutations);
     }
+
+    // 6. W1.3: Process new findings from walk output
+    if (output.newFindings && output.newFindings.length > 0) {
+      for (const nf of output.newFindings) {
+        const id = this.findingStore.generateId();
+        const now = new Date().toISOString();
+        const finding: Finding = {
+          id,
+          claim: nf.claim,
+          scope: nf.scope,
+          maturity: nf.maturity,
+          maturityReasoning: nf.maturityReasoning,
+          coachingValue: nf.coachingValue,
+          dimensions: nf.dimensions,
+          buildsOn: (nf.buildsOn ?? []).filter(ref => this.findingStore.has(ref)),
+          relatedTo: (nf.relatedTo ?? []).filter(ref => this.findingStore.has(ref)),
+          source: 'walk',
+          deepeningPotential: nf.deepeningPotential,
+          raisesQuestions: nf.raisesQuestions,
+          evidence: nf.evidence,
+          lineage: [{
+            timestamp: now,
+            previousMaturity: 'hypothesis',
+            newMaturity: nf.maturity,
+            trigger: `walk_P${pIdx}`,
+            reasoning: nf.maturityReasoning,
+          }],
+          createdAt: now,
+          lastUpdated: now,
+        };
+        try {
+          this.findingStore.add(finding);
+        } catch (e) {
+          console.warn(`[EssayProfileCoordinator] Failed to add finding from walk: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // W1.3: Process finding evolutions from walk output
+    if (output.findingEvolutions && output.findingEvolutions.length > 0) {
+      for (const evo of output.findingEvolutions) {
+        try {
+          this.findingStore.updateMaturity(
+            evo.findingId,
+            evo.newMaturity,
+            evo.reasoning,
+            `walk_P${pIdx}`,
+            evo.supersedes,
+          );
+        } catch (e) {
+          console.warn(`[EssayProfileCoordinator] Failed to evolve finding ${evo.findingId}: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // W3.2: Targeted finding ref recompute for the walked paragraph.
+    // afterMutation will also do a full recompute, but this targeted call
+    // ensures refs are correct for the walked paragraph immediately in case
+    // any code reads them between here and afterMutation.
+    recomputeFindingRefsForSentences(this.profile, this.findingStore, [pIdx]);
 
     // Build propagation context with back-propagated sentence locations
     const backPropContext: PropagationContext = {
@@ -1110,10 +1377,154 @@ export class EssayProfileCoordinator {
     const eMutations = this.earnednessMutator.applyEarnednessMap(this.profile, synthesis.momentEarnednessMap);
     allMutations.push(...eMutations);
 
+    // V2: Apply L3.75-discovered connections
+    if (synthesis.newConnections && synthesis.newConnections.length > 0) {
+      const { mutations: connMutations } = this.connectionMutator.addConnections(
+        this.profile,
+        synthesis.newConnections.map(conn => ({
+          from: conn.from,
+          to: conn.to,
+          description: conn.description,
+          reverseIllumination: conn.reverseIllumination,
+          significance: conn.significance,
+          strengthCategory: conn.strengthCategory,
+          directionality: conn.directionality,
+          discoveredBy: 'holistic_synthesis' as const,
+        })),
+      );
+      allMutations.push(...connMutations);
+    }
+
+    // V2: Apply graph summary
+    if (synthesis.connectionGraphSummary) {
+      this.profile.connections.graphSummary = synthesis.connectionGraphSummary;
+    }
+
+    // V2: Apply connection upgrades from L3.75
+    if (synthesis.connectionUpgrades && synthesis.connectionUpgrades.length > 0) {
+      for (const upgrade of synthesis.connectionUpgrades) {
+        const existing = this.profile.connections.all.find(c => c.id === upgrade.connectionId);
+        if (existing && existing.status === 'active') {
+          if (upgrade.strengthCategory) existing.strengthCategory = upgrade.strengthCategory;
+          if (upgrade.reverseIllumination) existing.reverseIllumination = upgrade.reverseIllumination;
+          if (upgrade.routingTags) existing.routingTags = upgrade.routingTags;
+          if (upgrade.significance) existing.significance = upgrade.significance;
+        }
+      }
+    }
+
+    // W1.4: Process new findings from holistic synthesis
+    if (synthesis.newFindings && synthesis.newFindings.length > 0) {
+      for (const nf of synthesis.newFindings) {
+        const id = this.findingStore.generateId();
+        const now = new Date().toISOString();
+        const finding: Finding = {
+          id,
+          claim: nf.claim,
+          scope: nf.scope,
+          maturity: nf.maturity,
+          maturityReasoning: nf.maturityReasoning,
+          coachingValue: nf.coachingValue,
+          dimensions: nf.dimensions,
+          buildsOn: (nf.buildsOn ?? []).filter(ref => this.findingStore.has(ref)),
+          relatedTo: (nf.relatedTo ?? []).filter(ref => this.findingStore.has(ref)),
+          source: 'holistic_synthesis',
+          deepeningPotential: nf.deepeningPotential,
+          raisesQuestions: nf.raisesQuestions,
+          evidence: nf.evidence,
+          lineage: [{
+            timestamp: now,
+            previousMaturity: 'hypothesis',
+            newMaturity: nf.maturity,
+            trigger: 'holistic_synthesis',
+            reasoning: nf.maturityReasoning,
+          }],
+          createdAt: now,
+          lastUpdated: now,
+        };
+        try {
+          this.findingStore.add(finding);
+        } catch (e) {
+          console.warn(`[EssayProfileCoordinator] Failed to add finding from synthesis: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // W1.4: Process finding evolutions from holistic synthesis
+    if (synthesis.findingEvolutions && synthesis.findingEvolutions.length > 0) {
+      for (const evo of synthesis.findingEvolutions) {
+        try {
+          this.findingStore.updateMaturity(
+            evo.findingId,
+            evo.newMaturity,
+            evo.reasoning,
+            'holistic_synthesis',
+            evo.supersedes,
+          );
+        } catch (e) {
+          console.warn(`[EssayProfileCoordinator] Failed to evolve finding ${evo.findingId}: ${(e as Error).message}`);
+        }
+      }
+    }
+
+    // W3.2: Full recompute after holistic synthesis finding mutations.
+    // Holistic synthesis creates cross-paragraph findings, so all sentences
+    // need their findingRefs updated. afterMutation will also recompute,
+    // but this ensures correctness before the structural islands computation.
+    recomputeFindingRefsForSentences(this.profile, this.findingStore);
+
+    // V2: Compute structural islands from connection graph
+    const connectedParagraphs = new Set<number>();
+    for (const c of this.profile.connections.all.filter(c => c.status === 'active')) {
+      if (c.strengthCategory === 'foundational' || c.strengthCategory === 'significant') {
+        connectedParagraphs.add(c.from.paragraph);
+        connectedParagraphs.add(c.to.paragraph);
+      }
+    }
+    this.profile.connections.structuralIslands = [];
+    for (let i = 0; i < this.profile.paragraphs.length; i++) {
+      if (!connectedParagraphs.has(i)) {
+        this.profile.connections.structuralIslands.push(i);
+      }
+    }
+
     this.afterMutation(allMutations, {});
 
     // Checkpoint after L3.75 (first comprehensive holistic understanding)
     this.checkpoint('after_l3_75');
+  }
+
+  /**
+   * W5.2: Apply section-level delta synthesis output.
+   *
+   * Only replaces the holistic sections that were re-synthesized by the delta
+   * synthesis call. All other sections remain untouched.
+   *
+   * Called by: orchestrators after delta synthesis completes (W5.4 triggers).
+   */
+  applySectionLevelSynthesis(output: DeltaSynthesisOutput): void {
+    this.checkSessionBoundary();
+    this.checkCircuitBreaker('delta_synthesis');
+
+    if (!output.isSubstantive || output.updatedSections.length === 0) {
+      console.log('[EssayProfileCoordinator] Delta synthesis produced no substantive changes — skipping');
+      return;
+    }
+
+    const mutations = this.holisticMutator.applySectionLevelMerge(
+      this.profile,
+      output.partialSynthesis,
+      output.updatedSections,
+    );
+
+    if (mutations.length > 0) {
+      this.afterMutation(mutations, {});
+      console.log(
+        `[EssayProfileCoordinator] Delta synthesis applied — ` +
+        `sections: [${output.updatedSections.join(', ')}], ` +
+        `changes: ${output.changeLog.length}`,
+      );
+    }
   }
 
   /**
@@ -1165,6 +1576,11 @@ export class EssayProfileCoordinator {
       allMutations.push(...hMutations);
     }
 
+    // Note: aoTakeaway is written by L3.75 (holisticSynthesis), not here.
+    // L3.5's per-paragraph aoTakeaway is part of holisticAnalysisEvolution but is not routed
+    // to the profile — it's used as working context only. L3.75 sees the whole essay and
+    // generates the authoritative essay-level AO impression.
+
     this.afterMutation(allMutations, { paragraphIndex: result.paragraphIndex });
   }
 
@@ -1181,6 +1597,24 @@ export class EssayProfileCoordinator {
 
     // Checkpoint after L4
     this.checkpoint('after_l4');
+  }
+
+  /**
+   * L4: Apply paragraph score matrix (wholesale L4 output).
+   * No mutator needed — direct assignment for complete L4 artifact.
+   */
+  applyScoreMatrix(matrix: ParagraphScoreMatrix): void {
+    this.checkSessionBoundary();
+    this.profile.scoreMatrix = matrix;
+  }
+
+  /**
+   * L4: Apply coherence report (wholesale L4 output).
+   * No mutator needed — direct assignment for complete L4 artifact.
+   */
+  applyCoherenceReport(report: CoherenceReport): void {
+    this.checkSessionBoundary();
+    this.profile.coherenceReport = report;
   }
 
   /**
@@ -1428,7 +1862,7 @@ export class EssayProfileCoordinator {
         {
           const eMutations = this.holisticMutator.enrichEmotionalTopography(
             this.profile,
-            { observation: insight.sourceText },
+            { observation: insight.sourceText, confidence: 0.7, evidence: `Student emotional reaction: "${insight.sourceText}"` },
             insightSource,
           );
           allMutations.push(...eMutations);
@@ -1531,6 +1965,10 @@ export class EssayProfileCoordinator {
     // Light-touch does NOT increment writeVersion or run full afterMutation
     // (by design — no profile-level lock)
     this.profile.metadata.lastMutatedAt = new Date().toISOString();
+
+    // W3.2: Sync finding refs on light-touch path (bypasses afterMutation)
+    recomputeFindingRefsForSentences(this.profile, this.findingStore);
+
     this.recomputeIndex();
   }
 
@@ -1572,6 +2010,110 @@ export class EssayProfileCoordinator {
     this.afterMutation(allMutations, {});
   }
 
+  /**
+   * Update the improvement phase in the profile index.
+   * Called after focused analysis recomputes the phase.
+   */
+  updateImprovementPhase(phase: ImprovementPhase): void {
+    this.checkSessionBoundary();
+    this.profile.index.improvementPhase = phase;
+    console.log(`[EssayProfileCoordinator] Improvement phase updated: ${phase.level}`);
+
+    // Manually perform afterMutation bookkeeping:
+    // - Increment writeVersion for optimistic concurrency tracking
+    // - Update lastMutatedAt timestamp
+    // - Recompute the ProfileIndex
+    // Note: No staleness propagation needed — improvement phase has no downstream
+    // dependencies in the dependency map.
+    this.writeVersion++;
+    this.profile.metadata.lastMutatedAt = new Date().toISOString();
+    this.sessionBoundary.lastMutationAt = Date.now();
+    this.recomputeIndex();
+  }
+
+  /**
+   * Add a detected pattern insight to the profile.
+   * Called after coaching turn detectPatterns().
+   */
+  addPatternInsight(pattern: PatternInsight): void {
+    this.checkSessionBoundary();
+    this.insightMutator.addPatternInsight(this.profile, pattern);
+    this.afterMutation(['conversation_insight_applied'], {});
+  }
+
+  /**
+   * Add connections via the ConnectionMutator (public entry point).
+   *
+   * Used by the orchestrator's growth cycle to properly route re-read
+   * connections through the ConnectionMutator instead of directly pushing
+   * to profile.connections.all[]. This ensures:
+   * - Duplicate detection (isDuplicate check)
+   * - connectionRef management on endpoint sentences
+   * - Proper mutation tracking for staleness propagation
+   *
+   * @returns connectionIds (parallel array with input) and mutations
+   */
+  addConnections(
+    connections: Array<{
+      from: ConnectionEndpoint;
+      to: ConnectionEndpoint;
+      description: string;
+      reverseIllumination: string | null;
+      significance: string;
+      strengthCategory: import('../profileTypes').ConnectionStrengthCategory;
+      directionality: import('../profileTypes').ConnectionDirectionality;
+      discoveredBy: import('../profileTypes').ConnectionSource;
+      routingTags?: import('../profileTypes').ConnectionRoutingTag[];
+      relatedFindings?: string[];
+    }>,
+  ): { mutations: MutationType[]; connectionIds: string[] } {
+    this.checkSessionBoundary();
+    this.checkCircuitBreaker('addConnections');
+
+    const result = this.connectionMutator.addConnections(this.profile, connections);
+
+    if (result.mutations.length > 0) {
+      this.afterMutation(result.mutations, {});
+    }
+
+    return result;
+  }
+
+  /**
+   * W3.1: Apply sentence understanding update directly.
+   *
+   * Public entry point for reverse-propagation from finding supersession.
+   * When findings are superseded during coaching, the sentence-level
+   * inferredIntents must be rebuilt from remaining active findings.
+   * This method wraps the sentenceMutator with proper afterMutation bookkeeping.
+   *
+   * @returns MutationType[] from the sentenceMutator
+   */
+  applySentenceUnderstandingDirect(
+    paragraphIndex: number,
+    sentenceIndex: number,
+    update: Partial<SentenceUnderstanding>,
+  ): MutationType[] {
+    this.checkSessionBoundary();
+    this.checkCircuitBreaker('L6_reverse_propagation');
+
+    const mutations = this.sentenceMutator.applySentenceUnderstanding(
+      this.profile,
+      paragraphIndex,
+      sentenceIndex,
+      update,
+    );
+
+    if (mutations.length > 0) {
+      this.afterMutation(mutations, {
+        paragraphIndex,
+        affectedSentences: [{ paragraph: paragraphIndex, sentence: sentenceIndex }],
+      });
+    }
+
+    return mutations;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   // QUERY METHODS (read-only — no mutations, no side effects)
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1581,6 +2123,44 @@ export class EssayProfileCoordinator {
    */
   getProfile(): Readonly<EssayProfile> {
     return this.profile;
+  }
+
+  /**
+   * W1.2: Get the FindingStore for direct access by pipeline stages.
+   */
+  getFindingStore(): FindingStore {
+    return this.findingStore;
+  }
+
+  /**
+   * Seed prior findings for comprehensive re-analysis evolution.
+   *
+   * Must be called immediately after coordinator creation, before any
+   * layer runs. The walk will see these findings in its prompt context
+   * and can produce findingEvolutions against them.
+   */
+  seedPriorFindings(priorFindings: Finding[]): void {
+    const { seeded, skipped } = this.findingStore.seedForReanalysis(priorFindings);
+    if (seeded > 0) {
+      console.log(
+        `[EssayProfileCoordinator] Seeded ${seeded} prior findings for re-analysis evolution` +
+        (skipped > 0 ? ` (${skipped} skipped — duplicate IDs)` : ''),
+      );
+    }
+  }
+
+  /**
+   * W3.2: Recompute all sentence findingRefs from the FindingStore.
+   *
+   * Public method for callers to force a full sync after batch operations
+   * (growth cycles, re-analysis, deep dives). Internally called by
+   * afterMutation, but exposed for explicit use when FindingStore is
+   * mutated outside the coordinator's dispatch methods.
+   *
+   * @param affectedParagraphs - If provided, only recompute for these paragraphs
+   */
+  recomputeAllFindingRefs(affectedParagraphs?: number[]): void {
+    recomputeFindingRefsForSentences(this.profile, this.findingStore, affectedParagraphs);
   }
 
   /**
@@ -1634,6 +2214,9 @@ export class EssayProfileCoordinator {
    * Runs full validation at checkpoints. Persists circuit breaker state.
    */
   async checkpoint(reason: CheckpointReason): Promise<void> {
+    // W1.2: Sync findings back to profile before persisting
+    this.profile.findings = this.findingStore.serialize().findings;
+
     const validationResult = reason === 'circuit_breaker' ? this.validateQuick() : this.validateFull();
 
     const metadata: CheckpointMetadata = {
@@ -1687,10 +2270,15 @@ export class EssayProfileCoordinator {
     // 3. Propagate staleness via the declared dependency map
     propagateStaleness(this.stalenessTracker, mutations, context);
 
-    // 4. Recompute ProfileIndex
+    // 4. W3.2: Recompute finding → sentence refs (bidirectional sync)
+    // This ensures findingRefs on SentenceUnderstanding always reflect
+    // the current FindingStore state after any mutation.
+    recomputeFindingRefsForSentences(this.profile, this.findingStore);
+
+    // 5. Recompute ProfileIndex
     this.recomputeIndex();
 
-    // 5. Quick validation (logged, does not block)
+    // 6. Quick validation (logged, does not block)
     const validation = this.validateQuick();
     if (!validation.valid) {
       console.warn(
@@ -1709,6 +2297,35 @@ export class EssayProfileCoordinator {
     const profile = this.profile;
     const index = profile.index;
 
+    // Rebuild digests if count mismatch (defensive — should not happen)
+    if (profile.paragraphs.length !== index.paragraphDigest.length) {
+      console.warn(
+        `[ProfileIndex] Paragraph count mismatch: ${profile.paragraphs.length} paragraphs but ` +
+        `${index.paragraphDigest.length} digests. Rebuilding.`,
+      );
+      index.paragraphDigest = profile.paragraphs.map((_, idx) => ({
+        index: idx,
+        roleSummary: '',
+        tags: [],
+        themes: [],
+        sentenceCount: 0,
+        hasStrengths: false,
+        hasWeaknesses: false,
+        connectionCount: 0,
+        improvementPriority: 0,
+      }));
+    }
+
+    // Pre-compute connection counts per paragraph (O(C) instead of O(N×C))
+    // Only count active connections
+    const connectionsByParagraph = new Map<number, number>();
+    for (const conn of profile.connections.all.filter(c => c.status === 'active')) {
+      connectionsByParagraph.set(conn.from.paragraph, (connectionsByParagraph.get(conn.from.paragraph) ?? 0) + 1);
+      if (conn.from.paragraph !== conn.to.paragraph) {
+        connectionsByParagraph.set(conn.to.paragraph, (connectionsByParagraph.get(conn.to.paragraph) ?? 0) + 1);
+      }
+    }
+
     // Update paragraph digests
     for (let i = 0; i < profile.paragraphs.length; i++) {
       const para = profile.paragraphs[i];
@@ -1725,17 +2342,18 @@ export class EssayProfileCoordinator {
         }
 
         // Count connections involving this paragraph
-        digest.connectionCount = profile.connections.all.filter(
-          c => c.from[0] === i || c.to[0] === i,
-        ).length;
+        digest.connectionCount = connectionsByParagraph.get(i) ?? 0;
       }
     }
 
     // Update connection graph from connections store
     index.connectionGraph = profile.connections.all.map(c => ({
-      from: c.from,
-      to: c.to,
-      type: c.type,
+      id: c.id,
+      from: { paragraph: c.from.paragraph, sentence: c.from.sentence },
+      to: { paragraph: c.to.paragraph, sentence: c.to.sentence },
+      routingTags: c.routingTags,
+      strengthCategory: c.strengthCategory,
+      status: c.status,
     }));
 
     // Update staleness snapshot in the index
@@ -1756,6 +2374,194 @@ export class EssayProfileCoordinator {
       (sum, p) => sum + p.sentences.length,
       0,
     );
+
+    // --- FIX 1: Populate the 5 previously-empty ProfileIndex fields ---
+
+    // 1. topicTags: Collect content-descriptive tags from all levels
+    const tagSet = new Set<string>();
+    const wordOccurrences = new Map<string, number>();
+    for (const para of profile.paragraphs) {
+      for (const tag of para.tags) {
+        tagSet.add(tag.toLowerCase());
+      }
+      for (const sent of para.sentences) {
+        if (sent.understanding) {
+          for (const tag of sent.understanding.tags) {
+            tagSet.add(tag.toLowerCase());
+          }
+          // Track significant word occurrences across sentences
+          if (sent.understanding?.significantChoices) {
+            for (const choice of sent.understanding.significantChoices) {
+              const word = choice.word.toLowerCase();
+              wordOccurrences.set(word, (wordOccurrences.get(word) ?? 0) + 1);
+            }
+          }
+        }
+      }
+    }
+    // Add thematic thread names
+    if (profile.thematicArchitecture?.threads) {
+      for (const thread of profile.thematicArchitecture.threads) {
+        tagSet.add(thread.thread.toLowerCase());
+      }
+    }
+    // Add significant words that appear in multiple sentences
+    for (const [word, count] of wordOccurrences) {
+      if (count >= 2) {
+        tagSet.add(word);
+      }
+    }
+    index.topicTags = Array.from(tagSet);
+
+    // 2. sectionTokenCounts: Estimate tokens via JSON.stringify char count / 4
+    const estimateTokens = (obj: unknown): number => Math.ceil(JSON.stringify(obj).length / 4);
+    index.sectionTokenCounts = {
+      voiceIdentity: estimateTokens(profile.voiceIdentity),
+      voiceMap: estimateTokens(profile.voiceMap),
+      emotionalTopography: estimateTokens(profile.emotionalTopography),
+      momentEarnednessMap: estimateTokens(profile.momentEarnednessMap),
+      thematicArchitecture: estimateTokens(profile.thematicArchitecture),
+      narrativeStrategy: estimateTokens(profile.narrativeStrategy),
+      characterRevelation: estimateTokens(profile.characterRevelation),
+      craftAssessment: estimateTokens(profile.craftAssessment),
+      entanglements: estimateTokens(profile.entanglements),
+      admissionsPositioning: estimateTokens(profile.admissionsPositioning),
+      northStar: estimateTokens(profile.northStar),
+      connections: estimateTokens(profile.connections),
+      paragraphs: profile.paragraphs.map(p => {
+        // Estimate tokens WITHOUT paragraph text (text is injected separately, not from profile)
+        const profileData = {
+          understanding: p.understanding,
+          analysis: p.analysis,
+          sentences: p.sentences.map(s => ({
+            understanding: s.understanding,
+            analysis: s.analysis,
+          })),
+        };
+        return estimateTokens(profileData);
+      }),
+    };
+
+    // 3. northStarSummary: Compact summary from profile.northStar
+    if (profile.northStar) {
+      const ns = profile.northStar;
+      let throughLineSummary: string | null = null;
+      if (ns.throughLineMap) {
+        if (ns.throughLineMap.centralElement && ns.throughLineMap.transformation) {
+          throughLineSummary = `${ns.throughLineMap.centralElement} — ${ns.throughLineMap.transformation}`;
+        } else if (ns.throughLineMap.centralElement) {
+          throughLineSummary = ns.throughLineMap.centralElement;
+        }
+      }
+      // Flatten structural roles: one entry per paragraph covered
+      const structuralRoles: Array<{ paragraphIndex: number; role: string; significance: 'load_bearing' | 'supporting' | 'transitional' }> = [];
+      for (const sr of ns.structuralRolesMap) {
+        const sig = sr.weight === 'decorative' ? 'transitional' as const : sr.weight;
+        for (const pIdx of sr.paragraphs) {
+          if (pIdx < 0 || pIdx >= profile.paragraphs.length) continue;
+          structuralRoles.push({ paragraphIndex: pIdx, role: sr.role, significance: sig });
+        }
+      }
+      // Compute maturity: count populated North Star dimensions
+      let dimensionCount = 0;
+      if (ns.throughLineMap) dimensionCount++;
+      if (ns.structuralRolesMap.length > 0) dimensionCount++;
+      if (ns.trajectory) dimensionCount++;
+      if (ns.distinctivenessSignature.articulation) dimensionCount++;
+      if (ns.intentBridge) dimensionCount++;
+      const maturity: 'absent' | 'sketch' | 'emerging' | 'full' =
+        dimensionCount === 0 ? 'absent' :
+        dimensionCount <= 2 ? 'sketch' :
+        dimensionCount === 3 ? 'emerging' : 'full';
+      index.northStarSummary = { throughLineSummary, structuralRoles, maturity };
+    } else {
+      index.northStarSummary = { throughLineSummary: null, structuralRoles: [], maturity: 'absent' };
+    }
+
+    // 4. activeConcerns: Walk L3.5 analysis results for problems
+    const concerns: Array<{ location: [number, number | null]; concern: string; severity: 'critical' | 'significant' | 'minor' }> = [];
+    for (let pIdx = 0; pIdx < profile.paragraphs.length; pIdx++) {
+      const para = profile.paragraphs[pIdx];
+      // Sentence-level concerns from analysis
+      for (let sIdx = 0; sIdx < para.sentences.length; sIdx++) {
+        const analysis = para.sentences[sIdx].analysis;
+        if (analysis?.isProblem) {
+          const severity: 'critical' | 'significant' | 'minor' =
+            analysis.priorityForImprovement >= 4 ? 'critical' :
+            analysis.priorityForImprovement >= 2 ? 'significant' : 'minor';
+          concerns.push({
+            location: [pIdx, sIdx],
+            concern: analysis.effectivenessReasoning,
+            severity,
+          });
+        }
+      }
+      // Paragraph-level concerns from growthEdges
+      if (para.analysis) {
+        for (const edge of para.analysis.growthEdges) {
+          concerns.push({
+            location: [pIdx, null],
+            concern: edge.description,
+            severity: 'significant',
+          });
+        }
+      }
+    }
+    // Cap concerns at 30, prioritized by severity
+    if (concerns.length > 30) {
+      const severityRank: Record<string, number> = { critical: 0, significant: 1, minor: 2 };
+      concerns.sort((a, b) => severityRank[a.severity] - severityRank[b.severity]);
+      index.activeConcerns = concerns.slice(0, 30);
+    } else {
+      index.activeConcerns = concerns;
+    }
+
+    // 5. improvementPriority and themes in paragraph digests
+    for (let i = 0; i < profile.paragraphs.length; i++) {
+      if (i < index.paragraphDigest.length) {
+        const para = profile.paragraphs[i];
+        const digest = index.paragraphDigest[i];
+        const sentencePriorities = para.sentences
+          .map(s => s.analysis?.priorityForImprovement ?? 0);
+        digest.improvementPriority = sentencePriorities.length > 0
+          ? Math.max(...sentencePriorities)
+          : 0;
+
+        // Populate themes from thematic thread appearances
+        if (profile.thematicArchitecture?.threads) {
+          digest.themes = profile.thematicArchitecture.threads
+            .filter(t => t.appearances.some(a => a.paragraph === i) ||
+                         (t.introducedAt.paragraph === i))
+            .map(t => t.thread);
+        } else {
+          digest.themes = [];
+        }
+      }
+    }
+
+    // W1.2: Compute finding summary from FindingStore
+    const activeFindings = this.findingStore.getActive();
+    if (activeFindings.length > 0) {
+      const byMaturity: Partial<Record<FindingMaturity, number>> = {};
+      for (const f of activeFindings) {
+        byMaturity[f.maturity] = (byMaturity[f.maturity] ?? 0) + 1;
+      }
+      const topFindings = this.findingStore.getActiveSortedByCoachingValue()
+        .slice(0, 10)
+        .map(f => ({
+          id: f.id,
+          claim: f.claim,
+          maturity: f.maturity,
+          coachingValue: f.coachingValue,
+        }));
+      index.findingSummary = {
+        totalActive: activeFindings.length,
+        byMaturity,
+        topFindings,
+      };
+    } else {
+      index.findingSummary = undefined;
+    }
   }
 
   /**
@@ -1863,24 +2669,11 @@ export class EssayProfileCoordinator {
     }
   }
 
-  /**
-   * Derive the paragraph index from an UnderstandingWalkOutput.
-   * The walk output contains a paragraphUnderstanding but not an explicit index,
-   * so we find the next paragraph that hasn't been deeply understood yet.
-   */
-  private findParagraphIndexForWalkOutput(output: UnderstandingWalkOutput): number {
-    // If the output has sentence understandings, the first one's location implies the paragraph
-    // We match based on the paragraph whose understanding is null (not yet walked)
-    // or whose sentences match the output's sentence indices
-    for (let i = 0; i < this.profile.paragraphs.length; i++) {
-      const para = this.profile.paragraphs[i];
-      if (!para.understanding) {
-        return i;
-      }
-    }
-    // Fallback: if all paragraphs have understanding, it's an update — use the last one
-    return this.profile.paragraphs.length - 1;
-  }
+  // REMOVED: findParagraphIndexForWalkOutput heuristic.
+  // UnderstandingWalkOutput now carries an explicit paragraphIndex field.
+  // The old heuristic ("first paragraph without understanding") broke on re-analysis
+  // because all paragraphs already have understanding, causing every walk step to
+  // overwrite the last paragraph.
 
   // ═══════════════════════════════════════════════════════════════════════════
   // READINESS SCORING (four functions, each returns 0-100)

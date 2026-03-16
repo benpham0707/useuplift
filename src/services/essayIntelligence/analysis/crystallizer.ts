@@ -30,9 +30,11 @@
  *       docs/plan-sections/01-essay-profile-types.md (North Star types)
  */
 
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import { ProfileRouter } from '../profileManager/profileRouter';
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
+import { FindingStore, buildFindingContext } from '../findings';
+import { ConnectionGraph, buildHolisticConnectionContext } from '../connections';
 import type {
   EssayProfile,
   EssayType,
@@ -47,6 +49,13 @@ import type {
   EssayTrajectory,
   DistinctivenessSignature,
   IntentBridge,
+  ParagraphScoreEntry,
+  ParagraphScoreMatrix,
+  CoherenceIssue,
+  CoherenceReport,
+  CoachingMap,
+  NorthStarEvolution,
+  NorthStarAssessment,
 } from '../profileTypes';
 
 // ============================================================================
@@ -54,85 +63,21 @@ import type {
 // ============================================================================
 
 const SONNET = 'claude-sonnet-4-5-20250929';
+const HAIKU = 'claude-haiku-4-5-20251001';
 
 /** Max tokens for the crystallization call — large output covering all three artifacts */
 const MAX_OUTPUT_TOKENS = 10000;
+
+/** Max tokens for the adversarial contradiction pass */
+const ADVERSARIAL_MAX_TOKENS = 4000;
 
 /** Temperature — low for deterministic synthesis, slight creativity for interpretation */
 const TEMPERATURE = 0.3;
 
 // ============================================================================
-// L4 OUTPUT TYPES
+// L4 OUTPUT TYPES (ParagraphScoreEntry, ParagraphScoreMatrix, CoherenceIssue,
+//   CoherenceReport are defined in profileTypes.ts — imported above)
 // ============================================================================
-
-/**
- * ParagraphScoreEntry — multi-dimensional score for a single paragraph.
- * Effectiveness comes from L3.5, the other 4 dimensions are L4's contribution.
- */
-export interface ParagraphScoreEntry {
-  index: number;
-  scores: {
-    /** Direct transfer from L3.5 paragraph analysis (0-100) */
-    effectiveness: number;
-    /** How well this paragraph fulfills its architectural role from the North Star (0-100) */
-    structural: number;
-    /** Voice consistency / intentional variation quality relative to essay's dominant voice (0-100) */
-    voice: number;
-    /** Emotional depth, authenticity, and moment earned-ness (0-100) */
-    emotional: number;
-    /** Thematic contribution — how well it serves the through-line and themes (0-100) */
-    thematic: number;
-  };
-  /** Single-sentence architectural assessment — NOT a topic summary */
-  verdict: string;
-  /** 1-5: improvement priority informed by structural role significance */
-  priorityForImprovement: number;
-}
-
-/**
- * ParagraphScoreMatrix — the complete scoring artifact.
- * Cross-paragraph patterns and improvements reference the North Star.
- */
-export interface ParagraphScoreMatrix {
-  paragraphs: ParagraphScoreEntry[];
-  /** Patterns that emerge when viewing scores ACROSS paragraphs */
-  crossParagraphPatterns: string[];
-  /** Prioritized improvements that reference North Star structural roles */
-  prioritizedImprovements: Array<{
-    paragraph: number;
-    improvement: string;
-    /** WHY this matters — references the essay's architecture, not just the paragraph */
-    whyThisMatters: string;
-    expectedImpact: 'transformative' | 'significant' | 'incremental';
-  }>;
-}
-
-/**
- * CoherenceIssue — a single contradiction detected across profile sections.
- */
-export interface CoherenceIssue {
-  /** Which profile section makes claim A (e.g., "voiceMap.shiftPoints") */
-  sectionA: string;
-  /** What claim A asserts */
-  claimA: string;
-  /** Which profile section makes claim B */
-  sectionB: string;
-  /** What claim B asserts — contradicts or tensions with claim A */
-  claimB: string;
-  /** How serious the contradiction is */
-  severity: 'blocking' | 'notable' | 'minor';
-  /** What should be done about it */
-  suggestedResolution: string;
-}
-
-/**
- * CoherenceReport — all contradictions found + overall coherence verdict.
- */
-export interface CoherenceReport {
-  contradictions: CoherenceIssue[];
-  /** False if any blocking contradictions exist */
-  isCoherent: boolean;
-}
 
 /**
  * L4CrystallizationResult — the complete output of the crystallization layer.
@@ -149,6 +94,10 @@ export interface L4CrystallizationResult {
     cacheWriteTokens: number;
   };
   timingMs: number;
+  /** Cost of the adversarial Haiku pass (if it ran) */
+  adversarialCost?: number;
+  /** Timing of the adversarial Haiku pass (if it ran) */
+  adversarialTimingMs?: number;
 }
 
 // ============================================================================
@@ -196,8 +145,26 @@ const ACTIVE_DIMENSIONS: Record<NorthStarScale, readonly string[]> = {
  * Contains: role, North Star guidance, scoring rubric, coherence rules,
  * examples of good vs bad output, and the complete output JSON schema.
  */
-function buildSystemPrompt(scale: NorthStarScale): string {
+function buildSystemPrompt(scale: NorthStarScale, essayType?: EssayType): string {
   const activeDims = ACTIVE_DIMENSIONS[scale];
+
+  // W3.2: Essay-type-aware scoring calibration guidance
+  const scoringCalibration = essayType === 'supplement'
+    ? `\n   ESSAY-TYPE CALIBRATION (supplement — short essay):
+   Short essays have simpler structural expectations. A 3-paragraph supplement achieving focused impact
+   is at the SAME quality level as a 5-paragraph personal statement with full structural complexity.
+   Do NOT penalize supplements for lacking:
+   - Complex multi-paragraph arcs (a single-turn narrative is structurally valid for 150-250 words)
+   - Multiple thematic threads (one well-developed thread is sufficient)
+   - Emotional build-up and release (concentrated emotion is appropriate)
+   Structural and thematic scores should reflect how well the essay achieves its scale-appropriate goals.\n`
+    : essayType === 'piq'
+    ? `\n   ESSAY-TYPE CALIBRATION (PIQ — medium essay):
+   PIQs (~350 words) should demonstrate moderate structural development.
+   Expect 2-3 clear sections with purposeful transitions. Thematic depth should be proportional
+   to length — a focused exploration of one insight is often stronger than scattered breadth.
+   Score structural dimensions against PIQ-appropriate expectations, not personal-statement complexity.\n`
+    : '';
 
   return `You are the Crystallizer — a literary-architectural analyst who reads a complete essay profile and produces three artifacts that no earlier analysis layer creates.
 
@@ -282,6 +249,24 @@ ${activeDims.includes('intentBridge') ? `   INTENT BRIDGE (personal statements):
    CALIBRATION: Use the L3.5 effectiveness scores as your anchor. The other 4 dimensions should be
    calibrated relative to the same scale. A paragraph with 75 effectiveness and 90 structural means
    its execution underperforms its architectural importance — that tension is diagnostic.
+${scoringCalibration}
+   ANTI-CLUSTERING PROTOCOL (W3.3 — mandatory):
+   Before assigning scores, you MUST:
+   1. FORCED RANKING: For each of the 4 new dimensions (structural, voice, emotional, thematic),
+      rank ALL paragraphs from strongest to weakest BEFORE assigning any score.
+   2. WITHIN-PARAGRAPH RANGE: Each paragraph's 4 new dimension scores (structural, voice, emotional,
+      thematic) must span at least 15 points. If a paragraph truly excels equally in all dimensions,
+      document your reasoning explicitly.
+   3. CROSS-PARAGRAPH RANGE: For each of the 4 new dimensions, the range across all paragraphs must
+      be at least 20 points. The best paragraph and worst paragraph in voice (or any dimension)
+      MUST differ by 20+ points.
+   4. FULL-RANGE ANCHORS: Calibrate using the full 0-100 scale:
+      - 90+: This paragraph is among the best you've seen for this dimension
+      - 70-89: Genuinely strong — does something distinctive
+      - 50-69: Functional — does its job without distinction
+      - 30-49: Weak — significant room for improvement
+      - Below 30: Actively problematic for this dimension
+      If all paragraphs cluster in the 70-85 range for any dimension, you have FAILED to differentiate.
 
    verdict: A single sentence capturing the paragraph's architectural assessment.
    BAD: "Good paragraph with strong writing."
@@ -296,16 +281,27 @@ ${activeDims.includes('intentBridge') ? `   INTENT BRIDGE (personal statements):
    BAD: "Improve the opening paragraph."
    GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value."
 
-3. COHERENCE REPORT — contradictions ACROSS profile sections.
-   Cross-check the profile for internal tensions. Examples:
-   - Voice map shows 4 unintentional shifts but voiceIdentity says "consistent throughout"
-   - Earnedness map says P4 is well-earned but analysis shows only 55 effectiveness
-   - Structural roles say P2 is load-bearing but score matrix shows it's the weakest paragraph
-   - Thematic architecture says thesis emerges in P3 but through-line traces meaning from P1
+3. COHERENCE REPORT — ACTIVE INVESTIGATION of contradictions ACROSS profile sections.
+   You are not passively checking for problems. You are ACTIVELY INVESTIGATING coherence.
 
-   These contradictions are diagnostic gold. If you find ZERO contradictions, look harder —
-   every complex profile has tensions worth surfacing. Even a well-written essay has places
-   where different analytical lenses see different things.
+   INVESTIGATION PROTOCOL:
+   For each pair of profile sections, ASK:
+   a) Does the voice map's account of shifts MATCH the voice identity's characterization?
+   b) Do the earnedness assessments ALIGN with the effectiveness scores?
+   c) Do the structural roles' importance claims MATCH the score matrix's scoring?
+   d) Does the thematic architecture's through-line claim MATCH the actual evidence?
+   e) Do the emotional topography peaks and valleys MATCH the narrative strategy's claimed arc?
+
+   For each tension found, CLASSIFY it:
+   - routingCategory: How should the system respond?
+     "productive_tension" — both sides are valid; the tension reveals something about the essay
+     "system_disagreement" — different analysis layers reached incompatible conclusions
+     "essay_flaw" — the essay itself contains an unresolved tension the student should address
+     "depth_signal" — the tension suggests deeper understanding is needed
+   - canCoexist: Can both claims be true simultaneously? (productive tensions often can)
+   - likelyResolution: Free-text explanation of how to resolve, or null if unresolvable
+   - evidenceA: Direct quote/reference supporting claim A
+   - evidenceB: Direct quote/reference supporting claim B
 
    severity:
    - "blocking": the profile contradicts itself in a way that would confuse downstream consumers
@@ -313,6 +309,31 @@ ${activeDims.includes('intentBridge') ? `   INTENT BRIDGE (personal statements):
    - "minor": a nuance difference between sections
 
    isCoherent: false if ANY blocking contradictions exist.
+
+4. COACHING MAP — structured improvement hierarchy (on scoreMatrix).
+   Beyond the flat prioritizedImprovements, produce a coachingMap with 5 sections:
+
+   transformativeInsight: The SINGLE most important thing about this essay — the insight that,
+   if the student understood it, would unlock the most improvement. Include evidence locations
+   and explain WHY this transforms understanding. Set requiresStudentAwareness if the student
+   must understand this before any specific feedback makes sense.
+
+   priorities: Ordered list of improvements. Each has:
+   - priority: what to do
+   - target: { paragraphs: [...], description: "..." }
+   - architecturalReason: WHY this matters to the essay's architecture (not just the paragraph)
+   - unlocksNext: what becomes possible AFTER this improvement
+   - expectedImpact: "transformative" | "significant" | "incremental"
+
+   protectedStrengths: Things that MUST NOT be damaged during improvement.
+   These are the essay's current assets. Include locations and WHY they must be protected.
+
+   emergentPatterns: Observations that only emerge when viewing the complete scoring picture.
+   Pattern + evidence + implication for coaching.
+
+   scoreTensions: Paragraphs where the 5 scores tell a story of tension.
+   E.g., high structural importance (90) but low effectiveness (55) = high-priority gap.
+   Include the paragraph index, tension description, interpretation, and coaching implication.
 
 OUTPUT FORMAT:
 Respond with a single JSON object. No markdown, no explanation, no code blocks.
@@ -340,11 +361,18 @@ ${activeDims.includes('intentBridge') ? `    "intentBridge": { "studentIntent": 
     "crossParagraphPatterns": ["..."],
     "prioritizedImprovements": [
       { "paragraph": <index>, "improvement": "...", "whyThisMatters": "...", "expectedImpact": "transformative"|"significant"|"incremental" }
-    ]
+    ],
+    "coachingMap": {
+      "transformativeInsight": { "insight": "...", "evidenceLocations": [{"paragraph": 0, "sentence": 2}], "whyThisTransforms": "...", "requiresStudentAwareness": true|false },
+      "priorities": [{ "priority": "...", "target": { "paragraphs": [0], "description": "..." }, "architecturalReason": "...", "unlocksNext": "...", "expectedImpact": "transformative"|"significant"|"incremental" }],
+      "protectedStrengths": [{ "description": "...", "locations": [{"paragraph": 0}], "whyProtect": "..." }],
+      "emergentPatterns": [{ "pattern": "...", "evidence": "...", "implication": "..." }],
+      "scoreTensions": [{ "paragraph": 0, "tension": "...", "interpretation": "...", "coachingImplication": "..." }]
+    }
   },
   "coherenceReport": {
     "contradictions": [
-      { "sectionA": "...", "claimA": "...", "sectionB": "...", "claimB": "...", "severity": "blocking"|"notable"|"minor", "suggestedResolution": "..." }
+      { "sectionA": "...", "claimA": "...", "sectionB": "...", "claimB": "...", "severity": "blocking"|"notable"|"minor", "suggestedResolution": "...", "nature": "free-text description of the tension", "routingCategory": "productive_tension"|"system_disagreement"|"essay_flaw"|"depth_signal", "canCoexist": true|false, "likelyResolution": "..."|null, "evidenceA": "...", "evidenceB": "..." }
     ],
     "isCoherent": <boolean>
   }
@@ -388,6 +416,7 @@ function buildProfileContext(
 function buildCallInstruction(
   profile: Readonly<EssayProfile>,
   scale: NorthStarScale,
+  priorNorthStar?: EssayNorthStar,
 ): string {
   const paragraphCount = profile.paragraphs.length;
 
@@ -431,9 +460,27 @@ IMPORTANT REMINDERS:
 - Structural roles must cover ALL ${paragraphCount} paragraphs. Every paragraph has an architectural role, even if it's transitional or decorative.
 - Score matrix must have exactly ${paragraphCount} entries (indices 0 through ${paragraphCount - 1}).
 - If an L3.5 effectiveness score is null, estimate from the paragraph's analysis context.
-- The coherence report should find at least 1-2 tensions — zero contradictions means you haven't looked hard enough.
+- The coherence report should surface genuine internal tensions. Contradictions are used productively downstream — report them honestly. Zero is fine if the profile is truly consistent.
 - For distinctiveness: if your signature could describe any essay about this topic, make it more specific to THIS essay's execution.
-${scale === 'personal_statement' ? '- Intent bridge: studentIntent is null (no L6 conversation yet). System reading should articulate what the system understands the essay to be doing.' : ''}`;
+- For coherence: ACTIVELY investigate each section pair. Classify each contradiction with routingCategory, canCoexist, and evidence.
+- For coaching map: the transformativeInsight should be the SINGLE most important thing the student needs to understand.
+${scale === 'personal_statement' ? '- Intent bridge: studentIntent is null (no L6 conversation yet). System reading should articulate what the system understands the essay to be doing.' : ''}${priorNorthStar ? `
+
+RE-CRYSTALLIZATION CONTEXT:
+This is a RE-CRYSTALLIZATION — a North Star already exists from a prior analysis round.
+Prior North Star (version ${(priorNorthStar.evolution?.version ?? 1)}):
+${JSON.stringify(priorNorthStar, null, 2)}
+
+Your task: produce an UPDATED North Star. Include an "evolution" field on the northStar output:
+{
+  "evolution": {
+    "version": ${(priorNorthStar.evolution?.version ?? 1) + 1},
+    "changelog": [{ "field": "...", "previousValue": "...", "newValue": "...", "trigger": "..." }, ...],
+    "coreIdentityStable": <boolean — true if the essay's core meaning identity hasn't shifted>,
+    "stabilityAssessment": "one sentence on how stable the North Star is across versions"
+  }
+}
+Log EVERY field that changed (even subtly) in the changelog. If nothing changed, emit an empty changelog and set coreIdentityStable: true.` : ''}`;
 }
 
 // ============================================================================
@@ -454,11 +501,13 @@ interface RawCrystallizationOutput {
     intentBridge: unknown;
     confidence: string;
     lastUpdatedBy: string;
+    evolution?: unknown;
   };
   scoreMatrix: {
     paragraphs: unknown[];
     crossParagraphPatterns: string[];
     prioritizedImprovements: unknown[];
+    coachingMap?: unknown;
   };
   coherenceReport: {
     contradictions: unknown[];
@@ -696,6 +745,28 @@ function buildNorthStar(
     ? (rawConfidence as NorthStarConfidence)
     : 'hypothesis';
 
+  // --- Evolution (optional — present during re-crystallization) ---
+  let evolution: NorthStarEvolution | undefined;
+  if (raw.evolution != null && typeof raw.evolution === 'object') {
+    const evoRaw = raw.evolution as Record<string, unknown>;
+    const rawChangelog = Array.isArray(evoRaw.changelog) ? evoRaw.changelog : [];
+    const changelog = rawChangelog
+      .filter((entry: unknown) => entry && typeof entry === 'object')
+      .map((entry: Record<string, unknown>) => ({
+        field: String(entry.field ?? ''),
+        previousValue: String(entry.previousValue ?? ''),
+        newValue: String(entry.newValue ?? ''),
+        trigger: String(entry.trigger ?? ''),
+      }));
+
+    evolution = {
+      version: typeof evoRaw.version === 'number' ? Math.max(1, Math.round(evoRaw.version)) : 2,
+      changelog,
+      coreIdentityStable: Boolean(evoRaw.coreIdentityStable ?? true),
+      stabilityAssessment: String(evoRaw.stabilityAssessment ?? ''),
+    };
+  }
+
   return {
     activeScale: scale,
     throughLineMap,
@@ -705,6 +776,7 @@ function buildNorthStar(
     intentBridge,
     confidence,
     lastUpdatedBy: 'L4',
+    ...(evolution ? { evolution } : {}),
   };
 }
 
@@ -796,7 +868,111 @@ function buildScoreMatrix(
     paragraphs,
     crossParagraphPatterns,
     prioritizedImprovements,
+    coachingMap: buildCoachingMap(raw.coachingMap, paragraphCount),
   };
+}
+
+/**
+ * Build validated CoachingMap from raw LLM output.
+ * Returns undefined if raw is falsy or parsing fails entirely.
+ */
+function buildCoachingMap(raw: unknown, paragraphCount: number): CoachingMap | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+
+  // --- Transformative Insight ---
+  const tiRaw = (r.transformativeInsight ?? {}) as Record<string, unknown>;
+  const transformativeInsight = {
+    insight: String(tiRaw.insight ?? ''),
+    evidenceLocations: parseLocations(tiRaw.evidenceLocations, paragraphCount),
+    whyThisTransforms: String(tiRaw.whyThisTransforms ?? ''),
+    requiresStudentAwareness: Boolean(tiRaw.requiresStudentAwareness ?? false),
+  };
+
+  // --- Priorities ---
+  const rawPriorities = Array.isArray(r.priorities) ? r.priorities : [];
+  const validImpacts = ['transformative', 'significant', 'incremental'] as const;
+  const priorities = rawPriorities
+    .filter((p: unknown) => p && typeof p === 'object')
+    .map((p: Record<string, unknown>) => {
+      const targetRaw = (p.target ?? {}) as Record<string, unknown>;
+      const rawImpact = String(p.expectedImpact ?? 'significant');
+      const expectedImpact = validImpacts.includes(rawImpact as typeof validImpacts[number])
+        ? (rawImpact as typeof validImpacts[number])
+        : 'significant' as const;
+      return {
+        priority: String(p.priority ?? ''),
+        target: {
+          paragraphs: Array.isArray(targetRaw.paragraphs)
+            ? (targetRaw.paragraphs as unknown[]).map((idx: unknown) => clampInt(idx as number, 0, paragraphCount - 1))
+            : [],
+          description: String(targetRaw.description ?? ''),
+        },
+        architecturalReason: String(p.architecturalReason ?? ''),
+        unlocksNext: String(p.unlocksNext ?? ''),
+        expectedImpact,
+      };
+    });
+
+  // --- Protected Strengths ---
+  const rawStrengths = Array.isArray(r.protectedStrengths) ? r.protectedStrengths : [];
+  const protectedStrengths = rawStrengths
+    .filter((s: unknown) => s && typeof s === 'object')
+    .map((s: Record<string, unknown>) => ({
+      description: String(s.description ?? ''),
+      locations: parseLocations(s.locations, paragraphCount),
+      whyProtect: String(s.whyProtect ?? ''),
+    }));
+
+  // --- Emergent Patterns ---
+  const rawPatterns = Array.isArray(r.emergentPatterns) ? r.emergentPatterns : [];
+  const emergentPatterns = rawPatterns
+    .filter((p: unknown) => p && typeof p === 'object')
+    .map((p: Record<string, unknown>) => ({
+      pattern: String(p.pattern ?? ''),
+      evidence: String(p.evidence ?? ''),
+      implication: String(p.implication ?? ''),
+    }));
+
+  // --- Score Tensions ---
+  const rawTensions = Array.isArray(r.scoreTensions) ? r.scoreTensions : [];
+  const scoreTensions = rawTensions
+    .filter((t: unknown) => t && typeof t === 'object')
+    .map((t: Record<string, unknown>) => ({
+      paragraph: clampInt(t.paragraph as number, 0, paragraphCount - 1),
+      tension: String(t.tension ?? ''),
+      interpretation: String(t.interpretation ?? ''),
+      coachingImplication: String(t.coachingImplication ?? ''),
+    }));
+
+  return {
+    transformativeInsight,
+    priorities,
+    protectedStrengths,
+    emergentPatterns,
+    scoreTensions,
+  };
+}
+
+/**
+ * Parse an array of location objects { paragraph, sentence? } with clamping.
+ */
+function parseLocations(
+  raw: unknown,
+  paragraphCount: number,
+): Array<{ paragraph: number; sentence?: number }> {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((loc: unknown) => loc && typeof loc === 'object')
+    .map((loc: Record<string, unknown>) => {
+      const result: { paragraph: number; sentence?: number } = {
+        paragraph: clampInt(loc.paragraph as number, 0, paragraphCount - 1),
+      };
+      if (typeof loc.sentence === 'number') {
+        result.sentence = Math.max(0, Math.round(loc.sentence));
+      }
+      return result;
+    });
 }
 
 /**
@@ -805,6 +981,7 @@ function buildScoreMatrix(
 function buildCoherenceReport(raw: RawCrystallizationOutput['coherenceReport']): CoherenceReport {
   const rawContradictions = Array.isArray(raw.contradictions) ? raw.contradictions : [];
   const validSeverities = ['blocking', 'notable', 'minor'] as const;
+  const validRoutingCategories = ['productive_tension', 'system_disagreement', 'essay_flaw', 'depth_signal'] as const;
 
   const contradictions: CoherenceIssue[] = rawContradictions
     .filter((c: unknown) => c && typeof c === 'object')
@@ -814,7 +991,7 @@ function buildCoherenceReport(raw: RawCrystallizationOutput['coherenceReport']):
         ? (rawSeverity as typeof validSeverities[number])
         : 'minor' as const;
 
-      return {
+      const issue: CoherenceIssue = {
         sectionA: String(c.sectionA ?? ''),
         claimA: String(c.claimA ?? ''),
         sectionB: String(c.sectionB ?? ''),
@@ -822,6 +999,34 @@ function buildCoherenceReport(raw: RawCrystallizationOutput['coherenceReport']):
         severity,
         suggestedResolution: String(c.suggestedResolution ?? ''),
       };
+
+      // Parse optional enriched fields (only include when LLM provides them)
+      if (c.routingCategory != null) {
+        const rawCategory = String(c.routingCategory);
+        issue.routingCategory = validRoutingCategories.includes(rawCategory as typeof validRoutingCategories[number])
+          ? (rawCategory as typeof validRoutingCategories[number])
+          : 'depth_signal';
+      }
+      if (c.canCoexist != null) {
+        issue.canCoexist = Boolean(c.canCoexist);
+      }
+      if (c.likelyResolution !== undefined) {
+        issue.likelyResolution = c.likelyResolution != null ? String(c.likelyResolution) : null;
+      }
+      if (c.evidenceA != null) {
+        issue.evidenceA = String(c.evidenceA);
+      }
+      if (c.evidenceB != null) {
+        issue.evidenceB = String(c.evidenceB);
+      }
+      if (c.source != null) {
+        issue.source = c.source === 'adversarial' ? 'adversarial' : 'primary';
+      }
+      if (c.nature != null) {
+        issue.nature = String(c.nature);
+      }
+
+      return issue;
     });
 
   // isCoherent is false if any blocking contradictions exist
@@ -853,6 +1058,412 @@ function clampScore(value: number): number {
 }
 
 // ============================================================================
+// W3.3: ANTI-CLUSTERING DETECTION
+// ============================================================================
+
+/**
+ * Post-parse programmatic detection of score clustering in the paragraph score matrix.
+ * Computes stdev and range per dimension across paragraphs, logs warnings when
+ * anti-clustering thresholds are violated.
+ *
+ * Thresholds:
+ * - Min 15pt within-paragraph range across 4 new dimensions
+ * - Min 20pt cross-paragraph range per dimension
+ * - Warning on 3+ clustered dimensions
+ */
+function detectScoreClustering(scoreMatrix: ParagraphScoreMatrix): void {
+  const paragraphs = scoreMatrix.paragraphs;
+  if (paragraphs.length < 2) return; // Need 2+ paragraphs for cross-paragraph analysis
+
+  const newDimensions = ['structural', 'voice', 'emotional', 'thematic'] as const;
+  let clusteredDimensionCount = 0;
+
+  // Cross-paragraph range check per dimension
+  for (const dim of newDimensions) {
+    const scores = paragraphs.map(p => p.scores[dim]);
+    const min = Math.min(...scores);
+    const max = Math.max(...scores);
+    const range = max - min;
+    const mean = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const variance = scores.reduce((a, b) => a + (b - mean) ** 2, 0) / scores.length;
+    const stdev = Math.sqrt(variance);
+
+    if (range < 20) {
+      clusteredDimensionCount++;
+      console.warn(
+        `[Crystallizer] SCORE CLUSTERING in ${dim}: range=${range} (< 20pt minimum), ` +
+        `stdev=${stdev.toFixed(1)}, scores=[${scores.join(', ')}]`,
+      );
+    }
+  }
+
+  // Within-paragraph range check
+  for (const p of paragraphs) {
+    const dimScores = [p.scores.structural, p.scores.voice, p.scores.emotional, p.scores.thematic];
+    const withinRange = Math.max(...dimScores) - Math.min(...dimScores);
+    if (withinRange < 15) {
+      console.warn(
+        `[Crystallizer] WITHIN-PARAGRAPH CLUSTERING for P${p.index}: ` +
+        `range=${withinRange} (< 15pt minimum), ` +
+        `structural=${p.scores.structural}, voice=${p.scores.voice}, ` +
+        `emotional=${p.scores.emotional}, thematic=${p.scores.thematic}`,
+      );
+    }
+  }
+
+  // Summary warning if 3+ dimensions clustered
+  if (clusteredDimensionCount >= 3) {
+    console.warn(
+      `[Crystallizer] SEVERE CLUSTERING: ${clusteredDimensionCount}/4 dimensions have insufficient cross-paragraph range. ` +
+      `Prompt anti-clustering protocol may have failed. Consider this a degraded score matrix.`,
+    );
+  }
+}
+
+// ============================================================================
+// ADVERSARIAL CONTRADICTION PASS (Improvement 4)
+// ============================================================================
+
+/**
+ * Raw output shape from the adversarial Haiku pass.
+ * Stays local to crystallizer.ts — not exported.
+ *
+ * Key design: `nature` is the LLM's free-text description of what the tension IS.
+ * It is NOT constrained to categories — the LLM describes what it sees.
+ * `routingCategory` is a system routing tag assigned by the LLM for downstream handling.
+ */
+interface AdversarialContradictionOutput {
+  contradictions: Array<{
+    sectionA: string;
+    claimA: string;
+    sectionB: string;
+    claimB: string;
+    /** Free-text description of the tension's nature — what the contradiction IS */
+    nature: string;
+    /** System routing tag — LLM assigns the closest category */
+    routingCategory: 'productive_tension' | 'system_disagreement' | 'essay_flaw' | 'depth_signal';
+    /** Can both readings coexist, or is one wrong? */
+    canCoexist: boolean;
+    /** If they can't coexist, which is more likely correct and why? */
+    likelyResolution: string | null;
+    /** LLM-assessed severity for routing */
+    severity: 'blocking' | 'notable' | 'minor';
+    /** Specific evidence from the profile for side A */
+    evidenceA: string;
+    /** Specific evidence from the profile for side B */
+    evidenceB: string;
+  }>;
+  northStarAssessment: {
+    passesIrreplaceabilityTest: boolean;
+    reasoning: string;
+    missingInsight: string | null;
+  };
+  overallCoherence: boolean;
+}
+
+/**
+ * Run the adversarial Haiku pass — a fresh-eyes consistency check.
+ *
+ * Receives the complete profile context PLUS finding context and connection graph
+ * context. The adversarial pass reads what already exists and probes for consistency.
+ * This is why Haiku is appropriate — it needs to READ critically, not CREATE deeply.
+ *
+ * Returns null on any failure (graceful degradation — adversarial pass is non-fatal).
+ */
+async function runAdversarialPass(
+  essayText: string,
+  profileContext: string,
+  primaryOutput: {
+    northStar: EssayNorthStar;
+    scoreMatrix: ParagraphScoreMatrix;
+    coherenceReport: CoherenceReport;
+  },
+  findingContext: string,
+  connectionContext: string,
+): Promise<{ output: AdversarialContradictionOutput; cost: number; timingMs: number } | null> {
+  const startTime = Date.now();
+
+  const systemPrompt = `You are a skeptical reviewer checking a crystallization analysis for internal consistency. You are NOT re-doing the analysis — you are STRESS-TESTING it.
+
+You receive:
+1. The complete essay profile (understanding + holistic synthesis + scoring)
+2. The primary crystallization output (North Star + Score Matrix + Coaching Map + initial coherence assessment)
+3. The system's findings (structured insights with maturity levels and evidence)
+4. The connection graph (cross-paragraph structural links)
+
+Your job: find tensions the primary analysis missed or smoothed over. The primary analyzer tends to rationalize — it created the synthesis and is naturally biased toward seeing it as coherent. You are the fresh eyes.
+
+PROBING STRATEGY (areas to investigate — NOT a checklist to fill):
+
+PROBE 1 — UNDERSTANDING vs. SCORING:
+For each paragraph, compare what the understanding says this paragraph DOES with how the scoring says it PERFORMS. The understanding describes function; the scoring evaluates execution. They often diverge in interesting ways.
+
+Key patterns to look for:
+- "Fulcrum paragraph" with low effectiveness → structural importance ≠ execution quality
+- "Transitional paragraph" with high effectiveness → best writing in the lowest-stakes position
+- "Opening paragraph" with mediocre effectiveness → the essay's first impression underperforms
+
+For each divergence, briefly read the actual essay text and form your own judgment: which assessment (understanding or scoring) is more defensible? Is this a genuine tension (the paragraph really IS important but poorly executed) or a measurement error?
+
+PROBE 2 — HOLISTIC CLAIMS vs. EVIDENCE:
+The holistic synthesis (voice identity, emotional topography, thematic architecture, narrative strategy, etc.) makes claims about the essay as a whole. Each claim should be evidenced in the paragraph-level data.
+
+Pick the BOLDEST claim in the holistic synthesis and trace its evidence:
+- Which paragraphs support it?
+- Which paragraphs complicate or undermine it?
+- Is the claim well-supported, partially supported, or unsubstantiated?
+
+If a holistic claim is unsubstantiated by the paragraph data, that's either a synthesis overreach (the Sonnet inferred too much) or the paragraph analysis missed something (the data is there but the analysis didn't surface it). State which and why.
+
+PROBE 3 — NORTH STAR IRREPLACEABILITY:
+The North Star should contain EMERGENT understanding that doesn't exist in any individual profile section. Apply three tests:
+
+DISTINCTIVENESS TEST: Read the distinctiveness signature. Now imagine deleting it. Can you reconstruct the SAME insight from the voice identity + thematic architecture + paragraph understandings? If yes, the signature is lossy compression, not emergent insight. It fails.
+
+STRUCTURAL ROLE TEST: Read each structural role description. Does it describe ARCHITECTURAL FUNCTION ("frames the economic lens that makes P3's stakes calculable") or just CONTENT ("introduces the family's background")? Content descriptions are summaries — they exist in the paragraph understanding already. Only architectural descriptions pass.
+
+THROUGH-LINE TEST (if present): Does the through-line trace MEANING TRANSFORMATION ("the diamond's signification shifts from commodity to inheritance to identity marker") or just PHYSICAL APPEARANCES ("the diamond appears in P1, P3, and P5")? Appearance tracking is already done by the connection graph. Only meaning transformation passes.
+
+PROBE 4 — PRODUCTIVE TENSIONS (the essay's own internal complexity):
+Look past system consistency. Are there tensions WITHIN THE ESSAY ITSELF that the analysis hasn't surfaced?
+
+The best essays HAVE productive tensions:
+- "Raw authentic voice but rough craft" — the authenticity might depend on the roughness. Polishing could destroy what makes it real.
+- "Unconventional structure but unclear arc" — the unconventionality might BE the arc, or it might be confusion disguised as creativity.
+- "Specific, grounded early paragraphs but abstract late paragraphs" — intentional shift from concrete to reflective? Or the writer running out of material?
+
+When you find productive tension, describe it as an OPEN QUESTION for coaching, not as a problem with a solution. The student decides how to handle it.
+
+PROBE 5 — COACHING MAP QUALITY:
+Is the transformative insight genuinely transformative, or is it a restatement of an obvious problem? Does the priority ordering make architectural sense (structural before craft, foundational before decorative)? Are the protected strengths genuinely worth protecting?
+
+FINDING CONTEXT:
+You also have access to the system's findings — structured insights about the essay with maturity levels (hypothesis → developing → confirmed → deepened → superseded). Look for:
+- Finding↔Score tension: A confirmed finding claims "P2 has deeply earned emotional resonance" but the score says otherwise
+- Supersession instability: A finding that was superseded multiple times suggests the system kept changing its mind — is the current reading stable?
+- Shallow threads: Findings with no depth chain might indicate areas the system hasn't explored enough
+
+FOR EACH TENSION YOU FIND:
+- State both sides with specific evidence (cite paragraph/sentence indices)
+- Describe the NATURE of the tension in your own words (free-text, not category-constrained)
+- Assess: can both readings coexist (productive) or is one wrong (destructive)?
+- If one is wrong, which is more defensible based on the actual text?
+- Assign a routing category: productive_tension | system_disagreement | essay_flaw | depth_signal
+- Rate severity: blocking | notable | minor
+  (blocking = fundamentally changes the coaching direction;
+   notable = should be surfaced but doesn't change direction;
+   minor = interesting but not actionable)
+
+IMPORTANT:
+- Finding zero tensions is a VALID outcome for a well-analyzed, straightforward essay. Do not manufacture tensions to seem thorough.
+- Do NOT re-score or re-analyze — only check CONSISTENCY.
+- You are a PROOFREADER of the analysis, not a competing analyst.
+
+Output JSON:
+{
+  "contradictions": [
+    {
+      "sectionA": "string — which profile section (e.g., 'P3 understanding')",
+      "claimA": "string — what section A claims",
+      "sectionB": "string — which profile section (e.g., 'L3.5 scoring P3')",
+      "claimB": "string — what section B claims",
+      "nature": "string — free-text description of the tension",
+      "routingCategory": "productive_tension" | "system_disagreement" | "essay_flaw" | "depth_signal",
+      "canCoexist": true/false,
+      "likelyResolution": "string | null — if can't coexist, which is right",
+      "severity": "blocking" | "notable" | "minor",
+      "evidenceA": "string — specific text/data supporting claim A",
+      "evidenceB": "string — specific text/data supporting claim B"
+    }
+  ],
+  "northStarAssessment": {
+    "passesIrreplaceabilityTest": true/false,
+    "reasoning": "string — detailed assessment of each test",
+    "missingInsight": "string | null — what emergent insight is absent"
+  },
+  "overallCoherence": true/false
+}`;
+
+  // Build user prompt with all available context
+  const contextParts: string[] = [
+    '=== ESSAY TEXT ===',
+    essayText,
+    '',
+    '=== PROFILE CONTEXT ===',
+    profileContext,
+  ];
+
+  if (findingContext) {
+    contextParts.push('', '=== SYSTEM FINDINGS ===', findingContext);
+  }
+
+  if (connectionContext) {
+    contextParts.push('', '=== CONNECTION GRAPH ===', connectionContext);
+  }
+
+  contextParts.push(
+    '',
+    '=== CRYSTALLIZATION OUTPUT ===',
+    JSON.stringify(primaryOutput, null, 2),
+    '',
+    'Run all 5 adversarial probes and report your findings.',
+  );
+
+  const userPrompt = contextParts.join('\n');
+
+  try {
+    const response = await callClaude<AdversarialContradictionOutput>({
+      model: HAIKU,
+      systemPrompt,
+      userPrompt,
+      maxTokens: ADVERSARIAL_MAX_TOKENS,
+      temperature: 0.2,
+      useJsonMode: true,
+    });
+
+    const cost = calculateCost(response.usage, HAIKU);
+    const timingMs = Date.now() - startTime;
+
+    console.log(
+      `[Crystallizer] Adversarial pass complete: cost=$${cost.toFixed(4)}, time=${timingMs}ms`,
+    );
+
+    const validated = validateAdversarialOutput(response.content);
+    return { output: validated, cost, timingMs };
+  } catch (error) {
+    console.warn(
+      '[Crystallizer] Adversarial pass failed (non-fatal):',
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
+}
+
+/**
+ * Validate and normalize adversarial output fields.
+ * Defensive: handles the LLM returning slightly different shapes.
+ */
+function validateAdversarialOutput(raw: AdversarialContradictionOutput): AdversarialContradictionOutput {
+  const validSeverities = ['blocking', 'notable', 'minor'] as const;
+  const validRoutingCategories = ['productive_tension', 'system_disagreement', 'essay_flaw', 'depth_signal'] as const;
+
+  const rawContradictions = Array.isArray(raw.contradictions) ? raw.contradictions : [];
+  const contradictions = rawContradictions
+    .filter((c: unknown) => c && typeof c === 'object')
+    .map((c: Record<string, unknown>) => {
+      const rawSeverity = String(c.severity ?? 'notable');
+      const severity = validSeverities.includes(rawSeverity as typeof validSeverities[number])
+        ? (rawSeverity as typeof validSeverities[number])
+        : 'notable' as const;
+
+      const rawCategory = String(c.routingCategory ?? 'depth_signal');
+      const routingCategory = validRoutingCategories.includes(rawCategory as typeof validRoutingCategories[number])
+        ? (rawCategory as typeof validRoutingCategories[number])
+        : 'depth_signal' as const;
+
+      return {
+        sectionA: String(c.sectionA ?? ''),
+        claimA: String(c.claimA ?? ''),
+        sectionB: String(c.sectionB ?? ''),
+        claimB: String(c.claimB ?? ''),
+        nature: String(c.nature ?? c.suggestedResolution ?? ''),
+        routingCategory,
+        canCoexist: Boolean(c.canCoexist ?? false),
+        likelyResolution: c.likelyResolution != null ? String(c.likelyResolution) : null,
+        severity,
+        evidenceA: String(c.evidenceA ?? ''),
+        evidenceB: String(c.evidenceB ?? ''),
+      };
+    });
+
+  const northStarAssessment = raw.northStarAssessment && typeof raw.northStarAssessment === 'object'
+    ? {
+        passesIrreplaceabilityTest: Boolean(raw.northStarAssessment.passesIrreplaceabilityTest ?? true),
+        reasoning: String(raw.northStarAssessment.reasoning ?? ''),
+        missingInsight: raw.northStarAssessment.missingInsight != null
+          ? String(raw.northStarAssessment.missingInsight)
+          : null,
+      }
+    : { passesIrreplaceabilityTest: true, reasoning: '', missingInsight: null };
+
+  return {
+    contradictions,
+    northStarAssessment,
+    overallCoherence: Boolean(raw.overallCoherence ?? true),
+  };
+}
+
+/**
+ * Merge adversarial results into the primary coherence report.
+ * - Tags primary issues with source: 'primary'
+ * - Converts adversarial contradictions to CoherenceIssue[] with source: 'adversarial'
+ * - Concatenates (both perspectives kept — no deduplication)
+ * - Updates isCoherent (either says incoherent → merged is incoherent)
+ * - Stores northStarAssessment on the merged report
+ */
+function mergeAdversarialResults(
+  primaryReport: CoherenceReport,
+  adversarial: AdversarialContradictionOutput,
+): CoherenceReport {
+  const validSeverities = ['blocking', 'notable', 'minor'] as const;
+  const validRoutingCategories = ['productive_tension', 'system_disagreement', 'essay_flaw', 'depth_signal'] as const;
+
+  // Tag primary issues with source
+  const taggedPrimary: CoherenceIssue[] = primaryReport.contradictions.map((c) => ({
+    ...c,
+    source: (c.source ?? 'primary') as 'primary' | 'adversarial',
+  }));
+
+  // Convert adversarial contradictions — all fields are validated at this point
+  const adversarialIssues: CoherenceIssue[] = adversarial.contradictions.map((c) => {
+    const rawSeverity = String(c.severity ?? 'notable');
+    const severity = validSeverities.includes(rawSeverity as typeof validSeverities[number])
+      ? (rawSeverity as typeof validSeverities[number])
+      : 'notable' as const;
+
+    const rawCategory = String(c.routingCategory ?? 'depth_signal');
+    const routingCategory = validRoutingCategories.includes(rawCategory as typeof validRoutingCategories[number])
+      ? (rawCategory as typeof validRoutingCategories[number])
+      : 'depth_signal' as const;
+
+    return {
+      sectionA: String(c.sectionA ?? ''),
+      claimA: String(c.claimA ?? ''),
+      sectionB: String(c.sectionB ?? ''),
+      claimB: String(c.claimB ?? ''),
+      severity,
+      suggestedResolution: c.likelyResolution ?? c.nature ?? '',
+      nature: c.nature ?? '',
+      routingCategory,
+      canCoexist: Boolean(c.canCoexist ?? false),
+      likelyResolution: c.likelyResolution ?? null,
+      evidenceA: String(c.evidenceA ?? ''),
+      evidenceB: String(c.evidenceB ?? ''),
+      source: 'adversarial' as const,
+    };
+  });
+
+  // Merge — if EITHER pass says incoherent, the merged report is incoherent
+  const allContradictions = [...taggedPrimary, ...adversarialIssues];
+  const hasBlockingContradiction = allContradictions.some((c) => c.severity === 'blocking');
+  const mergedIsCoherent = primaryReport.isCoherent && adversarial.overallCoherence && !hasBlockingContradiction;
+
+  // Build North Star assessment
+  const northStarAssessment: NorthStarAssessment = {
+    passesIrreplaceabilityTest: adversarial.northStarAssessment.passesIrreplaceabilityTest,
+    reasoning: adversarial.northStarAssessment.reasoning,
+    missingInsight: adversarial.northStarAssessment.missingInsight,
+  };
+
+  return {
+    contradictions: allContradictions,
+    isCoherent: mergedIsCoherent,
+    programmaticContradictions: primaryReport.programmaticContradictions,
+    northStarAssessment,
+  };
+}
+
+// ============================================================================
 // CRYSTALLIZER SERVICE
 // ============================================================================
 
@@ -871,15 +1482,21 @@ export class CrystallizerService {
    * - L3.75 holistic synthesis completed (voice map, earnedness map, entanglements)
    * - L3.5 analysis pass completed (paragraph effectiveness scores)
    *
-   * @param profile    The complete EssayProfile after L3.5
-   * @param essayType  The essay type (determines North Star scaling)
-   * @param essayText  The full essay text
+   * @param profile       The complete EssayProfile after L3.5
+   * @param essayType     The essay type (determines North Star scaling)
+   * @param essayText     The full essay text
+   * @param priorNorthStar  Optional prior North Star for re-crystallization evolution tracking
+   * @param findingStore  Optional FindingStore for adversarial pass finding context
+   * @param connectionGraph Optional ConnectionGraph for adversarial pass structural context
    * @returns L4CrystallizationResult with all three artifacts + cost tracking
    */
   async crystallize(
     profile: Readonly<EssayProfile>,
     essayType: EssayType,
     essayText: string,
+    priorNorthStar?: EssayNorthStar,
+    findingStore?: FindingStore,
+    connectionGraph?: ConnectionGraph,
   ): Promise<L4CrystallizationResult> {
     const startTime = Date.now();
     const scale = essayTypeToScale(essayType);
@@ -898,13 +1515,13 @@ export class CrystallizerService {
       `contextTokens=${assembledContext.estimatedTokens}, dropped=${assembledContext.droppedSections.length}`,
     );
 
-    // Build 3-block prompt structure
-    const systemPrompt = buildSystemPrompt(scale);
+    // Build 3-block prompt structure (W3.2: pass essayType for calibration guidance)
+    const systemPrompt = buildSystemPrompt(scale, essayType);
     const profileContext = buildProfileContext(profile, essayText, assembledContext);
-    const callInstruction = buildCallInstruction(profile, scale);
+    const callInstruction = buildCallInstruction(profile, scale, priorNorthStar);
 
     // Single Sonnet call with 3-block caching
-    const response = await callClaudeWithRetry<RawCrystallizationOutput>({
+    const response = await callClaude<RawCrystallizationOutput>({
       model: SONNET,
       systemPrompt,
       userPrompt: profileContext + '\n\n' + callInstruction,
@@ -915,6 +1532,9 @@ export class CrystallizerService {
     });
 
     const cost = calculateCost(response.usage, SONNET);
+    console.log(
+      `[EssayIntelligence] L4: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
     const timingMs = Date.now() - startTime;
 
     // Validate and coerce LLM output into typed structures
@@ -929,32 +1549,98 @@ export class CrystallizerService {
     const roleCount = northStar.structuralRolesMap.length;
     const contradictionCount = coherenceReport.contradictions.length;
     const improvementCount = scoreMatrix.prioritizedImprovements.length;
+    const coachingMapSections = scoreMatrix.coachingMap
+      ? [
+          scoreMatrix.coachingMap.priorities.length > 0 ? 'priorities' : null,
+          scoreMatrix.coachingMap.protectedStrengths.length > 0 ? 'strengths' : null,
+          scoreMatrix.coachingMap.emergentPatterns.length > 0 ? 'patterns' : null,
+          scoreMatrix.coachingMap.scoreTensions.length > 0 ? 'tensions' : null,
+          scoreMatrix.coachingMap.transformativeInsight.insight ? 'insight' : null,
+        ].filter(Boolean)
+      : [];
     console.log(
-      `[Crystallizer] L4 complete — ` +
+      `[Crystallizer] L4 primary complete — ` +
       `roles=${roleCount}, contradictions=${contradictionCount}, improvements=${improvementCount}, ` +
+      `coachingMap=[${coachingMapSections.join(',')}], ` +
       `cost=$${cost.toFixed(4)}, time=${timingMs}ms`,
     );
 
-    // Warn if coherence report found zero contradictions
+    // Log if coherence report found zero contradictions (this is a valid outcome)
     if (contradictionCount === 0) {
-      console.warn(
-        '[Crystallizer] Coherence report found zero contradictions — this is unusual. ' +
-        'Every complex profile should have at least minor tensions between analytical lenses.',
+      console.log(
+        '[Crystallizer] Coherence report found zero contradictions — profile is internally consistent.',
       );
     }
+
+    // W3.3: Post-parse anti-clustering detection for score matrix dimensions
+    detectScoreClustering(scoreMatrix);
+
+    // ── Adversarial Haiku Pass (non-fatal — graceful degradation) ──
+    let finalCoherenceReport = coherenceReport;
+    let adversarialCost: number | undefined;
+    let adversarialTimingMs: number | undefined;
+
+    // Build finding context for adversarial pass (include superseded + evidence for full picture)
+    const findingCtx = findingStore && findingStore.size > 0
+      ? buildFindingContext(findingStore, { includeSuperseded: true, includeEvidence: true })
+      : '';
+
+    // Build connection graph context for adversarial pass (structural islands, hubs, adjacency)
+    const connectionCtx = connectionGraph
+      ? buildHolisticConnectionContext(connectionGraph, paragraphCount)
+      : '';
+
+    const adversarialResult = await runAdversarialPass(
+      essayText,
+      profileContext,
+      { northStar, scoreMatrix, coherenceReport },
+      findingCtx,
+      connectionCtx,
+    );
+
+    if (adversarialResult) {
+      adversarialCost = adversarialResult.cost;
+      adversarialTimingMs = adversarialResult.timingMs;
+
+      finalCoherenceReport = mergeAdversarialResults(coherenceReport, adversarialResult.output);
+
+      const adversarialContradictionCount = adversarialResult.output.contradictions.length;
+      const passesIrreplaceability = adversarialResult.output.northStarAssessment.passesIrreplaceabilityTest;
+      console.log(
+        `[Crystallizer] Adversarial pass merged: ` +
+        `+${adversarialContradictionCount} contradictions, ` +
+        `irreplaceability=${passesIrreplaceability ? 'PASS' : 'FAIL'}, ` +
+        `total contradictions=${finalCoherenceReport.contradictions.length}, ` +
+        `isCoherent=${finalCoherenceReport.isCoherent}`,
+      );
+
+      // Log North Star failure for diagnostic purposes — do NOT re-run crystallization.
+      // A mediocre North Star is still better than none. The failure assessment is stored
+      // in the coherence report so re-crystallization can produce a more emergent North Star.
+      if (!passesIrreplaceability) {
+        console.log(
+          `[Crystallizer] North Star failed irreplaceability test: ` +
+          `${adversarialResult.output.northStarAssessment.reasoning.substring(0, 200)}`,
+        );
+      }
+    }
+
+    const totalTimingMs = Date.now() - startTime;
 
     return {
       northStar,
       scoreMatrix,
-      coherenceReport,
-      cost,
+      coherenceReport: finalCoherenceReport,
+      cost: cost + (adversarialCost ?? 0),
       tokenUsage: {
         inputTokens: response.usage.input_tokens,
         outputTokens: response.usage.output_tokens,
         cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
         cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
       },
-      timingMs,
+      timingMs: totalTimingMs,
+      adversarialCost,
+      adversarialTimingMs,
     };
   }
 

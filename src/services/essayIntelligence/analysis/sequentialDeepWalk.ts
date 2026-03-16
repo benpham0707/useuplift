@@ -33,17 +33,30 @@ import type {
   ParagraphUnderstanding,
   ObservationEntry,
   Connection,
+  ConnectionEndpoint,
+  ConnectionStrengthCategory,
+  ConnectionDirectionality,
   ConnectionScoutOutput,
   UnderstandingWalkOutput,
   ParagraphFirstImpression,
   WalkSkippedMarker,
+  FindingScope,
+  FindingMaturity,
+  FindingCoachingValue,
+  FindingEvidence,
+  HolisticDimension,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { ProfileRouter } from '../profileManager/profileRouter';
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
+import { FindingStore } from '../findings/findingStore';
+import {
+  buildParagraphFindingContext,
+  buildFindingReferenceContext,
+} from '../findings/findingContextBuilder';
 
 // ============================================================================
 // CONSTANTS
@@ -51,8 +64,34 @@ import type { AssembledProfileContext } from '../profileManager/profileRouter';
 
 const SONNET = 'claude-sonnet-4-5-20250929';
 const WALK_TEMPERATURE = 0.3;
-const WALK_MAX_TOKENS = 4096;
-const WALK_TIMEOUT_MS = 120_000;
+/**
+ * Base max tokens for walk output. Dynamically scaled by sentence count
+ * via computeWalkMaxTokens() to prevent truncation of dense paragraphs.
+ *
+ * Phase 1 budget breakdown for a paragraph with N sentences:
+ *   paragraphUnderstanding: ~200-300 tokens
+ *   sentenceUnderstandings (N × ~80): lightweight — primaryFunction + significance + tags
+ *   findings (1-5 per paragraph): ~800-2500 tokens (the PRIMARY output)
+ *   holisticEvolution + priorSentenceUpdates + newConnections: ~300-800 tokens
+ *   JSON overhead: ~200-400 tokens
+ *
+ * Phase 1 savings: per-sentence cost drops from ~300 to ~80 tokens.
+ * Freed budget goes to richer findings.
+ */
+const WALK_BASE_MAX_TOKENS = 4096;
+const WALK_MAX_TOKENS_CAP = 8192;
+const WALK_TIMEOUT_MS = 180_000;
+/** Finding budget: space for paragraph understanding + 1-5 findings + metadata */
+const WALK_FINDING_BUDGET = 3500;
+
+/**
+ * Compute max tokens for a paragraph's walk call based on sentence count.
+ * Phase 1: per-sentence cost is ~200 tokens (primaryFunction + significance + craft/tags).
+ * Finding budget is a flexible allocation for findings, connections, back-prop.
+ */
+function computeWalkMaxTokens(sentenceCount: number): number {
+  return Math.min(WALK_MAX_TOKENS_CAP, Math.max(WALK_BASE_MAX_TOKENS, sentenceCount * 200 + WALK_FINDING_BUDGET));
+}
 
 /** Maximum consecutive paragraph failures before aborting the walk */
 const MAX_CONSECUTIVE_FAILURES = 3;
@@ -72,6 +111,8 @@ export interface L3WalkResult {
     inferredIntents?: ObservationEntry[];
     narrativeContributions?: ObservationEntry[];
     newTags?: string[];
+    primaryFunction?: string;
+    significance?: 'pivotal' | 'contributing' | 'transitional';
   }>;
   /** Final holistic evolution state (incremental — full synthesis comes in L3.75) */
   holisticEvolution: {
@@ -107,47 +148,117 @@ export interface L3WalkResult {
  * UNDERSTANDING ONLY. The prompt contains structural forcing functions to
  * prevent evaluation contamination.
  */
-const SYSTEM_PROMPT = `You are the world's most perceptive essay reader. You have read thousands of college application essays. Your task is to deeply UNDERSTAND one paragraph at a time, building compound understanding across the essay.
+const SYSTEM_PROMPT = `You are a Literature PhD who has read 10,000 college application essays and can articulate what a casual reader feels but cannot name. You read like an expert: you notice not just WHAT techniques appear, but what their presence REVEALS about the essay's architecture of meaning. Your task is to deeply UNDERSTAND one paragraph at a time, building compound understanding across the essay.
 
-=== YOUR SOLE JOB: UNDERSTANDING ===
+=== YOUR SOLE JOB: UNDERSTANDING (NOT EVALUATION) ===
 
-You describe WHAT the essay IS — what each sentence does, what the writer is trying to achieve, how the narrative works, what craft techniques are used. You NEVER evaluate how well anything works. Evaluation is handled by a completely separate system.
+You describe WHAT the essay IS and HOW it works. You NEVER evaluate how WELL anything works. That is a separate system's job.
 
-FORBIDDEN VOCABULARY (these words indicate evaluation contamination):
-"effective", "effectively", "strong", "strongly", "weak", "weakly", "compelling", "powerful", "poor", "excellent", "impressive", "beautiful", "clumsy", "awkward", "masterful", "skillful", "skillfully", "brilliant", "mediocre", "lackluster", "flawed", "successful", "unsuccessful", "well-crafted", "poorly", "fails to", "succeeds in"
+FORBIDDEN VOCABULARY (evaluation contamination):
+"effective", "effectively", "strong", "strongly", "weak", "weakly", "compelling", "powerful", "poor", "excellent", "impressive", "beautiful", "clumsy", "awkward", "masterful", "skillful", "skillfully", "brilliant", "mediocre", "lackluster", "flawed", "successful", "unsuccessful", "well-crafted", "poorly", "fails to", "succeeds in", "nicely", "appropriately"
 
-When you catch yourself writing any of these words, STOP and rewrite the observation as pure description.
+=== DEPTH OF UNDERSTANDING — WHAT EXPERT READING LOOKS LIKE ===
 
-CORRECT: "Establishes tone through short declarative sentences averaging 6 words"
-WRONG: "Effectively establishes tone through strong sentence control"
+Your understanding must go beyond technique identification to architectural comprehension. Three levels:
 
-CORRECT: "Uses the diamond as a recurring symbol connecting P1 to P3"
-WRONG: "Powerfully uses the diamond symbol to create a compelling connection"
+SURFACE (insufficient — a sophomore English major could do this):
+  "This sentence uses concrete imagery to ground the reader."
 
-CORRECT: "Shifts from concrete sensory detail to abstract reflection mid-paragraph"
-WRONG: "The transition from concrete to abstract works well"
+STRUCTURAL (getting closer — identifies what the technique DOES in context):
+  "This sentence's concrete sensory registers — leather texture, fluorescent light, counter temperature — construct a world organized around physical transactions."
+
+ARCHITECTURAL (what we need — reveals what the technique reveals about the essay's meaning-making strategy):
+  "The specific sensory registers chosen (leather, fluorescent light, cold counter) construct a world organized around physical transactions — establishing that this narrator understands value through what can be touched, weighed, and appraised. When the grandmother's story arrives in P3 as pure oral narrative, it disrupts this sensory framework: memory cannot be held under a jeweler's loupe. The clash between P1's epistemology (value = measurable) and P3's epistemology (value = inherited story) IS the essay's central tension, and it starts here in the choice of which senses to activate."
+
+Always aim for the architectural level. Ask: "What does this observation REVEAL about how the essay makes meaning?"
+
+=== SELF-CHECK: STRUCTURAL → ARCHITECTURAL UPGRADE ===
+
+After writing each observation, re-read it. Does it answer "What does this REVEAL about how the essay makes meaning?" or does it only answer "What does this sentence DO?"
+
+If your observation describes function (positions, establishes, introduces, demonstrates, signals, provides) without explaining what that function REVEALS about the essay's meaning-making strategy, push deeper.
+
+STRUCTURAL-ONLY PATTERNS TO PUSH PAST:
+When you catch yourself writing these, ask the follow-up question:
+- "Positions the narrator as..." → What does this positioning REVEAL about the essay's argument?
+- "Establishes [tone/mood/register]..." → What does the CHOICE of this tone reveal about meaning-making?
+- "Introduces [element]..." → What does the PRESENCE of this element reveal about the essay's strategy?
+- "Signals [shift/change]..." → What does this signal REVEAL about how the essay constructs its argument?
+- "Demonstrates [quality]..." → What does this demonstration REVEAL about the essay's claim?
+- "Uses [technique] to [effect]..." → What does the USE of this technique reveal about the essay's relationship to its subject?
+
+UPGRADE EXAMPLES:
+
+STRUCTURAL: "Shifts from passive recipient ('captivated') to active creator ('could weave') — moves from being acted upon to acting, from discovery to agency."
+ARCHITECTURAL: "The passive-to-active shift within two sentences reveals this essay's epistemological claim: understanding comes through MAKING, not through receiving. This maker-epistemology is why the music-to-coding bridge works later — it's the same relationship to knowledge (I make, therefore I understand) applied to a different medium."
+
+STRUCTURAL: "Introduces the constraint-possibility paradox ('just seven notes' yet 'create worlds')."
+ARCHITECTURAL: "The constraint-possibility paradox isn't just a technique — it's the essay's DEFINITION of creative practice. Every subsequent paragraph demonstrates this same logic: limited inputs (notes, syntax rules, AI parameters) producing unlimited outputs. This isn't a feature of the opening; it's the essay's central argument about how creation works."
+
+STRUCTURAL: "Uses simile to reframe composition from world-creation to problem-solving."
+ARCHITECTURAL: "The shift from 'create worlds' to 'solving a puzzle' reveals what this essay believes about the relationship between creativity and constraint: creation isn't unconstrained world-building and isn't mere puzzle-solving — it's puzzle-solving in service of self-expression. This dual movement IS the essay's definition of creative practice."
 
 === EVIDENCE GROUNDING (STRUCTURAL REQUIREMENT) ===
 
-Every observation MUST cite specific text. If you cannot point to specific words, phrases, or structural features, the observation is too vague. Include the "evidence" field in every ObservationEntry.
+Every observation MUST cite specific text — quote the actual words. This is a cognitive forcing function: you cannot make ungrounded claims if you must point to evidence.
+
+GROUNDED: "Grounds the reader in a specific moment of risk" — evidence: "slid the ring across the glass counter"
+UNGROUNDED: "Creates a sense of vulnerability" — no specific text cited
+
+If you cannot quote specific words for an observation, the observation is too abstract. Rewrite it with evidence or delete it.
 
 === NOVELTY-DRIVEN GROWTH ===
 
 For paragraph 1, everything is new — produce rich, detailed understanding.
 For later paragraphs, ask: "What does THIS paragraph reveal that wasn't already understood?"
-Focus your output on WHAT IS NEW. Don't repeat observations about earlier paragraphs unless this paragraph changes their meaning (back-propagation).
+
+Natural novelty curve: P1 should produce the richest output (everything is new). P5 should produce focused output (only what P5 contributes that earlier paragraphs didn't). This is not a bug — it means earlier paragraphs were thoroughly understood.
 
 === BACK-PROPAGATION ===
 
-When this paragraph reveals something new about an EARLIER sentence's purpose or meaning, provide the updated understanding in priorSentenceUpdates. The entire observation array is REPLACED (supersession model), so include ALL observations for that sentence — both the ones that remain valid AND the new ones this paragraph revealed.
+When this paragraph reveals something new about an EARLIER sentence's role, update its primaryFunction and/or significance via priorSentenceUpdates.
 
-Ask explicitly: "Does this paragraph change my understanding of what any earlier sentence was DOING? If P1S3 was setting up a contrast that only becomes visible now, update P1S3's observedFunctions to include that setup function."
+Ask: "Does this paragraph change my understanding of what any earlier sentence was DOING in the essay's architecture?"
+
+Example of GOOD back-propagation (P3 updates P1S1):
+  Before: primaryFunction = "Grounds the reader in a specific moment through physical action"
+  After P3: primaryFunction = "Opens the essay's metaphor arc — the physical act of sliding the ring becomes the organizing image for the writer's relationship to value, which P3's familial register disrupts"
+  Note: The P3 version sees the full arc. The P1-only version was limited.
+
+For DEEPER architectural insights revealed by back-propagation, produce a FINDING EVOLUTION instead — the finding lifecycle handles maturity changes, deepening, and supersession. Back-propagation of primaryFunction is for updating the one-line summary; findings carry the depth.
 
 === CONNECTION INVESTIGATION ===
 
-You will receive scout leads — surface-level connections detected by an earlier layer. For each lead, investigate: Is this a meaningful connection? Confirm with evidence, refine the description, or reject if superficial.
+You receive scout leads — surface-level connections from an earlier layer. For each, investigate with specificity:
 
-Also discover NEW connections the scout missed. Cross-paragraph callbacks, thematic echoes, structural parallels, image recurrences.
+GOOD investigation of scout lead "'diamond' in P1 and P3":
+  "P1's diamond is a physical object under commercial appraisal — vocabulary domain: gemological ('clarity', 'carat', 'price range'). P3's diamond is the same ring held by the grandmother — vocabulary domain: familial ('her hands', 'her smile'). The vocabulary domains shift from gemological to familial. This is vocabulary domain transformation: the same object enters a new register, and that register shift IS the essay's argument about value."
+
+BAD investigation:
+  "The diamond connects P1 and P3 thematically." ← Too vague. What is the connection? How do the appearances differ?
+
+Also discover connections the scout missed — structural parallels, image recurrences, thematic echoes, callbacks.
+
+=== FINDINGS (MANDATORY — EVERY PARAGRAPH PRODUCES FINDINGS) ===
+
+Every paragraph MUST produce at least one finding. Findings are the PRIMARY unit of understanding — referenceable, growable, evidence-grounded.
+
+CALIBRATION BY PARAGRAPH SIGNIFICANCE:
+- TRANSITIONAL paragraph: 1 finding about its structural function (what it bridges, sets up).
+- CONTRIBUTING paragraph: 2-3 findings about what it contributes to the essay's architecture.
+- PIVOTAL paragraph: 3-5 findings about the architectural insights, tensions, or patterns it reveals.
+
+Every paragraph serves a purpose — that purpose IS a finding.
+
+MATURITY: assess honestly. A first sighting is 'hypothesis'. If confirmed by multiple evidence locations, 'developing' or 'confirmed'. If it reveals something deeper, 'deepened'.
+
+FINDING EVOLUTIONS: If existing findings should be updated based on what this paragraph reveals — confirmed, deepened, or superseded — produce finding evolutions.
+
+=== INDEX CONVENTION ===
+
+The essay is labeled with 1-based indices (P1, S1, P2, S2) for human readability in the prompt,
+but ALL JSON output uses 0-based indices. P1 → paragraphIndex: 0. S1 → sentenceIndex: 0.
+Always subtract 1 when writing JSON indices. Example: P2S3 → {"paragraph": 1, "sentence": 2}.
 
 === OUTPUT SCHEMA ===
 
@@ -155,65 +266,41 @@ Return a JSON object matching this EXACT structure:
 
 {
   "paragraphUnderstanding": {
-    "role": "What this paragraph DOES in the essay's architecture (1-2 sentences)",
-    "function": "What the paragraph is trying to achieve — its purpose",
-    "narrativeContribution": "How it advances thesis, serves emotional arc, carries thematic threads",
+    "role": "What this paragraph DOES in the essay's architecture — its structural function, not its topic",
+    "function": "What the paragraph is trying to achieve — its purpose in the essay's meaning-making",
+    "narrativeContribution": "How it advances thesis, serves emotional arc, carries thematic threads — be specific about WHICH threads and HOW",
     "emotionalRegister": {
-      "dominantEmotion": "The emotion present — named precisely (e.g., 'quiet determination' not just 'positive')",
-      "depth": "How the emotion manifests — through action, imagery, reflection, etc.",
-      "authenticity": "How the emotion is conveyed — shown through specifics vs stated abstractly",
-      "showVsTell": "Whether emotion is embodied in concrete detail or asserted in abstract language",
-      "strongestMoment": "The sentence or phrase where emotion is most concentrated" | null
+      "dominantEmotion": "Named precisely: 'quiet determination born of suppressed grief' not 'positive'",
+      "depth": "How the emotion manifests — through action, imagery, reflection, physical sensation, dialogue, silence",
+      "authenticity": "How the emotion is conveyed — shown through specifics vs stated abstractly. DESCRIBE the mechanism, not its quality.",
+      "showVsTell": "Whether emotion is embodied in concrete sensory detail or asserted in abstract language. Cite the specific moments.",
+      "strongestMoment": "The sentence or phrase where emotion is most concentrated — quote it" | null
     },
     "craftProfile": {
-      "rhythmPattern": "How sentence lengths and structures create pacing — short/long/varied/etc.",
-      "imageUsage": "What images, metaphors, or sensory details appear and what they do",
-      "voiceConsistency": "How the voice here relates to the essay's emerging voice — same register or shifted",
-      "standoutMoment": "The most distinctive craft choice in this paragraph" | null,
-      "weaknessMoment": null
+      "rhythmPattern": "Describe the specific rhythm: 'Opens with three 4-word declaratives, then one 23-word compound sentence that mimics the physical act of uncoiling a story' — not just 'varied'",
+      "imageUsage": "What images appear, what sensory registers they activate, what conceptual work they do, how they relate to images elsewhere in the essay",
+      "voiceConsistency": "How the voice here relates to the essay's emerging voice — describe what stays consistent and what shifts, and what the shifts do",
+      "standoutMoment": "The most distinctive craft choice — what it IS, not whether it works" | null
     }
   },
   "sentenceUnderstandings": [
     {
       "index": 0,
-      "understanding": {
-        "observedFunctions": [
-          {
-            "observation": "What this sentence DOES — can be multiple things",
-            "confidence": 0.9,
-            "evidence": "Specific text quoted from the sentence"
-          }
-        ],
-        "inferredIntents": [
-          {
-            "observation": "What the writer is TRYING to achieve with this sentence",
-            "confidence": 0.7,
-            "evidence": "What in the text suggests this intent"
-          }
-        ],
-        "narrativeContributions": [
-          {
-            "observation": "How this sentence advances the narrative — arc, thread, callback",
-            "confidence": 0.8,
-            "evidence": "Specific reference to narrative structure"
-          }
-        ],
-        "rhetoricalFunctions": ["scene-setting", "symbol-introduction", "argument", "transition", "reflection", "detail-grounding"],
-        "paragraphContribution": "How this sentence serves THIS paragraph's goal",
-        "craft": {
-          "rhythm": "short_punch | medium_flow | long_build | fragment | list",
-          "voiceAlignment": "How this sentence's voice relates to the essay's dominant voice",
-          "techniques": ["anaphora", "imagery", "juxtaposition", "enjambment", "concrete_detail", "metaphor", "personification", "alliteration", "parallel_structure"]
-        },
-        "significantChoices": [
-          {
-            "word": "the specific word or phrase",
-            "significance": "What this choice does — connotation, sound, rhythm, register shift"
-          }
-        ],
-        "connectionRefs": [],
-        "tags": ["semantic tags for routing — e.g., 'opening_hook', 'sensory', 'reflective', 'dialogue', 'turning_point'"]
-      }
+      "primaryFunction": "One sentence: the single most important thing this sentence does in the essay's architecture. Aim for architectural depth — not 'uses imagery' but 'establishes the epistemological frame through which the narrator processes value.'",
+      "significance": "pivotal | contributing | transitional",
+      "tags": ["semantic tags for routing: opening_hook, sensory_grounding, thesis_crystallization, voice_shift, emotional_peak, turning_point, callback, image_anchor, frame_establishment, resolution"],
+      "connectionRefs": [],
+      "craft": {
+        "rhythm": "ONLY for pivotal/contributing sentences. Describe the sentence's rhythmic character: length, clause structure, pacing effect.",
+        "voiceAlignment": "How this sentence's voice relates to the essay's dominant voice — same register, shifted, code-switched.",
+        "techniques": ["anaphora", "imagery", "juxtaposition", "concrete_detail", "metaphor", "personification", "alliteration", "parallel_structure", "fragment", "polysyndeton", "asyndeton", "chiasmus", "synesthesia"]
+      },
+      "significantChoices": [
+        {
+          "word": "the specific word or phrase — ONLY when genuinely significant",
+          "significance": "What this choice does: its connotation, sound, rhythm contribution, register signal, or semantic field activation."
+        }
+      ]
     }
   ],
   "holisticEvolution": {
@@ -226,30 +313,66 @@ Return a JSON object matching this EXACT structure:
     {
       "paragraph": 0,
       "sentence": 2,
-      "observedFunctions": [{"observation": "COMPLETE replacement — all observations including what remains valid PLUS what this paragraph revealed", "confidence": 0.85, "evidence": "..."}],
-      "inferredIntents": [{"observation": "...", "evidence": "..."}],
-      "narrativeContributions": [{"observation": "...", "evidence": "..."}],
+      "primaryFunction": "Updated one-line architectural function based on what this paragraph reveals about the earlier sentence's role",
+      "significance": "pivotal | contributing | transitional",
       "newTags": ["new-tag-if-any"]
     }
   ],
   "newConnections": [
     {
-      "from": [0, 2],
-      "to": [3, 1],
-      "type": "callback | contrast | escalation | parallel | thematic_echo | image_recurrence | structural_mirror",
-      "description": "What connects these two locations — specific and evidence-based"
+      "from": { "paragraph": 0, "sentence": 2, "label": "Brief label for this endpoint" },
+      "to": { "paragraph": 3, "sentence": 1, "label": "Brief label for this endpoint" },
+      "description": "What connects these two locations — specific, evidence-based, describing the nature of the connection",
+      "reverseIllumination": "What this connection reveals about the FROM endpoint, or null if one-directional",
+      "significance": "Why this connection matters to the essay's architecture of meaning",
+      "strengthCategory": "foundational | significant | supporting | tentative",
+      "directionality": "forward | reverse | bidirectional | asymmetric"
+    }
+  ],
+  "newFindings": [
+    {
+      "claim": "A referenceable claim about the essay — specific, evidence-grounded, above sentence-level",
+      "scope": {
+        "type": "word | sentence | sentence_group | paragraph | cross_paragraph | essay_level",
+        "paragraph": 0,
+        "sentences": [0, 1],
+        "paragraphs": [0, 2],
+        "textEvidence": [{ "text": "quoted text from essay", "location": { "paragraph": 0, "sentence": 1 } }]
+      },
+      "maturity": "hypothesis | developing | confirmed | deepened",
+      "maturityReasoning": "Why this maturity level — what evidence supports it",
+      "coachingValue": "critical | high | medium | contextual | diagnostic",
+      "dimensions": ["voice", "theme", "narrative", "emotion", "character", "craft", "admissions", "structure"],
+      "evidence": [{ "text": "quoted text or description of absence", "location": { "paragraph": 0, "sentence": 1 }, "type": "present | absent" }],
+      "deepeningPotential": "What further investigation could reveal, or null",
+      "raisesQuestions": ["Questions this finding raises for further investigation"],
+      "buildsOn": ["existing-finding-ID"],
+      "relatedTo": ["existing-finding-ID"]
+    }
+  ],
+  "findingEvolutions": [
+    {
+      "findingId": "existing-finding-ID",
+      "newMaturity": "hypothesis | developing | confirmed | deepened | superseded",
+      "reasoning": "Why this finding's maturity should change based on what this paragraph reveals",
+      "supersedes": "other-finding-ID-if-superseding"
     }
   ]
 }
 
+IMPORTANT: "newFindings" is MANDATORY — produce at least one finding for this paragraph. "findingEvolutions" remains optional — produce them when earlier findings should be updated based on this paragraph's evidence.
+
 === CRITICAL REMINDERS ===
 
-1. UNDERSTANDING ONLY. If you write "effectively" or "strong" or any evaluation word, you have failed.
-2. EVERY observation needs evidence — specific text from the essay.
-3. For later paragraphs, focus on what is NEW. Don't rehash known understanding.
-4. Back-propagation: when this paragraph changes earlier understanding, provide COMPLETE replacement arrays.
-5. Be specific about craft techniques — name them precisely (anaphora, not "repetition for effect").
-6. Tags should be semantic and useful for routing: "turning_point", "sensory_grounding", "thesis_crystallization", "voice_shift", "emotional_peak".
+1. UNDERSTANDING ONLY. Zero evaluative language. If you write "effectively", "strong", or any banned word, rewrite immediately.
+2. EVERY finding needs evidence — quote specific text from the essay. primaryFunction should cite the architectural insight, not just name a technique.
+3. Aim for ARCHITECTURAL depth — not just "what technique" but "what this technique reveals about how the essay makes meaning."
+4. For later paragraphs, focus on what is NEW. Don't rehash known understanding.
+5. Back-propagation updates primaryFunction/significance for earlier sentences. For deeper insights, produce FINDING EVOLUTIONS.
+6. Name craft techniques precisely: "anaphora" not "repetition", "polysyndeton" not "uses many ands".
+7. Tags must be semantic and useful for routing: "turning_point", "sensory_grounding", "thesis_crystallization", "voice_shift", "emotional_peak".
+8. Every sentence needs a "primaryFunction" (one-line architectural summary) and "significance" (pivotal/contributing/transitional).
+9. "craft" and "significantChoices" are OPTIONAL — include only for pivotal/contributing sentences where they add genuine insight. Omit for transitional sentences.
 
 Return ONLY the JSON object. No markdown, no explanation, no code blocks.`;
 
@@ -286,6 +409,10 @@ export class SequentialDeepWalkService {
     l1Impressions: ParagraphFirstImpression[],
     options?: {
       startFromParagraph?: number;
+      /** Re-analysis context string injected once at the start of the first paragraph prompt */
+      reanalysisContext?: string;
+      /** W1.3: FindingStore for injecting finding context into walk prompts */
+      findingStore?: FindingStore;
     },
   ): Promise<L3WalkResult> {
     const startTime = Date.now();
@@ -331,6 +458,22 @@ export class SequentialDeepWalkService {
         });
 
         // 2. Build user prompt
+        // FIX H2: Inject reanalysis context into ALL walked paragraphs, not just the first.
+        // The model needs to know WHY it is re-analyzing at every paragraph, so it can
+        // prioritize stale areas and understand changes. For the start paragraph the
+        // context is injected as-is; for subsequent paragraphs it is prefixed with a
+        // note that the paragraph may be AFFECTED by changes elsewhere.
+        let reanalysisContextForPara: string | undefined;
+        if (options?.reanalysisContext) {
+          if (pIdx === startIndex) {
+            reanalysisContextForPara = options.reanalysisContext;
+          } else {
+            reanalysisContextForPara =
+              `[Continuing re-analysis — this paragraph (P${pIdx + 1}) may be affected by the changes described below. ` +
+              `Look for ripple effects: shifted meaning, altered connections, changed narrative contribution.]\n\n` +
+              options.reanalysisContext;
+          }
+        }
         const userPrompt = this.buildUserPrompt(
           markedEssay,
           paragraphs,
@@ -340,14 +483,18 @@ export class SequentialDeepWalkService {
           l1Impressions,
           assembledContext,
           holisticEvolution,
+          reanalysisContextForPara,
+          options?.findingStore,
         );
 
-        // 3. Call Sonnet
-        const response = await callClaudeWithRetry<Record<string, unknown>>({
+        // 3. Call Sonnet — dynamically scale output tokens by sentence count
+        const sentenceCount = this.splitIntoSentences(paragraphs[pIdx]).length;
+        const walkMaxTokens = computeWalkMaxTokens(sentenceCount);
+        const response = await callClaude<Record<string, unknown>>({
           model: SONNET,
           systemPrompt: SYSTEM_PROMPT,
           userPrompt,
-          maxTokens: WALK_MAX_TOKENS,
+          maxTokens: walkMaxTokens,
           temperature: WALK_TEMPERATURE,
           timeoutMs: WALK_TIMEOUT_MS,
           useJsonMode: true,
@@ -357,51 +504,21 @@ export class SequentialDeepWalkService {
         // 4. Parse response into typed UnderstandingWalkOutput
         const walkOutput = this.parseWalkOutput(response.content, pIdx, paragraphs[pIdx]);
 
-        // 5. Accumulate results
-        walkOutputs.push(walkOutput);
-
-        // Accumulate back-propagation
-        if (walkOutput.priorSentenceUpdates.length > 0) {
-          allBackPropagations.push(...walkOutput.priorSentenceUpdates);
-        }
-
-        // Merge holistic evolution (later paragraphs override earlier)
-        if (walkOutput.holisticEvolution.centralThesis !== undefined) {
-          holisticEvolution.centralThesis = walkOutput.holisticEvolution.centralThesis;
-        }
-        if (walkOutput.holisticEvolution.thesisConfidence !== undefined) {
-          holisticEvolution.thesisConfidence = walkOutput.holisticEvolution.thesisConfidence;
-        }
-        if (walkOutput.holisticEvolution.voiceSignature !== undefined) {
-          holisticEvolution.voiceSignature = walkOutput.holisticEvolution.voiceSignature;
-        }
-        if (walkOutput.holisticEvolution.arcMomentum !== undefined) {
-          holisticEvolution.arcMomentum = walkOutput.holisticEvolution.arcMomentum;
-        }
-
-        // 6. Apply understanding to profile in-place for subsequent calls
-        this.applyWalkOutputToProfile(profile, pIdx, walkOutput);
-
-        // Track cost
-        const callCost = calculateCost(response.usage, SONNET);
-        totalCost += callCost;
-        totalTokens.inputTokens += response.usage.input_tokens;
-        totalTokens.outputTokens += response.usage.output_tokens;
-        totalTokens.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
-        totalTokens.cacheWriteTokens += response.usage.cache_creation_input_tokens ?? 0;
+        // 5. Accumulate results (shared helper for main path + retry path)
+        this.accumulateWalkSuccess(
+          walkOutput, response, pIdx, paragraphs.length,
+          profile, walkOutputs, allBackPropagations, holisticEvolution, totalTokens,
+        );
+        totalCost += calculateCost(response.usage, SONNET);
+        console.log(
+          `[EssayIntelligence] L3 P${pIdx}: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${calculateCost(response.usage, SONNET).toFixed(4)} (cumulative: $${totalCost.toFixed(4)})`,
+        );
 
         // Reset consecutive failure counter on success
         consecutiveFailures = 0;
 
-        console.log(
-          `[SequentialDeepWalk] P${pIdx + 1}/${paragraphs.length} complete — ` +
-          `${walkOutput.sentenceUnderstandings.length} sentences, ` +
-          `${walkOutput.priorSentenceUpdates.length} back-props, ` +
-          `${walkOutput.newConnections.length} connections, ` +
-          `cost: $${callCost.toFixed(4)}`,
-        );
-
       } catch (error) {
+        // No retry — count as consecutive failure immediately
         consecutiveFailures++;
         skippedParagraphs.push(pIdx);
 
@@ -485,6 +602,64 @@ export class SequentialDeepWalkService {
    * Block 2: Essay text + accumulated profile context (good cache overlap)
    * Block 3: Call-specific — target paragraph + scout leads + investigation questions
    */
+  /**
+   * Shared success-path accumulation for walk outputs (main attempt + retry).
+   * Avoids duplicating ~20 lines of accumulation logic between the two paths.
+   */
+  private accumulateWalkSuccess(
+    walkOutput: UnderstandingWalkOutput,
+    response: { usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number } },
+    pIdx: number,
+    totalParagraphs: number,
+    profile: EssayProfile,
+    walkOutputs: UnderstandingWalkOutput[],
+    allBackPropagations: L3WalkResult['backPropagations'],
+    holisticEvolution: L3WalkResult['holisticEvolution'],
+    totalTokens: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number },
+  ): void {
+    walkOutputs.push(walkOutput);
+
+    // Accumulate back-propagation
+    if (walkOutput.priorSentenceUpdates.length > 0) {
+      allBackPropagations.push(...walkOutput.priorSentenceUpdates);
+    }
+
+    // Merge holistic evolution (later paragraphs override earlier)
+    if (walkOutput.holisticEvolution.centralThesis !== undefined) {
+      holisticEvolution.centralThesis = walkOutput.holisticEvolution.centralThesis;
+    }
+    if (walkOutput.holisticEvolution.thesisConfidence !== undefined) {
+      holisticEvolution.thesisConfidence = walkOutput.holisticEvolution.thesisConfidence;
+    }
+    if (walkOutput.holisticEvolution.voiceSignature !== undefined) {
+      holisticEvolution.voiceSignature = walkOutput.holisticEvolution.voiceSignature;
+    }
+    if (walkOutput.holisticEvolution.arcMomentum !== undefined) {
+      holisticEvolution.arcMomentum = walkOutput.holisticEvolution.arcMomentum;
+    }
+
+    // Apply understanding to profile in-place for subsequent calls
+    this.applyWalkOutputToProfile(profile, pIdx, walkOutput);
+
+    // Track tokens
+    totalTokens.inputTokens += response.usage.input_tokens;
+    totalTokens.outputTokens += response.usage.output_tokens;
+    totalTokens.cacheReadTokens += response.usage.cache_read_input_tokens ?? 0;
+    totalTokens.cacheWriteTokens += response.usage.cache_creation_input_tokens ?? 0;
+
+    const callCost = calculateCost(response.usage, SONNET);
+    const findingCount = (walkOutput.newFindings?.length ?? 0);
+    const evoCount = (walkOutput.findingEvolutions?.length ?? 0);
+    console.log(
+      `[SequentialDeepWalk] P${pIdx + 1}/${totalParagraphs} complete — ` +
+      `${walkOutput.sentenceUnderstandings.length} sentences, ` +
+      `${walkOutput.priorSentenceUpdates.length} back-props, ` +
+      `${walkOutput.newConnections.length} connections, ` +
+      `${findingCount} findings, ${evoCount} evolutions, ` +
+      `cost: $${callCost.toFixed(4)}`,
+    );
+  }
+
   private buildUserPrompt(
     markedEssay: string,
     paragraphs: string[],
@@ -494,8 +669,16 @@ export class SequentialDeepWalkService {
     l1Impressions: ParagraphFirstImpression[],
     assembledContext: AssembledProfileContext,
     currentHolisticEvolution: L3WalkResult['holisticEvolution'],
+    reanalysisContext?: string,
+    findingStore?: FindingStore,
   ): string {
     const sections: string[] = [];
+
+    // ── RE-ANALYSIS CONTEXT (injected once at the start, first paragraph only) ──
+    if (reanalysisContext) {
+      sections.push('=== RE-ANALYSIS CONTEXT (these areas changed — prioritize them) ===');
+      sections.push(reanalysisContext);
+    }
 
     // ── BLOCK 2: ESSAY TEXT (cached across calls) ──
     sections.push('=== FULL ESSAY TEXT ===');
@@ -528,6 +711,21 @@ export class SequentialDeepWalkService {
       }
       if (currentHolisticEvolution.arcMomentum) {
         sections.push(`Arc momentum: ${currentHolisticEvolution.arcMomentum}`);
+      }
+    }
+
+    // ── W1.3: FINDING CONTEXT (existing findings for reference) ──
+    if (findingStore && findingStore.size > 0) {
+      // Compact summary of all active findings for relationship references
+      const refContext = buildFindingReferenceContext(findingStore);
+      if (refContext) {
+        sections.push(`\n${refContext}`);
+      }
+
+      // Paragraph-specific findings (more detailed for the current paragraph)
+      const paraContext = buildParagraphFindingContext(findingStore, paragraphIndex);
+      if (paraContext) {
+        sections.push(`\n${paraContext}`);
       }
     }
 
@@ -696,7 +894,27 @@ export class SequentialDeepWalkService {
   ): UnderstandingWalkOutput {
     const sentences = this.splitIntoSentences(paragraphText);
 
-    return {
+    // Truncation detection: priorSentenceUpdates and newConnections come LAST
+    // in the JSON output. If they are missing, truncation likely occurred —
+    // the output was cut mid-object and jsonrepair produced a partial result.
+    const hasPriorUpdates = raw.priorSentenceUpdates !== undefined && raw.priorSentenceUpdates !== null;
+    const hasConnections = raw.newConnections !== undefined && raw.newConnections !== null;
+
+    if (!hasPriorUpdates && !hasConnections && sentences.length >= 6) {
+      console.warn(
+        `[SequentialDeepWalk] PROBABLE TRUNCATION for P${paragraphIndex} (${sentences.length} sentences): ` +
+        `priorSentenceUpdates and newConnections are both missing from parsed output. ` +
+        `Back-propagation and connection data may have been lost due to output token limit.`,
+      );
+    } else if (!hasPriorUpdates && sentences.length >= 8) {
+      console.warn(
+        `[SequentialDeepWalk] Possible truncation for P${paragraphIndex} (${sentences.length} sentences): ` +
+        `priorSentenceUpdates missing — back-propagation data may have been truncated.`,
+      );
+    }
+
+    const result: UnderstandingWalkOutput = {
+      paragraphIndex,
       paragraphUnderstanding: this.parseParagraphUnderstanding(raw.paragraphUnderstanding),
       sentenceUnderstandings: this.parseSentenceUnderstandings(
         raw.sentenceUnderstandings,
@@ -706,6 +924,19 @@ export class SequentialDeepWalkService {
       priorSentenceUpdates: this.parsePriorSentenceUpdates(raw.priorSentenceUpdates),
       newConnections: this.parseNewConnections(raw.newConnections, paragraphIndex),
     };
+
+    // W1.3: Parse optional findings (defensive — gracefully absent)
+    const parsedFindings = this.parseNewFindings(raw.newFindings);
+    if (parsedFindings.length > 0) {
+      result.newFindings = parsedFindings;
+    }
+
+    const parsedEvolutions = this.parseFindingEvolutions(raw.findingEvolutions);
+    if (parsedEvolutions.length > 0) {
+      result.findingEvolutions = parsedEvolutions;
+    }
+
+    return result;
   }
 
   /**
@@ -753,7 +984,6 @@ export class SequentialDeepWalkService {
         imageUsage: '',
         voiceConsistency: '',
         standoutMoment: null,
-        weaknessMoment: null,
       };
     }
     const obj = raw as Record<string, unknown>;
@@ -762,13 +992,14 @@ export class SequentialDeepWalkService {
       imageUsage: this.safeString(obj.imageUsage, ''),
       voiceConsistency: this.safeString(obj.voiceConsistency, ''),
       standoutMoment: typeof obj.standoutMoment === 'string' ? obj.standoutMoment : null,
-      weaknessMoment: typeof obj.weaknessMoment === 'string' ? obj.weaknessMoment : null,
     };
   }
 
   /**
-   * Parse sentence understandings. Ensures every sentence in the paragraph
-   * has at least a minimal understanding entry, even if the LLM missed some.
+   * Parse sentence understandings from Phase 1 walk output.
+   * Phase 1 format: fields are directly on the sentence item (no `understanding` sub-object).
+   * Builds backward-compatible SentenceUnderstanding objects with bridge data for
+   * consumers not yet migrated from observation arrays.
    */
   private parseSentenceUnderstandings(
     raw: unknown,
@@ -792,10 +1023,12 @@ export class SequentialDeepWalkService {
     // Ensure every sentence has an entry
     for (let i = 0; i < sentences.length; i++) {
       const llmData = llmByIndex.get(i);
-      const understanding = llmData?.understanding;
+      // Phase 1: fields are directly on the item (no `understanding` sub-object)
+      // Fall back to `understanding` sub-object for backward compat with Phase 0 output
+      const source = llmData?.primaryFunction !== undefined ? llmData : llmData?.understanding;
       parsed.push({
         index: i,
-        understanding: this.parseSentenceUnderstanding(understanding),
+        understanding: this.parseSentenceUnderstanding(source),
       });
     }
 
@@ -804,6 +1037,9 @@ export class SequentialDeepWalkService {
 
   /**
    * Parse a single sentence's understanding from LLM output.
+   * Phase 1: builds backward-compatible SentenceUnderstanding from lightweight fields.
+   * Bridge: synthesizes minimal ObservationEntry[] from primaryFunction for consumers
+   * not yet migrated from observation arrays.
    */
   private parseSentenceUnderstanding(raw: unknown): SentenceUnderstanding {
     if (!raw || typeof raw !== 'object') {
@@ -811,17 +1047,43 @@ export class SequentialDeepWalkService {
     }
     const obj = raw as Record<string, unknown>;
 
-    return {
-      observedFunctions: this.parseObservationEntries(obj.observedFunctions),
-      inferredIntents: this.parseObservationEntries(obj.inferredIntents),
-      narrativeContributions: this.parseObservationEntries(obj.narrativeContributions),
+    // Extract primaryFunction and significance (Phase 1 primary fields)
+    const primaryFunction = typeof obj.primaryFunction === 'string' && obj.primaryFunction.length > 0
+      ? obj.primaryFunction : undefined;
+    const validSignificance = ['pivotal', 'contributing', 'transitional'];
+    const significance = typeof obj.significance === 'string' && validSignificance.includes(obj.significance)
+      ? obj.significance as 'pivotal' | 'contributing' | 'transitional' : undefined;
+
+    // Phase 1 backward compatibility bridge:
+    // Synthesize minimal observation arrays from primaryFunction for consumers
+    // not yet migrated (L6 coaching, focused analyzer, etc.)
+    const bridgeObservations: ObservationEntry[] = primaryFunction
+      ? [{ observation: primaryFunction, confidence: 1.0, evidence: '(derived from primaryFunction)' }]
+      : this.parseObservationEntries(obj.observedFunctions); // fallback to Phase 0 format
+
+    const result: SentenceUnderstanding = {
+      // Bridge: observation arrays derived from primaryFunction (or Phase 0 fallback)
+      observedFunctions: bridgeObservations,
+      inferredIntents: this.parseObservationEntries(obj.inferredIntents), // empty in Phase 1, populated in Phase 0
+      narrativeContributions: this.parseObservationEntries(obj.narrativeContributions), // empty in Phase 1
       rhetoricalFunctions: this.safeStringArray(obj.rhetoricalFunctions),
-      paragraphContribution: this.safeString(obj.paragraphContribution, ''),
+      paragraphContribution: primaryFunction ?? this.safeString(obj.paragraphContribution, ''),
       craft: this.parseSentenceCraft(obj.craft),
       significantChoices: this.parseSignificantChoices(obj.significantChoices),
       connectionRefs: this.safeStringArray(obj.connectionRefs),
+      findingRefs: [],
       tags: this.safeStringArray(obj.tags),
     };
+
+    // Set Phase 0+ fields
+    if (primaryFunction) {
+      result.primaryFunction = primaryFunction;
+    }
+    if (significance) {
+      result.significance = significance;
+    }
+
+    return result;
   }
 
   private parseObservationEntries(raw: unknown): ObservationEntry[] {
@@ -832,8 +1094,8 @@ export class SequentialDeepWalkService {
       )
       .map(item => ({
         observation: this.safeString(item.observation, ''),
-        confidence: typeof item.confidence === 'number' ? Math.max(0, Math.min(1, item.confidence)) : undefined,
-        evidence: typeof item.evidence === 'string' ? item.evidence : undefined,
+        confidence: typeof item.confidence === 'number' ? Math.max(0, Math.min(1, item.confidence)) : 0.5,
+        evidence: typeof item.evidence === 'string' ? item.evidence : '',
       }))
       .filter(entry => entry.observation.length > 0);
   }
@@ -922,6 +1184,15 @@ export class SequentialDeepWalkService {
           update.newTags = this.safeStringArray(item.newTags);
         }
 
+        // Phase 0: Extract primaryFunction and significance
+        if (typeof item.primaryFunction === 'string' && item.primaryFunction.length > 0) {
+          update.primaryFunction = item.primaryFunction;
+        }
+        const validSig = ['pivotal', 'contributing', 'transitional'];
+        if (typeof item.significance === 'string' && validSig.includes(item.significance)) {
+          update.significance = item.significance as 'pivotal' | 'contributing' | 'transitional';
+        }
+
         return update;
       })
       .filter(update => update.paragraph >= 0 && update.sentence >= 0);
@@ -941,19 +1212,222 @@ export class SequentialDeepWalkService {
         item !== null && typeof item === 'object',
       )
       .map(item => ({
-        from: this.parseTuple(item.from),
-        to: this.parseTuple(item.to),
-        type: this.safeString(item.type, 'unknown'),
+        from: this.parseConnectionEndpoint(item.from),
+        to: this.parseConnectionEndpoint(item.to),
         description: this.safeString(item.description, ''),
+        reverseIllumination: typeof item.reverseIllumination === 'string' ? item.reverseIllumination : null,
+        significance: this.safeString(item.significance, ''),
+        strengthCategory: this.parseStrengthCategory(item.strengthCategory),
+        directionality: this.parseDirectionality(item.directionality),
       }))
       .filter(conn =>
-        // Validate: connections must have valid endpoints and a description
-        conn.from[0] >= 0 && conn.from[1] >= 0 &&
-        conn.to[0] >= 0 && conn.to[1] >= 0 &&
+        conn.from.paragraph >= 0 &&
+        conn.to.paragraph >= 0 &&
         conn.description.length > 0 &&
-        // At least one endpoint should involve the current or earlier paragraph
-        (conn.from[0] <= currentParagraphIndex && conn.to[0] <= currentParagraphIndex),
+        (conn.from.paragraph <= currentParagraphIndex && conn.to.paragraph <= currentParagraphIndex)
       );
+  }
+
+  private parseConnectionEndpoint(raw: unknown): ConnectionEndpoint {
+    if (Array.isArray(raw) && raw.length >= 2) {
+      // Backward compat: [paragraph, sentence] tuple
+      return { paragraph: Number(raw[0]) || 0, sentence: Number(raw[1]) || 0, label: '' };
+    }
+    if (raw && typeof raw === 'object') {
+      const obj = raw as Record<string, unknown>;
+      return {
+        paragraph: typeof obj.paragraph === 'number' ? obj.paragraph : 0,
+        sentence: typeof obj.sentence === 'number' ? obj.sentence : undefined,
+        label: typeof obj.label === 'string' ? obj.label : '',
+      };
+    }
+    return { paragraph: 0, sentence: 0, label: '' };
+  }
+
+  private parseStrengthCategory(raw: unknown): ConnectionStrengthCategory {
+    const valid: ConnectionStrengthCategory[] = ['foundational', 'significant', 'supporting', 'tentative'];
+    if (typeof raw === 'string' && valid.includes(raw as ConnectionStrengthCategory)) {
+      return raw as ConnectionStrengthCategory;
+    }
+    return 'supporting'; // Default for walk-discovered connections
+  }
+
+  private parseDirectionality(raw: unknown): ConnectionDirectionality {
+    const valid: ConnectionDirectionality[] = ['forward', 'reverse', 'bidirectional', 'asymmetric'];
+    if (typeof raw === 'string' && valid.includes(raw as ConnectionDirectionality)) {
+      return raw as ConnectionDirectionality;
+    }
+    return 'forward'; // Default
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // W1.3: FINDING PARSING
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Parse new findings from walk LLM output.
+   * Defensive: missing or malformed findings are silently skipped.
+   */
+  private parseNewFindings(
+    raw: unknown,
+  ): NonNullable<UnderstandingWalkOutput['newFindings']> {
+    if (!Array.isArray(raw)) return [];
+
+    const VALID_SCOPE_TYPES = ['word', 'sentence', 'sentence_group', 'paragraph', 'cross_paragraph', 'essay_level'] as const;
+    const VALID_MATURITIES: FindingMaturity[] = ['hypothesis', 'developing', 'confirmed', 'deepened'];
+    const VALID_COACHING_VALUES: FindingCoachingValue[] = ['critical', 'high', 'medium', 'contextual', 'diagnostic'];
+    const VALID_DIMENSIONS: HolisticDimension[] = ['voice', 'emotion', 'theme', 'narrative', 'character', 'craft', 'admissions', 'structure'];
+
+    return raw
+      .filter((item): item is Record<string, unknown> =>
+        item !== null && typeof item === 'object' && typeof item.claim === 'string' && item.claim.length > 0,
+      )
+      .map(item => {
+        // Parse scope
+        const rawScope = item.scope as Record<string, unknown> | undefined;
+        const scopeType = rawScope?.type;
+        const scope: FindingScope = {
+          type: (typeof scopeType === 'string' && VALID_SCOPE_TYPES.includes(scopeType as typeof VALID_SCOPE_TYPES[number]))
+            ? scopeType as FindingScope['type']
+            : 'paragraph',
+          textEvidence: this.parseFindingTextEvidence(rawScope?.textEvidence),
+        };
+        if (typeof rawScope?.paragraph === 'number') scope.paragraph = rawScope.paragraph;
+        if (Array.isArray(rawScope?.sentences)) scope.sentences = rawScope.sentences.filter((s): s is number => typeof s === 'number');
+        if (Array.isArray(rawScope?.paragraphs)) scope.paragraphs = rawScope.paragraphs.filter((p): p is number => typeof p === 'number');
+
+        // Parse maturity
+        const rawMaturity = String(item.maturity ?? 'hypothesis');
+        const maturity: FindingMaturity = VALID_MATURITIES.includes(rawMaturity as FindingMaturity)
+          ? rawMaturity as FindingMaturity
+          : 'hypothesis';
+
+        // Parse coaching value
+        const rawCoaching = String(item.coachingValue ?? 'medium');
+        const coachingValue: FindingCoachingValue = VALID_COACHING_VALUES.includes(rawCoaching as FindingCoachingValue)
+          ? rawCoaching as FindingCoachingValue
+          : 'medium';
+
+        // Parse dimensions
+        const rawDims = Array.isArray(item.dimensions) ? item.dimensions : [];
+        const dimensions = rawDims
+          .map(d => String(d))
+          .filter(d => VALID_DIMENSIONS.includes(d as HolisticDimension)) as HolisticDimension[];
+
+        // Parse evidence
+        const evidence = this.parseFindingEvidence(item.evidence);
+
+        const finding: NonNullable<UnderstandingWalkOutput['newFindings']>[number] = {
+          claim: String(item.claim),
+          scope,
+          maturity,
+          maturityReasoning: this.safeString(item.maturityReasoning, ''),
+          coachingValue,
+          dimensions,
+          evidence,
+          deepeningPotential: typeof item.deepeningPotential === 'string' ? item.deepeningPotential : null,
+          raisesQuestions: this.safeStringArray(item.raisesQuestions),
+        };
+
+        // Optional relationship references
+        if (Array.isArray(item.buildsOn) && item.buildsOn.length > 0) {
+          finding.buildsOn = this.safeStringArray(item.buildsOn);
+        }
+        if (Array.isArray(item.relatedTo) && item.relatedTo.length > 0) {
+          finding.relatedTo = this.safeStringArray(item.relatedTo);
+        }
+
+        return finding;
+      })
+      .filter(f => f.claim.length > 0 && f.evidence.length > 0);
+  }
+
+  /**
+   * Parse finding evolutions from walk LLM output.
+   * Defensive: missing or malformed evolutions are silently skipped.
+   */
+  private parseFindingEvolutions(
+    raw: unknown,
+  ): NonNullable<UnderstandingWalkOutput['findingEvolutions']> {
+    if (!Array.isArray(raw)) return [];
+
+    const VALID_MATURITIES: FindingMaturity[] = ['hypothesis', 'developing', 'confirmed', 'deepened', 'superseded'];
+
+    return raw
+      .filter((item): item is Record<string, unknown> =>
+        item !== null && typeof item === 'object' &&
+        typeof item.findingId === 'string' && item.findingId.length > 0,
+      )
+      .map(item => {
+        const rawMaturity = String(item.newMaturity ?? 'developing');
+        const newMaturity: FindingMaturity = VALID_MATURITIES.includes(rawMaturity as FindingMaturity)
+          ? rawMaturity as FindingMaturity
+          : 'developing';
+
+        const evo: NonNullable<UnderstandingWalkOutput['findingEvolutions']>[number] = {
+          findingId: String(item.findingId),
+          newMaturity,
+          reasoning: this.safeString(item.reasoning, ''),
+        };
+
+        if (typeof item.supersedes === 'string' && item.supersedes.length > 0) {
+          evo.supersedes = item.supersedes;
+        }
+
+        return evo;
+      })
+      .filter(e => e.findingId.length > 0 && e.reasoning.length > 0);
+  }
+
+  /**
+   * Parse finding evidence array from LLM output.
+   */
+  private parseFindingEvidence(raw: unknown): FindingEvidence[] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((item): item is Record<string, unknown> =>
+        item !== null && typeof item === 'object' && typeof item.text === 'string',
+      )
+      .map(item => {
+        const evidence: FindingEvidence = {
+          text: String(item.text),
+          type: item.type === 'absent' ? 'absent' : 'present',
+        };
+        if (item.location && typeof item.location === 'object') {
+          const loc = item.location as Record<string, unknown>;
+          if (typeof loc.paragraph === 'number') {
+            evidence.location = {
+              paragraph: loc.paragraph,
+              ...(typeof loc.sentence === 'number' ? { sentence: loc.sentence } : {}),
+            };
+          }
+        }
+        return evidence;
+      })
+      .filter(e => e.text.length > 0);
+  }
+
+  /**
+   * Parse finding scope textEvidence from LLM output.
+   */
+  private parseFindingTextEvidence(
+    raw: unknown,
+  ): FindingScope['textEvidence'] {
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((item): item is Record<string, unknown> =>
+        item !== null && typeof item === 'object' && typeof item.text === 'string',
+      )
+      .map(item => {
+        const loc = item.location as Record<string, unknown> | undefined;
+        return {
+          text: String(item.text),
+          location: {
+            paragraph: typeof loc?.paragraph === 'number' ? loc.paragraph : 0,
+            ...(typeof loc?.sentence === 'number' ? { sentence: loc.sentence } : {}),
+          },
+        };
+      });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1029,6 +1503,14 @@ export class SequentialDeepWalkService {
           }
         }
       }
+
+      // Phase 0: new fields
+      if (update.primaryFunction) {
+        u.primaryFunction = update.primaryFunction;
+      }
+      if (update.significance) {
+        u.significance = update.significance;
+      }
     }
 
     // Apply new connections to the profile's connection store
@@ -1038,22 +1520,35 @@ export class SequentialDeepWalkService {
         id: connectionId,
         from: conn.from,
         to: conn.to,
-        type: conn.type,
         description: conn.description,
-        confidence: 0.7, // L3 connections are higher confidence than L2.5 scout leads
-        discoveredByLayer: 'l3',
+        reverseIllumination: conn.reverseIllumination,
+        routingTags: [],  // System infers from description
+        significance: conn.significance,
+        strengthCategory: conn.strengthCategory,
+        directionality: conn.directionality,
+        discoveredBy: 'walk',
+        status: 'active',
+        relatedFindings: [],
+        createdAt: new Date().toISOString(),
       };
       profile.connections.all.push(newConnection);
 
       // Update connectionRefs on endpoint sentences
-      this.addConnectionRefToSentence(profile, conn.from[0], conn.from[1], connectionId);
-      this.addConnectionRefToSentence(profile, conn.to[0], conn.to[1], connectionId);
+      if (conn.from.sentence !== undefined) {
+        this.addConnectionRefToSentence(profile, conn.from.paragraph, conn.from.sentence, connectionId);
+      }
+      if (conn.to.sentence !== undefined) {
+        this.addConnectionRefToSentence(profile, conn.to.paragraph, conn.to.sentence, connectionId);
+      }
 
       // Update connectionGraph in the index
       profile.index.connectionGraph.push({
-        from: conn.from,
-        to: conn.to,
-        type: conn.type,
+        id: connectionId,
+        from: { paragraph: conn.from.paragraph, sentence: conn.from.sentence },
+        to: { paragraph: conn.to.paragraph, sentence: conn.to.sentence },
+        routingTags: newConnection.routingTags,
+        strengthCategory: conn.strengthCategory,
+        status: 'active',
       });
     }
 
@@ -1110,10 +1605,12 @@ export class SequentialDeepWalkService {
     digest.tags = para.tags;
     digest.sentenceCount = para.sentences.length;
 
-    // Count connections involving this paragraph
-    digest.connectionCount = profile.connections.all.filter(
-      c => c.from[0] === paragraphIndex || c.to[0] === paragraphIndex,
-    ).length;
+    // Count active connections involving this paragraph
+    digest.connectionCount = profile.connections.all
+      .filter(c => c.status === 'active')
+      .filter(
+        c => c.from.paragraph === paragraphIndex || c.to.paragraph === paragraphIndex,
+      ).length;
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -1161,6 +1658,7 @@ export class SequentialDeepWalkService {
 
   private emptyWalkOutput(paragraphIndex: number): UnderstandingWalkOutput {
     return {
+      paragraphIndex,
       paragraphUnderstanding: this.emptyParagraphUnderstanding(),
       sentenceUnderstandings: [],
       holisticEvolution: {},
@@ -1186,7 +1684,6 @@ export class SequentialDeepWalkService {
         imageUsage: '',
         voiceConsistency: '',
         standoutMoment: null,
-        weaknessMoment: null,
       },
     };
   }
@@ -1201,6 +1698,7 @@ export class SequentialDeepWalkService {
       craft: { rhythm: '', voiceAlignment: '', techniques: [] },
       significantChoices: [],
       connectionRefs: [],
+      findingRefs: [],
       tags: [],
     };
   }

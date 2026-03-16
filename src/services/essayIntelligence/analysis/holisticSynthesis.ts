@@ -18,9 +18,9 @@
  * Types: src/services/essayIntelligence/profileTypes.ts (HolisticSynthesisOutput)
  */
 
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
-import { jsonrepair } from 'jsonrepair';
+import { parseLlmJsonOutput } from './llmJsonParser';
 import type {
   HolisticSynthesisOutput,
   VoiceIdentity,
@@ -47,7 +47,30 @@ import type {
   VoiceDimension,
   EarningMechanismType,
   ThreadStrength,
+  ConnectionEndpoint,
+  ConnectionStrengthCategory,
+  ConnectionDirectionality,
+  ConnectionRoutingTag,
+  FindingScope,
+  FindingMaturity,
+  FindingCoachingValue,
+  FindingEvidence,
+  DeltaSynthesisRequest,
+  DeltaSynthesisOutput,
+  HolisticSectionType,
+  SynthesisIterationOutput,
+  ReadingStrategy,
+  QuestionCurationOutput,
+  UnderstandingQuestion,
+  GrowthStepRecord,
+  ImprovementPhase,
+  Finding,
+  EssayUnderstanding,
 } from '../profileTypes';
+import { FindingStore } from '../findings/findingStore';
+import {
+  buildFindingReferenceContext,
+} from '../findings/findingContextBuilder';
 
 // ============================================================================
 // CONSTANTS
@@ -55,10 +78,24 @@ import type {
 
 const SONNET = 'claude-sonnet-4-5-20250929';
 const SYNTHESIS_TEMPERATURE = 0.4;
-/** Large output — 10 holistic sections with rich structured data */
-const SYNTHESIS_MAX_TOKENS = 12000;
-/** 3 minutes for a large single call */
-const SYNTHESIS_TIMEOUT_MS = 180_000;
+/** Phase A (voice+earned-ness) needs ~12K due to verbose voiceMap + earned-ness mechanisms */
+const SYNTHESIS_MAX_TOKENS_PHASE_A = 12000;
+/** Phase B (theme+narrative+entanglements) needs ~10K for 6 sections */
+const SYNTHESIS_MAX_TOKENS_PHASE_B = 10000;
+/** 5 minutes per phase — each phase generates ~8K tokens, well within this limit */
+const SYNTHESIS_TIMEOUT_MS = 300_000;
+/** W5.3: Delta synthesis needs ~4K tokens (only 1-3 sections) */
+const DELTA_SYNTHESIS_MAX_TOKENS = 6000;
+/** W5.3: 2 minutes for delta synthesis — much smaller output than full synthesis */
+const DELTA_SYNTHESIS_TIMEOUT_MS = 120_000;
+
+// ── V2 Growth Cycle Constants ──
+/** Phase Meta: walk validation + reading strategy + convergence (~3K tokens) */
+const META_MAX_TOKENS = 4000;
+const META_TIMEOUT_MS = 120_000;
+/** Question Curation call (~2K tokens) */
+const CURATION_MAX_TOKENS = 4000;
+const CURATION_TIMEOUT_MS = 120_000;
 
 // ============================================================================
 // INPUT TYPES
@@ -83,6 +120,11 @@ export interface HolisticSynthesisInput {
     voiceSignature?: string;
     arcMomentum?: string;
   };
+  /**
+   * W1.4: FindingStore for injecting existing finding context into synthesis prompts.
+   * When provided, synthesis can evolve existing findings and produce new essay-level ones.
+   */
+  findingStore?: FindingStore;
 }
 
 // ============================================================================
@@ -96,6 +138,29 @@ export interface HolisticSynthesisInput {
 export interface HolisticSynthesisResult {
   /** The 10 holistic section outputs — writes directly into profile */
   synthesis: HolisticSynthesisOutput;
+  /** Whether all 10 sections have substantive content */
+  isComplete: boolean;
+  /** Names of sections that are missing or effectively empty */
+  missingSections: string[];
+  /** Cost of the Sonnet call in USD */
+  cost: number;
+  /** Token usage breakdown */
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
+  /** Wall-clock time in milliseconds */
+  timingMs: number;
+}
+
+/**
+ * W5.3: Result from delta synthesis (targeted re-synthesis of specific sections).
+ */
+export interface DeltaSynthesisResult {
+  /** The delta synthesis output with partial holistic data */
+  output: DeltaSynthesisOutput;
   /** Cost of the Sonnet call in USD */
   cost: number;
   /** Token usage breakdown */
@@ -110,20 +175,107 @@ export interface HolisticSynthesisResult {
 }
 
 // ============================================================================
-// SYSTEM PROMPT (BLOCK 1 — CACHEABLE)
+// V2: ITERATION INPUT TYPE
 // ============================================================================
 
 /**
- * Static system prompt — cached across L3.75 calls for the same or different essays.
- * Contains role definition, output schema, quality standards, and examples.
+ * Input to synthesizeIteration() — one iteration of the growth cycle.
+ * Includes prior iteration state for convergence judgment.
  */
-const SYSTEM_PROMPT = `You are an expert essay holistic synthesizer. You have been given the COMPLETE sentence-level understanding of an essay from a deep sequential walk. Your task is to synthesize 10 holistic sections that capture the essay as a WHOLE.
+export interface SynthesisIterationInput {
+  /** The essay text */
+  essayText: string;
+  /** Complete profile after L3 walk */
+  profile: EssayProfile;
+  /** L3's holistic evolution accumulator */
+  walkEvolution: HolisticSynthesisInput['holisticEvolution'];
+  /** Prior iteration's synthesis (null for first iteration) */
+  previousSynthesis: HolisticSynthesisOutput | null;
+  /** Prior iteration's reading strategy (null for first iteration) */
+  previousReadingStrategy: ReadingStrategy | null;
+  /** Questions to curate — walk questions on first iter, curated queue on subsequent */
+  questionQueue: UnderstandingQuestion[];
+  /** Cumulative findings from walk + deep dives + re-reads */
+  cumulativeFindings: Finding[];
+  /** Activity log for convergence context */
+  activityLog: GrowthStepRecord[];
+  /** Prior improvement phase (available on re-analysis) */
+  priorPhase?: ImprovementPhase;
+  /** Current iteration number (0-based) */
+  iterationNumber: number;
+  /** Budget ceiling for the growth cycle */
+  budgetCeiling?: number;
+  /** Budget remaining */
+  budgetRemaining?: number;
+  /** FindingStore for finding context injection */
+  findingStore?: FindingStore;
+}
+
+/**
+ * Result from a single synthesis iteration.
+ */
+export interface SynthesisIterationResult {
+  /** The iteration output (synthesis + validation + meta) */
+  output: SynthesisIterationOutput;
+  /** Cost of all calls in this iteration */
+  cost: number;
+  /** Token usage */
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
+  /** Timing in ms */
+  timingMs: number;
+}
+
+// ============================================================================
+// SYSTEM PROMPT (BLOCK 1 — CACHEABLE)
+// ============================================================================
+
+// ── Shared preamble for both phases ──
+const SHARED_PREAMBLE = `You are an expert essay holistic synthesizer. You have been given the COMPLETE sentence-level understanding of an essay from a deep sequential walk. Your task is to synthesize holistic sections that capture the essay as a WHOLE.
 
 The sequential walk saw each paragraph in order and built understanding forward. YOUR unique advantage: you see EVERYTHING simultaneously. You can trace connections the walk could not — how a voice shift in paragraph 4 mirrors the emotional arc that started in paragraph 1, how an image in the opening becomes a metaphor by the closing.
 
-=== OUTPUT SCHEMA ===
+=== CRITICAL CONSTRAINT — Understanding Only (Anti-Contamination) ===
 
-Return a single JSON object with EXACTLY these 10 top-level keys. Every field must match the schema precisely.
+You are describing WHAT IS, not evaluating HOW WELL. Evaluation belongs in the analysis layer (L3.5), not here.
+
+FORBIDDEN VOCABULARY (these belong in the analysis layer, not here):
+- Evaluative judgments: "weak", "strong", "effective", "ineffective", "successful", "fails", "impressive", "lacking"
+- Prescriptive language: "should", "needs to", "must improve", "could be better", "would benefit from"
+- Comparative quality: "excellent", "poor", "mediocre", "masterful", "sophisticated", "clumsy", "awkward"
+- Score-adjacent: "high-quality", "low-quality", "well-crafted", "poorly executed"
+
+Use DESCRIPTIVE language only. This separation is structural: L3.75 builds the understanding substrate. L3.5 evaluates it. L5 prescribes action.
+
+CONTAMINATION EXAMPLES — what to avoid even when using "allowed" words:
+
+CONTAMINATED (evaluative framing without banned words):
+  voiceIdentity.signature: "The writer has a particularly authentic and engaging conversational style"
+  emotionalTopography.arcTrajectory: "The emotional journey works well, building meaningfully to a satisfying resolution"
+
+CLEAN (descriptive framing):
+  voiceIdentity.signature: "The writer uses second-person address in reflective passages and switches to fragmented, staccato sentences during action sequences. The vocabulary draws from two registers: clinical medical terminology and informal family speech."
+  emotionalTopography.arcTrajectory: "Emotion moves from controlled restraint (P0-P1) through escalating tension (P2-P3, marked by shorter sentences and present tense) to an unguarded disclosure in P4S3, followed by reflective distance in the closing."
+
+GENERAL STANDARDS:
+- Be specific. Use paragraph and sentence numbers. Quote text where it grounds your observation.
+- The walk's holistic evolution is a STARTING POINT. Confirm what's accurate, deepen what's shallow, correct what's wrong.
+- All paragraph indices are 0-based. All sentence indices are 0-based within their paragraph.
+- Return ONLY valid JSON matching the schema. No markdown, no explanation, no preamble.`;
+
+/**
+ * Phase A system prompt — Voice, Emotion, Earned-ness, Entanglements
+ * These are the perceptual/experiential dimensions that trace HOW the essay works.
+ */
+const SYSTEM_PROMPT_PHASE_A = `${SHARED_PREAMBLE}
+
+=== OUTPUT SCHEMA (Phase A: Voice + Emotion + Earned-ness) ===
+
+Return a single JSON object with EXACTLY these 4 top-level keys:
 
 {
   "voiceIdentity": {
@@ -194,6 +346,12 @@ Return a single JSON object with EXACTLY these 10 top-level keys. Every field mu
         "entanglementRef": "<ID of cross-dimension entanglement if this shift IS a move in another dimension> or null"
       }
     ],
+    "stabilityRegions": [
+      {
+        "paragraphs": [<paragraph indices where voice holds steady>],
+        "voiceCharacter": "<what characterizes the voice in this stable region>"
+      }
+    ],
     "codeSwitching": [
       {
         "location": { "paragraph": <n>, "sentence": <n> },
@@ -228,7 +386,8 @@ Return a single JSON object with EXACTLY these 10 top-level keys. Every field mu
         "assessment": "shown" | "told" | "mixed",
         "detail": "<what is shown or told and how>"
       }
-    ]
+    ],
+    "authenticityAssessment": "<describe how emotion is conveyed — through sensory detail, through abstraction, through dialogue, through action. Map the essay's emotional delivery style, not its quality.>"
   },
 
   "momentEarnednessMap": {
@@ -249,8 +408,49 @@ Return a single JSON object with EXACTLY these 10 top-level keys. Every field mu
       }
     ],
     "structuralObservation": "<essay-level summary of setup-payoff architecture — NOT a score, a structural observation>"
-  },
+  }
+}
 
+=== QUALITY STANDARDS ===
+
+VOICE MAP:
+- Map ALL 5 dimensions across the essay with specific locations, not just "formal in intro, informal in middle."
+- For each shift, the REASONING is the assessment. Explain WHY the shift happened. Cite the textual evidence that suggests intent.
+  * If you can point to clear textual evidence of intent — the shift serves a narrative purpose, aligns with structural boundaries, the student set it up — it's intentional.
+  * If you cannot point to evidence of intent — voice drifts without apparent purpose, oscillates without committing — it's unintentional or ambiguous.
+  * The reasoning field is the PRIMARY output. Make it specific: "The shift from technical vocabulary to intimate reflection occurs at the paragraph boundary between the coding scene and the personal realization. The student clearly separates these registers, and the shift serves the thematic pivot from external skill to internal meaning."
+  * Assessment ('intentional'/'unintentional'/'ambiguous') should follow FROM the reasoning, not precede it. Set confidence based on how much textual evidence you found — high confidence only when multiple signals converge.
+- Below 0.6 confidence: present as a QUESTION, not assertion. The reasoning should explain what evidence is missing.
+- Include stability regions — passages where voice holds steady and what characterizes it there.
+- momentEarnednessMap: Describe WHAT mechanisms exist or are absent. Do NOT say moments are "well-earned" or "unearned" — say "3 mechanisms converge" or "no sensory grounding precedes this moment."
+
+EARNED-NESS MAP:
+- For EACH significant moment (emotional, intellectual, humorous, subversive), trace BACKWARD. What earlier content earned this moment? What mechanisms were used?
+- Name WHICH earlier passage, WHAT mechanism type, and HOW it earns the later moment.
+- The 7 mechanism types, with examples of what rigorous earned-ness looks like:
+  * sensory_grounding: "Reader feels the cold counter, smells the leather — they're physically IN the pawnshop before being asked to feel the loss"
+  * emotional_setup: "The grandmother's laugh is established as warm in P1 before its absence is weaponized in P4"
+  * stakes_establishment: "The reader understands what the scholarship means to the family before learning it was denied"
+  * character_revelation: "We see the narrator's precision with instruments before they apply that same precision to a moral dilemma"
+  * thematic_preparation: "The concept of 'value' is explored through physical objects before being applied to relationships"
+  * intellectual_scaffolding: "The coding-music parallel is built step by step: scales→debugging, composing→architecture, before the AI DJ synthesis"
+  * comedic_subversive_setup: "Expectation of formal recital culture established before the narrator breaks convention"
+- GAPS are as important as mechanisms. Identify moments that AREN'T earned: "P3S5 claims 'it changed everything' but no prior passage established what 'everything' was or why it mattered." If a moment claims devastation but no earlier passage established emotional proximity to the object, name that gap. If a realization appears without the reasoning steps that would make it feel inevitable, name that gap.
+- Be skeptical of "confirmation" moments — where the writer claims external validation ("reaffirmed my belief," "proved that," "showed me that") without showing the validation being tested or earned. If the belief was never challenged or the connection was never demonstrated through specific detail, that's a gap. Having setup mechanisms doesn't mean the payoff moment is earned — the payoff must also be grounded, not just asserted.
+- Arrow DENSITY is the diagnosis. Many arrows converging on a moment = well-earned. Sparse arrows = unearned. Do NOT use scores or "well-earned"/"unearned" labels — describe WHAT mechanisms exist or are absent.
+- structuralObservation should describe the essay's overall setup-payoff architecture.`;
+
+/**
+ * Phase B system prompt — Theme, Narrative, Character, Craft, Admissions
+ * These are the structural/interpretive dimensions that trace WHAT the essay is.
+ */
+const SYSTEM_PROMPT_PHASE_B = `${SHARED_PREAMBLE}
+
+=== OUTPUT SCHEMA (Phase B: Theme + Narrative + Character + Craft + Admissions) ===
+
+Return a single JSON object with EXACTLY these 6 top-level keys:
+
+{
   "thematicArchitecture": {
     "centralThesis": "<the essay's central thesis>",
     "thesisConfidence": <0-1>,
@@ -270,6 +470,9 @@ Return a single JSON object with EXACTLY these 10 top-level keys. Every field mu
   "narrativeStrategy": {
     "primaryStrategy": "<the primary narrative approach and WHY it serves this story>",
     "strategyRationale": "<rationale for this strategy — what alternatives were available and why this one works>",
+    "arcType": "<the narrative arc type — e.g. 'transformation', 'revelation', 'journey', 'mosaic', 'circular', 'accumulation'>",
+    "arcMomentum": "building" | "sustaining" | "releasing" | "stalling",
+    "turningPoint": { "paragraph": <n>, "sentence": <n> } | null,
     "pivotPoints": [
       {
         "location": { "paragraph": <n>, "sentence": <n or omit> },
@@ -283,38 +486,40 @@ Return a single JSON object with EXACTLY these 10 top-level keys. Every field mu
   "characterRevelation": {
     "writerPortrait": "<who is this writer — the person behind the words, not the essay>",
     "valuesRevealed": ["<values SHOWN not told — what does this person care about?>"],
+    "revealedQualities": ["<specific qualities/traits the writer reveals through their writing — e.g. 'persistence under uncertainty', 'comfort with ambiguity', 'empathetic observation'>"],
     "growthArc": "<growth arc detected in the essay>",
     "intellectualFingerprint": "<how this person thinks — their cognitive style>",
     "blindSpots": ["<what they might not see about themselves or their essay>"]
   },
 
   "craftAssessment": {
-    "strengthSignatures": [
+    "craftSignatures": [
       {
-        "quality": "<name of the craft strength>",
-        "evidence": "<specific textual evidence>",
+        "quality": "<name of the craft technique observed>",
+        "evidence": "<specific textual evidence — quote the text>",
         "paragraphs": [<paragraph indices>]
       }
     ],
-    "growthEdges": [
+    "craftPatterns": [
       {
-        "quality": "<name of the growth area>",
-        "description": "<what it looks like and why it's a growth edge>",
+        "quality": "<name of the craft pattern observed>",
+        "description": "<describe WHAT the pattern is and WHERE it appears — do NOT evaluate it>",
         "paragraphs": [<paragraph indices>]
       }
     ],
-    "imageSystem": "<image/metaphor system analysis — coherence, resonance, evolution>",
-    "sentencePatterns": "<sentence-level patterns — rhythm, length variation, opening patterns>",
-    "wordPatterns": "<word-level patterns — favorite words, register consistency, precision>"
+    "imageSystem": "<describe the image/metaphor system — what images appear, how they recur or transform, what connections exist between them>",
+    "sentencePatterns": "<describe sentence-level patterns observed — rhythm, length variation, opening patterns, structural tendencies>",
+    "wordPatterns": "<describe word-level patterns — recurring words, register tendencies, vocabulary choices>"
   },
 
   "admissionsPositioning": {
-    "tellabilitySummary": "<30-second AO pitch — what would an admissions officer say about this essay to a colleague?>",
-    "distinctivenessFactors": ["<what makes this essay non-interchangeable>"],
-    "institutionalFit": "<what kinds of institutions this essay signals fit for>",
-    "redFlags": ["<anything that would concern an admissions reader>"],
-    "memorability": "<memorability assessment — will this be remembered after reading 50 essays?>",
-    "portfolioPosition": "<how this essay positions within a broader portfolio>"
+    "tellabilitySummary": "<30-second AO description — what would an admissions officer say this essay IS ABOUT to a colleague?>",
+    "distinctivenessFactors": ["<what makes this essay non-interchangeable — specific to THIS essay's execution>"],
+    "institutionalFit": "<what kinds of institutions this essay signals fit for — based on content and values shown>",
+    "redFlags": ["<anything an admissions reader would notice or question — describe WHAT it is, not whether it is a problem>"],
+    "memorability": "<what elements of this essay would persist in a reader's memory after reading 50 essays — describe the elements, not their quality>",
+    "portfolioPosition": "<what role this essay occupies within a broader portfolio — what dimension of the applicant it surfaces>",
+    "aoTakeaway": "<what an admissions officer would conclude about this student after reading the complete essay>"
   },
 
   "entanglements": [
@@ -323,42 +528,97 @@ Return a single JSON object with EXACTLY these 10 top-level keys. Every field mu
       "dimensions": ["<HolisticDimension values: voice, emotion, theme, narrative, character, craft, admissions, structure>"],
       "location": { "paragraph": <n>, "sentence": <n or omit> },
       "description": "<WHAT happens at the INTERSECTION — not 'voice and theme co-occur in P3' but 'P3S4's voice shift from observational to intimate IS the thematic pivot from public value to private meaning'>",
+      "significance": "foundational" | "supporting" | "subtle",
       "crossRefs": ["<which dimension sections should reference this entanglement>"]
+    }
+  ],
+
+  "connectionGraphSummary": "<3-5 sentences describing the essay's CONNECTION ARCHITECTURE: topology (linear chain, hub-and-spoke, web, fragmented, sparse), hub paragraphs, structural islands, broken chains, and primary structural dependency. What kind of connection structure does this essay have, and what does it reveal about how the essay makes meaning?>",
+
+  "newConnections": [
+    {
+      "from": { "paragraph": <n>, "sentence": <n or omit>, "label": "<brief label>" },
+      "to": { "paragraph": <n>, "sentence": <n or omit>, "label": "<brief label>" },
+      "description": "<what connects these passages — textual evidence, WHY it matters, HOW meaning flows>",
+      "reverseIllumination": "<what the connection reveals about the FROM endpoint, or null>",
+      "significance": "<why this connection matters for THIS essay's architecture>",
+      "strengthCategory": "foundational" | "significant" | "supporting" | "tentative",
+      "directionality": "forward" | "reverse" | "bidirectional" | "asymmetric"
+    }
+  ],
+
+  "connectionUpgrades": [
+    {
+      "connectionId": "<ID of an existing walk connection to upgrade>",
+      "strengthCategory": "foundational" | "significant" | "supporting" | "tentative",
+      "reverseIllumination": "<new reverse illumination discovered from full-text view>",
+      "significance": "<updated significance assessment>"
+    }
+  ],
+
+  "newFindings": [
+    {
+      "claim": "Essay-level finding — a pattern, tension, or quality visible only from the full picture",
+      "scope": {
+        "type": "word | sentence | sentence_group | paragraph | cross_paragraph | essay_level",
+        "paragraph": 0,
+        "sentences": [0, 1],
+        "paragraphs": [0, 2],
+        "textEvidence": [{ "text": "quoted text", "location": { "paragraph": 0, "sentence": 1 } }]
+      },
+      "maturity": "hypothesis | developing | confirmed | deepened",
+      "maturityReasoning": "Why this maturity level",
+      "coachingValue": "critical | high | medium | contextual | diagnostic",
+      "dimensions": ["voice", "theme", "narrative", "emotion", "character", "craft", "admissions", "structure"],
+      "evidence": [{ "text": "quoted text or absence description", "location": { "paragraph": 0, "sentence": 1 }, "type": "present | absent" }],
+      "deepeningPotential": "What further investigation could reveal, or null",
+      "raisesQuestions": ["Questions this finding raises"],
+      "buildsOn": ["existing-finding-ID"],
+      "relatedTo": ["existing-finding-ID"]
+    }
+  ],
+
+  "findingEvolutions": [
+    {
+      "findingId": "existing-finding-ID",
+      "newMaturity": "hypothesis | developing | confirmed | deepened | superseded",
+      "reasoning": "Why this finding's maturity should change now that you see the full picture",
+      "supersedes": "other-finding-ID-if-superseding"
     }
   ]
 }
 
+IMPORTANT: "newFindings" and "findingEvolutions" are OPTIONAL. Omit them entirely (or use empty arrays) if synthesis does not warrant any. Only produce findings that meet the UTILITY threshold: would this finding change the understanding or teaching of this essay?
+
 === QUALITY STANDARDS ===
 
-VOICE MAP:
-- Map ALL 5 dimensions across the essay with specific locations, not just "formal in intro, informal in middle."
-- For each shift, assess intentionality with EVIDENCE. What signals intentionality?
-  * Consistent patterns around a specific topic (intentional)
-  * Alignment with structural boundaries (intentional)
-  * Serves an identifiable purpose in another dimension (intentional)
-  * Random fluctuation without structural logic (unintentional)
-  * Oscillation between registers without committing (ambiguous)
-- Below 0.6 confidence: present as a QUESTION, not assertion. The reasoning should explain what evidence is missing.
-- Include stability regions — passages where voice holds steady and what characterizes it there.
-
-EARNED-NESS MAP:
-- For EACH significant moment, trace SPECIFIC arrows backward through SPECIFIC mechanism types.
-- Name WHICH earlier passage, WHAT mechanism type, and HOW it earns the later moment.
-- Example of rigorous earned-ness: "P2S3's sensory grounding ('cracked leather of the shop counter') establishes the physical world; P2S5's stakes_establishment ('everything we owned appraised') makes the economic risk visceral; P3S1's character_revelation ('my grandfather's hands trembled but his voice didn't') shows composure under pressure. Three mechanisms converge on P4S2's emotional peak."
-- Gaps are AS IMPORTANT as mechanisms. If a moment claims devastation but no earlier passage established emotional proximity to the object, name that gap.
-- structuralObservation should describe the essay's overall setup-payoff architecture quality.
+- craftAssessment.craftSignatures: Describe WHAT techniques are present and WHERE (e.g., "Uses anaphora in P3S1-S3, sentence fragments in P5S2-S4, extended metaphor linking P1 and P4"). Do NOT evaluate how well they work.
+- craftAssessment.craftPatterns: Describe WHAT patterns exist (e.g., "P2 and P4 use abstract nouns where P1 and P3 use concrete imagery"). Do NOT label them as weaknesses.
+- admissionsPositioning: Describe WHAT an admissions reader would notice. Do NOT evaluate whether it is effective.
+- admissionsPositioning.redFlags: Describe WHAT might draw attention (e.g., "The essay references a disciplinary incident without context"). Do NOT prescribe how to fix it.
+- characterRevelation.blindSpots: Describe WHAT is absent from the self-presentation. Do NOT say this is a problem.
 
 ENTANGLEMENTS:
 - Find moments where dimensions INTERSECT — where the voice shift IS the thematic pivot, where the emotional peak IS the character revelation.
 - NOT just dimensions that co-occur in the same paragraph.
 - Each must have a specific location, specific dimensions, and specific cross-references.
-- Include significance level for each.
 
-GENERAL:
-- Be specific. Use paragraph and sentence numbers. Quote text where it grounds your observation.
-- The walk's holistic evolution is a STARTING POINT. Confirm what's accurate, deepen what's shallow, correct what's wrong.
-- All paragraph indices are 0-based.
-- All sentence indices are 0-based within their paragraph.`;
+CONNECTION ARCHITECTURE:
+- connectionGraphSummary: Describe the essay's connection TOPOLOGY — linear chain? hub-and-spoke? web? fragmented? sparse? What are the hubs (most connections), islands (no strong connections), and broken chains?
+- newConnections: Only discover connections INVISIBLE to the sequential walk — bookending (P0↔P_last), cross-essay echoes, full-text patterns. The walk already found sequential connections; you add the ones requiring simultaneous full-text view. Return empty array [] if no new connections found.
+- connectionUpgrades: If you see a walk connection that should be stronger/weaker from the full-text view, or that has reverse illumination the walk couldn't see, include an upgrade. Return empty array [] if no upgrades needed.
+- Don't force connections. Fewer genuine connections are better than many forced ones.
+
+CONNECTION STRENGTH EVOLUTION:
+Review ALL existing connections now that you see the complete understanding. The walk saw connections sequentially — paragraph by paragraph — and may have misjudged strength or missed bidirectional illumination. For each connection, ask:
+- Is this connection stronger or weaker than the walk thought, now that you see the full picture?
+- Does this connection illuminate BOTH endpoints (bidirectional), even if the walk only saw one direction?
+Produce connectionUpgrades for any connections whose strengthCategory should change. Add reverseIllumination where you now see bidirectional illumination — describe what the connection reveals about the FROM endpoint when viewed from the TO endpoint's perspective.
+
+FINDINGS (W1.4):
+Review existing findings from the walk. With the complete essay understanding, some findings may now be confirmed, deepened, or superseded. Produce findingEvolutions where warranted.
+If synthesis reveals NEW essay-level findings — cross-essay patterns, structural strategies, identity-level observations — produce those in newFindings. Focus on findings that require the full-text simultaneous view (the walk could not have seen them paragraph-by-paragraph).
+DO NOT duplicate findings the walk already produced. Use buildsOn/relatedTo to reference existing findings.`;
 
 // ============================================================================
 // CONTEXT BUILDERS
@@ -368,7 +628,136 @@ GENERAL:
  * Build the serialized understanding context from the profile.
  * This is BLOCK 2 content — essay-specific, cacheable across L3.75 + L3.5.
  */
-function buildUnderstandingContext(profile: EssayProfile): string {
+// ============================================================================
+// V2: META PROMPT (Walk Validation + Reading Strategy + Convergence)
+// ============================================================================
+
+const SYSTEM_PROMPT_META = `You are an expert essay synthesizer performing meta-assessment after producing a holistic synthesis. You see the ENTIRE essay and the complete synthesis.
+
+Your task: produce three critical outputs that guide the growth cycle.
+
+=== CRITICAL — Understanding Only ===
+You describe WHAT IS, not how WELL. No evaluative language.
+
+=== OUTPUT FORMAT (JSON only) ===
+{
+  "walkDisagreements": [
+    {
+      "paragraph": <number>,
+      "walkReading": "<what the sequential walk understood about this paragraph>",
+      "synthesisReading": "<what your full-context synthesis sees differently>",
+      "confidence": <0-1, how confident you are that your reading is better>,
+      "resolution": "synthesis_wins" | "flag_for_reread" | "preserve_both",
+      "reasoning": "<why the readings differ and why you recommend this resolution>"
+    }
+  ],
+  "readingStrategy": {
+    "strategy": "<meta-understanding of how to read THIS specific essay>",
+    "bestApproach": "<what reading approach yields the deepest understanding>",
+    "antiPatterns": ["<what this essay is NOT — prevents misapplied frameworks>"],
+    "contextPriorities": ["<profile sections most important for this essay, in priority order>"]
+  },
+  "reReadCandidates": [
+    {
+      "paragraph": <number>,
+      "reason": "<why re-reading with full context would reveal more>",
+      "expectedDepthGain": "significant" | "moderate"
+    }
+  ],
+  "evolutionNarrative": "<what changed in this iteration and why — or for first iteration, what the synthesis captured>",
+  "selfAssessedConvergence": {
+    "hasConverged": <boolean>,
+    "reasoning": "<why you have/haven't reached sufficient depth>",
+    "remainingOpportunities": ["<specific things that would be lost if we stopped>"]
+  }
+}
+
+CONVERGENCE GUIDANCE:
+- You are the PRIMARY convergence signal — the system trusts your judgment.
+- Budget and iteration caps are backstops only.
+- Be honest: if further iteration would not meaningfully improve coaching quality, say so.
+- Name SPECIFIC remaining opportunities, not generic "could go deeper."
+- For simple essays, converge after 1 iteration. Complex essays may need 2-3.
+
+WALK VALIDATION GUIDANCE:
+- HIGH CONFIDENCE (>0.7): Your reading wins — the walk missed what full context reveals.
+- MEDIUM CONFIDENCE (0.4-0.7): Flag for re-read — combine local and global views.
+- LOW CONFIDENCE (<0.4): Preserve both — genuine ambiguity the essay supports.
+
+READING STRATEGY GUIDANCE:
+- contextPriorities: list profile sections (e.g., 'voiceIdentity', 'voiceMap', 'craftAssessment') in order of importance for THIS essay.
+- antiPatterns: what frameworks should NOT be applied to this essay.`;
+
+// ============================================================================
+// V2: QUESTION CURATION PROMPT
+// ============================================================================
+
+const SYSTEM_PROMPT_CURATION = `You are curating the question queue for deep dive dispatch.
+
+You have the current holistic synthesis, the reading strategy, and a list of questions from the walk and prior iterations. Your job is editorial: resolve what you can, filter what's low-quality, and curate what should drive deep dives.
+
+=== QUESTION QUALITY LEVELS ===
+
+LEVEL 1 — Surface (NEVER produce these):
+  "What techniques does the author use in paragraph 3?"
+  Why bad: Answerable by re-reading. Produces observations, not understanding.
+
+LEVEL 2 — Functional (ONLY if the walk couldn't answer):
+  "What function does the rhythm shift in P3S2 serve?"
+  Why borderline: Useful, but the walk should have caught them.
+
+LEVEL 3 — Architectural (GOOD — drive structural understanding):
+  "The constraint-creativity framework is stated in P0, demonstrated in P4, but never TESTED. Is the essay's central claim challenged anywhere?"
+  Why good: Cross-paragraph patterns the walk couldn't fully trace.
+
+LEVEL 4 — Epistemological (EXCELLENT — unlock deepest depth):
+  "The writer claims constraint enables creativity, but retreats to abstraction every time they approach a specific creative moment. Is this structural habit or protective choice?"
+  Why excellent: Requires investigation BEYOND the text surface.
+
+LEVEL 5 — Meta-Awareness (EXCEPTIONAL — produce 0-1 per essay):
+  "The essay's commitment to physical knowing creates ironic tension with the college essay form itself."
+  Why exceptional: Connects content to formal conditions.
+
+=== QUESTION QUALITY TEST ===
+Before including any question: "If I dispatched a deep dive, would the answer produce a FINDING the walk couldn't have produced?" If no: answer it yourself or discard.
+
+=== OUTPUT FORMAT (JSON only) ===
+{
+  "resolvedQuestions": [
+    {
+      "questionId": "<ID of the question being resolved>",
+      "answer": "<your answer, grounded in the synthesis>",
+      "evidence": "<specific text or synthesis evidence>"
+    }
+  ],
+  "curatedQueue": [
+    {
+      "question": {
+        "id": "<unique ID>",
+        "question": "<the question text>",
+        "dimensions": ["<routing tags>"],
+        "anchorParagraph": <number or null>,
+        "expectedInsight": "<what discovering the answer would reveal>",
+        "source": "walk" | "synthesis" | "deep_dive",
+        "status": "open"
+      },
+      "recommendedPrompt": "<deep dive prompt type from the library>",
+      "promptRationale": "<why this prompt, reading-strategy-aware>"
+    }
+  ],
+  "filteredQuestions": [
+    {
+      "questionId": "<ID of filtered question>",
+      "filterReason": "<why this question was filtered>"
+    }
+  ]
+}`;
+
+// ============================================================================
+// CONTEXT BUILDERS
+// ============================================================================
+
+function buildUnderstandingContext(profile: EssayProfile, findingStore?: FindingStore): string {
   const sections: string[] = [];
 
   // ── Essay text with markers ──
@@ -389,19 +778,23 @@ function buildUnderstandingContext(profile: EssayProfile): string {
     // Sentence-level understanding
     for (const sent of para.sentences) {
       if (sent.understanding) {
-        const funcs = sent.understanding.observedFunctions.map(f => f.observation).join('; ');
-        const intents = sent.understanding.inferredIntents.map(i => i.observation).join('; ');
-        const narrative = sent.understanding.narrativeContributions.map(n => n.observation).join('; ');
-        const craft = sent.understanding.craft;
         sections.push(`  [P${para.index}S${sent.index}] "${truncate(sent.text, 80)}"`);
-        sections.push(`    Functions: ${funcs || 'not yet analyzed'}`);
-        if (intents) sections.push(`    Intents: ${intents}`);
-        if (narrative) sections.push(`    Narrative: ${narrative}`);
-        if (craft.notableWords.length > 0) {
-          sections.push(`    Notable words: ${craft.notableWords.map(w => `"${w.word}" (${w.significance})`).join(', ')}`);
+        // Phase 2: primaryFunction is the primary per-sentence understanding
+        if (sent.understanding.primaryFunction) {
+          sections.push(`    Function: ${sent.understanding.primaryFunction} [${sent.understanding.significance ?? 'contributing'}]`);
+        } else {
+          // Fallback for pre-Phase-1 profiles
+          const funcs = sent.understanding.observedFunctions.map(f => f.observation).join('; ');
+          sections.push(`    Functions: ${funcs || 'not yet analyzed'}`);
         }
-        if (sent.understanding.rhetoricalFunctions.length > 0) {
-          sections.push(`    Rhetorical: ${sent.understanding.rhetoricalFunctions.join(', ')}`);
+        if (sent.understanding.craft?.techniques?.length) {
+          sections.push(`    Craft: [${sent.understanding.craft.techniques.join(', ')}]`);
+        }
+        if (sent.understanding.tags?.length) {
+          sections.push(`    Tags: [${sent.understanding.tags.join(', ')}]`);
+        }
+        if (sent.understanding.significantChoices.length > 0) {
+          sections.push(`    Notable words: ${sent.understanding.significantChoices.map(w => `"${w.word}" (${w.significance})`).join(', ')}`);
         }
       }
     }
@@ -409,10 +802,21 @@ function buildUnderstandingContext(profile: EssayProfile): string {
   }
 
   // ── Connection graph ──
-  if (profile.connections.all.length > 0) {
+  const activeConnections = profile.connections.all.filter(c => c.status === 'active');
+  if (activeConnections.length > 0) {
     sections.push('=== CONNECTION GRAPH ===\n');
-    for (const conn of profile.connections.all) {
-      sections.push(`  [P${conn.from[0]}S${conn.from[1]}] → [P${conn.to[0]}S${conn.to[1]}] (${conn.type}): ${conn.description} [confidence: ${conn.confidence}]`);
+    for (const conn of activeConnections) {
+      const from = conn.from.sentence !== undefined
+        ? `P${conn.from.paragraph}S${conn.from.sentence}`
+        : `P${conn.from.paragraph}`;
+      const to = conn.to.sentence !== undefined
+        ? `P${conn.to.paragraph}S${conn.to.sentence}`
+        : `P${conn.to.paragraph}`;
+      const tags = conn.routingTags.length > 0 ? ` [${conn.routingTags.join(',')}]` : '';
+      const dir = conn.directionality === 'bidirectional' ? '<->'
+        : conn.directionality === 'reverse' ? '<-'
+        : '->';
+      sections.push(`  ${conn.id}: ${from} ${dir} ${to}${tags} (${conn.strengthCategory}): ${conn.description}`);
     }
 
     if (profile.connections.imageRecurrences.length > 0) {
@@ -428,7 +832,18 @@ function buildUnderstandingContext(profile: EssayProfile): string {
         sections.push(`  ${arc.role} at P${arc.location[0]}S${arc.location[1]}`);
       }
     }
+
+    if (profile.connections.graphSummary) {
+      sections.push(`\nGraph Summary: ${profile.connections.graphSummary}`);
+    }
+
     sections.push('');
+  }
+
+  // ── Finding context (W2.2) ──
+  if (findingStore && findingStore.size > 0) {
+    sections.push('\n=== ACTIVE FINDINGS ===');
+    sections.push(buildFindingReferenceContext(findingStore));
   }
 
   return sections.join('\n');
@@ -461,10 +876,59 @@ function buildEvolutionScaffold(
     parts.push('No incremental holistic observations from the walk. Synthesize from scratch.');
   }
 
-  parts.push('\nSynthesize the complete holistic profile from the ground up. The walk\'s incremental observations above are a starting point — confirm what\'s accurate, deepen what\'s shallow, correct what\'s wrong using the full understanding.\n');
+  parts.push(`
+COVERAGE NOTICE: The walk's evolution tracked only 4 signals:
+  1. centralThesis → feeds into thematicArchitecture
+  2. thesisConfidence → feeds into thematicArchitecture.thesisConfidence
+  3. voiceSignature → feeds into voiceIdentity.signature
+  4. arcMomentum → feeds into narrativeStrategy.arcMomentum
+
+The remaining sections have NO walk scaffold and MUST be synthesized entirely from the paragraph-by-paragraph understanding above:
+  Phase A: voiceMap (all 5 dimensions), emotionalTopography, momentEarnednessMap
+  Phase B: characterRevelation, craftAssessment, admissionsPositioning, entanglements, narrativeStrategy (beyond arcMomentum), thematicArchitecture (beyond centralThesis)
+
+For these un-scaffolded sections, build from the ground up using the sentence-level understanding. Do not extrapolate from the 4 scaffolded signals — derive independently from evidence.
+`);
   parts.push('Return ONLY valid JSON matching the schema above. No markdown, no explanation, no preamble.');
 
   return parts.join('\n');
+}
+
+/**
+ * Format the activity log as prose for injection into L3.75 prompts.
+ * The LLM sees this as context for convergence judgment.
+ */
+function formatActivityLogForPrompt(
+  activityLog: GrowthStepRecord[],
+  budgetCeiling: number,
+  budgetRemaining: number,
+): string {
+  if (activityLog.length === 0) {
+    return '=== GROWTH ACTIVITY LOG ===\n(First iteration — no prior activity)';
+  }
+
+  const lines: string[] = ['=== GROWTH ACTIVITY LOG ==='];
+
+  for (const record of activityLog) {
+    const metrics: string[] = [];
+    if (record.questionsResolved > 0) metrics.push(`resolved ${record.questionsResolved} questions`);
+    if (record.questionsRaised > 0) metrics.push(`raised ${record.questionsRaised} new questions`);
+    if (record.findingsAdded > 0) metrics.push(`added ${record.findingsAdded} findings`);
+    if (record.findingsDeepened > 0) metrics.push(`deepened ${record.findingsDeepened} findings`);
+    if (record.findingsSuperseded > 0) metrics.push(`superseded ${record.findingsSuperseded} findings`);
+    if (record.sectionsUpdated.length > 0) metrics.push(`updated ${record.sectionsUpdated.join(', ')}`);
+
+    const metricsStr = metrics.length > 0 ? metrics.join(', ') : 'no profile changes';
+    lines.push(`  ${record.step}: ${metricsStr}`);
+    if (record.discoveryNote) {
+      lines.push(`  Discovery: "${record.discoveryNote}"`);
+    }
+  }
+
+  const totalCost = budgetCeiling - budgetRemaining;
+  lines.push(`\nCost so far: $${totalCost.toFixed(2)} of $${budgetCeiling.toFixed(2)} budget`);
+
+  return lines.join('\n');
 }
 
 /**
@@ -479,87 +943,136 @@ function truncate(text: string, maxLen: number): string {
 // JSON PARSING & VALIDATION
 // ============================================================================
 
-/**
- * Parse the LLM response into HolisticSynthesisOutput.
- * Uses a robust fallback chain: direct parse → jsonrepair → error.
- */
-function parseResponse(raw: unknown): HolisticSynthesisOutput {
-  // If callClaudeWithRetry with useJsonMode already parsed it, raw is an object
-  if (typeof raw === 'object' && raw !== null) {
-    return validateAndCoerce(raw as Record<string, unknown>);
-  }
+/** Phase A output — Voice, Emotion, Earned-ness */
+interface PhaseAOutput {
+  voiceIdentity: VoiceIdentity;
+  voiceMap: VoiceMap;
+  emotionalTopography: EmotionalTopography;
+  momentEarnednessMap: MomentEarnednessMap;
+}
 
-  // If raw is a string (shouldn't happen with useJsonMode, but defensive)
-  if (typeof raw === 'string') {
-    let parsed: unknown;
-
-    // Try direct parse
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      // Try jsonrepair
-      try {
-        const repaired = jsonrepair(raw);
-        parsed = JSON.parse(repaired);
-        console.warn('[HolisticSynthesis] jsonrepair succeeded — response had malformed JSON');
-      } catch {
-        throw new Error('[HolisticSynthesis] Failed to parse JSON response after repair attempt');
-      }
-    }
-
-    return validateAndCoerce(parsed as Record<string, unknown>);
-  }
-
-  throw new Error(`[HolisticSynthesis] Unexpected response type: ${typeof raw}`);
+/** Phase B output — Theme, Narrative, Character, Craft, Admissions, Entanglements */
+interface PhaseBOutput {
+  thematicArchitecture: ThematicArchitecture;
+  narrativeStrategy: NarrativeStrategy;
+  characterRevelation: CharacterRevelation;
+  craftAssessment: CraftAssessment;
+  admissionsPositioning: AdmissionsPositioning;
+  entanglements: CrossDimensionEntanglement[];
+  // V2 connection graph outputs
+  connectionGraphSummary?: string;
+  newConnections?: HolisticSynthesisOutput['newConnections'];
+  connectionUpgrades?: HolisticSynthesisOutput['connectionUpgrades'];
+  // W1.4 finding outputs
+  newFindings?: HolisticSynthesisOutput['newFindings'];
+  findingEvolutions?: HolisticSynthesisOutput['findingEvolutions'];
 }
 
 /**
- * Validate the parsed output has the required sections and coerce types
- * where the LLM may have minor deviations from the schema.
- *
- * Does NOT silently default to fake data — if a section is completely missing,
- * we throw. But we DO coerce minor issues like missing optional fields.
+ * Parse Phase A LLM response (voice + emotion + earned-ness + entanglements).
  */
-function validateAndCoerce(raw: Record<string, unknown>): HolisticSynthesisOutput {
-  const requiredSections = [
-    'voiceIdentity', 'voiceMap', 'emotionalTopography',
-    'momentEarnednessMap', 'thematicArchitecture', 'narrativeStrategy',
-    'characterRevelation', 'craftAssessment', 'admissionsPositioning',
-    'entanglements',
-  ] as const;
-
-  const missing = requiredSections.filter(s => !(s in raw));
+function parsePhaseA(raw: unknown): PhaseAOutput {
+  const parsed = parseLlmJsonOutput(raw, 'L3.75 Phase A (voice+earned-ness)');
+  const required = ['voiceIdentity', 'voiceMap', 'emotionalTopography', 'momentEarnednessMap'];
+  const missing = required.filter(s => !(s in parsed));
   if (missing.length > 0) {
     throw new Error(
-      `[HolisticSynthesis] Missing required sections: ${missing.join(', ')}. ` +
-      `Received keys: ${Object.keys(raw).join(', ')}`
+      `[HolisticSynthesis PhaseA] Missing sections: ${missing.join(', ')}. ` +
+      `Received keys: ${Object.keys(parsed).join(', ')}`
     );
   }
-
-  // Coerce each section
-  const voiceIdentity = coerceVoiceIdentity(raw.voiceIdentity as Record<string, unknown>);
-  const voiceMap = coerceVoiceMap(raw.voiceMap as Record<string, unknown>);
-  const emotionalTopography = coerceEmotionalTopography(raw.emotionalTopography as Record<string, unknown>);
-  const momentEarnednessMap = coerceEarnednessMap(raw.momentEarnednessMap as Record<string, unknown>);
-  const thematicArchitecture = coerceThematicArchitecture(raw.thematicArchitecture as Record<string, unknown>);
-  const narrativeStrategy = coerceNarrativeStrategy(raw.narrativeStrategy as Record<string, unknown>);
-  const characterRevelation = coerceCharacterRevelation(raw.characterRevelation as Record<string, unknown>);
-  const craftAssessment = coerceCraftAssessment(raw.craftAssessment as Record<string, unknown>);
-  const admissionsPositioning = coerceAdmissionsPositioning(raw.admissionsPositioning as Record<string, unknown>);
-  const entanglements = coerceEntanglements(raw.entanglements as unknown[]);
-
   return {
-    voiceIdentity,
-    voiceMap,
-    emotionalTopography,
-    momentEarnednessMap,
-    thematicArchitecture,
-    narrativeStrategy,
-    characterRevelation,
-    craftAssessment,
-    admissionsPositioning,
-    entanglements,
+    voiceIdentity: coerceVoiceIdentity(parsed.voiceIdentity as Record<string, unknown>),
+    voiceMap: coerceVoiceMap(parsed.voiceMap as Record<string, unknown>),
+    emotionalTopography: coerceEmotionalTopography(parsed.emotionalTopography as Record<string, unknown>),
+    momentEarnednessMap: coerceEarnednessMap(parsed.momentEarnednessMap as Record<string, unknown>),
   };
+}
+
+/**
+ * Parse Phase B LLM response (theme + narrative + character + craft + admissions).
+ */
+function parsePhaseB(raw: unknown): PhaseBOutput {
+  const parsed = parseLlmJsonOutput(raw, 'L3.75 Phase B (theme+narrative)');
+  const required = ['thematicArchitecture', 'narrativeStrategy', 'characterRevelation', 'craftAssessment', 'admissionsPositioning', 'entanglements'];
+  const missing = required.filter(s => !(s in parsed));
+  if (missing.length > 0) {
+    throw new Error(
+      `[HolisticSynthesis PhaseB] Missing sections: ${missing.join(', ')}. ` +
+      `Received keys: ${Object.keys(parsed).join(', ')}`
+    );
+  }
+  const result: PhaseBOutput = {
+    thematicArchitecture: coerceThematicArchitecture(parsed.thematicArchitecture as Record<string, unknown>),
+    narrativeStrategy: coerceNarrativeStrategy(parsed.narrativeStrategy as Record<string, unknown>),
+    characterRevelation: coerceCharacterRevelation(parsed.characterRevelation as Record<string, unknown>),
+    craftAssessment: coerceCraftAssessment(parsed.craftAssessment as Record<string, unknown>),
+    admissionsPositioning: coerceAdmissionsPositioning(parsed.admissionsPositioning as Record<string, unknown>),
+    entanglements: coerceEntanglements(parsed.entanglements as unknown[]),
+  };
+
+  // V2: Parse connection graph fields (optional — gracefully absent)
+  if (typeof parsed.connectionGraphSummary === 'string' && parsed.connectionGraphSummary.length > 0) {
+    result.connectionGraphSummary = parsed.connectionGraphSummary;
+  }
+
+  if (Array.isArray(parsed.newConnections) && parsed.newConnections.length > 0) {
+    result.newConnections = coerceNewConnections(parsed.newConnections as Array<Record<string, unknown>>);
+  }
+
+  if (Array.isArray(parsed.connectionUpgrades) && parsed.connectionUpgrades.length > 0) {
+    result.connectionUpgrades = coerceConnectionUpgrades(parsed.connectionUpgrades as Array<Record<string, unknown>>);
+  }
+
+  // W1.4: Parse finding outputs (optional — gracefully absent)
+  if (Array.isArray(parsed.newFindings) && parsed.newFindings.length > 0) {
+    result.newFindings = coerceSynthesisFindings(parsed.newFindings as Array<Record<string, unknown>>);
+  }
+
+  if (Array.isArray(parsed.findingEvolutions) && parsed.findingEvolutions.length > 0) {
+    result.findingEvolutions = coerceFindingEvolutions(parsed.findingEvolutions as Array<Record<string, unknown>>);
+  }
+
+  return result;
+}
+
+/**
+ * Merge Phase A + Phase B into the full HolisticSynthesisOutput.
+ */
+function mergePhases(phaseA: PhaseAOutput, phaseB: PhaseBOutput): HolisticSynthesisOutput {
+  const result: HolisticSynthesisOutput = {
+    voiceIdentity: phaseA.voiceIdentity,
+    voiceMap: phaseA.voiceMap,
+    emotionalTopography: phaseA.emotionalTopography,
+    momentEarnednessMap: phaseA.momentEarnednessMap,
+    thematicArchitecture: phaseB.thematicArchitecture,
+    narrativeStrategy: phaseB.narrativeStrategy,
+    characterRevelation: phaseB.characterRevelation,
+    craftAssessment: phaseB.craftAssessment,
+    admissionsPositioning: phaseB.admissionsPositioning,
+    entanglements: phaseB.entanglements,
+  };
+
+  // V2: Pass through connection graph fields from Phase B
+  if (phaseB.connectionGraphSummary) {
+    result.connectionGraphSummary = phaseB.connectionGraphSummary;
+  }
+  if (phaseB.newConnections && phaseB.newConnections.length > 0) {
+    result.newConnections = phaseB.newConnections;
+  }
+  if (phaseB.connectionUpgrades && phaseB.connectionUpgrades.length > 0) {
+    result.connectionUpgrades = phaseB.connectionUpgrades;
+  }
+
+  // W1.4: Pass through finding fields from Phase B
+  if (phaseB.newFindings && phaseB.newFindings.length > 0) {
+    result.newFindings = phaseB.newFindings;
+  }
+  if (phaseB.findingEvolutions && phaseB.findingEvolutions.length > 0) {
+    result.findingEvolutions = phaseB.findingEvolutions;
+  }
+
+  return result;
 }
 
 // ── Section coercion helpers ──
@@ -585,6 +1098,10 @@ function coerceVoiceMap(raw: Record<string, unknown>): VoiceMap {
     sentenceRhythm: coerceVoiceMapDimension(raw.sentenceRhythm as Record<string, unknown>),
     perspectiveDistance: coerceVoiceMapDimension(raw.perspectiveDistance as Record<string, unknown>),
     tonalDisposition: coerceVoiceMapDimensionWithQualities(raw.tonalDisposition as Record<string, unknown>),
+    stabilityRegions: ensureArray(raw.stabilityRegions).map((r: Record<string, unknown>) => ({
+      paragraphs: ensureArray(r.paragraphs).map(Number),
+      voiceCharacter: String(r.voiceCharacter ?? ''),
+    })),
     shifts: ensureArray(raw.shifts).map(coerceVoiceShift),
     codeSwitching: ensureArray(raw.codeSwitching).map(coerceCodeSwitchEvent),
   };
@@ -726,6 +1243,7 @@ function coerceEmotionalTopography(raw: Record<string, unknown>): EmotionalTopog
         detail: String(item.detail ?? ''),
       };
     }),
+    authenticityAssessment: String(raw.authenticityAssessment ?? ''),
   };
 }
 
@@ -815,6 +1333,24 @@ function coerceThematicArchitecture(raw: Record<string, unknown>): ThematicArchi
 }
 
 function coerceNarrativeStrategy(raw: Record<string, unknown>): NarrativeStrategy {
+  const validMomentum = ['building', 'sustaining', 'releasing', 'stalling'] as const;
+  const rawMomentum = String(raw.arcMomentum ?? 'building');
+  const arcMomentum = validMomentum.includes(rawMomentum as typeof validMomentum[number])
+    ? rawMomentum as typeof validMomentum[number]
+    : 'building' as const;
+
+  // Parse turning point — can be null, or {paragraph, sentence}
+  let turningPoint: { paragraph: number; sentence: number } | null = null;
+  if (raw.turningPoint && typeof raw.turningPoint === 'object') {
+    const tp = raw.turningPoint as Record<string, unknown>;
+    if (tp.paragraph !== undefined && tp.paragraph !== null) {
+      turningPoint = {
+        paragraph: Number(tp.paragraph),
+        sentence: Number(tp.sentence ?? 0),
+      };
+    }
+  }
+
   return {
     primaryStrategy: String(raw.primaryStrategy ?? ''),
     strategyRationale: String(raw.strategyRationale ?? raw.whyThisStructure ?? ''),
@@ -830,6 +1366,9 @@ function coerceNarrativeStrategy(raw: Record<string, unknown>): NarrativeStrateg
     }),
     pacingAnalysis: String(raw.pacingAnalysis ?? ''),
     structuralChoices: ensureStringArray(raw.structuralChoices),
+    arcType: String(raw.arcType ?? ''),
+    arcMomentum,
+    turningPoint,
   };
 }
 
@@ -840,17 +1379,24 @@ function coerceCharacterRevelation(raw: Record<string, unknown>): CharacterRevel
     growthArc: String(raw.growthArc ?? ''),
     intellectualFingerprint: String(raw.intellectualFingerprint ?? ''),
     blindSpots: ensureStringArray(raw.blindSpots),
+    revealedQualities: ensureStringArray(raw.revealedQualities),
   };
 }
 
 function coerceCraftAssessment(raw: Record<string, unknown>): CraftAssessment {
+  // Prompt uses descriptive field names (craftSignatures/craftPatterns) to avoid
+  // evaluative framing. Map to profile type's field names (strengthSignatures/growthEdges).
+  // Accept both old and new names for robustness.
+  const signaturesRaw = raw.craftSignatures ?? raw.strengthSignatures;
+  const patternsRaw = raw.craftPatterns ?? raw.growthEdges;
+
   return {
-    strengthSignatures: ensureArray(raw.strengthSignatures).map((item: Record<string, unknown>) => ({
+    strengthSignatures: ensureArray(signaturesRaw).map((item: Record<string, unknown>) => ({
       quality: String(item.quality ?? ''),
       evidence: String(item.evidence ?? ''),
       paragraphs: ensureNumberArray(item.paragraphs),
     })),
-    growthEdges: ensureArray(raw.growthEdges).map((item: Record<string, unknown>) => ({
+    growthEdges: ensureArray(patternsRaw).map((item: Record<string, unknown>) => ({
       quality: String(item.quality ?? ''),
       description: String(item.description ?? ''),
       paragraphs: ensureNumberArray(item.paragraphs),
@@ -869,6 +1415,7 @@ function coerceAdmissionsPositioning(raw: Record<string, unknown>): AdmissionsPo
     redFlags: ensureStringArray(raw.redFlags),
     memorability: String(raw.memorability ?? raw.memorabilityAssessment ?? ''),
     portfolioPosition: String(raw.portfolioPosition ?? raw.aoTakeaway ?? ''),
+    aoTakeaway: String(raw.aoTakeaway ?? ''),
   };
 }
 
@@ -879,10 +1426,16 @@ function coerceEntanglements(raw: unknown[]): CrossDimensionEntanglement[] {
     'voice', 'emotion', 'theme', 'narrative', 'character', 'craft', 'admissions', 'structure',
   ];
 
+  const validSignificance = ['foundational', 'supporting', 'subtle'] as const;
+
   return raw.map((item: Record<string, unknown>, idx: number) => {
     const loc = item.location as Record<string, unknown> | undefined;
     const rawDims = ensureStringArray(item.dimensions);
     const rawCrossRefs = ensureStringArray(item.crossRefs);
+    const rawSig = String(item.significance ?? 'supporting');
+    const significance = validSignificance.includes(rawSig as typeof validSignificance[number])
+      ? rawSig as typeof validSignificance[number]
+      : 'supporting' as const;
 
     return {
       id: String(item.id ?? `ent-${idx + 1}`),
@@ -893,6 +1446,7 @@ function coerceEntanglements(raw: unknown[]): CrossDimensionEntanglement[] {
       },
       description: String(item.description ?? ''),
       crossRefs: rawCrossRefs.filter(d => validDimensions.includes(d as HolisticDimension)) as HolisticDimension[],
+      significance,
     };
   });
 }
@@ -926,6 +1480,215 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+// ── V2 Connection coercion helpers ──
+
+const VALID_STRENGTH_CATEGORIES: ConnectionStrengthCategory[] = ['foundational', 'significant', 'supporting', 'tentative'];
+const VALID_DIRECTIONALITIES: ConnectionDirectionality[] = ['forward', 'reverse', 'bidirectional', 'asymmetric'];
+
+function coerceConnectionEndpoint(raw: unknown): ConnectionEndpoint {
+  if (!raw || typeof raw !== 'object') {
+    return { paragraph: 0, sentence: 0, label: '' };
+  }
+  const obj = raw as Record<string, unknown>;
+  return {
+    paragraph: typeof obj.paragraph === 'number' ? obj.paragraph : 0,
+    sentence: typeof obj.sentence === 'number' ? obj.sentence : undefined,
+    label: typeof obj.label === 'string' ? obj.label : '',
+  };
+}
+
+function coerceNewConnections(
+  raw: Array<Record<string, unknown>>,
+): HolisticSynthesisOutput['newConnections'] {
+  return raw
+    .filter(item => item && typeof item === 'object')
+    .map(item => ({
+      from: coerceConnectionEndpoint(item.from),
+      to: coerceConnectionEndpoint(item.to),
+      description: String(item.description ?? ''),
+      reverseIllumination: typeof item.reverseIllumination === 'string' ? item.reverseIllumination : null,
+      significance: String(item.significance ?? ''),
+      strengthCategory: (
+        VALID_STRENGTH_CATEGORIES.includes(item.strengthCategory as ConnectionStrengthCategory)
+          ? item.strengthCategory as ConnectionStrengthCategory
+          : 'significant'
+      ),
+      directionality: (
+        VALID_DIRECTIONALITIES.includes(item.directionality as ConnectionDirectionality)
+          ? item.directionality as ConnectionDirectionality
+          : 'forward'
+      ),
+    }))
+    .filter(conn => conn.description.length > 0);
+}
+
+function coerceConnectionUpgrades(
+  raw: Array<Record<string, unknown>>,
+): HolisticSynthesisOutput['connectionUpgrades'] {
+  return raw
+    .filter(item => item && typeof item === 'object' && typeof item.connectionId === 'string')
+    .map(item => {
+      const upgrade: NonNullable<HolisticSynthesisOutput['connectionUpgrades']>[number] = {
+        connectionId: String(item.connectionId),
+      };
+      if (VALID_STRENGTH_CATEGORIES.includes(item.strengthCategory as ConnectionStrengthCategory)) {
+        upgrade.strengthCategory = item.strengthCategory as ConnectionStrengthCategory;
+      }
+      if (typeof item.reverseIllumination === 'string' && item.reverseIllumination.length > 0) {
+        upgrade.reverseIllumination = item.reverseIllumination;
+      }
+      if (typeof item.significance === 'string' && item.significance.length > 0) {
+        upgrade.significance = item.significance;
+      }
+      return upgrade;
+    });
+}
+
+// ── W1.4 Finding coercion helpers ──
+
+const VALID_FINDING_SCOPE_TYPES = ['word', 'sentence', 'sentence_group', 'paragraph', 'cross_paragraph', 'essay_level'] as const;
+const VALID_FINDING_MATURITIES: FindingMaturity[] = ['hypothesis', 'developing', 'confirmed', 'deepened', 'superseded'];
+const VALID_FINDING_MATURITIES_NO_SUPERSEDED: FindingMaturity[] = ['hypothesis', 'developing', 'confirmed', 'deepened'];
+const VALID_COACHING_VALUES: FindingCoachingValue[] = ['critical', 'high', 'medium', 'contextual', 'diagnostic'];
+const VALID_HOLISTIC_DIMENSIONS: HolisticDimension[] = ['voice', 'emotion', 'theme', 'narrative', 'character', 'craft', 'admissions', 'structure'];
+
+function coerceSynthesisFindings(
+  raw: Array<Record<string, unknown>>,
+): NonNullable<HolisticSynthesisOutput['newFindings']> {
+  return raw
+    .filter(item => item && typeof item === 'object' && typeof item.claim === 'string' && item.claim.length > 0)
+    .map(item => {
+      // Parse scope
+      const rawScope = item.scope as Record<string, unknown> | undefined;
+      const scopeType = rawScope?.type;
+      const scope: FindingScope = {
+        type: (typeof scopeType === 'string' && VALID_FINDING_SCOPE_TYPES.includes(scopeType as typeof VALID_FINDING_SCOPE_TYPES[number]))
+          ? scopeType as FindingScope['type']
+          : 'essay_level',
+        textEvidence: coerceFindingTextEvidence(rawScope?.textEvidence),
+      };
+      if (typeof rawScope?.paragraph === 'number') scope.paragraph = rawScope.paragraph;
+      if (Array.isArray(rawScope?.sentences)) scope.sentences = rawScope.sentences.filter((s): s is number => typeof s === 'number');
+      if (Array.isArray(rawScope?.paragraphs)) scope.paragraphs = rawScope.paragraphs.filter((p): p is number => typeof p === 'number');
+
+      // Parse maturity (new findings cannot be 'superseded')
+      const rawMaturity = String(item.maturity ?? 'hypothesis');
+      const maturity: FindingMaturity = VALID_FINDING_MATURITIES_NO_SUPERSEDED.includes(rawMaturity as FindingMaturity)
+        ? rawMaturity as FindingMaturity
+        : 'hypothesis';
+
+      // Parse coaching value
+      const rawCoaching = String(item.coachingValue ?? 'medium');
+      const coachingValue: FindingCoachingValue = VALID_COACHING_VALUES.includes(rawCoaching as FindingCoachingValue)
+        ? rawCoaching as FindingCoachingValue
+        : 'medium';
+
+      // Parse dimensions
+      const rawDims = Array.isArray(item.dimensions) ? item.dimensions : [];
+      const dimensions = rawDims
+        .map(d => String(d))
+        .filter(d => VALID_HOLISTIC_DIMENSIONS.includes(d as HolisticDimension)) as HolisticDimension[];
+
+      // Parse evidence
+      const evidence = coerceFindingEvidenceArray(item.evidence);
+
+      const finding: NonNullable<HolisticSynthesisOutput['newFindings']>[number] = {
+        claim: String(item.claim),
+        scope,
+        maturity,
+        maturityReasoning: String(item.maturityReasoning ?? ''),
+        coachingValue,
+        dimensions,
+        evidence,
+        deepeningPotential: typeof item.deepeningPotential === 'string' ? item.deepeningPotential : null,
+        raisesQuestions: ensureStringArray(item.raisesQuestions),
+      };
+
+      // Optional relationship references
+      if (Array.isArray(item.buildsOn) && item.buildsOn.length > 0) {
+        finding.buildsOn = ensureStringArray(item.buildsOn);
+      }
+      if (Array.isArray(item.relatedTo) && item.relatedTo.length > 0) {
+        finding.relatedTo = ensureStringArray(item.relatedTo);
+      }
+
+      return finding;
+    })
+    .filter(f => f.claim.length > 0 && f.evidence.length > 0);
+}
+
+function coerceFindingEvolutions(
+  raw: Array<Record<string, unknown>>,
+): NonNullable<HolisticSynthesisOutput['findingEvolutions']> {
+  return raw
+    .filter(item =>
+      item && typeof item === 'object' &&
+      typeof item.findingId === 'string' && item.findingId.length > 0,
+    )
+    .map(item => {
+      const rawMaturity = String(item.newMaturity ?? 'developing');
+      const newMaturity: FindingMaturity = VALID_FINDING_MATURITIES.includes(rawMaturity as FindingMaturity)
+        ? rawMaturity as FindingMaturity
+        : 'developing';
+
+      const evo: NonNullable<HolisticSynthesisOutput['findingEvolutions']>[number] = {
+        findingId: String(item.findingId),
+        newMaturity,
+        reasoning: String(item.reasoning ?? ''),
+      };
+
+      if (typeof item.supersedes === 'string' && item.supersedes.length > 0) {
+        evo.supersedes = item.supersedes;
+      }
+
+      return evo;
+    })
+    .filter(e => e.findingId.length > 0 && e.reasoning.length > 0);
+}
+
+function coerceFindingEvidenceArray(raw: unknown): FindingEvidence[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> =>
+      item !== null && typeof item === 'object' && typeof item.text === 'string',
+    )
+    .map(item => {
+      const evidence: FindingEvidence = {
+        text: String(item.text),
+        type: item.type === 'absent' ? 'absent' : 'present',
+      };
+      if (item.location && typeof item.location === 'object') {
+        const loc = item.location as Record<string, unknown>;
+        if (typeof loc.paragraph === 'number') {
+          evidence.location = {
+            paragraph: loc.paragraph,
+            ...(typeof loc.sentence === 'number' ? { sentence: loc.sentence } : {}),
+          };
+        }
+      }
+      return evidence;
+    })
+    .filter(e => e.text.length > 0);
+}
+
+function coerceFindingTextEvidence(raw: unknown): FindingScope['textEvidence'] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is Record<string, unknown> =>
+      item !== null && typeof item === 'object' && typeof item.text === 'string',
+    )
+    .map(item => {
+      const loc = item.location as Record<string, unknown> | undefined;
+      return {
+        text: String(item.text),
+        location: {
+          paragraph: typeof loc?.paragraph === 'number' ? loc.paragraph : 0,
+          ...(typeof loc?.sentence === 'number' ? { sentence: loc.sentence } : {}),
+        },
+      };
+    });
+}
+
 // ============================================================================
 // HOLISTIC SYNTHESIS SERVICE
 // ============================================================================
@@ -934,82 +1697,745 @@ export class HolisticSynthesisService {
   /**
    * Synthesize all 10 holistic sections from the complete L3 understanding.
    *
-   * Single Sonnet call. Uses prompt caching on the system prompt for savings
-   * when multiple essays are processed sequentially.
+   * Two parallel Sonnet calls (Phase A: voice+emotion+earned-ness, Phase B: theme+narrative+character+craft+admissions).
+   * Each generates ~8K tokens, avoiding the 10+ minute timeout of a single 16K-token call.
+   * Results are merged into the full HolisticSynthesisOutput.
    *
    * @param input - Essay text, complete profile after L3 walk, holistic evolution scaffold
    * @returns The 10 holistic sections + cost/timing metadata
-   * @throws Error if Sonnet call fails or response cannot be parsed
+   * @throws Error if either Sonnet call fails or response cannot be parsed
    */
   async synthesize(input: HolisticSynthesisInput): Promise<HolisticSynthesisResult> {
     const startTime = Date.now();
 
-    // Build the user prompt from essay context + understanding + scaffold
-    const understandingContext = buildUnderstandingContext(input.profile);
+    // Build the shared user prompt from essay context + understanding + scaffold
+    const understandingContext = buildUnderstandingContext(input.profile, input.findingStore);
     const evolutionScaffold = buildEvolutionScaffold(input.holisticEvolution);
 
-    // Combine into user prompt: Block 2 (essay-specific) + Block 3 (call-specific)
+    // W1.4: Build finding context if a FindingStore is available
+    let findingContextBlock = '';
+    if (input.findingStore && input.findingStore.size > 0) {
+      const refContext = buildFindingReferenceContext(input.findingStore);
+      if (refContext) {
+        findingContextBlock = '\n\n' + refContext;
+      }
+    }
+
     const userPrompt = [
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',
       understandingContext,
+      findingContextBlock,
       '\n',
       evolutionScaffold,
     ].join('');
 
     console.log(
-      `[HolisticSynthesis] Starting synthesis — ` +
+      `[HolisticSynthesis] Starting 2-phase parallel synthesis — ` +
       `${input.profile.paragraphs.length} paragraphs, ` +
-      `${input.profile.connections.all.length} connections, ` +
-      `~${Math.round(userPrompt.length / 4)} estimated input tokens`
+      `${input.profile.connections.all.filter(c => c.status === 'active').length} active connections, ` +
+      `~${Math.round(userPrompt.length / 4)} estimated input tokens per phase`
     );
 
-    // Make the Sonnet call
-    const response: ClaudeResponse<unknown> = await callClaudeWithRetry<unknown>(
-      {
+    // Run Phase A and Phase B in parallel
+    const [responseA, responseB] = await Promise.all([
+      callClaude<unknown>(
+        {
+          model: SONNET,
+          systemPrompt: SYSTEM_PROMPT_PHASE_A,
+          userPrompt,
+          maxTokens: SYNTHESIS_MAX_TOKENS_PHASE_A,
+          temperature: SYNTHESIS_TEMPERATURE,
+          timeoutMs: SYNTHESIS_TIMEOUT_MS,
+          useJsonMode: true,
+          cacheSystemPrompt: true,
+        },
+      ).then(r => {
+        console.log(
+          `[HolisticSynthesis] Phase A complete — ` +
+          `${r.usage.output_tokens} output tokens, ` +
+          `$${calculateCost(r.usage, SONNET).toFixed(4)}, ` +
+          `stopReason: ${r.stopReason}`
+        );
+        return r;
+      }),
+      callClaude<unknown>(
+        {
+          model: SONNET,
+          systemPrompt: SYSTEM_PROMPT_PHASE_B,
+          userPrompt,
+          maxTokens: SYNTHESIS_MAX_TOKENS_PHASE_B,
+          temperature: SYNTHESIS_TEMPERATURE,
+          timeoutMs: SYNTHESIS_TIMEOUT_MS,
+          useJsonMode: true,
+          cacheSystemPrompt: true,
+        },
+      ).then(r => {
+        console.log(
+          `[HolisticSynthesis] Phase B complete — ` +
+          `${r.usage.output_tokens} output tokens, ` +
+          `$${calculateCost(r.usage, SONNET).toFixed(4)}, ` +
+          `stopReason: ${r.stopReason}`
+        );
+        return r;
+      }),
+    ]);
+
+    // Parse and merge
+    const phaseA = parsePhaseA(responseA.content);
+    const phaseB = parsePhaseB(responseB.content);
+    const synthesis = mergePhases(phaseA, phaseB);
+
+    // Combined cost
+    const costA = calculateCost(responseA.usage, SONNET);
+    const costB = calculateCost(responseB.usage, SONNET);
+    const cost = costA + costB;
+
+    const timingMs = Date.now() - startTime;
+
+    // ── Completeness guard ──
+    const COMPLETENESS_CHECKS: Array<{
+      name: string;
+      check: () => boolean;
+    }> = [
+      { name: 'voiceIdentity', check: () => !!(synthesis.voiceIdentity?.signature) },
+      { name: 'voiceMap', check: () => !!(synthesis.voiceMap?.register) },
+      { name: 'emotionalTopography', check: () => !!(synthesis.emotionalTopography?.arcTrajectory) },
+      { name: 'momentEarnednessMap', check: () => Array.isArray(synthesis.momentEarnednessMap?.moments) && synthesis.momentEarnednessMap.moments.length > 0 },
+      { name: 'thematicArchitecture', check: () => !!(synthesis.thematicArchitecture?.centralThesis) },
+      { name: 'narrativeStrategy', check: () => !!(synthesis.narrativeStrategy?.primaryStrategy) },
+      { name: 'characterRevelation', check: () => !!(synthesis.characterRevelation?.writerPortrait) },
+      { name: 'craftAssessment', check: () => (synthesis.craftAssessment?.strengthSignatures?.length ?? 0) > 0 || !!(synthesis.craftAssessment?.imageSystem) },
+      { name: 'admissionsPositioning', check: () => !!(synthesis.admissionsPositioning?.tellabilitySummary) },
+      { name: 'entanglements', check: () => Array.isArray(synthesis.entanglements) },
+    ];
+
+    const missingSections: string[] = [];
+    for (const { name, check } of COMPLETENESS_CHECKS) {
+      if (!check()) {
+        missingSections.push(name);
+      }
+    }
+    const isComplete = missingSections.length === 0;
+
+    if (!isComplete) {
+      console.warn(
+        `[HolisticSynthesis] INCOMPLETE: Missing/empty sections: [${missingSections.join(', ')}]. ` +
+        `These sections will have default/empty values in the profile.`,
+      );
+    }
+
+    // Warn if either phase was truncated
+    if (responseA.stopReason === 'max_tokens') {
+      console.warn('[HolisticSynthesis] WARNING: Phase A output was truncated by maxTokens limit.');
+    }
+    if (responseB.stopReason === 'max_tokens') {
+      console.warn('[HolisticSynthesis] WARNING: Phase B output was truncated by maxTokens limit.');
+    }
+
+    const totalInputTokens = responseA.usage.input_tokens + responseB.usage.input_tokens;
+    const totalOutputTokens = responseA.usage.output_tokens + responseB.usage.output_tokens;
+    const totalCacheRead = (responseA.usage.cache_read_input_tokens ?? 0) + (responseB.usage.cache_read_input_tokens ?? 0);
+    const totalCacheWrite = (responseA.usage.cache_creation_input_tokens ?? 0) + (responseB.usage.cache_creation_input_tokens ?? 0);
+
+    console.log(
+      `[HolisticSynthesis] Complete — ` +
+      `${totalOutputTokens} output tokens (A: ${responseA.usage.output_tokens}, B: ${responseB.usage.output_tokens}), ` +
+      `$${cost.toFixed(4)} cost, ` +
+      `${timingMs}ms, ` +
+      `complete: ${isComplete} (${10 - missingSections.length}/10 sections), ` +
+      `moments: ${synthesis.momentEarnednessMap.moments.length}, ` +
+      `shifts: ${synthesis.voiceMap.shifts.length}, ` +
+      `entanglements: ${synthesis.entanglements.length}`,
+    );
+
+    return {
+      synthesis,
+      isComplete,
+      missingSections,
+      cost,
+      tokenUsage: {
+        inputTokens: totalInputTokens,
+        outputTokens: totalOutputTokens,
+        cacheReadTokens: totalCacheRead,
+        cacheWriteTokens: totalCacheWrite,
+      },
+      timingMs,
+    };
+  }
+
+  // =========================================================================
+  // V2: ITERATION-BASED SYNTHESIS (Growth Cycle)
+  // =========================================================================
+
+  /**
+   * Run one iteration of the growth cycle synthesis.
+   *
+   * Three sequential calls per iteration:
+   * 1. Phase A + Phase B (parallel): holistic sections (reuses existing prompts)
+   * 2. Phase Meta: walk validation + reading strategy + convergence
+   * 3. Question Curation: curate/resolve/filter the question queue
+   *
+   * Iteration 0 synthesizes from scratch. Iteration 1+ refines with prior context.
+   *
+   * @param input Iteration input with prior state and activity log
+   * @returns Complete iteration output including synthesis + meta + curation
+   */
+  async synthesizeIteration(input: SynthesisIterationInput): Promise<SynthesisIterationResult> {
+    const startTime = Date.now();
+    const isFirstIteration = input.iterationNumber === 0;
+
+    console.log(
+      `[HolisticSynthesis] Iteration ${input.iterationNumber} starting — ` +
+      `${isFirstIteration ? 'from scratch' : 'refining'}, ` +
+      `${input.cumulativeFindings.length} cumulative findings, ` +
+      `${input.questionQueue.length} questions in queue`,
+    );
+
+    // ── Build shared context ──
+    const understandingContext = buildUnderstandingContext(input.profile, input.findingStore);
+    const evolutionScaffold = buildEvolutionScaffold(input.walkEvolution);
+
+    // Build finding context
+    let findingContextBlock = '';
+    if (input.findingStore && input.findingStore.size > 0) {
+      const refContext = buildFindingReferenceContext(input.findingStore);
+      if (refContext) {
+        findingContextBlock = '\n\n' + refContext;
+      }
+    }
+
+    // Build iteration context (prior synthesis + new findings for iter > 0)
+    const iterationContext = isFirstIteration
+      ? ''
+      : this.buildIterationContext(input);
+
+    // Build activity log context
+    const activityContext = input.activityLog.length > 0
+      ? '\n\n' + formatActivityLogForPrompt(input.activityLog, input.budgetCeiling ?? 0.60, input.budgetRemaining ?? 0.60)
+      : '';
+
+    // Build phase context
+    const phaseContext = input.priorPhase
+      ? this.buildPhaseContext(input.priorPhase)
+      : '';
+
+    const userPrompt = [
+      '=== FULL ESSAY TEXT ===\n',
+      input.essayText,
+      '\n\n',
+      understandingContext,
+      findingContextBlock,
+      iterationContext,
+      activityContext,
+      phaseContext,
+      '\n',
+      evolutionScaffold,
+    ].join('');
+
+    // ── Step 1: Phase A + Phase B (parallel) — 10 holistic sections ──
+    const [responseA, responseB] = await Promise.all([
+      callClaude<unknown>({
         model: SONNET,
-        systemPrompt: SYSTEM_PROMPT,
+        systemPrompt: SYSTEM_PROMPT_PHASE_A,
         userPrompt,
-        maxTokens: SYNTHESIS_MAX_TOKENS,
+        maxTokens: SYNTHESIS_MAX_TOKENS_PHASE_A,
         temperature: SYNTHESIS_TEMPERATURE,
         timeoutMs: SYNTHESIS_TIMEOUT_MS,
         useJsonMode: true,
         cacheSystemPrompt: true,
-      },
-      {},
-      3, // maxRetries
-    );
+      }),
+      callClaude<unknown>({
+        model: SONNET,
+        systemPrompt: SYSTEM_PROMPT_PHASE_B,
+        userPrompt,
+        maxTokens: SYNTHESIS_MAX_TOKENS_PHASE_B,
+        temperature: SYNTHESIS_TEMPERATURE,
+        timeoutMs: SYNTHESIS_TIMEOUT_MS,
+        useJsonMode: true,
+        cacheSystemPrompt: true,
+      }),
+    ]);
 
-    // Parse and validate the response
-    const synthesis = parseResponse(response.content);
-
-    // Calculate cost
-    const cost = calculateCost(response.usage, SONNET);
-
-    const timingMs = Date.now() - startTime;
+    const phaseA = parsePhaseA(responseA.content);
+    const phaseB = parsePhaseB(responseB.content);
+    const synthesis = mergePhases(phaseA, phaseB);
 
     console.log(
-      `[HolisticSynthesis] Complete — ` +
-      `${response.usage.output_tokens} output tokens, ` +
-      `$${cost.toFixed(4)} cost, ` +
-      `${timingMs}ms, ` +
-      `stopReason: ${response.stopReason}, ` +
-      `moments: ${synthesis.momentEarnednessMap.moments.length}, ` +
-      `shifts: ${synthesis.voiceMap.shifts.length}, ` +
-      `entanglements: ${synthesis.entanglements.length}`
+      `[HolisticSynthesis] Iteration ${input.iterationNumber} — Phase A+B complete, ` +
+      `$${(calculateCost(responseA.usage, SONNET) + calculateCost(responseB.usage, SONNET)).toFixed(4)}`,
     );
 
-    // Warn if output was truncated (stop_reason === 'max_tokens')
-    if (response.stopReason === 'max_tokens') {
-      console.warn(
-        '[HolisticSynthesis] WARNING: Output was truncated by maxTokens limit. ' +
-        'Some holistic sections may be incomplete. Consider increasing SYNTHESIS_MAX_TOKENS.'
-      );
-    }
+    // ── Step 2: Phase Meta — validation + reading strategy + convergence ──
+    const metaUserPrompt = this.buildMetaUserPrompt(
+      input,
+      synthesis,
+      understandingContext,
+    );
+
+    const metaResponse = await callClaude<unknown>({
+      model: SONNET,
+      systemPrompt: SYSTEM_PROMPT_META,
+      userPrompt: metaUserPrompt,
+      maxTokens: META_MAX_TOKENS,
+      temperature: SYNTHESIS_TEMPERATURE,
+      timeoutMs: META_TIMEOUT_MS,
+      useJsonMode: true,
+      cacheSystemPrompt: true,
+    });
+
+    const metaOutput = this.parseMetaOutput(metaResponse.content);
+
+    console.log(
+      `[HolisticSynthesis] Iteration ${input.iterationNumber} — Meta complete, ` +
+      `converged=${metaOutput.selfAssessedConvergence.hasConverged}, ` +
+      `${metaOutput.walkDisagreements.length} disagreements, ` +
+      `${metaOutput.reReadCandidates.length} re-read candidates`,
+    );
+
+    // ── Step 3: Question Curation ──
+    const curationUserPrompt = this.buildCurationUserPrompt(
+      input,
+      synthesis,
+      metaOutput.readingStrategy,
+    );
+
+    const curationResponse = await callClaude<unknown>({
+      model: SONNET,
+      systemPrompt: SYSTEM_PROMPT_CURATION,
+      userPrompt: curationUserPrompt,
+      maxTokens: CURATION_MAX_TOKENS,
+      temperature: SYNTHESIS_TEMPERATURE,
+      timeoutMs: CURATION_TIMEOUT_MS,
+      useJsonMode: true,
+      cacheSystemPrompt: true,
+    });
+
+    const curationOutput = this.parseCurationOutput(curationResponse.content);
+
+    console.log(
+      `[HolisticSynthesis] Iteration ${input.iterationNumber} — Curation complete, ` +
+      `${curationOutput.resolvedQuestions.length} resolved, ` +
+      `${curationOutput.curatedQueue.length} curated, ` +
+      `${curationOutput.filteredQuestions.length} filtered`,
+    );
+
+    // ── Aggregate costs ──
+    const costA = calculateCost(responseA.usage, SONNET);
+    const costB = calculateCost(responseB.usage, SONNET);
+    const costMeta = calculateCost(metaResponse.usage, SONNET);
+    const costCuration = calculateCost(curationResponse.usage, SONNET);
+    const totalCost = costA + costB + costMeta + costCuration;
+    const timingMs = Date.now() - startTime;
+
+    const tokenUsage = {
+      inputTokens: responseA.usage.input_tokens + responseB.usage.input_tokens +
+        metaResponse.usage.input_tokens + curationResponse.usage.input_tokens,
+      outputTokens: responseA.usage.output_tokens + responseB.usage.output_tokens +
+        metaResponse.usage.output_tokens + curationResponse.usage.output_tokens,
+      cacheReadTokens:
+        (responseA.usage.cache_read_input_tokens ?? 0) +
+        (responseB.usage.cache_read_input_tokens ?? 0) +
+        (metaResponse.usage.cache_read_input_tokens ?? 0) +
+        (curationResponse.usage.cache_read_input_tokens ?? 0),
+      cacheWriteTokens:
+        (responseA.usage.cache_creation_input_tokens ?? 0) +
+        (responseB.usage.cache_creation_input_tokens ?? 0) +
+        (metaResponse.usage.cache_creation_input_tokens ?? 0) +
+        (curationResponse.usage.cache_creation_input_tokens ?? 0),
+    };
+
+    console.log(
+      `[HolisticSynthesis] Iteration ${input.iterationNumber} complete — ` +
+      `$${totalCost.toFixed(4)} total (A=$${costA.toFixed(3)}, B=$${costB.toFixed(3)}, ` +
+      `Meta=$${costMeta.toFixed(3)}, Curation=$${costCuration.toFixed(3)}), ` +
+      `${timingMs}ms`,
+    );
 
     return {
-      synthesis,
+      output: {
+        synthesis,
+        walkDisagreements: metaOutput.walkDisagreements,
+        questionCuration: curationOutput,
+        readingStrategy: metaOutput.readingStrategy,
+        reReadCandidates: metaOutput.reReadCandidates,
+        evolutionNarrative: metaOutput.evolutionNarrative,
+        selfAssessedConvergence: metaOutput.selfAssessedConvergence,
+      },
+      cost: totalCost,
+      tokenUsage,
+      timingMs,
+    };
+  }
+
+  // ── Iteration helper: build iteration context for iter > 0 ──
+
+  private buildIterationContext(input: SynthesisIterationInput): string {
+    if (!input.previousSynthesis) return '';
+
+    const parts: string[] = ['\n\n=== PREVIOUS SYNTHESIS (Iteration ' + (input.iterationNumber - 1) + ') ===\n'];
+
+    // Include a compact summary of the prior synthesis for stability guidance
+    parts.push('The following synthesis was produced in the previous iteration.');
+    parts.push('STABLE claims should not change without strong new evidence.');
+    parts.push('REFINEMENT areas may evolve freely with new information.\n');
+
+    // Include key claims from prior synthesis as stability anchors
+    if (input.previousSynthesis.voiceIdentity?.signature) {
+      parts.push(`Voice Identity: "${truncate(input.previousSynthesis.voiceIdentity.signature, 200)}"`);
+    }
+    if (input.previousSynthesis.thematicArchitecture?.centralThesis) {
+      parts.push(`Central Thesis: "${truncate(input.previousSynthesis.thematicArchitecture.centralThesis, 200)}"`);
+    }
+    if (input.previousSynthesis.narrativeStrategy?.primaryStrategy) {
+      parts.push(`Narrative Strategy: "${truncate(input.previousSynthesis.narrativeStrategy.primaryStrategy, 200)}"`);
+    }
+    if (input.previousSynthesis.characterRevelation?.writerPortrait) {
+      parts.push(`Writer Portrait: "${truncate(input.previousSynthesis.characterRevelation.writerPortrait, 200)}"`);
+    }
+
+    // Include ALL new information since last iteration — never trim findings.
+    // The LLM decides what's relevant for convergence judgment. (LLM-first Rule 2)
+    const newFindings = input.cumulativeFindings.filter(
+      f => f.source === 'deep_dive' || f.source === 'holistic_synthesis',
+    );
+    if (newFindings.length > 0) {
+      parts.push('\n=== NEW INFORMATION SINCE LAST ITERATION ===\n');
+      for (const finding of newFindings) {
+        parts.push(`  [${finding.id}] ${finding.claim} (${finding.maturity}, ${finding.coachingValue})`);
+        if (finding.evidence.length > 0) {
+          parts.push(`    Evidence: "${truncate(finding.evidence[0].text, 100)}"`);
+        }
+      }
+    }
+
+    if (input.previousReadingStrategy) {
+      parts.push('\n=== PREVIOUS READING STRATEGY ===\n');
+      parts.push(`Strategy: ${input.previousReadingStrategy.strategy}`);
+      parts.push(`Best approach: ${input.previousReadingStrategy.bestApproach}`);
+    }
+
+    return parts.join('\n');
+  }
+
+  // ── Meta prompt builder ──
+
+  private buildMetaUserPrompt(
+    input: SynthesisIterationInput,
+    synthesis: HolisticSynthesisOutput,
+    understandingContext: string,
+  ): string {
+    const parts: string[] = [];
+
+    parts.push('=== ESSAY TEXT ===\n');
+    parts.push(input.essayText);
+    parts.push('\n\n=== CURRENT SYNTHESIS (just produced) ===\n');
+
+    // Compact synthesis summary for meta assessment
+    parts.push(`Voice Identity: ${truncate(synthesis.voiceIdentity?.signature ?? '', 300)}`);
+    parts.push(`Central Thesis: ${truncate(synthesis.thematicArchitecture?.centralThesis ?? '', 300)}`);
+    parts.push(`Narrative Strategy: ${truncate(synthesis.narrativeStrategy?.primaryStrategy ?? '', 300)}`);
+    parts.push(`Character: ${truncate(synthesis.characterRevelation?.writerPortrait ?? '', 300)}`);
+    parts.push(`Emotional Arc: ${truncate(synthesis.emotionalTopography?.arcTrajectory ?? '', 300)}`);
+    parts.push(`Entanglements: ${synthesis.entanglements?.length ?? 0}`);
+    parts.push(`Earned Moments: ${synthesis.momentEarnednessMap?.moments?.length ?? 0}`);
+
+    parts.push('\n\n=== WALK PARAGRAPH READINGS ===\n');
+    for (const para of input.profile.paragraphs) {
+      if (para.understanding) {
+        parts.push(`[P${para.index}] Role: ${para.understanding.role}`);
+        parts.push(`  Function: ${para.understanding.function}`);
+      }
+    }
+
+    if (input.activityLog.length > 0) {
+      parts.push('\n\n');
+      parts.push(formatActivityLogForPrompt(
+        input.activityLog,
+        input.budgetCeiling ?? 0.60,
+        input.budgetRemaining ?? 0.60,
+      ));
+    }
+
+    if (input.priorPhase) {
+      parts.push(this.buildPhaseContext(input.priorPhase));
+    }
+
+    parts.push('\n\nProduce the meta-assessment JSON. Be specific to THIS essay.');
+
+    return parts.join('\n');
+  }
+
+  // ── Curation prompt builder ──
+
+  private buildCurationUserPrompt(
+    input: SynthesisIterationInput,
+    synthesis: HolisticSynthesisOutput,
+    readingStrategy: ReadingStrategy,
+  ): string {
+    const parts: string[] = [];
+
+    parts.push('=== CURRENT SYNTHESIS ===\n');
+    parts.push(`Voice: ${truncate(synthesis.voiceIdentity?.signature ?? '', 200)}`);
+    parts.push(`Theme: ${truncate(synthesis.thematicArchitecture?.centralThesis ?? '', 200)}`);
+    parts.push(`Strategy: ${truncate(synthesis.narrativeStrategy?.primaryStrategy ?? '', 200)}`);
+
+    parts.push('\n\n=== READING STRATEGY ===\n');
+    parts.push(JSON.stringify(readingStrategy, null, 2));
+
+    parts.push('\n\n=== QUESTIONS TO CURATE ===\n');
+    for (const q of input.questionQueue) {
+      parts.push(`[${q.id}] (${q.source}, ${q.status}) ${q.question}`);
+      if (q.expectedInsight) {
+        parts.push(`  Expected insight: ${q.expectedInsight}`);
+      }
+      if (q.dimensions.length > 0) {
+        parts.push(`  Dimensions: ${q.dimensions.join(', ')}`);
+      }
+    }
+
+    if (input.cumulativeFindings.length > 0) {
+      parts.push('\n\n=== EXISTING FINDINGS ===\n');
+      // Show ALL active findings — the LLM decides what's relevant for curation. (LLM-first Rule 2)
+      const active = input.cumulativeFindings.filter(f => f.maturity !== 'superseded');
+      for (const f of active) {
+        parts.push(`[${f.id}] ${f.claim} (${f.maturity}, ${f.coachingValue})`);
+      }
+    }
+
+    parts.push('\n\n=== AVAILABLE DEEP DIVE PROMPTS ===\n');
+    parts.push('voice_authenticity, voice_register_analysis, emotion_earning_trace, emotion_arc_mapping, ');
+    parts.push('theme_thread_tracing, theme_subtext_excavation, narrative_strategy_assessment, narrative_pivot_analysis, ');
+    parts.push('character_values_mapping, character_growth_arc, craft_rhythm_analysis, craft_image_system, ');
+    parts.push('admissions_positioning, admissions_distinctiveness, epistemological_framework, absence_detection, ');
+    parts.push('coherence_validation, meta_awareness, cross_dimension_intersection');
+
+    parts.push('\n\nCurate the queue. Resolve what you can answer, filter low-quality, curate for deep dives.');
+
+    return parts.join('\n');
+  }
+
+  // ── Phase context builder ──
+
+  private buildPhaseContext(phase: ImprovementPhase): string {
+    const parts: string[] = ['\n\n=== PHASE CONTEXT ===\n'];
+    parts.push(`Overall phase: ${phase.level} — ${phase.reasoning}`);
+    if (phase.coachingLens) {
+      parts.push(`Coaching lens: ${phase.coachingLens}`);
+    }
+    if (phase.dimensionPhases && phase.dimensionPhases.length > 0) {
+      parts.push('Dimension phases:');
+      for (const dp of phase.dimensionPhases) {
+        parts.push(`  ${dp.dimension}: ${dp.level} — ${dp.reasoning}`);
+      }
+    }
+    return parts.join('\n');
+  }
+
+  // ── Meta output parser ──
+
+  private parseMetaOutput(raw: unknown): {
+    walkDisagreements: SynthesisIterationOutput['walkDisagreements'];
+    readingStrategy: ReadingStrategy;
+    reReadCandidates: SynthesisIterationOutput['reReadCandidates'];
+    evolutionNarrative: string;
+    selfAssessedConvergence: SynthesisIterationOutput['selfAssessedConvergence'];
+  } {
+    const parsed = parseLlmJsonOutput(raw, 'L3.75 Meta');
+
+    const walkDisagreements = ensureArray(parsed.walkDisagreements).map(
+      (item: Record<string, unknown>) => {
+        const validResolutions = ['synthesis_wins', 'flag_for_reread', 'preserve_both'] as const;
+        const rawRes = String(item.resolution ?? 'preserve_both');
+        return {
+          paragraph: Number(item.paragraph ?? 0),
+          walkReading: String(item.walkReading ?? ''),
+          synthesisReading: String(item.synthesisReading ?? ''),
+          confidence: clampNumber(Number(item.confidence ?? 0.5), 0, 1),
+          resolution: (validResolutions.includes(rawRes as typeof validResolutions[number])
+            ? rawRes : 'preserve_both') as typeof validResolutions[number],
+          reasoning: String(item.reasoning ?? ''),
+        };
+      },
+    );
+
+    const rawStrategy = parsed.readingStrategy as Record<string, unknown> | undefined;
+    const readingStrategy: ReadingStrategy = {
+      strategy: String(rawStrategy?.strategy ?? ''),
+      bestApproach: String(rawStrategy?.bestApproach ?? ''),
+      antiPatterns: ensureStringArray(rawStrategy?.antiPatterns),
+      contextPriorities: ensureStringArray(rawStrategy?.contextPriorities),
+    };
+
+    const reReadCandidates = ensureArray(parsed.reReadCandidates).map(
+      (item: Record<string, unknown>) => ({
+        paragraph: Number(item.paragraph ?? 0),
+        reason: String(item.reason ?? ''),
+        expectedDepthGain: (item.expectedDepthGain === 'significant' ? 'significant' : 'moderate') as 'significant' | 'moderate',
+      }),
+    );
+
+    const rawConvergence = parsed.selfAssessedConvergence as Record<string, unknown> | undefined;
+    const selfAssessedConvergence = {
+      hasConverged: rawConvergence?.hasConverged === true,
+      reasoning: String(rawConvergence?.reasoning ?? ''),
+      remainingOpportunities: ensureStringArray(rawConvergence?.remainingOpportunities),
+    };
+
+    return {
+      walkDisagreements,
+      readingStrategy,
+      reReadCandidates,
+      evolutionNarrative: String(parsed.evolutionNarrative ?? ''),
+      selfAssessedConvergence,
+    };
+  }
+
+  // ── Curation output parser ──
+
+  private parseCurationOutput(raw: unknown): QuestionCurationOutput {
+    const parsed = parseLlmJsonOutput(raw, 'L3.75 Question Curation');
+
+    const resolvedQuestions = ensureArray(parsed.resolvedQuestions).map(
+      (item: Record<string, unknown>) => ({
+        questionId: String(item.questionId ?? ''),
+        answer: String(item.answer ?? ''),
+        evidence: String(item.evidence ?? ''),
+      }),
+    ).filter(q => q.questionId.length > 0);
+
+    const curatedQueue = ensureArray(parsed.curatedQueue).map(
+      (item: Record<string, unknown>) => {
+        const rawQ = item.question as Record<string, unknown> | undefined;
+        const question: UnderstandingQuestion = {
+          id: String(rawQ?.id ?? `q-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`),
+          question: String(rawQ?.question ?? ''),
+          dimensions: ensureStringArray(rawQ?.dimensions),
+          anchorParagraph: typeof rawQ?.anchorParagraph === 'number' ? rawQ.anchorParagraph : undefined,
+          expectedInsight: String(rawQ?.expectedInsight ?? ''),
+          source: (['walk', 'synthesis', 'deep_dive', 'coaching'].includes(String(rawQ?.source ?? ''))
+            ? String(rawQ?.source) : 'synthesis') as UnderstandingQuestion['source'],
+          status: 'open',
+        };
+        return {
+          question,
+          recommendedPrompt: String(item.recommendedPrompt ?? ''),
+          promptRationale: String(item.promptRationale ?? ''),
+        };
+      },
+    ).filter(cq => cq.question.question.length > 0 && cq.recommendedPrompt.length > 0);
+
+    const filteredQuestions = ensureArray(parsed.filteredQuestions).map(
+      (item: Record<string, unknown>) => ({
+        questionId: String(item.questionId ?? ''),
+        filterReason: String(item.filterReason ?? ''),
+      }),
+    ).filter(fq => fq.questionId.length > 0);
+
+    return {
+      resolvedQuestions,
+      curatedQueue,
+      filteredQuestions,
+    };
+  }
+
+  /**
+   * W5.3: Delta synthesis — re-synthesize ONLY targeted holistic sections.
+   *
+   * Much cheaper than full L3.75 (~$0.04-0.08 vs ~$0.15-0.30) because:
+   * - Single Sonnet call (not two parallel phases)
+   * - Only re-synthesizes 1-3 sections, not all 10
+   * - Includes current holistic state as reference context
+   *
+   * Triggered by: blocking contradictions (W5.4a), coaching supersession (W5.4b),
+   * or focused analysis ripple (W5.4c).
+   *
+   * @param request - Which sections to update and why
+   * @param currentProfile - Current profile with existing holistic sections as reference
+   * @returns DeltaSynthesisResult with partial holistic data for merge
+   */
+  async deltaSynthesize(
+    request: DeltaSynthesisRequest,
+    currentProfile: Readonly<EssayProfile>,
+  ): Promise<DeltaSynthesisResult> {
+    const startTime = Date.now();
+
+    const sectionNames = request.targetSections.join(', ');
+    console.log(
+      `[HolisticSynthesis] Delta synthesis — ` +
+      `trigger=${request.trigger}, ` +
+      `sections=[${sectionNames}], ` +
+      `evidence=${request.evidence.slice(0, 100)}...`,
+    );
+
+    // Build current holistic context for reference
+    const currentHolisticContext = this.buildCurrentHolisticContext(currentProfile, request.targetSections);
+
+    // Build understanding context (same helper as full synthesis)
+    const understandingContext = buildUnderstandingContext(currentProfile as EssayProfile);
+
+    const essayText = currentProfile.paragraphs.map((p, i) => `[P${i}] ${p.text}`).join('\n\n');
+
+    const userPrompt = [
+      '=== ESSAY TEXT ===\n',
+      essayText,
+      '\n\n',
+      understandingContext,
+      '\n\n=== CURRENT HOLISTIC STATE (for sections being updated) ===\n',
+      currentHolisticContext,
+      '\n\n=== DELTA SYNTHESIS REQUEST ===\n',
+      `TRIGGER: ${request.trigger}\n`,
+      `EVIDENCE: ${request.evidence}\n`,
+      `TARGET SECTIONS: [${sectionNames}]\n`,
+      '\nUpdate ONLY the sections listed above. Use the current holistic state as your starting point.',
+      '\nIf the evidence does not actually warrant a change, set isSubstantive to false.',
+    ].join('');
+
+    const systemPrompt = this.buildDeltaSynthesisSystemPrompt(request.targetSections);
+
+    let response: ClaudeResponse<unknown>;
+    try {
+      response = await callClaude<unknown>({
+        model: SONNET,
+        systemPrompt,
+        userPrompt,
+        maxTokens: DELTA_SYNTHESIS_MAX_TOKENS,
+        temperature: SYNTHESIS_TEMPERATURE,
+        timeoutMs: DELTA_SYNTHESIS_TIMEOUT_MS,
+        useJsonMode: true,
+        cacheSystemPrompt: true,
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[HolisticSynthesis] Delta synthesis Sonnet call failed: ${msg}`);
+      throw error;
+    }
+
+    const cost = calculateCost(response.usage, SONNET);
+    const timingMs = Date.now() - startTime;
+
+    // Parse the response
+    const parsed = parseLlmJsonOutput(response.content);
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('[HolisticSynthesis] Delta synthesis returned unparseable output');
+    }
+
+    const raw = parsed as Record<string, unknown>;
+
+    // Extract output
+    const output = this.parseDeltaSynthesisOutput(raw, request.targetSections);
+
+    console.log(
+      `[HolisticSynthesis] Delta synthesis complete — ` +
+      `isSubstantive=${output.isSubstantive}, ` +
+      `updatedSections=[${output.updatedSections.join(', ')}], ` +
+      `changeLog=${output.changeLog.length} entries, ` +
+      `cost=$${cost.toFixed(4)}, time=${timingMs}ms`,
+    );
+
+    return {
+      output,
       cost,
       tokenUsage: {
         inputTokens: response.usage.input_tokens,
@@ -1020,7 +2446,390 @@ export class HolisticSynthesisService {
       timingMs,
     };
   }
+
+  // ── Delta synthesis helpers ──────────────────────────────────────────────
+
+  /**
+   * Build a JSON representation of the current holistic sections being updated.
+   * Gives the LLM the existing state so it can make targeted changes.
+   */
+  private buildCurrentHolisticContext(
+    profile: Readonly<EssayProfile>,
+    targetSections: HolisticSectionType[],
+  ): string {
+    const sections: Record<string, unknown> = {};
+
+    for (const section of targetSections) {
+      switch (section) {
+        case 'voice_identity':
+          sections.voiceIdentity = profile.voiceIdentity;
+          break;
+        case 'voice_map':
+          sections.voiceMap = profile.voiceMap;
+          break;
+        case 'emotional_topography':
+          sections.emotionalTopography = profile.emotionalTopography;
+          break;
+        case 'moment_earnedness_map':
+          sections.momentEarnednessMap = profile.momentEarnednessMap;
+          break;
+        case 'thematic_architecture':
+          sections.thematicArchitecture = profile.thematicArchitecture;
+          break;
+        case 'narrative_strategy':
+          sections.narrativeStrategy = profile.narrativeStrategy;
+          break;
+        case 'character_revelation':
+          sections.characterRevelation = profile.characterRevelation;
+          break;
+        case 'craft_assessment':
+          sections.craftAssessment = profile.craftAssessment;
+          break;
+        case 'cross_dimension_entanglements':
+          sections.entanglements = profile.entanglements;
+          break;
+        case 'admissions_positioning':
+          sections.admissionsPositioning = profile.admissionsPositioning;
+          break;
+      }
+    }
+
+    return JSON.stringify(sections, null, 2);
+  }
+
+  /**
+   * Build the system prompt for delta synthesis.
+   * Tells the LLM which sections to re-synthesize and the expected output format.
+   */
+  private buildDeltaSynthesisSystemPrompt(targetSections: HolisticSectionType[]): string {
+    const sectionDescriptions: Record<HolisticSectionType, string> = {
+      'voice_identity': 'voiceIdentity: { signature, authenticVsPerformed, distinctivePatterns, tonalRange }',
+      'voice_map': 'voiceMap: { register, dimensions, shifts, stabilityRegions, codeSwitching, observations }',
+      'emotional_topography': 'emotionalTopography: { arcTrajectory, peakMoments, undertones, emotionalAnchors }',
+      'moment_earnedness_map': 'momentEarnednessMap: { moments (with earningMechanisms), overallEarnednessLevel }',
+      'thematic_architecture': 'thematicArchitecture: { centralThesis, thesisConfidence, threads, subtext }',
+      'narrative_strategy': 'narrativeStrategy: { primaryStrategy, strategyRationale, pivotPoints, pacingAnalysis, structuralChoices }',
+      'character_revelation': 'characterRevelation: { writerPortrait, valuesRevealed, growthShown, vulnerabilityMoments }',
+      'craft_assessment': 'craftAssessment: { strengthSignatures, growthEdges, imageSystem, syntaxPatterns }',
+      'cross_dimension_entanglements': 'entanglements: [{ id, type, dimensions, location, description, implication }]',
+      'admissions_positioning': 'admissionsPositioning: { tellabilitySummary, distinctivenessFactors, aoProjectedReaction, memorabilityPrediction }',
+    };
+
+    const targetDescriptions = targetSections
+      .map(s => `  - ${sectionDescriptions[s]}`)
+      .join('\n');
+
+    return `You are an expert essay holistic synthesizer performing a TARGETED delta synthesis.
+
+You have the full sentence-level understanding of an essay, the CURRENT holistic profile state,
+and a specific trigger that requires updating specific sections.
+
+IMPORTANT RULES:
+1. Update ONLY the sections listed in the request. Do NOT modify other sections.
+2. Use the current holistic state as your starting point — make targeted adjustments, not full rewrites.
+3. If the evidence does not actually warrant a meaningful change, set isSubstantive to false.
+4. Every change must be grounded in the essay text or understanding data provided.
+5. The changeLog must explain WHAT changed and WHY for each section.
+
+TARGET SECTIONS TO UPDATE:
+${targetDescriptions}
+
+OUTPUT FORMAT (JSON only, no prose):
+{
+  "isSubstantive": <boolean — true if any section actually changed meaningfully>,
+  "changeLog": [
+    { "section": "<HolisticSectionType>", "summary": "<what changed and why>" }
+  ],
+  "sections": {
+    <only include the sections you are updating, using the profile field names>
+  }
+}
+
+The "sections" object should use the profile field names (voiceIdentity, voiceMap, emotionalTopography,
+momentEarnednessMap, thematicArchitecture, narrativeStrategy, characterRevelation, craftAssessment,
+entanglements, admissionsPositioning) — matching the exact same schema as the current holistic state provided.`;
+  }
+
+  /**
+   * Parse the raw LLM output into a DeltaSynthesisOutput.
+   */
+  private parseDeltaSynthesisOutput(
+    raw: Record<string, unknown>,
+    targetSections: HolisticSectionType[],
+  ): DeltaSynthesisOutput {
+    const isSubstantive = raw.isSubstantive === true;
+
+    // Parse changeLog
+    const rawChangeLog = Array.isArray(raw.changeLog) ? raw.changeLog : [];
+    const changeLog: DeltaSynthesisOutput['changeLog'] = rawChangeLog
+      .filter((entry: unknown): entry is Record<string, unknown> => entry !== null && typeof entry === 'object')
+      .map((entry: Record<string, unknown>) => ({
+        section: String(entry.section ?? '') as HolisticSectionType,
+        summary: String(entry.summary ?? ''),
+      }));
+
+    // Parse sections into partialSynthesis
+    const rawSections = (raw.sections && typeof raw.sections === 'object')
+      ? raw.sections as Record<string, unknown>
+      : {};
+
+    const partialSynthesis: Partial<HolisticSynthesisOutput> = {};
+    const updatedSections: HolisticSectionType[] = [];
+
+    // Map section types to field names
+    const sectionFieldMap: Record<HolisticSectionType, string> = {
+      'voice_identity': 'voiceIdentity',
+      'voice_map': 'voiceMap',
+      'emotional_topography': 'emotionalTopography',
+      'moment_earnedness_map': 'momentEarnednessMap',
+      'thematic_architecture': 'thematicArchitecture',
+      'narrative_strategy': 'narrativeStrategy',
+      'character_revelation': 'characterRevelation',
+      'craft_assessment': 'craftAssessment',
+      'cross_dimension_entanglements': 'entanglements',
+      'admissions_positioning': 'admissionsPositioning',
+    };
+
+    for (const section of targetSections) {
+      const fieldName = sectionFieldMap[section];
+      if (fieldName && rawSections[fieldName] && typeof rawSections[fieldName] === 'object') {
+        // Trust the LLM output structure — it matches the profile schema.
+        // The coordinator's applySectionLevelMerge will write it into the profile.
+        (partialSynthesis as Record<string, unknown>)[fieldName] = rawSections[fieldName];
+        updatedSections.push(section);
+      }
+    }
+
+    return {
+      updatedSections,
+      changeLog,
+      isSubstantive,
+      partialSynthesis,
+    };
+  }
 }
 
 /** Singleton instance */
 export const holisticSynthesisService = new HolisticSynthesisService();
+
+// ============================================================================
+// ESSAY UNDERSTANDING PROSE SYNTHESIS (Gap 1)
+// ============================================================================
+
+/** Max tokens for understanding prose synthesis */
+const UNDERSTANDING_PROSE_MAX_TOKENS = 4000;
+const UNDERSTANDING_PROSE_TIMEOUT_MS = 120_000;
+
+/**
+ * Input for understanding prose synthesis.
+ */
+export interface UnderstandingProseSynthesisInput {
+  /** The full essay text */
+  essayText: string;
+  /** The profile with all 10 holistic sections populated */
+  profile: EssayProfile;
+  /** The reading strategy (from L3.75) */
+  readingStrategy: ReadingStrategy;
+  /** Top findings by coaching value */
+  topFindings: Finding[];
+  /** Previous understanding prose (null for first pass — produces replacement, not append) */
+  previousUnderstanding: EssayUnderstanding | null;
+}
+
+/**
+ * Result from understanding prose synthesis.
+ */
+export interface UnderstandingProseSynthesisResult {
+  understanding: EssayUnderstanding;
+  cost: number;
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
+  timingMs: number;
+}
+
+/**
+ * Synthesize the essay understanding prose — a single, coherent narrative
+ * that reads like expert literary analysis.
+ *
+ * This is NOT a summary of the 10 holistic sections. It's the ARGUMENT the
+ * system would make about this essay if asked "what do you see?"
+ *
+ * Called after each L3.75 synthesis iteration during the growth cycle.
+ * One Sonnet call per invocation (~$0.02-0.04).
+ */
+export async function synthesizeUnderstandingProse(
+  input: UnderstandingProseSynthesisInput,
+): Promise<UnderstandingProseSynthesisResult> {
+  const startTime = Date.now();
+
+  // Build compact section summaries (first 2-3 sentences of each section's key prose)
+  const sectionSummaries = buildCompactSectionSummaries(input.profile);
+
+  // Build top findings context
+  const findingsContext = input.topFindings.length > 0
+    ? input.topFindings.slice(0, 10).map(f =>
+      `- [${f.id}] (${f.maturity}/${f.coachingValue}): ${f.claim}`,
+    ).join('\n')
+    : '(No findings yet)';
+
+  // Build previous understanding context
+  const previousContext = input.previousUnderstanding && input.previousUnderstanding.prose
+    ? `\n\n=== PREVIOUS UNDERSTANDING ===\n${input.previousUnderstanding.prose}\n\nCentral tension: ${input.previousUnderstanding.centralTension}\nConfirmed insights: ${input.previousUnderstanding.confirmedInsights.join('; ')}\nActive hypotheses: ${input.previousUnderstanding.activeHypotheses.join('; ')}\nMaturity: ${input.previousUnderstanding.maturity}\n\nIMPORTANT: What has CHANGED in your understanding since this previous version? The output should be a REPLACEMENT — a complete, current narrative that incorporates new insights. Not an append.`
+    : '';
+
+  const systemPrompt = `You are an expert literary analyst and admissions consultant synthesizing your understanding of a college essay.
+
+You have access to 10 separate holistic analyses (voice, emotion, theme, narrative, character, craft, admissions, etc.), a reading strategy, and the essay's top findings. Your task: synthesize all of this into a SINGLE, COHERENT narrative that answers the question "What do you see in this essay?"
+
+This is NOT a summary of the sections. It's your ARGUMENT — synthesized, opinionated, grounded in specific text. Think of it as what you would say if a colleague asked "Tell me about this essay."
+
+=== UNDERSTANDING DEPTH HIERARCHY ===
+
+Reach for the deepest available level:
+
+Level 1 (Observational): "The essay describes a diamond appraisal experience."
+Level 2 (Analytical): "The diamond becomes a metaphor for the writer's self-assessment."
+Level 3 (Interpretive): "The essay's structure mirrors the appraisal process itself — examining facets one by one."
+Level 4 (Epistemological): "The essay defines understanding as physical encounter — to know value is to hold it, weigh it, see it under light."
+Level 5 (Meta-Awareness): "The essay's commitment to physical knowing creates an ironic tension with the college essay form itself."
+
+Not every essay has a Level 5 insight. But when one does, you should see it.
+
+=== OUTPUT FORMAT (JSON) ===
+{
+  "prose": "Your synthesized understanding of the essay as a coherent narrative (300-700 words depending on depth available). Rich prose, grounded in specific text. This should DISAGREE with individual sections if they contradict each other — you are the SYNTHESIS, not the concatenation.",
+  "centralTension": "The essay's driving tension — what makes it move, whether the writer knows it or not. NOT the thesis.",
+  "confirmedInsights": ["Things you are confident about", "..."],
+  "activeHypotheses": ["Tentative readings that need more evidence", "..."],
+  "maturity": "initial|developing|deep|comprehensive|exhaustive"
+}
+
+MATURITY LEVELS (you assess this — not a formula):
+- initial: First walk only, surface-level understanding
+- developing: Walk + some deep dives, patterns emerging
+- deep: Multiple growth cycles, most questions answered, strong thesis
+- comprehensive: Deep dives exhausted, coaching integrated, nuanced reading
+- exhaustive: Student edits analyzed, re-analysis complete, full mental model`;
+
+  const userPrompt = `=== ESSAY TEXT ===
+${input.essayText}
+
+=== READING STRATEGY ===
+${input.readingStrategy.strategy}
+Best approach: ${input.readingStrategy.bestApproach}
+
+=== HOLISTIC SECTION SUMMARIES ===
+${sectionSummaries}
+
+=== TOP FINDINGS ===
+${findingsContext}${previousContext}
+
+Produce the understanding synthesis as JSON.`;
+
+  const response: ClaudeResponse = await callClaude({
+    model: SONNET,
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userPrompt }],
+    maxTokens: UNDERSTANDING_PROSE_MAX_TOKENS,
+    temperature: 0.4,
+    timeoutMs: UNDERSTANDING_PROSE_TIMEOUT_MS,
+  });
+
+  const parsed = parseLlmJsonOutput<{
+    prose: string;
+    centralTension: string;
+    confirmedInsights: string[];
+    activeHypotheses: string[];
+    maturity: EssayUnderstanding['maturity'];
+  }>(response.text);
+
+  const timingMs = Date.now() - startTime;
+  const cost = calculateCost(response);
+
+  // Determine what changed for the growth log
+  const trigger: EssayUnderstanding['growthLog'][0]['trigger'] = input.previousUnderstanding
+    ? 'deep_dive'  // Iterative update
+    : 'walk';      // First synthesis
+
+  const whatChanged = input.previousUnderstanding
+    ? `Understanding updated: maturity ${input.previousUnderstanding.maturity} → ${parsed.maturity}. ` +
+      `Confirmed: ${parsed.confirmedInsights.length}, Hypotheses: ${parsed.activeHypotheses.length}`
+    : `Initial understanding synthesized. Central tension: "${parsed.centralTension.substring(0, 100)}"`;
+
+  const understanding: EssayUnderstanding = {
+    prose: parsed.prose || '',
+    centralTension: parsed.centralTension || '',
+    confirmedInsights: parsed.confirmedInsights || [],
+    activeHypotheses: parsed.activeHypotheses || [],
+    maturity: parsed.maturity || 'initial',
+    growthLog: [
+      ...(input.previousUnderstanding?.growthLog ?? []),
+      {
+        timestamp: new Date().toISOString(),
+        trigger,
+        whatChanged,
+      },
+    ],
+  };
+
+  return {
+    understanding,
+    cost,
+    tokenUsage: {
+      inputTokens: response.usage?.input_tokens ?? 0,
+      outputTokens: response.usage?.output_tokens ?? 0,
+      cacheReadTokens: (response.usage as Record<string, number>)?.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: (response.usage as Record<string, number>)?.cache_creation_input_tokens ?? 0,
+    },
+    timingMs,
+  };
+}
+
+/**
+ * Build compact section summaries for the understanding synthesis prompt.
+ * Extracts the most important 2-3 sentences from each holistic section.
+ */
+function buildCompactSectionSummaries(profile: EssayProfile): string {
+  const sections: string[] = [];
+
+  if (profile.voiceIdentity?.signature) {
+    sections.push(`VOICE: ${profile.voiceIdentity.signature}. ${profile.voiceIdentity.evolution || ''}`);
+  }
+  if (profile.emotionalTopography?.arcTrajectory) {
+    sections.push(`EMOTION: ${profile.emotionalTopography.arcTrajectory}. Authenticity: ${profile.emotionalTopography.authenticityAssessment || 'not assessed'}`);
+  }
+  if (profile.thematicArchitecture?.centralThesis) {
+    sections.push(`THEME: Central thesis: ${profile.thematicArchitecture.centralThesis} (confidence: ${profile.thematicArchitecture.thesisConfidence}). Subtext: ${profile.thematicArchitecture.subtext || 'none detected'}`);
+  }
+  if (profile.narrativeStrategy?.primaryStrategy) {
+    sections.push(`NARRATIVE: ${profile.narrativeStrategy.primaryStrategy}. Arc: ${profile.narrativeStrategy.arcType || 'not classified'}, momentum: ${profile.narrativeStrategy.arcMomentum || 'unknown'}`);
+  }
+  if (profile.characterRevelation?.writerPortrait) {
+    sections.push(`CHARACTER: ${profile.characterRevelation.writerPortrait}. Growth: ${profile.characterRevelation.growthArc || 'not detected'}`);
+  }
+  if (profile.craftAssessment?.imageSystem) {
+    sections.push(`CRAFT: Image system: ${profile.craftAssessment.imageSystem}. Patterns: ${profile.craftAssessment.sentencePatterns || 'not analyzed'}`);
+  }
+  if (profile.admissionsPositioning?.tellabilitySummary) {
+    sections.push(`ADMISSIONS: ${profile.admissionsPositioning.tellabilitySummary}. Memorability: ${profile.admissionsPositioning.memorability || 'not assessed'}`);
+  }
+  if (profile.momentEarnednessMap?.structuralObservation) {
+    sections.push(`EARNEDNESS: ${profile.momentEarnednessMap.structuralObservation}`);
+  }
+  if (profile.entanglements?.length) {
+    const topEntanglements = profile.entanglements
+      .filter(e => e.significance === 'foundational')
+      .slice(0, 3)
+      .map(e => e.description)
+      .join('; ');
+    if (topEntanglements) {
+      sections.push(`ENTANGLEMENTS: ${topEntanglements}`);
+    }
+  }
+
+  return sections.join('\n\n') || '(No holistic sections populated yet)';
+}

@@ -25,8 +25,9 @@
  */
 
 import crypto from 'crypto';
-import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
+import { parseLlmJsonArray } from './llmJsonParser';
 import type {
   EssayProfile,
   ParagraphProfile,
@@ -35,7 +36,18 @@ import type {
   EssayNorthStar,
   ThroughLineMap,
   MomentEarnednessMap,
+  ParagraphScoreMatrix,
+  ParagraphScoreEntry,
+  CoherenceReport,
+  ReanalysisBrief,
+  ReadingStrategy,
+  L5TeachingMode,
+  L5AnnotationType,
+  PriorAnnotationContext,
+  AnnotationDensityDiagnostic,
 } from '../profileTypes';
+import type { FindingStore } from '../findings/findingStore';
+import { buildAnnotationFindingContext } from '../findings/findingContextBuilder';
 
 // ============================================================================
 // CONSTANTS
@@ -44,65 +56,52 @@ import type {
 const SONNET = 'claude-sonnet-4-5-20250929';
 
 /**
- * Phase-specific annotation targets.
- * Count ranges and focus level per improvement phase.
+ * Phase-specific annotation GUIDANCE.
+ * Soft guidance for the LLM prompt — NOT hard caps.
+ * The LLM decides how many annotations each paragraph needs.
+ * We never truncate or delete annotations the LLM produces.
+ *
+ * Previous design had hard maxPerParagraph caps that sliced annotations
+ * after generation — destroying paid LLM output (Rule 2 violation).
+ * Foundation phase capped at 1 annotation per paragraph, which meant
+ * a rich paragraph with 4 genuine teaching moments lost 3 of them.
  */
-const PHASE_TARGETS: Record<ImprovementPhaseLevel, {
-  minPerParagraph: number;
-  maxPerParagraph: number;
-  essayLevelMin: number;
-  essayLevelMax: number;
+const PHASE_GUIDANCE: Record<ImprovementPhaseLevel, {
   focusLevel: string;
   description: string;
 }> = {
   foundation: {
-    minPerParagraph: 0,
-    maxPerParagraph: 1,
-    essayLevelMin: 2,
-    essayLevelMax: 3,
     focusLevel: 'essay-level',
-    description: 'Focus on 2-3 essay-level issues. What is the most important structural problem? If the thesis is unclear, that is issue #1. If the arc does not land, that is the priority. Do NOT mention sentence-level craft or word choices.',
+    description: `Focus on the 2-3 most important structural issues. What is the most important structural problem? If the thesis is unclear, that is issue #1. If the arc does not land, that is the priority.
+Prioritize essay-level and paragraph-level insights. Use sentence-level precision only when a specific sentence is the lynchpin of a structural problem.
+Typical annotation count: 3-5 total for the essay. But if a paragraph genuinely has multiple important structural issues, annotate all of them.`,
   },
   architecture: {
-    minPerParagraph: 0,
-    maxPerParagraph: 2,
-    essayLevelMin: 0,
-    essayLevelMax: 1,
     focusLevel: 'paragraph-level',
-    description: 'Focus on 3-5 paragraph-level issues. How well does each paragraph serve its structural role? Are transitions doing their job? Is the pacing right? Show vs tell at the paragraph level is fair game. Do NOT nitpick individual sentences or words.',
+    description: `Focus on paragraph-level issues — structural roles, transitions, pacing, show vs tell. How well does each paragraph serve its role? Are transitions earning the reader's continued attention?
+Typical annotation count: 4-7 total. Focus on the 2-3 biggest architectural gaps.
+Sentence-level annotations are appropriate when a sentence is failing its structural role (e.g., a transition sentence that doesn't actually transition).`,
   },
   craft: {
-    minPerParagraph: 1,
-    maxPerParagraph: 3,
-    essayLevelMin: 0,
-    essayLevelMax: 1,
     focusLevel: 'sentence-level',
-    description: 'Focus on 5-8 sentence-level issues. Which sentences are not pulling their weight? Where does the voice waver? Which rhythms clash with the essay\'s dominant cadence? Be specific — cite the sentence, explain WHY it underperforms in its structural context, show a rewrite.',
+    description: `The structure works. Now each sentence must carry its weight. Which sentences are not pulling their weight? Where does the voice waver? Which rhythms clash with the essay's dominant cadence?
+Be specific — cite the sentence, explain WHY it underperforms in its structural context, show a rewrite.
+Typical annotation count: 6-10 total. More annotations per paragraph because the granularity is finer.`,
   },
   polish: {
-    minPerParagraph: 1,
-    maxPerParagraph: 4,
-    essayLevelMin: 0,
-    essayLevelMax: 0,
     focusLevel: 'word-level',
-    description: 'Focus on 8-12 word-level issues. Which specific words could be sharper? Where could an image be more precise? Which phrases are cliche? Which verbs are passive when they should drive? Be surgical — the structure works, the sentences work, now make every word earn its place.',
+    description: `The essay is strong. Word-level precision matters now. Which specific words could be sharper? Where could an image be more precise? Which phrases are cliche? Which verbs are passive when they should drive?
+Be surgical — the structure works, the sentences work, now make every word earn its place.
+Notable words identified during understanding are prime annotation targets — they represent word choices the analysis system flagged as significant. When a sentence has notable words listed, consider whether teaching the student about those specific choices would sharpen their craft awareness.
+Typical annotation count: 8-14. These are surgical.`,
   },
   distinction: {
-    minPerParagraph: 0,
-    maxPerParagraph: 2,
-    essayLevelMin: 1,
-    essayLevelMax: 2,
     focusLevel: 'memorability',
-    description: 'Focus on 3-5 memorability opportunities. What would make an admissions officer remember this essay next week? Where is the essay close to something extraordinary but not quite there? What separates this essay\'s good from unforgettable? Look for the 1% moves.',
+    description: `The essay is good. The question is: will the AO remember it tomorrow?
+Focus on memorability opportunities — what would make an admissions officer remember this essay next week? Where is the essay close to something extraordinary but not quite there?
+Typical annotation count: 3-6. Quality over quantity. Each annotation should itself be distinctive.`,
   },
 };
-
-/** Annotation types for L5 output */
-type AnnotationType =
-  | 'strength_acknowledgment'
-  | 'growth_opportunity'
-  | 'structural_note'
-  | 'teaching_moment';
 
 // ============================================================================
 // OUTPUT TYPES
@@ -111,33 +110,94 @@ type AnnotationType =
 /**
  * A single L5 annotation — ephemeral feedback anchored to a location.
  * Never stored in the profile.
+ *
+ * V2: Teaching-focused annotations with teaching modes, cross-paragraph
+ * awareness, and capacity-building notes.
  */
 export interface L5Annotation {
   /** Unique ID for this annotation */
   id: string;
-  /** Location reference */
+
+  /** Location anchor — structural quality control, not judgment restriction */
   location: {
     paragraphIndex: number;
     sentenceIndex: number | null;
-    /** Exact text span this annotation references (for highlighting) */
+    /** Exact text span for highlighting. Must exist in the paragraph text. */
     spanText: string | null;
   };
-  /** Annotation classification */
-  type: AnnotationType;
-  /** The annotation content — specific, essay-architecture-grounded */
+
+  /**
+   * Primary annotation type — ROUTING taxonomy.
+   * The LLM assigns this for downstream UI/sorting, but the real intent
+   * lives in teachingIntent.
+   */
+  type: L5AnnotationType;
+
+  /**
+   * Free-text teaching intent — what this annotation is trying to
+   * accomplish for the student's learning. Not constrained to the 4 types.
+   */
+  teachingIntent: string;
+
+  /**
+   * Teaching mode — LLM-selected PER ANNOTATION based on what this
+   * specific finding needs. Not per-essay, not per-phase.
+   *
+   * AWARENESS: "Notice this..." — draws attention to a pattern.
+   * CONSEQUENCE: "This matters because..." — explains architectural impact.
+   * CONNECTION: "This relates to..." — links moments across the essay.
+   * ACTION: "Try this..." — specific, structurally-grounded suggestion.
+   */
+  teachingMode: L5TeachingMode;
+
+  /** The annotation content — specific, architecture-grounded */
   content: string;
-  /** WHY this matters — references the essay's architecture, not generic writing advice */
+
+  /** WHY this matters — references the essay's architecture */
   teachingRationale: string;
+
   /** How this relates to the essay's through-line/structural role */
   northStarConnection: string;
-  /** Priority 1-5 (1=most important for this phase) */
+
+  /**
+   * Priority 1-5, LLM-assigned based on coaching value for this student
+   * at this phase. 1 = "if the student reads ONE annotation, read this one."
+   */
   priority: number;
-  /** Which improvement phase this annotation belongs to */
+
+  /** Which improvement phase this annotation naturally belongs to */
   phase: ImprovementPhaseLevel;
-  /** Concrete rewrite suggestion if applicable */
+
+  /**
+   * Concrete rewrite suggestion — ONLY for ACTION mode annotations.
+   * Must be structurally aware: the rewrite considers the paragraph's
+   * architectural role, not just sentence quality.
+   */
   rewriteExample: string | null;
+
   /** Confidence in this annotation (0-1) */
   confidence: number;
+
+  /**
+   * Cross-paragraph scope. When this annotation teaches about a
+   * pattern that spans multiple paragraphs, list the other paragraphs
+   * involved. The location field still points to the PRIMARY anchor.
+   */
+  crossParagraphRefs: number[];
+
+  /**
+   * Capacity-building note. How does this annotation help the student
+   * see patterns THEMSELVES in future writing?
+   * Populated only when the LLM identifies a transferable skill.
+   */
+  capacityBuildingNote: string | null;
+
+  /**
+   * W1.6: Grounding quality diagnostic — how well this annotation connects
+   * to the essay's architecture via its northStarConnection.
+   * Populated during post-processing. Diagnostic signal, not a filter.
+   */
+  groundingQuality?: 'grounded' | 'weakly_grounded' | 'ungrounded';
 }
 
 /**
@@ -148,19 +208,9 @@ export interface ParagraphAnnotations {
   annotations: L5Annotation[];
 }
 
-/**
- * Re-analysis context passed when L5 runs during re-analysis (not first pass).
- */
-export interface ReanalysisBrief {
-  /** What changed (human-readable summary) */
-  changeSummary: string;
-  /** Which paragraphs were edited */
-  editedParagraphs: number[];
-  /** Student's stated intent if available (from L6 conversation) */
-  studentIntent: string | null;
-  /** Structural significance of the changed areas */
-  structuralSignificance: string | null;
-}
+// ReanalysisBrief is the canonical type defined in profileTypes.ts — imported above.
+// Re-export it for callers that import from this module.
+export type { ReanalysisBrief } from '../profileTypes';
 
 /**
  * Complete L5 output — ephemeral, never stored.
@@ -168,8 +218,12 @@ export interface ReanalysisBrief {
 export interface L5AnnotationResult {
   paragraphAnnotations: ParagraphAnnotations[];
   essayLevelAnnotations: L5Annotation[];
+  /** Cross-paragraph annotations that span multiple paragraphs */
+  crossParagraphAnnotations: L5Annotation[];
   phase: ImprovementPhaseLevel;
   annotationCount: number;
+  /** Density diagnostics per paragraph — signal, not a problem to fix */
+  densityDiagnostics: AnnotationDensityDiagnostic[];
   cost: number;
   tokenUsage: {
     inputTokens: number;
@@ -189,6 +243,8 @@ interface RawAnnotation {
   sentenceIndex?: number | null;
   spanText?: string | null;
   type?: string;
+  teachingIntent?: string;
+  teachingMode?: string;
   content?: string;
   teachingRationale?: string;
   northStarConnection?: string;
@@ -196,6 +252,8 @@ interface RawAnnotation {
   phase?: string;
   rewriteExample?: string | null;
   confidence?: number;
+  crossParagraphRefs?: number[];
+  capacityBuildingNote?: string | null;
 }
 
 interface RawParagraphAnnotationOutput {
@@ -215,10 +273,18 @@ class DeepAnnotationService {
    *
    * @param profile Complete EssayProfile with Understanding + Analysis + North Star
    * @param reanalysisBrief Optional context when running during re-analysis
+   * @param contradictionFlags Optional W4.4 contradiction flags for annotation context
+   * @param findingStore Optional FindingStore for per-paragraph finding references (W7.1)
+   * @param readingStrategy Optional L3.75 reading strategy for this essay
+   * @param priorAnnotations Optional previous annotation context for re-analysis
    */
   async generateAnnotations(
     profile: Readonly<EssayProfile>,
     reanalysisBrief?: ReanalysisBrief,
+    contradictionFlags?: string[],
+    findingStore?: FindingStore,
+    readingStrategy?: ReadingStrategy,
+    priorAnnotations?: Map<number, PriorAnnotationContext>,
   ): Promise<L5AnnotationResult> {
     const startTime = Date.now();
 
@@ -226,29 +292,37 @@ class DeepAnnotationService {
     this.validatePrerequisites(profile);
 
     const phase = profile.index.improvementPhase;
-    const phaseTarget = PHASE_TARGETS[phase.level];
+    const phaseGuidance = PHASE_GUIDANCE[phase.level];
     const northStar = profile.northStar;
     const essayText = this.getEssayText(profile);
 
     // ── Build the cached context blocks ──
-    const systemPrompt = this.buildSystemPrompt(phase, phaseTarget);
-    const sharedContext = this.buildSharedContext(profile, essayText, northStar, reanalysisBrief);
+    const systemPrompt = this.buildSystemPrompt(phase, phaseGuidance, readingStrategy);
+    const sharedContext = this.buildSharedContext(profile, essayText, northStar, reanalysisBrief, contradictionFlags);
 
-    // ── Parallel annotation calls per paragraph ──
-    const paragraphResults = await Promise.allSettled(
-      profile.paragraphs.map((para) =>
-        this.annotateParagraph(
-          para,
-          profile,
-          northStar,
-          phase,
-          phaseTarget,
-          systemPrompt,
-          sharedContext,
-          essayText,
+    // Batch paragraphs in groups of 2 to prevent rate limit storms
+    const L5_BATCH_SIZE = 2;
+    const paragraphResults: PromiseSettledResult<Awaited<ReturnType<typeof this.annotateParagraph>>>[] = [];
+    for (let batchStart = 0; batchStart < profile.paragraphs.length; batchStart += L5_BATCH_SIZE) {
+      const batch = profile.paragraphs.slice(batchStart, batchStart + L5_BATCH_SIZE);
+      const batchResults = await Promise.allSettled(
+        batch.map((para) =>
+          this.annotateParagraph(
+            para,
+            profile,
+            northStar,
+            phase,
+            phaseGuidance,
+            systemPrompt,
+            sharedContext,
+            essayText,
+            findingStore,
+            priorAnnotations?.get(para.index),
+          ),
         ),
-      ),
-    );
+      );
+      paragraphResults.push(...batchResults);
+    }
 
     // ── Accumulate results ──
     const paragraphAnnotations: ParagraphAnnotations[] = [];
@@ -279,10 +353,33 @@ class DeepAnnotationService {
       }
     }
 
+    // ── W1.6: Grounding diagnostic (replaces destructive filter) ──
+    // Tag each annotation with groundingQuality instead of deleting ungrounded ones.
+    // Deleting paid LLM output is a Rule 2 violation — diagnose, don't destroy.
+    let totalUngrounded = 0;
+    for (const pa of paragraphAnnotations) {
+      for (const ann of pa.annotations) {
+        if (!ann.northStarConnection || ann.northStarConnection.trim().length < 5) {
+          ann.groundingQuality = 'ungrounded';
+        } else if (/(P\d|through.?line|structural|fulcrum|arc|earning|voice|theme|motif|pivot|tension|contrast)/i.test(ann.northStarConnection)) {
+          ann.groundingQuality = 'grounded';
+        } else if (ann.northStarConnection.trim().length >= 10) {
+          ann.groundingQuality = 'weakly_grounded';
+        } else {
+          ann.groundingQuality = 'ungrounded';
+        }
+      }
+      const ungroundedCount = pa.annotations.filter(a => a.groundingQuality === 'ungrounded').length;
+      if (ungroundedCount > pa.annotations.length * 0.3) {
+        console.warn(`[L5] Warning: ${ungroundedCount}/${pa.annotations.length} annotations ungrounded at P${pa.paragraphIndex} — prompt quality signal`);
+      }
+      totalUngrounded += ungroundedCount;
+    }
+    if (totalUngrounded > 0) {
+      console.log(`[L5] ${totalUngrounded} ungrounded annotations total (diagnosed, not filtered)`);
+    }
+
     // ── Extract essay-level annotations ──
-    // Essay-level annotations come from any paragraph call that generated them
-    // (type === 'structural_note' with paragraphIndex === -1 or null)
-    // In Foundation and Distinction phases, we also generate dedicated essay-level annotations
     const essayLevelAnnotations = this.extractEssayLevelAnnotations(paragraphAnnotations, phase);
 
     // ── Deduplicate and prioritize ──
@@ -290,19 +387,82 @@ class DeepAnnotationService {
       paragraphAnnotations,
       essayLevelAnnotations,
       phase,
-      phaseTarget,
+      phaseGuidance,
     );
+
+    // ── Cross-paragraph annotations ──
+    // After all paragraph-level calls complete, run ONE additional call
+    // to identify teaching moments that span paragraphs.
+    let crossParagraphAnnotations: L5Annotation[] = [];
+    try {
+      const crossResult = await this.generateCrossParagraphAnnotations(
+        allAnnotations.paragraphAnnotations,
+        profile,
+        phase,
+        systemPrompt,
+        sharedContext,
+      );
+      crossParagraphAnnotations = crossResult.annotations;
+      totalCost += crossResult.cost;
+      totalTokenUsage.inputTokens += crossResult.tokenUsage.inputTokens;
+      totalTokenUsage.outputTokens += crossResult.tokenUsage.outputTokens;
+      totalTokenUsage.cacheReadTokens += crossResult.tokenUsage.cacheReadTokens;
+      totalTokenUsage.cacheWriteTokens += crossResult.tokenUsage.cacheWriteTokens;
+
+      if (crossParagraphAnnotations.length > 0) {
+        console.log(
+          `[L5] Cross-paragraph annotations: ${crossParagraphAnnotations.length} generated`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        '[DeepAnnotationService] Cross-paragraph annotation generation failed:',
+        error instanceof Error ? error.message : error,
+      );
+      // Continue — cross-paragraph annotations are additive, not critical
+    }
+
+    // ── Density diagnostics ──
+    const densityDiagnostics: AnnotationDensityDiagnostic[] = [];
+    for (const pa of allAnnotations.paragraphAnnotations) {
+      const paraProfile = profile.paragraphs[pa.paragraphIndex];
+
+      if (pa.annotations.length === 0 && paraProfile && !paraProfile.walkSkipped) {
+        const role = paraProfile.understanding?.role ?? 'unknown';
+        console.log(
+          `[L5] Zero annotations for P${pa.paragraphIndex} (role: ${role}, phase: ${phase.level}). ` +
+          `This is expected for transitional paragraphs, investigate if load-bearing.`,
+        );
+      }
+
+      // Record density diagnostic for paragraphs with notable density
+      if (pa.annotations.length > 0) {
+        densityDiagnostics.push({
+          paragraphIndex: pa.paragraphIndex,
+          annotationCount: pa.annotations.length,
+          strengthCount: pa.annotations.filter(a => a.type === 'strength').length,
+          growthCount: pa.annotations.filter(a => a.type === 'growth').length,
+          interpretation: pa.annotations.length > 4
+            ? `High density (${pa.annotations.length}) — paragraph is architecturally rich or troubled`
+            : pa.annotations.length <= 1
+              ? `Low density (${pa.annotations.length}) — paragraph may be transitional or clean`
+              : `Normal density (${pa.annotations.length})`,
+        });
+      }
+    }
 
     const annotationCount = allAnnotations.paragraphAnnotations.reduce(
       (sum, pa) => sum + pa.annotations.length,
       0,
-    ) + allAnnotations.essayLevelAnnotations.length;
+    ) + allAnnotations.essayLevelAnnotations.length + crossParagraphAnnotations.length;
 
     return {
       paragraphAnnotations: allAnnotations.paragraphAnnotations,
       essayLevelAnnotations: allAnnotations.essayLevelAnnotations,
+      crossParagraphAnnotations,
       phase: phase.level,
       annotationCount,
+      densityDiagnostics,
       cost: totalCost,
       tokenUsage: totalTokenUsage,
       timingMs: Date.now() - startTime,
@@ -348,36 +508,108 @@ class DeepAnnotationService {
   /**
    * Block 1: System prompt with phase-specific instructions.
    * Cached across all paragraph calls within the same essay.
+   *
+   * V2: Teaching-focused prompt with teaching modes, cognitive sequencing,
+   * capacity building, and reading strategy awareness.
    */
   private buildSystemPrompt(
     phase: ImprovementPhase,
-    phaseTarget: typeof PHASE_TARGETS[ImprovementPhaseLevel],
+    phaseGuidance: typeof PHASE_GUIDANCE[ImprovementPhaseLevel],
+    readingStrategy?: ReadingStrategy,
   ): string {
-    return `You are an expert essay feedback engine for college admissions essays. You generate annotations that transform local observations into structurally-grounded teaching moments.
+    const readingStrategySection = readingStrategy
+      ? `
+READING STRATEGY AWARENESS:
+The analysis system discovered that this essay rewards attention to:
+"${readingStrategy.strategy}"
+Best approach: "${readingStrategy.bestApproach}"
+What this essay is NOT: ${readingStrategy.antiPatterns.join('; ')}
 
-YOUR FUNDAMENTAL PRINCIPLE: Every annotation must explain WHY something matters to the essay's architecture, not just WHAT to fix. You never give generic writing advice. You give advice that could only apply to THIS specific essay because it references THIS essay's structural roles, through-line, and earned-ness architecture.
+Let this guide what you emphasize in annotations. If the reading strategy
+says the essay rewards attention to vocabulary domain shifts, annotations
+about voice register and word choice carry more weight than generic
+structural observations. The reading strategy tells you what makes THIS
+essay tick — let your annotations match.
+`
+      : '';
 
-BANNED PHRASES (never use these without essay-specific architectural reasoning):
-- "Consider adding more sensory detail"
-- "Show don't tell"
-- "Use stronger verbs"
-- "Add more specificity"
-- "Make this more vivid"
-- "Vary your sentence structure"
-If you need to surface one of these concepts, you MUST ground it in the essay's architecture: WHY does this paragraph need sensory detail? WHAT does it earn for a later moment? HOW does it serve the structural role?
+    return `You are a writing teacher generating annotations for a college admissions essay. You have access to a deep analytical profile of this essay — including structural architecture, voice map, emotional topography, earned-ness assessments, thematic threads, and a North Star that captures what the essay is trying to MEAN.
+
+YOUR FUNDAMENTAL PRINCIPLE: Every annotation is a TEACHING MOMENT, not an assessment. You never describe what IS — you explain what it MEANS for the essay's architecture and what the student can't see without your architectural knowledge.
+
+THE TEACHING TEST:
+Before finalizing each annotation, ask: "Could the student see this by re-reading their own essay carefully?"
+- If YES → this is assessment, not teaching. Upgrade by adding CONSEQUENCE (why it matters for the architecture) or don't include it.
+- If NO → this is teaching. Keep it.
+
+Examples of the upgrade:
+  ASSESSMENT: "P2 uses extended metaphor."
+  TEACHING: "P2's extended metaphor does double duty: it makes the abstract strategic thinking concrete for the reader AND it establishes the vocabulary domain that P4's leadership moment needs to feel native, not imported."
+
+The student already knows P2 uses a metaphor. They don't know WHY it matters that it does.
+
+TEACHING MODES (select per annotation — not per essay or per phase):
+- AWARENESS: "Notice this..." — draws attention to a pattern the student likely hasn't seen. No fix suggested. Goal: build perception.
+- CONSEQUENCE: "This matters because..." — explains the architectural consequence of a local choice. Goal: build structural thinking.
+- CONNECTION: "This relates to..." — links this moment to another part of the essay. Goal: build architectural vision.
+- ACTION: "Try this..." — specific, structurally-grounded rewrite. Goal: provide a concrete next step.
+
+Select the mode that serves each specific teaching moment. Don't default to ACTION for everything — awareness and consequence build deeper learning than instructions.
 
 CURRENT IMPROVEMENT PHASE: ${phase.level}
-PHASE FOCUS: ${phaseTarget.focusLevel}
-PHASE INSTRUCTIONS: ${phaseTarget.description}
+${phaseGuidance.description}
+
 PHASE REASONING: ${phase.reasoning}
 FOCUS AREAS: ${phase.focusAreas.join(', ')}
-DEFERRED AREAS: ${phase.deferredAreas.join(', ')}
+${phase.deferredAreas.length > 0 ? `DEFERRED (lower priority, but use when the teaching moment is powerful enough): ${phase.deferredAreas.join(', ')}` : ''}
+COACHING LENS: ${phase.coachingLens}
 
-ANNOTATION TYPES:
-- strength_acknowledgment: What is working and WHY it serves the architecture. Not just "good job" — explain the structural contribution.
-- growth_opportunity: Where improvement would have the highest architectural impact. Frame as opportunity, not deficiency.
-- structural_note: How this paragraph/sentence relates to the essay's architecture. Connection to other parts.
-- teaching_moment: Deeper understanding of craft that helps the student grow as a writer. WHY this technique matters here.
+ANNOTATION TYPES (routing taxonomy — the real intent lives in teachingIntent):
+- strength: What is working and WHY it works architecturally. Not just "good job" — explain the structural contribution.
+- growth: Where improvement would have the highest architectural impact. Frame as opportunity, not deficiency.
+- structural: How this relates to the essay's architecture. Connection to other parts.
+- teaching: Deeper understanding of craft that helps the student grow as a writer. WHY this technique matters here.
+
+ANNOTATION SEQUENCING:
+Order annotations within each paragraph for cognitive flow:
+AWARENESS → CONSEQUENCE → CONNECTION → ACTION.
+Exception: if a single annotation is the most important thing about this paragraph, lead with it regardless of mode.
+
+REWRITE EXAMPLES — STRUCTURAL AWARENESS REQUIRED:
+Every rewriteExample must demonstrate awareness of the paragraph's architectural role. A rewrite that makes a sentence "better" in isolation but ignores its structural function is worse than no rewrite. If you cannot produce a structurally aware rewrite, set rewriteExample to null. A null rewrite with strong teachingRationale beats a generic rewrite.
+
+STRENGTH ANNOTATIONS:
+When acknowledging strengths, explain WHY they work architecturally. "This is a strong opening" is assessment. "This opening earns the reader's attention by creating a specific sensory world — and that world is what makes P4's meaning-shift possible" is teaching.
+
+CAPACITY BUILDING (the capacityBuildingNote field):
+Populate ONLY when you identify a transferable writing skill. Not every annotation has one. But when it does, frame it as a PATTERN the student can look for on their own.
+GOOD: "In your next essay, watch for the moment where you switch from showing a specific experience to explaining what it means. That switch is almost always where your strongest writing yields to your safest."
+BAD: "Remember to show, don't tell." (Generic. Not transferable.)
+${readingStrategySection}
+CROSS-REFERENCING:
+- Reference findings by [F] label as your PRIMARY grounding — findings carry evidence, scope, and coaching value. Example: "As noted in [F3], your metaphor here is decorative rather than structural."
+- Reference sentences by P{n}S{m} and their primary function for sentence-level context. Example: "P2S3's primary function — grounding the reader through physical detail — connects to the essay's through-line."
+
+SENTENCE TAGS:
+Each sentence may carry semantic tags (e.g., "opening_hook", "emotional_peak", "thematic_pivot", "setup_payoff").
+These tags indicate architectural function identified during understanding. Use them to calibrate annotation density:
+- "opening_hook" — first impression impact is teachable
+- "emotional_peak" — earned-ness is the teaching angle
+- "thematic_pivot" — structural consequence is the teaching angle
+Tags are informational — they should inform but not constrain your annotations.
+
+CRAFT TECHNIQUES:
+For Craft/Polish/Distinction phases, each sentence includes identified craft techniques
+(e.g., "anaphora", "juxtaposition", "sensory detail"). Reference these by name when your
+annotation teaches about craft. Instead of "this sentence uses repetition effectively",
+say "the anaphora here ('I knew... I knew... I knew') does something specific — it builds
+the emotional pressure that P4's breaking point needs to feel inevitable."
+
+NORTH STAR GROUNDING (required — structural quality control):
+Every annotation's northStarConnection must reference THIS essay's specific architecture (structural role, through-line, earned-ness, or connection network). If you cannot ground an observation in the essay's architecture, do not include it.
+
+CROSS-PARAGRAPH AWARENESS:
+If an annotation's teaching point involves another paragraph, populate crossParagraphRefs with the other paragraph indices. The annotation still anchors to one primary location, but the reader can see the connection.
 
 ANNOTATION STRUCTURE (JSON):
 {
@@ -386,25 +618,26 @@ ANNOTATION STRUCTURE (JSON):
       "paragraphIndex": 0,
       "sentenceIndex": 2,
       "spanText": "exact text from the paragraph if applicable",
-      "type": "growth_opportunity",
+      "type": "growth",
+      "teachingIntent": "Show the student that this sentence is spending P4's emotional budget",
+      "teachingMode": "consequence",
       "content": "The annotation text — specific, architecture-grounded",
       "teachingRationale": "WHY this matters to the essay's architecture",
       "northStarConnection": "How this relates to structural role / through-line",
       "priority": 1,
       "phase": "${phase.level}",
-      "rewriteExample": "Concrete alternative showing the suggestion in action, or null",
-      "confidence": 0.85
+      "rewriteExample": "Structurally aware alternative, or null",
+      "confidence": 0.85,
+      "crossParagraphRefs": [3, 4],
+      "capacityBuildingNote": "In future writing, watch for moments where you claim an emotion instead of letting the reader feel it through detail."
     }
   ]
 }
 
-STRENGTH DISTRIBUTION: At least 25% of annotations should be strength_acknowledgment type. Students learn better when they understand what is WORKING, not just what needs fixing.
-
 QUALITY BAR:
-- Every annotation's teachingRationale must reference the essay's architecture (structural role, through-line involvement, earned-ness, or connection network)
-- Every northStarConnection must be specific to THIS essay, not generic
-- If you cannot ground an observation in the essay's architecture, do not include it
 - Priority 1 = most important for this phase. Priority 5 = least important.
+- Every annotation must pass the teaching test.
+- At least 25% of annotations should be strength type.
 
 OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanation text.`;
   }
@@ -418,6 +651,7 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     essayText: string,
     northStar: EssayNorthStar,
     reanalysisBrief?: ReanalysisBrief,
+    contradictionFlags?: string[],
   ): string {
     const sections: string[] = [];
 
@@ -439,12 +673,92 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     }
 
     // ── Connection graph summary ──
-    if (profile.connections?.all?.length > 0) {
-      const connectionSummary = profile.connections.all
-        .slice(0, 20) // Cap to avoid token bloat
-        .map((c) => `  [${c.from.join(',')}]→[${c.to.join(',')}] (${c.type}): ${c.description}`)
+    const activeConns = profile.connections?.all?.filter(c => c.status === 'active') ?? [];
+    if (activeConns.length > 0) {
+      const connectionSummary = activeConns
+        .map((c) => {
+          const from = c.from.sentence !== undefined
+            ? `P${c.from.paragraph}S${c.from.sentence}`
+            : `P${c.from.paragraph}`;
+          const to = c.to.sentence !== undefined
+            ? `P${c.to.paragraph}S${c.to.sentence}`
+            : `P${c.to.paragraph}`;
+          return `  ${c.id}: ${from} → ${to} [${c.routingTags.join(',')}] (${c.strengthCategory}): ${c.description}`;
+        })
         .join('\n');
       sections.push(`CONNECTION GRAPH:\n${connectionSummary}`);
+      if (profile.connections.graphSummary) {
+        sections.push(`Graph Summary: ${profile.connections.graphSummary}`);
+      }
+    }
+
+    // ── L4 Coaching Map OR Prioritized Improvements (direct annotation fuel) ──
+    const coachingMap = profile.scoreMatrix?.coachingMap;
+    if (coachingMap) {
+      const cmParts: string[] = [];
+      if (coachingMap.transformativeInsight.insight) {
+        cmParts.push(
+          `  TRANSFORMATIVE INSIGHT: ${coachingMap.transformativeInsight.insight}\n` +
+          `    WHY: ${coachingMap.transformativeInsight.whyThisTransforms}` +
+          (coachingMap.transformativeInsight.requiresStudentAwareness ? ' [requires student awareness]' : ''),
+        );
+      }
+      if (coachingMap.priorities.length > 0) {
+        const priorityLines = coachingMap.priorities
+          .map((p, i) =>
+            `  ${i + 1}. P[${p.target.paragraphs.join(',')}]: ${p.priority} [${p.expectedImpact}]\n` +
+            `     Architecture: ${p.architecturalReason}\n` +
+            `     Unlocks: ${p.unlocksNext}`,
+          )
+          .join('\n');
+        cmParts.push(`  PRIORITIES:\n${priorityLines}`);
+      }
+      if (coachingMap.protectedStrengths.length > 0) {
+        const strengthLines = coachingMap.protectedStrengths
+          .map((s) => `  PROTECT: ${s.description} — ${s.whyProtect}`)
+          .join('\n');
+        cmParts.push(`  PROTECTED STRENGTHS:\n${strengthLines}`);
+      }
+      sections.push(`COACHING MAP (from L4 score matrix):\n${cmParts.join('\n')}`);
+    } else if (profile.scoreMatrix?.prioritizedImprovements?.length) {
+      // Fallback to flat prioritized improvements when coaching map isn't available
+      const improvements = profile.scoreMatrix.prioritizedImprovements
+        .map((imp) =>
+          `  P${imp.paragraph}: ${imp.improvement} [${imp.expectedImpact}]\n` +
+          `    WHY: ${imp.whyThisMatters}`,
+        )
+        .join('\n');
+      sections.push(`PRIORITIZED IMPROVEMENTS (from L4 score matrix):\n${improvements}`);
+    }
+
+    // ── L4 Coherence Issues (blocking contradictions are annotation-worthy) ──
+    if (profile.coherenceReport && !profile.coherenceReport.isCoherent) {
+      const blocking = profile.coherenceReport.contradictions
+        .filter((c) => c.severity === 'blocking' || c.severity === 'notable');
+      if (blocking.length > 0) {
+        const coherenceText = blocking
+          .map((c) => {
+            let line = `  [${c.severity}] ${c.sectionA}: "${c.claimA}" vs ${c.sectionB}: "${c.claimB}"`;
+            if (c.routingCategory) line += ` (${c.routingCategory})`;
+            if (c.source === 'adversarial') line += ' [adversarial]';
+            line += `\n    Resolution: ${c.suggestedResolution}`;
+            if (c.evidenceA) line += `\n    Evidence A: ${c.evidenceA}`;
+            if (c.evidenceB) line += `\n    Evidence B: ${c.evidenceB}`;
+            return line;
+          })
+          .join('\n');
+        sections.push(`COHERENCE ISSUES (contradictions in profile):\n${coherenceText}`);
+      }
+    }
+
+    // ── W4.4: Programmatic contradiction flags (from contradiction consumer) ──
+    if (contradictionFlags && contradictionFlags.length > 0) {
+      sections.push(
+        `PROGRAMMATIC CONTRADICTIONS (cross-domain validation):\n` +
+        `The following contradictions were detected by deterministic cross-checks between profile sections.\n` +
+        `Consider surfacing relevant contradictions as annotations when they affect a paragraph you are annotating.\n` +
+        contradictionFlags.map((flag) => `  ${flag}`).join('\n'),
+      );
     }
 
     // ── Re-analysis brief (when running during re-analysis) ──
@@ -464,7 +778,9 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     profile: Readonly<EssayProfile>,
     northStar: EssayNorthStar,
     phase: ImprovementPhase,
-    phaseTarget: typeof PHASE_TARGETS[ImprovementPhaseLevel],
+    phaseGuidance: typeof PHASE_GUIDANCE[ImprovementPhaseLevel],
+    findingStore?: FindingStore,
+    priorAnnotationCtx?: PriorAnnotationContext,
   ): string {
     const sections: string[] = [];
 
@@ -523,6 +839,31 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       );
     }
 
+    // ── W1.3: Sentence tag map (all phases) ──
+    const taggedSentences = para.sentences.filter(s => s.understanding?.tags?.length);
+    if (taggedSentences.length > 0) {
+      const tagMapParts: string[] = ['SENTENCE TAG MAP:'];
+      for (const s of taggedSentences) {
+        tagMapParts.push(`  S${s.index}: [${s.understanding!.tags.join(', ')}]`);
+      }
+      sections.push(tagMapParts.join('\n'));
+    }
+
+    // ── L4 Score Matrix entry for this paragraph (multi-dimensional scoring) ──
+    const scoreEntry = profile.scoreMatrix?.paragraphs?.find((p) => p.index === para.index);
+    if (scoreEntry) {
+      sections.push(
+        `MULTI-DIMENSIONAL SCORES (L4):\n` +
+        `  Effectiveness: ${scoreEntry.scores.effectiveness}/100\n` +
+        `  Structural: ${scoreEntry.scores.structural}/100\n` +
+        `  Voice: ${scoreEntry.scores.voice}/100\n` +
+        `  Emotional: ${scoreEntry.scores.emotional}/100\n` +
+        `  Thematic: ${scoreEntry.scores.thematic}/100\n` +
+        `  Verdict: ${scoreEntry.verdict}\n` +
+        `  Priority: ${scoreEntry.priorityForImprovement}/5`,
+      );
+    }
+
     // ── Sentence-level detail (for Craft/Polish phases) ──
     if (phase.level === 'craft' || phase.level === 'polish' || phase.level === 'distinction') {
       const sentenceDetails = para.sentences
@@ -538,7 +879,24 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
             }
           }
           if (s.understanding) {
-            parts.push(`    Functions: ${s.understanding.observedFunctions.map((f) => f.observation).join('; ')}`);
+            // Phase 2: primaryFunction replaces observation array display
+            if (s.understanding.primaryFunction) {
+              parts.push(`    Function: ${s.understanding.primaryFunction} [${s.understanding.significance ?? 'contributing'}]`);
+            } else {
+              parts.push(`    Functions: ${s.understanding.observedFunctions.map((f) => f.observation).join('; ')}`);
+            }
+            // W1.3: Wire sentence tags to L5
+            if (s.understanding.tags?.length) {
+              parts.push(`    Tags: [${s.understanding.tags.join(', ')}]`);
+            }
+            // W1.4: Wire craft techniques to L5
+            if (s.understanding.craft?.techniques?.length) {
+              parts.push(`    Craft: [${s.understanding.craft.techniques.join(', ')}] rhythm=${s.understanding.craft.rhythm ?? 'uncharacterized'}`);
+            }
+            // W1.5: Wire significantChoices to L5
+            if (s.understanding.significantChoices?.length) {
+              parts.push(`    Notable words: ${s.understanding.significantChoices.map(w => `"${w.word}" (${w.significance?.substring(0, 80) ?? ''})`).join('; ')}`);
+            }
           }
           return parts.join('\n');
         })
@@ -548,15 +906,49 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       }
     }
 
-    // ── Phase-specific generation instructions ──
+    // ── W7.1: Per-paragraph finding context ──
+    if (findingStore && findingStore.size > 0) {
+      const findingContext = buildAnnotationFindingContext(findingStore, para.index);
+      if (findingContext) {
+        sections.push(findingContext);
+      }
+    }
+
+    // Phase 2: [U] observation labels removed — findings ([F] labels) are the primary context.
+    // buildObservationLabelSummary() is no longer called.
+
+    // ── Prior annotation context (re-analysis) ──
+    if (priorAnnotationCtx && priorAnnotationCtx.priorAnnotations.length > 0) {
+      const priorLines = priorAnnotationCtx.priorAnnotations.map((a) =>
+        `  [${a.addressedByEdit ? 'ADDRESSED' : 'STILL RELEVANT'}] ` +
+        `(${a.teachingMode}) ${a.content.substring(0, 100)}...`,
+      ).join('\n');
+      sections.push(
+        `PRIOR ANNOTATIONS (from before the student's edit):\n${priorLines}\n\n` +
+        `If an annotation was ADDRESSED by the edit:\n` +
+        `- Acknowledge the improvement briefly.\n` +
+        `- Surface any NEW concerns the edit may have introduced.\n\n` +
+        `If an annotation is STILL RELEVANT:\n` +
+        `- Don't repeat it verbatim. Either deepen it (add new dimension or\n` +
+        `  architectural connection) or reference it briefly and move to what's changed.`,
+      );
+    }
+
+    // ── Generation instructions ──
     sections.push(
       `\nGENERATION INSTRUCTIONS:\n` +
-      `Generate ${phaseTarget.minPerParagraph}-${phaseTarget.maxPerParagraph} annotations for this paragraph ` +
-      `at the ${phaseTarget.focusLevel} level.\n` +
-      `Frame EVERY annotation in terms of its STRUCTURAL consequence — not just "fix this" ` +
-      `but "fix this because of what it means for the essay's architecture."\n` +
+      `Generate TEACHING annotations for this paragraph.\n` +
+      `Produce as many annotations as this paragraph genuinely needs — no fixed count. ` +
+      `A rich, load-bearing paragraph may need 4-5 annotations; a clean transitional paragraph may need 0. ` +
+      `Let the paragraph's architectural importance and your teaching judgment determine the count.\n` +
+      `Every annotation must pass the TEACHING TEST: could the student see this by re-reading carefully? ` +
+      `If yes, upgrade it by adding CONSEQUENCE or don't include it.\n` +
+      `Select the teaching mode (awareness/consequence/connection/action) that serves each specific moment.\n` +
+      `Order annotations for cognitive flow: AWARENESS → CONSEQUENCE → CONNECTION → ACTION.\n` +
       `Reference the structural role, through-line, and/or earned-ness context above.\n` +
-      `Include at least one strength_acknowledgment if the paragraph has genuine strengths.\n` +
+      `Reference findings by [F] label when relevant. Use sentence primary functions for per-sentence context.\n` +
+      `Include at least one strength annotation if the paragraph has genuine strengths.\n` +
+      `If crossParagraphRefs apply, populate them with the indices of related paragraphs.\n` +
       `If this paragraph has 0 annotations to generate at the current phase level, return an empty annotations array.`,
     );
 
@@ -624,6 +1016,27 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       `  Register: ${profile.voiceIdentity.register}\n` +
       `  Distinctive Patterns: ${profile.voiceIdentity.distinctivePatterns.join(', ')}`,
     );
+
+    // Voice map (compact — baselines + shifts only, ~500 chars max)
+    if (profile.voiceMap) {
+      const vmParts: string[] = [];
+      if (profile.voiceMap.register?.baseline) vmParts.push(`Register: ${profile.voiceMap.register.baseline}`);
+      if (profile.voiceMap.vocabularyFingerprint?.baseline) vmParts.push(`Vocab: ${profile.voiceMap.vocabularyFingerprint.baseline}`);
+      if (profile.voiceMap.sentenceRhythm?.baseline) vmParts.push(`Rhythm: ${profile.voiceMap.sentenceRhythm.baseline}`);
+      if (profile.voiceMap.perspectiveDistance?.baseline) vmParts.push(`Perspective: ${profile.voiceMap.perspectiveDistance.baseline}`);
+      if (profile.voiceMap.tonalDisposition?.baseline) vmParts.push(`Tone: ${profile.voiceMap.tonalDisposition.baseline}`);
+      if (vmParts.length > 0) {
+        sections.push(`  Voice Map Baselines: ${vmParts.join(' | ')}`);
+      }
+      if (profile.voiceMap.shifts?.length) {
+        const shiftSummaries = profile.voiceMap.shifts.map(s => {
+          const loc = s.location ? `P${s.location.paragraph}${s.location.sentence !== undefined ? 'S' + s.location.sentence : ''}` : '?';
+          const intent = s.intentionality?.assessment ?? '?';
+          return `${loc}: ${s.fromDescription ?? '?'} → ${s.toDescription ?? '?'} (${intent})`;
+        });
+        sections.push(`  Voice Shifts: ${shiftSummaries.join('; ')}`);
+      }
+    }
 
     // Thematic architecture (compact)
     sections.push(
@@ -708,10 +1121,17 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     for (const moment of earnednessMap.moments) {
       const arrowCount = moment.mechanisms.length;
       const earned = arrowCount >= 2 ? 'EARNED' : 'UNDER-EARNED';
+      const mechDetails = moment.mechanisms.length > 0
+        ? moment.mechanisms.map((m) => {
+            const loc = m.location ? `P${m.location.paragraph}${m.location.sentence !== undefined ? 'S' + m.location.sentence : ''}` : '?';
+            const contrib = m.contribution ? `: ${m.contribution.substring(0, 100)}` : '';
+            return `${m.type} from ${loc}${contrib}`;
+          }).join('; ')
+        : 'none';
       lines.push(
         `  P${moment.location.paragraph}S${moment.location.sentence} [${moment.momentType}] — ${earned} (${arrowCount} mechanisms)\n` +
         `    "${moment.description}"\n` +
-        `    Mechanisms: ${moment.mechanisms.map((m) => `${m.type} from P${m.location.paragraph}`).join(', ') || 'none'}\n` +
+        `    Mechanisms: ${mechDetails}\n` +
         (moment.gaps.length > 0 ? `    Gaps: ${moment.gaps.join('; ')}` : ''),
       );
     }
@@ -721,13 +1141,21 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
 
   private renderReanalysisBrief(brief: ReanalysisBrief): string {
     const lines: string[] = ['RE-ANALYSIS CONTEXT (student recently edited the essay):'];
-    lines.push(`  Changes: ${brief.changeSummary}`);
-    lines.push(`  Edited Paragraphs: ${brief.editedParagraphs.map((p) => `P${p}`).join(', ')}`);
+    // Use changeSummary if present, otherwise fall back to summaryForPrompt
+    const summary = brief.changeSummary ?? brief.summaryForPrompt;
+    lines.push(`  Changes: ${summary}`);
+    // Use editedParagraphs if present, otherwise fall back to structural.paragraphsChanged
+    const editedParas = brief.editedParagraphs ?? brief.structural.paragraphsChanged;
+    if (editedParas.length > 0) {
+      lines.push(`  Edited Paragraphs: ${editedParas.map((p) => `P${p}`).join(', ')}`);
+    }
     if (brief.studentIntent) {
       lines.push(`  Student Intent: ${brief.studentIntent}`);
     }
-    if (brief.structuralSignificance) {
-      lines.push(`  Structural Significance: ${brief.structuralSignificance}`);
+    const structSig = brief.structuralSignificance ??
+      (brief.structural.changeScope !== 'sentence' ? brief.structural.changeScope : null);
+    if (structSig) {
+      lines.push(`  Structural Significance: ${structSig}`);
     }
     lines.push(
       '\n  INSTRUCTION: Acknowledge the student\'s edits in your annotations where relevant. ' +
@@ -770,14 +1198,23 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     const relevantMoments: string[] = [];
 
     for (const moment of earnednessMap.moments) {
-      // This paragraph contains a significant moment
+      // This paragraph contains a significant moment — list each mechanism with detail
       if (moment.location.paragraph === paragraphIndex) {
         const earned = moment.mechanisms.length >= 2;
-        relevantMoments.push(
-          `This paragraph contains a ${moment.momentType} peak: "${moment.description}" ` +
-          `(${earned ? 'EARNED' : 'UNDER-EARNED'} — ${moment.mechanisms.length} earning mechanisms)` +
-          (moment.gaps.length > 0 ? `. Gaps: ${moment.gaps.join('; ')}` : ''),
-        );
+        let momentDesc = `This paragraph contains a ${moment.momentType} peak: "${moment.description}" ` +
+          `(${earned ? 'EARNED' : 'UNDER-EARNED'} — ${moment.mechanisms.length} earning mechanisms)`;
+        if (moment.mechanisms.length > 0) {
+          const mechLines = moment.mechanisms.map(m => {
+            const loc = m.location ? `P${m.location.paragraph}${m.location.sentence !== undefined ? 'S' + m.location.sentence : ''}` : '?';
+            const contrib = m.contribution ? m.contribution.substring(0, 120) : '';
+            return `  - ${m.type} from ${loc}: ${contrib}`;
+          });
+          momentDesc += '\n' + mechLines.join('\n');
+        }
+        if (moment.gaps.length > 0) {
+          momentDesc += `\n  Gaps: ${moment.gaps.join('; ')}`;
+        }
+        relevantMoments.push(momentDesc);
       }
 
       // This paragraph provides an earning mechanism for another moment
@@ -796,6 +1233,42 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
   }
 
   // ==========================================================================
+  // W7.2: OBSERVATION LABEL BUILDER
+  // ==========================================================================
+
+  /**
+   * Build an observation label summary for a paragraph.
+   * Maps each sentence's observedFunctions to [U1], [U2], etc. labels
+   * that the LLM can cross-reference in its annotations.
+   *
+   * Labels are numbered sequentially across all sentences in the paragraph,
+   * providing a flat namespace: P0S0's first observation is [U1], second is [U2],
+   * P0S1's first observation continues as [U3], etc.
+   */
+  private buildObservationLabelSummary(
+    para: Readonly<ParagraphProfile>,
+  ): string | null {
+    const labels: string[] = [];
+    let labelCounter = 1;
+
+    for (const sentence of para.sentences) {
+      if (!sentence.understanding?.observedFunctions?.length) continue;
+
+      for (const obs of sentence.understanding.observedFunctions) {
+        const label = `U${labelCounter++}`;
+        const confidenceStr = obs.confidence >= 0.8 ? '' : ` (conf: ${obs.confidence.toFixed(1)})`;
+        labels.push(`  [${label}] S${sentence.index}: ${obs.observation}${confidenceStr}`);
+      }
+    }
+
+    if (labels.length === 0) {
+      return null;
+    }
+
+    return `OBSERVATION LABELS FOR P${para.index}:\n${labels.join('\n')}`;
+  }
+
+  // ==========================================================================
   // PER-PARAGRAPH ANNOTATION CALL
   // ==========================================================================
 
@@ -804,10 +1277,12 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     profile: Readonly<EssayProfile>,
     northStar: EssayNorthStar,
     phase: ImprovementPhase,
-    phaseTarget: typeof PHASE_TARGETS[ImprovementPhaseLevel],
+    phaseGuidance: typeof PHASE_GUIDANCE[ImprovementPhaseLevel],
     systemPrompt: string,
     sharedContext: string,
     _essayText: string,
+    findingStore?: FindingStore,
+    priorAnnotationCtx?: PriorAnnotationContext,
   ): Promise<{
     paragraphAnnotations: ParagraphAnnotations;
     cost: number;
@@ -832,7 +1307,9 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       profile,
       northStar,
       phase,
-      phaseTarget,
+      phaseGuidance,
+      findingStore,
+      priorAnnotationCtx,
     );
 
     // 3-block caching: system (cached) + shared context (cached) + paragraph-specific (not cached)
@@ -842,7 +1319,7 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     // identical across all parallel calls and starts at the same token boundary.
     const userMessage = `${sharedContext}\n\n===\n\nTARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
 
-    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaudeWithRetry<RawParagraphAnnotationOutput>(
+    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaude<RawParagraphAnnotationOutput>(
       {
         model: SONNET,
         systemPrompt,
@@ -855,10 +1332,13 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     );
 
     const cost = calculateCost(response.usage, SONNET);
+    console.log(
+      `[EssayIntelligence] L5 P${para.index}: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
 
     // ── Parse and validate ──
     const rawOutput = this.parseRawOutput(response.content, para.index);
-    const validAnnotations = this.validateAnnotations(rawOutput, para, phase);
+    const validAnnotations = this.validateAnnotations(rawOutput, para, phase, profile.paragraphs.length);
 
     return {
       paragraphAnnotations: {
@@ -880,66 +1360,50 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
   // ==========================================================================
 
   /**
-   * Robust JSON parsing with fallback chain.
+   * Parse raw LLM output into RawAnnotation[].
+   * Delegates JSON extraction to the shared parser, then extracts the annotations array.
    */
   private parseRawOutput(
     content: RawParagraphAnnotationOutput | unknown,
     paragraphIndex: number,
   ): RawAnnotation[] {
-    // Case 1: Already parsed as expected shape
-    if (
-      content &&
-      typeof content === 'object' &&
-      'annotations' in (content as Record<string, unknown>) &&
-      Array.isArray((content as RawParagraphAnnotationOutput).annotations)
-    ) {
-      return (content as RawParagraphAnnotationOutput).annotations;
+    try {
+      return parseLlmJsonArray(content, `L5 deepAnnotation P${paragraphIndex}`) as RawAnnotation[];
+    } catch {
+      console.warn(
+        `[DeepAnnotationService] Failed to parse annotations for P${paragraphIndex}. ` +
+        `Content type: ${typeof content}`,
+      );
+      return [];
     }
-
-    // Case 2: The content IS the array directly
-    if (Array.isArray(content)) {
-      return content as RawAnnotation[];
-    }
-
-    // Case 3: Content is a string (JSON mode sometimes returns stringified JSON)
-    if (typeof content === 'string') {
-      try {
-        const parsed = JSON.parse(content);
-        if (Array.isArray(parsed)) return parsed as RawAnnotation[];
-        if (parsed && typeof parsed === 'object' && Array.isArray(parsed.annotations)) {
-          return parsed.annotations as RawAnnotation[];
-        }
-      } catch {
-        // Try extracting JSON from markdown code blocks
-        const jsonMatch = (content as string).match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (jsonMatch) {
-          try {
-            const innerParsed = JSON.parse(jsonMatch[1]);
-            if (Array.isArray(innerParsed)) return innerParsed as RawAnnotation[];
-            if (innerParsed?.annotations) return innerParsed.annotations as RawAnnotation[];
-          } catch {
-            // Fall through to empty
-          }
-        }
-      }
-    }
-
-    console.warn(
-      `[DeepAnnotationService] Failed to parse annotations for P${paragraphIndex}. ` +
-      `Content type: ${typeof content}`,
-    );
-    return [];
   }
 
   /**
    * Validate and transform raw LLM annotations into typed L5Annotation objects.
+   * V2: handles teachingIntent, teachingMode, crossParagraphRefs, capacityBuildingNote.
+   * Also maps V1 type names to V2 for backward compatibility.
    */
   private validateAnnotations(
     rawAnnotations: RawAnnotation[],
     para: Readonly<ParagraphProfile>,
     phase: ImprovementPhase,
+    totalParagraphs?: number,
   ): L5Annotation[] {
     const valid: L5Annotation[] = [];
+
+    // V1 → V2 type mapping for backward compatibility
+    const typeMapping: Record<string, L5AnnotationType> = {
+      'strength_acknowledgment': 'strength',
+      'growth_opportunity': 'growth',
+      'structural_note': 'structural',
+      'teaching_moment': 'teaching',
+      'strength': 'strength',
+      'growth': 'growth',
+      'structural': 'structural',
+      'teaching': 'teaching',
+    };
+
+    const validTeachingModes: L5TeachingMode[] = ['awareness', 'consequence', 'connection', 'action'];
 
     for (const raw of rawAnnotations) {
       // ── Validate required fields ──
@@ -953,16 +1417,13 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         continue;
       }
 
-      // ── Validate type ──
-      const validTypes: AnnotationType[] = [
-        'strength_acknowledgment',
-        'growth_opportunity',
-        'structural_note',
-        'teaching_moment',
-      ];
-      const annotationType: AnnotationType = validTypes.includes(raw.type as AnnotationType)
-        ? (raw.type as AnnotationType)
-        : 'teaching_moment';
+      // ── Validate type (V1 + V2 names accepted) ──
+      const annotationType: L5AnnotationType = typeMapping[raw.type ?? ''] ?? 'teaching';
+
+      // ── Validate teaching mode ──
+      const teachingMode: L5TeachingMode = validTeachingModes.includes(raw.teachingMode as L5TeachingMode)
+        ? (raw.teachingMode as L5TeachingMode)
+        : 'consequence'; // Default to consequence — the most common teaching mode
 
       // ── Validate paragraph index ──
       const paragraphIndex = typeof raw.paragraphIndex === 'number'
@@ -984,7 +1445,6 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
           const lowerParaText = para.text.toLowerCase();
           const lowerSpan = raw.spanText.toLowerCase();
           if (lowerParaText.includes(lowerSpan)) {
-            // Find actual text for the match
             const idx = lowerParaText.indexOf(lowerSpan);
             spanText = para.text.substring(idx, idx + raw.spanText.length);
           }
@@ -1000,6 +1460,16 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         ? (raw.phase as ImprovementPhaseLevel)
         : phase.level;
 
+      // ── Validate crossParagraphRefs ──
+      let crossParagraphRefs: number[] = [];
+      if (Array.isArray(raw.crossParagraphRefs)) {
+        const maxIdx = totalParagraphs ?? para.index + 10; // Reasonable upper bound
+        crossParagraphRefs = raw.crossParagraphRefs
+          .filter((ref): ref is number =>
+            typeof ref === 'number' && ref >= 0 && ref < maxIdx && ref !== paragraphIndex,
+          );
+      }
+
       // ── Build the annotation ──
       valid.push({
         id: crypto.randomUUID(),
@@ -1009,6 +1479,10 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
           spanText,
         },
         type: annotationType,
+        teachingIntent: (raw.teachingIntent && typeof raw.teachingIntent === 'string')
+          ? raw.teachingIntent.trim()
+          : raw.content.trim().substring(0, 80),
+        teachingMode,
         content: raw.content.trim(),
         teachingRationale: raw.teachingRationale.trim(),
         northStarConnection: (raw.northStarConnection && typeof raw.northStarConnection === 'string')
@@ -1024,6 +1498,10 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         confidence: typeof raw.confidence === 'number'
           ? Math.max(0, Math.min(1, raw.confidence))
           : 0.75,
+        crossParagraphRefs,
+        capacityBuildingNote: (raw.capacityBuildingNote && typeof raw.capacityBuildingNote === 'string')
+          ? raw.capacityBuildingNote.trim()
+          : null,
       });
     }
 
@@ -1049,10 +1527,10 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       const toKeep: L5Annotation[] = [];
 
       for (const ann of pa.annotations) {
-        // Promote structural_note annotations that reference essay-wide architecture
+        // Promote structural annotations that reference essay-wide architecture
         // in Foundation or Distinction phases
         if (
-          ann.type === 'structural_note' &&
+          ann.type === 'structural' &&
           (phase.level === 'foundation' || phase.level === 'distinction') &&
           ann.priority <= 2
         ) {
@@ -1073,24 +1551,32 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
   }
 
   /**
-   * Deduplicate and enforce phase-specific annotation count limits.
+   * Deduplicate annotations. NO caps, NO trimming, NO slicing.
+   *
+   * The only filtering: genuinely identical annotations (same content via
+   * first-100-chars normalization) are deduplicated because they represent
+   * LLM repetition, not distinct findings. Everything else is kept.
+   *
+   * If annotation density diverges from phase expectations, that's
+   * diagnostic SIGNAL — a rich paragraph with 6 annotations means the
+   * paragraph is doing a lot of architectural work. A sparse paragraph
+   * with 0 means it's either transitional (fine) or the prompt missed
+   * something (investigate). Neither case is fixed by deleting annotations.
    */
   private deduplicateAndPrioritize(
     paragraphAnnotations: ParagraphAnnotations[],
     essayLevelAnnotations: L5Annotation[],
     phase: ImprovementPhase,
-    phaseTarget: typeof PHASE_TARGETS[ImprovementPhaseLevel],
+    phaseGuidance: typeof PHASE_GUIDANCE[ImprovementPhaseLevel],
   ): {
     paragraphAnnotations: ParagraphAnnotations[];
     essayLevelAnnotations: L5Annotation[];
   } {
     // ── Deduplicate by content similarity ──
-    // Annotations with very similar content across paragraphs get deduplicated
     const seenContent = new Set<string>();
 
     for (const pa of paragraphAnnotations) {
       pa.annotations = pa.annotations.filter((ann) => {
-        // Create a normalized key from content (first 100 chars, lowercased)
         const key = ann.content.toLowerCase().substring(0, 100).replace(/\s+/g, ' ');
         if (seenContent.has(key)) {
           return false;
@@ -1102,13 +1588,18 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       // Sort by priority within each paragraph
       pa.annotations.sort((a, b) => a.priority - b.priority);
 
-      // Cap per-paragraph count
-      if (pa.annotations.length > phaseTarget.maxPerParagraph) {
-        pa.annotations = pa.annotations.slice(0, phaseTarget.maxPerParagraph);
+      // NO cap. NO slice. All annotations the LLM produced are kept.
+      // Log density as diagnostic signal.
+      if (pa.annotations.length > 4) {
+        console.log(
+          `[L5] High annotation density at P${pa.paragraphIndex}: ` +
+          `${pa.annotations.length} annotations (phase: ${phase.level}). ` +
+          `This is diagnostic signal — paragraph may be architecturally rich or troubled.`,
+        );
       }
     }
 
-    // ── Essay-level deduplication and cap ──
+    // ── Essay-level deduplication (no cap) ──
     essayLevelAnnotations = essayLevelAnnotations.filter((ann) => {
       const key = ann.content.toLowerCase().substring(0, 100).replace(/\s+/g, ' ');
       if (seenContent.has(key)) return false;
@@ -1118,11 +1609,142 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
 
     essayLevelAnnotations.sort((a, b) => a.priority - b.priority);
 
-    if (essayLevelAnnotations.length > phaseTarget.essayLevelMax) {
-      essayLevelAnnotations = essayLevelAnnotations.slice(0, phaseTarget.essayLevelMax);
-    }
+    // NO cap. NO slice. If the LLM produced 5 essay-level annotations,
+    // that density is signal about the essay's complexity.
 
     return { paragraphAnnotations, essayLevelAnnotations };
+  }
+
+  // ==========================================================================
+  // CROSS-PARAGRAPH ANNOTATIONS
+  // ==========================================================================
+
+  /**
+   * Generate cross-paragraph annotations after individual paragraph
+   * annotation calls complete.
+   *
+   * Receives all paragraph annotations + full context.
+   * Produces 0-3 annotations that span multiple paragraphs —
+   * teaching moments that per-paragraph calls cannot capture.
+   */
+  private async generateCrossParagraphAnnotations(
+    paragraphAnnotations: ParagraphAnnotations[],
+    profile: Readonly<EssayProfile>,
+    phase: ImprovementPhase,
+    systemPrompt: string,
+    sharedContext: string,
+  ): Promise<{
+    annotations: L5Annotation[];
+    cost: number;
+    tokenUsage: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens: number;
+      cacheWriteTokens: number;
+    };
+  }> {
+    // Skip if too few paragraphs for meaningful cross-paragraph patterns
+    if (profile.paragraphs.length < 3) {
+      return {
+        annotations: [],
+        cost: 0,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      };
+    }
+
+    // Build a summary of paragraph annotations already generated
+    const annotationSummary = paragraphAnnotations
+      .filter(pa => pa.annotations.length > 0)
+      .map(pa =>
+        `P${pa.paragraphIndex}:\n` +
+        pa.annotations.map(a =>
+          `  [${a.teachingMode}] ${a.content.substring(0, 120)}...`,
+        ).join('\n'),
+      ).join('\n\n');
+
+    // Skip if no annotations were generated (nothing to build on)
+    if (!annotationSummary) {
+      return {
+        annotations: [],
+        cost: 0,
+        tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      };
+    }
+
+    const userPrompt = `${sharedContext}
+
+===
+
+CROSS-PARAGRAPH ANNOTATION REQUEST:
+
+You have already generated per-paragraph annotations (summarized below).
+Now identify teaching moments that SPAN PARAGRAPHS — patterns, expectations,
+through-line moments that only make sense as a connected sequence.
+
+These are the annotations ONLY YOU can generate. Per-paragraph calls cannot
+see the full picture. You can.
+
+ALREADY GENERATED:
+${annotationSummary}
+
+Generate 0-3 cross-paragraph annotations. Each must:
+- Reference at least 2 paragraphs with specific text quotes from each
+- Explain the RELATIONSHIP between the paragraphs that creates the teaching moment
+- Use "location" to anchor to the PRIMARY paragraph, "crossParagraphRefs" for others
+- Be something a per-paragraph annotation could NOT have captured
+- Pass the teaching test: the student cannot see this cross-paragraph pattern on their own
+
+If no cross-paragraph teaching moments exist beyond what individual annotations
+already cover, return an empty annotations array. Do not force cross-paragraph
+annotations that don't add value.
+
+Output JSON: { "annotations": [...] }`;
+
+    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaude<RawParagraphAnnotationOutput>(
+      {
+        model: SONNET,
+        systemPrompt,
+        userPrompt,
+        maxTokens: 1500,
+        temperature: 0.3,
+        useJsonMode: true,
+        cacheSystemPrompt: true,
+      },
+    );
+
+    const cost = calculateCost(response.usage, SONNET);
+    console.log(
+      `[EssayIntelligence] L5 cross-paragraph: ${response.usage.input_tokens.toLocaleString()} input + ` +
+      `${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
+
+    // Parse and validate — use a synthetic ParagraphProfile for validation
+    const rawOutput = this.parseRawOutput(response.content, -1);
+
+    // Validate each annotation against the actual paragraph it references
+    const validAnnotations: L5Annotation[] = [];
+    for (const raw of rawOutput) {
+      const paraIdx = typeof raw.paragraphIndex === 'number' ? raw.paragraphIndex : 0;
+      const targetPara = profile.paragraphs[paraIdx];
+      if (!targetPara) continue;
+
+      const validated = this.validateAnnotations([raw], targetPara, phase, profile.paragraphs.length);
+      validAnnotations.push(...validated);
+    }
+
+    // Filter: cross-paragraph annotations MUST have crossParagraphRefs
+    const crossAnns = validAnnotations.filter(a => a.crossParagraphRefs.length > 0);
+
+    return {
+      annotations: crossAnns,
+      cost,
+      tokenUsage: {
+        inputTokens: response.usage.input_tokens,
+        outputTokens: response.usage.output_tokens,
+        cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+        cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+      },
+    };
   }
 
   // ==========================================================================

@@ -204,13 +204,74 @@ export type MutationType =
   | 'holistic_section_updated'
   | 'connection_added'
   | 'connection_removed'
+  | 'connection_invalidated'
   | 'voice_shift_added'
   | 'voice_shift_removed'
   | 'voice_intentionality_updated'
   | 'earnedness_arrow_added'
   | 'earnedness_arrow_removed'
   | 'north_star_updated'
-  | 'conversation_insight_applied';
+  | 'conversation_insight_applied'
+  | 'sentence_correction_not_found'
+  | 'earnedness_deferred';
+
+// ============================================================================
+// CONNECTION V2 TYPES — Bidirectional, Strength-Aware Connection Graph
+// ============================================================================
+
+/**
+ * Functional routing tags — the system's operational view of connections.
+ * Answer: "What does the system need to know about this connection
+ * to make routing, revalidation, and dispatch decisions?"
+ *
+ * NOT a taxonomy of what connections mean. That lives in `description`.
+ */
+export type ConnectionRoutingTag =
+  | 'structural'   // Removing/changing one endpoint would break the other
+  | 'earning'      // One endpoint sets up or earns the other
+  | 'thematic'     // Endpoints share a thematic thread or image system
+  | 'contrastive'; // Endpoints create meaning through opposition or tension
+
+/**
+ * Connection endpoint — a specific location in the essay.
+ */
+export interface ConnectionEndpoint {
+  /** Paragraph index (0-based) */
+  paragraph: number;
+  /** Sentence index (0-based). undefined = paragraph-level endpoint */
+  sentence?: number;
+  /** Brief label for this endpoint in context */
+  label: string;
+}
+
+/**
+ * How meaning flows in the connection.
+ */
+export type ConnectionDirectionality =
+  | 'forward'           // from -> to is the primary meaning direction
+  | 'reverse'           // to -> from is the primary meaning direction
+  | 'bidirectional'     // both directions carry equal meaning
+  | 'asymmetric';       // both carry meaning but unequally (from->to primary)
+
+/**
+ * Which layer/step discovered the connection.
+ */
+export type ConnectionSource =
+  | 'scout'             // L2.5 surface-level detection
+  | 'walk'              // L3 sequential walk discovery
+  | 'holistic_synthesis'// L3.75 full-context discovery
+  | 'deep_dive'         // Post-walk targeted investigation
+  | 'coaching'          // Student conversation reveals connection
+  | 'edit_reanalysis';  // Re-analysis after edit
+
+/**
+ * Connection significance category — LLM-assigned based on architectural importance.
+ */
+export type ConnectionStrengthCategory =
+  | 'foundational'  // Essay breaks if this connection is severed
+  | 'significant'   // Essay loses something important
+  | 'supporting'    // Essay loses a nuance
+  | 'tentative';    // Possible echo, not yet confirmed
 
 /**
  * Checkpoint reason — when and why the coordinator saves state.
@@ -241,10 +302,13 @@ export type CheckpointReason =
 export interface ObservationEntry {
   /** The observation text */
   observation: string;
-  /** Confidence in this observation (0-1). Higher = more certain. */
-  confidence?: number;
-  /** Text evidence supporting this observation */
-  evidence?: string;
+  /** Confidence in this observation (0-1). Higher = more certain.
+   *  REQUIRED — forces the LLM to calibrate certainty, improving downstream filtering. */
+  confidence: number;
+  /** Text evidence from the essay supporting this observation.
+   *  REQUIRED — cognitive forcing function that prevents hallucinated observations.
+   *  Every observation must cite specific text from the essay. */
+  evidence: string;
 }
 
 /**
@@ -308,8 +372,18 @@ export interface SentenceUnderstanding {
   /** IDs into the centralized connections store */
   connectionRefs: string[];
 
+  /** IDs of findings that reference this sentence (derived from FindingStore, not LLM-produced) */
+  findingRefs: string[];
+
   /** Semantic tags for fast lookup and routing */
   tags: string[];
+
+  /** Phase 0: One-line summary of this sentence's primary architectural function.
+   *  Coexists with observation arrays; becomes the replacement in Phase 1+. */
+  primaryFunction?: string;
+  /** Phase 0: How architecturally significant this sentence is to the essay.
+   *  Drives downstream attention allocation. */
+  significance?: 'pivotal' | 'contributing' | 'transitional';
 }
 
 /**
@@ -391,7 +465,6 @@ export interface ParagraphUnderstanding {
     imageUsage: string;
     voiceConsistency: string;
     standoutMoment: string | null;
-    weaknessMoment: string | null;
   };
 }
 
@@ -492,6 +565,12 @@ export interface VoiceMap {
   perspectiveDistance: VoiceMapDimension;
   /** Tonal Disposition: emotional coloring of the narrator's stance */
   tonalDisposition: VoiceMapDimensionWithQualities;
+
+  /** Passages where voice holds steady — characterizes the voice in stable regions */
+  stabilityRegions: Array<{
+    paragraphs: number[];
+    voiceCharacter: string;
+  }>;
 
   /** Recorded voice shifts — where one or more voice dimensions change */
   shifts: VoiceShift[];
@@ -617,6 +696,9 @@ export interface EmotionalTopography {
     assessment: 'shown' | 'told' | 'mixed';
     detail: string;
   }>;
+  /** Overall authenticity assessment — where emotions feel genuine vs performed.
+   *  Critical for admissions essay coaching: performed emotion is an AO red flag. */
+  authenticityAssessment: string;
 }
 
 /**
@@ -722,6 +804,13 @@ export interface NarrativeStrategy {
   pacingAnalysis: string;
   /** Structural choices and their effects */
   structuralChoices: string[];
+  /** The type of narrative arc: chronological, reflective, bracket, montage, etc. */
+  arcType: string;
+  /** Current arc momentum — is the essay building toward something, sustaining, or stalling? */
+  arcMomentum: 'building' | 'sustaining' | 'releasing' | 'stalling';
+  /** The essay's turning point / fulcrum — null if no clear pivot exists.
+   *  Used by L4 North Star for structural roles and by readiness scoring. */
+  turningPoint: { paragraph: number; sentence: number } | null;
 }
 
 /**
@@ -738,6 +827,10 @@ export interface CharacterRevelation {
   intellectualFingerprint: string;
   /** Blind spots they might not see */
   blindSpots: string[];
+  /** Qualities the writer reveals through the essay — distinct from values.
+   *  Values = what they believe. Qualities = how they show up (resilient, curious, empathetic).
+   *  Used by admissions positioning and portfolio strategy. */
+  revealedQualities: string[];
 }
 
 /**
@@ -785,6 +878,10 @@ export interface CrossDimensionEntanglement {
   description: string;
   /** Which dimension sections this entanglement should be cross-referenced in */
   crossRefs: HolisticDimension[];
+  /** How important this entanglement is to the essay's meaning.
+   *  Foundational = core to what makes the essay work. Supporting = enriches.
+   *  Subtle = present but not load-bearing. Used by L4 distinctiveness and L5 annotations. */
+  significance: 'foundational' | 'supporting' | 'subtle';
 }
 
 /**
@@ -803,6 +900,8 @@ export interface AdmissionsPositioning {
   memorability: string;
   /** How this essay positions within a portfolio */
   portfolioPosition: string;
+  /** AO takeaway — what an admissions officer would think after reading this essay (from L3.5 analysis) */
+  aoTakeaway: string;
 }
 
 // ============================================================================
@@ -862,6 +961,8 @@ export interface EssayNorthStar {
   confidence: NorthStarConfidence;
   /** Which layer last updated the North Star */
   lastUpdatedBy: string;
+  /** Version/changelog tracking for re-crystallization (present after version >= 2) */
+  evolution?: NorthStarEvolution;
 }
 
 /**
@@ -960,12 +1061,28 @@ export interface IntentBridge {
 // ============================================================================
 
 /**
- * ProfileConnections — centralized connection store. Single source of truth.
- * Sentences reference by ID (connectionRefs), never embed descriptions.
+ * ProfileConnections (V2) — the connection graph.
+ * Bidirectional, strength-aware network that serves as the essay's architectural map.
+ *
+ * Append-only with status tracking (Rule 2: never discard paid output).
+ * Querying active connections means filtering to `status === 'active'`.
  */
 export interface ProfileConnections {
-  /** All connections stored ONCE with unique ID */
+  /** All connections — append-only with status tracking */
   all: Connection[];
+
+  /**
+   * LLM-generated prose describing the essay's overall connection architecture.
+   * Updated after each layer that discovers connections.
+   */
+  graphSummary: string;
+
+  /**
+   * Paragraphs with no strong connections in or out.
+   * System-computed from graph structure (not LLM judgment).
+   */
+  structuralIslands: number[];
+
   /** Image/metaphor recurrences across paragraphs */
   imageRecurrences: Array<{
     image: string;
@@ -984,23 +1101,77 @@ export interface ProfileConnections {
 }
 
 /**
- * Connection — a single cross-paragraph connection.
+ * Connection (V2) — a single relationship between two passages in the essay.
+ *
+ * Bidirectional: the connection has a primary direction (from -> to)
+ * and describes what each endpoint means to the other.
+ *
+ * The LLM describes connections freely; the system adds routing tags.
+ * No fixed taxonomy of connection types — that lives in `description`.
  */
 export interface Connection {
   /** Unique connection ID */
   id: string;
-  /** Source location [paragraph, sentence] */
-  from: [number, number];
-  /** Target location [paragraph, sentence] */
-  to: [number, number];
-  /** Connection type */
-  type: string;
-  /** Description of what connects these locations */
+
+  /** Primary endpoint — where the connection originates or is first visible */
+  from: ConnectionEndpoint;
+
+  /** Secondary endpoint — where the connection lands or becomes visible */
+  to: ConnectionEndpoint;
+
+  /**
+   * LLM-written description of what connects these passages.
+   * No category constraint — the LLM expresses freely.
+   */
   description: string;
-  /** Confidence in this connection (0-1) */
-  confidence: number;
-  /** Which layer discovered this connection */
-  discoveredByLayer: string;
+
+  /**
+   * What this connection reveals about the FROM endpoint (reverse illumination).
+   * null if the connection is primarily one-directional.
+   */
+  reverseIllumination: string | null;
+
+  /**
+   * Functional routing tags — what the system needs to know operationally.
+   * Multiple tags allowed (a connection can be both structural and thematic).
+   */
+  routingTags: ConnectionRoutingTag[];
+
+  /**
+   * LLM's assessment of how important this connection is to the essay's
+   * architecture of meaning. Prose, not a score.
+   */
+  significance: string;
+
+  /**
+   * Strength category for UI display and edit triage.
+   * LLM-assigned based on significance assessment.
+   */
+  strengthCategory: ConnectionStrengthCategory;
+
+  /**
+   * How meaning flows — LLM specifies per instance.
+   */
+  directionality: ConnectionDirectionality;
+
+  /** Which layer/step discovered this connection */
+  discoveredBy: ConnectionSource;
+
+  /** Connection status — system bookkeeping */
+  status: 'active' | 'invalidated' | 'under_review' | 'superseded';
+
+  /** If invalidated, why and when */
+  invalidation?: {
+    reason: string;
+    invalidatedAt: string;
+    trigger: string;  // 'edit_P3', 'coaching_correction', etc.
+  };
+
+  /** Finding IDs this connection is related to */
+  relatedFindings: string[];
+
+  /** ISO timestamp */
+  createdAt: string;
 }
 
 // ============================================================================
@@ -1201,6 +1372,20 @@ export interface VersionRecord {
     adjustment: string;
     source: 'conversation' | 'edit_workshop';
   }>;
+  /** Serialized staleness accumulator at analysis checkpoint (Set<string> → string[]) */
+  accumulatedStaleness?: {
+    strongStale: string[];
+    moderateStale: string[];
+    weakStale: string[];
+    totalEdits: number;
+    transformativeCount: number;
+    significantCount: number;
+    moderateCount: number;
+  };
+  /** W9.1: Editing approaches tracked during this version (optional — backward compatible) */
+  approaches?: EditApproach[];
+  /** W9.2: Detected edit strategy pattern for this version (optional — backward compatible) */
+  editStrategy?: EditStrategyPattern | null;
 }
 
 // ============================================================================
@@ -1218,19 +1403,53 @@ export interface VersionRecord {
  */
 export interface ImprovementPhase {
   level: ImprovementPhaseLevel;
-  /** Why this phase was chosen */
+  /** LLM-generated reasoning for why this phase was chosen */
   reasoning: string;
   /** Specific things to address at this level */
   focusAreas: string[];
   /** Things that exist but aren't worth surfacing yet */
   deferredAreas: string[];
-  /** Rough percentage of essay that's "solid" at each granularity */
-  readiness: {
+
+  /** LLM prose readiness assessment (replaces numeric readiness) */
+  readinessAssessment: string;
+
+  /** Deterministic lookup from level — for backward-compat logging only */
+  legacyReadiness: {
     essayLevel: number;
     paragraphLevel: number;
     sentenceLevel: number;
     wordLevel: number;
   };
+
+  /**
+   * Per-dimension phase assessments. LLM selects which dimensions are relevant
+   * for THIS essay and assesses each independently.
+   */
+  dimensionPhases: Array<{
+    dimension: string;
+    level: ImprovementPhaseLevel;
+    reasoning: string;
+    coachingApproach: string;
+  }>;
+
+  /** 2-4 sentence coaching directive injected into L5/L6 prompts */
+  coachingLens: string;
+
+  /**
+   * Phase transition detection (null on first analysis).
+   * When priorPhase is provided, Sonnet assesses whether the shift is genuine.
+   */
+  transition: {
+    priorLevel: ImprovementPhaseLevel;
+    isGenuineShift: boolean;
+    transitionReasoning: string;
+  } | null;
+
+  /**
+   * W3.4: Whether this phase is near a boundary.
+   * When true, the phase could change with small improvements.
+   */
+  nearBoundary?: boolean;
 }
 
 // ============================================================================
@@ -1281,11 +1500,14 @@ export interface ProfileIndex {
     paragraphs: number[];
   };
 
-  /** Connection graph: which paragraphs/sentences link to each other */
+  /** Connection graph summary — compact view for LLM context */
   connectionGraph: Array<{
-    from: [number, number];
-    to: [number, number];
-    type: string;
+    id: string;
+    from: { paragraph: number; sentence?: number };
+    to: { paragraph: number; sentence?: number };
+    routingTags: ConnectionRoutingTag[];
+    strengthCategory: ConnectionStrengthCategory;
+    status: 'active' | 'invalidated' | 'under_review' | 'superseded';
   }>;
 
   /** Compact North Star summary — structural significance without full North Star */
@@ -1321,6 +1543,18 @@ export interface ProfileIndex {
   fullAnalysisCount: number;
   /** Timestamp of last comprehensive analysis */
   lastComprehensiveAt: string | null;
+
+  /** W1.1: Compact finding summary for context routing (computed from FindingStore) */
+  findingSummary?: {
+    totalActive: number;
+    byMaturity: Partial<Record<FindingMaturity, number>>;
+    topFindings: Array<{
+      id: string;
+      claim: string;
+      maturity: FindingMaturity;
+      coachingValue: FindingCoachingValue;
+    }>;
+  };
 }
 
 // ============================================================================
@@ -1349,6 +1583,73 @@ export interface ProfileIndex {
  * - Analysis (evaluative): how well it works — persistent, refined over time
  * - Feedback (prescriptive): what to do about it — EPHEMERAL, generated fresh per context
  */
+
+// ============================================================================
+// ESSAY UNDERSTANDING (Gap 1 — Synthesized Narrative)
+// ============================================================================
+
+/**
+ * EssayUnderstanding — the system's developing understanding of the WHOLE essay.
+ *
+ * Rich prose that reads like expert literary analysis. Grows with each pass.
+ * This is NOT a summary of the 10 holistic sections. It's the ARGUMENT the
+ * system would make about this essay if asked "what do you see?" — synthesized,
+ * opinionated, grounded in specific text.
+ *
+ * The holistic sections remain the structured breakdown. The understanding
+ * prose is the synthesized narrative — derived from them, not replacing them.
+ */
+export interface EssayUnderstanding {
+  /**
+   * The system's developing understanding of the WHOLE essay.
+   * Rich prose — reads like expert literary analysis.
+   * Grows with each pass: initial synthesis ~300 words,
+   * after deep dives ~500 words, after coaching ~700 words.
+   *
+   * Reads as a complete, current narrative each time (REPLACEMENT, not append).
+   */
+  prose: string;
+
+  /**
+   * The essay's central tension — what drives it, whether
+   * the writer knows it or not. NOT the thesis. The tension.
+   * Updated as understanding deepens.
+   */
+  centralTension: string;
+
+  /**
+   * Things the system is confident about.
+   * Persist across runs unless explicitly superseded.
+   */
+  confirmedInsights: string[];
+
+  /**
+   * Tentative readings that need more evidence.
+   * May be confirmed, superseded, or acknowledged as ambiguous.
+   */
+  activeHypotheses: string[];
+
+  /**
+   * How deep the system has gone.
+   * LLM-assessed — NOT a formula from finding maturities.
+   * 'initial' = first walk only
+   * 'developing' = walk + some deep dives
+   * 'deep' = multiple growth cycles, most questions answered
+   * 'comprehensive' = deep dives exhausted, coaching integrated
+   * 'exhaustive' = student edits analyzed, re-analysis complete
+   */
+  maturity: 'initial' | 'developing' | 'deep' | 'comprehensive' | 'exhaustive';
+
+  /**
+   * How understanding evolved — each entry records what changed and why.
+   */
+  growthLog: Array<{
+    timestamp: string;
+    trigger: 'walk' | 'deep_dive' | 'coaching' | 'edit' | 'coherence_check';
+    whatChanged: string;
+  }>;
+}
+
 export interface EssayProfile {
   /** Profile Index (always loaded — ~250-350 tokens) */
   index: ProfileIndex;
@@ -1376,11 +1677,23 @@ export interface EssayProfile {
   /** AO pitch, distinctiveness, institutional fit, red flags, memorability */
   admissionsPositioning: AdmissionsPositioning;
 
+  // -- ESSAY UNDERSTANDING (Gap 1 — synthesized narrative prose) --
+  /** The system's holistic understanding of the essay as a coherent narrative.
+   *  Synthesized from the 10 holistic sections — the ARGUMENT, not the summary. */
+  essayUnderstanding: EssayUnderstanding;
+
   // -- NORTH STAR (architecture of meaning — replaces EssayDNA) --
 
   /** How the essay MEANS — through-line, structural roles, trajectory,
    *  distinctiveness, intent bridge. Scaled by essay length. */
   northStar: EssayNorthStar;
+
+  // -- L4 SCORING & COHERENCE (architecture validation) --
+
+  /** Multi-dimensional per-paragraph scoring (L4 output, optional until L4 completes) */
+  scoreMatrix?: ParagraphScoreMatrix;
+  /** Cross-profile contradiction detection (L4 output, optional until L4 completes) */
+  coherenceReport?: CoherenceReport;
 
   // -- PARAGRAPH MAP (per-paragraph understanding + analysis) --
   paragraphs: ParagraphProfile[];
@@ -1390,6 +1703,15 @@ export interface EssayProfile {
 
   // -- EDIT UNDERSTANDING (version tracking + change comprehension) --
   editHistory: VersionRecord[];
+
+  // -- FINDINGS (V2 — graduated evolution, FindingStore-managed) --
+  /** All findings (active + superseded). Managed by FindingStore, synced at checkpoint. */
+  findings: Finding[];
+
+  // -- PERSISTENT QUESTION QUEUE (Gap 2 — accumulated across growth cycles) --
+  /** All questions ever raised — persistent store with status tracking.
+   *  Managed by QuestionQueueManager, synced at growth cycle end. */
+  questionQueue: UnderstandingQuestion[];
 
   // -- CONVERSATION INSIGHTS (L6-sourced student revelations) --
   conversationInsights: ConversationInsight[];
@@ -1407,6 +1729,655 @@ export interface EssayProfile {
     /** Whether this was migrated from the legacy system (needs re-analysis) */
     legacyProfile: boolean;
   };
+}
+
+// ============================================================================
+// L4 SCORING & COHERENCE TYPES
+// ============================================================================
+
+/**
+ * ParagraphScoreEntry — multi-dimensional score for a single paragraph.
+ * Effectiveness comes from L3.5, the other 4 dimensions are L4's contribution.
+ */
+export interface ParagraphScoreEntry {
+  index: number;
+  scores: {
+    /** Direct transfer from L3.5 paragraph analysis (0-100) */
+    effectiveness: number;
+    /** How well this paragraph fulfills its architectural role from the North Star (0-100) */
+    structural: number;
+    /** Voice consistency / intentional variation quality relative to essay's dominant voice (0-100) */
+    voice: number;
+    /** Emotional depth, authenticity, and moment earned-ness (0-100) */
+    emotional: number;
+    /** Thematic contribution — how well it serves the through-line and themes (0-100) */
+    thematic: number;
+  };
+  /** Single-sentence architectural assessment — NOT a topic summary */
+  verdict: string;
+  /** 1-5: improvement priority informed by structural role significance */
+  priorityForImprovement: number;
+}
+
+/**
+ * ParagraphScoreMatrix — the complete scoring artifact.
+ * Cross-paragraph patterns and improvements reference the North Star.
+ */
+export interface ParagraphScoreMatrix {
+  paragraphs: ParagraphScoreEntry[];
+  /** Patterns that emerge when viewing scores ACROSS paragraphs */
+  crossParagraphPatterns: string[];
+  /** Prioritized improvements that reference North Star structural roles */
+  prioritizedImprovements: Array<{
+    paragraph: number;
+    improvement: string;
+    /** WHY this matters — references the essay's architecture, not just the paragraph */
+    whyThisMatters: string;
+    expectedImpact: 'transformative' | 'significant' | 'incremental';
+  }>;
+  /** Structured coaching hierarchy — replaces flat prioritizedImprovements when available */
+  coachingMap?: CoachingMap;
+}
+
+/**
+ * CoherenceIssue — a single contradiction detected across profile sections.
+ */
+export interface CoherenceIssue {
+  /** Which profile section makes claim A (e.g., "voiceMap.shiftPoints") */
+  sectionA: string;
+  /** What claim A asserts */
+  claimA: string;
+  /** Which profile section makes claim B */
+  sectionB: string;
+  /** What claim B asserts — contradicts or tensions with claim A */
+  claimB: string;
+  /** How serious the contradiction is */
+  severity: 'blocking' | 'notable' | 'minor';
+  /** What should be done about it */
+  suggestedResolution: string;
+  /**
+   * Free-text description of the tension's nature — what the contradiction IS.
+   * Not how to fix it (that's suggestedResolution/likelyResolution).
+   * The LLM describes the tension freely; this is NOT constrained to categories.
+   */
+  nature?: string;
+  /** Contradiction routing category — how should the system respond */
+  routingCategory?: 'productive_tension' | 'system_disagreement' | 'essay_flaw' | 'depth_signal';
+  /** Whether both sides of the tension can coexist (productive tensions often can) */
+  canCoexist?: boolean;
+  /** Free-text resolution path (null if unknown) */
+  likelyResolution?: string | null;
+  /** Direct evidence quote from section A */
+  evidenceA?: string;
+  /** Direct evidence quote from section B */
+  evidenceB?: string;
+  /** Whether detected by primary crystallization or adversarial pass */
+  source?: 'primary' | 'adversarial';
+}
+
+/**
+ * CoherenceReport — all contradictions found + overall coherence verdict.
+ */
+export interface CoherenceReport {
+  contradictions: CoherenceIssue[];
+  /** False if any blocking contradictions exist */
+  isCoherent: boolean;
+  /**
+   * W4.1: Programmatic contradictions detected by cross-domain validation.
+   * These are discovered by deterministic checks (not LLM), so they have
+   * explicit evidence references.
+   */
+  programmaticContradictions?: ProgrammaticContradiction[];
+  /** Adversarial assessment of the North Star's coherence and irreplaceability */
+  northStarAssessment?: NorthStarAssessment;
+}
+
+/**
+ * W4.1: ProgrammaticContradiction — a contradiction detected by deterministic
+ * cross-domain checks (not LLM). Has explicit evidence references.
+ */
+export interface ProgrammaticContradiction {
+  type: 'understanding_vs_analysis' | 'voicemap_vs_identity' | 'structural_weight_vs_scores' | 'earnedness_vs_effectiveness';
+  /** Evidence from side A */
+  evidenceA: { section: string; claim: string; location?: { paragraph: number; sentence?: number } };
+  /** Evidence from side B */
+  evidenceB: { section: string; claim: string; location?: { paragraph: number; sentence?: number } };
+  /** How serious */
+  severity: 'blocking' | 'notable' | 'minor';
+  /** Whether this contradiction has been consumed by the pipeline */
+  consumed: boolean;
+}
+
+/**
+ * W4.4: ContradictionInvestigation — how a contradiction should be handled.
+ */
+export interface ContradictionInvestigation {
+  contradictionIndex: number;
+  action: 'reprompt' | 'flag' | 'finding' | 'log';
+  /** If action is 'finding', the finding to create */
+  findingClaim?: string;
+  /** If action is 'flag', the flag for L5 injection */
+  flagText?: string;
+}
+
+// ============================================================================
+// COACHING MAP TYPES (Improvement 4 — Active Contradiction Mining)
+// ============================================================================
+
+/**
+ * CoachingMap — structured improvement hierarchy replacing flat prioritizedImprovements.
+ * Produced by L4 Crystallizer alongside the score matrix. Provides a holistic coaching
+ * strategy that connects transformative insight → priorities → protections → tensions.
+ */
+export interface CoachingMap {
+  /** The single most transformative insight about this essay */
+  transformativeInsight: {
+    insight: string;
+    evidenceLocations: Array<{ paragraph: number; sentence?: number }>;
+    whyThisTransforms: string;
+    requiresStudentAwareness: boolean;
+  };
+  /** Ordered priorities with architectural reasoning */
+  priorities: Array<{
+    priority: string;
+    target: { paragraphs: number[]; description: string };
+    architecturalReason: string;
+    unlocksNext: string;
+    expectedImpact: 'transformative' | 'significant' | 'incremental';
+  }>;
+  /** Strengths that must NOT be damaged during improvement */
+  protectedStrengths: Array<{
+    description: string;
+    locations: Array<{ paragraph: number; sentence?: number }>;
+    whyProtect: string;
+  }>;
+  /** Patterns that emerge from viewing the essay holistically */
+  emergentPatterns: Array<{
+    pattern: string;
+    evidence: string;
+    implication: string;
+  }>;
+  /** Score tensions that have coaching implications */
+  scoreTensions: Array<{
+    paragraph: number;
+    tension: string;
+    interpretation: string;
+    coachingImplication: string;
+  }>;
+}
+
+/**
+ * NorthStarEvolution — version/changelog for re-crystallization tracking.
+ * Present after the first re-crystallization (version >= 2).
+ */
+export interface NorthStarEvolution {
+  version: number;
+  changelog: Array<{
+    field: string;
+    previousValue: string;
+    newValue: string;
+    trigger: string;
+  }>;
+  coreIdentityStable: boolean;
+  stabilityAssessment: string;
+}
+
+/**
+ * NorthStarAssessment — adversarial pass assessment of the North Star's quality.
+ * Tests whether the North Star captures something genuinely unique and irreplaceable.
+ */
+export interface NorthStarAssessment {
+  passesIrreplaceabilityTest: boolean;
+  reasoning: string;
+  missingInsight: string | null;
+}
+
+// ============================================================================
+// DELTA SYNTHESIS TYPES (W5 — Iterative L3.75 Refinement)
+// ============================================================================
+
+/**
+ * W5.1: What triggered the delta synthesis.
+ */
+export type DeltaSynthesisTrigger =
+  | 'blocking_contradiction'
+  | 'coaching_supersession'
+  | 'focused_analysis_ripple';
+
+/**
+ * W5.1: Request for a targeted delta synthesis of specific holistic sections.
+ */
+export interface DeltaSynthesisRequest {
+  targetSections: HolisticSectionType[];
+  trigger: DeltaSynthesisTrigger;
+  evidence: string;
+}
+
+/**
+ * W5.1: Output from a delta synthesis — only the updated sections.
+ */
+export interface DeltaSynthesisOutput {
+  updatedSections: HolisticSectionType[];
+  changeLog: Array<{ section: HolisticSectionType; summary: string }>;
+  isSubstantive: boolean;
+  /** Partial holistic data — only sections that were re-synthesized */
+  partialSynthesis: Partial<HolisticSynthesisOutput>;
+}
+
+// ============================================================================
+// COGNITIVE STATE TYPES (W6 — Coaching Intelligence)
+// ============================================================================
+
+/**
+ * W6.1: CognitiveState — ROUTING HINT for system bookkeeping.
+ * The LLM infers cognitive state in free-text prose (not constrained to these values).
+ * This enum is used by the system for routing and session memory tracking ONLY.
+ * The LLM also produces a freeform 'cognitiveStateDescription' field.
+ *
+ * ⚠️ CLUSTER D NOTE: IMPROVEMENT_6 specifies that the LLM should NOT be forced
+ * to choose from a fixed enum. When implementing L6, ensure the LLM describes
+ * cognitive state freely and this type is only used for downstream routing.
+ *
+ * Critical disambiguation: 'I don't get what you mean about voice shifting'
+ * = confused_about_feedback. 'Tell me more about voice' = curious_deeper.
+ */
+export type CognitiveState =
+  | 'confused_about_feedback'
+  | 'confused_about_concept'
+  | 'curious_deeper'
+  | 'curious_wider'
+  | 'frustrated'
+  | 'resistant_to_specific'
+  | 'resistant_to_general'
+  | 'engaged'
+  | 'seeking_validation'
+  | 'overwhelmed';
+
+/**
+ * W6.2: TopicConfusionTracker — tracks repeated confusion per topic for escalation.
+ */
+export interface TopicConfusionTracker {
+  topic: string;
+  instanceCount: number;
+  escalationLevel: 0 | 1 | 2 | 3;
+  approachesTried: string[];
+}
+
+// ============================================================================
+// COGNITIVE ASSESSMENT TYPES (Improvement 6 — LLM-First Coaching)
+// ============================================================================
+
+/**
+ * The LLM's assessment of where the student is RIGHT NOW.
+ * Free prose — not constrained to categories.
+ *
+ * This COMPLEMENTS the CognitiveState routing hint. The LLM reads the
+ * student's message IN CONTEXT (conversation history, prior insights,
+ * emotional valence) and produces a brief assessment that directly
+ * shapes the coaching response.
+ *
+ * The CognitiveState enum remains as a system routing tag (for confusion
+ * tracking, escalation logic). This interface captures the FULL LLM
+ * perception that a 10-state enum cannot express.
+ */
+export interface CognitiveAssessment {
+  /**
+   * Free prose assessment of the student's current state.
+   * 2-4 sentences. Specific. References conversation context.
+   *
+   * Examples of what this field can express (impossible with a 10-state enum):
+   * - "Frustrated but starting to see it — the resistance is productive,
+   *    not defensive. They're wrestling with the feedback, not rejecting it."
+   * - "Performing understanding without actually getting it — they're using
+   *    our vocabulary back at us but the revision they're describing would
+   *    make the same mistake in new words."
+   * - "Genuinely stuck — not confused about the feedback but unable to
+   *    see HOW to implement it. Needs a concrete example, not more explanation."
+   */
+  assessment: string;
+
+  /**
+   * What the student needs RIGHT NOW — not a fixed category,
+   * but a specific, contextual read.
+   *
+   * Examples:
+   * - "A concrete example of what their P3 transition could look like"
+   * - "Validation that their resistance to changing the ending is actually
+   *    defensible — then help them strengthen it"
+   * - "A question that makes them see the voice shift themselves"
+   */
+  whatTheyNeed: string;
+
+  /**
+   * Coaching approach recommendation for this specific turn.
+   * Not from a fixed rotation — selected based on what the student needs.
+   *
+   * Examples:
+   * - "Socratic questioning — they're close to seeing the pattern"
+   * - "Direct instruction — they need concrete technique, not discovery"
+   * - "Reflective mirroring — repeat back what they said so they can hear it"
+   * - "Minimal response — acknowledge and let them keep thinking"
+   */
+  recommendedApproach: string;
+
+  /**
+   * LLM routing tag: how much coaching does this turn need?
+   * Replaces shouldUseMinimalResponse() keyword matching.
+   *
+   * The LLM that produces the cognitive assessment ALSO decides response
+   * intensity, because it has the full context. No keyword matching,
+   * no confidence thresholds, no deterministic category routing.
+   *
+   * - "full": substantive — the student needs real coaching content
+   * - "brief": shorter — acknowledge and advance, don't elaborate
+   * - "minimal": acknowledge only — the student needs space or simple confirmation
+   */
+  responseIntensity: 'full' | 'brief' | 'minimal';
+}
+
+/**
+ * Tracks the coaching session's arc. System infrastructure, not judgment.
+ * The LLM reads this context; the system doesn't decide from it.
+ */
+export interface CoachingSessionMemory {
+  /** Total turns in this session */
+  turnCount: number;
+
+  /** Topics discussed, with turn numbers */
+  topicsDiscussed: Array<{
+    topic: string;
+    turnNumbers: number[];
+    /** LLM-generated summary of what was said about this topic */
+    summary: string;
+    /** Whether the student seemed to understand/accept the coaching */
+    resolution: 'understood' | 'partially_understood' | 'unresolved' | 'rejected';
+  }>;
+
+  /** Teaching approaches tried, with outcomes */
+  approachesUsed: Array<{
+    turnNumber: number;
+    approach: string;
+    /** LLM-assessed outcome: did the approach work? */
+    outcome: string;
+  }>;
+
+  /**
+   * Student's stated preferences and resistances accumulated in this session.
+   * Not the full ConversationInsight objects — just coaching-relevant summaries.
+   */
+  studentStances: Array<{
+    stance: string;
+    turnNumber: number;
+  }>;
+
+  /**
+   * LLM-generated session arc summary — updated every 3-5 turns.
+   * Describes the shape of the conversation so far and where it's heading.
+   */
+  sessionArcSummary: string;
+
+  /**
+   * What the session should focus on next — LLM-assessed after each turn.
+   * Not a fixed curriculum — emerges from the conversation.
+   */
+  nextFocus: string;
+}
+
+/**
+ * Observations about how this student learns. Accumulated across the session.
+ * The LLM reads these to calibrate its approach — but the observations
+ * are DESCRIPTIVE, not prescriptive.
+ */
+export interface LearningStyleObservations {
+  /**
+   * How the student responds to different teaching modes.
+   * Updated by the LLM after each turn.
+   */
+  observations: Array<{
+    observation: string;
+    confidence: 'tentative' | 'growing' | 'confident';
+    turnObserved: number;
+  }>;
+}
+
+/**
+ * Quality signals extracted from the conversation itself.
+ * No essay comparison needed. Updated after each pattern detection cycle.
+ */
+export interface CoachingQualitySignals {
+  /**
+   * Does the student's vocabulary evolve across the session?
+   * If they start using architectural terms naturally, coaching is building capacity.
+   */
+  vocabularyEvolution: 'adopting_architectural_language' | 'stable' | 'not_yet';
+
+  /**
+   * Is the student asking BETTER questions over time?
+   */
+  questionQualityTrend: 'improving' | 'stable' | 'declining';
+
+  /**
+   * When the student describes planned revisions, are they
+   * architecturally grounded or surface-level?
+   */
+  revisionSophistication: 'architectural' | 'surface' | 'not_yet_discussed';
+
+  /**
+   * Is the student initiating topics or only responding?
+   */
+  studentInitiation: 'high' | 'moderate' | 'low';
+
+  /**
+   * Has the student had any "aha" moments?
+   */
+  breakthroughMoments: number;
+}
+
+// ============================================================================
+// VERSION INTELLIGENCE TYPES (W9 — Approach Tracking)
+// ============================================================================
+
+/**
+ * W9.1: EditApproach — tracks a writing approach the student tried.
+ */
+export interface EditApproach {
+  id: string;
+  description: string;
+  snapshotText: string;
+  /** Compact summary of the analysis state when this approach was active */
+  analysisSnapshot?: string;
+  /** Whether the student abandoned this approach */
+  abandoned: boolean;
+  /** If abandoned, which approach replaced it */
+  nextApproach?: string;
+}
+
+/**
+ * W9.2: EditStrategyPattern — detected editing strategy.
+ */
+export type EditStrategyPattern =
+  | 'iterating_on_opening_voice'
+  | 'restructuring_argument'
+  | 'polishing_specific_section'
+  | 'experimenting_with_alternatives';
+
+// ============================================================================
+// FINDING LIFECYCLE TYPES (V2 — Graduated Evolution)
+// ============================================================================
+
+/**
+ * Finding lifecycle maturity — LLM-assigned, system-validated.
+ * Tracks where a finding is in its lifecycle from initial hypothesis
+ * through confirmation to depth.
+ *
+ * The LLM decides maturity, not a formula. The system validates
+ * referential integrity (no references to non-existent IDs) but
+ * never overrides the LLM's maturity assessment.
+ */
+export type FindingMaturity =
+  | 'hypothesis'
+  | 'developing'
+  | 'confirmed'
+  | 'deepened'
+  | 'superseded';
+
+/**
+ * Finding coaching value — LLM-assigned routing signal.
+ * Determines how useful this finding is for coaching THIS student.
+ * Orthogonal to maturity: a hypothesis can be critical, a deepened
+ * finding can be diagnostic.
+ */
+export type FindingCoachingValue =
+  | 'critical'
+  | 'high'
+  | 'medium'
+  | 'contextual'
+  | 'diagnostic';
+
+/**
+ * Finding source — what layer/process discovered this finding.
+ */
+export type FindingSource =
+  | 'walk'
+  | 'deep_dive'
+  | 'coaching'
+  | 'edit_reanalysis'
+  | 'coherence_check'
+  | 'holistic_synthesis';
+
+/**
+ * FindingScope — what part of the essay this finding is about.
+ * Findings exist at natural granularity, not forced to paragraph boundaries.
+ */
+export interface FindingScope {
+  type: 'word' | 'sentence' | 'sentence_group' | 'paragraph' | 'cross_paragraph' | 'essay_level';
+  /** Primary paragraph (for paragraph-scoped or narrower) */
+  paragraph?: number;
+  /** Specific sentences within the paragraph */
+  sentences?: number[];
+  /** Multiple paragraphs (for cross_paragraph scope) */
+  paragraphs?: number[];
+  /** Text evidence anchoring this scope to specific essay locations */
+  textEvidence: Array<{
+    text: string;
+    location: { paragraph: number; sentence?: number };
+  }>;
+}
+
+/**
+ * FindingEvidence — evidence supporting a finding's claim.
+ * Every finding must cite specific text or specific absences.
+ * Absence is evidence: "The essay never shows X" is as important
+ * as "The essay shows Y."
+ */
+export interface FindingEvidence {
+  /** Quoted text, or description of an absence */
+  text: string;
+  /** Where in the essay (undefined for essay-level absences) */
+  location?: { paragraph: number; sentence?: number };
+  /** 'present' = text is quoted; 'absent' = evidence is something NOT there */
+  type: 'present' | 'absent';
+}
+
+/**
+ * FindingLineageEntry — records a maturity transition.
+ * Append-only growth log. Every time a finding's maturity changes,
+ * a lineage entry records what happened and why.
+ */
+export interface FindingLineageEntry {
+  timestamp: string;
+  previousMaturity: FindingMaturity;
+  newMaturity: FindingMaturity;
+  /** What caused the change: 'walk_P3', 'deep_dive_voice', 'coaching_turn_2' */
+  trigger: string;
+  /** LLM's explanation for the transition */
+  reasoning: string;
+  /** If this transition superseded another finding */
+  supersedes?: string;
+}
+
+/**
+ * Finding — a referenceable claim about the essay that carries evidence,
+ * scope, maturity, coaching value, and relationship references.
+ *
+ * Findings are the structured index into the prose understanding.
+ * They are what downstream systems (L3.5 scoring, L5 annotations,
+ * L6 coaching, dispatch) query against.
+ *
+ * Design principles:
+ * - LLM owns all judgment (maturity, coaching value, relationships)
+ * - Never deleted, only superseded (append-only with pointer evolution)
+ * - Dimensions are routing tags, not a closed taxonomy
+ * - Evidence is mandatory (cognitive forcing function)
+ */
+export interface Finding {
+  /** Unique finding ID (e.g., 'F1', 'F2', ...) */
+  id: string;
+
+  /** The insight itself — a claim about the essay */
+  claim: string;
+
+  /** What part of the essay this finding is about */
+  scope: FindingScope;
+
+  /** Lifecycle maturity — LLM-assigned, system-validated */
+  maturity: FindingMaturity;
+
+  /**
+   * LLM's reasoning for the current maturity level.
+   * Required on every maturity assignment or transition.
+   * Serves as audit trail and context for future LLM calls.
+   */
+  maturityReasoning: string;
+
+  /** How useful this finding is for coaching — LLM-assigned routing signal */
+  coachingValue: FindingCoachingValue;
+
+  /** LLM-assigned dimensions this finding touches */
+  dimensions: HolisticDimension[];
+
+  /** Findings this one builds on (depth chain — emergent, not forced) */
+  buildsOn: string[];
+
+  /** Findings this one relates to laterally */
+  relatedTo: string[];
+
+  /** If superseded, what replaced it */
+  supersededBy?: string;
+
+  /**
+   * If superseded, WHY. LLM explains the supersession.
+   * Gives downstream systems context to ignore it correctly.
+   */
+  supersessionReason?: string;
+
+  /** What discovered this finding */
+  source: FindingSource;
+
+  /**
+   * What investigating this finding further might reveal.
+   * null if fully explored. Used by dispatch to select deep dives.
+   * LLM-generated prose, not a category.
+   */
+  deepeningPotential: string | null;
+
+  /** Questions this finding raises */
+  raisesQuestions: string[];
+
+  /** Text evidence — every finding must cite specific text or specific absences */
+  evidence: FindingEvidence[];
+
+  /**
+   * Growth lineage — every time this finding's maturity changes,
+   * record what happened. Append-only.
+   */
+  lineage: FindingLineageEntry[];
+
+  /** ISO timestamp of creation */
+  createdAt: string;
+
+  /** ISO timestamp of last maturity change */
+  lastUpdated: string;
 }
 
 // ============================================================================
@@ -1482,6 +2453,13 @@ export interface ConnectionScoutOutput {
  * Supersession model: priorSentenceUpdates replace entire arrays, never append.
  */
 export interface UnderstandingWalkOutput {
+  /**
+   * Explicit paragraph index — MUST be provided by the walk caller.
+   * Removes the heuristic "first paragraph without understanding" which
+   * breaks on re-analysis when all paragraphs already have understanding.
+   */
+  paragraphIndex: number;
+
   /** This paragraph's understanding (no evaluation) */
   paragraphUnderstanding: ParagraphUnderstanding;
   /** Sentence-level understanding for each sentence in this paragraph */
@@ -1516,14 +2494,53 @@ export interface UnderstandingWalkOutput {
     inferredIntents?: ObservationEntry[];
     narrativeContributions?: ObservationEntry[];
     newTags?: string[];
+    primaryFunction?: string;
+    significance?: 'pivotal' | 'contributing' | 'transitional';
   }>;
 
-  /** Cross-paragraph links discovered. Each gets a unique ID in the connection store. */
+  /**
+   * Cross-paragraph connections discovered during this paragraph's walk.
+   * Each gets enriched by the system (ID, routing tags, status) before
+   * being added to the connection store.
+   */
   newConnections: Array<{
-    from: [number, number];
-    to: [number, number];
-    type: string;
+    from: ConnectionEndpoint;
+    to: ConnectionEndpoint;
     description: string;
+    reverseIllumination: string | null;
+    significance: string;
+    strengthCategory: ConnectionStrengthCategory;
+    directionality: ConnectionDirectionality;
+  }>;
+
+  /**
+   * W1.3: New findings discovered during this paragraph's walk.
+   * Only produced when something rises above sentence-level (pattern, tension, quality).
+   * Optional — if LLM omits, same behavior as before.
+   */
+  newFindings?: Array<{
+    claim: string;
+    scope: FindingScope;
+    maturity: FindingMaturity;
+    maturityReasoning: string;
+    coachingValue: FindingCoachingValue;
+    dimensions: HolisticDimension[];
+    evidence: FindingEvidence[];
+    deepeningPotential: string | null;
+    raisesQuestions: string[];
+    buildsOn?: string[];
+    relatedTo?: string[];
+  }>;
+
+  /**
+   * W1.3: Evolutions of existing findings based on new understanding from this paragraph.
+   * Optional — if LLM omits, same behavior as before.
+   */
+  findingEvolutions?: Array<{
+    findingId: string;
+    newMaturity: FindingMaturity;
+    reasoning: string;
+    supersedes?: string;
   }>;
 }
 
@@ -1548,6 +2565,92 @@ export interface HolisticSynthesisOutput {
   craftAssessment: CraftAssessment;
   entanglements: CrossDimensionEntanglement[];
   admissionsPositioning: AdmissionsPositioning;
+
+  /**
+   * V2: Connections discovered from full-context view.
+   * L3.75 sees ALL text simultaneously and may discover connections
+   * the sequential walk could not see (e.g., bookending, cross-essay echoes).
+   * Optional — absent in older profiles or if L3.75 finds no new connections.
+   */
+  newConnections?: Array<{
+    from: ConnectionEndpoint;
+    to: ConnectionEndpoint;
+    description: string;
+    reverseIllumination: string | null;
+    significance: string;
+    strengthCategory: ConnectionStrengthCategory;
+    directionality: ConnectionDirectionality;
+  }>;
+
+  /**
+   * V2: LLM-generated prose describing the essay's connection architecture.
+   * Topology (hub-and-spoke, web, linear chain), hubs, islands, broken chains.
+   * Optional — absent in older profiles.
+   */
+  connectionGraphSummary?: string;
+
+  /**
+   * V2: Walk connection upgrades — L3.75 may upgrade walk connections
+   * (adding reverseIllumination, adjusting strength, adding routing tags).
+   * Optional — absent if no walk connections need upgrading.
+   */
+  connectionUpgrades?: Array<{
+    connectionId: string;
+    strengthCategory?: ConnectionStrengthCategory;
+    reverseIllumination?: string;
+    routingTags?: ConnectionRoutingTag[];
+    significance?: string;
+  }>;
+
+  /**
+   * W1.4: New essay-level findings from holistic synthesis.
+   * L3.75 sees the complete picture and may discover essay-level patterns
+   * that the paragraph-by-paragraph walk could not see.
+   * Optional — if LLM omits, same behavior as before.
+   */
+  newFindings?: Array<{
+    claim: string;
+    scope: FindingScope;
+    maturity: FindingMaturity;
+    maturityReasoning: string;
+    coachingValue: FindingCoachingValue;
+    dimensions: HolisticDimension[];
+    evidence: FindingEvidence[];
+    deepeningPotential: string | null;
+    raisesQuestions: string[];
+    buildsOn?: string[];
+    relatedTo?: string[];
+  }>;
+
+  /**
+   * W1.4: Finding evolutions — L3.75 may confirm, deepen, or supersede
+   * findings discovered during the walk.
+   * Optional — if LLM omits, same behavior as before.
+   */
+  findingEvolutions?: Array<{
+    findingId: string;
+    newMaturity: FindingMaturity;
+    reasoning: string;
+    supersedes?: string;
+  }>;
+}
+
+/**
+ * SentenceAnalysisConfidence — LLM-assessed confidence metadata on a sentence score.
+ * The LLM produces these directly; the system never computes or overrides them.
+ * Used by L5 (feedback routing), L6 (coaching conversation starters), and
+ * phase detection (reduced certainty when many scores are low-confidence).
+ */
+export interface SentenceAnalysisConfidence {
+  /** LLM's prose explanation of confidence in this score — cites specific textual evidence or ambiguity */
+  reasoning: string;
+  /** Routing-grade confidence tag — LLM assigns this directly */
+  level: 'high' | 'moderate' | 'low';
+  /**
+   * What would change this score? Cognitive forcing function against overconfidence.
+   * Required for 'low' and 'moderate' confidence. Null for 'high' confidence.
+   */
+  sensitivityNote: string | null;
 }
 
 /**
@@ -1567,11 +2670,18 @@ export interface AnalysisPassOutput {
     isStrength: boolean;
     isProblem: boolean;
     priorityForImprovement: number;
+    /** LLM-assessed confidence in this sentence's effectiveness score. Optional for backward compat. */
+    confidence?: SentenceAnalysisConfidence;
   }>;
 
   /** Paragraph-level analysis */
   paragraphEffectiveness: number;
   paragraphVerdict: string;
+
+  /** Essay-specific calibration reflection produced BEFORE scoring (anti-clustering). Optional for backward compat. */
+  calibrationReflection?: string;
+  /** How this paragraph compares to the anchor paragraph. Null for the anchor itself. Optional for backward compat. */
+  comparativeNotes?: string | null;
 
   /** Essay-level evaluative insights that emerged from analyzing this paragraph */
   holisticAnalysisEvolution: {
@@ -1861,6 +2971,402 @@ export interface PreMutationSnapshot {
 }
 
 /**
+ * ReanalysisBrief — canonical single definition used across:
+ *   - versionTracker (produces it from accumulated changes)
+ *   - deepAnnotationService (consumes it for L5 re-analysis context)
+ *   - focusedAnalyzer (consumes it for surgical escalation context)
+ *   - reanalysisOrchestrator (passes it to analyzeEssay)
+ *
+ * The versionTracker shape is the richest / source-of-truth.
+ * Optional fields provide backward compat for deepAnnotationService + focusedAnalyzer.
+ * Target: under 500 tokens when serialized.
+ */
+export interface ReanalysisBrief {
+  // ── Core (always populated by versionTracker) ─────────────────────────────
+  /**
+   * Net changes (not every intermediate step — A→B→C→A shows as "no net change").
+   * Computed by collapsing all PendingChanges per location into a single net diff.
+   */
+  netChanges: Array<{
+    location: { paragraph: number; sentence?: number };
+    oldText: string;
+    newText: string;
+    significance: string;
+    changeType: string;
+    appearsToHaveReverted?: boolean;
+  }>;
+  /** Structural summary of what kind of editing happened */
+  structural: {
+    /** Paragraph indices (0-based) that changed */
+    paragraphsChanged: number[];
+    hasReordering: boolean;
+    hasInsertions: boolean;
+    hasDeletions: boolean;
+    changeScope: 'sentence' | 'paragraph' | 'multi_paragraph' | 'essay_level';
+  };
+  /** Student intent from conversation context (if available) */
+  studentIntent?: string;
+  /** Profile areas with the most accumulated staleness (prioritized for re-analysis) */
+  staleAreas: string[];
+  /** Human-readable summary for injection into LLM prompts (~300 tokens max) */
+  summaryForPrompt: string;
+
+  // ── L5 compat (deepAnnotationService) ────────────────────────────────────
+  /** Brief human-readable summary of what changed (alias for summaryForPrompt) */
+  changeSummary?: string;
+  /** Paragraph indices that were edited (alias for structural.paragraphsChanged) */
+  editedParagraphs?: number[];
+  /** Structural significance description */
+  structuralSignificance?: string;
+
+  // ── Focused analysis compat (focusedAnalyzer escalation ladder) ───────────
+  /** Index of the specific paragraph that was edited */
+  editedParagraphIndex?: number;
+  /** Index of the specific sentence that was edited */
+  editedSentenceIndex?: number;
+  /** Connection IDs that touch this paragraph/sentence */
+  affectedConnectionIds?: string[];
+  /** Conversation context from student */
+  conversationContext?: string;
+  /** Previous analysis for this paragraph (for delta comparison) */
+  previousAnalysis?: AnalysisPassOutput;
+
+  // ── Overflow tracking ─────────────────────────────────────────────────────
+  /**
+   * True if netChanges was capped (>20 changes). Consumers can use this
+   * to know that the full change history was not included in the brief.
+   */
+  truncated?: boolean;
+
+  // ── W9.3: Cross-version approach context ─────────────────────────────────
+  /**
+   * Formatted context block describing editing approaches and strategy pattern.
+   * Injected into re-analysis and coaching prompts so the system is aware of
+   * the student's editing journey (abandoned approaches, current strategy).
+   */
+  approachContext?: string;
+}
+
+// ============================================================================
+// GROWTH ENGINE TYPES (V2 — L3.75 Iterative Synthesis)
+// ============================================================================
+
+/**
+ * UnderstandingQuestion — a question raised by the walk or synthesis
+ * that could drive a deep dive investigation.
+ */
+export interface UnderstandingQuestion {
+  /** Unique question ID */
+  id: string;
+  /** The question text */
+  question: string;
+  /** What dimension(s) this question touches — routing tags, not closed taxonomy */
+  dimensions: string[];
+  /** Where in the essay this question is anchored (if paragraph-specific) */
+  anchorParagraph?: number;
+  /** What discovering the answer would reveal */
+  expectedInsight: string;
+  /** Which layer/step raised this question */
+  source: 'walk' | 'synthesis' | 'deep_dive' | 'coaching' | 'maturity_gap';
+  /** Status tracking */
+  status: 'open' | 'resolved' | 'filtered';
+  /** Resolution (if resolved) */
+  resolution?: string;
+
+  // ── Persistent Queue Fields (Gap 2) ──
+
+  /** Priority: LLM-assigned, may change as understanding deepens */
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  /** How many growth iterations this question has survived */
+  iterationsSurvived: number;
+  /** Parent question ID — if this was spawned from investigating another question */
+  parentQuestionId?: string;
+  /** Child question IDs — questions spawned from investigating this one */
+  spawnedQuestions: string[];
+  /** Which growth step answered it (if resolved) */
+  resolvedBy?: string;
+  /** When this question was first raised (ISO timestamp) */
+  raisedAt: string;
+  /** When this question was resolved (ISO timestamp, if resolved) */
+  resolvedAt?: string;
+  /** Which growth iteration first raised this question */
+  raisedDuringIteration: number;
+}
+
+/**
+ * Raw activity record for a single growth step.
+ * Pure bookkeeping — NO weighted formula, NO composite score.
+ * Presented to L3.75 as context for convergence judgment.
+ */
+export interface GrowthStepRecord {
+  /** Which growth step this records */
+  step: string;  // 'synthesis_iter_1', 'deep_dive_voice_authenticity', 'reread_P1'
+  /** Raw metrics — what changed (tracking, not scoring) */
+  questionsResolved: number;
+  questionsRaised: number;
+  findingsAdded: number;
+  findingsDeepened: number;
+  findingsSuperseded: number;
+  /** Which holistic sections were updated */
+  sectionsUpdated: string[];
+  /** Cost of this step */
+  cost: number;
+  /** LLM-generated one-liner from the step's output: what did this step reveal? */
+  discoveryNote: string;
+}
+
+/**
+ * Growth cycle state — simplified to activity tracking + resource limits.
+ * Convergence is L3.75's judgment. System enforces budget + iteration caps only.
+ */
+export interface GrowthCycleState {
+  /** Current iteration (0-based) */
+  iteration: number;
+  /** Raw activity log — presented to L3.75 for convergence judgment */
+  activityLog: GrowthStepRecord[];
+  /** Budget remaining in USD */
+  budgetRemaining: number;
+  /** Budget ceiling for the entire growth cycle */
+  budgetCeiling: number;
+  /** Whether the cycle has converged */
+  isConverged: boolean;
+  /** Why it converged (if it did) — only system backstop reasons */
+  convergenceReason?: 'budget_exhausted' | 'safety_cap' | 'llm_converged';
+}
+
+/**
+ * ReadingStrategy — meta-understanding of how to read THIS specific essay.
+ * Produced by L3.75 synthesis. Consumed by profile router, coaching, deep dives.
+ */
+export interface ReadingStrategy {
+  /** Meta-understanding of how to read this specific essay */
+  strategy: string;
+  /** What reading approach yields the deepest understanding */
+  bestApproach: string;
+  /** What this essay is NOT — prevents misapplied frameworks */
+  antiPatterns: string[];
+  /**
+   * Routing signal for the Profile Router — which profile sections
+   * matter most for understanding this essay, in priority order.
+   * L3.75 produces this because it KNOWS what dimensions matter.
+   * The router uses it directly — no keyword matching needed.
+   *
+   * Example: ['voiceIdentity', 'voiceMap', 'craftAssessment', 'emotionalTopography']
+   */
+  contextPriorities: string[];
+}
+
+/**
+ * QuestionCurationOutput — L3.75's editorial pass on the question queue.
+ * Resolves questions it can answer, filters low-quality ones, curates
+ * the queue for deep dive dispatch.
+ */
+export interface QuestionCurationOutput {
+  /** Walk questions that L3.75 answered with full-context view */
+  resolvedQuestions: Array<{
+    questionId: string;
+    answer: string;
+    evidence: string;
+  }>;
+  /** Walk questions kept + new questions L3.75 raised, with deep dive recommendations */
+  curatedQueue: Array<{
+    question: UnderstandingQuestion;
+    /** Which deep dive prompt would best investigate this */
+    recommendedPrompt: string;
+    /** Why this prompt — not just dimension matching, reading-strategy-aware */
+    promptRationale: string;
+  }>;
+  /** Walk questions filtered out (with reason, for transparency and debugging) */
+  filteredQuestions: Array<{
+    questionId: string;
+    filterReason: string;
+  }>;
+}
+
+/**
+ * SynthesisIterationOutput — complete output from one L3.75 growth cycle iteration.
+ * Combines synthesis, walk validation, question curation, and convergence signal.
+ */
+export interface SynthesisIterationOutput {
+  /** The holistic sections (same structure as HolisticSynthesisOutput) */
+  synthesis: HolisticSynthesisOutput;
+  /** Walk validation: disagreements with the walk's reading */
+  walkDisagreements: Array<{
+    paragraph: number;
+    walkReading: string;
+    synthesisReading: string;
+    confidence: number;
+    resolution: 'synthesis_wins' | 'flag_for_reread' | 'preserve_both';
+    reasoning: string;
+  }>;
+  /** Question curation output */
+  questionCuration: QuestionCurationOutput;
+  /** Reading Strategy — meta-understanding of how to read THIS essay */
+  readingStrategy: ReadingStrategy;
+  /** Which paragraphs would benefit from re-reading with full context */
+  reReadCandidates: Array<{
+    paragraph: number;
+    reason: string;
+    expectedDepthGain: 'significant' | 'moderate';
+  }>;
+  /** What changed compared to previous iteration (LLM-generated narrative) */
+  evolutionNarrative: string;
+  /** Self-assessed convergence signal */
+  selfAssessedConvergence: {
+    hasConverged: boolean;
+    reasoning: string;
+    /** What would be lost if we stopped here */
+    remainingOpportunities: string[];
+  };
+}
+
+/**
+ * StableSynthesisState — tracks which claims are stable vs. evolving
+ * across synthesis iterations to prevent drift.
+ */
+export interface StableSynthesisState {
+  /** Core claims that are established and shouldn't change without strong evidence */
+  stableCore: {
+    /** Claims that have been stable for 2+ iterations */
+    confirmedClaims: string[];
+    /** Version when each claim was last modified */
+    claimVersions: Record<string, number>;
+  };
+  /** Areas where the synthesis is still evolving */
+  refinementZone: {
+    /** Claims that changed in the last iteration */
+    recentlyChanged: string[];
+    /** Claims flagged as uncertain by the LLM */
+    uncertain: string[];
+  };
+}
+
+/**
+ * Deep dive request — assembled by the dispatch function for the deep dive runner.
+ */
+export interface DeepDiveRequest {
+  /** The question being investigated */
+  question: UnderstandingQuestion;
+  /** Which deep dive prompt template to use */
+  promptType: string;
+  /** Why this prompt was chosen */
+  rationale: string;
+  /** Estimated cost in USD */
+  estimatedCost: number;
+}
+
+/**
+ * Deep dive result — output from a single deep dive investigation.
+ */
+export interface DeepDiveResult {
+  /** The prompt type that was used */
+  promptType: string;
+  /** New findings discovered */
+  findings: Array<{
+    claim: string;
+    scope: FindingScope;
+    maturity: FindingMaturity;
+    maturityReasoning: string;
+    coachingValue: FindingCoachingValue;
+    dimensions: HolisticDimension[];
+    evidence: FindingEvidence[];
+    deepeningPotential: string | null;
+    raisesQuestions: string[];
+    buildsOn?: string[];
+    relatedTo?: string[];
+  }>;
+  /** New questions raised by the deep dive */
+  questionsRaised: UnderstandingQuestion[];
+  /** LLM-generated discovery note */
+  discoveryNote: string;
+  /** Cost in USD */
+  cost: number;
+  /** Token usage */
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
+  /** Timing in ms */
+  timingMs: number;
+}
+
+/**
+ * Re-read result — output from a targeted paragraph re-read with full context.
+ */
+export interface ReReadResult {
+  /** Which paragraph was re-read */
+  paragraphIndex: number;
+  /** Updated paragraph understanding */
+  updatedUnderstanding: ParagraphUnderstanding;
+  /** Updated sentence understandings */
+  updatedSentences: Array<{
+    index: number;
+    understanding: SentenceUnderstanding;
+  }>;
+  /** New findings from the re-read */
+  findings: Array<{
+    claim: string;
+    scope: FindingScope;
+    maturity: FindingMaturity;
+    maturityReasoning: string;
+    coachingValue: FindingCoachingValue;
+    dimensions: HolisticDimension[];
+    evidence: FindingEvidence[];
+    deepeningPotential: string | null;
+    raisesQuestions: string[];
+    buildsOn?: string[];
+    relatedTo?: string[];
+  }>;
+  /** New connections discovered */
+  newConnections: Array<{
+    from: ConnectionEndpoint;
+    to: ConnectionEndpoint;
+    description: string;
+    reverseIllumination: string | null;
+    significance: string;
+    strengthCategory: ConnectionStrengthCategory;
+    directionality: ConnectionDirectionality;
+  }>;
+  /** What the re-read revealed that the walk missed */
+  discoveryNote: string;
+  /** Cost in USD */
+  cost: number;
+  /** Token usage */
+  tokenUsage: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
+  /** Timing in ms */
+  timingMs: number;
+}
+
+/**
+ * Deep dive prompt template — stored in the prompt library.
+ */
+export interface DeepDivePromptTemplate {
+  /** Unique prompt type identifier */
+  type: string;
+  /** Human-readable name */
+  name: string;
+  /** Which domain(s) this prompt investigates */
+  domains: string[];
+  /** The focus text that describes what this deep dive investigates */
+  focusDescription: string;
+  /** Which profile sections this prompt needs as context */
+  requiredContext: string[];
+  /** Estimated cost in USD per call */
+  estimatedCost: number;
+  /** The system prompt template (with {placeholders}) */
+  systemPrompt: string;
+  /** The user prompt template (with {placeholders}) */
+  userPrompt: string;
+}
+
+/**
  * EditUnderstandingOutput — wrapper for EditUnderstanding results
  * used by the coordinator's applyEditUnderstanding method.
  */
@@ -1873,4 +3379,222 @@ export interface EditUnderstandingOutput {
   stalenessEffects: StalenessEffect[];
   /** Whether this edit triggered from focused or comprehensive analysis */
   analysisMode: 'focused' | 'comprehensive';
+}
+
+// ─── L5 Annotation Types ────────────────────────────────────────────────────
+
+/** L5 annotation routing type — simplified from V1's 4 verbose types */
+export type L5AnnotationType = 'strength' | 'growth' | 'structural' | 'teaching';
+
+/** Teaching mode for L5 annotations — LLM-selected per annotation based on what the finding needs */
+export type L5TeachingMode = 'awareness' | 'consequence' | 'connection' | 'action';
+
+/** Annotation density diagnostic — signal about paragraph complexity, not a problem to fix */
+export interface AnnotationDensityDiagnostic {
+  paragraphIndex: number;
+  annotationCount: number;
+  strengthCount: number;
+  growthCount: number;
+  /**
+   * LLM-generated interpretation of the density pattern.
+   * Not computed from counts — the LLM assesses what the density means.
+   */
+  interpretation: string;
+}
+
+/**
+ * Context from previous annotation run, passed during re-analysis.
+ * Allows L5 to acknowledge edits, deepen still-relevant annotations,
+ * and avoid verbatim repetition.
+ */
+export interface PriorAnnotationContext {
+  /** Summary of previous annotations for this paragraph */
+  priorAnnotations: Array<{
+    content: string;
+    type: string;
+    teachingMode: string;
+    /** Whether the student's edit addressed this annotation */
+    addressedByEdit: boolean;
+  }>;
+}
+
+// ============================================================================
+// VERSION BRANCHING TYPES (Improvement #10 — Snapshot + Compare)
+// ============================================================================
+
+/**
+ * What triggered a snapshot's creation.
+ */
+export type SnapshotSource =
+  | 'student_manual'      // Student explicitly asked to save a snapshot
+  | 'coach_suggested'     // Coach suggested saving before a major change
+  | 'auto_before_rewrite' // System auto-saved before a detected major rewrite
+  | 'auto_milestone';     // System auto-saved at a growth milestone
+
+/**
+ * SnapshotUnderstanding — frozen understanding state at snapshot time.
+ *
+ * Deep copies of all understanding-layer data. Excludes operational state
+ * (growth cycle logs, cost tracking, session memory).
+ */
+export interface SnapshotUnderstanding {
+  /** North Star through-line summary at snapshot time */
+  northStarThroughLine: string | null;
+
+  /** North Star structural roles (paragraph → role mapping) */
+  northStarStructuralRoles: Array<{
+    paragraphIndex: number;
+    role: string;
+    significance: 'load_bearing' | 'supporting' | 'transitional';
+  }>;
+
+  /** Per-paragraph understanding (deep copy) — null entries for unwalked paragraphs */
+  paragraphUnderstandings: Array<{
+    paragraphIndex: number;
+    understanding: ParagraphUnderstanding | null;
+    text: string;
+  }>;
+
+  /** Active findings at snapshot time (deep copy from FindingStore) */
+  findings: Finding[];
+
+  /** Active connections at snapshot time (deep copy) */
+  connections: Connection[];
+
+  /** Connection graph summary prose */
+  connectionGraphSummary: string;
+
+  /**
+   * Holistic sections snapshot — Record keyed by section name.
+   * Values are deep copies of the profile's holistic sections.
+   * Using Record<string, unknown> because these are passed to LLM as context,
+   * not operated on programmatically by the snapshot system.
+   */
+  holisticSections: Record<string, unknown>;
+
+  /** Active questions from the growth engine */
+  questionQueue: UnderstandingQuestion[];
+
+  /** Understanding maturity / confidence level */
+  maturity: ConfidenceLevel;
+
+  /** Reading strategy from L3.75 synthesis (null if not yet produced) */
+  readingStrategy: ReadingStrategy | null;
+
+  /** Improvement phase at snapshot time (null if not yet assessed) */
+  improvementPhase: ImprovementPhase | null;
+}
+
+/**
+ * EssaySnapshot — a frozen point-in-time capture of essay state.
+ * Immutable once created. Text + understanding are preserved as deep copies.
+ */
+export interface EssaySnapshot {
+  /** Unique snapshot ID (e.g., 'snap-1', 'snap-2') */
+  id: string;
+
+  /** Human-readable name, either student-provided or auto-generated */
+  name: string;
+
+  /** ISO timestamp when this snapshot was created */
+  createdAt: string;
+
+  /** What prompted the snapshot — LLM-described or system-described context */
+  context: string;
+
+  /** The essay text at snapshot time — frozen */
+  text: string;
+
+  /** The paragraph count at snapshot time (for structural comparison) */
+  paragraphCount: number;
+
+  /** Understanding state at snapshot time — deep copies, not references */
+  understanding: SnapshotUnderstanding;
+
+  /** Source — what triggered the snapshot */
+  source: SnapshotSource;
+
+  /** If this snapshot was auto-suggested, the trigger description */
+  autoTrigger?: string;
+
+  /** Parent snapshot ID, if this is a snapshot-of-a-snapshot (nesting) */
+  parentSnapshotId?: string;
+}
+
+/**
+ * SnapshotComparison — the LLM's comparative analysis of two versions.
+ * Pure LLM output with no deterministic scoring.
+ */
+export interface SnapshotComparison {
+  /** The snapshot being compared to */
+  snapshotId: string;
+
+  /** The snapshot name */
+  snapshotName: string;
+
+  /** ISO timestamp when the comparison was generated */
+  comparedAt: string;
+
+  /**
+   * The comparative analysis — LLM-generated prose.
+   * NOT a score. NOT a recommendation. A nuanced comparison
+   * that helps the student understand what each version does.
+   */
+  analysis: string;
+
+  /**
+   * Per-paragraph understanding deltas — where understanding diverged.
+   * Only paragraphs where understanding MEANINGFULLY changed.
+   */
+  paragraphDeltas: Array<{
+    paragraph: number;
+    /** Did the text change? */
+    textChanged: boolean;
+    /** Did the understanding change? (can be no even if text changed) */
+    understandingChanged: boolean;
+    /** What changed in understanding, if anything */
+    understandingDelta: string | null;
+    /** Which version serves the essay better for THIS paragraph, and why */
+    assessment: string;
+  }>;
+
+  /**
+   * Structural comparison — did the essay's connection architecture change?
+   */
+  structuralDelta: {
+    /** Connections present in snapshot but not current */
+    lostConnections: Array<{ id: string; description: string; significance: string }>;
+    /** Connections present in current but not snapshot */
+    gainedConnections: Array<{ id: string; description: string; significance: string }>;
+    /** Connections present in both but changed */
+    changedConnections: Array<{ id: string; changeDescription: string }>;
+    /** Overall architectural assessment */
+    architecturalAssessment: string;
+  };
+
+  /**
+   * Finding comparison — what understanding diverged?
+   */
+  findingDelta: {
+    /** Findings that exist in current but not snapshot */
+    newFindings: string[];
+    /** Findings in snapshot that were superseded in current */
+    supersededFindings: Array<{
+      snapshotFindingId: string;
+      currentSuccessor: string;
+      reason: string;
+    }>;
+    /** Findings that exist in both but at different maturity levels */
+    maturityDifferences: Array<{
+      findingId: string;
+      snapshotMaturity: FindingMaturity;
+      currentMaturity: FindingMaturity;
+    }>;
+  };
+
+  /**
+   * Coaching implications — what does this comparison mean for coaching?
+   * LLM-generated prose for the coach to guide the student.
+   */
+  coachingImplications: string;
 }

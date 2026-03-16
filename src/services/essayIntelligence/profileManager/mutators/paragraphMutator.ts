@@ -94,7 +94,6 @@ export class ParagraphMutator {
           imageUsage: '',
           voiceConsistency: '',
           standoutMoment: null,
-          weaknessMoment: null,
         },
       };
     }
@@ -128,11 +127,64 @@ export class ParagraphMutator {
   }
 
   /**
-   * Update structural role from L2 cartography.
-   * This updates the paragraph's understanding with structural context,
-   * superseding any previous role assignment.
+   * Update structural role from a simple role string.
+   * Matches the IParagraphMutator interface signature.
+   *
+   * Called by the coordinator during L1 impressions and L2 cartography
+   * where only a role string is available. Sets the paragraph's role
+   * in understanding, creating a default understanding object if needed.
    */
   updateStructuralRole(
+    profile: EssayProfile,
+    paragraphIndex: number,
+    role: string,
+  ): MutationType[] {
+    const errors = this.validate(profile, paragraphIndex);
+    if (errors.length > 0) {
+      console.error(
+        `[ParagraphMutator] updateStructuralRole validation failed:`,
+        errors,
+      );
+      return [];
+    }
+
+    const para = getParagraph(profile, paragraphIndex)!;
+
+    if (para.understanding) {
+      para.understanding.role = role;
+    } else {
+      para.understanding = {
+        role,
+        function: '',
+        narrativeContribution: '',
+        emotionalRegister: {
+          dominantEmotion: '',
+          depth: '',
+          authenticity: '',
+          showVsTell: '',
+          strongestMoment: null,
+        },
+        craftProfile: {
+          rhythmPattern: '',
+          imageUsage: '',
+          voiceConsistency: '',
+          standoutMoment: null,
+        },
+      };
+    }
+
+    return ['paragraph_role_updated'];
+  }
+
+  /**
+   * Update structural role from rich L2 cartography data.
+   * Preserves the full domain logic for role updates that include
+   * narrative function, strength contribution, and weakness flags.
+   *
+   * Can be called directly by external consumers that have richer
+   * structural data (e.g., L2 cartography with full role objects).
+   */
+  updateStructuralRoleRich(
     profile: EssayProfile,
     paragraphIndex: number,
     role: {
@@ -145,7 +197,7 @@ export class ParagraphMutator {
     const errors = this.validate(profile, paragraphIndex);
     if (errors.length > 0) {
       console.error(
-        `[ParagraphMutator] updateStructuralRole validation failed:`,
+        `[ParagraphMutator] updateStructuralRoleRich validation failed:`,
         errors,
       );
       return [];
@@ -173,7 +225,6 @@ export class ParagraphMutator {
           imageUsage: '',
           voiceConsistency: '',
           standoutMoment: null,
-          weaknessMoment: null,
         },
       };
     }
@@ -194,29 +245,51 @@ export class ParagraphMutator {
   }
 
   /**
-   * Update structural bookkeeping (sentence counts, boundaries).
-   * This is a mechanical update, not an analytical judgment.
+   * Update paragraph tags (deduplicated).
+   * Matches the IParagraphMutator interface signature.
    */
-  updateStructuralBookkeeping(
+  updateParagraphTags(
     profile: EssayProfile,
     paragraphIndex: number,
-    sentenceCount: number,
+    tags: string[],
   ): void {
     const errors = this.validate(profile, paragraphIndex);
     if (errors.length > 0) {
       console.error(
-        `[ParagraphMutator] updateStructuralBookkeeping validation failed:`,
+        `[ParagraphMutator] updateParagraphTags validation failed:`,
         errors,
       );
       return;
     }
 
-    // Update the index digest for this paragraph
-    const digest = profile.index.paragraphDigest.find(
-      (d) => d.index === paragraphIndex,
-    );
-    if (digest) {
-      digest.sentenceCount = sentenceCount;
+    const para = getParagraph(profile, paragraphIndex)!;
+
+    for (const tag of tags) {
+      if (!para.tags.includes(tag)) {
+        para.tags.push(tag);
+      }
+    }
+  }
+
+  /**
+   * Update structural bookkeeping (sentence counts, boundaries).
+   * Matches the IParagraphMutator interface signature.
+   *
+   * Accepts the total paragraph count and an array of sentence counts
+   * (one per paragraph). Updates the index digest for each paragraph.
+   */
+  updateStructuralBookkeeping(
+    profile: EssayProfile,
+    paragraphCount: number,
+    sentenceCounts: number[],
+  ): void {
+    for (let i = 0; i < Math.min(paragraphCount, sentenceCounts.length); i++) {
+      const digest = profile.index.paragraphDigest.find(
+        (d) => d.index === i,
+      );
+      if (digest) {
+        digest.sentenceCount = sentenceCounts[i];
+      }
     }
   }
 

@@ -1,15 +1,69 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { ChatHeader } from './ChatHeader';
-import { MessageDisplay } from './MessageDisplay';
+import { MessageDisplay, type Message } from './MessageDisplay';
 import { ChatInput } from './ChatInput';
 import { cn } from '@/lib/utils';
+
+const MOCK_MESSAGES: Message[] = [
+  {
+    id: '1',
+    role: 'user',
+    content: "Hi there, I'm currently working on a fiction book. Can you start by asking me a few key questions to help me get started? Ask me questions one at a time."
+  },
+  {
+    id: '2',
+    role: 'assistant',
+    content: (
+      <div className="space-y-3">
+        <p>A worthy endeavor. Let us weave the tapestry of your world together. We must first establish the anchor of your reality.</p>
+        <p>What is the <strong>core truth or central premise</strong> of this narrative? Is it a dystopian descent, a cyberpunk thriller, or a galactic enigma?</p>
+      </div>
+    )
+  },
+  {
+    id: '3',
+    role: 'user',
+    content: "It is a sci-fi mystery set within the neon depths of a cyberpunk city."
+  },
+  {
+    id: '4',
+    role: 'assistant',
+    content: (
+      <div className="space-y-3">
+        <p>An excellent foundation. The neon lights cast long shadows where secrets breed. Now, we must define the rules of this realm.</p>
+        <p>How do the <strong>technological advancements</strong> of this city directly manipulate the lives of its denizens or the nature of your mystery?</p>
+        <p>Consider the following paradigms:</p>
+        <ul className="list-disc pl-4 marker:text-cyan-500">
+          <li>Are sentient artificial minds walking among them?</li>
+          <li>Does the eye of surveillance ever close?</li>
+          <li>How deep is the chasm between the elite and the forgotten?</li>
+        </ul>
+      </div>
+    )
+  }
+];
 
 interface ChatPanelProps {
   className?: string;
 }
 
 export function ChatPanel({ className }: ChatPanelProps) {
+  // Progressive reveal — simulates real chat so each message triggers its mount animation
+  const [visibleMessages, setVisibleMessages] = useState<Message[]>([]);
+
+  useEffect(() => {
+    const timers = MOCK_MESSAGES.map((msg, i) =>
+      setTimeout(() => {
+        setVisibleMessages(prev => {
+          if (prev.find(m => m.id === msg.id)) return prev;
+          return [...prev, msg];
+        });
+      }, i * 800)
+    );
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
   return (
     <div
       className={cn(
@@ -37,8 +91,16 @@ export function ChatPanel({ className }: ChatPanelProps) {
         <ChatHeader />
 
         {/* Scrollable Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-36 scrollbar-hide z-10">
-          <MessageDisplay />
+        <div
+          className="flex-1 overflow-y-auto px-4 pt-4 scrollbar-none z-10 relative"
+          style={{
+            maskImage: 'linear-gradient(to bottom, black 0%, black calc(100% - 280px), rgba(0,0,0,0.7) calc(100% - 180px), rgba(0,0,0,0.3) calc(100% - 120px), transparent calc(100% - 60px))',
+            WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black calc(100% - 280px), rgba(0,0,0,0.7) calc(100% - 180px), rgba(0,0,0,0.3) calc(100% - 120px), transparent calc(100% - 60px))',
+          }}
+        >
+          <MessageDisplay messages={visibleMessages} />
+          {/* Bumper matches fade zone so user can scroll last message fully above it */}
+          <div className="h-[450px] w-full flex-shrink-0 pointer-events-none" />
         </div>
 
         {/* The Cloud Valley & Input Area */}
@@ -51,7 +113,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
           <motion.div
             animate={{ y: [0, -3, 0] }}
             transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute bottom-6 -left-12 w-72 h-40"
+            className="absolute bottom-[1px] -left-[53px] w-[268px] h-40"
           >
             {/* Magical Cyan Underglow */}
             <div className="absolute inset-0 bg-cyan-300/30 blur-2xl rounded-full" />
@@ -61,11 +123,13 @@ export function ChatPanel({ className }: ChatPanelProps) {
               {/* Flat Base */}
               <div className="absolute bottom-0 left-0 w-full h-20 bg-white/95 rounded-full" />
               {/* Outer Left Bump */}
-              <div className="absolute bottom-6 left-8 w-24 h-24 bg-white/95 rounded-full" />
-              {/* Center Peak - Pushed further left to clear the text area */}
-              <div className="absolute bottom-[20px] left-20 w-32 h-32 bg-white/95 rounded-full" />
+              <div className="absolute bottom-12 left-8 w-24 h-24 bg-white/95 rounded-full" />
+              {/* Left Center Bump */}
+              <div className="absolute bottom-[18px] left-16 w-[100px] h-[100px] bg-white/95 rounded-full" />
+              {/* Right Center Bump */}
+              <div className="absolute bottom-[25px] left-[100px] w-[90px] h-[90px] bg-white/95 rounded-full" />
               {/* Inner Right Slope - Smaller and much lower to open the valley */}
-              <div className="absolute bottom-4 left-44 w-20 h-20 bg-white/90 rounded-full" />
+              <div className="absolute bottom-2 left-40 w-20 h-20 bg-white/90 rounded-full" />
             </div>
           </motion.div>
 
@@ -73,7 +137,7 @@ export function ChatPanel({ className }: ChatPanelProps) {
           <motion.div
             animate={{ y: [0, -4, 0] }}
             transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-            className="absolute bottom-6 -right-12 w-72 h-40"
+            className="absolute bottom-[1px] -right-[53px] w-[268px] h-40"
           >
             {/* Magical Purple Underglow */}
             <div className="absolute inset-0 bg-purple-400/30 blur-2xl rounded-full" />
@@ -93,11 +157,12 @@ export function ChatPanel({ className }: ChatPanelProps) {
             </div>
           </motion.div>
 
-          {/* Interactive Input Container */}
-          <div className="absolute bottom-0 left-0 right-0 p-5 pointer-events-auto flex justify-center z-30">
-            <div className="w-full relative z-40">
-              <ChatInput />
-            </div>
+        </div>
+
+        {/* Interactive Input Container - Above everything */}
+        <div className="absolute bottom-0 left-0 right-0 p-5 flex justify-center z-30">
+          <div className="w-full relative">
+            <ChatInput />
           </div>
         </div>
       </div>

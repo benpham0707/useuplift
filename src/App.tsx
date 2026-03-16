@@ -29,6 +29,7 @@ import RequireTermsAccepted from "@/components/RequireTermsAccepted";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 const WorkshopDemo = lazy(() => import("./pages/WorkshopDemo"));
+const VaporChatDemoPage = lazy(() => import("./pages/VaporChatDemo"));
 const ActivityWorkshop = lazy(() => import("./pages/ActivityWorkshop"));
 import Pricing from "./pages/Pricing";
 const PIQWorkshop = lazy(() => import("./pages/PIQWorkshop"));
@@ -76,6 +77,7 @@ const AppRoutes = () => (
       {/* Test/demo routes */}
       <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
       <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
+      <Route path="/vapor-demo" element={<VaporChatDemoPage />} />
       <Route path="/chat-demo" element={<div className="flex h-screen"><div className="flex-1 bg-slate-50" /><div className="w-[480px] shrink-0"><ChatPanel /></div></div>} />
       <Route path="/workshop-demo" element={<WorkshopDemo />} />
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />

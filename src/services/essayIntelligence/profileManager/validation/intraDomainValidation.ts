@@ -85,18 +85,20 @@ function checkIndexBounds(profile: Readonly<EssayProfile>): ValidationCheck {
 
   // Check connection graph entries reference valid indices
   for (const entry of profile.index.connectionGraph) {
-    const [fromP, fromS] = entry.from;
-    const [toP, toS] = entry.to;
+    const fromP = entry.from.paragraph;
+    const fromS = entry.from.sentence;
+    const toP = entry.to.paragraph;
+    const toS = entry.to.sentence;
 
     if (fromP < 0 || fromP >= paragraphCount) {
       locations.push({ paragraph: fromP });
-    } else if (fromS < 0 || fromS >= (profile.paragraphs[fromP]?.sentences.length ?? 0)) {
+    } else if (fromS !== undefined && (fromS < 0 || fromS >= (profile.paragraphs[fromP]?.sentences.length ?? 0))) {
       locations.push({ paragraph: fromP, sentence: fromS });
     }
 
     if (toP < 0 || toP >= paragraphCount) {
       locations.push({ paragraph: toP });
-    } else if (toS < 0 || toS >= (profile.paragraphs[toP]?.sentences.length ?? 0)) {
+    } else if (toS !== undefined && (toS < 0 || toS >= (profile.paragraphs[toP]?.sentences.length ?? 0))) {
       locations.push({ paragraph: toP, sentence: toS });
     }
   }
@@ -154,13 +156,15 @@ function checkConnectionEndpoints(profile: Readonly<EssayProfile>): ValidationCh
   const locations: Array<{ paragraph: number; sentence?: number }> = [];
 
   for (const conn of profile.connections.all) {
-    const [fromP, fromS] = conn.from;
-    const [toP, toS] = conn.to;
+    const fromP = conn.from.paragraph;
+    const fromS = conn.from.sentence;
+    const toP = conn.to.paragraph;
+    const toS = conn.to.sentence;
 
     // Check from endpoint
     if (fromP < 0 || fromP >= paragraphCount) {
       locations.push({ paragraph: fromP, sentence: fromS });
-    } else {
+    } else if (fromS !== undefined) {
       const fromPara = profile.paragraphs[fromP];
       if (fromS < 0 || fromS >= fromPara.sentences.length) {
         locations.push({ paragraph: fromP, sentence: fromS });
@@ -170,7 +174,7 @@ function checkConnectionEndpoints(profile: Readonly<EssayProfile>): ValidationCh
     // Check to endpoint
     if (toP < 0 || toP >= paragraphCount) {
       locations.push({ paragraph: toP, sentence: toS });
-    } else {
+    } else if (toS !== undefined) {
       const toPara = profile.paragraphs[toP];
       if (toS < 0 || toS >= toPara.sentences.length) {
         locations.push({ paragraph: toP, sentence: toS });
@@ -307,8 +311,8 @@ function checkNoOrphanedRefs(profile: Readonly<EssayProfile>): ValidationCheck {
         if (!conn) continue; // Already caught by connectionIds check
 
         const isEndpoint =
-          (conn.from[0] === para.index && conn.from[1] === sentence.index) ||
-          (conn.to[0] === para.index && conn.to[1] === sentence.index);
+          (conn.from.paragraph === para.index && conn.from.sentence === sentence.index) ||
+          (conn.to.paragraph === para.index && conn.to.sentence === sentence.index);
 
         if (!isEndpoint) {
           locations.push({ paragraph: para.index, sentence: sentence.index });

@@ -13,27 +13,27 @@ export function ChatInput() {
       <div className="absolute -inset-1 bg-gradient-to-r from-cyan-400/20 via-purple-400/20 to-cyan-400/20 rounded-3xl blur-md opacity-70 group-hover:opacity-100 transition duration-1000 group-hover:duration-200" />
 
       {/* The Cloud-Glass Input Container */}
-      <div className="relative flex items-end gap-2 p-2 bg-white/50 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(168,85,247,0.08)] rounded-[2rem]">
+      <div className="relative flex items-center gap-1 p-1 bg-white/50 backdrop-blur-2xl border border-white/80 shadow-[0_8px_32px_rgba(168,85,247,0.08)] rounded-full">
 
         {/* Input Field */}
-        <div className="flex-1 min-h-[44px] flex items-center px-4">
+        <div className="flex-1 min-h-[32px] flex items-center px-3">
           <input
             type="text"
             placeholder="Inscribe your thoughts into the mist..."
-            className="w-full bg-transparent border-none outline-none text-slate-700 placeholder:text-purple-400/60 font-medium placeholder:font-normal placeholder:tracking-wide"
+            className="w-full bg-transparent border-none outline-none text-sm text-slate-700 placeholder:text-purple-400/60 font-medium placeholder:font-normal placeholder:tracking-wide"
           />
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center pr-1 pb-1">
+        <div className="flex items-center gap-1.5">
           {/* Magic/Enhance Button */}
-          <button className="flex items-center justify-center w-9 h-9 rounded-full bg-gradient-to-br from-white/80 to-white/40 hover:from-white hover:to-white/80 transition-all shadow-sm border border-purple-100 group/btn">
-            <Sparkles className="w-4 h-4 text-cyan-500 group-hover/btn:rotate-12 transition-transform" />
+          <button className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-br from-white/80 to-white/40 hover:from-white hover:to-white/80 transition-all shadow-sm border border-purple-100 group/btn">
+            <Sparkles className="w-3.5 h-3.5 text-cyan-500 group-hover/btn:rotate-12 transition-transform" />
           </button>
 
           {/* Send Button */}
-          <button className="flex items-center justify-center w-10 h-10 ml-2 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-400 hover:to-cyan-400 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105">
-            <Send className="w-4 h-4 ml-0.5" />
+          <button className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-cyan-500 hover:from-purple-400 hover:to-cyan-400 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)] transition-all transform hover:scale-105">
+            <Send className="w-3.5 h-3.5 ml-0.5" />
           </button>
         </div>
       </div>

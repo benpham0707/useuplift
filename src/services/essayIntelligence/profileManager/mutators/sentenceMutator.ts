@@ -73,6 +73,7 @@ function ensureUnderstanding(sentence: SentenceProfile): SentenceUnderstanding {
       },
       significantChoices: [],
       connectionRefs: [],
+      findingRefs: [],
       tags: [],
     };
   }
@@ -199,12 +200,37 @@ export class SentenceMutator {
       }
     }
 
+    if (update.findingRefs !== undefined) {
+      for (const ref of update.findingRefs) {
+        if (!understanding.findingRefs.includes(ref)) {
+          understanding.findingRefs.push(ref);
+        }
+      }
+      if (!mutations.includes('sentence_understanding_updated')) {
+        mutations.push('sentence_understanding_updated');
+      }
+    }
+
     if (update.tags !== undefined) {
       for (const tag of update.tags) {
         if (!understanding.tags.includes(tag)) {
           understanding.tags.push(tag);
         }
       }
+      if (!mutations.includes('sentence_understanding_updated')) {
+        mutations.push('sentence_understanding_updated');
+      }
+    }
+
+    // Phase 0: primaryFunction and significance (supersession — overwrite)
+    if (update.primaryFunction !== undefined) {
+      understanding.primaryFunction = update.primaryFunction;
+      if (!mutations.includes('sentence_understanding_updated')) {
+        mutations.push('sentence_understanding_updated');
+      }
+    }
+    if (update.significance !== undefined) {
+      understanding.significance = update.significance;
       if (!mutations.includes('sentence_understanding_updated')) {
         mutations.push('sentence_understanding_updated');
       }
@@ -260,6 +286,8 @@ export class SentenceMutator {
       inferredIntents?: ObservationEntry[];
       narrativeContributions?: ObservationEntry[];
       newTags?: string[];
+      primaryFunction?: string;
+      significance?: 'pivotal' | 'contributing' | 'transitional';
     },
   ): MutationType[] {
     const errors = this.validate(profile, update.paragraph, update.sentence);
@@ -302,6 +330,20 @@ export class SentenceMutator {
           understanding.tags.push(tag);
         }
       }
+      if (!mutations.includes('sentence_understanding_updated')) {
+        mutations.push('sentence_understanding_updated');
+      }
+    }
+
+    // Phase 0: primaryFunction and significance
+    if (update.primaryFunction) {
+      understanding.primaryFunction = update.primaryFunction;
+      if (!mutations.includes('sentence_understanding_updated')) {
+        mutations.push('sentence_understanding_updated');
+      }
+    }
+    if (update.significance) {
+      understanding.significance = update.significance;
       if (!mutations.includes('sentence_understanding_updated')) {
         mutations.push('sentence_understanding_updated');
       }
@@ -470,9 +512,9 @@ export class SentenceMutator {
     if (idx >= 0) {
       understanding.inferredIntents[idx] = correctedTo;
     } else {
-      // If exact match not found, append the correction as a new intent
-      // (the original may have been superseded by a previous update)
-      understanding.inferredIntents.push(correctedTo);
+      // Observation not found — do NOT silently append. Signal failure to caller.
+      console.warn(`[SentenceMutator] correctInferredIntent: observation not found for correction. Searched: "${correctedObservation}" in P${paragraphIndex}S${sentenceIndex}. Available: [${understanding.inferredIntents.map(i => i.observation.substring(0, 50)).join(', ')}]`);
+      return ['sentence_correction_not_found'];
     }
 
     // Lower confidence on related observations — a correction suggests
@@ -575,6 +617,30 @@ export class SentenceMutator {
 
     // Return empty — clarifications do NOT propagate staleness
     return [];
+  }
+
+  /**
+   * Update sentence text (for light-touch updates).
+   * Replaces the sentence's text field with the new text.
+   * Does NOT touch understanding or analysis — those are separate concerns.
+   */
+  updateSentenceText(
+    profile: EssayProfile,
+    paragraphIndex: number,
+    sentenceIndex: number,
+    newText: string,
+  ): void {
+    const errors = this.validate(profile, paragraphIndex, sentenceIndex);
+    if (errors.length > 0) {
+      console.error(
+        `[SentenceMutator] updateSentenceText validation failed:`,
+        errors,
+      );
+      return;
+    }
+
+    const sentence = getSentence(profile, paragraphIndex, sentenceIndex)!;
+    sentence.text = newText;
   }
 
   // ═══════════════════════════════════════════════════════════════════════════

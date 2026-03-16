@@ -76,6 +76,7 @@ const CATEGORY_AFFECTED_SECTIONS: Record<InsightCategory, string[]> = {
 export class InsightMutator {
   /**
    * Apply a conversation insight. Routes based on category:
+   * Matches the IInsightMutator interface signature.
    *
    * - confirmation: boosts confidence, never supersedes
    * - reinterpretation: supersedes specific observations
@@ -86,14 +87,13 @@ export class InsightMutator {
    * - emotional_reaction: never supersedes — additive
    * - resistance: never supersedes — signals disagreement
    *
-   * @returns mutations and which profile sections may need updating
+   * @returns MutationType[] for staleness propagation
    */
   applyInsight(
     profile: EssayProfile,
     insight: ConversationInsight,
-  ): { mutations: MutationType[]; affectedSections: string[] } {
+  ): MutationType[] {
     const mutations: MutationType[] = [];
-    const affectedSections: string[] = [];
 
     // Store the insight in the conversation insights array
     profile.conversationInsights.push(insight);
@@ -118,19 +118,23 @@ export class InsightMutator {
 
     // Route based on category
     if (SUPERSEDING_CATEGORIES.has(insight.category)) {
-      affectedSections.push(...CATEGORY_AFFECTED_SECTIONS[insight.category]);
       mutations.push('conversation_insight_applied');
     } else if (ADDITIVE_CATEGORIES.has(insight.category)) {
-      // Additive categories may still affect sections but don't trigger supersession
-      if (insight.category === 'confirmation') {
-        // Confirmation boosts confidence — no staleness, but the coordinator
-        // may want to know about it for readiness scoring.
-        // No affected sections reported — confirmations don't invalidate anything.
-      }
       mutations.push('conversation_insight_applied');
     }
 
-    return { mutations, affectedSections };
+    return mutations;
+  }
+
+  /**
+   * Get the profile sections affected by an insight's category.
+   * Preserved for external callers who need to know which sections
+   * may need re-analysis after an insight is applied.
+   *
+   * @returns Array of section names that may need updating
+   */
+  getAffectedSections(category: InsightCategory): string[] {
+    return [...CATEGORY_AFFECTED_SECTIONS[category]];
   }
 
   /**

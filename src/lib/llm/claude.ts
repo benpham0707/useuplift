@@ -213,6 +213,46 @@ export class ClaudeAPIError extends Error {
   }
 }
 
+/**
+ * Structured error report for essay intelligence pipeline failures.
+ * Attached to every layer failure so the orchestrator knows exactly
+ * what happened, where, and how much was already billed.
+ */
+export interface LayerError {
+  /** Pipeline layer that failed */
+  layer: string;
+  /** Which paragraph failed (for per-paragraph layers) */
+  paragraphIndex?: number;
+  /** Classified error type */
+  errorType: 'rate_limit' | 'timeout' | 'server_error' | 'parse_error' | 'unknown';
+  /** HTTP status code from the API (undefined for client-side errors) */
+  httpStatus?: number;
+  /** Human-readable error message */
+  message: string;
+  /** Tokens already billed before the error (across successful calls in this layer) */
+  tokensBilled: number;
+  /** Dollar cost already incurred before the error */
+  costBilled: number;
+  /** ISO timestamp of the failure */
+  timestamp: string;
+}
+
+/**
+ * Classify a caught error into a LayerError errorType.
+ */
+export function classifyError(error: unknown): { errorType: LayerError['errorType']; httpStatus?: number } {
+  if (error instanceof ClaudeAPIError) {
+    if (error.isRateLimit) return { errorType: 'rate_limit', httpStatus: error.status };
+    if (error.isTimeout) return { errorType: 'timeout', httpStatus: error.status };
+    if (error.isServerError || error.isOverloaded) return { errorType: 'server_error', httpStatus: error.status };
+    return { errorType: 'unknown', httpStatus: error.status };
+  }
+  if (error instanceof Error && error.message.includes('parse')) {
+    return { errorType: 'parse_error' };
+  }
+  return { errorType: 'unknown' };
+}
+
 // ============================================================================
 // DEFAULT OPTIONS
 // ============================================================================
@@ -591,7 +631,7 @@ export async function callClaude<T = any>(
 export async function callClaudeWithRetry<T = any>(
   promptOrInput: string | ClaudeMessageInput | ClaudeSimpleInput,
   options: ClaudeCallOptions = {},
-  maxRetries = 3
+  maxRetries = 0
 ): Promise<ClaudeResponse<T>> {
   let lastError: Error | null = null;
 

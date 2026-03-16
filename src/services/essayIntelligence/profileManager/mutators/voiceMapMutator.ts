@@ -51,7 +51,7 @@ export class VoiceMapMutator {
    *
    * @returns MutationType[] for staleness propagation
    */
-  applyFullVoiceMap(profile: EssayProfile, voiceMap: VoiceMap): MutationType[] {
+  applyVoiceMap(profile: EssayProfile, voiceMap: VoiceMap): MutationType[] {
     profile.voiceMap = voiceMap;
     return ['voice_shift_added'];
   }
@@ -116,16 +116,45 @@ export class VoiceMapMutator {
   }
 
   /**
-   * Update intentionality assessment for an existing shift.
+   * Update intentionality assessment for an existing shift by index.
+   * Matches the IVoiceMapMutator interface signature.
    *
    * Typically called when the student confirms or denies a shift was intentional
    * during L6 coaching. The intentionality assessment is the most critical
    * annotation on a shift — it determines whether the shift is a strength
    * (intentional variation) or a weakness (unintentional drift).
    *
+   * @param shiftIndex - index into profile.voiceMap.shifts[]
    * @returns MutationType[] for staleness propagation
    */
   updateIntentionality(
+    profile: EssayProfile,
+    shiftIndex: number,
+    intentionality: {
+      assessment: 'intentional' | 'unintentional' | 'ambiguous';
+      confidence: number;
+      reasoning: string;
+    },
+  ): MutationType[] {
+    if (shiftIndex < 0 || shiftIndex >= profile.voiceMap.shifts.length) {
+      console.error(
+        `[VoiceMapMutator] updateIntentionality: shift index ${shiftIndex} out of range [0, ${profile.voiceMap.shifts.length - 1}]`,
+      );
+      return [];
+    }
+
+    const shift = profile.voiceMap.shifts[shiftIndex];
+    shift.intentionality = intentionality;
+    return ['voice_intentionality_updated'];
+  }
+
+  /**
+   * Update intentionality assessment for an existing shift by location.
+   * Preserved for external callers that have location-based lookup.
+   *
+   * @returns MutationType[] for staleness propagation
+   */
+  updateIntentionalityByLocation(
     profile: EssayProfile,
     location: { paragraph: number; sentence?: number },
     intentionality: VoiceShift['intentionality'],
@@ -138,7 +167,7 @@ export class VoiceMapMutator {
 
     if (!shift) {
       console.error(
-        `[VoiceMapMutator] updateIntentionality: no shift found at P${location.paragraph}${location.sentence !== undefined ? `S${location.sentence}` : ''}`,
+        `[VoiceMapMutator] updateIntentionalityByLocation: no shift found at P${location.paragraph}${location.sentence !== undefined ? `S${location.sentence}` : ''}`,
       );
       return [];
     }

@@ -24,6 +24,7 @@ import type {
   EssayProfile,
   ValidationResult,
   ValidationCheck,
+  ProgrammaticContradiction,
 } from '../../profileTypes';
 
 // ============================================================================
@@ -129,18 +130,22 @@ function checkEarnednessConnectionAlignment(profile: Readonly<EssayProfile>): Va
   }
 
   // Build a lookup of connection pairs: "fromP.fromS->toP.toS"
+  // Only consider active connections for alignment checks
+  const activeConnections = connections.filter(c => c.status === 'active');
   const connectionPairs = new Set<string>();
-  for (const conn of connections) {
-    connectionPairs.add(`${conn.from[0]}.${conn.from[1]}->${conn.to[0]}.${conn.to[1]}`);
+  for (const conn of activeConnections) {
+    const fromS = conn.from.sentence ?? -1;
+    const toS = conn.to.sentence ?? -1;
+    connectionPairs.add(`${conn.from.paragraph}.${fromS}->${conn.to.paragraph}.${toS}`);
     // Also add reverse direction since connections may be undirected
-    connectionPairs.add(`${conn.to[0]}.${conn.to[1]}->${conn.from[0]}.${conn.from[1]}`);
+    connectionPairs.add(`${conn.to.paragraph}.${toS}->${conn.from.paragraph}.${fromS}`);
   }
 
   // Also build paragraph-level pairs (less strict check)
   const paragraphPairs = new Set<string>();
-  for (const conn of connections) {
-    paragraphPairs.add(`${conn.from[0]}->${conn.to[0]}`);
-    paragraphPairs.add(`${conn.to[0]}->${conn.from[0]}`);
+  for (const conn of activeConnections) {
+    paragraphPairs.add(`${conn.from.paragraph}->${conn.to.paragraph}`);
+    paragraphPairs.add(`${conn.to.paragraph}->${conn.from.paragraph}`);
   }
 
   const misalignedLocations: Array<{ paragraph: number; sentence?: number }> = [];
@@ -232,13 +237,11 @@ function checkEvaluativeLanguageInUnderstanding(profile: Readonly<EssayProfile>)
       if (!sentence.understanding) continue;
 
       const sentenceTexts: string[] = [];
+      // Phase 2: scan primaryFunction (primary) + fallback observation arrays for pre-Phase-1 profiles
+      if (sentence.understanding.primaryFunction) {
+        sentenceTexts.push(sentence.understanding.primaryFunction);
+      }
       for (const obs of sentence.understanding.observedFunctions) {
-        sentenceTexts.push(obs.observation);
-      }
-      for (const obs of sentence.understanding.inferredIntents) {
-        sentenceTexts.push(obs.observation);
-      }
-      for (const obs of sentence.understanding.narrativeContributions) {
         sentenceTexts.push(obs.observation);
       }
       sentenceTexts.push(sentence.understanding.paragraphContribution);
@@ -286,8 +289,8 @@ function checkOrphanedConnectionRefs(profile: Readonly<EssayProfile>): Validatio
 
         // Check that this sentence is actually an endpoint
         const isEndpoint =
-          (conn.from[0] === para.index && conn.from[1] === sentence.index) ||
-          (conn.to[0] === para.index && conn.to[1] === sentence.index);
+          (conn.from.paragraph === para.index && conn.from.sentence === sentence.index) ||
+          (conn.to.paragraph === para.index && conn.to.sentence === sentence.index);
 
         if (!isEndpoint) {
           locations.push({ paragraph: para.index, sentence: sentence.index });
@@ -405,15 +408,13 @@ function checkProfileIndexCompleteness(profile: Readonly<EssayProfile>): Validat
   }
 
   // Check connections are reflected in connectionGraph
-  const graphPairs = new Set(
-    profile.index.connectionGraph.map(
-      (e) => `${e.from[0]}.${e.from[1]}->${e.to[0]}.${e.to[1]}`,
-    ),
+  const graphIds = new Set(
+    profile.index.connectionGraph.map((e) => e.id),
   );
 
   for (const conn of profile.connections.all) {
-    const key = `${conn.from[0]}.${conn.from[1]}->${conn.to[0]}.${conn.to[1]}`;
-    if (!graphPairs.has(key)) {
+    if (!graphIds.has(conn.id)) {
+      const key = `${conn.from.paragraph}.${conn.from.sentence ?? '-'}->${conn.to.paragraph}.${conn.to.sentence ?? '-'}`;
       issues.push(`Connection ${conn.id} (${key}) not in index connectionGraph`);
     }
   }
@@ -440,4 +441,230 @@ function checkProfileIndexCompleteness(profile: Readonly<EssayProfile>): Validat
 function containsEvaluativeLanguage(text: string, evaluativeWords: string[]): boolean {
   const lower = text.toLowerCase();
   return evaluativeWords.some((word) => lower.includes(word));
+}
+
+// ============================================================================
+// W4.2: PROGRAMMATIC CONTRADICTION CHECKS
+// ============================================================================
+
+/**
+ * Detect programmatic contradictions across all cross-domain checks.
+ * Returns all found contradictions. Called by the orchestrator after L4
+ * to augment the LLM-detected coherence report with deterministic checks.
+ */
+export function detectProgrammaticContradictions(
+  profile: Readonly<EssayProfile>,
+): ProgrammaticContradiction[] {
+  const contradictions: ProgrammaticContradiction[] = [];
+
+  contradictions.push(...checkUnderstandingVsAnalysisScores(profile));
+  contradictions.push(...checkVoiceMapVsVoiceIdentity(profile));
+  contradictions.push(...checkStructuralWeightVsScores(profile));
+  contradictions.push(...checkEarnednessVsEffectiveness(profile));
+
+  return contradictions;
+}
+
+/**
+ * W4.2.1: Understanding describes earned/authentic language but analysis
+ * gives low effectiveness scores.
+ *
+ * Detects: paragraph understanding describes language as "earned", "authentic",
+ * "genuine", or "grounded" but the paragraph's analysis effectiveness is < 50.
+ */
+function checkUnderstandingVsAnalysisScores(
+  profile: Readonly<EssayProfile>,
+): ProgrammaticContradiction[] {
+  const contradictions: ProgrammaticContradiction[] = [];
+  const authenticityMarkers = [
+    'earned', 'authentic', 'genuine', 'grounded', 'sincere',
+    'deeply felt', 'hard-won', 'lived experience',
+  ];
+
+  for (const para of profile.paragraphs) {
+    if (!para.understanding || !para.analysis) continue;
+
+    const understandingText = [
+      para.understanding.role,
+      para.understanding.function,
+      para.understanding.narrativeContribution,
+    ].join(' ').toLowerCase();
+
+    const hasAuthenticityLanguage = authenticityMarkers.some(
+      (marker) => understandingText.includes(marker),
+    );
+
+    if (hasAuthenticityLanguage && para.analysis.effectiveness < 50) {
+      contradictions.push({
+        type: 'understanding_vs_analysis',
+        evidenceA: {
+          section: `P${para.index} understanding`,
+          claim: `Describes language as earned/authentic (found markers in role/function/narrativeContribution)`,
+          location: { paragraph: para.index },
+        },
+        evidenceB: {
+          section: `P${para.index} analysis`,
+          claim: `Effectiveness score is ${para.analysis.effectiveness}/100 (below 50 threshold)`,
+          location: { paragraph: para.index },
+        },
+        severity: para.analysis.effectiveness < 30 ? 'blocking' : 'notable',
+        consumed: false,
+      });
+    }
+  }
+
+  return contradictions;
+}
+
+/**
+ * W4.2.2: VoiceMap has many unintentional shifts but voiceIdentity claims
+ * consistency.
+ *
+ * Detects: voiceMap has 3+ unintentional shifts while voiceIdentity's
+ * consistency description suggests high consistency.
+ */
+function checkVoiceMapVsVoiceIdentity(
+  profile: Readonly<EssayProfile>,
+): ProgrammaticContradiction[] {
+  const contradictions: ProgrammaticContradiction[] = [];
+
+  const unintentionalShifts = profile.voiceMap.shifts.filter(
+    (s) => !s.intentional,
+  );
+
+  if (unintentionalShifts.length < 3) return contradictions;
+
+  // Check if voiceIdentity claims consistency
+  const consistencyText = profile.voiceIdentity.consistency.toLowerCase();
+  const consistencyMarkers = [
+    'consistent', 'unified', 'cohesive', 'stable', 'steady',
+    'uniform', 'harmonious', 'unwavering',
+  ];
+  const claimsConsistency = consistencyMarkers.some(
+    (marker) => consistencyText.includes(marker),
+  );
+
+  if (claimsConsistency) {
+    contradictions.push({
+      type: 'voicemap_vs_identity',
+      evidenceA: {
+        section: 'voiceMap.shifts',
+        claim: `${unintentionalShifts.length} unintentional voice shifts detected (at paragraphs ${unintentionalShifts.map((s) => s.location.paragraph).join(', ')})`,
+      },
+      evidenceB: {
+        section: 'voiceIdentity.consistency',
+        claim: `Voice identity describes consistency as: "${profile.voiceIdentity.consistency.substring(0, 150)}"`,
+      },
+      severity: unintentionalShifts.length >= 5 ? 'blocking' : 'notable',
+      consumed: false,
+    });
+  }
+
+  return contradictions;
+}
+
+/**
+ * W4.2.3: North Star marks a paragraph as load-bearing but it has the lowest
+ * effectiveness scores.
+ *
+ * Detects: a paragraph with structural weight 'load_bearing' in the North Star
+ * has the lowest effectiveness score among all paragraphs with analysis.
+ */
+function checkStructuralWeightVsScores(
+  profile: Readonly<EssayProfile>,
+): ProgrammaticContradiction[] {
+  const contradictions: ProgrammaticContradiction[] = [];
+
+  if (!profile.northStar?.structuralRolesMap?.length) return contradictions;
+
+  // Find load-bearing paragraphs
+  const loadBearingParagraphs = new Set<number>();
+  for (const role of profile.northStar.structuralRolesMap) {
+    if (role.weight === 'load_bearing') {
+      for (const pIdx of role.paragraphs) {
+        loadBearingParagraphs.add(pIdx);
+      }
+    }
+  }
+
+  if (loadBearingParagraphs.size === 0) return contradictions;
+
+  // Find min effectiveness across all analyzed paragraphs
+  const analyzedParagraphs = profile.paragraphs.filter((p) => p.analysis);
+  if (analyzedParagraphs.length < 2) return contradictions;
+
+  const minEffectiveness = Math.min(
+    ...analyzedParagraphs.map((p) => p.analysis!.effectiveness),
+  );
+
+  // Check if any load-bearing paragraph has the lowest score
+  for (const para of analyzedParagraphs) {
+    if (
+      loadBearingParagraphs.has(para.index) &&
+      para.analysis!.effectiveness === minEffectiveness
+    ) {
+      const role = profile.northStar.structuralRolesMap.find(
+        (r) => r.weight === 'load_bearing' && r.paragraphs.includes(para.index),
+      );
+
+      contradictions.push({
+        type: 'structural_weight_vs_scores',
+        evidenceA: {
+          section: `northStar.structuralRolesMap`,
+          claim: `P${para.index} is marked as load_bearing (role: "${role?.role ?? 'unknown'}")`,
+          location: { paragraph: para.index },
+        },
+        evidenceB: {
+          section: `P${para.index} analysis`,
+          claim: `Has the lowest effectiveness score (${para.analysis!.effectiveness}/100) among all paragraphs`,
+          location: { paragraph: para.index },
+        },
+        severity: para.analysis!.effectiveness < 40 ? 'blocking' : 'notable',
+        consumed: false,
+      });
+    }
+  }
+
+  return contradictions;
+}
+
+/**
+ * W4.2.4: Earned moments exist in paragraphs with low overall effectiveness.
+ *
+ * Detects: the moment earnedness map identifies earned moments in a paragraph
+ * whose analysis effectiveness is below 45.
+ */
+function checkEarnednessVsEffectiveness(
+  profile: Readonly<EssayProfile>,
+): ProgrammaticContradiction[] {
+  const contradictions: ProgrammaticContradiction[] = [];
+
+  const moments = profile.momentEarnednessMap?.moments ?? [];
+  if (moments.length === 0) return contradictions;
+
+  for (const moment of moments) {
+    const paraIdx = moment.location.paragraph;
+    const para = profile.paragraphs.find((p) => p.index === paraIdx);
+    if (!para?.analysis) continue;
+
+    if (para.analysis.effectiveness < 45) {
+      contradictions.push({
+        type: 'earnedness_vs_effectiveness',
+        evidenceA: {
+          section: `momentEarnednessMap`,
+          claim: `P${paraIdx} has an earned moment: "${moment.moment.substring(0, 120)}" (${moment.mechanisms.length} earning mechanism(s))`,
+          location: { paragraph: paraIdx },
+        },
+        evidenceB: {
+          section: `P${paraIdx} analysis`,
+          claim: `Paragraph effectiveness is only ${para.analysis.effectiveness}/100 (below 45 threshold)`,
+          location: { paragraph: paraIdx },
+        },
+        severity: para.analysis.effectiveness < 30 ? 'blocking' : 'notable',
+        consumed: false,
+      });
+    }
+  }
+
+  return contradictions;
 }

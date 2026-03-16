@@ -13,15 +13,10 @@
  *   Phase 5: L4 crystallization                  (North Star + score matrix + coherence)
  *   Phase 6: L5 annotations                      (ephemeral feedback — parallel)
  *
- * Error recovery:
- *   L1: FATAL (no profile without impressions → abort)
- *   L2: survivable (L3 can walk without structural map, quality degrades)
- *   L2.5: survivable (L3 walks without scout leads)
- *   L3: FATAL (no understanding → nothing downstream can run)
- *   L3.75: survivable (holistic sections stay empty, L3.5 still has per-paragraph data)
- *   L3.5: FATAL (no analysis → no improvement phase → no annotations)
- *   L4: survivable (no North Star → annotations less architecture-grounded)
- *   L5: survivable (annotations are ephemeral — return result without them)
+ * Error recovery: FAIL-FAST
+ *   ANY layer failure → abort pipeline immediately. Don't burn money on
+ *   downstream layers that depend on data we don't have.
+ *   Every failure logs: layer, errorType, httpStatus, stack trace, cost so far.
  *
  * Checkpointing:
  *   after_l1_l2  → after Phase 1
@@ -39,6 +34,7 @@
 import type {
   EssayProfile,
   EssayType,
+  Finding,
   ParagraphFirstImpression,
   ConnectionScoutOutput,
   UnderstandingWalkOutput,
@@ -50,9 +46,22 @@ import type {
   ConfidenceLevel,
   CheckpointReason,
   CheckpointStore,
+  ParagraphScoreMatrix,
+  CoherenceReport,
+  ReanalysisBrief,
+  DeltaSynthesisRequest,
+  HolisticSectionType,
+  GrowthCycleState,
+  GrowthStepRecord,
+  ReadingStrategy,
+  SynthesisIterationOutput,
+  DeepDiveRequest,
+  UnderstandingQuestion,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
+import { classifyError } from '../../../lib/llm/claude';
+import type { LayerError } from '../../../lib/llm/claude';
 
 // Layer services
 import { firstImpressionsService } from './firstImpressions';
@@ -63,8 +72,26 @@ import { scoutPassService } from './scoutPass';
 import type { ScoutPassResult } from './scoutPass';
 import { sequentialDeepWalkService } from './sequentialDeepWalk';
 import type { L3WalkResult } from './sequentialDeepWalk';
-import { holisticSynthesisService } from './holisticSynthesis';
-import type { HolisticSynthesisResult } from './holisticSynthesis';
+import { holisticSynthesisService, synthesizeUnderstandingProse } from './holisticSynthesis';
+import type { HolisticSynthesisResult, DeltaSynthesisResult, SynthesisIterationResult } from './holisticSynthesis';
+
+// V2: Growth cycle imports
+import {
+  initGrowthCycleState,
+  buildStepRecord,
+  dispatchDeepDives,
+  mergeFindingsFromDeepDive,
+  mergeFindingsFromReRead,
+  analyzeMaturityGaps,
+  maturityGapsToQuestions,
+  MAX_ITERATIONS,
+  GROWTH_BUDGET_CEILING,
+  MIN_BUDGET_FOR_STEP,
+} from './growthEngine';
+import type { StepResult } from './growthEngine';
+import { QuestionQueueManager } from './questionQueueManager';
+import { runDeepDive } from './deepDiveRunner';
+import { runTargetedReRead } from './fullContextReReader';
 import { analysisPassService } from './analysisPass';
 import type { L35AnalysisResult } from './analysisPass';
 import { crystallizerService } from './crystallizer';
@@ -72,9 +99,23 @@ import type { L4CrystallizationResult } from './crystallizer';
 import { deepAnnotationService } from './deepAnnotationService';
 import type { L5AnnotationResult } from './deepAnnotationService';
 
+// W4.4: Contradiction consumer + programmatic detection
+import { consumeContradictions } from './contradictionConsumer';
+import type { ContradictionConsumptionResult } from './contradictionConsumer';
+import { detectProgrammaticContradictions } from '../profileManager/validation/crossDomainValidation';
+
 // Profile manager
 import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
+
+// Finding store (for contradiction → finding pipeline)
+import { FindingStore } from '../findings/findingStore';
+
+// Connection graph (for adversarial pass structural context)
+import { ConnectionGraph } from '../connections';
+
+// Re-export LayerError for consumers of PipelineResult
+export type { LayerError } from '../../../lib/llm/claude';
 
 // ============================================================================
 // TYPES
@@ -118,6 +159,18 @@ export interface PipelineInput {
   checkpointStore?: CheckpointStore;
   /** Whether to include L5 annotations — defaults to true */
   includeAnnotations?: boolean;
+  /**
+   * Optional brief from version tracker — passed through to L5 annotations
+   * so the annotation pipeline knows what changed and can prioritize stale areas.
+   */
+  reanalysisBrief?: ReanalysisBrief;
+  /**
+   * Prior findings from a previous analysis round (for comprehensive re-analysis).
+   * Seeded into the coordinator's FindingStore BEFORE the walk runs, so the walk
+   * can see them and produce findingEvolutions (confirm, deepen, supersede).
+   * Without this, the walk creates findings from scratch with no prior context.
+   */
+  priorFindings?: Finding[];
 }
 
 /** Complete pipeline result */
@@ -132,14 +185,18 @@ export interface PipelineResult {
   costSummary: CostSummary;
   /** Which layers succeeded */
   layersCompleted: string[];
-  /** Which layers failed (with error messages) */
-  layersFailed: Array<{ layer: string; error: string }>;
+  /** Which layers failed (with structured error details) */
+  layersFailed: LayerError[];
   /** Computed improvement phase (from L3.5) */
   improvementPhase: ImprovementPhase | null;
   /** Profile confidence level */
   confidenceLevel: ConfidenceLevel;
   /** L5 annotation result (ephemeral — not stored in profile) */
   annotations: L5AnnotationResult | null;
+  /** L4 paragraph score matrix (5-dimensional scoring) */
+  scoreMatrix: ParagraphScoreMatrix | null;
+  /** L4 coherence report (cross-profile contradiction detection) */
+  coherenceReport: CoherenceReport | null;
 }
 
 // ============================================================================
@@ -197,7 +254,7 @@ export class AnalysisOrchestrator {
     const startTime = Date.now();
     const costTracker = new CostTracker();
     const layersCompleted: string[] = [];
-    const layersFailed: Array<{ layer: string; error: string }> = [];
+    const layersFailed: LayerError[] = [];
     const includeAnnotations = input.includeAnnotations ?? true;
 
     const checkpointStore = input.checkpointStore ?? new InMemoryCheckpointStore();
@@ -224,16 +281,19 @@ export class AnalysisOrchestrator {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       console.error('[Orchestrator] L1 FATAL:', msg);
-      layersFailed.push({ layer: 'L1', error: msg });
+      layersFailed.push(this.buildLayerError('L1', error, 0));
       // L1 is FATAL — return immediately with empty result
       return this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime);
     }
 
     // ── Parse essay structure from L1 output ──
-    const paragraphTexts = l1Result.impressions.map((imp) => {
-      // Reconstruct paragraph text from sentence texts
-      return imp.sentences.map((s) => s.text).join(' ');
-    });
+    // Fix A3.3: Derive paragraph texts from the original essay text to preserve formatting.
+    // Split on double-newlines to get raw paragraphs, then align positionally with L1 impressions.
+    // Fall back to joining sentence texts when there is no corresponding raw paragraph.
+    const rawParagraphs = input.essayText.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+    const paragraphTexts = l1Result.impressions.map((imp, idx) =>
+      rawParagraphs[idx]?.trim() ?? imp.sentences.map((s) => s.text).join(' '),
+    );
     const sentenceTexts = l1Result.impressions.map((imp) =>
       imp.sentences.map((s) => s.text),
     );
@@ -252,36 +312,37 @@ export class AnalysisOrchestrator {
       checkpointStore,
     });
 
+    // ── Seed prior findings for re-analysis evolution (BEFORE any layer runs) ──
+    if (input.priorFindings && input.priorFindings.length > 0) {
+      coordinator.seedPriorFindings(input.priorFindings);
+    }
+
     // ── Apply L1 impressions to profile ──
     coordinator.applyFirstImpressions(l1Result.impressions);
 
-    // ── L2 + L2.5 in parallel (both survivable) ──
-    let structuralMap: StructuralCartography | null = null;
-    let scoutOutput: ConnectionScoutOutput | null = null;
+    // ── L2 + L2.5 in parallel (FAIL-FAST: abort if either fails) ──
+    let structuralMap: StructuralCartography;
+    let scoutOutput: ConnectionScoutOutput;
 
-    const [l2Outcome, l25Outcome] = await Promise.allSettled([
-      this.runL2(input.essayText, l1Result.impressions, costTracker),
-      this.runL2_5(input.essayText, l1Result.impressions, costTracker),
-    ]);
+    try {
+      const [l2Result, l25Result] = await Promise.all([
+        this.runL2(input.essayText, l1Result.impressions, costTracker),
+        this.runL2_5(input.essayText, l1Result.impressions, costTracker),
+      ]);
 
-    if (l2Outcome.status === 'fulfilled' && l2Outcome.value) {
-      structuralMap = l2Outcome.value.cartography;
+      if (!l2Result || !l25Result) {
+        throw new Error('L2 or L2.5 returned null result');
+      }
+
+      structuralMap = l2Result.cartography;
       coordinator.applyStructuralCartography(structuralMap);
       layersCompleted.push('L2');
       console.log(
         `[Orchestrator] L2 complete: arc=${structuralMap.arcType}, ` +
-        `cost=$${l2Outcome.value.cost.toFixed(4)}`,
+        `cost=$${l2Result.cost.toFixed(4)}`,
       );
-    } else {
-      const msg = l2Outcome.status === 'rejected'
-        ? (l2Outcome.reason instanceof Error ? l2Outcome.reason.message : String(l2Outcome.reason))
-        : 'null result';
-      console.error(`[Orchestrator] L2 failed (survivable): ${msg}`);
-      layersFailed.push({ layer: 'L2', error: msg });
-    }
 
-    if (l25Outcome.status === 'fulfilled' && l25Outcome.value) {
-      scoutOutput = l25Outcome.value.scoutOutput;
+      scoutOutput = l25Result.scoutOutput;
       coordinator.applyScoutLeads(scoutOutput);
       layersCompleted.push('L2.5');
       console.log(
@@ -289,32 +350,45 @@ export class AnalysisOrchestrator {
         `${scoutOutput.repeatedElements.length} repeated, ` +
         `${scoutOutput.tonalShifts.length} shifts, ` +
         `${scoutOutput.structuralEchoes.length} echoes, ` +
-        `cost=$${l25Outcome.value.cost.toFixed(4)}`,
+        `cost=$${l25Result.cost.toFixed(4)}`,
       );
-    } else {
-      const msg = l25Outcome.status === 'rejected'
-        ? (l25Outcome.reason instanceof Error ? l25Outcome.reason.message : String(l25Outcome.reason))
-        : 'null result';
-      console.error(`[Orchestrator] L2.5 failed (survivable): ${msg}`);
-      layersFailed.push({ layer: 'L2.5', error: msg });
+    } catch (error) {
+      layersFailed.push(this.buildLayerError('L2/L2.5', error, costTracker.summarize(0).totalCost));
+      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
     }
 
     // ── Checkpoint after Phase 1 ──
     await this.safeCheckpoint(coordinator, 'after_l1_l2');
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 2: Sequential Deep Walk (L3 — FATAL on failure)
+    // PHASE 2: Sequential Deep Walk (L3 — FAIL-FAST)
     // ═══════════════════════════════════════════════════════════════════════
 
     let l3Result: L3WalkResult;
     try {
       const profile = coordinator.getProfile();
+
+      // Build reanalysis context string for L3 walk injection (Fix A3.1)
+      let l3ReanalysisContext: string | undefined;
+      if (input.reanalysisBrief) {
+        const brief = input.reanalysisBrief;
+        const staleLines = brief.staleAreas.map((a) => `• ${a}`).join('\n');
+        l3ReanalysisContext = `${brief.summaryForPrompt}${staleLines ? `\n\nSTALE AREAS:\n${staleLines}` : ''}`;
+      }
+
+      // Pass FindingStore to walk so it can see prior findings (re-analysis evolution)
+      const walkFindingStore = coordinator.getFindingStore();
+
       l3Result = await sequentialDeepWalkService.walkEssay(
         input.essayText,
         profile as EssayProfile,
-        structuralMap as StructuralCartography,
+        structuralMap,
         scoutOutput,
         l1Result.impressions,
+        {
+          reanalysisContext: l3ReanalysisContext,
+          findingStore: walkFindingStore.size > 0 ? walkFindingStore : undefined,
+        },
       );
 
       // Apply each walk step to the coordinator
@@ -332,10 +406,7 @@ export class AnalysisOrchestrator {
         `cost=$${l3Result.cost.toFixed(4)}, time=${l3Result.timingMs}ms`,
       );
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('[Orchestrator] L3 FATAL:', msg);
-      layersFailed.push({ layer: 'L3', error: msg });
-      // L3 is FATAL — checkpoint whatever we have and return
+      layersFailed.push(this.buildLayerError('L3', error, costTracker.summarize(0).totalCost));
       await this.safeCheckpoint(coordinator, 'after_l3');
       return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
     }
@@ -344,56 +415,88 @@ export class AnalysisOrchestrator {
     await this.safeCheckpoint(coordinator, 'after_l3');
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 3: Holistic Synthesis (L3.75 — survivable)
+    // PHASE 3: Growth Cycle (L3.75 Iterative Synthesis — FAIL-FAST)
+    //
+    // Replaces the single L3.75 call with an iterative growth engine:
+    //   synthesize → curate questions → dispatch deep dives → re-read → repeat
+    // L3.75 judges convergence. System enforces budget + iteration caps only.
     // ═══════════════════════════════════════════════════════════════════════
 
+    let growthReadingStrategy: ReadingStrategy | undefined;
+
     try {
-      const profileForSynthesis = coordinator.getProfile();
-      const l375Result: HolisticSynthesisResult = await holisticSynthesisService.synthesize({
-        essayText: input.essayText,
-        profile: profileForSynthesis as EssayProfile,
-        holisticEvolution: l3Result.holisticEvolution,
-      });
+      const growthResult = await this.runGrowthCycle(
+        coordinator.getProfile() as EssayProfile,
+        l3Result,
+        input.essayText,
+        costTracker,
+        coordinator.getFindingStore(),
+        undefined, // priorPhase
+        coordinator,
+      );
 
-      // applyHolisticSynthesis triggers checkpoint('after_l3_75') internally
-      coordinator.applyHolisticSynthesis(l375Result.synthesis);
+      // Apply the final synthesis to the profile
+      coordinator.applyHolisticSynthesis(growthResult.finalSynthesis);
+      growthReadingStrategy = growthResult.readingStrategy;
 
-      costTracker.record('L3.75', l375Result.cost, l375Result.tokenUsage, l375Result.timingMs);
+      // Record aggregate L3.75 cost
+      costTracker.record('L3.75', growthResult.totalCost, {
+        inputTokens: 0, outputTokens: 0,
+        cacheReadTokens: 0, cacheWriteTokens: 0,
+      }, Date.now() - startTime);
       layersCompleted.push('L3.75');
 
       console.log(
-        `[Orchestrator] L3.75 complete: holistic synthesis applied, ` +
-        `cost=$${l375Result.cost.toFixed(4)}, time=${l375Result.timingMs}ms`,
+        `[Orchestrator] Growth cycle complete: ` +
+        `${growthResult.growthState.iteration + 1} iterations, ` +
+        `converged=${growthResult.growthState.isConverged}` +
+        (growthResult.growthState.convergenceReason
+          ? ` (${growthResult.growthState.convergenceReason})`
+          : ' (llm_converged)') + `, ` +
+        `cost=$${growthResult.totalCost.toFixed(4)}, ` +
+        `${growthResult.growthState.activityLog.length} activity records`,
       );
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[Orchestrator] L3.75 failed (survivable): ${msg}`);
-      layersFailed.push({ layer: 'L3.75', error: msg });
+      layersFailed.push(this.buildLayerError('L3.75', error, costTracker.summarize(0).totalCost));
+      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 4: Analysis Pass (L3.5 — FATAL on failure)
+    // PHASE 4: Analysis Pass (L3.5 — FAIL-FAST)
     // ═══════════════════════════════════════════════════════════════════════
 
     let l35Result: L35AnalysisResult;
     try {
       const profileForAnalysis = coordinator.getProfile();
-      l35Result = await analysisPassService.analyzeAllParagraphs(profileForAnalysis as EssayProfile);
+
+      // W1.5: Pass FindingStore to L3.5 so analysis can reference findings by [F] labels
+      const findingStoreForAnalysis = coordinator.getFindingStore();
+
+      l35Result = await analysisPassService.analyzeAllParagraphs(
+        profileForAnalysis as EssayProfile,
+        input.reanalysisBrief?.staleAreas,
+        findingStoreForAnalysis.size > 0 ? findingStoreForAnalysis : undefined,
+        input.essayType,
+      );
+
+      // If any individual paragraphs failed within the layer, treat as failure
+      if (l35Result.failedParagraphs.length > 0) {
+        throw new Error(
+          `L3.5 partial failure: ${l35Result.failedParagraphs.length} paragraphs failed: ` +
+          l35Result.failedParagraphs.map((f) => `P${f.index}(${f.error})`).join(', '),
+        );
+      }
 
       // Apply each paragraph's analysis to the coordinator
       for (const paragraphAnalysis of l35Result.paragraphAnalyses) {
         coordinator.applyAnalysisPassResult(paragraphAnalysis);
       }
 
+      // ── Apply computed improvement phase to profile BEFORE L5 starts ──
+      coordinator.updateImprovementPhase(l35Result.improvementPhase);
+
       costTracker.record('L3.5', l35Result.cost, l35Result.tokenUsage, l35Result.timingMs);
       layersCompleted.push('L3.5');
-
-      if (l35Result.failedParagraphs.length > 0) {
-        console.warn(
-          `[Orchestrator] L3.5 partial: ${l35Result.failedParagraphs.length} paragraphs failed: ` +
-          l35Result.failedParagraphs.map((f) => `P${f.index}(${f.error})`).join(', '),
-        );
-      }
 
       console.log(
         `[Orchestrator] L3.5 complete: ${l35Result.paragraphAnalyses.length} paragraphs analyzed, ` +
@@ -401,10 +504,7 @@ export class AnalysisOrchestrator {
         `cost=$${l35Result.cost.toFixed(4)}, time=${l35Result.timingMs}ms`,
       );
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error('[Orchestrator] L3.5 FATAL:', msg);
-      layersFailed.push({ layer: 'L3.5', error: msg });
-      // L3.5 is FATAL — no analysis means no improvement phase, no annotations
+      layersFailed.push(this.buildLayerError('L3.5', error, costTracker.summarize(0).totalCost));
       await this.safeCheckpoint(coordinator, 'after_l3_5');
       return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
     }
@@ -413,19 +513,38 @@ export class AnalysisOrchestrator {
     await this.safeCheckpoint(coordinator, 'after_l3_5');
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 5: Crystallization (L4 — survivable)
+    // PHASE 5: Crystallization (L4 — FAIL-FAST)
     // ═══════════════════════════════════════════════════════════════════════
+
+    let l4Result: L4CrystallizationResult;
 
     try {
       const profileForCrystal = coordinator.getProfile();
-      const l4Result: L4CrystallizationResult = await crystallizerService.crystallize(
+
+      // Detect prior North Star for re-crystallization evolution tracking
+      const priorNorthStar = profileForCrystal.northStar?.lastUpdatedBy === 'L4'
+        ? profileForCrystal.northStar
+        : undefined;
+
+      // Build FindingStore and ConnectionGraph for adversarial pass context
+      const findingStoreForL4 = coordinator.getFindingStore();
+      const connectionGraphForL4 = ConnectionGraph.fromArray(
+        (profileForCrystal as EssayProfile).connections.all,
+      );
+
+      l4Result = await crystallizerService.crystallize(
         profileForCrystal as EssayProfile,
         input.essayType,
         input.essayText,
+        priorNorthStar,
+        findingStoreForL4.size > 0 ? findingStoreForL4 : undefined,
+        connectionGraphForL4.totalCount > 0 ? connectionGraphForL4 : undefined,
       );
 
       // applyNorthStar triggers checkpoint('after_l4') internally
       coordinator.applyNorthStar(l4Result.northStar);
+      coordinator.applyScoreMatrix(l4Result.scoreMatrix);
+      coordinator.applyCoherenceReport(l4Result.coherenceReport);
 
       costTracker.record('L4', l4Result.cost, l4Result.tokenUsage, l4Result.timingMs);
       layersCompleted.push('L4');
@@ -434,16 +553,122 @@ export class AnalysisOrchestrator {
         `[Orchestrator] L4 complete: North Star crystallized, ` +
         `coherent=${l4Result.coherenceReport.isCoherent}, ` +
         `contradictions=${l4Result.coherenceReport.contradictions.length}, ` +
+        `scoreMatrix=${l4Result.scoreMatrix.paragraphs.length} paragraphs, ` +
         `cost=$${l4Result.cost.toFixed(4)}, time=${l4Result.timingMs}ms`,
       );
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.error(`[Orchestrator] L4 failed (survivable): ${msg}`);
-      layersFailed.push({ layer: 'L4', error: msg });
+      layersFailed.push(this.buildLayerError('L4', error, costTracker.summarize(0).totalCost));
+      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 6: Annotations (L5 — survivable, ephemeral)
+    // PHASE 5.5: Contradiction Consumption (W4.4 — programmatic + LLM merge)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    let contradictionAnnotationFlags: string[] = [];
+
+    try {
+      const profileForContradictions = coordinator.getProfile();
+
+      // Step 1: Run programmatic contradiction detection
+      const programmaticContradictions = detectProgrammaticContradictions(
+        profileForContradictions as EssayProfile,
+      );
+
+      // Step 2: Merge with LLM-detected contradictions on the coherence report
+      if (programmaticContradictions.length > 0) {
+        const updatedReport = {
+          ...l4Result.coherenceReport,
+          programmaticContradictions,
+        };
+        coordinator.applyCoherenceReport(updatedReport);
+
+        console.log(
+          `[Orchestrator] W4.4: ${programmaticContradictions.length} programmatic contradiction(s) merged into coherence report`,
+        );
+      }
+
+      // Step 3: Consume all programmatic contradictions
+      if (programmaticContradictions.length > 0) {
+        const findingStore = new FindingStore();
+        const consumptionResult = consumeContradictions(programmaticContradictions, findingStore);
+        contradictionAnnotationFlags = consumptionResult.annotationFlags;
+
+        console.log(
+          `[Orchestrator] W4.4: Contradiction consumption complete — ` +
+          `${consumptionResult.findingsCreated.length} findings, ` +
+          `${consumptionResult.annotationFlags.length} annotation flags, ` +
+          `${consumptionResult.consumed} consumed`,
+        );
+      }
+    } catch (error) {
+      // Contradiction consumption is NOT fatal — log and continue
+      console.error(
+        '[Orchestrator] W4.4: Contradiction consumption failed (non-fatal):',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    // ═════════════════════════════════���═════════════════════════════════════
+    // PHASE 5.75: W5.4a — Delta Synthesis for Blocking Contradictions
+    // ═══════════════════════════════════════════════════════════════════════
+    //
+    // If L4 found blocking contradictions, derive the affected holistic
+    // sections and trigger a targeted delta synthesis to resolve them.
+    // Cap: 1 delta synthesis per pipeline run.
+
+    let deltaSynthesisCount = 0;
+
+    if (!l4Result.coherenceReport.isCoherent && deltaSynthesisCount < 1) {
+      const blockingContradictions = l4Result.coherenceReport.contradictions
+        .filter(c => c.severity === 'blocking');
+
+      if (blockingContradictions.length > 0) {
+        try {
+          // Derive affected holistic sections from contradiction section references
+          const affectedSections = this.deriveAffectedSections(blockingContradictions);
+
+          if (affectedSections.length > 0) {
+            const evidence = blockingContradictions
+              .map(c => `${c.sectionA} claims "${c.claimA}" but ${c.sectionB} claims "${c.claimB}"`)
+              .join('; ');
+
+            const deltaRequest: DeltaSynthesisRequest = {
+              targetSections: affectedSections,
+              trigger: 'blocking_contradiction',
+              evidence,
+            };
+
+            const profileForDelta = coordinator.getProfile();
+            const deltaResult = await holisticSynthesisService.deltaSynthesize(
+              deltaRequest,
+              profileForDelta,
+            );
+
+            coordinator.applySectionLevelSynthesis(deltaResult.output);
+            deltaSynthesisCount++;
+
+            costTracker.record('delta_synthesis', deltaResult.cost, deltaResult.tokenUsage, deltaResult.timingMs);
+
+            console.log(
+              `[Orchestrator] W5.4a: Delta synthesis for blocking contradictions — ` +
+              `sections=[${affectedSections.join(', ')}], ` +
+              `isSubstantive=${deltaResult.output.isSubstantive}, ` +
+              `cost=$${deltaResult.cost.toFixed(4)}`,
+            );
+          }
+        } catch (error) {
+          // Delta synthesis failure is NOT fatal — pipeline continues with existing holistic sections
+          console.error(
+            '[Orchestrator] W5.4a: Delta synthesis failed (non-fatal):',
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 6: Annotations (L5 — FAIL-FAST)
     // ═══════════════════════════════════════════════════════════════════════
 
     let l5Result: L5AnnotationResult | null = null;
@@ -451,15 +676,22 @@ export class AnalysisOrchestrator {
     if (includeAnnotations) {
       try {
         const profileForAnnotations = coordinator.getProfile();
+        // W7.1: Pass FindingStore to L5 for per-paragraph finding references
+        const findingStoreForL5 = coordinator.getFindingStore();
         l5Result = await deepAnnotationService.generateAnnotations(
           profileForAnnotations as EssayProfile,
+          input.reanalysisBrief,
+          contradictionAnnotationFlags,
+          findingStoreForL5.size > 0 ? findingStoreForL5 : undefined,
+          growthReadingStrategy,
         );
 
         costTracker.record('L5', l5Result.cost, l5Result.tokenUsage, l5Result.timingMs);
         layersCompleted.push('L5');
 
         console.log(
-          `[Orchestrator] L5 complete: ${l5Result.annotationCount} annotations, ` +
+          `[Orchestrator] L5 complete: ${l5Result.annotationCount} annotations ` +
+          `(${l5Result.crossParagraphAnnotations.length} cross-paragraph), ` +
           `phase=${l5Result.phase}, ` +
           `cost=$${l5Result.cost.toFixed(4)}, time=${l5Result.timingMs}ms`,
         );
@@ -467,9 +699,8 @@ export class AnalysisOrchestrator {
         // Checkpoint after L5
         await this.safeCheckpoint(coordinator, 'after_l5');
       } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(`[Orchestrator] L5 failed (survivable): ${msg}`);
-        layersFailed.push({ layer: 'L5', error: msg });
+        layersFailed.push(this.buildLayerError('L5', error, costTracker.summarize(0).totalCost));
+        return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
       }
     } else {
       console.log('[Orchestrator] L5 skipped: annotations disabled');
@@ -492,6 +723,13 @@ export class AnalysisOrchestrator {
       : ['L1', 'L2', 'L2.5', 'L3', 'L3.75', 'L3.5', 'L4'];
     const completedAllLayers = allExpectedLayers.every((l) => layersCompleted.includes(l));
 
+    // ── Pipeline completion cost summary ──
+    const totalCalls = costSummary.layers.reduce((sum, _) => sum + 1, 0);
+    const layerSummaries = costSummary.layers.map((l) => `${l.layer}: $${l.cost.toFixed(3)}`).join(' | ');
+    console.log(
+      `[EssayIntelligence] COMPLETE: ${totalCalls} layer groups, $${costSummary.totalCost.toFixed(4)} total\n` +
+      `  ${layerSummaries}`,
+    );
     console.log(
       `[Orchestrator] Pipeline complete — ` +
       `layers=${layersCompleted.join(',')} | ` +
@@ -507,9 +745,11 @@ export class AnalysisOrchestrator {
       costSummary,
       layersCompleted,
       layersFailed,
-      improvementPhase: l35Result!.improvementPhase,
-      confidenceLevel: this.computeConfidenceLevel(layersCompleted),
+      improvementPhase: l35Result.improvementPhase,
+      confidenceLevel: this.computeConfidenceLevel(layersCompleted, l4Result.coherenceReport),
       annotations: l5Result,
+      scoreMatrix: l4Result.scoreMatrix,
+      coherenceReport: l4Result.coherenceReport,
     };
   }
 
@@ -544,8 +784,455 @@ export class AnalysisOrchestrator {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // PRIVATE: Growth Cycle (V2 L3.75)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Run the iterative growth cycle for L3.75.
+   *
+   * Loop: synthesize → curate questions → dispatch deep dives → re-read
+   *       → check convergence → repeat
+   *
+   * L3.75 owns convergence. System enforces budget + iteration caps only.
+   */
+  private async runGrowthCycle(
+    profile: EssayProfile,
+    walkResult: L3WalkResult,
+    essayText: string,
+    costTracker: CostTracker,
+    findingStore?: import('../findings/findingStore').FindingStore,
+    priorPhase?: ImprovementPhase,
+    coordinator?: EssayProfileCoordinator,
+  ): Promise<{
+    finalSynthesis: HolisticSynthesisOutput;
+    readingStrategy: ReadingStrategy;
+    growthState: GrowthCycleState;
+    totalCost: number;
+  }> {
+    const state = initGrowthCycleState();
+
+    let currentSynthesis: SynthesisIterationOutput | null = null;
+    let cumulativeFindings: Finding[] = [
+      ...profile.findings,
+    ];
+
+    // Gap 2: Seed from persistent question queue instead of ephemeral []
+    const queueManager = new QuestionQueueManager(profile.questionQueue ?? []);
+
+    while (!state.isConverged && state.iteration < MAX_ITERATIONS) {
+      // ── Step 1: L3.75 synthesizes + validates + curates ──
+      // Gap 2: Feed open questions from persistent queue (not ephemeral curated queue)
+      const openQuestions = currentSynthesis
+        ? currentSynthesis.questionCuration.curatedQueue.map(cq => cq.question)
+        : queueManager.getOpenQuestions();
+
+      const iterResult: SynthesisIterationResult = await holisticSynthesisService.synthesizeIteration({
+        essayText,
+        profile,
+        walkEvolution: walkResult.holisticEvolution,
+        previousSynthesis: currentSynthesis?.synthesis ?? null,
+        previousReadingStrategy: currentSynthesis?.readingStrategy ?? null,
+        questionQueue: openQuestions,
+        cumulativeFindings,
+        activityLog: state.activityLog,
+        priorPhase,
+        iterationNumber: state.iteration,
+        budgetCeiling: state.budgetCeiling,
+        budgetRemaining: state.budgetRemaining,
+        findingStore,
+      });
+
+      state.budgetRemaining -= iterResult.cost;
+      costTracker.record(
+        `L3.75_iter_${state.iteration}`,
+        iterResult.cost,
+        iterResult.tokenUsage,
+        iterResult.timingMs,
+      );
+
+      // Gap 2: Merge L3.75 curation into the persistent queue
+      queueManager.mergeCuratedOutput(iterResult.output.questionCuration, state.iteration);
+
+      // Build step record for activity log
+      const synthStepResult: StepResult = {
+        questionsResolved: iterResult.output.questionCuration.resolvedQuestions.length,
+        questionsRaised: iterResult.output.questionCuration.curatedQueue.length,
+        findingsAdded: iterResult.output.synthesis.newFindings?.length ?? 0,
+        findingsDeepened: iterResult.output.synthesis.findingEvolutions?.filter(
+          e => e.newMaturity === 'deepened' || e.newMaturity === 'confirmed',
+        ).length ?? 0,
+        findingsSuperseded: iterResult.output.synthesis.findingEvolutions?.filter(
+          e => e.newMaturity === 'superseded',
+        ).length ?? 0,
+        sectionsUpdated: ['voiceIdentity', 'thematicArchitecture', 'narrativeStrategy',
+          'characterRevelation', 'craftAssessment', 'emotionalTopography',
+          'momentEarnednessMap', 'admissionsPositioning', 'entanglements', 'voiceMap'],
+        cost: iterResult.cost,
+        discoveryNote: iterResult.output.evolutionNarrative,
+      };
+      state.activityLog.push(buildStepRecord(`synthesis_iter_${state.iteration}`, synthStepResult));
+
+      currentSynthesis = iterResult.output;
+
+      // ── Step 1.5: Synthesize understanding prose (Gap 1) ──
+      // One Sonnet call after each L3.75 iteration — produces the coherent narrative
+      if (state.budgetRemaining >= MIN_BUDGET_FOR_STEP) {
+        try {
+          const topFindings = cumulativeFindings
+            .filter(f => f.maturity !== 'superseded')
+            .sort((a, b) => {
+              const valueOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, contextual: 3, diagnostic: 4 };
+              return (valueOrder[a.coachingValue] ?? 2) - (valueOrder[b.coachingValue] ?? 2);
+            })
+            .slice(0, 10);
+
+          const understandingResult = await synthesizeUnderstandingProse({
+            essayText,
+            profile,
+            readingStrategy: currentSynthesis.readingStrategy,
+            topFindings,
+            previousUnderstanding: profile.essayUnderstanding?.prose
+              ? profile.essayUnderstanding
+              : null,
+          });
+
+          // Update profile with the synthesized understanding
+          profile.essayUnderstanding = understandingResult.understanding;
+
+          state.budgetRemaining -= understandingResult.cost;
+          costTracker.record(
+            `understanding_prose_iter_${state.iteration}`,
+            understandingResult.cost,
+            understandingResult.tokenUsage,
+            understandingResult.timingMs,
+          );
+        } catch (error) {
+          console.warn(
+            `[Orchestrator] Understanding prose synthesis failed (non-fatal):`,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+
+      // ── Step 2: L3.75 says converged? Trust it (after at least 1 iteration). ──
+      if (currentSynthesis.selfAssessedConvergence.hasConverged && state.iteration >= 1) {
+        state.isConverged = true;
+        state.convergenceReason = 'llm_converged';
+        break;
+      }
+
+      // ── Step 3: Run re-reads L3.75 flagged ──
+      // L3.75 curated these candidates — respect its ordering. Budget check stops when
+      // we can't afford more. No hard cap beyond the budget backstop. (LLM-first Rule 2)
+      for (const reRead of currentSynthesis.reReadCandidates) {
+        if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) break;
+
+        try {
+          const reReadResult = await runTargetedReRead(
+            reRead.paragraph,
+            essayText,
+            profile,
+            currentSynthesis.synthesis,
+            currentSynthesis.readingStrategy,
+            reRead.reason,
+          );
+
+          state.budgetRemaining -= reReadResult.cost;
+          costTracker.record(
+            `reread_P${reRead.paragraph}`,
+            reReadResult.cost,
+            reReadResult.tokenUsage,
+            reReadResult.timingMs,
+          );
+
+          // Merge findings from re-read into cumulativeFindings AND findingStore
+          let reReadFindingsAbsorbed = 0;
+          if (reReadResult.findings.length > 0) {
+            const newFindingObjects = reReadResult.findings.map((f, idx) => ({
+              ...f,
+              id: `FR${state.iteration}_${reRead.paragraph}_${idx}`,
+              source: 'holistic_synthesis' as const,
+              buildsOn: f.buildsOn ?? [],
+              relatedTo: f.relatedTo ?? [],
+              raisesQuestions: f.raisesQuestions ?? [],
+              lineage: [],
+              createdAt: new Date().toISOString(),
+              lastUpdated: new Date().toISOString(),
+            })) as Finding[];
+            cumulativeFindings = mergeFindingsFromReRead(cumulativeFindings, newFindingObjects);
+
+            // W3.4: Absorb findings into FindingStore so they aren't orphaned
+            if (findingStore) {
+              for (const finding of newFindingObjects) {
+                try {
+                  // Filter buildsOn/relatedTo to only IDs that exist in the store
+                  // (LLM may reference IDs it generated that aren't in our store)
+                  const safeBuildsOn = finding.buildsOn.filter(id => findingStore.has(id));
+                  const safeRelatedTo = finding.relatedTo.filter(id => findingStore.has(id));
+                  findingStore.add({
+                    ...finding,
+                    buildsOn: safeBuildsOn,
+                    relatedTo: safeRelatedTo,
+                  });
+                  reReadFindingsAbsorbed++;
+                } catch (e) {
+                  console.warn(
+                    `[Orchestrator] Failed to absorb re-read finding ${finding.id} into FindingStore: ` +
+                    `${e instanceof Error ? e.message : String(e)}`,
+                  );
+                }
+              }
+              if (reReadFindingsAbsorbed > 0) {
+                console.log(
+                  `[Orchestrator] Absorbed ${reReadFindingsAbsorbed}/${newFindingObjects.length} ` +
+                  `findings from re-read P${reRead.paragraph} into FindingStore`,
+                );
+              }
+            }
+          }
+
+          // W3.4: Absorb connections from re-read into profile via ConnectionMutator
+          // (duplicate detection, connectionRef management, mutation tracking)
+          let reReadConnectionsAbsorbed = 0;
+          if (reReadResult.newConnections.length > 0) {
+            const connectionsToAdd = reReadResult.newConnections.map(conn => ({
+              from: conn.from,
+              to: conn.to,
+              description: conn.description,
+              reverseIllumination: conn.reverseIllumination,
+              significance: conn.significance,
+              strengthCategory: conn.strengthCategory,
+              directionality: conn.directionality,
+              discoveredBy: 'holistic_synthesis' as const,
+            }));
+
+            if (coordinator) {
+              // Route through coordinator → ConnectionMutator for proper integrity
+              const { connectionIds } = coordinator.addConnections(connectionsToAdd);
+              reReadConnectionsAbsorbed = connectionIds.filter(id => id !== '').length;
+            } else {
+              // Fallback: direct push (should not happen in normal pipeline)
+              console.warn(
+                `[Orchestrator] No coordinator available for re-read connection absorption — ` +
+                `falling back to direct push (bypasses duplicate detection + connectionRef management)`,
+              );
+              for (const conn of connectionsToAdd) {
+                try {
+                  profile.connections.all.push({
+                    id: `CR${state.iteration}_P${reRead.paragraph}_${reReadConnectionsAbsorbed}`,
+                    from: conn.from,
+                    to: conn.to,
+                    description: conn.description,
+                    reverseIllumination: conn.reverseIllumination,
+                    significance: conn.significance,
+                    strengthCategory: conn.strengthCategory,
+                    directionality: conn.directionality,
+                    discoveredBy: conn.discoveredBy,
+                    routingTags: [],
+                    status: 'active',
+                    relatedFindings: [],
+                    createdAt: new Date().toISOString(),
+                  });
+                  reReadConnectionsAbsorbed++;
+                } catch (e) {
+                  console.warn(
+                    `[Orchestrator] Failed to absorb re-read connection from P${reRead.paragraph}: ` +
+                    `${e instanceof Error ? e.message : String(e)}`,
+                  );
+                }
+              }
+            }
+
+            if (reReadConnectionsAbsorbed > 0) {
+              console.log(
+                `[Orchestrator] Absorbed ${reReadConnectionsAbsorbed}/${reReadResult.newConnections.length} ` +
+                `connections from re-read P${reRead.paragraph} into profile`,
+              );
+            }
+          }
+
+          const reReadStep: StepResult = {
+            findingsAdded: reReadFindingsAbsorbed,
+            cost: reReadResult.cost,
+            discoveryNote: reReadResult.discoveryNote,
+          };
+          state.activityLog.push(buildStepRecord(`reread_P${reRead.paragraph}`, reReadStep));
+        } catch (error) {
+          console.warn(
+            `[Orchestrator] Re-read P${reRead.paragraph} failed (non-fatal):`,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+
+      // ── Step 3.5: Maturity gap analysis (Gap 4) ──
+      // Detect stuck findings and feed investigation questions into the persistent queue
+      const maturityGaps = analyzeMaturityGaps(cumulativeFindings, state);
+      if (maturityGaps.length > 0) {
+        const gapQuestions = maturityGapsToQuestions(maturityGaps, state.iteration);
+        for (const gq of gapQuestions) {
+          queueManager.addQuestion(gq);
+        }
+        console.log(
+          `[Orchestrator] Maturity gap analysis: ${maturityGaps.length} gaps found, ` +
+          `${gapQuestions.length} investigation questions added`,
+        );
+      }
+
+      // ── Step 4: Dispatch deep dives (persistent queue as primary signal) ──
+      // Gap 2: Use persistent queue's open questions for dispatch instead of ephemeral curated queue
+      const dives = dispatchDeepDives(
+        currentSynthesis.questionCuration.curatedQueue,
+        state.budgetRemaining,
+      );
+
+      for (const dive of dives) {
+        if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) break;
+
+        try {
+          const diveResult = await runDeepDive(
+            dive,
+            essayText,
+            profile,
+            currentSynthesis.synthesis,
+            currentSynthesis.readingStrategy,
+            findingStore,
+          );
+
+          state.budgetRemaining -= diveResult.cost;
+          costTracker.record(
+            `deep_dive_${dive.promptType}`,
+            diveResult.cost,
+            diveResult.tokenUsage,
+            diveResult.timingMs,
+          );
+
+          // Merge findings from deep dive
+          if (diveResult.findings.length > 0) {
+            const newFindingObjects = diveResult.findings.map((f, idx) => ({
+              ...f,
+              id: `FD${state.iteration}_${dive.promptType}_${idx}`,
+              source: 'deep_dive' as const,
+              buildsOn: f.buildsOn ?? [],
+              relatedTo: f.relatedTo ?? [],
+              raisesQuestions: f.raisesQuestions ?? [],
+              lineage: [],
+              createdAt: new Date().toISOString(),
+              lastUpdated: new Date().toISOString(),
+            })) as Finding[];
+            cumulativeFindings = mergeFindingsFromDeepDive(cumulativeFindings, newFindingObjects);
+          }
+
+          // Gap 2: Mark the question as resolved if deep dive answered it
+          if (dive.question.id) {
+            queueManager.resolve(
+              dive.question.id,
+              `deep_dive_${dive.promptType}`,
+              diveResult.discoveryNote || 'Investigated via deep dive',
+            );
+          }
+
+          // Gap 2: Add new questions from deep dive to persistent queue
+          for (const newQ of diveResult.questionsRaised) {
+            if (dive.question.id) {
+              queueManager.spawnChild(dive.question.id, newQ);
+            } else {
+              queueManager.addQuestion(newQ);
+            }
+          }
+
+          const diveStep: StepResult = {
+            findingsAdded: diveResult.findings.length,
+            questionsRaised: diveResult.questionsRaised.length,
+            cost: diveResult.cost,
+            discoveryNote: diveResult.discoveryNote,
+          };
+          state.activityLog.push(buildStepRecord(`deep_dive_${dive.promptType}`, diveStep));
+        } catch (error) {
+          console.warn(
+            `[Orchestrator] Deep dive ${dive.promptType} failed (non-fatal):`,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
+      }
+
+      // ── Step 5: Budget backstop ──
+      if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) {
+        state.isConverged = true;
+        state.convergenceReason = 'budget_exhausted';
+      }
+
+      state.iteration++;
+    }
+
+    // Safety cap reached
+    if (state.iteration >= MAX_ITERATIONS && !state.isConverged) {
+      state.isConverged = true;
+      state.convergenceReason = 'safety_cap';
+    }
+
+    // First iteration convergence: if L3.75 says converged on first iteration, trust it
+    if (!state.isConverged && currentSynthesis?.selfAssessedConvergence.hasConverged) {
+      state.isConverged = true;
+      state.convergenceReason = 'llm_converged';
+    }
+
+    // Gap 2: Persist the question queue back to the profile
+    profile.questionQueue = queueManager.getAll();
+
+    return {
+      finalSynthesis: currentSynthesis!.synthesis,
+      readingStrategy: currentSynthesis!.readingStrategy,
+      growthState: state,
+      totalCost: state.budgetCeiling - state.budgetRemaining,
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // PRIVATE: Helpers
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build a LayerError from a caught exception AND log full diagnostics.
+   * This is the single place where pipeline errors get diagnosed — every detail
+   * you'd need to fix the issue should be in these logs.
+   */
+  private buildLayerError(
+    layer: string,
+    error: unknown,
+    costSoFar: number,
+    paragraphIndex?: number,
+  ): LayerError {
+    const { errorType, httpStatus } = classifyError(error);
+    const msg = error instanceof Error ? error.message : String(error);
+    const stack = error instanceof Error ? error.stack : undefined;
+    const timestamp = new Date().toISOString();
+
+    // Log EVERYTHING — this is what you read when debugging a failed run
+    console.error(
+      `\n${'═'.repeat(72)}\n` +
+      `[EssayIntelligence] LAYER FAILURE — ${layer}${paragraphIndex != null ? ` P${paragraphIndex}` : ''}\n` +
+      `${'═'.repeat(72)}\n` +
+      `  errorType:  ${errorType}\n` +
+      `  httpStatus: ${httpStatus ?? 'N/A'}\n` +
+      `  message:    ${msg}\n` +
+      `  costSoFar:  $${costSoFar.toFixed(4)}\n` +
+      `  timestamp:  ${timestamp}\n` +
+      (stack ? `  stack:\n${stack.split('\n').map(l => `    ${l}`).join('\n')}\n` : '') +
+      `${'═'.repeat(72)}\n`,
+    );
+
+    return {
+      layer,
+      paragraphIndex,
+      errorType,
+      httpStatus,
+      message: msg,
+      tokensBilled: 0,
+      costBilled: costSoFar,
+      timestamp,
+    };
+  }
 
   /**
    * Safe checkpoint — never lets checkpoint failure kill the pipeline.
@@ -565,26 +1252,93 @@ export class AnalysisOrchestrator {
   }
 
   /**
-   * Determine confidence level based on which layers completed.
+   * Determine confidence level based on which layers completed and coherence.
+   *
+   * Coherence degradation (A2):
+   * - 3+ blocking contradictions → cap at 'developing' (profile is unreliable)
+   * - Any blocking contradictions → cap at 'deep' (some contradictions)
+   *
+   * NOTE (Cluster B checkpoint): The `blockingCount >= 3` threshold is an operational
+   * heuristic for profile reliability, not an analytical judgment about essay quality.
+   * It uses the Crystallizer's `isCoherent` signal (LLM-determined) as the primary gate,
+   * then the count as severity calibration. If future growth cycle iterations produce
+   * LLM-assessed confidence, this heuristic should be replaced by that signal.
    */
-  private computeConfidenceLevel(layersCompleted: string[]): ConfidenceLevel {
+  private computeConfidenceLevel(
+    layersCompleted: string[],
+    coherenceReport: CoherenceReport | null,
+  ): ConfidenceLevel {
     const has = (layer: string) => layersCompleted.includes(layer);
 
+    // Base level from layer completion
+    let level: ConfidenceLevel;
     if (has('L4') && has('L3.5') && has('L3.75') && has('L3')) {
-      return 'comprehensive';
+      level = 'comprehensive';
+    } else if (has('L3') && has('L3.5')) {
+      level = 'deep';
+    } else if (has('L3')) {
+      level = 'developing';
+    } else {
+      return 'initial'; // Can't degrade further
     }
-    if (has('L3') && has('L3.5')) {
-      return 'deep';
+
+    // Degrade if coherence report shows contradictions
+    if (coherenceReport && !coherenceReport.isCoherent) {
+      const blockingCount = coherenceReport.contradictions
+        .filter((c) => c.severity === 'blocking').length;
+      if (blockingCount >= 3) {
+        level = 'developing'; // Major contradictions — profile is unreliable
+      } else if (level === 'comprehensive') {
+        level = 'deep'; // Some contradictions — cap below comprehensive
+      }
     }
-    if (has('L3')) {
-      return 'developing';
-    }
-    return 'initial';
+
+    return level;
   }
 
   /**
    * Return the highest-numbered layer that completed.
    */
+  /**
+   * W5.4a: Derive which holistic sections are affected by blocking contradictions.
+   *
+   * Maps section name strings (from CoherenceIssue.sectionA/sectionB) to
+   * HolisticSectionType values. The section names in coherence issues are
+   * free-form strings like "voiceMap.shiftPoints" or "craftAssessment" —
+   * we match by prefix to determine which holistic section owns them.
+   */
+  private deriveAffectedSections(
+    contradictions: Array<{ sectionA: string; sectionB: string }>,
+  ): HolisticSectionType[] {
+    const sectionPrefixMap: Array<{ prefix: string; type: HolisticSectionType }> = [
+      { prefix: 'voiceIdentity', type: 'voice_identity' },
+      { prefix: 'voiceMap', type: 'voice_map' },
+      { prefix: 'emotionalTopography', type: 'emotional_topography' },
+      { prefix: 'momentEarnednessMap', type: 'moment_earnedness_map' },
+      { prefix: 'thematicArchitecture', type: 'thematic_architecture' },
+      { prefix: 'narrativeStrategy', type: 'narrative_strategy' },
+      { prefix: 'characterRevelation', type: 'character_revelation' },
+      { prefix: 'craftAssessment', type: 'craft_assessment' },
+      { prefix: 'entanglements', type: 'cross_dimension_entanglements' },
+      { prefix: 'admissionsPositioning', type: 'admissions_positioning' },
+    ];
+
+    const affected = new Set<HolisticSectionType>();
+
+    for (const c of contradictions) {
+      for (const sectionRef of [c.sectionA, c.sectionB]) {
+        for (const { prefix, type } of sectionPrefixMap) {
+          if (sectionRef.startsWith(prefix)) {
+            affected.add(type);
+            break;
+          }
+        }
+      }
+    }
+
+    return Array.from(affected);
+  }
+
   private highestLayerCompleted(layersCompleted: string[]): string {
     const ordered = ['L5', 'L4', 'L3.5', 'L3.75', 'L3', 'L2.5', 'L2', 'L1'];
     for (const layer of ordered) {
@@ -599,7 +1353,7 @@ export class AnalysisOrchestrator {
   private buildPartialResult(
     coordinator: EssayProfileCoordinator | null,
     layersCompleted: string[],
-    layersFailed: Array<{ layer: string; error: string }>,
+    layersFailed: LayerError[],
     costTracker: CostTracker,
     startTime: number,
   ): PipelineResult {
@@ -614,12 +1368,21 @@ export class AnalysisOrchestrator {
           metadata: { confidenceLevel: 'initial' as ConfidenceLevel, totalAnalysisCost: 0 },
         } as unknown as Readonly<EssayProfile>);
 
+    // Log abort with full cost breakdown
+    const layerCostBreakdown = costSummary.layers.length > 0
+      ? costSummary.layers.map((l) => `${l.layer}: $${l.cost.toFixed(3)}`).join(' | ')
+      : '(no layers completed)';
     console.error(
-      `[Orchestrator] Pipeline ABORTED — ` +
-      `completed=${layersCompleted.join(',') || 'none'} | ` +
-      `failed=${layersFailed.map((f) => `${f.layer}:${f.error.substring(0, 60)}`).join('; ')} | ` +
-      `cost=$${costSummary.totalCost.toFixed(4)} | ` +
-      `time=${totalTimingMs}ms`,
+      `\n${'▓'.repeat(72)}\n` +
+      `[EssayIntelligence] PIPELINE ABORTED\n` +
+      `${'▓'.repeat(72)}\n` +
+      `  completed: ${layersCompleted.join(', ') || 'none'}\n` +
+      `  failed:    ${layersFailed.map((f) => `${f.layer} (${f.errorType})`).join(', ')}\n` +
+      `  cost:      $${costSummary.totalCost.toFixed(4)} wasted\n` +
+      `  breakdown: ${layerCostBreakdown}\n` +
+      `  time:      ${totalTimingMs}ms\n` +
+      `  reason:    ${layersFailed[layersFailed.length - 1]?.message ?? 'unknown'}\n` +
+      `${'▓'.repeat(72)}\n`,
     );
 
     return {
@@ -630,8 +1393,10 @@ export class AnalysisOrchestrator {
       layersCompleted,
       layersFailed,
       improvementPhase: null,
-      confidenceLevel: this.computeConfidenceLevel(layersCompleted),
+      confidenceLevel: this.computeConfidenceLevel(layersCompleted, null),
       annotations: null,
+      scoreMatrix: null,
+      coherenceReport: null,
     };
   }
 }
@@ -641,3 +1406,42 @@ export class AnalysisOrchestrator {
 // ============================================================================
 
 export const analysisOrchestrator = new AnalysisOrchestrator();
+
+// ============================================================================
+// LAUNCH 3: STANDALONE FUNCTION EXPORTS
+// ============================================================================
+// These top-level functions allow ReanalysisOrchestrator (and tests) to call
+// the pipeline without referencing the singleton object directly.
+
+/**
+ * Standalone wrapper for analyzeEssay. Delegates to the singleton.
+ * Optionally accepts a ReanalysisBrief (used by re-analysis passes
+ * to pass context to L5 annotations via input.reanalysisBrief).
+ *
+ * FIX 1.7: Brief is no longer ignored — it is threaded into PipelineInput
+ * so that deepAnnotationService.generateAnnotations() receives it.
+ */
+export async function analyzeEssay(
+  input: PipelineInput,
+  reanalysisBrief?: ReanalysisBrief,
+): Promise<PipelineResult> {
+  // Merge the brief into the input so the orchestrator's internal methods can use it
+  const mergedInput: PipelineInput = reanalysisBrief
+    ? { ...input, reanalysisBrief }
+    : input;
+  return analysisOrchestrator.analyzeEssay(mergedInput);
+}
+
+/**
+ * Run comprehensive re-analysis with a ReanalysisBrief.
+ * Called by ReanalysisOrchestrator when significant changes warrant a full pipeline.
+ *
+ * FIX 1.7: Brief is now properly passed through to the pipeline.
+ */
+export async function analyzeEssayWithBrief(
+  input: PipelineInput,
+  brief: ReanalysisBrief,
+  _existingProfile?: EssayProfile,
+): Promise<PipelineResult> {
+  return analyzeEssay(input, brief);
+}
