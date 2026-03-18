@@ -14,7 +14,8 @@ export interface InterestArea {
 }
 
 export interface OnboardingFormData {
-  // Step 1: Academic Path
+  // Step 1: Academic Path & Name
+  first_name?: string;
   academic_path?: AcademicPath;
 
   // Step 2: Academic Details (varies by path)
