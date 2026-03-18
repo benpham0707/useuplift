@@ -2,9 +2,13 @@ import { motion } from 'motion/react';
 import { AcademicPath } from '@/types/onboarding';
 import { GraduationCap, School, Briefcase, Compass } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface AcademicPathStepProps {
+  firstName?: string;
   selectedPath?: AcademicPath;
+  onNameChange: (name: string) => void;
   onSelect: (path: AcademicPath) => void;
 }
 
@@ -42,7 +46,7 @@ const PATH_OPTIONS: PathOption[] = [
   },
 ];
 
-export const AcademicPathStep = ({ selectedPath, onSelect }: AcademicPathStepProps) => {
+export const AcademicPathStep = ({ firstName, selectedPath, onNameChange, onSelect }: AcademicPathStepProps) => {
   return (
     <div className="space-y-8">
       <div className="text-center space-y-3">
@@ -64,10 +68,29 @@ export const AcademicPathStep = ({ selectedPath, onSelect }: AcademicPathStepPro
         </motion.p>
       </div>
 
+      {/* Name Input */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.2 }}
+        transition={{ duration: 0.5, delay: 0.15 }}
+        className="max-w-md mx-auto space-y-2"
+      >
+        <Label htmlFor="first_name" className="text-base">What should we call you?</Label>
+        <Input
+          id="first_name"
+          type="text"
+          placeholder="Enter your first name"
+          value={firstName || ''}
+          onChange={(e) => onNameChange(e.target.value)}
+          className="text-lg py-6"
+          autoComplete="given-name"
+        />
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
         className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto"
       >
         {PATH_OPTIONS.map((option, index) => {

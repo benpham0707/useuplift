@@ -50,8 +50,8 @@ export const OnboardingFlow = ({ initialData, initialStep }: OnboardingFlowProps
   };
 
   const handleContinueStep1 = async () => {
-    if (!formData.academic_path) return;
-    await nextStep({ academic_path: formData.academic_path });
+    if (!formData.first_name || !formData.academic_path) return;
+    await nextStep({ first_name: formData.first_name, academic_path: formData.academic_path });
   };
 
   const handleContinueStep2 = async () => {
@@ -74,7 +74,7 @@ export const OnboardingFlow = ({ initialData, initialStep }: OnboardingFlowProps
   // Determine if continue button should be disabled
   const isContinueDisabled = () => {
     if (currentStep === 1) {
-      return !formData.academic_path;
+      return !formData.first_name || !formData.academic_path;
     }
 
     if (currentStep === 2) {
@@ -166,7 +166,9 @@ export const OnboardingFlow = ({ initialData, initialStep }: OnboardingFlowProps
             >
               {currentStep === 1 && (
                 <AcademicPathStep
+                  firstName={formData.first_name}
                   selectedPath={formData.academic_path}
+                  onNameChange={(name) => updateFormData({ first_name: name })}
                   onSelect={handleAcademicPathSelect}
                 />
               )}

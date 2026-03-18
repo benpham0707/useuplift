@@ -28,6 +28,7 @@ export const useOnboardingStatus = () => {
           .select(
             `onboarding_completed,
              current_onboarding_step,
+             first_name,
              academic_path,
              school_name,
              graduation_year,
@@ -43,7 +44,7 @@ export const useOnboardingStatus = () => {
              interest_areas`
           )
           .eq('user_id', user.id)
-          .maybeSingle();
+          .maybeSingle() as { data: any; error: any }; // Type assertion for newly added columns
 
         if (error) {
           console.error('[useOnboardingStatus] Error fetching status:', error);
@@ -68,6 +69,7 @@ export const useOnboardingStatus = () => {
         }
 
         const formData: OnboardingFormData = {
+          first_name: data.first_name,
           academic_path: data.academic_path,
           school_name: data.school_name,
           graduation_year: data.graduation_year,

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seedDashboardData, needsDashboardSeeding } from '@/lib/seedDashboardData';
 import { useUserStreak } from '@/hooks/useDashboard';
@@ -37,7 +38,25 @@ export default function DashboardHome() {
         return;
       }
 
-      setUserName(user.email?.split('@')[0] || 'there');
+      // Fetch first_name from profiles table (set during onboarding)
+      try {
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('user_id', user.id)
+          .maybeSingle() as { data: any; error: any }; // Type assertion for newly added column
+
+        if (profileError) {
+          console.error('Error fetching profile name:', profileError);
+        }
+
+        // Use first_name from onboarding, fallback to email username, then 'there'
+        const name = profileData?.first_name || user.email?.split('@')[0] || 'there';
+        setUserName(name);
+      } catch (error) {
+        console.error('Error fetching user name:', error);
+        setUserName(user.email?.split('@')[0] || 'there');
+      }
 
       try {
         const needsSeeding = await needsDashboardSeeding(user.id);
