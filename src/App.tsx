@@ -26,6 +26,8 @@ import VerifyEmail from "./pages/VerifyEmail";
 import ResetPassword from "./pages/ResetPassword";
 import RequireVerified from "@/components/RequireVerified";
 import RequireTermsAccepted from "@/components/RequireTermsAccepted";
+import RequireOnboarding from "@/components/RequireOnboarding";
+import Onboarding from "./pages/Onboarding";
 import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 const WorkshopDemo = lazy(() => import("./pages/WorkshopDemo"));
@@ -83,8 +85,11 @@ const AppRoutes = () => (
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
       <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
 
-      {/* Dashboard routes */}
-      <Route element={<RequireVerified><RequireTermsAccepted><DashboardLayout /></RequireTermsAccepted></RequireVerified>}>
+      {/* Onboarding route - requires verified email and terms accepted */}
+      <Route path="/onboarding" element={<RequireVerified><RequireTermsAccepted><Onboarding /></RequireTermsAccepted></RequireVerified>} />
+
+      {/* Dashboard routes - requires verified, terms accepted, AND onboarding completed */}
+      <Route element={<RequireVerified><RequireTermsAccepted><RequireOnboarding><DashboardLayout /></RequireOnboarding></RequireTermsAccepted></RequireVerified>}>
         <Route path="/dashboard" element={<DashboardHome />} />
         <Route path="/dashboard/scanner" element={<PortfolioScanner />} />
         <Route path="/dashboard/insights" element={<PortfolioInsightsNew />} />
