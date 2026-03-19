@@ -86,6 +86,8 @@ export interface L35AnalysisResult {
     cacheWriteTokens: number;
   };
   timingMs: number;
+  /** Which analysis mode was used: essay_level (1 Sonnet call) or paragraph_level (anchor + parallel) */
+  analysisMode: 'essay_level' | 'paragraph_level';
   /** Paragraphs that failed analysis (partial success — others still returned) */
   failedParagraphs: Array<{ index: number; error: string }>;
   /** Score distribution diagnostics — operational bookkeeping (Rule 6), not analytical judgment */
@@ -335,6 +337,9 @@ WHY 72: Specific day (not 'every day'), specific sensory registers (smell, not s
 SCORE 88: "I wanted to disappear. For three weeks afterward, I couldn't pick up my violin without my stomach clenching."
 WHY 88: 'Wanted to disappear' is emotionally honest without melodrama. 'Three weeks' is precise and devastating — not 'a while' or 'for some time.' 'Stomach clenching' is a physical, involuntary response that proves the emotion rather than asserting it. The sentence earns its emotional weight through bodily specificity.
 
+SCORE 78 (admissions resonance): "That semester my GPA dropped from a 3.8 to a 2.4, and I told no one."
+WHY 78: Craft is PLAIN — no imagery, no metaphor, no rhythm. But admissions resonance is exceptional: the specific numbers (3.8 → 2.4) prove this is real, not performed. 'I told no one' reveals isolation, shame, and the gap between public persona and private struggle — an AO learns more about this applicant from this one sentence than from three paragraphs of polished prose. High revelation density compensates for modest craft. This is what it looks like when admissions resonance outweighs pure craft in scoring.
+
 ## REFERENCING FINDINGS (PRIMARY CONTEXT)
 
 Findings are labeled [F1], [F2], etc. They represent the system's STRUCTURED understanding — each carries evidence, scope, maturity, and coaching value. Reference findings by [F] label as your PRIMARY basis for analysis.
@@ -362,6 +367,10 @@ For each sentence, follow this exact sequence:
    - Structural contribution vs. filler
    - Earned emotional moments vs. asserted emotions
    - Memorable craft vs. generic competence
+   - **Admissions resonance** — does this sentence reveal something about the writer that an admissions officer would REMEMBER? A plain sentence that shows character, values, or growth can outperform a "well-crafted" sentence that reveals nothing.
+   - **Revelation density** — how much does this sentence advance the reader's understanding of WHO this person is? High revelation density means the sentence does double duty: it moves the narrative AND reveals the writer. Low revelation density means the sentence serves structure but is interchangeable with any applicant's version.
+
+   **WEIGHT**: In a college admissions essay, admissions resonance and revelation density carry MORE weight than pure craft. A technically plain sentence that reveals genuine character insight (e.g., an honest admission of failure, a specific detail that could only come from THIS writer's life) should score HIGHER than a beautifully crafted sentence that reveals nothing memorable about the applicant. Craft serves revelation, not the other way around.
 4. **Assign the score** — AFTER reasoning, not before. The reasoning determines the score.
 5. **Identify strengths** — with SPECIFIC text evidence ("the image of X does Y because Z")
    - Every strength MUST cite specific text: "the verb 'stumbled' conveys X" — not "the imagery is vivid"
@@ -400,6 +409,22 @@ Not just local quality — structural importance in the essay:
 - The strongest and weakest sentences in this paragraph MUST differ by at least 20 points. If you cannot find a 20-point difference, you are not reading critically enough.
 - A mediocre essay's sentences should average 50-65, NOT 70-80. Reserve 70+ for sentences that genuinely earn it through specific detail, distinctive voice, or structural mastery.
 - Use the FULL range. Cliched openings, unearned claims, and template language belong at 35-50 — not in the "functional" 55-75 band.
+
+**Inter-essay calibration — expected score distributions by essay quality tier:**
+
+Think about WHERE this essay sits among all the college essays you've read. Different quality tiers produce fundamentally different score distributions:
+
+| Essay Quality Tier | Expected Sentence Average | Typical Range | Signal |
+|---------------------|--------------------------|---------------|--------|
+| WEAK (undeveloped, confused, generic throughout) | 35-45 | 25-60 | Mostly telling, vague, unearned. Few sentences with any specificity. |
+| MEDIOCRE (competent but interchangeable, "could be anyone's essay") | 45-55 | 30-70 | Some functional craft but nothing distinctive. Stock phrases, generic reflections. |
+| COMPETENT (solid structure, some good moments, some generic stretches) | 55-65 | 40-80 | Clear thesis, generally effective, but voice is inconsistent. |
+| STRONG (distinctive voice, specific imagery, mostly earned moments) | 65-75 | 45-90 | Memorable passages, authentic voice, genuine specificity. |
+| EXCEPTIONAL (would make an AO pause, re-read, and remember) | 75-85 | 55-95 | Nearly every sentence earns its place. Distinctive craft throughout. |
+
+**COMPRESSION CHECK**: If most of your sentence scores fall in the 55-75 band regardless of essay quality, you are COMPRESSING. A mediocre essay should NOT average 65 — that score belongs to competent essays with genuine craft moments. A weak essay should NOT average 55 — that's still "functional," and weak essays are below functional.
+
+Before scoring, explicitly classify this essay into one of these tiers and let that classification anchor your scoring range. State your tier classification in the calibrationReflection.
 
 **Essay-specific ceiling/floor reflection** — complete BEFORE scoring:
 
@@ -469,6 +494,257 @@ Respond with a single JSON object matching this schema EXACTLY:
 }`;
 }
 
+// ============================================================================
+// PHASE-AWARE COST OPTIMIZATION — Essay-Level vs Paragraph-Level Analysis
+// ============================================================================
+
+/**
+ * Estimate whether the essay is in an 'early' or 'mature' phase BEFORE running L3.5.
+ * Uses signals from L3 understanding + L3.75 holistic synthesis (both available pre-L3.5).
+ *
+ * 'early' = foundation/architecture phase → use cheap essay-level analysis (1 Sonnet call)
+ * 'mature' = craft/polish/distinction phase → use full per-paragraph analysis (anchor + parallel)
+ *
+ * The estimate is deliberately CONSERVATIVE: defaults to 'early' and requires strong evidence
+ * of maturity to unlock the expensive path. This is safe because:
+ * - First analysis is almost always 'early' (no prior scores exist)
+ * - Subsequent analyses after edits will have prior phase data to guide the decision
+ * - If we incorrectly classify as 'early', the essay-level analysis still produces useful
+ *   paragraph-level verdicts — the student just doesn't get sentence-level scores yet
+ */
+function estimatePhaseFromProfile(profile: Readonly<EssayProfile>): 'early' | 'mature' {
+  const ns = profile.index.northStarSummary;
+
+  // Signal 1: North Star maturity — a 'full' or 'emerging' north star with a substantive
+  // through-line summary indicates the essay has clear structural coherence
+  const hasStrongNorthStar = ns.maturity === 'full' ||
+    (ns.maturity === 'emerging' && ns.throughLineSummary != null && ns.throughLineSummary.length > 50);
+
+  // Signal 2: Paragraph understanding quality — check structural roles from L3 walk
+  const paragraphsWithUnderstanding = profile.paragraphs.filter(
+    p => p.understanding && !p.walkSkipped && p.sentences.length > 0,
+  );
+  if (paragraphsWithUnderstanding.length === 0) return 'early';
+
+  // Signal 3: Check structural roles for indicators of weakness
+  // Look for paragraphs whose understanding.role suggests structural problems
+  const weakRoleIndicators = ['unclear', 'unfocused', 'missing', 'confused', 'disjointed', 'undeveloped'];
+  const strongRoleIndicators = ['anchor', 'fulcrum', 'pivot', 'establishes', 'resolves', 'synthesizes', 'bridges'];
+
+  let weakSignalCount = 0;
+  let strongSignalCount = 0;
+
+  for (const para of paragraphsWithUnderstanding) {
+    const role = para.understanding!.role.toLowerCase();
+    const func = para.understanding!.function.toLowerCase();
+    const combined = `${role} ${func}`;
+
+    if (weakRoleIndicators.some(w => combined.includes(w))) weakSignalCount++;
+    if (strongRoleIndicators.some(s => combined.includes(s))) strongSignalCount++;
+  }
+
+  // Signal 4: Craft assessment quality from L3.75 holistic synthesis
+  const hasCraftAssessment = profile.craftAssessment != null;
+  const hasVoiceIdentity = profile.voiceIdentity != null;
+  const hasNarrativeStrategy = profile.narrativeStrategy != null;
+
+  // Signal 5: Emotional topography quality — real essays with developed emotional arcs
+  const hasEmotionalPeaks = (profile.emotionalTopography?.peakMoments?.length ?? 0) > 0;
+
+  // Decision: essay is mature ONLY if MULTIPLE signals align
+  // - Strong north star AND no weak structural signals AND holistic sections are rich
+  const holisticRichness = [hasCraftAssessment, hasVoiceIdentity, hasNarrativeStrategy, hasEmotionalPeaks]
+    .filter(Boolean).length;
+
+  if (
+    hasStrongNorthStar &&
+    weakSignalCount === 0 &&
+    strongSignalCount > paragraphsWithUnderstanding.length * 0.4 &&
+    holisticRichness >= 3
+  ) {
+    return 'mature';
+  }
+
+  return 'early';
+}
+
+/**
+ * Compact system prompt for essay-level analysis (1 Sonnet call for the whole essay).
+ *
+ * Key differences from the per-paragraph buildSystemPrompt():
+ * - NO sentence-scoring calibration table (no per-sentence scores at this phase)
+ * - NO anchor paragraph mechanics
+ * - NO isStrength/isProblem thresholds
+ * - NO per-sentence confidence assessment
+ * - FOCUSED on paragraph-level verdicts + essay-level strengths/weaknesses + coaching direction
+ *
+ * ~2K tokens vs ~4K tokens for the per-paragraph prompt.
+ */
+function buildEssayLevelSystemPrompt(): string {
+  return `You are an expert admissions essay analyst. Your task is to evaluate the essay at the PARAGRAPH level — producing a per-paragraph verdict and an essay-level assessment of strengths, weaknesses, and coaching direction.
+
+## YOUR ROLE
+
+You receive COMPLETE understanding of the essay — holistic synthesis, voice map, earnedness network, thematic architecture, every paragraph's purpose and contribution. Your job is to evaluate EFFECTIVENESS: how well each paragraph achieves its purpose within the essay's architecture.
+
+## PARAGRAPH VERDICT SCALE
+
+For each paragraph, assign one of these verdicts:
+
+| Verdict | Meaning | Effectiveness Score |
+|---------|---------|-------------------|
+| strong | This paragraph does its job with distinction. Clear purpose, effective execution, would hold up in a competitive applicant pool. | 80 |
+| functional | This paragraph serves its purpose adequately but without distinction. Competent but interchangeable — another applicant could have written it. | 65 |
+| developing | This paragraph has a clear purpose but doesn't achieve it effectively. Issues with specificity, voice, structure, or emotional grounding. | 50 |
+| weak | This paragraph actively harms the essay or fails its structural role. Needs fundamental rework. | 35 |
+
+## EVALUATION CRITERIA
+
+For each paragraph, consider:
+- **Structural role fulfillment**: Does it do what it needs to do in the essay's architecture?
+- **Specificity vs vagueness**: Real details vs generic language any applicant could write
+- **Voice authenticity**: Does the writer's voice come through, or is it performed?
+- **Show vs tell**: Physical, sensory grounding vs abstract assertions
+- **Admissions resonance**: Would an AO learn something memorable about this applicant?
+- **Narrative contribution**: Does it advance the essay's through-line effectively?
+
+## REFERENCING FINDINGS
+
+Findings are labeled [F1], [F2], etc. Reference them by label as your PRIMARY basis for evaluation.
+
+## OUTPUT FORMAT
+
+Respond with a single JSON object:
+
+{
+  "essayTierClassification": "weak | mediocre | competent | strong | exceptional",
+  "essayTierReasoning": "2-3 sentences explaining this tier classification with specific text references",
+  "paragraphVerdicts": [
+    {
+      "paragraphIndex": 0,
+      "verdict": "strong | functional | developing | weak",
+      "reasoning": "2-3 sentences explaining why, citing specific text",
+      "primaryStrength": "string | null — what this paragraph does best, with text evidence",
+      "primaryWeakness": "string | null — what most needs improvement, with description of what better looks like"
+    }
+  ],
+  "essayStrengths": [
+    {
+      "quality": "string — what works at the essay level",
+      "evidence": "string — specific text cited",
+      "paragraphs": [0, 2]
+    }
+  ],
+  "essayWeaknesses": [
+    {
+      "quality": "string — what needs improvement at the essay level",
+      "description": "string — what improvement looks like",
+      "paragraphs": [1, 3]
+    }
+  ],
+  "coachingDirection": "string — 2-3 sentences: what should this writer focus on FIRST to improve this essay? Be specific and actionable."
+}`;
+}
+
+/**
+ * Build a compact essay-level user prompt that includes text + understanding for all paragraphs.
+ * Similar to buildProfileContext but more compact — no per-sentence understanding detail.
+ */
+function buildEssayLevelUserPrompt(
+  profile: Readonly<EssayProfile>,
+  staleAreaHints?: string[],
+  findingContext?: string,
+): string {
+  const sections: string[] = [];
+
+  // Essay text with paragraph markers (no per-sentence markers for essay-level)
+  sections.push('=== ESSAY TEXT ===');
+  for (const para of profile.paragraphs) {
+    sections.push(`\n[P${para.index}]`);
+    for (const sentence of para.sentences) {
+      sections.push(`  [P${para.index}S${sentence.index}] ${sentence.text}`);
+    }
+  }
+
+  // Compact profile summary
+  sections.push('\n=== ESSAY UNDERSTANDING ===');
+  sections.push(`${profile.index.essayLength.paragraphs} paragraphs, ${profile.index.essayLength.sentences} sentences, ${profile.index.essayLength.words} words`);
+
+  // Holistic synthesis (compact)
+  if (profile.voiceIdentity) {
+    sections.push(`\nVoice: ${profile.voiceIdentity.signature}`);
+    if (profile.voiceIdentity.evolution) sections.push(`Voice evolution: ${profile.voiceIdentity.evolution}`);
+  }
+  if (profile.emotionalTopography) {
+    sections.push(`Emotional arc: ${profile.emotionalTopography.arcTrajectory}`);
+  }
+  if (profile.thematicArchitecture) {
+    sections.push(`Thesis: ${profile.thematicArchitecture.centralThesis} (confidence: ${profile.thematicArchitecture.thesisConfidence})`);
+    sections.push(`Theme evolution: ${profile.thematicArchitecture.thesisEvolution}`);
+  }
+  if (profile.narrativeStrategy) {
+    sections.push(`Strategy: ${profile.narrativeStrategy.primaryStrategy}`);
+    sections.push(`Pacing: ${profile.narrativeStrategy.pacingAnalysis}`);
+  }
+  if (profile.characterRevelation) {
+    sections.push(`Character: ${profile.characterRevelation.writerPortrait}`);
+    sections.push(`Values: ${profile.characterRevelation.valuesRevealed.join(', ')}`);
+  }
+  if (profile.admissionsPositioning) {
+    sections.push(`Admissions: ${profile.admissionsPositioning.tellabilitySummary}`);
+  }
+  if (profile.craftAssessment) {
+    sections.push(`Craft: sentences=${profile.craftAssessment.sentencePatterns}, words=${profile.craftAssessment.wordPatterns}, images=${profile.craftAssessment.imageSystem}`);
+  }
+
+  // North star
+  const ns = profile.index.northStarSummary;
+  if (ns.throughLineSummary) {
+    sections.push(`\nThrough-line: ${ns.throughLineSummary}`);
+  }
+
+  // Per-paragraph understanding (compact — role + function only)
+  sections.push('\n=== PER-PARAGRAPH UNDERSTANDING ===');
+  for (const para of profile.paragraphs) {
+    if (para.understanding) {
+      sections.push(`P${para.index}: Role="${para.understanding.role}" | Function="${para.understanding.function}" | Emotion="${para.understanding.emotionalRegister.dominantEmotion}" (${para.understanding.emotionalRegister.showVsTell})`);
+    }
+  }
+
+  // Connections (compact)
+  const activeConns = profile.connections?.all.filter(c => c.status === 'active') ?? [];
+  if (activeConns.length > 0) {
+    sections.push('\n=== KEY CONNECTIONS ===');
+    for (const conn of activeConns.slice(0, 10)) { // Cap at 10 for token efficiency
+      const from = `P${conn.from.paragraph}${conn.from.sentence !== undefined ? 'S' + conn.from.sentence : ''}`;
+      const to = `P${conn.to.paragraph}${conn.to.sentence !== undefined ? 'S' + conn.to.sentence : ''}`;
+      sections.push(`${from} → ${to}: ${conn.description} [${conn.strengthCategory}]`);
+    }
+  }
+
+  // Stale area hints
+  if (staleAreaHints && staleAreaHints.length > 0) {
+    sections.push('\n=== STALE AREAS (re-evaluate carefully) ===');
+    for (const hint of staleAreaHints) {
+      sections.push(`• ${hint}`);
+    }
+  }
+
+  // Finding context
+  if (findingContext && findingContext.length > 0) {
+    sections.push('\n=== FINDINGS ===');
+    sections.push(findingContext);
+  }
+
+  sections.push('\n=== INSTRUCTIONS ===');
+  sections.push(`Evaluate ALL ${profile.paragraphs.length} paragraphs (indices 0 through ${profile.paragraphs.length - 1}).`);
+  sections.push('For each paragraph, assign a verdict and reasoning based on how well it fulfills its structural role.');
+  sections.push('Then identify essay-level strengths, weaknesses, and coaching direction.');
+  sections.push('Produce the JSON output matching the schema in the system prompt.');
+
+  return sections.join('\n');
+}
+
 /**
  * Block 2: Essay text + complete understanding profile.
  * Cached across ALL parallel paragraph calls — major cost savings.
@@ -507,54 +783,23 @@ function buildProfileContext(profile: Readonly<EssayProfile>): string {
     }
   }
 
-  // Voice map (spatial voice tracking — complements voice identity)
+  // Voice map — COMPACT for scoring context (full voice map is in coaching, not needed for scoring)
+  // Only include: register baseline + shift count + notable shifts (max 2)
   if (profile.voiceMap) {
-    sections.push('\n--- Voice Map (spatial voice tracking) ---');
-    // Baselines (always show)
+    sections.push('\n--- Voice (compact) ---');
     if (profile.voiceMap.register?.baseline) {
-      sections.push(`Register baseline: ${profile.voiceMap.register.baseline}`);
+      sections.push(`Register: ${profile.voiceMap.register.baseline}`);
     }
-    if (profile.voiceMap.vocabularyFingerprint?.baseline) {
-      sections.push(`Vocabulary: ${profile.voiceMap.vocabularyFingerprint.baseline}`);
-      // Show up to 3 domains
-      const domains = profile.voiceMap.vocabularyFingerprint.domains?.slice(0, 3);
-      if (domains?.length) {
-        sections.push(`  Domains: ${domains.map(d => `${d.domain}: [${d.exampleWords?.slice(0, 4).join(', ') ?? ''}]`).join('; ')}`);
-      }
-    }
-    if (profile.voiceMap.sentenceRhythm?.baseline) {
-      sections.push(`Rhythm: ${profile.voiceMap.sentenceRhythm.baseline}`);
-    }
-    if (profile.voiceMap.perspectiveDistance?.baseline) {
-      sections.push(`Perspective: ${profile.voiceMap.perspectiveDistance.baseline}`);
-    }
-    if (profile.voiceMap.tonalDisposition?.baseline) {
-      sections.push(`Tonal disposition: ${profile.voiceMap.tonalDisposition.baseline}`);
-    }
-    // Stability regions (max 3)
-    if (profile.voiceMap.stabilityRegions?.length) {
-      sections.push('Stability regions:');
-      for (const region of profile.voiceMap.stabilityRegions.slice(0, 3)) {
-        sections.push(`  P[${region.paragraphs?.join(',') ?? '?'}]: ${region.voiceCharacter ?? 'unknown'}`);
-      }
-    }
-    // Voice shifts (ALL — most valuable for analysis)
-    if (profile.voiceMap.shifts?.length) {
-      sections.push('Voice shifts:');
-      for (const shift of profile.voiceMap.shifts) {
-        const loc = shift.location ? `P${shift.location.paragraph}${shift.location.sentence !== undefined ? 'S' + shift.location.sentence : ''}` : '?';
-        const dims = shift.dimensions?.join(', ') ?? '';
-        const intentAssessment = shift.intentionality?.assessment ?? '?';
-        const intentConf = shift.intentionality?.confidence ?? '?';
-        sections.push(`  ${loc} [${dims}]: ${shift.fromDescription ?? '?'} → ${shift.toDescription ?? '?'} (intentional: ${intentAssessment}, conf: ${intentConf})`);
-      }
-    }
-    // Code-switching (max 3)
-    if (profile.voiceMap.codeSwitching?.length) {
-      sections.push('Code-switching:');
-      for (const cs of profile.voiceMap.codeSwitching.slice(0, 3)) {
-        const loc = cs.location ? `P${cs.location.paragraph}${cs.location.sentence !== undefined ? 'S' + cs.location.sentence : ''}` : '?';
-        sections.push(`  ${loc}: ${cs.language ?? '?'} — ${cs.culturalFunction ?? ''}`);
+    const shiftCount = profile.voiceMap.shifts?.length ?? 0;
+    if (shiftCount > 0) {
+      sections.push(`Voice shifts: ${shiftCount} detected`);
+      // Show only the 2 most significant shifts (highest confidence)
+      const topShifts = [...(profile.voiceMap.shifts ?? [])]
+        .sort((a, b) => (b.intentionality?.confidence ?? 0) - (a.intentionality?.confidence ?? 0))
+        .slice(0, 2);
+      for (const shift of topShifts) {
+        const loc = shift.location ? `P${shift.location.paragraph}` : '?';
+        sections.push(`  ${loc}: ${shift.fromDescription ?? '?'} → ${shift.toDescription ?? '?'} (${shift.intentionality?.assessment ?? '?'})`);
       }
     }
   }
@@ -627,78 +872,39 @@ function buildProfileContext(profile: Readonly<EssayProfile>): string {
     }
   }
 
-  // Moment earnedness map
+  // Moment earnedness — COMPACT for scoring (mechanism count + gaps only, not full contribution text)
   if (profile.momentEarnednessMap && profile.momentEarnednessMap.moments.length > 0) {
-    sections.push('\n--- Moment Earnedness ---');
-    sections.push(`Structural observation: ${profile.momentEarnednessMap.structuralObservation}`);
+    sections.push('\n--- Earned-ness (compact) ---');
+    sections.push(`Architecture: ${profile.momentEarnednessMap.structuralObservation}`);
     for (const moment of profile.momentEarnednessMap.moments) {
-      // Show mechanism count without pre-judging earnedness — let the LLM evaluate the quality
-      // of earning based on the mechanisms themselves, not a threshold formula (LLM-first Rule 1)
-      sections.push(`  ${moment.momentType} at P${moment.location.paragraph}S${moment.location.sentence}: ${moment.description} [${moment.mechanisms.length} earning mechanism(s)]`);
-      if (moment.mechanisms?.length) {
-        for (const mech of moment.mechanisms) {
-          const loc = mech.location ? `P${mech.location.paragraph}${mech.location.sentence !== undefined ? 'S' + mech.location.sentence : ''}` : '';
-          const contribution = mech.contribution ? mech.contribution.substring(0, 120) : '';
-          sections.push(`    Mechanism: ${mech.type ?? 'unknown'} from ${loc}: ${contribution}`);
-        }
-      }
-      if (moment.gaps.length > 0) {
-        sections.push(`    Gaps: ${moment.gaps.join('; ')}`);
-      }
+      const gapNote = moment.gaps.length > 0 ? ` | gaps: ${moment.gaps.length}` : '';
+      sections.push(`  P${moment.location.paragraph}S${moment.location.sentence}: ${moment.description} [${moment.mechanisms.length} mechanisms${gapNote}]`);
     }
   }
 
-  // Cross-dimension entanglements
-  if (profile.entanglements && profile.entanglements.length > 0) {
-    sections.push('\n--- Cross-Dimension Entanglements ---');
-    for (const e of profile.entanglements) {
-      sections.push(`  [${e.dimensions.join('+')}] at P${e.location.paragraph}${e.location.sentence !== undefined ? `S${e.location.sentence}` : ''}: ${e.description}`);
-    }
+  // Entanglements — only include count for scoring context (full detail is in coaching)
+  const entanglementCount = profile.entanglements?.length ?? 0;
+  if (entanglementCount > 0) {
+    sections.push(`\nEntanglements: ${entanglementCount} cross-dimension moments detected`);
   }
 
-  // Per-paragraph understanding (ALL paragraphs — the LLM needs complete context)
-  // Phase 2: primaryFunction per sentence + findings (via [F] labels) replace [U] observation labels.
-  sections.push('\n=== PER-PARAGRAPH UNDERSTANDING ===');
-  sections.push('(Each sentence shows its primary function and significance level. Reference findings by [F] label for deeper context.)');
+  // Per-paragraph understanding — COMPACT digests for scoring context.
+  // The scored paragraph gets its full detail via Block 3 (buildParagraphPrompt).
+  // Other paragraphs only need their role + one-liner function for cross-paragraph calibration.
+  sections.push('\n=== PARAGRAPH ROLES ===');
   for (const para of profile.paragraphs) {
-    sections.push(`\n--- P${para.index} Understanding ---`);
     if (para.understanding) {
-      sections.push(`Role: ${para.understanding.role}`);
-      sections.push(`Function: ${para.understanding.function}`);
-      sections.push(`Narrative contribution: ${para.understanding.narrativeContribution}`);
-      sections.push(`Emotional register: ${para.understanding.emotionalRegister.dominantEmotion} (${para.understanding.emotionalRegister.depth}, ${para.understanding.emotionalRegister.authenticity})`);
-      sections.push(`Show vs tell: ${para.understanding.emotionalRegister.showVsTell}`);
-    }
-
-    for (const sentence of para.sentences) {
-      if (!sentence.understanding) continue;
-      sections.push(`  P${para.index}S${sentence.index}:`);
-      // Phase 2: primaryFunction is the primary per-sentence understanding
-      if (sentence.understanding.primaryFunction) {
-        sections.push(`    Primary function: ${sentence.understanding.primaryFunction} [${sentence.understanding.significance ?? 'contributing'}]`);
-      } else {
-        // Fallback for pre-Phase-1 profiles
-        const funcs = sentence.understanding.observedFunctions.map(o => o.observation).join('; ');
-        if (funcs) sections.push(`    Functions: ${funcs}`);
-      }
-      if (sentence.understanding.craft.techniques.length > 0) {
-        sections.push(`    Craft: rhythm=${sentence.understanding.craft.rhythm}, techniques=[${sentence.understanding.craft.techniques.join(', ')}]`);
-      }
+      sections.push(`P${para.index}: ${para.understanding.role} — ${para.understanding.function}`);
     }
   }
 
-  // Connections
+  // Connections — compact topology only (full descriptions are in coaching context, not scoring)
   const activeConns = profile.connections?.all.filter(c => c.status === 'active') ?? [];
   if (activeConns.length > 0) {
-    sections.push('\n=== CONNECTIONS ===');
+    sections.push(`\n=== CONNECTIONS (${activeConns.length} active) ===`);
+    // Just show the topology — which paragraphs connect to which
     for (const conn of activeConns) {
-      const from = conn.from.sentence !== undefined
-        ? `P${conn.from.paragraph}S${conn.from.sentence}`
-        : `P${conn.from.paragraph}`;
-      const to = conn.to.sentence !== undefined
-        ? `P${conn.to.paragraph}S${conn.to.sentence}`
-        : `P${conn.to.paragraph}`;
-      sections.push(`  ${conn.id}: ${from} → ${to}: ${conn.description} [${conn.routingTags.join(',')}] (${conn.strengthCategory})`);
+      sections.push(`  P${conn.from.paragraph}→P${conn.to.paragraph} [${conn.routingTags.join(',')}] (${conn.strengthCategory})`);
     }
   }
 
@@ -1061,8 +1267,64 @@ export class AnalysisPassService {
         cost: emptyPhaseResult.cost,
         tokenUsage: emptyPhaseResult.tokenUsage,
         timingMs: Date.now() - startTime,
+        analysisMode: 'paragraph_level',
         failedParagraphs: [],
       };
+    }
+
+    // ── Phase-aware cost optimization: route between essay-level and paragraph-level ──
+    // Essay-level = 1 Sonnet call (~$0.10-0.15) for foundation/architecture essays
+    // Paragraph-level = anchor + parallel calls (~$0.50-0.92) for craft/polish/distinction
+    const phaseEstimate = estimatePhaseFromProfile(profile);
+
+    if (phaseEstimate === 'early') {
+      console.log(
+        `[AnalysisPass] Mode: essay_level (early phase), 1 Sonnet call for ${analyzableParagraphs.length} paragraphs`,
+      );
+      try {
+        return await this.analyzeEssayLevel(profile, staleAreaHints, findingStore, essayType, startTime);
+      } catch (error) {
+        // DO NOT fall back to expensive per-paragraph mode — that would cost 7-10x more.
+        // Return a minimal degraded result with phase assessment only. The coaching system
+        // can still function with paragraph understanding from L3 even without L3.5 scores.
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.error(
+          `[AnalysisPass] Essay-level analysis failed: ${errorMsg}. Returning degraded result (NOT falling back to per-paragraph — would waste budget).`,
+        );
+
+        // Still run phase assessment — it can work from holistic profile data even without L3.5 scores
+        let degradedPhase: ImprovementPhase;
+        try {
+          const phaseResult = await assessPhase({ analyses: [], profile, essayType });
+          degradedPhase = phaseResult.phase;
+        } catch {
+          degradedPhase = {
+            level: 'foundation',
+            reasoning: 'L3.5 analysis failed — defaulting to foundation phase',
+            focusAreas: ['Essay structure and clarity'],
+            deferredAreas: [],
+            readinessAssessment: 'Analysis incomplete — coaching available but scoring data unavailable',
+            legacyReadiness: { essayLevel: 20, paragraphLevel: 25, sentenceLevel: 20, wordLevel: 0 },
+            dimensionPhases: [],
+            coachingLens: 'Focus on structural guidance. Per-paragraph scoring is not yet available.',
+            transition: null,
+          };
+        }
+
+        return {
+          paragraphAnalyses: [],
+          improvementPhase: degradedPhase,
+          cost: 0,
+          tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          timingMs: Date.now() - startTime,
+          analysisMode: 'essay_level' as const,
+          failedParagraphs: [], // Empty — essay-level failure is not a per-paragraph failure
+        };
+      }
+    } else {
+      console.log(
+        `[AnalysisPass] Mode: paragraph_level (mature phase), anchor + parallel for ${analyzableParagraphs.length} paragraphs`,
+      );
     }
 
     // Build cached context blocks (shared across all parallel calls)
@@ -1285,9 +1547,202 @@ export class AnalysisPassService {
       cost: totalCost,
       tokenUsage: totalUsage,
       timingMs,
+      analysisMode: 'paragraph_level' as const,
       failedParagraphs,
       distributionDiagnostics: diagnostics,
     };
+  }
+
+  /**
+   * Essay-level analysis — 1 Sonnet call for the whole essay.
+   * Used for early-phase essays (foundation/architecture) where sentence-level scoring
+   * is noise. Produces paragraph-level verdicts + essay-level strengths/weaknesses.
+   *
+   * Output is AnalysisPassOutput[]-compatible: each paragraph gets effectiveness + verdict +
+   * holisticAnalysisEvolution, but sentenceAnalyses is an EMPTY array.
+   */
+  private async analyzeEssayLevel(
+    profile: Readonly<EssayProfile>,
+    staleAreaHints?: string[],
+    findingStore?: FindingStore,
+    essayType?: EssayType,
+    startTime?: number,
+  ): Promise<L35AnalysisResult> {
+    const start = startTime ?? Date.now();
+
+    // Build finding context for ALL paragraphs (combined)
+    let combinedFindingContext: string | undefined;
+    if (findingStore) {
+      const allContexts: string[] = [];
+      for (const para of profile.paragraphs) {
+        const ctx = buildAnnotationFindingContext(findingStore, para.index);
+        if (ctx && ctx.length > 0) allContexts.push(ctx);
+      }
+      if (allContexts.length > 0) {
+        combinedFindingContext = allContexts.join('\n');
+      }
+    }
+
+    const systemPrompt = buildEssayLevelSystemPrompt();
+    const userPrompt = buildEssayLevelUserPrompt(profile, staleAreaHints, combinedFindingContext);
+
+    const response = await callClaude<string>(
+      {
+        model: SONNET,
+        systemPrompt,
+        userPrompt,
+        maxTokens: 2000,
+        temperature: ANALYSIS_TEMPERATURE,
+        // Essay-level call analyzes ALL paragraphs at once — needs more time than a single-paragraph call.
+        // 180s (3 min) is generous for a single Sonnet call producing ~1500-2000 output tokens.
+        timeoutMs: 180_000,
+        // JSON mode for reliable structured output parsing
+        useJsonMode: true,
+        cacheSystemPrompt: true,
+      },
+    );
+
+    const cost = calculateCost(response.usage, SONNET);
+    console.log(
+      `[EssayIntelligence] L3.5 essay-level: ${response.usage.input_tokens.toLocaleString()} input + ` +
+      `${response.usage.output_tokens.toLocaleString()} output = $${cost.toFixed(4)}`,
+    );
+
+    // Parse the LLM response
+    const parsed = parseLlmJsonOutput(response.content, 'L3.5 essay-level analysis');
+
+    // Transform into AnalysisPassOutput[] (compatible with existing downstream)
+    const results = this.transformEssayLevelOutput(parsed, profile);
+
+    // Assess improvement phase (still runs — uses whatever analysis data is available)
+    const priorPhase = profile.index?.improvementPhase ?? null;
+    const phaseResult = await assessPhase({
+      analyses: results,
+      profile,
+      essayType,
+      priorPhase: priorPhase.level !== 'foundation' || priorPhase.reasoning !== 'Initial profile — no analysis has been performed yet'
+        ? priorPhase
+        : null,
+    });
+
+    const totalCost = cost + phaseResult.cost;
+    const timingMs = Date.now() - start;
+
+    console.log(
+      `[AnalysisPass] Complete (essay-level): ${results.length} paragraph verdicts, ` +
+      `phase=${phaseResult.phase.level}, cost=$${totalCost.toFixed(4)}, time=${timingMs}ms`,
+    );
+
+    return {
+      paragraphAnalyses: results,
+      improvementPhase: phaseResult.phase,
+      cost: totalCost,
+      tokenUsage: {
+        inputTokens: response.usage.input_tokens + phaseResult.tokenUsage.inputTokens,
+        outputTokens: response.usage.output_tokens + phaseResult.tokenUsage.outputTokens,
+        cacheReadTokens: (response.usage.cache_read_input_tokens ?? 0) + phaseResult.tokenUsage.cacheReadTokens,
+        cacheWriteTokens: (response.usage.cache_creation_input_tokens ?? 0) + phaseResult.tokenUsage.cacheWriteTokens,
+      },
+      timingMs,
+      analysisMode: 'essay_level',
+      failedParagraphs: [],
+    };
+  }
+
+  /**
+   * Transform essay-level LLM output into AnalysisPassOutput[] compatible with downstream systems.
+   *
+   * Maps verdict → effectiveness score:
+   * - strong → 80, functional → 65, developing → 50, weak → 35
+   *
+   * sentenceAnalyses is EMPTY array for each paragraph (no per-sentence data at this phase).
+   */
+  private transformEssayLevelOutput(
+    raw: Record<string, unknown>,
+    profile: Readonly<EssayProfile>,
+  ): AnalysisPassOutput[] {
+    const verdictToScore: Record<string, number> = {
+      strong: 80,
+      functional: 65,
+      developing: 50,
+      weak: 35,
+    };
+
+    const results: AnalysisPassOutput[] = [];
+    const rawVerdicts = Array.isArray(raw.paragraphVerdicts) ? raw.paragraphVerdicts : [];
+    const rawStrengths = Array.isArray(raw.essayStrengths) ? raw.essayStrengths : [];
+    const rawWeaknesses = Array.isArray(raw.essayWeaknesses) ? raw.essayWeaknesses : [];
+
+    for (const para of profile.paragraphs) {
+      // Find this paragraph's verdict
+      const rawVerdict = rawVerdicts.find(
+        (v: Record<string, unknown>) => Number(v.paragraphIndex) === para.index,
+      ) as Record<string, unknown> | undefined;
+
+      const verdictStr = String(rawVerdict?.verdict ?? 'developing').toLowerCase();
+      const effectiveness = verdictToScore[verdictStr] ?? 50;
+      const reasoning = String(rawVerdict?.reasoning ?? 'No reasoning provided');
+
+      // Build strength signatures from essay-level strengths that reference this paragraph
+      const strengthSignatures: Array<{ quality: string; evidence: string; paragraphs: number[] }> = [];
+      for (const s of rawStrengths) {
+        const obj = s as Record<string, unknown>;
+        const paragraphs = Array.isArray(obj.paragraphs) ? obj.paragraphs.map(Number) : [];
+        if (paragraphs.includes(para.index) || paragraphs.length === 0) {
+          strengthSignatures.push({
+            quality: String(obj.quality ?? ''),
+            evidence: String(obj.evidence ?? ''),
+            paragraphs: paragraphs.length > 0 ? paragraphs : [para.index],
+          });
+        }
+      }
+
+      // Add paragraph-specific strength if present
+      if (rawVerdict?.primaryStrength && typeof rawVerdict.primaryStrength === 'string') {
+        strengthSignatures.push({
+          quality: rawVerdict.primaryStrength,
+          evidence: reasoning,
+          paragraphs: [para.index],
+        });
+      }
+
+      // Build growth edges from essay-level weaknesses that reference this paragraph
+      const growthEdges: Array<{ quality: string; description: string; paragraphs: number[] }> = [];
+      for (const w of rawWeaknesses) {
+        const obj = w as Record<string, unknown>;
+        const paragraphs = Array.isArray(obj.paragraphs) ? obj.paragraphs.map(Number) : [];
+        if (paragraphs.includes(para.index) || paragraphs.length === 0) {
+          growthEdges.push({
+            quality: String(obj.quality ?? ''),
+            description: String(obj.description ?? ''),
+            paragraphs: paragraphs.length > 0 ? paragraphs : [para.index],
+          });
+        }
+      }
+
+      // Add paragraph-specific weakness if present
+      if (rawVerdict?.primaryWeakness && typeof rawVerdict.primaryWeakness === 'string') {
+        growthEdges.push({
+          quality: rawVerdict.primaryWeakness,
+          description: reasoning,
+          paragraphs: [para.index],
+        });
+      }
+
+      results.push({
+        paragraphIndex: para.index,
+        sentenceAnalyses: [], // EMPTY — no per-sentence data at essay-level phase
+        paragraphEffectiveness: effectiveness,
+        paragraphVerdict: reasoning,
+        holisticAnalysisEvolution: {
+          strengthSignatures: strengthSignatures.length > 0 ? strengthSignatures : undefined,
+          growthEdges: growthEdges.length > 0 ? growthEdges : undefined,
+          aoTakeaway: typeof raw.coachingDirection === 'string' ? raw.coachingDirection : undefined,
+        },
+      });
+    }
+
+    return results;
   }
 
   /**

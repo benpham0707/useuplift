@@ -1,1412 +1,1403 @@
-# Implementation Blueprint: Conversator Intelligence System
+# FORGE_PLAN.md -- Final Implementation Blueprint (13 Gaps)
 
-> **Version**: v3 (Reality-Checked Blueprint)
-> **Status**: Ready to implement
-> **Date**: 2026-03-15
-
-The Conversator Intelligence System gives the essay analysis pipeline access to what the student KNOWS but didn't WRITE. It operates across three layers: (1) a pre-analysis GatheringService that conducts a 2-4 turn conversation to capture intent, domain expertise, audience, backstory, emotional stakes, and voice choices; (2) pipeline injection that threads this declared data into L3 walk, L3.75 synthesis, L3.5 analysis, L4 crystallization, and L5 annotations; and (3) coaching-time intelligence extraction that continues gathering declared data during L6 conversations, with bidirectional synergy mechanisms connecting all layers.
-
-The single persistent data model is `DeclaredDataEntry[]` on `EssayProfile.studentDeclaredData`. The GatheringService produces an intermediate `StudentDeclaredContext` during crystallization, which is immediately converted to initial `DeclaredDataEntry[]` entries. From that point forward, all consumers read from the same unified array.
+> **Version**: v1 (Reality-Checked)
+> **Date**: 2026-03-18
+> **Status**: FINAL -- passes the "start coding" test
+> **Verification**: Every code path, type, and prompt traced against real codebase
 
 ---
 
-## Architecture Overview
+## DEPENDENCY CHAIN & IMPLEMENTATION ORDER
 
 ```
-+-----------------------------------------------------------------+
-|  LAYER 1: Pre-Analysis Gathering (GatheringService)              |
-|                                                                   |
-|  Essay Text --> Sonnet Seed Questions --> Student Answers          |
-|                --> Haiku Classification --> Sonnet Crystallization  |
-|                                                                   |
-|  Output: StudentDeclaredContext (intermediate)                    |
-|       --> CONVERTED TO --> initial DeclaredDataEntry[]             |
-|                             stored on EssayProfile                |
-+-----------------------+-------------------------------------------+
-                        |
-                        v
-+-----------------------------------------------------------------+
-|  LAYER 2: Pipeline Injection                                      |
-|                                                                   |
-|  buildDeclaredDataBlock(profile.studentDeclaredData) -->           |
-|    L3 walk (after essay text, before accumulated understanding)    |
-|    L3.75 synthesis (after holistic scaffold)                       |
-|    L3.5 analysis (Block 2 cached context)                         |
-|    L4 crystallizer (near IntentBridge schema)                     |
-|    L5 annotations (after phase context)                           |
-|                                                                   |
-|  L1, L2, L2.5 EXCLUDED (descriptive/structural -- no bias)       |
-+-----------------------+-------------------------------------------+
-                        |
-                        v
-+-----------------------------------------------------------------+
-|  LAYER 3: Coaching-Time Intelligence (L6)                         |
-|                                                                   |
-|  Stage 2.5: Question injection (targetAudience: 'student')        |
-|  Stage 4: Declared data extraction (declaredEntries[] on output)  |
-|  DeclaredDataMutator: storage + supersession + staleness          |
-|  IntentGapDetector: post-L3.5 gap --> Finding generation           |
-|  Adaptive overlay: declared data in all routing rules             |
-+-----------------------+-------------------------------------------+
-                        |
-                        v
-+-----------------------------------------------------------------+
-|  SYNERGY LAYER (SYN-1 through SYN-9)                              |
-|                                                                   |
-|  Bidirectional amplification between gathering, pipeline,         |
-|  and coaching. $0-0.005 marginal cost per round.                  |
-+-----------------------------------------------------------------+
+Phase 0 — CRITICAL BUGS + quick wins (parallel, ~4 hrs):
+  GAP-14  (Activity Major Alignment)  -- CRITICAL bug: Robotics ≠ irrelevant to ME
+  GAP-15  (Coaching Length Directive)  -- complement GAP-1 with prompt-level word limits
+  GAP-20  (Resistance → Brief)        -- map resistance states to brief intensity
+  GAP-9   (False Precision)           -- effectiveness bands utility
+  GAP-7   (Emotional Cues)            -- activity workshop, isolated
+  GAP-11  (School Context)            -- activity workshop, isolated
+
+Phase 1 — Essay Intelligence foundation (parallel, ~6 hrs):
+  GAP-18  (Observation Quality Filter) -- L3 walk: 129→30-45 observations
+  GAP-19  (Voice Intentionality)       -- quality-level-aware calibration in L3.75
+  GAP-21  (Scope Inflation + Red Flags) -- add 3 structural red flag patterns to L3.75
+  GAP-4   (AO First Read)             -- new file + orchestrator wiring
+  GAP-5   (Person Portrait)           -- L3.75 prompt: lunch framing
+  GAP-10  (Archetype)                 -- L3.75 type + prompt, feeds GAP-8
+
+Phase 2 — Scoring & Phase (depends on Phase 1, ~2 hrs):
+  GAP-17  (Scoring Calibration)       -- widen effective scoring range (implement FIRST)
+  GAP-3   (Phase Detector)            -- phaseAssessment.ts narrative calibration
+  GAP-8   (Scoring Bias)              -- analysisPass.ts admissions criteria (implement AFTER 17)
+
+Phase 3 — Coaching layer (depends on Phase 2, ~3 hrs):
+  GAP-1   (Response Intensity)        -- coachingService.ts maxTokens wiring
+  GAP-2   (Learning Style)            -- coachingService.ts sidecar + accumulation
+  GAP-6   (Strategic Thread)          -- coachingService.ts strategic question + staleness
+
+Phase 4 — Cross-cutting (depends on modules existing, ~3 hrs):
+  GAP-16  (PIQ Ceiling Recognition)   -- reduce suggestions for 85+ PIQs
+  GAP-12  (PIQ Portfolio)             -- embedded portfolio context
+  GAP-13  (Cross-Module Bridge)       -- new bridge file, all modules
 ```
 
 ---
 
-## Types (add to `profileTypes.ts`)
+## GAP-9: False Precision (Score Presentation)
 
-### DeclaredDataEntry -- the UNIFIED persistent data model
+**Decision**: Agent A -- effectiveness bands
+**Files**: New utility (suggest `src/services/essayIntelligence/analysis/effectivenessBands.ts`)
+**Risk**: Low
+**Effort**: ~30 min
+
+### What to Build
+
+A `toEffectivenessBand()` utility function that maps 0-100 scores to named bands for user-facing display. Internal scoring remains 0-100.
+
+### Type Definition
 
 ```typescript
-/**
- * Categories of student-declared data.
- * Each category has different downstream routing behavior.
- */
-export type DeclaredDataCategory =
-  | 'intent'          // What the student is trying to achieve with this essay
-  | 'domain'          // Domain expertise or cultural knowledge behind references
-  | 'audience'        // Who this essay is for (school, program, reader)
-  | 'backstory'       // Context invisible in the text (life events, relationships)
-  | 'emotional_stakes' // Why this essay matters personally to the student
-  | 'voice_choice'    // Intentional stylistic decisions explained by the student
-  | 'correction'      // Student says the analysis got something wrong
-  | 'preference';     // Student expresses a stylistic preference
+// src/services/essayIntelligence/analysis/effectivenessBands.ts
 
-/**
- * Where in the essay this declaration applies.
- * 'essay_wide' for declarations that span the entire essay.
- */
-export interface LocationScope {
-  type: 'essay_wide' | 'paragraph' | 'sentence';
-  paragraph?: number;   // 0-based, required for paragraph/sentence scope
-  sentence?: number;    // 0-based, required for sentence scope
+export type EffectivenessBand =
+  | 'masterful'     // 96-100
+  | 'exceptional'   // 86-95
+  | 'strong'        // 76-85
+  | 'functional'    // 55-75
+  | 'developing'    // 40-54
+  | 'problematic';  // 0-39
+
+export interface EffectivenessBandResult {
+  band: EffectivenessBand;
+  label: string;          // "Strong" (title case for display)
+  description: string;    // "Does its job with distinction"
+  range: [number, number]; // [76, 85]
 }
 
-/**
- * How certain the student is about this declaration.
- * Affects downstream weighting -- 'exploring' entries are deprioritized
- * in IntentBridge synthesis and supersession.
- */
-export type StudentCertainty = 'definite' | 'tentative' | 'exploring';
-
-/**
- * DeclaredDataEntry -- a single piece of student-declared data.
- *
- * This is the ONLY persistent data model for student declarations.
- * GatheringService produces initial entries; L6 coaching adds more.
- * Supersession: later entries for same location+category supersede earlier.
- */
-export interface DeclaredDataEntry {
-  /** Unique ID (e.g., 'D1', 'D2', ...) */
-  id: string;
-  /** When this entry was created */
-  timestamp: string;
-  /** What category of declaration */
-  category: DeclaredDataCategory;
-  /** Where in the essay this applies */
-  location: LocationScope;
-  /** The student's actual words (preserved exactly) */
-  content: string;
-  /** How certain the student seems */
-  certainty: StudentCertainty;
-  /** Source of this entry */
-  source: 'gathering' | 'coaching';
-  /** If sourced from coaching, the ConversationInsight ID */
-  sourceInsightId?: string;
-  /** If this entry supersedes an earlier one */
-  supersedes?: string;
-}
+export function toEffectivenessBand(score: number): EffectivenessBandResult;
 ```
 
-### StudentDeclaredContext -- intermediate crystallization format ONLY
+### Implementation
 
-```typescript
-/**
- * Used ONLY as the Sonnet crystallization output format.
- * Immediately converted to DeclaredDataEntry[] after crystallization.
- * NOT stored on EssayProfile. NOT consumed by any pipeline layer.
- */
-export interface StudentDeclaredContext {
-  intent: string | null;
-  domain: string | null;
-  audience: string | null;
-  backstory: string | null;
-  emotionalStakes: string | null;
-  voiceChoices: string | null;
-  contradictions: Array<{ declared: string; observed: string; tension: string }>;
-  confidence: 'partial' | 'complete';
-  rawExchanges: Array<{ role: 'system' | 'student'; content: string }>;
-}
-```
+Map ranges from the existing calibration table in `analysisPass.ts` lines 315-322:
 
-### EssayProfile Extension
+| Score | Band | Label | Description |
+|-------|------|-------|-------------|
+| 96-100 | masterful | Masterful | Would make an AO pause and re-read |
+| 86-95 | exceptional | Exceptional | Memorable after reading 50 essays |
+| 76-85 | strong | Strong | Does its job with distinction |
+| 55-75 | functional | Functional | Competent but not memorable |
+| 40-54 | developing | Developing | Gets the point across with issues |
+| 0-39 | problematic | Problematic | Actively harms the essay |
 
-```typescript
-// ADD to EssayProfile interface in profileTypes.ts
-// Position: after conversationInsights, before metadata
+### Consumer Sites
+- Frontend components displaying sentence/paragraph scores
+- Any coaching response that references scores to students
+- The utility is a pure function -- no LLM calls, no side effects
 
-/** Student-declared data -- gathered pre-analysis and during L6 coaching.
- *  Unified array: GatheringService provides initial entries, coaching adds more.
- *  Supersession: later entries for same location+category supersede earlier. */
-studentDeclaredData: DeclaredDataEntry[];
-```
-
-### PipelineInput Extension
-
-```typescript
-// ADD to PipelineInput interface in analysisOrchestrator.ts
-
-/** Pre-gathered student declared context.
- *  If provided, seeded into profile.studentDeclaredData before pipeline starts.
- *  If not provided, pipeline runs without student context (current behavior). */
-studentDeclaredContext?: StudentDeclaredContext;
-```
+### Test
+Unit test: input scores at boundaries (0, 39, 40, 54, 55, 75, 76, 85, 86, 95, 96, 100) map to correct bands. Edge cases: NaN -> problematic, negative -> problematic, >100 -> masterful.
 
 ---
 
-## Implementation Item 1: GatheringService
+## GAP-7: Emotional Cues (Activity Workshop)
 
-**New file**: `src/services/essayIntelligence/analysis/gatheringService.ts` (~300 lines)
+**Decision**: Hybrid (A's softened ban + B's translation table)
+**Files**: `src/services/portfolioStrategy/services/activityWorkshop/chat/dynamicConversationEngine.ts`, `src/services/portfolioStrategy/services/activityWorkshop/chat/questionGenerator.ts`
+**Risk**: Low
+**Effort**: ~45 min
 
-A standalone 3-phase service that operates in the pre-analysis void. No dependency on profile, synthesis, reading strategy, coaching service, or question queue.
+### Change 1: Soften the ban in dynamicConversationEngine.ts
 
-### Phase 1: Seed Question Generation
+**File**: `dynamicConversationEngine.ts`
+**Location**: Lines 574-578 (the "DON'T ASK ABOUT" section in `buildSystemPrompt()`)
 
-**LLM Call Spec:**
-| Field | Value |
-|-------|-------|
-| Model | `claude-sonnet-4-5-20250929` (MODEL CONSTRAINT: question gen = Sonnet) |
-| Caching | `cacheSystemPrompt: true` |
-| Max tokens | 1500 |
-| Temperature | 0.5 |
-| Timeout | 45000ms |
-| Input cost | ~1500 tokens system + ~2000 tokens essay = ~3500 tokens = ~$0.0105 input |
-| Output cost | ~500 tokens = ~$0.0075 |
-| Total | ~$0.006 (with cache hits: ~$0.003) |
-
-**System prompt:**
+**Current**:
 ```
-You are reading a college application essay for the first time. Your job is to
-identify what you CANNOT know from the text alone -- the author's invisible context.
-
-Generate 2-3 questions that would most deepen understanding of this essay.
-Focus on these facets (prioritize whichever has the biggest gap):
-- INTENT: What is the writer trying to achieve? What should the reader take away?
-- DOMAIN: Does the essay reference specialized knowledge the writer has?
-- BACKSTORY: What happened before/after what the essay describes?
-- EMOTIONAL STAKES: Why does this story/topic matter to the writer personally?
-- VOICE CHOICES: Are there stylistic decisions that might be intentional?
-- AUDIENCE: Is this essay for a specific school/program/reader?
-
-RULES:
-- Questions must be answerable by the writer (not by further analysis)
-- Questions should feel natural and curious, not interrogative
-- Each question should target a DIFFERENT facet
-- Order by information value (most important first)
-
-OUTPUT: JSON array of objects:
-[
-  {
-    "question": "the question text",
-    "facet": "intent" | "domain" | "backstory" | "emotional_stakes" | "voice_choice" | "audience",
-    "rationale": "why this information would deepen understanding"
-  }
-]
+DON'T ASK ABOUT:
+- "What was hardest/most challenging?" (struggles don't make impressive descriptions)
+- "What obstacles/barriers did you face?" (same problem - focuses on difficulty, not achievement)
+- "How did you feel?" (vague, doesn't translate to concrete descriptions)
+- Generic struggles, difficulties, or challenges
 ```
 
-**User prompt:**
+**Replace with**:
 ```
-ESSAY TEXT:
+DON'T INITIATE QUESTIONS ABOUT:
+- "What was hardest/most challenging?" (struggles don't make impressive descriptions)
+- "What obstacles/barriers did you face?" (same problem - focuses on difficulty, not achievement)
+- "How did you feel?" (vague, doesn't translate to concrete descriptions)
+- Generic struggles, difficulties, or challenges
 
-{essayText}
+WHEN A STUDENT VOLUNTEERS EMOTIONAL CONTEXT (they bring it up, you don't ask):
+Emotion is EVIDENCE OF STAKES. Translate it into description-worthy content:
+- "terrified/nervous" -> the stakes were high enough to feel personal risk -> ask about WHAT was at risk
+- "proud/excited" -> the outcome mattered to them personally -> ask about the specific outcome
+- "frustrated/angry" -> they cared enough to push through -> ask about what they DID about it
+- "passionate/obsessed" -> sustained deep engagement -> ask about hours, duration, depth
+- "overwhelmed" -> the scope was significant -> ask about scale and what they managed
 
-Generate 2-3 questions for the writer.
+Example: Student says "I was so nervous presenting to the board"
+BAD follow-up: "How did you handle that nervousness?"
+GOOD follow-up: "Presenting to a board — how many people were you presenting to, and what were you asking them to approve?"
+The emotion tells you the stakes were real. Now get the FACTS that prove it.
 ```
 
-**Validation:**
+### Change 2: Add follow-up template in questionGenerator.ts
+
+**File**: `questionGenerator.ts`
+**Location**: After line 305 (after `short_response` in `FOLLOW_UP_TEMPLATES`)
+
+**Add**:
 ```typescript
-interface SeedQuestion {
-  question: string;
-  facet: 'intent' | 'domain' | 'backstory' | 'emotional_stakes' | 'voice_choice' | 'audience';
-  rationale: string;
-}
-
-function validateSeedQuestions(raw: unknown): SeedQuestion[] {
-  const parsed = parseLlmJsonOutput(raw, 'gatheringSeedQuestions');
-  if (!Array.isArray(parsed)) return [];
-  return parsed
-    .filter((q: Record<string, unknown>) =>
-      typeof q.question === 'string' &&
-      typeof q.facet === 'string' &&
-      ['intent', 'domain', 'backstory', 'emotional_stakes', 'voice_choice', 'audience'].includes(q.facet as string)
-    )
-    .map((q: Record<string, unknown>) => ({
-      question: q.question as string,
-      facet: q.facet as SeedQuestion['facet'],
-      rationale: typeof q.rationale === 'string' ? q.rationale as string : '',
-    }))
-    .slice(0, 3);  // Cap at 3
-}
+mentioned_emotion: [
+  "That sounds like the stakes were real. What specifically was on the line?",
+  "When you felt that way, what were you in the middle of? Walk me through the specifics.",
+  "That emotion tells me you cared deeply about this. What was the concrete outcome?",
+],
 ```
 
-### Phase 2: Multi-Turn Gathering
+### Test
+Manual: provide an activity description, then in conversation say "I was really nervous about presenting." Verify the response probes for FACTS (who, how many, what outcome) rather than FEELINGS.
 
-Student answers seed questions. Each answer is classified by Haiku.
+---
 
-**Classification LLM Call Spec:**
-| Field | Value |
-|-------|-------|
-| Model | `claude-haiku-4-5-20251001` (classification = Haiku) |
-| Caching | `cacheSystemPrompt: true` |
-| Max tokens | 256 |
-| Temperature | 0.1 |
-| Timeout | 15000ms |
-| Cost | ~$0.001 per classification |
+## GAP-11: School/Competition Context (Activity Workshop)
 
-**Classification prompt:**
-```
-Classify the student's response into one or more of these facets:
-intent, domain, audience, backstory, emotional_stakes, voice_choice
+**Decision**: Hybrid (A's templates + B's advocacy framing)
+**Files**: `src/services/portfolioStrategy/services/activityWorkshop/chat/questionGenerator.ts`
+**Risk**: Low
+**Effort**: ~30 min
 
-The student was asked: "{questionText}"
-The student answered: "{studentResponse}"
+### What to Add
 
-OUTPUT: JSON object:
-{
-  "primaryFacet": "intent" | "domain" | "audience" | "backstory" | "emotional_stakes" | "voice_choice",
-  "secondaryFacets": ["facet", ...],
-  "extractedContent": "the key information from the response"
-}
-```
+New question templates in `QUESTION_TEMPLATES` after the existing `connections.characterTraits` block (line ~274). These are framed as advocacy (building the student's case), not data collection.
 
-**Gap detection (pure logic, no LLM):**
 ```typescript
-function detectGaps(
-  classifiedResponses: Array<{ facet: string; content: string }>,
-): string[] {
-  const covered = new Set(classifiedResponses.map(r => r.facet));
-  const allFacets = ['intent', 'domain', 'audience', 'backstory', 'emotional_stakes', 'voice_choice'];
-  return allFacets.filter(f => !covered.has(f));
-}
-```
-
-If gaps remain after initial questions, generate 1 follow-up question targeting the most important uncovered facet. Conversation cap: 4 turns total (2-3 seed questions + 1 optional follow-up).
-
-### Phase 3: Crystallization
-
-**LLM Call Spec:**
-| Field | Value |
-|-------|-------|
-| Model | `claude-sonnet-4-5-20250929` (synthesis = Sonnet) |
-| Caching | `cacheSystemPrompt: true` |
-| Max tokens | 2000 |
-| Temperature | 0.3 |
-| Timeout | 60000ms |
-| Input cost | ~1000 tokens system + ~2000 tokens essay + ~1500 tokens conversation = ~4500 tokens = ~$0.0135 |
-| Output cost | ~800 tokens = ~$0.012 |
-| Total | ~$0.010 (with cache hits: ~$0.008) |
-
-**System prompt:**
-```
-You are synthesizing a pre-analysis conversation with a college essay writer into
-structured context. The writer has answered questions about their essay.
-
-Synthesize their declarations into the output format below. Important:
-- Preserve the student's exact words for intent and voice choices
-- Flag contradictions between what they SAY and what the essay TEXT shows
-  (these are coaching gold -- the divergence IS the discovery)
-- Mark confidence as 'complete' only if all 6 facets have substantive content
-- Leave facets as null if the student didn't address them (don't fabricate)
-
-OUTPUT: JSON object matching this schema:
-{
-  "intent": "string or null -- what the student says they're trying to achieve",
-  "domain": "string or null -- domain expertise or cultural knowledge",
-  "audience": "string or null -- target school/program/reader",
-  "backstory": "string or null -- context not visible in the text",
-  "emotionalStakes": "string or null -- why this matters personally",
-  "voiceChoices": "string or null -- intentional stylistic decisions",
-  "contradictions": [
-    {
-      "declared": "what the student said",
-      "observed": "what the text actually shows",
-      "tension": "the meaningful divergence"
-    }
+// CONTEXT - Competitive Environment (builds the case for impressiveness)
+'facts.context.schoolSize': {
+  questions: [
+    "How big is your school? That helps me understand the scale of what you did.",
+    "How many students are at your school — roughly?",
   ],
-  "confidence": "partial" | "complete"
+  category: 'numeric_ask',
+  phase: 'fact_gathering',
+  priority: 'medium',
+},
+'facts.context.competitionLevel': {
+  questions: [
+    "Was there a selection process to get this role, or did you create it yourself?",
+    "How many people applied or tried out? That selectivity makes your role more impressive.",
+    "Were you chosen for this — and if so, from how many candidates?",
+  ],
+  category: 'specific_probe',
+  phase: 'fact_gathering',
+  priority: 'high',
+},
+'facts.context.fieldSelectivity': {
+  questions: [
+    "In your field, how competitive is this level of achievement?",
+    "How does what you accomplished compare to others at your level?",
+    "Is this the kind of thing most students can do, or is it rare?",
+  ],
+  category: 'specific_probe',
+  phase: 'fact_gathering',
+  priority: 'medium',
+},
+```
+
+### Test
+Run the question generator with an activity profile that has leadership signals but no context fields populated. Verify the context templates appear as candidates.
+
+---
+
+## GAP-4: AO First Read Simulation
+
+**Decision**: Agent A -- new Haiku call, parallel with L1
+**Files**: New file `src/services/essayIntelligence/analysis/aoFirstRead.ts`, modify `src/services/essayIntelligence/analysis/analysisOrchestrator.ts`, add type to `profileTypes.ts`
+**Risk**: Medium (new pipeline stage)
+**Effort**: ~2 hours
+
+### Type Definition
+
+Add to `profileTypes.ts`:
+
+```typescript
+/**
+ * AOFirstRead -- the naive gut reaction of an admissions officer
+ * reading this essay for the first time under attention fatigue.
+ *
+ * Produced by a Haiku call PARALLEL with L1. The value is the naive
+ * reaction BEFORE deep understanding -- something L3.75's admissionsPositioning
+ * cannot replicate because it knows too much.
+ */
+export interface AOFirstRead {
+  /** Where in the first paragraph (if anywhere) the AO's attention locks in */
+  hookMoment: string | null;
+  /** One sentence the AO would say to a colleague: "This is the essay about..." */
+  committeeOneLiner: string;
+  /** What makes this essay NOT just another [topic] essay -- or null if it IS just another one */
+  distinctivenessSignal: string | null;
+  /** Risk of being put down after paragraph 1: high / moderate / low */
+  putDownRisk: 'high' | 'moderate' | 'low';
+  /** Gut reaction reasoning: 2-3 sentences of honest AO internal monologue */
+  gutReaction: string;
 }
 ```
 
-**User prompt:**
-```
-ESSAY TEXT:
-{essayText}
-
-GATHERING CONVERSATION:
-{formattedConversation}
-
-Synthesize the student's declarations.
-```
-
-### Conversion to DeclaredDataEntry[]
+### New File: aoFirstRead.ts
 
 ```typescript
-function convertToDeclaredEntries(
-  ctx: StudentDeclaredContext,
-): DeclaredDataEntry[] {
-  const entries: DeclaredDataEntry[] = [];
-  const now = new Date().toISOString();
-  let nextId = 1;
+// src/services/essayIntelligence/analysis/aoFirstRead.ts
 
-  const facetMap: Array<[keyof StudentDeclaredContext, DeclaredDataCategory]> = [
-    ['intent', 'intent'],
-    ['domain', 'domain'],
-    ['audience', 'audience'],
-    ['backstory', 'backstory'],
-    ['emotionalStakes', 'emotional_stakes'],
-    ['voiceChoices', 'voice_choice'],
-  ];
+const HAIKU = 'claude-haiku-4-5-20251001';
 
-  for (const [field, category] of facetMap) {
-    const value = ctx[field];
-    if (typeof value === 'string' && value !== null) {
-      entries.push({
-        id: `D${nextId++}`,
-        timestamp: now,
-        category,
-        location: { type: 'essay_wide' },
-        content: value,
-        certainty: ctx.confidence === 'complete' ? 'definite' : 'tentative',
-        source: 'gathering',
-      });
-    }
-  }
+const SYSTEM_PROMPT = `You are an admissions officer at a selective university. It's 4:15pm. You've read 29 essays today. You have a stack of 14 more. You're experienced, fair, but TIRED.
 
-  // Contradictions become special entries (consumed by IntentGapDetector as seed gaps)
-  for (const contradiction of ctx.contradictions) {
-    entries.push({
-      id: `D${nextId++}`,
-      timestamp: now,
-      category: 'intent',
-      location: { type: 'essay_wide' },
-      content: `CONTRADICTION: Student declares "${contradiction.declared}" but text shows "${contradiction.observed}". Tension: ${contradiction.tension}`,
-      certainty: 'tentative',
-      source: 'gathering',
-    });
-  }
+You are about to read essay #30. Give your HONEST gut reaction.
 
-  return entries;
-}
-```
+You are NOT analyzing this essay deeply. You are reading it ONCE, the way a real AO reads -- scanning for a hook, forming a quick impression, deciding whether to lean forward or start skimming.
 
-### GatheringService Public API
+Output JSON:
+{
+  "hookMoment": "<quote the specific phrase/image in paragraph 1 that made you keep reading, or null if nothing grabbed you>",
+  "committeeOneLiner": "<one sentence you'd say to your colleague: 'This is the essay about...' -- what sticks?>",
+  "distinctivenessSignal": "<what makes this NOT just another [topic] essay, or null if you've read this essay 50 times before>",
+  "putDownRisk": "<high|moderate|low> -- how likely are you to start skimming by paragraph 2?",
+  "gutReaction": "<2-3 sentences of honest internal monologue as you read. Be real. 'Another sports injury essay...' or 'Okay the pawnshop detail is specific, I'm paying attention...'>"
+}`;
 
-```typescript
-export interface GatheringResult {
-  /** Crystallized context (intermediate -- immediately converted) */
-  context: StudentDeclaredContext;
-  /** Converted entries ready for profile seeding */
-  entries: DeclaredDataEntry[];
-  /** Total cost of all gathering phases */
+export interface AOFirstReadResult {
+  firstRead: AOFirstRead;
   cost: number;
-  /** Token usage breakdown */
-  tokenUsage: {
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-  };
-  /** Number of conversation turns completed */
-  turnsCompleted: number;
-  /** Wall-clock time in ms */
+  tokenUsage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   timingMs: number;
 }
 
-export class GatheringService {
-  /**
-   * Phase 1: Generate seed questions from essay text.
-   * Returns questions for the caller to present to the student.
-   */
-  async generateSeedQuestions(essayText: string): Promise<{
-    questions: SeedQuestion[];
-    cost: number;
-  }>;
-
-  /**
-   * Phase 2: Process a student response to a gathering question.
-   * Classifies the response and detects remaining gaps.
-   * Returns follow-up question if gaps remain, null if gathering is complete.
-   */
-  async processResponse(
-    essayText: string,
-    questionAsked: string,
-    studentResponse: string,
-    priorExchanges: Array<{ question: string; response: string; facet: string }>,
-  ): Promise<{
-    classification: { primaryFacet: string; extractedContent: string };
-    followUpQuestion: SeedQuestion | null;
-    isComplete: boolean;
-    cost: number;
-  }>;
-
-  /**
-   * Phase 3: Crystallize all exchanges into StudentDeclaredContext,
-   * then convert to DeclaredDataEntry[].
-   */
-  async crystallize(
-    essayText: string,
-    exchanges: Array<{ question: string; response: string; facet: string }>,
-  ): Promise<GatheringResult>;
-}
-
-export const gatheringService = new GatheringService();
+export async function runAOFirstRead(essayText: string): Promise<AOFirstReadResult>;
 ```
 
-### Cost Summary
+### Implementation Notes
+- Single Haiku call, `maxTokens: 400`, `temperature: 0.5` (slightly higher for authentic voice)
+- `cacheSystemPrompt: true` (system prompt is static)
+- User prompt is just the essay text: `"Read this essay:\n\n${essayText}"`
+- Validate output: coerce `putDownRisk` to valid enum, default `hookMoment`/`distinctivenessSignal` to null
+- On failure: return a degraded result with `putDownRisk: 'moderate'` and generic `gutReaction`
 
-| Phase | Model | Calls | Cost per call | Total |
-|-------|-------|-------|---------------|-------|
-| Seed questions | Sonnet | 1 | ~$0.006 | ~$0.006 |
-| Classification | Haiku | 2-4 | ~$0.001 | ~$0.003 |
-| Follow-up gen | Sonnet | 0-1 | ~$0.004 | ~$0.002 |
-| Crystallization | Sonnet | 1 | ~$0.010 | ~$0.010 |
-| **Total** | | **4-7** | | **~$0.017-0.021** |
+### Orchestrator Wiring
+
+**File**: `analysisOrchestrator.ts`
+**Location**: After L1 call starts (line ~273), add AOFirstRead in parallel
+
+```typescript
+// PHASE 1: Foundation (L1 + AOFirstRead parallel → L2 + L2.5 parallel)
+const [l1Result, aoFirstReadResult] = await Promise.allSettled([
+  firstImpressionsService.analyze(input.essayText),
+  runAOFirstRead(input.essayText),
+]);
+```
+
+Store the `AOFirstRead` result on the profile (add `aoFirstRead?: AOFirstRead` to `EssayProfile`). Available to:
+- L3.75 holistic synthesis (as input context -- "the naive AO reaction was...")
+- L6 coaching (the coach can reference "an AO reading this would...")
+- L3.5 scoring (as calibration context for the anchor paragraph)
+
+### Cost
+~$0.003 per essay. Zero additional latency (parallel with L1).
+
+### Test
+Run against a strong essay and a weak essay. Verify:
+- Strong: low putDownRisk, non-null hookMoment and distinctivenessSignal
+- Weak: high putDownRisk, generic committeeOneLiner
 
 ---
 
-## Implementation Item 2: Context Formatter
+## GAP-5: Person Portrait (Human Behind the Essay)
 
-**New file**: `src/services/essayIntelligence/analysis/contextFormatters.ts` (~80 lines)
+**Decision**: Agent B -- lunch framing with examples
+**Files**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
+**Risk**: Low
+**Effort**: ~20 min
+
+### Prompt Change
+
+**File**: `holisticSynthesis.ts`
+**Location**: Line 487 (the `writerPortrait` field in the L3.75 JSON schema)
+
+**Current**:
+```
+"writerPortrait": "<who is this writer -- the person behind the words, not the essay>"
+```
+
+**Replace with**:
+```
+"writerPortrait": "<who would you want to have lunch with after reading this? Describe the PERSON — their energy, what they'd talk about, how they see the world. NOT their essay topics or writing ability.
+
+WRONG: 'A thoughtful writer who uses vivid imagery to explore themes of identity and belonging.'
+WRONG: 'The author demonstrates strong emotional intelligence through their narrative choices.'
+RIGHT: 'Someone who notices small things others miss — the kind of person who'd stop mid-sentence because they saw something out the window that reminded them of their grandmother's kitchen. Probably argues with their friends about whether something counts as art. Almost certainly has strong opinions about food.'
+RIGHT: 'The person who stays late not because they have to but because they got curious about something adjacent. Laughs at their own failures with genuine amusement, not performance. Would probably talk your ear off about water quality data if you let them.'>"
+```
+
+### Why This Works
+The "lunch" framing forces the LLM to describe a PERSON, not a writer. The WRONG/RIGHT examples explicitly prohibit essay analysis language. The result feeds into `characterRevelation.writerPortrait` which is used by coaching and admissions positioning.
+
+### Test
+Run L3.75 against an essay. Verify the writerPortrait describes a person you could picture having lunch with, not an abstract analysis of writing technique.
+
+---
+
+## GAP-10: Essay Archetype Classification
+
+**Decision**: Hybrid (A's profile field + B's scoring calibration)
+**Files**: `profileTypes.ts`, `holisticSynthesis.ts`, `analysisPass.ts`
+**Risk**: Medium
+**Effort**: ~1.5 hours
+
+### Type Addition
+
+**File**: `profileTypes.ts`
+**Location**: After `aoTakeaway` field on `AdmissionsPositioning` (line 904)
+
+**Add**:
+```typescript
+/** Archetype classification -- what essay "type" this falls into from an AO's pattern-matching perspective */
+archetypeContext?: {
+  /** The archetype name: "sports injury comeback", "immigrant identity", "service trip revelation", etc. */
+  archetype: string;
+  /** How common this archetype is in the applicant pool */
+  poolDensity: 'saturated' | 'common' | 'moderate' | 'uncommon' | 'rare';
+  /** What (if anything) makes THIS essay's execution non-generic within the archetype */
+  differentiator: string | null;
+};
+```
+
+### L3.75 Prompt Addition
+
+**File**: `holisticSynthesis.ts`
+**Location**: After `aoTakeaway` in the admissionsPositioning JSON schema (line ~522)
+
+**Add to schema**:
+```
+"archetypeContext": {
+  "archetype": "<name the essay archetype an AO would mentally file this under — e.g., 'sports injury comeback', 'immigrant identity', 'service trip revelation', 'music as metaphor', 'death of a grandparent', 'leadership through adversity'. Be honest about the archetype even if the essay is good.>",
+  "poolDensity": "<saturated|common|moderate|uncommon|rare> — how many essays in a typical applicant pool of 500 match this archetype?",
+  "differentiator": "<what makes THIS essay's execution non-generic within the archetype, or null if the execution is also generic>"
+}
+```
+
+### L3.5 Scoring Calibration
+
+**File**: `analysisPass.ts`
+**Location**: After the calibration examples (around line 337), add a new calibration note
+
+**Add**:
+```
+ARCHETYPE CALIBRATION:
+If the holistic context identifies a saturated or common archetype with a null differentiator,
+the essay must earn its scores through EXECUTION, not topic. A "sports injury comeback" essay
+with generic execution ("I learned perseverance") should score 10-15 points lower on sentences
+that rely on the archetype's expected beats rather than earning moments through specific detail.
+A saturated archetype with brilliant execution can still score 85+, but generic sentences within
+a saturated archetype rarely deserve above 55.
+```
+
+### Orchestrator Wiring
+The archetype is produced by L3.75 and stored on the profile. L3.5 receives the full profile (including archetype) as part of its understanding context. No explicit wiring needed beyond the prompt addition -- the existing context assembly already passes the holistic profile to L3.5.
+
+### Test
+Run against a "sports injury" essay with generic execution. Verify:
+- L3.75 outputs `archetype: "sports injury comeback"`, `poolDensity: "saturated"`
+- L3.5 scores generic "I learned perseverance" sentences lower (~50-55) than specific detail sentences (~70+)
+
+---
+
+## GAP-3: Phase Detector (Narrative Essay Calibration)
+
+**Decision**: Hybrid (A's data surfacing + B's reframe)
+**Files**: `src/services/essayIntelligence/analysis/phaseAssessment.ts`
+**Risk**: Low
+**Effort**: ~30 min
+
+### Change 1: Surface narrative data in buildHolisticDigest()
+
+**File**: `phaseAssessment.ts`
+**Location**: Lines 215-222 (the `narrativeStrategy` section of `buildHolisticDigest()`)
+
+**Current**:
+```typescript
+if (profile.narrativeStrategy) {
+  const ns = profile.narrativeStrategy;
+  if (ns.arcMomentum) lines.push(`  Arc momentum: ${ns.arcMomentum}`);
+  if (Array.isArray(ns.pivotPoints)) {
+    lines.push(`  Pivot points: ${ns.pivotPoints.length}`);
+  }
+  if (ns.turningPoint != null) lines.push(`  Turning point: present`);
+}
+```
+
+**Replace with**:
+```typescript
+if (profile.narrativeStrategy) {
+  const ns = profile.narrativeStrategy;
+  if (ns.arcType) lines.push(`  Narrative arc: ${ns.arcType}`);
+  if (ns.primaryStrategy) lines.push(`  Strategy: ${ns.primaryStrategy}`);
+  if (ns.arcMomentum) lines.push(`  Arc momentum: ${ns.arcMomentum}`);
+  if (Array.isArray(ns.pivotPoints)) {
+    lines.push(`  Pivot points: ${ns.pivotPoints.length}`);
+  }
+  if (ns.turningPoint != null) lines.push(`  Turning point: present`);
+}
+```
+
+### Change 2: Add narrative calibration to phase system prompt
+
+**File**: `phaseAssessment.ts`
+**Location**: After line 116 (the dimension divergence check), before "COACHING LENS:"
+
+**Add**:
+```
+NARRATIVE ESSAY CALIBRATION:
+For narrative essays (reflective, montage, bracket, lyrical arcs), "thesis" manifests as an emergent theme or revelation, not an explicit statement. A narrative essay at ARCHITECTURE phase may have a powerful through-line but no stated thesis -- this is intentional, not a weakness. Judge narrative essays by their arc coherence, earned moments, and thematic resonance rather than thesis clarity. When the holistic context shows a narrative arc type, recalibrate your thesis expectations accordingly.
+```
+
+### Why Both Changes Together
+The data surfacing ensures the LLM sees the narrative arc type. The calibration note tells it what to do with that information. Without both, the LLM either lacks the data (change 1 alone) or lacks the instruction (change 2 alone).
+
+### Test
+Run phase assessment on a narrative essay with strong arc but no explicit thesis. Verify it does NOT default to foundation/architecture solely due to low thesis confidence.
+
+---
+
+## GAP-8: Scoring Bias (Admissions Relevance in Craft Scores)
+
+**Decision**: Agent A -- integrated admissions criteria
+**Files**: `src/services/essayIntelligence/analysis/analysisPass.ts`
+**Risk**: Medium (changes scoring behavior)
+**Effort**: ~45 min
+
+### Change 1: Add admissions criteria to evaluation method
+
+**File**: `analysisPass.ts`
+**Location**: Lines 358-364 (the evaluation criteria list)
+
+**Current**:
+```
+3. **Reason about effectiveness** -- HOW WELL does this sentence achieve its stated purpose? Consider:
+   - Specificity vs. vagueness
+   - Show vs. tell
+   - Voice authenticity vs. performed voice
+   - Structural contribution vs. filler
+   - Earned emotional moments vs. asserted emotions
+   - Memorable craft vs. generic competence
+```
+
+**Replace with**:
+```
+3. **Reason about effectiveness** -- HOW WELL does this sentence achieve its stated purpose? Consider:
+   - Specificity vs. vagueness
+   - Show vs. tell
+   - Voice authenticity vs. performed voice
+   - Structural contribution vs. filler
+   - Earned emotional moments vs. asserted emotions
+   - Memorable craft vs. generic competence
+   - Admissions resonance: does this sentence reveal something about the student that would matter to an AO? A sentence can be well-crafted but reveal nothing, or plainly written but deeply revealing
+   - Revelation density: how much of the student's character, values, or thinking does this sentence surface per word?
+
+ADMISSIONS-CRAFT INTEGRATION:
+This is a college admissions essay, not a literary exercise. When craft quality and admissions value conflict, admissions value carries MORE weight. A plainly-written sentence that reveals a genuine, specific moment of the student's character ("My GPA dropped from 3.9 to 2.1 the semester my parents divorced") is MORE effective than a beautifully crafted sentence that reveals nothing new about the student. Score accordingly.
+```
+
+### Change 2: Add admissions calibration example
+
+**File**: `analysisPass.ts`
+**Location**: After the score 88 example (around line 337), add:
+
+```
+SCORE 78: "My GPA dropped from 3.9 to 2.1 the semester my parents divorced."
+WHY 78: No craft technique — the sentence is plain. But the specificity is devastating: exact numbers (3.9 to 2.1), exact trigger (parents' divorce), exact timeframe (one semester). An AO reads this and UNDERSTANDS something irreplaceable about this student's trajectory. The admissions revelation density is very high despite modest craft. Not 86+ because the sentence could be more architecturally integrated into the essay's structure.
+```
+
+### What NOT to Change
+- Do NOT add new fields to `SentenceAnalysis`. The LLM already has `effectivenessReasoning` which is free-form. Admissions considerations will naturally appear there.
+- Do NOT add post-hoc scoring adjustments. The LLM integrates admissions natively during its reasoning process.
+
+### Test
+Run L3.5 on an essay with a plain but deeply revealing sentence. Verify it scores higher (~75-85) than a beautifully crafted but generic sentence (~55-65).
+
+---
+
+## GAP-1: Response Intensity (Coaching Length Control)
+
+**Decision**: Hybrid (A's memory + Stage 1.5 signal)
+**Files**: `src/services/essayIntelligence/profileTypes.ts`, `src/services/essayIntelligence/coaching/coachingService.ts`
+**Risk**: Low
+**Effort**: ~1 hour
+
+### Type Change
+
+**File**: `profileTypes.ts`
+**Location**: After `nextFocus` in `CoachingSessionMemory` (line 2146)
+
+**Add**:
+```typescript
+/**
+ * The response intensity from the PREVIOUS turn's sidecar output.
+ * Used as a consistency signal alongside Stage 1.5's intensity assessment.
+ * null on first turn.
+ */
+lastResponseIntensity?: 'full' | 'brief' | 'minimal' | null;
+```
+
+### Wiring: Use Stage 1.5 intensity for maxTokens
+
+**File**: `coachingService.ts`
+**Location**: After the Stage 1.5 call returns (around line 2450+) and before the Stage 3 Sonnet call (line 1482-1492)
+
+The Stage 1.5 call at line 2357 already returns `responseIntensity` in its output. The implementation should:
+
+1. Extract `intensity` from the Stage 1.5 result (already parsed)
+2. Map intensity to maxTokens:
+   - `full` -> 2200 (current default)
+   - `brief` -> 1200
+   - `minimal` -> 600
+3. Pass the dynamic maxTokens to the Stage 3 `callClaude()` call at line 1487
+
+**Current** (line 1487):
+```typescript
+maxTokens: 2200,
+```
+
+**Replace with** (pseudocode -- actual variable name depends on where 1.5 result is accessible):
+```typescript
+maxTokens: intensityToMaxTokens(stage1_5Intensity),
+```
+
+Where:
+```typescript
+function intensityToMaxTokens(intensity: 'full' | 'brief' | 'minimal'): number {
+  switch (intensity) {
+    case 'full': return 2200;
+    case 'brief': return 1200;
+    case 'minimal': return 600;
+  }
+}
+```
+
+### Wiring: Store sidecar intensity in session memory
+
+After parsing the sidecar from Stage 3's response (where `responseIntensity` is extracted), store it:
 
 ```typescript
-import type { DeclaredDataEntry, DeclaredDataCategory } from '../profileTypes';
+memory.lastResponseIntensity = sidecar.responseIntensity;
+```
 
-const CATEGORY_LABELS: Record<DeclaredDataCategory, string> = {
-  intent: 'Intent',
-  domain: 'Domain Knowledge',
-  audience: 'Target Audience',
-  backstory: 'Backstory',
-  emotional_stakes: 'Emotional Stakes',
-  voice_choice: 'Voice Choices',
-  correction: 'Student Correction',
-  preference: 'Student Preference',
-};
+This is available on the next turn for consistency checking but is NOT the primary signal (Stage 1.5 is).
+
+### Important Implementation Detail
+The Stage 1.5 call currently runs INSIDE `processCoachingTurn`. Its result needs to be accessible at the point where `maxTokens` is set for Stage 3. Trace the call flow:
+- Stage 1.5 runs at line ~2357 (private method)
+- Stage 3 Sonnet call at line ~1482 (inside the main flow)
+- The `stage1_5Intensity` must flow from the Stage 1.5 result to the Stage 3 call site
+
+### Test
+Send a short confirmation message ("Yeah, I see what you mean"). Verify:
+- Stage 1.5 returns `minimal` intensity
+- Stage 3 maxTokens is set to 600
+- Coach response is short (acknowledgment, not lecture)
+
+---
+
+## GAP-2: Learning Style Accumulation
+
+**Decision**: Refined (complete existing wiring)
+**Files**: `src/services/essayIntelligence/coaching/coachingService.ts`
+**Risk**: Low
+**Effort**: ~45 min
+
+### Change 1: Add learningStyleUpdate to sidecar
+
+**File**: `coachingService.ts`
+**Location**: Line 167 (the `SIDECAR_INSTRUCTIONS` constant, sidecar JSON schema)
+
+**Current sidecar JSON** (line 167):
+```
+{"category":"...","cognitiveState":"...","focusParagraphs":[...],"dimensionFocus":[...],"responseIntensity":"...","sessionJournalEntry":"...","contextAccumulation":"...","needsDeepening":...,"deepeningReason":"..."}
+```
+
+**Add field**:
+```
+"learningStyleUpdate":"<1-sentence observation about how this student learns based on THIS turn's interaction, or null. Examples: 'Responds better to specific text comparisons than abstract descriptions', 'Needs to see the problem demonstrated before accepting the fix', 'Engages deeply when connecting essay craft to their personal experience'>"
+```
+
+### Change 2: Accumulate from sidecar on every turn
+
+After parsing the sidecar (in the sidecar extraction logic), when `sidecar.learningStyleUpdate` is non-null:
+
+```typescript
+if (sidecar.learningStyleUpdate) {
+  // Cap at 8 observations, evict oldest tentative first
+  if (style.observations.length >= 8) {
+    const tentativeIdx = style.observations.findIndex(o => o.confidence === 'tentative');
+    if (tentativeIdx >= 0) {
+      style.observations.splice(tentativeIdx, 1);
+    } else {
+      style.observations.shift(); // evict oldest
+    }
+  }
+  style.observations.push({
+    observation: sidecar.learningStyleUpdate,
+    confidence: 'tentative',
+    turnObserved: memory.turnCount + 1,
+  });
+}
+```
+
+### Change 3: Promote confidence over time
+
+In the existing pattern detection (every 3+ turns, line ~2195), when `learningStyleUpdate` is non-null from pattern detection, check if it confirms an existing tentative observation. If so, promote to 'growing'. If a 'growing' observation is confirmed again, promote to 'confident'.
+
+This logic already partially exists -- the pattern detection `learningStyleUpdate` field was designed for this. The gap is that the sidecar provides turn-by-turn signal to ACCUMULATE, while pattern detection provides periodic CONFIRMATION.
+
+### Test
+Run a 5-turn coaching session. Verify:
+- Turn 1: sidecar produces learningStyleUpdate -> added as tentative
+- Turn 3: pattern detection confirms -> promoted to growing
+- Turn 6: further confirmation -> promoted to confident
+- Never exceeds 8 observations
+
+---
+
+## GAP-6: Strategic Thread (Persistent Coaching Direction)
+
+**Decision**: Agent B -- strategic question + staleness
+**Files**: `src/services/essayIntelligence/profileTypes.ts`, `src/services/essayIntelligence/coaching/coachingService.ts`
+**Risk**: Low-Medium
+**Effort**: ~1 hour
+
+### Type Changes
+
+**File**: `profileTypes.ts`
+**Location**: `CoachingSessionMemory` (line 2108)
+
+**Replace** `nextFocus` (line 2142-2146):
+```typescript
+/**
+ * What the session should focus on next -- LLM-assessed after each turn.
+ * Not a fixed curriculum -- emerges from the conversation.
+ */
+nextFocus: string;
+```
+
+**With**:
+```typescript
+/**
+ * Strategic question driving the session -- a curiosity, not a topic label.
+ * Example: "Does the student hear the voice shift between P2 and P3?"
+ * LLM-assessed after each turn. Naturally infiltrates coaching responses.
+ * @deprecated nextFocus still populated for backward compat; strategicQuestion is preferred.
+ */
+nextFocus: string;
 
 /**
- * Formats DeclaredDataEntry[] into a prompt-injectable text block.
- * Reads from the unified array -- no separate data model.
- *
- * Groups by category, shows only active entries (not superseded),
- * marks tentative/exploring entries.
- *
- * @param entries  The full studentDeclaredData array from the profile
- * @param options  Optional filters for category and paragraph scope
- * @returns        Formatted string block, or '' if no entries match
+ * The strategic question that should guide the next coaching response.
+ * A QUESTION, not a topic. Example: "Can the student explain why P4 matters
+ * to their overall argument?" Questions naturally infiltrate responses better
+ * than topic directives like "focus on voice."
  */
-export function buildDeclaredDataBlock(
-  entries: DeclaredDataEntry[],
-  options?: {
-    /** Filter to specific categories */
-    categories?: DeclaredDataCategory[];
-    /** Filter to specific paragraph (includes essay_wide entries) */
-    paragraph?: number;
-  },
-): string {
-  if (!entries || entries.length === 0) return '';
+strategicQuestion: string;
 
-  // Filter: only active entries (not superseded)
-  const supersededIds = new Set(
-    entries.filter(e => e.supersedes).map(e => e.supersedes!),
-  );
-  let active = entries.filter(e => !supersededIds.has(e.id));
+/**
+ * How many consecutive turns the strategicQuestion has remained unchanged.
+ * Reset to 0 when strategicQuestion is updated by pattern detection.
+ * At 4+, pattern detection includes a gentle escalation note.
+ */
+questionStaleness: number;
+```
 
-  // Apply optional filters
-  if (options?.categories) {
-    active = active.filter(e => options.categories!.includes(e.category));
-  }
-  if (options?.paragraph !== undefined) {
-    active = active.filter(e =>
-      e.location.type === 'essay_wide' ||
-      e.location.paragraph === options.paragraph,
-    );
-  }
+### Session Memory Initialization
 
-  if (active.length === 0) return '';
+**File**: `coachingService.ts`
+**Location**: `initializeSessionMemory()` (line 2565)
 
-  // Group by category
-  const grouped = new Map<DeclaredDataCategory, DeclaredDataEntry[]>();
-  for (const entry of active) {
-    const existing = grouped.get(entry.category) ?? [];
-    existing.push(entry);
-    grouped.set(entry.category, existing);
-  }
+Add:
+```typescript
+strategicQuestion: '',
+questionStaleness: 0,
+```
+
+### Injection into Stage 3 prompt
+
+**File**: `coachingService.ts`
+**Location**: Session arc section (line 1434-1450)
+
+In the MIDDLE SESSION and LATE SESSION blocks, replace:
+```
+${sessionMemory.nextFocus ? `SUGGESTED NEXT FOCUS: ${sessionMemory.nextFocus}` : ''}
+```
+
+With:
+```
+${sessionMemory.strategicQuestion ? `STRATEGIC QUESTION (let this guide your response): ${sessionMemory.strategicQuestion}` : (sessionMemory.nextFocus ? `SUGGESTED NEXT FOCUS: ${sessionMemory.nextFocus}` : '')}
+${sessionMemory.questionStaleness >= 4 ? `NOTE: This question has been the strategic thread for ${sessionMemory.questionStaleness} turns without the student engaging it directly. Consider weaving it in more gently, or assessing whether it's still the right question.` : ''}
+```
+
+### Pattern Detection Update
+
+**File**: `coachingService.ts`
+**Location**: Pattern detection output schema (line ~2220)
+
+Add to the JSON schema:
+```
+"strategicQuestionUpdate": "<a QUESTION (not a topic) that should drive the next coaching response. Must be specific to this essay and this student's current position. Example: 'Can the student feel the difference between P2's authentic voice and P3's performed voice?' Set to null if the current strategic question is still the right one.>"
+```
+
+After pattern detection parses, if `strategicQuestionUpdate` is non-null:
+```typescript
+memory.strategicQuestion = parsed.strategicQuestionUpdate;
+memory.questionStaleness = 0;
+```
+Else:
+```typescript
+memory.questionStaleness += 1;
+```
+
+### Test
+Run a 6-turn session. Verify:
+- Turn 2: pattern detection sets a specific question ("Does the student...")
+- Turns 3-5: question remains, staleness increments
+- Turn 6: if student engages the question, pattern detection updates it. If not, staleness note appears in prompt.
+
+---
+
+## GAP-12: PIQ Portfolio Synthesis
+
+**Decision**: Agent B -- embedded portfolio context
+**Files**: PIQ analysis service (the main prompt builder for PIQ analysis)
+**Risk**: Low
+**Effort**: ~1 hour
+
+### Design
+
+When analyzing the Nth PIQ (N >= 2), inject a portfolio context section into the analysis prompt. The section contains `quickSummary` and key dimension highlights from prior PIQ results.
+
+### What to Build
+
+1. A function `buildPIQPortfolioContext(priorResults: PIQWorkshopResult[]): string` that assembles a prompt section:
+
+```typescript
+function buildPIQPortfolioContext(priorResults: PIQWorkshopResult[]): string {
+  if (priorResults.length === 0) return '';
 
   const lines: string[] = [
-    '=== STUDENT-DECLARED CONTEXT ===',
-    'The writer has shared the following about their essay. Use this to deepen',
-    'your understanding -- what the text DOES may differ from what the student',
-    'INTENDED, and that divergence is itself meaningful.',
+    '=== PIQ PORTFOLIO CONTEXT ===',
+    `This student has already written ${priorResults.length} other PIQ(s).`,
     '',
   ];
 
-  for (const [category, items] of grouped) {
-    lines.push(`**${CATEGORY_LABELS[category]}**:`);
-    for (const item of items) {
-      const certaintyTag = item.certainty !== 'definite'
-        ? ` [${item.certainty}]`
-        : '';
-      const scopeTag = item.location.type !== 'essay_wide'
-        ? ` (P${(item.location.paragraph ?? 0) + 1}${item.location.sentence !== undefined ? `S${item.location.sentence + 1}` : ''})`
-        : '';
-      lines.push(`  - ${item.content}${certaintyTag}${scopeTag}`);
+  for (let i = 0; i < priorResults.length; i++) {
+    const r = priorResults[i];
+    lines.push(`PIQ ${i + 1}: ${r.quickSummary}`);
+
+    // Extract top dimensions that scored well
+    const strongDims = r.dimensions
+      .filter(d => d.status === 'good' || d.status === 'excellent')
+      .map(d => d.name)
+      .slice(0, 3);
+    if (strongDims.length > 0) {
+      lines.push(`  Strong dimensions: ${strongDims.join(', ')}`);
+    }
+
+    // Extract main issues
+    const topIssueNames = r.topIssues.slice(0, 2).map(i => i.title);
+    if (topIssueNames.length > 0) {
+      lines.push(`  Key issues: ${topIssueNames.join(', ')}`);
     }
     lines.push('');
   }
+
+  lines.push('PORTFOLIO DIRECTIVE: This PIQ should reveal DIFFERENT dimensions of this student than their other PIQs. If their prior PIQs already demonstrate leadership and initiative, this one should show a different facet -- creativity, vulnerability, intellectual curiosity, community connection, etc. Evaluate this PIQ in the context of what the PORTFOLIO needs, not just what this individual PIQ achieves.');
 
   return lines.join('\n');
 }
 ```
 
----
+2. Inject this into the PIQ analysis prompt when `priorResults` is provided as an optional parameter.
 
-## Implementation Item 3: Pipeline Input Extension
+### Caller Responsibility
+The HTTP route handler or PIQ orchestrator must pass prior `PIQWorkshopResult[]` when available. This requires the caller to store/retrieve prior results -- likely from the database or session state. The bridge function itself is pure (string in, string out).
 
-**Modified file**: `src/services/essayIntelligence/analysis/analysisOrchestrator.ts`
-
-### Change 1: PipelineInput type
-
-```typescript
-// ADD to PipelineInput interface (line ~174, after priorFindings)
-
-/**
- * Pre-gathered student declared context.
- * If provided, seeded into profile.studentDeclaredData before pipeline starts.
- * If not provided, pipeline runs without student context (current behavior).
- */
-studentDeclaredContext?: StudentDeclaredContext;
-```
-
-### Change 2: Seed declared data before pipeline
-
-In `analyzeEssay()`, after coordinator creation (line ~313) and before L1 starts:
-
-```typescript
-// ── Seed student declared data (if gathering was performed) ──
-if (input.studentDeclaredContext) {
-  const declaredEntries = convertToDeclaredEntries(input.studentDeclaredContext);
-  coordinator.seedDeclaredData(declaredEntries);
-  console.log(
-    `[Orchestrator] Seeded ${declaredEntries.length} declared data entries from gathering`,
-  );
-}
-```
-
-### Change 3: Pass declared data to downstream layers
-
-Each layer that receives declared data gets it from the profile:
-
-```typescript
-// L3 walkEssay call (line ~382):
-// ADD to options object:
-const profile = coordinator.getProfile();
-l3Result = await sequentialDeepWalkService.walkEssay(
-  input.essayText,
-  profile as EssayProfile,
-  structuralMap,
-  scoutOutput,
-  l1Result.impressions,
-  {
-    reanalysisContext: l3ReanalysisContext,
-    findingStore: walkFindingStore.size > 0 ? walkFindingStore : undefined,
-    studentDeclaredData: profile.studentDeclaredData?.length > 0
-      ? profile.studentDeclaredData
-      : undefined,
-  },
-);
-```
+### Test
+Analyze a 2nd PIQ with prior result showing strong leadership. Verify the analysis flags when the 2nd PIQ also focuses on leadership ("portfolio overlap -- consider showing a different dimension").
 
 ---
 
-## Implementation Item 4: L3 Walk Injection (GAP-1 + GAP-6)
+## GAP-13: Cross-Module Bridge
 
-**Modified file**: `src/services/essayIntelligence/analysis/sequentialDeepWalk.ts`
+**Decision**: Agent B -- prose narrative bridge
+**Files**: New file `src/services/studentNarrativeBridge.ts`
+**Risk**: Low
+**Effort**: ~1 hour
 
-### Change 1: Add option to walkEssay signature
+### What to Build
 
-```typescript
-// Line ~410, add to options interface:
-/** Student-declared data for context injection */
-studentDeclaredData?: DeclaredDataEntry[];
-```
-
-### Change 2: Inject into per-paragraph user prompt
-
-Position: AFTER essay text, BEFORE accumulated understanding context. This is the high-attention zone.
+A pure function that assembles available cross-module context into a prose string. No LLM calls. Decoupled -- modules don't know about each other's types.
 
 ```typescript
-// In buildUserPrompt() (approximately line ~440), after essay text section:
-
-// ── Student-declared context (if available) ──
-const declaredBlock = studentDeclaredData
-  ? buildDeclaredDataBlock(studentDeclaredData, { paragraph: paragraphIndex })
-  : '';
-
-// Build user prompt:
-const userPrompt = [
-  `FULL ESSAY (${paragraphs.length} paragraphs):`,
-  markedEssayText,
-  '',
-  // HIGH-ATTENTION ZONE: student context after essay, before accumulated understanding
-  declaredBlock ? declaredBlock + '\n' : '',
-  // Accumulated understanding from prior paragraphs...
-  accumulatedContext,
-  '',
-  `TARGET: Paragraph ${paragraphIndex + 1} (P${paragraphIndex + 1})`,
-  `${paragraphText}`,
-  '',
-  scoutLeadSection,
-  findingContext,
-].filter(Boolean).join('\n');
-```
-
-### Change 3: Attention-weighted token allocation (GAP-6)
-
-Uses student-declared structural significance AND L2 structural weight to adjust per-paragraph token budgets.
-
-```typescript
-// REPLACE computeWalkMaxTokens (line ~92):
+// src/services/studentNarrativeBridge.ts
 
 /**
- * Compute max tokens for a paragraph's walk call.
- * Base: sentence count * 200 + finding budget.
- * Multiplier: structural significance from student declarations or L2 cartography.
+ * Assembles available cross-module context into a prose string
+ * for injection into any module's prompts.
  *
- * StructuralWeight (from profileTypes.ts):
- *   'load_bearing' => 1.4x (these paragraphs carry the essay's argument)
- *   'supporting'   => 1.0x (baseline)
- *   'transitional'  => 0.8x (bridges between ideas, less depth needed)
- *   'decorative'    => 0.7x (scene-setting, atmosphere)
+ * Pure function. No LLM calls. Each input is optional.
+ * Modules produce strings; this bridge consumes them.
  */
-const WEIGHT_MULTIPLIERS: Record<string, number> = {
-  load_bearing: 1.4,
-  supporting: 1.0,
-  transitional: 0.8,
-  decorative: 0.7,
-};
 
-function computeWalkMaxTokens(
-  sentenceCount: number,
-  structuralWeight?: string,
-): number {
-  const base = Math.max(WALK_BASE_MAX_TOKENS, sentenceCount * 200 + WALK_FINDING_BUDGET);
-  const multiplier = structuralWeight
-    ? (WEIGHT_MULTIPLIERS[structuralWeight] ?? 1.0)
-    : 1.0;
-  return Math.min(WALK_MAX_TOKENS_CAP, Math.round(base * multiplier));
+export interface StudentModuleOutputs {
+  /** From essay intelligence: quickSummary or coaching lens */
+  essayIntelligence?: {
+    coachingLens?: string;      // from ImprovementPhase
+    writerPortrait?: string;    // from CharacterRevelation
+    revealedQualities?: string[]; // from CharacterRevelation
+  };
+  /** From activity workshop: profile summary */
+  activityProfiles?: Array<{
+    title: string;
+    tier: number;
+    keyStrengths: string[];
+  }>;
+  /** From PIQ workshop: prior PIQ summaries */
+  piqSummaries?: string[];
+  /** From academic advisor: academic context */
+  academicContext?: {
+    gpaContext?: string;
+    courseLoadSummary?: string;
+    majorDirection?: string;
+  };
 }
-```
 
-Then at the call site (line ~492):
+export function assembleStudentContext(outputs: StudentModuleOutputs): string {
+  const sections: string[] = [];
 
-```typescript
-// Get structural weight from L2 cartography or student declarations
-const structuralWeight = structuralMap?.paragraphRoles?.[pIdx]?.weight;
-const walkMaxTokens = computeWalkMaxTokens(sentenceCount, structuralWeight);
-```
-
----
-
-## Implementation Item 5: L3.75 Synthesis Injection (GAP-5)
-
-**Modified file**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
-
-### Injection: User prompt, after holistic scaffold
-
-Position: In the user prompt (not system prompt -- preserves caching). After the holistic evolution scaffold, before the output schema reminder.
-
-```typescript
-// In buildSynthesisUserPrompt(), after holistic evolution scaffold:
-
-// ── Student-declared context ──
-const declaredBlock = profile.studentDeclaredData?.length > 0
-  ? buildDeclaredDataBlock(profile.studentDeclaredData)
-  : '';
-
-// Inject into user prompt
-if (declaredBlock) {
-  userPromptSections.push(declaredBlock);
-  userPromptSections.push(
-    'Note: When the student\'s declared intent diverges from what the text does,',
-    'describe BOTH. The divergence is information, not an error to resolve.',
-    ''
-  );
-}
-```
-
-### GAP-5: Topic-Fit Signal
-
-AdmissionsPositioning does NOT have a `topicFitSignal` field. Instead of adding one, inject topic motivation context into the Phase B prompt that produces AdmissionsPositioning. The LLM naturally incorporates topic-fit assessment into the existing fields (`distinctivenessFactors`, `memorability`, `portfolioPosition`).
-
-```typescript
-// In Phase B user prompt, when student has declared audience or intent:
-const topicContext = profile.studentDeclaredData?.filter(
-  e => e.category === 'audience' || e.category === 'intent',
-);
-if (topicContext?.length) {
-  phaseBPrompt += '\n\nSTUDENT CONTEXT FOR ADMISSIONS ASSESSMENT:\n';
-  for (const entry of topicContext) {
-    phaseBPrompt += `- ${CATEGORY_LABELS[entry.category]}: ${entry.content}\n`;
-  }
-  phaseBPrompt += 'Consider whether the essay\'s actual content and positioning aligns with these stated goals.\n';
-}
-```
-
----
-
-## Implementation Item 6: L3.5 Analysis Injection (GAP-4)
-
-**Modified file**: `src/services/essayIntelligence/analysis/analysisPass.ts`
-
-### Change: Block 2 cached context injection
-
-L3.5 uses 3-block caching: Block 1 (system, cached), Block 2 (essay+profile, cached across parallel paragraph calls), Block 3 (paragraph-specific, not cached).
-
-Student declared data goes into Block 2 so it is PART of the cache key:
-
-```typescript
-// In buildBlock2Context() (the function that assembles the shared cached context):
-
-// ── Student-declared context (cached across all parallel paragraph calls) ──
-const declaredBlock = profile.studentDeclaredData?.length > 0
-  ? buildDeclaredDataBlock(profile.studentDeclaredData)
-  : '';
-
-if (declaredBlock) {
-  block2Sections.push(declaredBlock);
-  block2Sections.push(
-    'ANALYSIS DIRECTIVE: When evaluating effectiveness, consider whether the text',
-    'achieves what the student intended. Intent-effect gaps are high-coaching-value findings.',
-    'A sentence that "fails" by generic standards may succeed at its intended purpose,',
-    'and a sentence that "works" generically may fail at the student\'s specific goal.',
-    ''
-  );
-}
-```
-
-### GAP-4: Teaching Calibration
-
-Student domain expertise informs teaching annotation density. When a student declares domain expertise, L3.5 should note it but NOT reduce analytical depth -- depth of analysis is constant. The teaching calibration happens in L5, not L3.5.
-
-The injection into Block 2 context is sufficient: the analysis LLM sees the student's domain claims and factors them into effectiveness assessment. No structural changes to L3.5 needed beyond the Block 2 injection.
-
----
-
-## Implementation Item 7: L4 Crystallizer Injection (GAP-3)
-
-**Modified file**: `src/services/essayIntelligence/analysis/crystallizer.ts`
-
-### Change 1: IntentBridge pre-population from gathering
-
-When `studentDeclaredData` has entries with category `'intent'`, pre-populate `IntentBridge.studentIntent` before the crystallization Sonnet runs.
-
-```typescript
-// In the crystallization prompt assembly, near IntentBridge schema (line ~348):
-
-// ── Pre-populate studentIntent from declared data ──
-const intentEntries = profile.studentDeclaredData?.filter(
-  e => e.category === 'intent' && !e.supersedes,
-);
-const declaredIntent = intentEntries?.length
-  ? intentEntries.map(e => e.content).join('; ')
-  : null;
-
-// Inject into crystallization prompt
-if (declaredIntent) {
-  promptSections.push(
-    `\nSTUDENT-DECLARED INTENT:\n"${declaredIntent}"`,
-    'The IntentBridge.studentIntent should reflect this. The systemReading should',
-    'reflect YOUR independent reading. Alignments should map where they agree and diverge.',
-    ''
-  );
-}
-```
-
-### Change 2: User prompt context injection
-
-```typescript
-// In the crystallization user prompt:
-const declaredBlock = profile.studentDeclaredData?.length > 0
-  ? buildDeclaredDataBlock(profile.studentDeclaredData)
-  : '';
-
-if (declaredBlock) {
-  userPromptSections.push(declaredBlock);
-}
-```
-
----
-
-## Implementation Item 8: L5 Annotation Injection (GAP-4 Teaching)
-
-**Modified file**: `src/services/essayIntelligence/analysis/deepAnnotationService.ts`
-
-### Change: Domain-calibrated teaching
-
-When students declare domain expertise, L5 annotations should calibrate teaching depth accordingly. A student who knows music theory doesn't need "a chord progression is a sequence of chords" explained.
-
-```typescript
-// In the L5 system prompt or phase guidance, add domain awareness:
-
-const domainEntries = profile.studentDeclaredData?.filter(
-  e => e.category === 'domain',
-);
-if (domainEntries?.length) {
-  const domainSection = domainEntries
-    .map(e => `- ${e.content}`)
-    .join('\n');
-
-  phaseGuidance += `\n\nSTUDENT DOMAIN EXPERTISE:\n${domainSection}\n` +
-    'Calibrate teaching depth: do NOT explain concepts the student already knows.\n' +
-    'Reference their expertise when it creates teaching leverage (e.g., "Your music theory\n' +
-    'background means you understand tension/resolution -- apply that same principle to\n' +
-    'your paragraph transitions").\n';
-}
-```
-
----
-
-## Implementation Item 9: DeclaredDataMutator
-
-**New file**: `src/services/essayIntelligence/profileManager/mutators/declaredDataMutator.ts` (~100 lines)
-
-```typescript
-import type {
-  EssayProfile,
-  DeclaredDataEntry,
-  MutationType,
-} from '../../profileTypes';
-
-/**
- * Mutator for student-declared data on EssayProfile.
- * Handles storage, supersession, and staleness propagation.
- */
-export class DeclaredDataMutator {
-  /**
-   * Add a new DeclaredDataEntry to the profile.
-   * Handles supersession: if an entry with the same location+category exists,
-   * the new entry's `supersedes` field is set to the old entry's ID.
-   */
-  addEntry(profile: EssayProfile, entry: DeclaredDataEntry): MutationType[] {
-    const mutations: MutationType[] = [];
-
-    // Check for supersession
-    const existingIdx = profile.studentDeclaredData.findIndex(
-      e => e.category === entry.category &&
-        e.location.type === entry.location.type &&
-        e.location.paragraph === entry.location.paragraph &&
-        e.location.sentence === entry.location.sentence &&
-        !e.supersedes, // Only supersede active entries
-    );
-
-    if (existingIdx >= 0) {
-      entry.supersedes = profile.studentDeclaredData[existingIdx].id;
-    }
-
-    profile.studentDeclaredData.push(entry);
-    mutations.push('declared_data_applied');
-
-    return mutations;
+  if (outputs.essayIntelligence) {
+    const ei = outputs.essayIntelligence;
+    const parts: string[] = [];
+    if (ei.writerPortrait) parts.push(`This student: ${ei.writerPortrait}`);
+    if (ei.revealedQualities?.length) parts.push(`Qualities shown in writing: ${ei.revealedQualities.join(', ')}`);
+    if (ei.coachingLens) parts.push(`Current coaching approach: ${ei.coachingLens}`);
+    if (parts.length > 0) sections.push(parts.join('. '));
   }
 
-  /**
-   * Seed multiple entries at once (used during gathering conversion).
-   */
-  seedEntries(profile: EssayProfile, entries: DeclaredDataEntry[]): MutationType[] {
-    profile.studentDeclaredData = [...profile.studentDeclaredData, ...entries];
-    return entries.length > 0 ? ['declared_data_applied'] : [];
+  if (outputs.activityProfiles?.length) {
+    const summary = outputs.activityProfiles
+      .map(a => `${a.title} (Tier ${a.tier}): ${a.keyStrengths.slice(0, 2).join(', ')}`)
+      .join('; ');
+    sections.push(`Activities: ${summary}`);
   }
 
-  /**
-   * Get active entries (not superseded) for a given scope.
-   */
-  getActiveEntries(
-    profile: EssayProfile,
-    options?: { category?: string; paragraph?: number },
-  ): DeclaredDataEntry[] {
-    const supersededIds = new Set(
-      profile.studentDeclaredData
-        .filter(e => e.supersedes)
-        .map(e => e.supersedes!),
-    );
-
-    return profile.studentDeclaredData.filter(e => {
-      if (supersededIds.has(e.id)) return false;
-      if (options?.category && e.category !== options.category) return false;
-      if (options?.paragraph !== undefined) {
-        return e.location.type === 'essay_wide' ||
-          e.location.paragraph === options.paragraph;
-      }
-      return true;
-    });
+  if (outputs.piqSummaries?.length) {
+    sections.push(`PIQ insights: ${outputs.piqSummaries.join('. ')}`);
   }
+
+  if (outputs.academicContext) {
+    const ac = outputs.academicContext;
+    const parts: string[] = [];
+    if (ac.majorDirection) parts.push(`Intended direction: ${ac.majorDirection}`);
+    if (ac.gpaContext) parts.push(ac.gpaContext);
+    if (ac.courseLoadSummary) parts.push(ac.courseLoadSummary);
+    if (parts.length > 0) sections.push(parts.join('. '));
+  }
+
+  if (sections.length === 0) return '';
+
+  return `=== STUDENT CONTEXT (from other modules) ===\n${sections.join('\n')}\n===`;
 }
-
-export const declaredDataMutator = new DeclaredDataMutator();
 ```
 
-### MutationType extension
+### Consumer Pattern
+Each module that wants cross-module context adds an optional `studentContext?: string` parameter to its prompt builder. The caller assembles the context via `assembleStudentContext()` and passes it if available.
 
-```typescript
-// ADD to MutationType union in profileTypes.ts:
-| 'declared_data_applied'   // Student declared data added/updated
-| 'declared_intent_applied' // Intent-specific declared data (triggers IntentBridge staleness)
-| 'declared_context_applied' // Context-specific declared data (triggers holistic staleness)
-```
+### Test
+Call `assembleStudentContext()` with partial data (only activity profiles). Verify it produces a clean string with no undefined/null artifacts. Call with empty object -- verify it returns empty string.
 
 ---
 
-## Implementation Item 10: Coordinator Extension
+## GAP-14: Activity Major Alignment Bug (CRITICAL)
 
-**Modified file**: `src/services/essayIntelligence/profileManager/essayProfileManager.ts`
+**Decision**: Diagnostic + fix
+**Files**: Activity scoring pipeline (where activity is classified into a domain before `majorAlignmentMatrix.ts` lookup)
+**Risk**: Low (bug fix)
+**Effort**: ~2-4 hours (diagnosis + fix)
 
-```typescript
-// ADD method to EssayProfileCoordinator:
+### The Problem
 
-/**
- * Seed student declared data from pre-analysis gathering.
- * Called once, before pipeline starts.
- */
-seedDeclaredData(entries: DeclaredDataEntry[]): void {
-  declaredDataMutator.seedEntries(this.profile, entries);
-  console.log(
-    `[Coordinator] Seeded ${entries.length} declared data entries`,
-  );
-}
+The audit found that a Robotics Club President applying for Mechanical Engineering was classified as `relevantToMajor: false`. The `majorAlignmentMatrix.ts` correctly maps STEM_COMPETITION and CODING_ENGINEERING domains to Engineering as "critical" relevance (boostFactor 0.85-0.95). The bug is UPSTREAM: the activity is being classified into the wrong domain (or domain classification is failing entirely).
 
-/**
- * Add a single declared data entry from coaching extraction.
- * Handles supersession and triggers staleness propagation.
- */
-addDeclaredDataEntry(entry: DeclaredDataEntry): void {
-  const mutations = declaredDataMutator.addEntry(this.profile, entry);
+### Diagnostic Steps
 
-  // Staleness propagation based on category
-  if (entry.category === 'intent' || entry.category === 'correction') {
-    // Intent changes make IntentBridge and analysis stale
-    this.markStale('intent_bridge', 'moderate');
-    if (entry.location.paragraph !== undefined) {
-      this.markStale(`paragraph_analysis_${entry.location.paragraph}`, 'moderate');
-    }
-  }
-  if (entry.category === 'domain' || entry.category === 'backstory') {
-    // Context changes make holistic sections stale
-    this.markStale('holistic_synthesis', 'weak');
-  }
-}
-```
+1. Trace the scoring pipeline for Robotics Club President:
+   - Where does domain classification happen? (likely in `activityScoringService.ts` or the LLM scoring prompt)
+   - What domain does "Robotics Club" get mapped to?
+   - Is it falling through to a default/generic domain?
 
----
+2. Check `majorAlignmentMatrix.ts`'s `getMajorAlignment()` (line 1470-1494):
+   - What happens when the domain is not in the matrix?
+   - Does the fallback return `unrelated` (0.0)?
 
-## Implementation Item 11: Edit Understanding Injection (GAP-7)
+3. Check the `connections.majorAlignment` field on ActivityProfile:
+   - Is the LLM-populated `relevantToMajor` boolean being set by conversation extraction or by the scoring pipeline?
+   - If by conversation extraction: the LLM might be making a bad judgment call
+   - If by scoring pipeline: the domain→major lookup is failing
 
-**Modified file**: `src/services/essayIntelligence/analysis/editUnderstandingService.ts`
+### Fix Approach
 
-### Change: Inject declared intents into edit understanding prompt
+The fix depends on the diagnostic. Most likely scenarios:
 
-Per SYN-5 decision: inject declared intents as context, let existing `apparentPurpose` absorb alignment assessment.
+**Scenario A**: Activity classified into wrong domain (e.g., "GENERAL_LEADERSHIP" instead of "STEM_COMPETITION"). Fix: improve domain classification prompt or add keyword boosting for STEM terms.
 
-```typescript
-// In the Sonnet understanding prompt (Step 2-4), add declared intent context:
+**Scenario B**: Domain lookup fallback returns `unrelated`. Fix: change fallback from `{relevance: 'unrelated', boostFactor: 0}` to `{relevance: 'supporting', boostFactor: 0.2}` with a flag that it's a default.
 
-const intentEntries = profile.studentDeclaredData?.filter(
-  e => e.category === 'intent' && !e.supersedes,
-);
+**Scenario C**: The `relevantToMajor` boolean is set by conversation extraction LLM, not the matrix. Fix: wire the matrix lookup result INTO the profile's `connections.majorAlignment` field, overriding the conversational LLM's judgment with the structured lookup.
 
-if (intentEntries?.length) {
-  promptSections.push(
-    '\nSTUDENT-DECLARED INTENT:',
-    ...intentEntries.map(e => `- ${e.content}`),
-    '',
-    'When assessing apparentPurpose of this edit, consider whether it moves',
-    'TOWARD or AWAY from the student\'s declared intent. This alignment is',
-    'itself a meaningful observation.',
-    ''
-  );
-}
-```
-
-This costs $0 (same Sonnet call, ~50 additional input tokens). The `apparentPurpose` field is already consumed by VersionTracker and coaching.
+### Test
+Score a Robotics Club activity for a Mechanical Engineering applicant. Verify `relevantToMajor: true` and `boostFactor >= 0.85`.
 
 ---
 
-## Implementation Item 12: IntentGapDetector
+## GAP-15: Coaching Response Length Prompt Directive
 
-**New file**: `src/services/essayIntelligence/analysis/intentGapDetector.ts` (~120 lines)
+**Decision**: Complement GAP-1's maxTokens with explicit prompt instruction
+**Files**: `src/services/essayIntelligence/coaching/coachingService.ts`
+**Risk**: Low
+**Effort**: ~15 min
 
-Runs after L3.5, before L4. Produces Findings for intent-effect gaps.
+### The Problem
+
+GAP-1 reduces maxTokens based on Stage 1.5 intensity (600/1200/2200). But maxTokens is a ceiling, not an instruction. The model will still produce 500 tokens of coaching within a 600-token window. The prompt itself needs to say "write 1-3 sentences."
+
+### Implementation
+
+In `coachingService.ts`, where the user prompt is assembled (around line 1465-1478), append an intensity directive BEFORE the "Respond to the student's message" instruction:
+
+```
+// Build this based on the Stage 1.5 intensity result:
+const intensityDirective = {
+  full: '', // no additional constraint — existing "shorter is better" guidance applies
+  brief: `\n\nRESPONSE LENGTH: BRIEF. 3-6 sentences maximum. Acknowledge their point, add ONE new observation or connection, suggest next step. Do NOT elaborate beyond what is needed.`,
+  minimal: `\n\nRESPONSE LENGTH: MINIMAL. 1-3 sentences maximum. Acknowledge what they said. Advance the conversation with a question or a redirect. Nothing more.`,
+}[stage1_5Intensity];
+```
+
+This works WITH GAP-1's maxTokens reduction. Both signals together: the prompt says "1-3 sentences" AND the window caps at 600 tokens.
+
+### Test
+Send "ok that makes sense" → verify response is 1-3 sentences (not a paragraph that acknowledges then re-explains).
+
+---
+
+## GAP-16: PIQ Ceiling Recognition ("Leave It Alone" Mode)
+
+**Decision**: Reduce suggestion volume for high-scoring PIQs
+**Files**: PIQ analysis service (wherever the teaching/suggestion generation happens)
+**Risk**: Low
+**Effort**: ~1 hour
+
+### The Problem
+
+The audit found: "The system risks over-coaching excellent work and making it worse." A PIQ scoring 90+ needs 1-2 micro-polish suggestions, not a full 13-dimension improvement plan. Over-coaching strong work is the fastest way to lose credibility with good writers.
+
+### Implementation
+
+Add a ceiling-recognition gate to the PIQ analysis pipeline. After Phase 17 (initial scoring) but before Phase 19 (teaching layer):
 
 ```typescript
-import type { EssayProfile, Finding, FindingScope, FindingMaturity } from '../profileTypes';
-import { FindingStore } from '../findings/findingStore';
+// In the PIQ analysis orchestration, after initial scoring:
+const overallScore = phase17Result.overallScore;
 
-/**
- * Scans profile for intent-effect gaps and converts them to Findings.
- *
- * An intent-effect gap exists when:
- * 1. Student declared intent for a location (DeclaredDataEntry with category='intent')
- * 2. The analysis of that location shows the text doing something different
- *
- * These gaps are coaching gold: they tell us WHERE the student's vision
- * diverges from the text's reality.
- *
- * No LLM call needed -- pure comparison between declared data and analysis output.
- * The gap detection is mechanical; the gap DESCRIPTION comes from existing analysis.
- */
-export function detectIntentEffectGaps(
-  profile: EssayProfile,
-  findingStore: FindingStore,
-): Finding[] {
-  const newFindings: Finding[] = [];
-  const intentEntries = profile.studentDeclaredData?.filter(
-    e => e.category === 'intent' && !e.supersedes,
-  );
+if (overallScore >= 85) {
+  // Ceiling mode: dramatically reduce suggestion volume
+  const ceilingConfig = {
+    maxWorkshopItems: overallScore >= 92 ? 1 : 2,
+    maxSeverity: 'minor' as const,  // no "critical" or "major" suggestions for strong PIQs
+    ceilingNote: overallScore >= 92
+      ? 'This PIQ is exceptional. The suggestions below are micro-polish only — the essay works as-is.'
+      : 'This PIQ is strong. Focus on the 1-2 suggestions that would make it memorable, not just good.',
+  };
 
-  if (!intentEntries?.length) return [];
+  // Filter workshop items to only minor suggestions
+  phase17Result.workshopItems = phase17Result.workshopItems
+    .filter(item => item.severity === 'minor' || item.severity === 'suggestion')
+    .slice(0, ceilingConfig.maxWorkshopItems);
 
-  for (const entry of intentEntries) {
-    // Essay-wide intent: compare against North Star system reading
-    if (entry.location.type === 'essay_wide' && profile.northStar?.intentBridge) {
-      const bridge = profile.northStar.intentBridge;
-      const divergent = bridge.alignments.filter(
-        a => a.alignment === 'divergent' || a.alignment === 'student_unaware',
-      );
+  // Add ceiling note to the result
+  phase17Result.ceilingNote = ceilingConfig.ceilingNote;
+}
+```
 
-      for (const alignment of divergent) {
-        const finding: Finding = {
-          id: `F-gap-${entry.id}-${alignment.aspect}`,
-          source: 'intent_gap',
-          scope: { type: 'essay' },
-          maturity: 'hypothesis',
-          coachingValue: 'critical',
-          content: `Intent-effect gap: Student declares "${entry.content}" but the essay's ${alignment.aspect} shows "${alignment.detail}"`,
-          evidence: [{
-            location: { type: 'essay' },
-            text: alignment.detail,
-            reasoning: `Student intent: "${entry.content}". Essay behavior: "${alignment.detail}". Alignment: ${alignment.alignment}.`,
-          }],
-          lineage: [{
-            iteration: 0,
-            action: 'created',
-            reasoning: 'Detected divergence between student-declared intent and essay behavior',
-            timestamp: new Date().toISOString(),
-          }],
-          createdAt: new Date().toISOString(),
-          lastUpdatedAt: new Date().toISOString(),
-          deepeningPotential: 'The student may not realize this gap exists -- confirming or explaining it would advance their understanding',
-          iterationsSurvived: 0,
-        };
+### Test
+Run PIQ analysis on the "elite translator" PIQ (golden dataset). Verify:
+- Score 85+ → max 2 suggestions, all minor severity
+- Score 92+ → max 1 suggestion with "exceptional" ceiling note
 
-        findingStore.addFinding(finding);
-        newFindings.push(finding);
-      }
-    }
+---
 
-    // Paragraph-specific intent: compare against paragraph analysis
-    if (entry.location.type === 'paragraph' && entry.location.paragraph !== undefined) {
-      const paraIdx = entry.location.paragraph;
-      const paraProfile = profile.paragraphs[paraIdx];
-      if (!paraProfile?.analysis) continue;
+## GAP-17: Scoring Calibration Widening
 
-      // Check if paragraph analysis mentions divergence from intent
-      // This is a soft check -- the analysis may or may not have noticed
-      const analysis = paraProfile.analysis;
-      if (analysis.effectivenessAssessment) {
-        const finding: Finding = {
-          id: `F-gap-${entry.id}-p${paraIdx}`,
-          source: 'intent_gap',
-          scope: { type: 'paragraph', paragraph: paraIdx },
-          maturity: 'hypothesis',
-          coachingValue: 'critical',
-          content: `Intent-effect gap at P${paraIdx + 1}: Student intends "${entry.content}" but analysis assesses effectiveness as: ${analysis.effectivenessAssessment}`,
-          evidence: [{
-            location: { type: 'paragraph', paragraph: paraIdx },
-            text: analysis.effectivenessAssessment,
-            reasoning: `Declared intent vs analysis assessment at paragraph ${paraIdx + 1}`,
-          }],
-          lineage: [{
-            iteration: 0,
-            action: 'created',
-            reasoning: 'Detected potential divergence between student intent and paragraph effectiveness',
-            timestamp: new Date().toISOString(),
-          }],
-          createdAt: new Date().toISOString(),
-          lastUpdatedAt: new Date().toISOString(),
-          deepeningPotential: 'Student input could confirm whether this gap is real or a misreading',
-          iterationsSurvived: 0,
-        };
+**Decision**: Add inter-essay calibration to L3.5 prompt
+**Files**: `src/services/essayIntelligence/analysis/analysisPass.ts`
+**Risk**: Medium (shifts score distributions)
+**Effort**: ~30 min
 
-        findingStore.addFinding(finding);
-        newFindings.push(finding);
+### The Problem
+
+The audit found an 11.4-point mean gap between a mediocre essay (59.1) and a strong essay (70.5). LLM variance is 8-15 points. The distributions overlap. The anti-clustering rules enforce INTRA-essay spread (20pt min between best/worst in a paragraph) but not INTER-essay spread.
+
+### Implementation
+
+In `buildSystemPrompt()` (analysisPass.ts), add to the pre-scoring calibration section (after line 414):
+
+```
+INTER-ESSAY CALIBRATION (prevents score compression):
+The FULL 0-100 range must be used meaningfully:
+- A WEAK essay (cliche-heavy, no specificity, no voice) should AVERAGE 40-50
+- A MEDIOCRE essay (some specificity, some voice, structural issues) should AVERAGE 50-60
+- A COMPETENT essay (solid structure, some distinction) should AVERAGE 60-70
+- A STRONG essay (specific, voiced, architecturally sound) should AVERAGE 70-80
+- An EXCEPTIONAL essay (unforgettable, every sentence earns its place) should AVERAGE 80-90
+
+If you find yourself scoring most sentences in the 55-75 range, you are COMPRESSING.
+Step back and ask: "Is this essay mediocre, competent, or strong?" Then ensure your
+paragraph average lands in the corresponding band above.
+```
+
+### Test
+Run L3.5 on the piano essay (mediocre) and health clinic essay (strong). Verify:
+- Piano essay mean drops from ~59 to ~50-55
+- Health clinic essay mean rises from ~70 to ~75-80
+- Gap widens from 11.4 to 20+ points
+
+---
+
+## GAP-18: L3 Observation Quality Filter (Signal-to-Noise)
+
+**Decision**: Add utility filter + prompt-level quality instruction
+**Files**: `src/services/essayIntelligence/analysis/sequentialDeepWalk.ts`
+**Risk**: Medium (reduces output volume)
+**Effort**: ~2-3 hours
+
+### The Problem
+
+The L3 walk produces 129 observations for a 7-paragraph essay. ~70% are obvious or redundant (parallel syntax noted for the 15th time, the same cross-paragraph connection flagged from both endpoints). Elite counselor's notes would fit half a page. The system should produce only observations that contribute to deep understanding.
+
+### Root Cause
+
+The observation count is EMERGENT from:
+1. Mandatory 1-5 findings per paragraph (correct — keep)
+2. Three observation fields per sentence (observedFunctions, inferredIntents, narrativeContributions) each accepting multiple entries
+3. Rich evidence arrays on each finding
+4. Back-propagations creating additional entries
+
+The prompt asks for quality but the schema allows unlimited quantity per field.
+
+### Implementation: Two-Part Fix
+
+**Part 1: Prompt-level quality filter** (in sequentialDeepWalk.ts system prompt, after the novelty-driven growth section):
+
+```
+OBSERVATION ECONOMY:
+Every observation must pass this test: "Would a competent English teacher already know this?"
+If YES — do NOT produce the observation. It wastes the student's and coach's attention.
+If NO — produce it with evidence.
+
+Examples of observations to SKIP:
+- "Uses parallel syntax" (obvious structural observation)
+- "Transitions from one topic to another" (descriptive of any essay)
+- "The sentence functions as a topic sentence" (basic compositional observation)
+
+Examples of observations to PRODUCE:
+- "The parallel syntax between P1S2 and P5S1 creates an echo that the reader might not consciously notice but that gives the essay structural coherence" (non-obvious architectural connection)
+- "The narrator's voice shifts from received philosophical language to physical specificity exactly once — in P4S3 — and that moment is the essay's emotional pivot" (cross-paragraph insight a teacher would miss)
+
+QUANTITY GUIDANCE:
+- A transitional paragraph needs 1-2 observations (its function + one insight)
+- A contributing paragraph needs 3-5 observations (what it does + how it serves the arc)
+- A pivotal paragraph needs 5-8 observations (architectural significance + specific craft)
+- An entire 7-paragraph essay should produce 25-40 total observations, not 100+
+```
+
+**Part 2: Post-processing deduplication** (in the walk output validation):
+
+```typescript
+// After all paragraphs are walked, deduplicate cross-paragraph observations:
+function deduplicateObservations(paragraphs: ParagraphUnderstanding[]): ParagraphUnderstanding[] {
+  const seenObservations = new Set<string>();
+
+  for (const para of paragraphs) {
+    for (const sentence of para.sentences) {
+      // For each observation field, filter to unique observations
+      for (const field of ['observedFunctions', 'inferredIntents', 'narrativeContributions'] as const) {
+        if (sentence[field]) {
+          sentence[field] = sentence[field].filter(obs => {
+            // Normalize: lowercase, remove quotes, trim
+            const normalized = obs.observation.toLowerCase().replace(/['"]/g, '').trim();
+            // Check for near-duplicate (first 50 chars match)
+            const key = normalized.substring(0, 50);
+            if (seenObservations.has(key)) return false;
+            seenObservations.add(key);
+            return true;
+          });
+        }
       }
     }
   }
 
-  return newFindings;
+  return paragraphs;
 }
 ```
 
-### Orchestrator integration
+### Expected Impact
+- Current: ~129 observations for 7-paragraph essay
+- Target: ~30-45 observations (25-40 from prompt + dedup removes remaining overlaps)
+- Each surviving observation should be non-obvious and architecturally significant
 
-In `analysisOrchestrator.ts`, between Phase 4 (L3.5) and Phase 5 (L4):
+### Test
+Run L3 on the piano essay. Count observations. Verify:
+- Total < 50
+- Zero observations that a competent English teacher would already know
+- All architectural observations (cross-paragraph connections, fulfilled/unfulfilled promises) survive
+- Obvious observations (parallel syntax, topic sentences, tense shifts) are absent
+
+---
+
+## GAP-19: Voice Shift Intentionality Over-Attribution
+
+**Decision**: Quality-level-aware calibration in L3.75 voice map prompt
+**Files**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
+**Risk**: Low
+**Effort**: ~30 min
+
+### The Problem
+
+The audit found that 4/5 voice shifts were marked "intentional" for a mediocre piano essay. The L3.75 prompt already says "assessment should follow FROM the reasoning" and "below 0.6 confidence, present as question" — but the LLM defaults to "intentional" because it attributes craft sophistication to all writers by default. A 17-year-old who shifts from lyrical to analytical register mid-paragraph is almost certainly losing control of their voice, not deploying a deliberate rhetorical strategy.
+
+### Root Cause
+
+The prompt has no quality-level calibration. It treats a mediocre essay the same as a polished one. An elite writing professor would say: "In a strong essay, most voice shifts are intentional. In a mediocre essay, most are accidental."
+
+### Implementation
+
+**File**: `holisticSynthesis.ts`
+**Location**: After the existing voice map quality standards (lines 416-424), add:
+
+```
+INTENTIONALITY CALIBRATION BY ESSAY QUALITY:
+
+CRITICAL: Your default assessment should be calibrated to the essay's overall quality level.
+- In a STRONG essay (most sentences are specific, voiced, architecturally sound): voice shifts are more likely intentional. The writer has demonstrated craft control elsewhere.
+- In a FUNCTIONAL essay (competent but generic): voice shifts are more likely UNINTENTIONAL or AMBIGUOUS. The writer may not have the craft awareness to deploy register shifts deliberately. Default to "ambiguous" unless you have STRONG textual evidence of intentional deployment (e.g., a structural marker like an em-dash, a paragraph break aligned with a thematic pivot, or explicit setup language).
+- In a DEVELOPING essay (vague, telling-heavy): voice shifts are almost certainly unintentional. Default to "unintentional" unless the evidence is overwhelming.
+
+The essay's quality level is visible in the understanding context you received. Use the paragraph verdicts and overall arc assessment to calibrate your prior.
+
+Example of WRONG intentionality assessment for a mediocre essay:
+"intentional (0.75) — The shift from sensory to abstract vocabulary enacts the paragraph's epistemological argument."
+WHY WRONG: A 17-year-old writing a mediocre essay is not "enacting an epistemological argument." They shifted registers because they ran out of sensory vocabulary and defaulted to abstract language. The shift IS observable, but attributing intent to it flatters the writer and misleads the coaching.
+
+Example of RIGHT intentionality assessment for the same essay:
+"ambiguous (0.45) — The register shifts from sensory ('fingers danced') to abstract ('analytical thinking') at the em-dash. The em-dash suggests structural awareness, but the abstract vocabulary reads more like the writer defaulting to a formal register they associate with 'smart writing' than deliberately deploying conceptual language. The shift may be unintentional — the writer may not hear the register change."
+```
+
+### Why This Matters for Coaching
+
+The coaching system uses voice shift intentionality to decide whether to praise a craft choice or flag a loss of control. If a shift is "intentional," the coach says "nice — that register change works." If it's "unintentional," the coach says "do you hear how your voice changes here? Is that what you want?" Getting this wrong means the coach validates accidental craft choices, reinforcing bad habits.
+
+### Test
+Run L3.75 on the piano essay (mediocre). Verify:
+- At least 2/5 shifts are "ambiguous" or "unintentional" (currently 4/5 are "intentional")
+- Confidence scores for "intentional" assessments are backed by specific textual evidence, not inferred sophistication
+- The P5 shift (to pure abstraction) should be "ambiguous" or "unintentional" (currently "ambiguous" — should stay)
+
+---
+
+## GAP-20: Coaching Resistance → Shorter Responses
+
+**Decision**: Map resistance cognitive states to brief intensity
+**Files**: `src/services/essayIntelligence/coaching/coachingService.ts`
+**Risk**: Low
+**Effort**: ~30 min
+
+### The Problem
+
+The audit found: "The coach escalates directness (good) but also escalates response length (bad). T6 is 418 words. T7 is 512 words. T8 is 607 words. Each time the student deflects, the coach lectures MORE. An elite human coach would do the opposite."
+
+When a student is resistant, they need a SHORT, direct question — not a longer lecture. The current system detects resistance correctly (cognitive state: resistant_to_specific, resistant_to_general) but responds with MORE words because nothing maps resistance to brief/minimal intensity.
+
+### Implementation
+
+This is a wiring fix that connects to GAP-1 (response intensity) and GAP-15 (length directive).
+
+**File**: `coachingService.ts`
+**Location**: Where Stage 1.5 intensity is extracted and passed to Stage 3
+
+After extracting `responseIntensity` from Stage 1.5, add an override for resistance states:
 
 ```typescript
-// ── Intent-Effect Gap Detection (between L3.5 and L4) ──
-if (coordinator.getProfile().studentDeclaredData?.length > 0) {
-  const gapFindings = detectIntentEffectGaps(
-    coordinator.getProfile() as EssayProfile,
-    coordinator.getFindingStore(),
-  );
-  if (gapFindings.length > 0) {
-    console.log(
-      `[Orchestrator] Detected ${gapFindings.length} intent-effect gap findings`,
-    );
-  }
+// After Stage 1.5 returns cognitiveAssessment:
+let effectiveIntensity = cognitiveAssessment.responseIntensity;
+
+// Override: resistance should produce BRIEF responses, not full lectures
+if (
+  cognitiveAssessment.cognitiveState === 'resistant_to_specific' ||
+  cognitiveAssessment.cognitiveState === 'resistant_to_general'
+) {
+  effectiveIntensity = 'brief';
+}
+
+// Override: overwhelmed should produce MINIMAL responses
+if (cognitiveAssessment.cognitiveState === 'overwhelmed') {
+  effectiveIntensity = 'minimal';
 }
 ```
 
-Cost: $0 (pure logic, no LLM call).
+This feeds into GAP-1's maxTokens mapping (brief=1200) and GAP-15's prompt directive ("3-6 sentences maximum").
+
+### Why This Works
+
+When a student is resistant, the elite coach move is: name the pattern in 1-2 sentences, ask a direct question, then STOP. "I notice you've asked about the rewrite three times without sharing it. What's holding you back?" (25 words). The 1200-token window + "3-6 sentences" directive + the existing resistance-specific coaching philosophy should produce this naturally.
+
+### Test
+Send a message that triggers resistant_to_specific (e.g., "just tell me if the opening is good enough"). Verify:
+- maxTokens = 1200
+- Prompt says "3-6 sentences maximum"
+- Response is short and direct, not a lecture
 
 ---
 
-## Implementation Item 13: Coaching Intelligence Extraction (L6)
+## GAP-21: Scope Inflation Pattern Detection
 
-**Modified file**: `src/services/essayIntelligence/coaching/coachingService.ts`
+**Decision**: Add to L3.75 admissionsPositioning as a red flag
+**Files**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
+**Risk**: Low
+**Effort**: ~20 min
 
-### Change 1: Stage 4 declaredEntries extraction
+### The Problem
 
-Add `declaredEntries` to Stage 4 Sonnet output schema for `reinterpretation` and `new_context` categories:
+The audit found: "'Create worlds through sound' (P0) → 'create projects' (P3) → 'make a meaningful difference' (P6). Claims get bigger, evidence gets thinner. The system notes individual gaps but never identifies this as a structural pattern."
 
-```typescript
-// In Stage 4 Sonnet prompt, extend output schema:
-`"declaredEntries": [
-  {
-    "category": "intent" | "domain" | "backstory" | "emotional_stakes" | "voice_choice" | "correction",
-    "content": "extracted declaration in the student's words",
-    "certainty": "definite" | "tentative" | "exploring",
-    "location": { "type": "essay_wide" } | { "type": "paragraph", "paragraph": <0-based> }
-  }
-]`
+Scope inflation is a common pattern in mediocre essays: the language gets grander as the essay progresses, but the supporting detail gets vaguer. AOs notice this — it signals a student who is reaching for significance rather than earning it.
+
+### Implementation
+
+**File**: `holisticSynthesis.ts`
+**Location**: In the Phase B system prompt, the `admissionsPositioning.redFlags` field description (around line 520)
+
+**Current**:
+```
+"redFlags": ["<anything an admissions reader would notice or question — describe WHAT it is, not whether it is a problem>"],
 ```
 
-After Stage 4 completes, convert to DeclaredDataEntry and apply:
+**Add to the quality standards section** (after line 425, in the section that guides redFlags):
 
-```typescript
-// After Stage 4 Sonnet response processing:
-if (stage4Output.declaredEntries?.length) {
-  for (const raw of stage4Output.declaredEntries) {
-    const entry: DeclaredDataEntry = {
-      id: `D${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-      timestamp: new Date().toISOString(),
-      category: raw.category,
-      location: raw.location,
-      content: raw.content,
-      certainty: raw.certainty,
-      source: 'coaching',
-      sourceInsightId: insightExtracted?.id,
-    };
-    coordinator.addDeclaredDataEntry(entry);
-  }
-}
+```
+RED FLAG PATTERNS TO CHECK:
+- SCOPE INFLATION: Do claims get bigger while evidence gets thinner? "I changed my community" in the conclusion when the essay shows a single tutoring session. If the scale of claimed impact GROWS across paragraphs while the specificity of evidence SHRINKS, flag this as: "Scope inflation: language escalates from [specific early claim] to [broad late claim] without proportional evidence."
+- PEOPLE ABSENCE: Does the essay mention zero named individuals? An essay about growth with no teachers, mentors, teammates, or family members is a red flag — it suggests the student either lacks meaningful relationships or doesn't know how to write about them. Flag as: "No named individuals appear in the essay."
+- SOLO CREDIT for TEAM WORK: Does the essay use "I" exclusively for something that likely involved collaboration? "I developed an AI DJ" for what was probably a team project. Flag as: "Solo credit language for likely collaborative work — [specific claim]."
 ```
 
-### Change 2: Haiku extraction for correction/preference
+### Why This Matters
 
-For `correction` and `preference` categories (which skip Stage 4 Sonnet), add a lightweight Haiku call:
+These three red flag patterns (scope inflation, people absence, solo credit) were the top 3 things the audit said an elite counselor catches in the first 30 seconds but the system never flags. Adding them to the L3.75 red flag detection costs zero — it's prompt guidance for a field that already exists.
 
-```typescript
-// After Stage 1 classification, if category is 'correction' or 'preference':
-if (['correction', 'preference'].includes(stage1Category)) {
-  const extractionResponse = await callClaude<{ declaredEntries: Array<{ category: string; content: string; location: LocationScope; certainty: string }> }>({
-    model: HAIKU,
-    systemPrompt: 'Extract structured declarations from the student message.',
-    userPrompt: `Student message: "${studentMessage}"\nCategory: ${stage1Category}\n\nExtract as JSON: { "declaredEntries": [{ "category": "...", "content": "...", "location": {...}, "certainty": "..." }] }`,
-    maxTokens: 512,
-    temperature: 0.1,
-    useJsonMode: true,
-    cacheSystemPrompt: true,
-  });
-  // Process entries...
-}
-```
-
-Cost: ~$0.001 per correction/preference coaching turn.
-
-### Change 3: Question injection (Stage 2.5)
-
-```typescript
-// In Stage 2.5 (context routing), inject top student-facing question:
-if (questionQueueManager) {
-  const studentQuestions = questionQueueManager.getTopQuestions(1, { targetAudience: 'student' });
-  if (studentQuestions.length > 0) {
-    stage3Context.pendingQuestion = studentQuestions[0];
-  }
-}
-```
+### Test
+Run L3.75 on the piano essay. Verify redFlags includes:
+- Scope inflation (P0 "create worlds" → P7 "meaningful difference")
+- No named individuals (zero people appear)
+- Solo credit ("I developed an AI DJ" when it was a team hackathon entry — though L3.75 may not know this without coaching context)
 
 ---
 
-## Implementation Item 14: UnderstandingQuestion Extension
+## IMPLEMENTATION COST SUMMARY
 
-**Modified file**: `src/services/essayIntelligence/profileTypes.ts`
+| Gap | New Files | New LLM Calls | Prompt Token Impact | Type Changes | Effort |
+|-----|-----------|---------------|---------------------|--------------|--------|
+| 14 | 0 | 0 | 0 | 0 (bug fix) | 2-4 hr |
+| 15 | 0 | 0 | +30 tokens (user prompt) | 0 | 15 min |
+| 9 | 1 utility | 0 | 0 | 1 type + function | 30 min |
+| 7 | 0 | 0 | +200 tokens (system) | 0 | 45 min |
+| 11 | 0 | 0 | 0 (templates) | 0 | 30 min |
+| 18 | 0 | 0 | +150 tokens (walk prompt) | 0 | 2-3 hr |
+| 4 | 1 service | 1 Haiku ($0.003) | 0 | 1 interface | 2 hr |
+| 5 | 0 | 0 | +80 tokens (L3.75) | 0 | 20 min |
+| 10 | 0 | 0 | +100 tokens (L3.75) + +80 (L3.5) | 1 field | 1.5 hr |
+| 17 | 0 | 0 | +100 tokens (system) | 0 | 30 min |
+| 3 | 0 | 0 | +80 tokens (system) | 0 | 30 min |
+| 8 | 0 | 0 | +200 tokens (system) | 0 | 45 min |
+| 16 | 0 | 0 | 0 | 0 | 1 hr |
+| 1 | 0 | 0 | 0 | 1 field | 1 hr |
+| 2 | 0 | 0 | +30 tokens (sidecar) | 0 | 45 min |
+| 6 | 0 | 0 | +50 tokens (session arc) | 2 fields | 1 hr |
+| 12 | 0 | 0 | +100-200 tokens (per PIQ) | 0 | 1 hr |
+| 13 | 1 bridge | 0 | 0 | 1 interface | 1 hr |
+| 19 | 0 | 0 | +200 tokens (L3.75) | 0 | 30 min |
+| 20 | 0 | 0 | 0 | 0 | 30 min |
+| 21 | 0 | 0 | +100 tokens (L3.75) | 0 | 20 min |
+| **TOTAL** | **3 files** | **1 Haiku** | **~+1500 tokens** | **~8 additions** | **~19.5 hr** |
 
-```typescript
-// ADD to UnderstandingQuestion interface:
-
-/** Who should answer this question: the system (via deep dive/re-read)
- *  or the student (via coaching conversation). */
-targetAudience: 'system' | 'student';
-```
-
-Default: `'system'` (backward compatible). Walk and synthesis prompts extended to classify questions by audience during generation.
-
----
-
-## Implementation Item 15: Profile Initialization
-
-**Modified files**:
-- `src/services/essayIntelligence/profileManager/essayProfileManager.ts` -- add `studentDeclaredData: []` to `createEmptyProfile()`
-- `src/services/essayIntelligence/versioning/` -- include `studentDeclaredData` in snapshot serialization
-
----
-
-## Cost Summary Table
-
-| Component | Model | Calls | Cost per call | Total cost |
-|-----------|-------|-------|---------------|------------|
-| **Gathering Phase 1** (seed questions) | Sonnet | 1 | ~$0.006 | ~$0.006 |
-| **Gathering Phase 2** (classification) | Haiku | 2-4 | ~$0.001 | ~$0.003 |
-| **Gathering Phase 2** (follow-up gen) | Sonnet | 0-1 | ~$0.004 | ~$0.002 |
-| **Gathering Phase 3** (crystallization) | Sonnet | 1 | ~$0.010 | ~$0.010 |
-| **Pipeline injection** (L3/L3.5/L3.75/L4/L5) | N/A | 0 | $0 | $0 |
-| **Intent gap detection** (post-L3.5) | N/A | 0 | $0 | $0 |
-| **L6 correction/preference extraction** | Haiku | 0-1 | ~$0.001 | ~$0.001 |
-| **L6 Stage 4 declared entries** | N/A | 0 | $0 | $0 |
-| **SYN-2: Finding question promoter** | Haiku | 0-1 | ~$0.002 | ~$0.002 |
-| **TOTAL (gathering + first analysis)** | | **4-8** | | **~$0.017-0.024** |
-| **TOTAL (per coaching turn)** | | **0-1** | | **$0-0.001** |
+### Per-Essay Cost Impact
+- New: 1 Haiku call at ~$0.003
+- Prompt inflation: ~1200 tokens across all prompts = ~$0.004 additional input cost (Sonnet pricing)
+- L3 observation reduction: saves ~$0.05-0.10 in output tokens (fewer observations = fewer output tokens)
+- **Net incremental cost per essay: ~$0.00** (observation savings offset prompt inflation + new call)
+- Quality improvement is essentially FREE in cost terms
 
 ---
 
-## Execution Order with Verification Steps
+## RISK REGISTER
 
-### Phase A: Types and Foundation (Items 1-2, 9-10, 14-15)
-
-1. Add types to `profileTypes.ts` (DeclaredDataEntry, DeclaredDataCategory, LocationScope, StudentCertainty, StudentDeclaredContext)
-2. Add `studentDeclaredData: DeclaredDataEntry[]` to EssayProfile
-3. Add `targetAudience` to UnderstandingQuestion
-4. Add MutationType extensions
-5. Create `contextFormatters.ts`
-6. Create `declaredDataMutator.ts`
-7. Extend coordinator (seedDeclaredData, addDeclaredDataEntry)
-8. Update createEmptyProfile, snapshot serialization
-
-**Verification**: `npx tsc --noEmit` passes. All existing tests pass unchanged.
-
-### Phase B: GatheringService (Item 1)
-
-1. Create `gatheringService.ts`
-2. Implement Phase 1 (seed questions)
-3. Implement Phase 2 (classification + gap detection)
-4. Implement Phase 3 (crystallization)
-5. Implement `convertToDeclaredEntries()`
-
-**Verification**: Unit test with real Sonnet/Haiku calls. Verify:
-- 2-3 seed questions generated, each targeting a different facet
-- Classification produces valid facet labels
-- Crystallization produces valid StudentDeclaredContext
-- Conversion produces valid DeclaredDataEntry[]
-- Total cost < $0.025
-
-### Phase C: Pipeline Integration (Items 3-8, 11-12)
-
-1. Extend PipelineInput
-2. Add seeding in orchestrator
-3. L3 walk injection
-4. L3.75 synthesis injection
-5. L3.5 analysis Block 2 injection
-6. L4 crystallizer injection
-7. L5 annotation injection
-8. Edit understanding injection
-9. IntentGapDetector
-10. Orchestrator gap detection integration
-
-**Verification**: End-to-end pipeline test with and without gathering:
-- Pipeline WITHOUT gathering: identical output to current behavior
-- Pipeline WITH gathering: declared data visible in walk/synthesis/analysis prompts
-- IntentBridge.studentIntent populated when gathering provides intent
-- Token counts reasonable (Block 2 grows by ~200-400 tokens)
-- L3.5 cache hits confirmed (Block 2 is shared across parallel calls)
-- Intent-effect gap findings created when divergences exist
-
-### Phase D: Coaching Integration (Item 13)
-
-1. Stage 4 declaredEntries schema extension
-2. Haiku extraction for correction/preference
-3. Question injection (Stage 2.5)
-4. Wire QuestionQueueManager to coaching service
-
-**Verification**: Coaching integration test:
-- Student says "I meant this as irony" -> DeclaredDataEntry with category='correction'
-- Student says "This essay is for MIT" -> DeclaredDataEntry with category='audience'
-- Student-facing question from queue appears in coaching response
-- Stage 4 produces finding maturity transitions when student confirms/denies
-
-### Phase E: Synergies (SYN-1 through SYN-9)
-
-1. SYN-4: IntentBridge auto-population from accumulated intent entries
-2. SYN-5: Edit understanding intent injection
-3. SYN-6: Finding maturity via Stage 4 confirmation
-4. SYN-7: Staleness propagation for declared data
-5. SYN-1: L3.75 dimensionConfidence output
-6. SYN-2: FindingQuestionPromoter
-7. SYN-3: Connection-gap questions in L3.75
-8. SYN-8: Finding resolution ladder soft gate
-9. SYN-9: Phase-aware question filtering in Stage 2.5
-
-**Verification**: Each synergy has $0-0.002 marginal cost. Total synergy cost < $0.005.
+| Risk | Impact | Mitigation |
+|------|--------|------------|
+| GAP-18 observation reduction too aggressive — loses genuine insights | High | Run L3 before/after on 3 essays, manually compare. Keep architectural cross-paragraph insights. |
+| GAP-17 calibration widening + GAP-8 admissions criteria together shift scores unpredictably | High | Implement GAP-17 first, validate distributions, THEN add GAP-8. Never both at once. |
+| GAP-14 major alignment fix has deeper root cause than expected | Medium | Diagnostic steps in plan. If domain classification is LLM-based, fix may require prompt change + test suite. |
+| GAP-10 archetype penalty too aggressive | Medium | Start with "10-15 points lower" as guidance, not hard rule; LLM calibrates |
+| GAP-4 AOFirstRead Haiku fails | Low | Graceful degradation: skip and continue pipeline, log warning |
+| GAP-1 maxTokens=600 too short for some minimal turns | Low | Floor at 600, sidecar still fits; if Sonnet needs more it won't hit 600 for minimal |
+| GAP-6 strategicQuestion stale forever | Low | Staleness counter + pattern detection re-evaluation provides escalation path |
+| GAP-16 ceiling recognition too aggressive — misses real issues in strong PIQs | Low | Only filter to minor severity, don't eliminate all suggestions. Ceiling note frames as polish, not critique. |
 
 ---
 
-## File Inventory
+## QUALITY GATES
 
-### New Files (4 files, ~600 lines)
+Before considering any gap "done":
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `src/services/essayIntelligence/analysis/gatheringService.ts` | ~300 | Pre-analysis gathering service |
-| `src/services/essayIntelligence/analysis/contextFormatters.ts` | ~80 | buildDeclaredDataBlock() utility |
-| `src/services/essayIntelligence/analysis/intentGapDetector.ts` | ~120 | Intent-effect gap -> Finding detection |
-| `src/services/essayIntelligence/profileManager/mutators/declaredDataMutator.ts` | ~100 | DeclaredDataEntry CRUD + supersession |
+1. **Type check passes**: `npx tsc --noEmit` with zero errors
+2. **Prompt spec complete**: every prompt change has before/after text in this doc
+3. **Test exists**: at least one test scenario per gap
+4. **No regression**: existing tests still pass
+5. **Cost verified**: run 1 end-to-end and verify cost is within +$0.01 of baseline
 
-### Modified Files (9 files)
+---
 
-| File | Change | Lines added |
-|------|--------|-------------|
-| `profileTypes.ts` | Types: DeclaredDataEntry, StudentDeclaredContext, MutationType, targetAudience | ~80 |
-| `analysisOrchestrator.ts` | PipelineInput extension, seeding, gap detection integration | ~30 |
-| `sequentialDeepWalk.ts` | walkEssay option, user prompt injection, computeWalkMaxTokens multiplier | ~40 |
-| `holisticSynthesis.ts` | User prompt declared data injection + topic-fit context | ~20 |
-| `analysisPass.ts` | Block 2 declared data injection | ~20 |
-| `crystallizer.ts` | IntentBridge pre-population + user prompt injection | ~25 |
-| `deepAnnotationService.ts` | Domain-calibrated teaching guidance | ~15 |
-| `editUnderstandingService.ts` | Declared intent context injection | ~15 |
-| `essayProfileManager.ts` | seedDeclaredData(), addDeclaredDataEntry(), createEmptyProfile | ~30 |
+## NOTES FOR IMPLEMENTER
 
-**Total estimated diff**: ~455 lines added across 13 files.
+1. **GAP-14 (major alignment) is the most urgent fix.** A student seeing their primary activity classified as "irrelevant to major" will lose trust in the entire system. Diagnose first: trace the activity through domain classification → major lookup. The matrix data is correct; the bug is upstream.
+
+2. **GAP-15 + GAP-1 work together.** GAP-15 (prompt directive) tells the model "write 1-3 sentences." GAP-1 (maxTokens) constrains the ceiling. Implement GAP-15 first (15 min), then GAP-1 (1 hr). Both together are much more effective than either alone.
+
+3. **GAP-18 (observation compression) is the highest-risk change.** Reducing L3 output from 129 to 30-45 observations could lose genuine insights if the quality filter is too aggressive. Run before/after on 3 essays and manually verify that cross-paragraph architectural insights survive while obvious syntax observations are eliminated. Iterate the prompt until the balance is right.
+
+4. **GAP-17 (scoring calibration) and GAP-8 (admissions criteria) must be sequenced.** Implement GAP-17 first and validate the new score distributions. THEN add GAP-8. Doing both simultaneously makes it impossible to diagnose which change caused any distribution shift.
+
+5. **GAP-6 has a backward compat concern.** Existing sessions have `nextFocus` populated. The `strategicQuestion` field is new and will be empty for existing sessions. The prompt injection uses a fallback: if `strategicQuestion` is empty, use `nextFocus`. Pattern detection will populate `strategicQuestion` on the next cycle.
+
+6. **GAP-10's archetype feeds into GAP-8.** Implement GAP-10 first so that L3.5 has archetype context available when the scoring calibration from GAP-8 references it.
+
+7. **GAP-4 is the only new file that touches the analysis pipeline.** Wire into `analysisOrchestrator.ts` with `Promise.allSettled` (not `Promise.all`) so a Haiku failure doesn't crash the pipeline.
+
+8. **GAP-13 is standalone.** The bridge file can be implemented and tested in isolation. Wiring it into each module's prompt builder is a separate step that can happen incrementally.
+
+9. **GAP-16 (PIQ ceiling) should be validated against the golden dataset.** The "elite translator" PIQ should score 85+ and trigger ceiling mode. Verify it gets max 2 suggestions, all minor severity.

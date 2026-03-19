@@ -2,6 +2,14 @@
 /**
  * Insight-Driven Academic Advisor
  *
+ * DEFERRED: School-specific context injection and competition-realistic framing.
+ * The advisor needs its own forge plan — it has separate types, prompts, and
+ * conversation flow from the essay coaching pipeline. Adding school-specific
+ * context (acceptance rates, program strengths) and realistic competition
+ * framing requires understanding the advisor's architecture deeply. This is
+ * NOT a quick fix to bolt onto the coaching/essay pipeline changes.
+ * See: final audit Finding 56+ (academic advisor improvements).
+ *
  * PHILOSOPHY:
  * This is NOT a generic chatbot. This is an expert advisor who has:
  * 1. Already analyzed the student's FULL profile (grades, courses, activities)

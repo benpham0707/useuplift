@@ -78,11 +78,15 @@ const WALK_TEMPERATURE = 0.3;
  * Phase 1 savings: per-sentence cost drops from ~300 to ~80 tokens.
  * Freed budget goes to richer findings.
  */
-const WALK_BASE_MAX_TOKENS = 4096;
-const WALK_MAX_TOKENS_CAP = 8192;
+// Tightened from 4096/8192/3500 as part of observation economy optimization.
+// The OBSERVATION ECONOMY prompt guidance (30-50 total observations for 7 paragraphs)
+// means each paragraph produces 4-10 observations instead of 15-20. This naturally
+// reduces output volume, so we can safely lower the token budgets.
+const WALK_BASE_MAX_TOKENS = 2500;
+const WALK_MAX_TOKENS_CAP = 5000;
 const WALK_TIMEOUT_MS = 180_000;
-/** Finding budget: space for paragraph understanding + 1-5 findings + metadata */
-const WALK_FINDING_BUDGET = 3500;
+/** Finding budget: space for paragraph understanding + 1-3 findings + metadata */
+const WALK_FINDING_BUDGET = 2000;
 
 /**
  * Compute max tokens for a paragraph's walk call based on sentence count.
@@ -213,6 +217,31 @@ For paragraph 1, everything is new — produce rich, detailed understanding.
 For later paragraphs, ask: "What does THIS paragraph reveal that wasn't already understood?"
 
 Natural novelty curve: P1 should produce the richest output (everything is new). P5 should produce focused output (only what P5 contributes that earlier paragraphs didn't). This is not a bug — it means earlier paragraphs were thoroughly understood.
+
+=== OBSERVATION ECONOMY ===
+
+Every observation must pass this test: "Would a competent English teacher already know this?"
+If YES — do NOT produce the observation. It wastes the student's and coach's attention.
+If NO — produce it with evidence.
+
+Observations to SKIP (these are obvious to any reader):
+- "Uses parallel syntax" or "Uses a semicolon to separate clauses" (basic structural description)
+- "Transitions from one topic to another" (descriptive of any essay)
+- "The sentence functions as a topic sentence" (basic compositional observation)
+- "Uses a metaphor/simile comparing X to Y" (surface-level identification without insight into WHY or WHAT IT DOES architecturally)
+- "The paragraph describes [summary of content]" (plot summary, not observation)
+
+Observations to PRODUCE (these require genuine analytical insight):
+- "The parallel syntax between P1S2 and P5S1 creates a structural echo the reader feels before they notice — this gives the essay coherence that the conscious argument doesn't" (cross-paragraph architectural insight)
+- "The narrator's voice shifts from received philosophical language to physical specificity exactly once — in P4S3 — and that single moment is the essay's emotional pivot" (pattern observation a teacher would miss)
+- "P2's puzzle metaphor isn't just a comparison — it pre-justifies the coding bridge in P4 by establishing music as analytical practice" (strategic architectural function that requires tracking across paragraphs)
+
+QUANTITY GUIDANCE:
+- A transitional paragraph should produce 2-4 observations total across all sentence fields
+- A contributing paragraph should produce 4-7 observations
+- A pivotal paragraph should produce 6-10 observations
+- An entire 7-paragraph essay should produce 30-50 total observations, not 100+
+If you're producing more than 50 observations, you're including obvious material. Cut the observations a competent reader would already know.
 
 === BACK-PROPAGATION ===
 

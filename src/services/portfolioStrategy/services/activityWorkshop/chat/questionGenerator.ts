@@ -261,6 +261,35 @@ const QUESTION_TEMPLATES: Record<string, {
     phase: 'connection_mapping',
     priority: 'high',
   },
+  // GAP-11: School/competition context — frames the achievement's impressiveness
+  'facts.context.competitionLevel': {
+    questions: [
+      "Was there a selection process for this role, or did you create it?",
+      "How many people applied or tried out? That selectivity makes your role more impressive.",
+      "Were you chosen for this — and if so, from how many candidates?",
+    ],
+    category: 'specific_probe',
+    phase: 'fact_gathering',
+    priority: 'high',
+  },
+  'facts.context.schoolScale': {
+    questions: [
+      "How big is your school? That helps me understand the scale of what you did.",
+      "Is {activity} a big deal at your school, or were you building something from scratch?",
+    ],
+    category: 'numeric_ask',
+    phase: 'fact_gathering',
+    priority: 'medium',
+  },
+  'facts.context.fieldSelectivity': {
+    questions: [
+      "In your area, how competitive is this level of achievement?",
+      "How does what you accomplished compare to others at your level?",
+    ],
+    category: 'specific_probe',
+    phase: 'fact_gathering',
+    priority: 'medium',
+  },
   'connections.characterTraits': {
     questions: [
       "What does {activity} show about who you are as a person?",
@@ -302,6 +331,21 @@ const FOLLOW_UP_TEMPLATES: Record<string, string[]> = {
     "Tell me more about that.",
     "What else can you share about that?",
     "I'd love to hear more details.",
+  ],
+  // GAP-7: Emotional signal follow-ups — translate emotion into description-worthy facts
+  mentioned_emotion: [
+    "That tells me this really mattered. What specifically was on the line?",
+    "That emotion shows the stakes were real. What was the concrete outcome?",
+    "When you felt that way, what were you in the middle of doing? Walk me through the specifics.",
+  ],
+  // GAP-11: School/competition context — build the case for impressiveness
+  mentioned_first: [
+    "'First' — that context matters. Was there an existing program, or did you build the path?",
+    "Being the first to do this — how big is your school? That frames the achievement.",
+  ],
+  mentioned_competition: [
+    "How selective was that? Roughly how many applied or competed?",
+    "What level was that — local, regional, state, national?",
   ],
 };
 

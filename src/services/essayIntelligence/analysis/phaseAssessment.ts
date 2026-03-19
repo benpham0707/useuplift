@@ -115,6 +115,18 @@ You do NOT need to assess all 8 dimensions. Choose 3-6 that are most meaningful 
 DIMENSION DIVERGENCE CHECK (mandatory):
 Before assigning dimension phases, ask: "Are there dimensions at DIFFERENT developmental levels?" An essay can have authentic voice (craft phase) but broken structure (foundation phase). If your dimension phases are all the same level, reconsider whether you are reading the holistic context carefully. Uniform dimension phases are valid for some essays but rare — most essays have uneven development across dimensions. Cite specific holistic evidence for each dimension's level.
 
+NARRATIVE vs ARGUMENTATIVE CALIBRATION (mandatory):
+Check the holistic context for arc type and primary strategy. If the essay is NARRATIVE (memoir, reflective, montage, bracket, chronological, or similar):
+
+- "Thesis" manifests as an EMERGENT THEME woven through scenes and moments — not a stated argument. A narrative essay at Architecture phase may have a powerful through-line but no explicit thesis statement. This is BY DESIGN, not a weakness.
+- A narrative essay with a clear emotional arc, specific scenes, and an emergent theme should NOT be placed at Foundation phase simply because it lacks an explicit thesis. Foundation phase for narratives means: no discernible through-line, scenes that don't accumulate toward meaning, or fundamentally confused storytelling.
+- For narrative essays, evaluate "structural coherence" through narrative arc and scene progression, NOT through topic sentences and argument structure.
+- A narrative essay's "pivot points" serve the same structural role as an argumentative essay's "thesis + evidence" — they are how the essay builds its case through SHOWING rather than TELLING.
+
+If the essay is ARGUMENTATIVE (thesis-driven, analytical):
+- Standard phase criteria apply. Thesis clarity, evidence structure, and logical progression are the primary structural signals.
+- An argumentative essay at Foundation phase legitimately lacks a clear thesis or has incoherent evidence organization.
+
 COACHING LENS:
 This is the most important output. It's a 2-4 sentence directive that will be injected into feedback and coaching prompts. It should capture:
 - The student's current developmental stage as a writer
@@ -214,6 +226,8 @@ function buildHolisticDigest(profile: Readonly<EssayProfile>): string {
   // Narrative strategy
   if (profile.narrativeStrategy) {
     const ns = profile.narrativeStrategy;
+    if (ns.arcType) lines.push(`  Arc type: ${ns.arcType}`);
+    if (ns.primaryStrategy) lines.push(`  Primary strategy: ${ns.primaryStrategy}`);
     if (ns.arcMomentum) lines.push(`  Arc momentum: ${ns.arcMomentum}`);
     if (Array.isArray(ns.pivotPoints)) {
       lines.push(`  Pivot points: ${ns.pivotPoints.length}`);

@@ -93,6 +93,8 @@ import { QuestionQueueManager } from './questionQueueManager';
 import { runDeepDive } from './deepDiveRunner';
 import { runTargetedReRead } from './fullContextReReader';
 import { analysisPassService } from './analysisPass';
+import { runAOFirstRead } from './aoFirstRead';
+import type { AOFirstReadResult } from './aoFirstRead';
 import type { L35AnalysisResult } from './analysisPass';
 import { crystallizerService } from './crystallizer';
 import type { L4CrystallizationResult } from './crystallizer';
@@ -265,25 +267,48 @@ export class AnalysisOrchestrator {
     );
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 1: Foundation (L1 first → L2 + L2.5 parallel)
+    // PHASE 1: Foundation (L1 + AO First Read parallel → L2 + L2.5 parallel)
     // ═══════════════════════════════════════════════════════════════════════
 
-    // ── L1: First Impressions (FATAL on failure) ──
+    // ── L1: First Impressions (FATAL) + AO First Read (non-fatal) — PARALLEL ──
+    // GAP-4: AO First Read runs alongside L1 at zero added latency.
+    // L1 failure is FATAL. AO failure is gracefully degraded (null on profile).
     let l1Result: FirstImpressionsResult;
-    try {
-      l1Result = await firstImpressionsService.analyze(input.essayText);
-      costTracker.record('L1', l1Result.cost, l1Result.tokenUsage, l1Result.timingMs);
-      layersCompleted.push('L1');
-      console.log(
-        `[Orchestrator] L1 complete: ${l1Result.impressions.length} paragraphs, ` +
-        `cost=$${l1Result.cost.toFixed(4)}, time=${l1Result.timingMs}ms`,
-      );
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
+    let aoFirstReadResult: AOFirstReadResult | null = null;
+
+    const [l1Settled, aoSettled] = await Promise.allSettled([
+      firstImpressionsService.analyze(input.essayText),
+      runAOFirstRead(input.essayText),
+    ]);
+
+    // Handle L1 (FATAL on failure)
+    if (l1Settled.status === 'rejected') {
+      const msg = l1Settled.reason instanceof Error ? l1Settled.reason.message : String(l1Settled.reason);
       console.error('[Orchestrator] L1 FATAL:', msg);
-      layersFailed.push(this.buildLayerError('L1', error, 0));
-      // L1 is FATAL — return immediately with empty result
+      layersFailed.push(this.buildLayerError('L1', l1Settled.reason, 0));
       return this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime);
+    }
+    l1Result = l1Settled.value;
+    costTracker.record('L1', l1Result.cost, l1Result.tokenUsage, l1Result.timingMs);
+    layersCompleted.push('L1');
+    console.log(
+      `[Orchestrator] L1 complete: ${l1Result.impressions.length} paragraphs, ` +
+      `cost=$${l1Result.cost.toFixed(4)}, time=${l1Result.timingMs}ms`,
+    );
+
+    // Handle AO First Read (non-fatal — graceful degradation)
+    if (aoSettled.status === 'fulfilled') {
+      aoFirstReadResult = aoSettled.value;
+      costTracker.record('AOFirstRead', aoFirstReadResult.cost, aoFirstReadResult.tokenUsage, aoFirstReadResult.timingMs);
+      console.log(
+        `[Orchestrator] AO First Read complete: putDownRisk=${aoFirstReadResult.firstRead.putDownRisk}, ` +
+        `cost=$${aoFirstReadResult.cost.toFixed(4)}, time=${aoFirstReadResult.timingMs}ms`,
+      );
+    } else {
+      console.warn(
+        `[Orchestrator] AO First Read failed (non-fatal): ` +
+        `${aoSettled.reason instanceof Error ? aoSettled.reason.message : String(aoSettled.reason)}`,
+      );
     }
 
     // ── Parse essay structure from L1 output ──
@@ -319,6 +344,12 @@ export class AnalysisOrchestrator {
 
     // ── Apply L1 impressions to profile ──
     coordinator.applyFirstImpressions(l1Result.impressions);
+
+    // ── Apply AO First Read to profile (if available) ──
+    if (aoFirstReadResult) {
+      const profile = coordinator.getProfile();
+      (profile as { aoFirstRead?: typeof aoFirstReadResult.firstRead | null }).aoFirstRead = aoFirstReadResult.firstRead;
+    }
 
     // ── L2 + L2.5 in parallel (FAIL-FAST: abort if either fails) ──
     let structuralMap: StructuralCartography;
