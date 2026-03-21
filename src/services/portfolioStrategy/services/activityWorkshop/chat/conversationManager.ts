@@ -27,6 +27,12 @@ import {
 } from './types';
 import { ActivityProfile, createEmptyProfile, createProfileFromBasicData } from '../profile/types';
 import { activityProfileService } from '../profile/activityProfileService';
+import {
+  MAJOR_ACTIVITY_ALIGNMENT_MATRIX,
+  type MajorCategory,
+  type ActivityCategory as AlignmentActivityCategory,
+} from '../../../knowledge/majorActivityAlignment';
+import { normalizeMajor } from '../../../knowledge/fieldSpecificExpectations';
 
 // ============================================================================
 // CONSTANTS
@@ -175,6 +181,11 @@ export class ConversationManager {
 
     // Update profile with extracted fields
     const updatedProfile = this.applyExtractionToProfile(state.currentProfile, extraction);
+
+    // Compute major alignment from the scoring matrix when intended major is known
+    // This bridges the gap between the alignment matrix (which is correct) and
+    // the profile's relevantToMajor boolean (which defaults to false and was never populated)
+    this.computeMajorAlignment(updatedProfile, state.studentContext?.intendedMajor);
 
     // Update gaps
     const completeness = activityProfileService.calculateCompleteness(updatedProfile);
@@ -486,6 +497,108 @@ export class ConversationManager {
     updatedProfile.dataCompleteness = completeness.overall;
 
     return updatedProfile;
+  }
+
+  /**
+   * Compute major alignment using the knowledge-base alignment matrix.
+   *
+   * This bridges the gap between:
+   * - MAJOR_ACTIVITY_ALIGNMENT_MATRIX (which correctly scores Robotics+Engineering = 5/5)
+   * - ActivityProfile.connections.majorAlignment.relevantToMajor (which defaulted to false)
+   *
+   * Without this, ALL activities show "Not aligned with intended major" regardless of
+   * actual alignment — a trust-destroying bug identified in the output quality audit.
+   */
+  private computeMajorAlignment(profile: ActivityProfile, intendedMajor?: string): void {
+    if (!intendedMajor) return;
+
+    // Map free-text major to MajorCategory
+    let majorCategory: MajorCategory;
+    try {
+      majorCategory = normalizeMajor(intendedMajor);
+    } catch {
+      // If the major can't be resolved, don't override the default
+      return;
+    }
+
+    // Map activity category to alignment matrix key
+    // Use activity title + category to determine the best alignment key
+    const categoryKey = this.mapToAlignmentKey(profile);
+
+    // Look up alignment score from the matrix
+    const majorMatrix = MAJOR_ACTIVITY_ALIGNMENT_MATRIX[majorCategory];
+    if (!majorMatrix) return;
+
+    const alignmentScore = majorMatrix[categoryKey as AlignmentActivityCategory] ?? 2;
+
+    // Convert score to relevantToMajor boolean and type
+    const isRelevant = alignmentScore >= 3; // 3+ = complementary or better = relevant
+    const alignmentType =
+      alignmentScore >= 5 ? 'core' :
+      alignmentScore >= 4 ? 'strong' :
+      alignmentScore >= 3 ? 'complementary' :
+      'neutral';
+
+    // Populate the profile's majorAlignment — this was the missing bridge
+    profile.connections.majorAlignment.relevantToMajor = isRelevant;
+
+    // Only set howRelevant if we have genuine alignment (score >= 3)
+    if (isRelevant && !profile.connections.majorAlignment.howRelevant) {
+      profile.connections.majorAlignment.howRelevant =
+        `${alignmentType} alignment with ${intendedMajor} (${alignmentScore}/5)`;
+    }
+  }
+
+  /**
+   * Map an activity profile to the best alignment matrix key.
+   * Uses activity title keywords and existing category to find the right domain.
+   */
+  private mapToAlignmentKey(profile: ActivityProfile): string {
+    const title = (profile.activityTitle || '').toLowerCase();
+
+    // Title-based classification (more accurate than category alone)
+    // These keywords map to specific alignment matrix categories
+    if (/robot|mechatron|arduino|circuit|hardware/.test(title)) return 'stem_clubs';
+    if (/debate|speech|forensic|model.?un/.test(title)) return 'debate_speech';
+    if (/math|olympiad|amc|aime|mathcount/.test(title)) return 'stem_competitions';
+    if (/research|lab|experiment/.test(title)) return 'stem_research';
+    if (/code|coding|program|hack|software|app|web|cs\b/.test(title)) return 'stem_clubs';
+    if (/orchestra|band|choir|music|piano|violin/.test(title)) return 'performing_arts_music';
+    if (/theater|theatre|drama|act/.test(title)) return 'performing_arts_theater';
+    if (/dance/.test(title)) return 'performing_arts_dance';
+    if (/art|paint|draw|sculpt|photo|film/.test(title)) return 'visual_arts';
+    if (/newspaper|journal|writing|literary|magazine/.test(title)) return 'writing_journalism';
+    if (/student.?gov|student.?council|class.?president/.test(title)) return 'student_government';
+    if (/business|entrepreneur|startup|venture/.test(title)) return 'entrepreneurship';
+    if (/intern/.test(title)) return 'internships';
+    if (/volunt|service|community|nonprofit/.test(title)) return 'nonprofit_service';
+    if (/athlet|sport|team|varsity|captain|basketball|football|soccer|tennis|swim|track|cross.?country/.test(title)) return 'athletics';
+    if (/science.?olympiad|science.?bowl|science.?fair/.test(title)) return 'academic_teams';
+
+    // Fallback: use the profile's category field if available
+    const categoryMapping: Record<string, string> = {
+      academic_competition: 'academic_teams',
+      research: 'stem_research',
+      stem_project: 'stem_clubs',
+      arts_performance: 'performing_arts_music',
+      arts_visual: 'visual_arts',
+      arts_literary: 'writing_journalism',
+      athletics: 'athletics',
+      community_service: 'nonprofit_service',
+      leadership_governance: 'student_government',
+      entrepreneurship: 'entrepreneurship',
+      work_experience: 'work_experience',
+      internship: 'internships',
+      summer_program: 'internships',
+    };
+
+    // Try to get category from the profile metadata or generated data
+    const profileCategory = (profile.metadata as Record<string, unknown>)?.activityCategory as string | undefined;
+    if (profileCategory && categoryMapping[profileCategory]) {
+      return categoryMapping[profileCategory];
+    }
+
+    return 'work_experience'; // safe fallback
   }
 
   /**

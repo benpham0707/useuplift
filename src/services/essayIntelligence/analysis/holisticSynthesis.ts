@@ -78,10 +78,14 @@ import {
 
 const SONNET = 'claude-sonnet-4-5-20250929';
 const SYNTHESIS_TEMPERATURE = 0.4;
-/** Phase A (voice+earned-ness) needs ~12K due to verbose voiceMap + earned-ness mechanisms */
-const SYNTHESIS_MAX_TOKENS_PHASE_A = 12000;
-/** Phase B (theme+narrative+entanglements) needs ~10K for 6 sections */
-const SYNTHESIS_MAX_TOKENS_PHASE_B = 10000;
+// Tightened from 12K/10K. The MECHANISM QUALITY STANDARD (only count genuine
+// sensory/emotional experiences, not dead metaphors) + person portrait "lunch" framing
+// + observation economy all produce more concise, higher-quality output. The LLM should
+// focus on the most valuable insights, not fill a large token budget with filler.
+/** Phase A (voice+earned-ness) — concise voice map + earned-ness with strict mechanism quality */
+const SYNTHESIS_MAX_TOKENS_PHASE_A = 8000;
+/** Phase B (theme+narrative+character+craft+admissions) — 6 sections, quality over volume */
+const SYNTHESIS_MAX_TOKENS_PHASE_B = 7000;
 /** 5 minutes per phase — each phase generates ~8K tokens, well within this limit */
 const SYNTHESIS_TIMEOUT_MS = 300_000;
 /** W5.3: Delta synthesis needs ~4K tokens (only 1-3 sections) */
@@ -387,7 +391,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
         "detail": "<what is shown or told and how>"
       }
     ],
-    "authenticityAssessment": "<describe how emotion is conveyed — through sensory detail, through abstraction, through dialogue, through action. Map the essay's emotional delivery style, not its quality.>"
+    "authenticityAssessment": "<describe how emotion is conveyed — through sensory detail, through abstraction, through dialogue, through action. If emotion is largely ABSENT (the essay operates through intellectual assertion without emotional exposure), describe that absence and what the essay uses INSTEAD of emotion. Map what IS there, not what should be.>"
   },
 
   "momentEarnednessMap": {
@@ -422,6 +426,15 @@ VOICE MAP:
   * Assessment ('intentional'/'unintentional'/'ambiguous') should follow FROM the reasoning, not precede it. Set confidence based on how much textual evidence you found — high confidence only when multiple signals converge.
 - Below 0.6 confidence: present as a QUESTION, not assertion. The reasoning should explain what evidence is missing.
 - Include stability regions — passages where voice holds steady and what characterizes it there.
+
+INTENTIONALITY CALIBRATION BY ESSAY QUALITY:
+Your default intentionality assessment must be calibrated to the essay's overall quality level. Look at the paragraph understanding context you received — if most paragraphs have middling verdicts, the writer likely lacks craft control:
+- STRONG essay (most sentences specific, voiced, architectural): voice shifts are likely intentional. The writer has demonstrated craft awareness.
+- FUNCTIONAL essay (competent but generic, some cliches): voice shifts are likely UNINTENTIONAL or AMBIGUOUS. Default to "ambiguous" unless you find STRONG textual evidence (structural marker like em-dash at the shift, paragraph break aligned with thematic pivot, explicit setup).
+- DEVELOPING essay (vague, telling-heavy): voice shifts are almost certainly unintentional. Default to "unintentional."
+WRONG for a mediocre essay: "intentional (0.75) — The shift from sensory to abstract vocabulary enacts the paragraph's epistemological argument." (A 17-year-old writing a mediocre essay is not enacting an epistemological argument.)
+RIGHT for the same essay: "ambiguous (0.45) — Register shifts from sensory to abstract at the em-dash. The em-dash suggests awareness, but the abstract vocabulary reads more like defaulting to a formal register than deliberately deploying conceptual language."
+
 - momentEarnednessMap: Describe WHAT mechanisms exist or are absent. Do NOT say moments are "well-earned" or "unearned" — say "3 mechanisms converge" or "no sensory grounding precedes this moment."
 
 EARNED-NESS MAP:
@@ -435,6 +448,17 @@ EARNED-NESS MAP:
   * thematic_preparation: "The concept of 'value' is explored through physical objects before being applied to relationships"
   * intellectual_scaffolding: "The coding-music parallel is built step by step: scales→debugging, composing→architecture, before the AI DJ synthesis"
   * comedic_subversive_setup: "Expectation of formal recital culture established before the narrator breaks convention"
+
+MECHANISM QUALITY STANDARD (critical — prevents false earned-ness):
+A mechanism only counts if it creates a SPECIFIC sensory or emotional experience in the reader. Stock phrasing and dead metaphors do NOT count as mechanisms even if they technically contain sensory or emotional language:
+  COUNTS as sensory_grounding: "slid the ring across the glass counter" — you see the action, hear the glass, feel the weight
+  DOES NOT COUNT: "fingers danced across the piano keys" — dead metaphor, evokes no specific sensory experience. The reader does not see, hear, or feel anything particular
+  COUNTS as emotional_setup: "her laugh filled the kitchen every Sunday" — establishes a specific, recurring emotional reality
+  DOES NOT COUNT: "I was captivated by the power" — tells an emotion without grounding it in any moment the reader can enter
+  COUNTS as intellectual_scaffolding: "spent hours swapping B-flat for B-natural, listening for the mood shift" — shows the actual process of discovering
+  DOES NOT COUNT: "I spent hours experimenting with chord progressions" — summary of a process with no specific detail a reader can follow
+If a claimed mechanism is stock language, a cliché, or a summary that doesn't create a specific experience for the reader, it is NOT a mechanism — it is a GAP. Credit mechanisms only for language that makes the reader SEE, HEAR, FEEL, or FOLLOW something concrete.
+
 - GAPS are as important as mechanisms. Identify moments that AREN'T earned: "P3S5 claims 'it changed everything' but no prior passage established what 'everything' was or why it mattered." If a moment claims devastation but no earlier passage established emotional proximity to the object, name that gap. If a realization appears without the reasoning steps that would make it feel inevitable, name that gap.
 - Be skeptical of "confirmation" moments — where the writer claims external validation ("reaffirmed my belief," "proved that," "showed me that") without showing the validation being tested or earned. If the belief was never challenged or the connection was never demonstrated through specific detail, that's a gap. Having setup mechanisms doesn't mean the payoff moment is earned — the payoff must also be grounded, not just asserted.
 - Arrow DENSITY is the diagnosis. Many arrows converging on a moment = well-earned. Sparse arrows = unearned. Do NOT use scores or "well-earned"/"unearned" labels — describe WHAT mechanisms exist or are absent.
@@ -484,11 +508,16 @@ Return a single JSON object with EXACTLY these 6 top-level keys:
   },
 
   "characterRevelation": {
-    "writerPortrait": "<who is this writer — the person behind the words, not the essay>",
+    "writerPortrait": "<WHO WOULD YOU WANT TO HAVE LUNCH WITH after reading this? Describe the PERSON — their energy, what they'd talk about, how they see the world. NOT their essay topics or writing ability.
+
+WRONG: 'A thoughtful writer who uses vivid imagery to explore themes of identity and belonging.'
+WRONG: 'The author demonstrates strong emotional intelligence through their narrative choices.'
+RIGHT: 'Someone who notices small things others miss — the kind of person who'd stop mid-sentence because they saw something out the window that reminded them of their grandmother's kitchen. Probably argues with their friends about whether something counts as art. Almost certainly has strong opinions about food.'
+RIGHT: 'The person who stays late not because they have to but because they got curious about something adjacent. Laughs at their own failures with genuine amusement, not performance. Would probably talk your ear off about water quality data if you let them.'>",
     "valuesRevealed": ["<values SHOWN not told — what does this person care about?>"],
-    "revealedQualities": ["<specific qualities/traits the writer reveals through their writing — e.g. 'persistence under uncertainty', 'comfort with ambiguity', 'empathetic observation'>"],
+    "revealedQualities": ["<qualities the writer reveals through ACTION in the essay — 'takes on adult responsibility without being asked', 'notices physical details others miss', 'processes difficulty through lists and counting'. NOT writerly qualities like 'precise' or 'image-driven'>"],
     "growthArc": "<growth arc detected in the essay>",
-    "intellectualFingerprint": "<how this person thinks — their cognitive style>",
+    "intellectualFingerprint": "<how this person thinks — their cognitive style, shown through the essay's structure and choices>",
     "blindSpots": ["<what they might not see about themselves or their essay>"]
   },
 
@@ -519,7 +548,12 @@ Return a single JSON object with EXACTLY these 6 top-level keys:
     "redFlags": ["<anything an admissions reader would notice or question — describe WHAT it is, not whether it is a problem>"],
     "memorability": "<what elements of this essay would persist in a reader's memory after reading 50 essays — describe the elements, not their quality>",
     "portfolioPosition": "<what role this essay occupies within a broader portfolio — what dimension of the applicant it surfaces>",
-    "aoTakeaway": "<what an admissions officer would conclude about this student after reading the complete essay>"
+    "aoTakeaway": "<what an admissions officer would conclude about this student after reading the complete essay>",
+    "archetypeContext": {
+      "archetype": "<name the essay archetype an AO would mentally file this under — e.g., 'sports injury comeback', 'immigrant identity through food', 'music as life metaphor', 'service trip revelation', 'death of grandparent', 'overcoming disability', 'coding project as passion', 'family sacrifice narrative'. Be honest about the archetype even if the essay is good. Every essay has one.>",
+      "poolDensity": "<saturated|common|moderate|uncommon|rare> — how many essays in a typical applicant pool of 500 match this archetype?",
+      "differentiator": "<what makes THIS essay's execution non-generic within the archetype, or null if the execution is also generic. Be specific: 'the pawnshop inventory detail' or 'the grandmother's hands as recurring image' — not 'strong voice'.>"
+    }
   },
 
   "entanglements": [
@@ -595,7 +629,11 @@ IMPORTANT: "newFindings" and "findingEvolutions" are OPTIONAL. Omit them entirel
 - craftAssessment.craftSignatures: Describe WHAT techniques are present and WHERE (e.g., "Uses anaphora in P3S1-S3, sentence fragments in P5S2-S4, extended metaphor linking P1 and P4"). Do NOT evaluate how well they work.
 - craftAssessment.craftPatterns: Describe WHAT patterns exist (e.g., "P2 and P4 use abstract nouns where P1 and P3 use concrete imagery"). Do NOT label them as weaknesses.
 - admissionsPositioning: Describe WHAT an admissions reader would notice. Do NOT evaluate whether it is effective.
-- admissionsPositioning.redFlags: Describe WHAT might draw attention (e.g., "The essay references a disciplinary incident without context"). Do NOT prescribe how to fix it.
+- admissionsPositioning.redFlags: Describe WHAT might draw attention. Do NOT prescribe fixes. CHECK FOR THESE STRUCTURAL PATTERNS:
+  * SCOPE INFLATION: Do claims get BIGGER while evidence gets THINNER across the essay? If P1 claims "I created" and P7 claims "I'll change the world" without proportional evidence escalation, flag: "Scope inflation: language escalates from [early claim] to [late claim] without proportional evidence."
+  * PEOPLE ABSENCE: Does the essay contain ZERO named individuals (no teacher, teammate, family member, mentor)? If so, flag: "No named individuals appear in the essay — every experience is described in isolation from other people."
+  * SOLO CREDIT FOR LIKELY TEAMWORK: Does the essay claim sole credit ("I developed", "I created") for something that likely involved collaboration (hackathon project, club achievement, team competition)? Flag: "Solo credit language for likely collaborative work: [specific claim]."
+  These three patterns are what elite counselors catch in the first 30 seconds. They are structural, not craft issues.
 - characterRevelation.blindSpots: Describe WHAT is absent from the self-presentation. Do NOT say this is a problem.
 
 ENTANGLEMENTS:
@@ -1408,7 +1446,7 @@ function coerceCraftAssessment(raw: Record<string, unknown>): CraftAssessment {
 }
 
 function coerceAdmissionsPositioning(raw: Record<string, unknown>): AdmissionsPositioning {
-  return {
+  const result: AdmissionsPositioning = {
     tellabilitySummary: String(raw.tellabilitySummary ?? ''),
     distinctivenessFactors: ensureStringArray(raw.distinctivenessFactors),
     institutionalFit: String(raw.institutionalFit ?? ''),
@@ -1417,6 +1455,27 @@ function coerceAdmissionsPositioning(raw: Record<string, unknown>): AdmissionsPo
     portfolioPosition: String(raw.portfolioPosition ?? raw.aoTakeaway ?? ''),
     aoTakeaway: String(raw.aoTakeaway ?? ''),
   };
+
+  // Parse archetypeContext if present in LLM output
+  const rawArchetype = raw.archetypeContext;
+  if (rawArchetype && typeof rawArchetype === 'object' && !Array.isArray(rawArchetype)) {
+    const arch = rawArchetype as Record<string, unknown>;
+    const validPoolDensities = ['saturated', 'common', 'moderate', 'uncommon', 'rare'] as const;
+    const rawDensity = String(arch.poolDensity ?? 'common');
+    const poolDensity = validPoolDensities.includes(rawDensity as typeof validPoolDensities[number])
+      ? rawDensity as 'saturated' | 'common' | 'moderate' | 'uncommon' | 'rare'
+      : 'common';
+
+    if (arch.archetype) {
+      result.archetypeContext = {
+        archetype: String(arch.archetype),
+        poolDensity,
+        differentiator: arch.differentiator != null ? String(arch.differentiator) : null,
+      };
+    }
+  }
+
+  return result;
 }
 
 function coerceEntanglements(raw: unknown[]): CrossDimensionEntanglement[] {

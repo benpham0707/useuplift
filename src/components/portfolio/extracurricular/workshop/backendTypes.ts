@@ -389,6 +389,14 @@ export interface AnalysisResult {
 
   // PHASE 18 VALIDATION SUMMARY (Added for quality overview)
   validationSummary?: ValidationSummary;
+
+  // GAP-16: PIQ Ceiling Recognition
+  // When a PIQ scores 85+, we reduce suggestion volume and add a note
+  ceilingNote?: string;
+
+  // GAP-55: PIQ Word-Budget Awareness
+  // When a PIQ is near the 350-word limit, suggestions must be framed as substitutions
+  wordBudgetNote?: string;
 }
 
 // ============================================================================

@@ -819,6 +819,9 @@ export interface NarrativeStrategy {
 export interface CharacterRevelation {
   /** Who is this writer (the person behind the words) */
   writerPortrait: string;
+  /** The original essay-only portrait before coaching revelations enriched it.
+   *  Preserved so cross-layer comparison remains possible. */
+  essayOnlyPortrait?: string;
   /** Values revealed — shown, not told */
   valuesRevealed: string[];
   /** Growth arc detected in the essay */
@@ -902,6 +905,15 @@ export interface AdmissionsPositioning {
   portfolioPosition: string;
   /** AO takeaway — what an admissions officer would think after reading this essay (from L3.5 analysis) */
   aoTakeaway: string;
+  /** Essay archetype classification — what "genre" this essay falls into from an AO's pattern-matching perspective */
+  archetypeContext?: {
+    /** The archetype name: "sports injury comeback", "immigrant identity", "music as life metaphor", etc. */
+    archetype: string;
+    /** How common this archetype is in the applicant pool */
+    poolDensity: 'saturated' | 'common' | 'moderate' | 'uncommon' | 'rare';
+    /** What makes THIS essay's execution non-generic within the archetype, or null if generic */
+    differentiator: string | null;
+  };
 }
 
 // ============================================================================
@@ -1677,6 +1689,12 @@ export interface EssayProfile {
   /** AO pitch, distinctiveness, institutional fit, red flags, memorability */
   admissionsPositioning: AdmissionsPositioning;
 
+  // -- AO FIRST READ (GAP-4 — naive gut reaction under attention fatigue) --
+  /** The AO's gut reaction BEFORE deep analysis. Produced by Haiku parallel with L1.
+   *  Captures the "4pm, 29th essay" experience that L3.75 cannot replicate because
+   *  it already has deep understanding by the time it runs. Optional — null if call failed. */
+  aoFirstRead?: import('./analysis/aoFirstRead').AOFirstRead | null;
+
   // -- ESSAY UNDERSTANDING (Gap 1 — synthesized narrative prose) --
   /** The system's holistic understanding of the essay as a coherent narrative.
    *  Synthesized from the 10 holistic sections — the ARGUMENT, not the summary. */
@@ -1716,6 +1734,12 @@ export interface EssayProfile {
   // -- CONVERSATION INSIGHTS (L6-sourced student revelations) --
   conversationInsights: ConversationInsight[];
   patternInsights: PatternInsight[];
+
+  /** Accumulated student-declared context — prose string summarizing everything
+   *  the student has revealed across coaching turns. Updated by Stage 4 when
+   *  category is 'new_context'. Unlike conversationInsights (individual records),
+   *  this is a synthesized narrative the LLM reads as a single block. */
+  studentDeclaredContext: string;
 
   // -- PROFILE METADATA --
   metadata: {
@@ -2003,6 +2027,101 @@ export interface TopicConfusionTracker {
   approachesTried: string[];
 }
 
+/**
+ * Tracks repeated resistance to specific coaching suggestions.
+ * Parallel to TopicConfusionTracker but with posture-based escalation.
+ *
+ * Escalation levels change the coach's BEHAVIORAL POSTURE, not just technique:
+ * 0 = no resistance
+ * 1 = noted — record the resistance, no special handling
+ * 2 = reframe — ask what they're protecting before offering alternatives
+ * 3 = name_pattern — explicitly name the pattern of resistance
+ * 4 = honor_and_wait — stop suggesting changes to this area entirely
+ */
+export interface TopicResistanceTracker {
+  /** Key format: "${dimensionFocus}:P${paragraphIndex}" or "${dimensionFocus}:essay" */
+  topic: string;
+  /** What specific suggestion(s) were rejected */
+  rejectedSuggestions: string[];
+  /** Number of resistance instances */
+  instanceCount: number;
+  /** Current escalation level (0-4) */
+  escalationLevel: 0 | 1 | 2 | 3 | 4;
+  /** Turn numbers where resistance was detected */
+  resistanceTurns: number[];
+}
+
+/**
+ * The coach's evolving hypothesis about who this student is.
+ * NOT analysis of the essay — analysis of the PERSON writing it.
+ * Synthesized every 5 turns by Sonnet, with inter-synthesis updates
+ * from the Sonnet sidecar's portraitEvolution field.
+ *
+ * Design principle: descriptive, not prescriptive. The theory
+ * describes what the coach OBSERVES. The Stage 3 Sonnet decides
+ * what to DO with these observations.
+ */
+export interface StudentTheory {
+  /**
+   * Who this person is — beyond what the essay reveals.
+   * 2-4 sentences. The coach's empathetic read of the student.
+   */
+  personhood: string;
+
+  /**
+   * What the student is protecting — topics, phrasings, or approaches
+   * they've resisted changing. Each entry is a specific thing, not a category.
+   */
+  protectedValues: Array<{
+    value: string;
+    evidence: string;
+    implication: string;
+  }>;
+
+  /**
+   * Hypotheses about what the student can't see about their own essay.
+   * These are HYPOTHESES — the coach may be wrong.
+   */
+  blindSpotHypotheses: Array<{
+    hypothesis: string;
+    analysisEvidence: string;
+    coachingEvidence: string;
+    readyToSurface: boolean;
+  }>;
+
+  /**
+   * Tensions between what the student says and what the essay does,
+   * or between different things the student has said.
+   */
+  tensions: Array<{
+    studentSays: string;
+    essayShows: string;
+    coachingOpportunity: string;
+  }>;
+
+  /**
+   * The student's relationship to this essay — why it matters to them,
+   * what they're trying to prove, what they're afraid of. 1-3 sentences.
+   */
+  essayRelationship: string;
+
+  /**
+   * Cross-layer observations — connections between essay-level analysis
+   * and conversation behavior that neither layer alone can see.
+   */
+  crossLayerPatterns: Array<{
+    analysisObservation: string;
+    conversationEvidence: string;
+    coachingImplication: string;
+  }>;
+
+  /** Turn number when this theory was last synthesized */
+  synthesizedAtTurn: number;
+
+  /** Raw inter-synthesis observations from Sonnet sidecar (cleared on synthesis) */
+  pendingObservations: string[];
+}
+
 // ============================================================================
 // COGNITIVE ASSESSMENT TYPES (Improvement 6 — LLM-First Coaching)
 // ============================================================================
@@ -2076,6 +2195,26 @@ export interface CognitiveAssessment {
 }
 
 /**
+ * A single coaching session event — unified record of what happened.
+ * Replaces the separate approachesUsed[], studentStances[], topicsDiscussed[] arrays.
+ * kind is a free-form string — the LLM describes what happened in its own words.
+ */
+export interface SessionEvent {
+  /** Turn number when this event occurred */
+  turn: number;
+  /** LLM-generated event kind — free prose, not enum */
+  kind: string;
+  /** One-sentence summary of what happened */
+  summary: string;
+  /** LLM-assessed significance (0-1). Higher = more important to remember */
+  significance: number;
+  /** Paragraph indices involved (empty for essay-level events) */
+  paragraphRefs: number[];
+  /** Finding IDs referenced in this event (empty if none) */
+  findingRefs: string[];
+}
+
+/**
  * Tracks the coaching session's arc. System infrastructure, not judgment.
  * The LLM reads this context; the system doesn't decide from it.
  */
@@ -2083,28 +2222,25 @@ export interface CoachingSessionMemory {
   /** Total turns in this session */
   turnCount: number;
 
-  /** Topics discussed, with turn numbers */
+  /** Unified session event log — replaces topicsDiscussed, approachesUsed, studentStances */
+  events: SessionEvent[];
+
+  /** @deprecated Use events[] instead */
   topicsDiscussed: Array<{
     topic: string;
     turnNumbers: number[];
-    /** LLM-generated summary of what was said about this topic */
     summary: string;
-    /** Whether the student seemed to understand/accept the coaching */
     resolution: 'understood' | 'partially_understood' | 'unresolved' | 'rejected';
   }>;
 
-  /** Teaching approaches tried, with outcomes */
+  /** @deprecated Use events[] instead */
   approachesUsed: Array<{
     turnNumber: number;
     approach: string;
-    /** LLM-assessed outcome: did the approach work? */
     outcome: string;
   }>;
 
-  /**
-   * Student's stated preferences and resistances accumulated in this session.
-   * Not the full ConversationInsight objects — just coaching-relevant summaries.
-   */
+  /** @deprecated Use events[] instead */
   studentStances: Array<{
     stance: string;
     turnNumber: number;
@@ -2121,6 +2257,38 @@ export interface CoachingSessionMemory {
    * Not a fixed curriculum — emerges from the conversation.
    */
   nextFocus: string;
+
+  /** Previous turn's responseIntensity from sidecar — for next-turn consistency */
+  lastResponseIntensity?: 'full' | 'brief' | 'minimal' | null;
+
+  /** Strategic question driving the session — a QUESTION, not a topic. */
+  strategicQuestion: string;
+
+  /** Turns since strategicQuestion was last updated. At 4+, escalation note appears. */
+  questionStaleness: number;
+
+  /** The coach's evolving theory about WHO this student is as a person.
+   *  Synthesized every 5 coaching turns. Ephemeral to the session — not persisted
+   *  across sessions. Lives on session memory, not the profile. */
+  studentTheory?: StudentTheory;
+
+  /** Consecutive deflection turns counter (for demonstration trigger).
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  deflectionCounter?: number;
+
+  /** Portrait observations accumulated before the first StudentTheory synthesis.
+   *  Flushed into pendingObservations when the first theory is created at turn 5.
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  preTheoryObservations?: string[];
+
+  /** Per-topic resistance trackers (parallel to confusion tracking).
+   *  Keyed by "${dimensionFocus}:P${paragraph}" or "${dimensionFocus}:essay".
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  resistanceTrackers?: Record<string, TopicResistanceTracker>;
+
+  /** Per-topic confusion trackers for escalation ladder.
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  confusionTrackers?: Record<string, TopicConfusionTracker>;
 }
 
 /**

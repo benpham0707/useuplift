@@ -23,6 +23,7 @@
 import type {
   EssayProfile,
   CheckpointStore,
+  EditUnderstanding,
   EditUnderstandingOutput,
   VersionRecord,
   ConversationInsight,
@@ -198,6 +199,10 @@ export class ReanalysisOrchestrator {
    */
   private deltaSynthesisCount: number;
 
+  /** Most recent EditUnderstanding from processEdit().
+   *  Consumed once by the next processCoachingTurn() call, then cleared. */
+  private lastEditUnderstanding: EditUnderstanding | null = null;
+
   // ── Construction ──────────────────────────────────────────────────────────
 
   constructor(profile: EssayProfile, checkpointStore: CheckpointStore, essayId?: string) {
@@ -348,13 +353,36 @@ export class ReanalysisOrchestrator {
       // edit context in Stage 1 classification and Stage 3 response generation.
       // W9.3: pass edit strategy context from version tracker for approach-aware coaching
       const editStrategyContext = this.versionTracker.getApproachContext() ?? undefined;
+
+      // W6A.3: Create session event for edit intelligence so it persists beyond one coaching turn
+      if (this.lastEditUnderstanding && sessionMemory) {
+        const eu = this.lastEditUnderstanding;
+        const editParagraphs: number[] = [];
+        if (eu.scopeRecommendation.targets) {
+          for (const target of eu.scopeRecommendation.targets) {
+            const match = target.match(/P(\d+)/i);
+            if (match) editParagraphs.push(parseInt(match[1], 10) - 1);
+          }
+        }
+        // Ensure events array exists
+        if (!sessionMemory.events) sessionMemory.events = [];
+        sessionMemory.events.push({
+          turn: (sessionMemory.turnCount || 0) + 1,
+          kind: `edit:${eu.changeType}`,
+          summary: `Student edited${editParagraphs.length > 0 ? ` P${editParagraphs.map(p => p + 1).join(', P')}` : ''} — ${eu.apparentPurpose}`,
+          significance: eu.significance === 'transformative' ? 0.9 : eu.significance === 'significant' ? 0.8 : eu.significance === 'moderate' ? 0.6 : 0.4,
+          paragraphRefs: editParagraphs,
+          findingRefs: [],
+        });
+      }
+
       const coachingResult: CoachingResult = await coachingService.processCoachingTurn(
         studentMessage,
         conversationHistory,
         profile,
         this.coordinator,
         this.router,
-        recentEditSummary,
+        this.buildRichEditContext(recentEditSummary),
         editStrategyContext,
         sessionMemory,
         learningStyle,
@@ -681,6 +709,54 @@ export class ReanalysisOrchestrator {
     console.log(`[ReanalysisOrchestrator] Destroyed session: ${this.essayId}`);
   }
 
+  // ── PRIVATE: edit context helpers ─────────────────────────────────────────
+
+  /**
+   * Build rich edit context from stored EditUnderstanding.
+   * Falls back to VersionTracker summary if no EditUnderstanding is available.
+   * Consumed once — clears lastEditUnderstanding after building.
+   */
+  private buildRichEditContext(fallbackSummary?: string): string | undefined {
+    const eu = this.lastEditUnderstanding;
+    if (!eu) return fallbackSummary;
+
+    // Consume once
+    this.lastEditUnderstanding = null;
+
+    const parts: string[] = [];
+
+    parts.push(
+      `Change type: ${eu.changeType.replace(/_/g, ' ')} (${eu.significance}).`,
+    );
+    parts.push(
+      `Apparent purpose: "${eu.apparentPurpose}" (confidence: ${eu.purposeConfidence.toFixed(2)}).`,
+    );
+
+    if (eu.profileImpact.connectionImpact.length > 0) {
+      const impacts = eu.profileImpact.connectionImpact
+        .filter(ci => ci.effect !== 'unchanged')
+        .map(ci => `${ci.connectionId} ${ci.effect}: ${ci.reasoning}`)
+        .slice(0, 3);
+      if (impacts.length > 0) {
+        parts.push(`Connection effects: ${impacts.join('; ')}.`);
+      }
+    }
+
+    if (eu.profileImpact.directImpact) {
+      parts.push(`Direct impact: ${eu.profileImpact.directImpact}`);
+    }
+
+    if (eu.profileImpact.holisticImpact) {
+      parts.push(`Holistic: ${eu.profileImpact.holisticImpact}`);
+    }
+
+    if (fallbackSummary) {
+      parts.push(`Summary: ${fallbackSummary}`);
+    }
+
+    return parts.join(' ');
+  }
+
   // ── PRIVATE: delta synthesis helpers ──────────────────────────────────────
 
   /**
@@ -747,6 +823,9 @@ export class ReanalysisOrchestrator {
       );
 
       editOutput = editResult.output;
+
+      // Store for rich context in next coaching turn
+      this.lastEditUnderstanding = editOutput.understanding;
 
       // FIX 1.5: cost is LayerCost (single object), not a number
       totalCost += editResult.cost.cost;

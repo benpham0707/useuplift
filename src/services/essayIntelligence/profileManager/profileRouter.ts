@@ -291,11 +291,16 @@ function getTaskPriorities(rule: RoutingRule): TaskPriorityWeights {
         structuralContext: 8,
       };
 
-    // Overview coaching → prioritize holistic + northStar
+    // Overview coaching → prioritize person + admissions + architecture
     case 'l6_coaching_overview':
       return {
-        holisticFull: 10,
         northStar: 10,
+        characterRevelation: 10,
+        admissionsPositioning: 10,
+        narrativeStrategy: 8,
+        thematicArchitecture: 8,
+        voiceIdentity: 5,
+        craftAssessment: 5,
         paragraphDigests: 4,
       };
 
@@ -1323,15 +1328,24 @@ export class ProfileRouter {
   /**
    * Rule 8: L6 coaching — overview question
    *
-   * ALWAYS: ProfileIndex + all holistic sections
-   * EXCLUDE: paragraph details (digests only)
+   * REDESIGNED: The coach doesn't need ALL 10 holistic sections for an overview question.
+   * For "what do you think of my essay?" the coach needs:
+   *   ALWAYS: ProfileIndex + North Star + character portrait + admissions positioning
+   *   IMPORTANT: Narrative strategy + thematic architecture (structural context)
+   *   NICE_TO_HAVE: Voice identity + craft assessment (if budget allows)
+   *   EXCLUDED: Full voice map, emotional topography, moment earnedness, entanglements
+   *
+   * The old version dumped all 10 sections as 'always', bloating the prompt with ~3000
+   * tokens of holistic data the coach rarely references in an overview response.
+   * The coaching philosophy prompt already says "shorter is better" — the context
+   * should match that principle.
    */
   private assembleL6CoachingOverview(
     profile: Readonly<EssayProfile>,
   ): ProfileSection[] {
     const sections: ProfileSection[] = [];
 
-    // ALWAYS: ProfileIndex
+    // ALWAYS: ProfileIndex (compact table of contents)
     sections.push({
       name: 'profileIndex',
       content: profile.index,
@@ -1339,32 +1353,57 @@ export class ProfileRouter {
       priority: 'always',
     });
 
-    // ALWAYS: All holistic sections
-    const holisticFull = {
-      voiceIdentity: profile.voiceIdentity,
-      voiceMap: profile.voiceMap,
-      emotionalTopography: profile.emotionalTopography,
-      momentEarnednessMap: profile.momentEarnednessMap,
-      thematicArchitecture: profile.thematicArchitecture,
-      narrativeStrategy: profile.narrativeStrategy,
-      characterRevelation: profile.characterRevelation,
-      craftAssessment: profile.craftAssessment,
-      entanglements: profile.entanglements,
-      admissionsPositioning: profile.admissionsPositioning,
-    };
-    sections.push({
-      name: 'holisticFull',
-      content: holisticFull,
-      tokenEstimate: estimateTokens(holisticFull),
-      priority: 'always',
-    });
-
-    // ALWAYS: North Star
+    // ALWAYS: North Star (the essay's architecture of meaning)
     sections.push({
       name: 'northStar',
       content: profile.northStar,
       tokenEstimate: profile.index.sectionTokenCounts.northStar,
       priority: 'always',
+    });
+
+    // ALWAYS: Character portrait + admissions positioning (WHO is this person + how does AO read it)
+    sections.push({
+      name: 'characterRevelation',
+      content: profile.characterRevelation,
+      tokenEstimate: profile.index.sectionTokenCounts.characterRevelation ?? estimateTokens(profile.characterRevelation),
+      priority: 'always',
+    });
+
+    sections.push({
+      name: 'admissionsPositioning',
+      content: profile.admissionsPositioning,
+      tokenEstimate: profile.index.sectionTokenCounts.admissionsPositioning ?? estimateTokens(profile.admissionsPositioning),
+      priority: 'always',
+    });
+
+    // IMPORTANT: Narrative strategy + thematic architecture (structural context for coaching)
+    sections.push({
+      name: 'narrativeStrategy',
+      content: profile.narrativeStrategy,
+      tokenEstimate: profile.index.sectionTokenCounts.narrativeStrategy ?? estimateTokens(profile.narrativeStrategy),
+      priority: 'connection_driven',
+    });
+
+    sections.push({
+      name: 'thematicArchitecture',
+      content: profile.thematicArchitecture,
+      tokenEstimate: profile.index.sectionTokenCounts.thematicArchitecture ?? estimateTokens(profile.thematicArchitecture),
+      priority: 'connection_driven',
+    });
+
+    // NICE_TO_HAVE: Voice identity + craft assessment (included if budget allows)
+    sections.push({
+      name: 'voiceIdentity',
+      content: profile.voiceIdentity,
+      tokenEstimate: profile.index.sectionTokenCounts.voiceIdentity ?? estimateTokens(profile.voiceIdentity),
+      priority: 'nice_to_have',
+    });
+
+    sections.push({
+      name: 'craftAssessment',
+      content: profile.craftAssessment,
+      tokenEstimate: profile.index.sectionTokenCounts.craftAssessment ?? estimateTokens(profile.craftAssessment),
+      priority: 'nice_to_have',
     });
 
     // Paragraph digests only (not full details)

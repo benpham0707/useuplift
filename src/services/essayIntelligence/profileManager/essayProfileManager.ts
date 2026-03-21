@@ -882,6 +882,7 @@ export function createInitialProfile(input: {
     // Conversation insights — empty
     conversationInsights: [],
     patternInsights: [],
+    studentDeclaredContext: '',
 
     // Metadata
     metadata: {
@@ -1886,6 +1887,14 @@ export class EssayProfileCoordinator {
       insightCategory: insight.category,
       affectedSentences,
     });
+  }
+
+  /**
+   * Update the accumulated student-declared context prose string.
+   * Called by Stage 4 new_context handler when the student reveals background information.
+   */
+  updateStudentDeclaredContext(context: string): void {
+    this.profile.studentDeclaredContext = context;
   }
 
   /**

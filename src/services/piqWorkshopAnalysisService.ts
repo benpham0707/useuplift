@@ -9,6 +9,53 @@
 import type { AnalysisResult, ValidationSummary } from '@/components/portfolio/extracurricular/workshop/backendTypes';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
+// ============================================================================
+// GAP-12: PIQ PORTFOLIO CONTEXT
+// When analyzing the Nth PIQ (N >= 2), inject prior PIQ summaries into
+// the analysis prompt so the LLM can recommend DIFFERENT dimensions.
+// This is a standalone utility — callers pass prior results, and get back
+// a prompt section string to inject into the edge function body.
+// ============================================================================
+
+export interface PriorPIQSummary {
+  promptType: string;
+  quickSummary: string;
+  topDimensions: string[];
+}
+
+/**
+ * Build a portfolio context prompt section from prior PIQ analysis results.
+ * Returns an empty string when there are no prior PIQs — safe to always call.
+ *
+ * Usage: inject the returned string into the edge function's `studentContext`
+ * or as a top-level `portfolioContext` field when the route handler wires it up.
+ */
+export function buildPIQPortfolioContext(priorResults: PriorPIQSummary[]): string {
+  if (priorResults.length === 0) return '';
+
+  const lines: string[] = [
+    '=== PIQ PORTFOLIO CONTEXT ===',
+    `This student has ${priorResults.length} other PIQ(s) analyzed.`,
+    '',
+  ];
+
+  for (const r of priorResults) {
+    lines.push(`${r.promptType}: "${r.quickSummary}"`);
+    if (r.topDimensions.length > 0) {
+      lines.push(`  Strong dimensions: ${r.topDimensions.join(', ')}`);
+    }
+    lines.push('');
+  }
+
+  lines.push(
+    'PORTFOLIO DIRECTIVE: This PIQ should reveal DIFFERENT dimensions than their other PIQs. ' +
+    'If prior PIQs already show leadership/initiative, this one should show creativity, vulnerability, ' +
+    'or intellectual curiosity.'
+  );
+
+  return lines.join('\n');
+}
+
 // Supabase client for edge function calls — lazy init to avoid crash when env vars are missing
 let _supabase: SupabaseClient | null = null;
 function getSupabase(): SupabaseClient {
@@ -126,6 +173,45 @@ export async function analyzePIQEntryTwoStep(
       categories: {},
     };
 
+    // ========================================================================
+    // GAP-16: PIQ CEILING RECOGNITION
+    // When a PIQ scores 85+, reduce suggestion volume. Don't over-coach excellent work.
+    // ========================================================================
+    const overallScore = phase17Data.analysis.narrative_quality_index;
+    if (overallScore >= 85 && phase17Result.workshopItems?.length) {
+      const maxItems = overallScore >= 92 ? 1 : 2;
+
+      // Filter to keep only minor/optimization items if severity is available,
+      // otherwise just truncate to maxItems (the items are already priority-sorted
+      // from the edge function, so the first N are the most impactful)
+      const hasSeverity = phase17Result.workshopItems.some((item: any) => item.severity);
+      if (hasSeverity) {
+        const minorItems = phase17Result.workshopItems.filter(
+          (item: any) => item.severity === 'optimization' || item.severity === 'warning'
+        );
+        phase17Result.workshopItems = minorItems.length > 0
+          ? minorItems.slice(0, maxItems)
+          : phase17Result.workshopItems.slice(0, maxItems);
+      } else {
+        phase17Result.workshopItems = phase17Result.workshopItems.slice(0, maxItems);
+      }
+
+      phase17Result.ceilingNote = overallScore >= 92
+        ? 'This PIQ is exceptional. These are micro-polish suggestions only \u2014 the essay works as-is.'
+        : 'This PIQ is strong. Focus on the 1\u20132 changes that would make it memorable, not just good.';
+    }
+
+    // ========================================================================
+    // GAP-55: PIQ WORD-BUDGET AWARENESS
+    // When near the 350-word limit, frame suggestions as substitutions, not additions.
+    // ========================================================================
+    const wordCount = essayText.split(/\s+/).filter(Boolean).length;
+    if (wordCount >= 320) {
+      phase17Result.wordBudgetNote = wordCount >= 340
+        ? `At ${wordCount}/350 words, every suggestion must be a SUBSTITUTION: replace X with Y, never add. Any addition requires cutting something else.`
+        : `At ${wordCount}/350 words, prefer substitutions over additions. If suggesting new content, identify what to cut to make room.`;
+    }
+
     // Notify UI that Phase 17 is complete - suggestions can be displayed!
     callbacks.onPhase17Complete?.(phase17Result);
 
@@ -137,11 +223,14 @@ export async function analyzePIQEntryTwoStep(
 
     const phase18Start = Date.now();
 
+    // Use ceiling-filtered workshop items if ceiling recognition was applied
+    const itemsForValidation = phase17Result.workshopItems || phase17Data.workshopItems;
+
     const { data: phase18Data, error: phase18Error } = await getSupabase().functions.invoke(
       'validate-workshop',
       {
         body: {
-          workshopItems: phase17Data.workshopItems,
+          workshopItems: itemsForValidation,
           essayText,
           promptText
         }
@@ -368,6 +457,14 @@ export async function analyzePIQEntry(
       workshopItems: data.workshopItems,
       categories: {}, // Legacy field - not used
     };
+
+    // GAP-55: PIQ Word-Budget Awareness (legacy path)
+    const legacyWordCount = essayText.split(/\s+/).filter(Boolean).length;
+    if (legacyWordCount >= 320) {
+      analysisResult.wordBudgetNote = legacyWordCount >= 340
+        ? `At ${legacyWordCount}/350 words, every suggestion must be a SUBSTITUTION: replace X with Y, never add. Any addition requires cutting something else.`
+        : `At ${legacyWordCount}/350 words, prefer substitutions over additions. If suggesting new content, identify what to cut to make room.`;
+    }
 
     return analysisResult;
 
