@@ -1381,14 +1381,14 @@ export class ProfileRouter {
       name: 'narrativeStrategy',
       content: profile.narrativeStrategy,
       tokenEstimate: profile.index.sectionTokenCounts.narrativeStrategy ?? estimateTokens(profile.narrativeStrategy),
-      priority: 'important',
+      priority: 'connection_driven',
     });
 
     sections.push({
       name: 'thematicArchitecture',
       content: profile.thematicArchitecture,
       tokenEstimate: profile.index.sectionTokenCounts.thematicArchitecture ?? estimateTokens(profile.thematicArchitecture),
-      priority: 'important',
+      priority: 'connection_driven',
     });
 
     // NICE_TO_HAVE: Voice identity + craft assessment (included if budget allows)

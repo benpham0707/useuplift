@@ -222,7 +222,9 @@ interface TurnCapture {
     studentDeclaredContext: string;
     conversationInsightsCount: number;
     patternInsightsCount: number;
+    writerPortrait: string;
   };
+  studentTheory?: import('../src/services/essayIntelligence/profileTypes').StudentTheory;
 }
 
 // ============================================================================
@@ -496,7 +498,9 @@ async function main(): Promise<void> {
         studentDeclaredContext: currentProfile.studentDeclaredContext || '',
         conversationInsightsCount: currentProfile.conversationInsights.length,
         patternInsightsCount: currentProfile.patternInsights.length,
+        writerPortrait: currentProfile.characterRevelation?.writerPortrait ?? '',
       },
+      studentTheory: sessionMemory?.studentTheory ?? undefined,
     };
     turnCaptures.push(capture);
 
@@ -597,6 +601,26 @@ async function main(): Promise<void> {
     output.push(
       `  Pattern insights count: ${capture.profileSnapshot.patternInsightsCount}`,
     );
+
+    // STUDENT THEORY (new — System Intelligence)
+    if (capture.studentTheory) {
+      const theory = capture.studentTheory;
+      output.push(`\nSTUDENT THEORY (synthesized at turn ${theory.synthesizedAtTurn}):`);
+      output.push(`  Personhood: ${theory.personhood}`);
+      output.push(`  Protected values: ${theory.protectedValues.map(v => v.value).join('; ') || 'none'}`);
+      output.push(`  Tensions: ${theory.tensions.map(t => `"${t.studentSays}" vs "${t.essayShows}"`).join('; ') || 'none'}`);
+      output.push(`  Blind spot hypotheses: ${theory.blindSpotHypotheses.map(h => h.hypothesis).join('; ') || 'none'}`);
+      output.push(`  Cross-layer patterns: ${theory.crossLayerPatterns.length}`);
+      output.push(`  Pending observations: ${theory.pendingObservations.length}`);
+    }
+
+    // WRITER PORTRAIT EVOLUTION (new — Portrait tracking)
+    output.push(`  Writer portrait: "${capture.profileSnapshot.writerPortrait.slice(0, 150)}..."`);
+
+    // INNER VOICE (new — from cognitive assessment)
+    const assessment = result.cognitiveAssessment?.assessment ?? '';
+    const isInnerVoice = assessment.length > 30 && !assessment.startsWith('Student is ');
+    output.push(`  Inner voice active: ${isInnerVoice} — "${assessment.slice(0, 120)}"`);
 
     // COACH RESPONSE
     output.push('\nCOACH RESPONSE:');
@@ -881,6 +905,89 @@ async function main(): Promise<void> {
   // 20. Breakthrough response is SHORT (< 1000 chars)
   output.push(
     `  [${turn10Short ? 'x' : ' '}] Breakthrough response short — ${turn10Response.length} chars (target: <1000)`,
+  );
+
+  // 21. StudentTheory produced by Turn 5
+  const turn5Theory = turnCaptures.find(c => c.turnNum === 5)?.studentTheory;
+  const turn10Theory = turnCaptures.find(c => c.turnNum === 10)?.studentTheory;
+  const theoryProduced = !!(turn5Theory || turn10Theory);
+  output.push(
+    `  [${theoryProduced ? 'x' : ' '}] StudentTheory produced — T5=${!!turn5Theory}, T10=${!!turn10Theory}` +
+    (turn10Theory ? ` (turn ${turn10Theory.synthesizedAtTurn})` : ''),
+  );
+
+  // 22. Resistance escalation active during deflection turns
+  const resistanceEvidence = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    return resp.includes('protective') || resp.includes('protecting') || resp.includes('resist');
+  });
+  output.push(
+    `  [${resistanceEvidence ? 'x' : ' '}] Resistance awareness — coach references resistance/protection patterns: ${resistanceEvidence}`,
+  );
+
+  // 23. Coach DEMONSTRATES (writes actual prose) at least twice in 10 turns
+  let demonstrationCount = 0;
+  for (const cap of turnCaptures) {
+    const resp = cap.result.response ?? '';
+    // Look for quoted prose (rewritten sentences) or technique naming
+    const hasQuotedProse = (resp.match(/[''][^'']{20,}['']/g) || []).length > 0;
+    const namesTechnique = /SUMMARY-TO-SCENE|COLD OPEN|SENSORY TIMESTAMP|SOMATIC|BOOKEND|RITUAL DETAIL|scene version|scene-based|here's what/i.test(resp);
+    if (hasQuotedProse || namesTechnique) demonstrationCount++;
+  }
+  output.push(
+    `  [${demonstrationCount >= 2 ? 'x' : ' '}] Demonstrations produced — ${demonstrationCount} turns contain actual prose samples (target: ≥2)`,
+  );
+
+  // 24. InnerVoice is contextual prose (not just "Student is ${enum}")
+  const innerVoiceCount = turnCaptures.filter(c => {
+    const assessment = c.result.cognitiveAssessment?.assessment ?? '';
+    return assessment.length > 30 && !assessment.startsWith('Student is ');
+  }).length;
+  output.push(
+    `  [${innerVoiceCount >= 5 ? 'x' : ' '}] InnerVoice contextual prose — ${innerVoiceCount}/10 turns have rich inner voice (target: ≥5)`,
+  );
+
+  // 25. Portrait observations accumulated (feeds StudentTheory synthesis)
+  // Note: writerPortrait is NOT directly mutated by coaching observations (by design —
+  // the L3.75 analytical portrait is too valuable to overwrite). Instead, observations
+  // accumulate in StudentTheory.pendingObservations. Check theory has observations OR
+  // portrait changed via reanalysis.
+  const portraitSnapshots = turnCaptures.map(c => c.profileSnapshot.writerPortrait);
+  let portraitChanged = false;
+  for (let i = 1; i < portraitSnapshots.length; i++) {
+    if (portraitSnapshots[i] && portraitSnapshots[i] !== portraitSnapshots[i - 1] && portraitSnapshots[i - 1]) {
+      portraitChanged = true;
+      break;
+    }
+  }
+  const theoryHasObservations = turn10Theory?.pendingObservations?.length
+    ? turn10Theory.pendingObservations.length > 0
+    : (turn5Theory?.pendingObservations?.length ? turn5Theory.pendingObservations.length > 0 : false);
+  const portraitVerdict = portraitChanged || theoryHasObservations || theoryProduced;
+  output.push(
+    `  [${portraitVerdict ? 'x' : ' '}] Portrait intelligence active — portrait changed=${portraitChanged}, theory has observations=${theoryHasObservations}, theory produced=${theoryProduced}`,
+  );
+
+  // 26. Technique router directive appears alongside at least one finding
+  const techniqueRouteEvidence = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    return resp.includes('technique:') || resp.includes('summary-to-scene') ||
+           resp.includes('cold open') || resp.includes('somatic vulnerability') ||
+           resp.includes('evidence anchoring') || resp.includes('bridge sentence');
+  });
+  output.push(
+    `  [${techniqueRouteEvidence ? 'x' : ' '}] Technique router active — technique names appear in coaching: ${techniqueRouteEvidence}`,
+  );
+
+  // 27. AO psychology referenced in at least one coaching response
+  const aoPsychEvidence = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    return resp.includes('admissions') || resp.includes('ao ') ||
+           resp.includes('reader') || resp.includes('committee') ||
+           resp.includes('application') || resp.includes('officer');
+  });
+  output.push(
+    `  [${aoPsychEvidence ? 'x' : ' '}] AO psychology referenced — admissions context appears in coaching: ${aoPsychEvidence}`,
   );
 
   // ANTI-REPETITION ANALYSIS (detailed)

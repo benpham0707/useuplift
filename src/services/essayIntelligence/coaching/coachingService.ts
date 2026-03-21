@@ -36,6 +36,8 @@ import type {
   ObservationEntry,
   CognitiveState,
   TopicConfusionTracker,
+  TopicResistanceTracker,
+  StudentTheory,
   CognitiveAssessment,
   CoachingSessionMemory,
   SessionEvent,
@@ -66,6 +68,134 @@ const MAX_HISTORY_TURNS = 12;
  *  on a topic is detectable after 3 mentions, and earlier detection means earlier
  *  injection into Stage 3 so the coach can reference patterns in the same turn) */
 const PATTERN_DETECTION_MIN_TURNS = 3;
+
+/**
+ * Finding-to-technique routing table.
+ * Maps diagnosed issues (from L3.5 findings) to specific craft techniques with
+ * coaching directives. Only matched directives enter the prompt — no static bloat.
+ */
+interface TechniqueRoute {
+  /** Keywords to match against finding claim (all must be present, case-insensitive) */
+  claimKeywords: string[];
+  /** Optional dimension filter (any one must match) */
+  dimensions?: string[];
+  /** Named craft technique */
+  technique: string;
+  /** Coaching directive — injected into prompt alongside the matched finding */
+  directive: string;
+}
+
+const TECHNIQUE_ROUTES: TechniqueRoute[] = [
+  {
+    // Matches: "summary mode", "narrates from 30,000 feet", "telling not showing", "operates in summary"
+    claimKeywords: ['summary'],
+    technique: 'SUMMARY-TO-SCENE',
+    directive: 'Identify the MOMENT buried in the summary. Write a 2-sentence scene version using student details. Ask: "What were your hands doing?"',
+  },
+  {
+    // Matches: "generic opening", "template opening", "could be anyone's opening"
+    claimKeywords: ['opening'],
+    dimensions: ['voice', 'craft'],
+    technique: 'COLD OPEN / SENSORY TIMESTAMP',
+    directive: 'The opening needs a physical anchor before any philosophy. Write 2 sentences that put the reader in the room where this essay\'s topic first mattered.',
+  },
+  {
+    // Matches: "emotional distance", "naming emotions", "labels feelings", "captivated", "fascinated"
+    claimKeywords: ['emotion'],
+    dimensions: ['emotion'],
+    technique: 'SOMATIC VULNERABILITY',
+    directive: 'Replace the named emotion with what the BODY did. "I was nervous" → what did their hands do, their stomach, their voice?',
+  },
+  {
+    // Matches: "no named individuals", "people absence", "unnamed", "no specific person"
+    claimKeywords: ['named'],
+    technique: 'NAMED CHARACTER',
+    directive: 'A person needs to be ON THE PAGE. Ask for the name + one physical detail. Write a 1-sentence introduction that makes the reader see them.',
+  },
+  {
+    // Matches: "without proportional evidence", "claim exceeds", "escalates beyond", "grandiose"
+    claimKeywords: ['without'],
+    technique: 'EVIDENCE ANCHORING',
+    directive: 'The claim exceeds the evidence. Identify the SPECIFIC, SMALL thing the student actually did. That specific thing is more powerful than the grand claim.',
+  },
+  {
+    // Matches: "singular first-person", "solo credit", "I developed", "likely involved collaboration"
+    claimKeywords: ['singular'],
+    technique: 'COLLABORATIVE SPECIFICITY',
+    directive: 'Show the student how including collaborators STRENGTHENS, not weakens, the essay. "We built" with a specific role is more credible than "I developed" without one.',
+  },
+  {
+    // Matches: "generic ending/conclusion", "aspirational", "look forward to", "journey"
+    claimKeywords: ['conclusion'],
+    technique: 'RITUAL DETAIL / BOOKEND INVERSION',
+    directive: 'Replace aspirational closing with a specific image or habit that PROVES the transformation. Return to the opening scene with one thing changed.',
+  },
+  {
+    // Matches: "voice shift", "inconsistent voice", "register change", "different voice"
+    claimKeywords: ['voice'],
+    dimensions: ['voice'],
+    technique: 'VOICE COMPARISON',
+    directive: 'Quote 2 sentences from different paragraphs. Name which sounds more like them. Show what the gap reveals.',
+  },
+  {
+    // Matches: "decorative", "atmosphere", "doesn't serve", "filler detail"
+    claimKeywords: ['decorative'],
+    technique: 'FUNCTIONAL DETAIL',
+    directive: 'Every detail must reveal character, carry theme, or advance narrative. If it\'s just scenery, cut it. Show what the detail DOES for the reader.',
+  },
+  {
+    // Matches: "too neat", "manufactured growth", "sudden realization", "epiphany"
+    claimKeywords: ['neat'],
+    technique: 'ANTI-LESSON',
+    directive: 'The takeaway is too clean. Real growth is messy. Help the student find the version that\'s honest rather than tidy.',
+  },
+  {
+    // Matches: "no stakes", "nothing at risk", "low consequence", "stakes"
+    claimKeywords: ['stakes'],
+    technique: 'STAKES ESTABLISHMENT',
+    directive: 'What could the student LOSE? What was at risk? If nothing was at risk, the reader can\'t feel invested.',
+  },
+  {
+    // Matches: "pacing compressed", "rushed", "compressed moment"
+    claimKeywords: ['compress'],
+    dimensions: ['structure'],
+    technique: 'SCENE EXPANSION',
+    directive: 'The essay\'s most important moment gets the same word count as setup. The reader needs to LINGER at the pivot point.',
+  },
+  {
+    // Matches: "abrupt transition", "disconnected", "jump between"
+    claimKeywords: ['transition'],
+    dimensions: ['structure'],
+    technique: 'BRIDGE SENTENCE',
+    directive: 'Write a 1-sentence bridge between the two paragraphs using a detail that lives in BOTH worlds.',
+  },
+  {
+    // Matches: "cliche", "stock phrasing", "overused"
+    claimKeywords: ['cliche'],
+    dimensions: ['craft', 'voice'],
+    technique: 'DEFINITIONAL PIVOT',
+    directive: 'Quote the cliche. Ask: what does this word actually mean to YOU? Show what their specific meaning sounds like as a sentence.',
+  },
+  {
+    // Matches: "vulnerability retreat", "pulls back", "avoids emotional depth"
+    claimKeywords: ['retreat'],
+    technique: 'SUSTAINED VULNERABILITY',
+    directive: 'Quote where they pulled back. Ask: what are you protecting by not staying in the hard moment?',
+  },
+  {
+    // Matches: "no arc", "flat progression", "no turning point"
+    claimKeywords: ['arc'],
+    dimensions: ['narrative', 'structure'],
+    technique: 'NARRATIVE ARC',
+    directive: 'The essay needs a before/after with a turning point. Help the student identify THE moment when something changed.',
+  },
+  {
+    // Matches: "parallel asserted", "connection claimed", "stated not enacted"
+    claimKeywords: ['parallel'],
+    technique: 'ENACTED PARALLEL',
+    directive: 'Instead of explaining the connection, show the reader by writing the two activities in a way that reveals the structural echo.',
+  },
+];
 
 /**
  * Phase-gated craft technique vocabulary.
@@ -164,7 +294,7 @@ const SIDECAR_INSTRUCTIONS = `
 METADATA (required — append after EVERY response):
 After your coaching response, on a new line write exactly <!--METADATA--> followed by a JSON object on the SAME line. This metadata is parsed by the system and NOT shown to the student. Do NOT put the metadata inside a code block.
 
-{"category":"<confirmation|reinterpretation|new_context|correction|preference|clarification|emotional_reaction|resistance>","cognitiveState":"<engaged|confused_about_feedback|confused_about_concept|curious_deeper|curious_wider|frustrated|resistant_to_specific|resistant_to_general|seeking_validation|overwhelmed>","focusParagraphs":[<0-based paragraph indices discussed>],"dimensionFocus":["<dimensions discussed>"],"responseIntensity":"<full|brief|minimal>","sessionJournalEntry":"<1-2 sentence coaching log or null>","contextAccumulation":"<new SPECIFIC details the student revealed — names, places, moments, sensory details, relationships, emotions. These feed personalized coaching and example generation. Capture the CONCRETE: 'Piano teacher Mrs. Chen, taught Chopin Nocturnes, student sat on the bench she warmed' NOT the abstract: 'student has a meaningful relationship with their teacher'. null if no new details.>","needsDeepening":<true only if student reinterpreted essay meaning or revealed significant new context>,"deepeningReason":"<reason or null>","learningStyleUpdate":"<1-sentence observation about how this student learns based on THIS turn, or null. E.g., 'Responds better to specific text comparisons than abstract descriptions'>","strategicQuestionUpdate":"<a QUESTION that should drive the next response, or null to keep current. Must be specific: 'Can the student feel the voice shift between P2 and P3?' NOT 'focus on voice'.>"}`;
+{"category":"<confirmation|reinterpretation|new_context|correction|preference|clarification|emotional_reaction|resistance>","cognitiveState":"<engaged|confused_about_feedback|confused_about_concept|curious_deeper|curious_wider|frustrated|resistant_to_specific|resistant_to_general|seeking_validation|overwhelmed>","focusParagraphs":[<0-based paragraph indices discussed>],"dimensionFocus":["<dimensions discussed>"],"responseIntensity":"<full|brief|minimal>","sessionJournalEntry":"<1-2 sentence coaching log or null>","contextAccumulation":"<new SPECIFIC details the student revealed — names, places, moments, sensory details, relationships, emotions. These feed personalized coaching and example generation. Capture the CONCRETE: 'Piano teacher Mrs. Chen, taught Chopin Nocturnes, student sat on the bench she warmed' NOT the abstract: 'student has a meaningful relationship with their teacher'. null if no new details.>","needsDeepening":<true only if student reinterpreted essay meaning or revealed significant new context>,"deepeningReason":"<reason or null>","learningStyleUpdate":"<1-sentence observation about how this student learns based on THIS turn, or null. E.g., 'Responds better to specific text comparisons than abstract descriptions'>","strategicQuestionUpdate":"<a QUESTION that should drive the next response, or null to keep current. Must be specific: 'Can the student feel the voice shift between P2 and P3?' NOT 'focus on voice'.>","innerVoice":"<Your honest inner read of this student RIGHT NOW — 2-3 sentences. What do you see that you wouldn't say out loud? Are they performing understanding? Ready for a breakthrough? Avoiding the real issue? Wrestling productively? Be specific: reference what they said, not abstract categories. null only if this is the very first turn.>","portraitEvolution":"<1-sentence observation about who this student IS as a person — their relationship to writing, their emotional patterns, what they protect — based on THIS turn only. Not a synthesis, just the raw observation. null if nothing new revealed.>"}`;
 
 // ============================================================================
 // EXPORTED TYPES
@@ -314,6 +444,13 @@ interface CoachingSidecar {
   deepeningReason: string | null;
   learningStyleUpdate: string | null;
   strategicQuestionUpdate: string | null;
+  /** The coach's honest inner assessment — what you see but wouldn't say out loud.
+   *  2-3 sentences. Be specific and honest. null only on first turn. */
+  innerVoice: string | null;
+  /** 1-sentence observation about who this student IS as a person — their relationship
+   *  to writing, their emotional patterns, what they protect — based on THIS turn only.
+   *  Raw observation, not a synthesis. null if nothing new revealed this turn. */
+  portraitEvolution: string | null;
 }
 
 // ============================================================================
@@ -326,12 +463,10 @@ export class CoachingService {
   // W6.2: CONFUSION TRACKING (escalation ladder)
   // --------------------------------------------------------------------------
 
-  /**
-   * Tracks repeated confusion per topic across coaching turns.
-   * Key = topic string (e.g., "voice", "transition", "opening").
-   * Persists for the lifetime of this service instance (i.e., the coaching session).
-   */
-  private confusionTrackers: Map<string, TopicConfusionTracker> = new Map();
+  // All mutable per-session state (confusion trackers, resistance trackers,
+  // deflection counter, pre-theory observations) is stored on CoachingSessionMemory
+  // (not as instance state) to avoid cross-contamination when the singleton
+  // CoachingService handles concurrent sessions.
 
   // --------------------------------------------------------------------------
   // COST-OPTIMIZED HELPERS (replace Stage 1 / Stage 1.5 / Pattern Detection)
@@ -551,6 +686,8 @@ export class CoachingService {
       deepeningReason: null,
       learningStyleUpdate: null,
       strategicQuestionUpdate: null,
+      innerVoice: null,
+      portraitEvolution: null,
     };
   }
 
@@ -599,6 +736,10 @@ export class CoachingService {
         ? raw.learningStyleUpdate : null,
       strategicQuestionUpdate: typeof raw.strategicQuestionUpdate === 'string' && raw.strategicQuestionUpdate.length > 0
         ? raw.strategicQuestionUpdate : null,
+      innerVoice: typeof raw.innerVoice === 'string' && raw.innerVoice.length > 0
+        ? raw.innerVoice : null,
+      portraitEvolution: typeof raw.portraitEvolution === 'string' && raw.portraitEvolution.length > 0
+        ? raw.portraitEvolution : null,
     };
   }
 
@@ -761,17 +902,24 @@ export class CoachingService {
       scopeCertainty: sidecar.focusParagraphs.length > 0 ? 'high' : 'low',
     };
 
-    // Build a CognitiveAssessment from the sidecar
+    // Build a CognitiveAssessment from the sidecar — use innerVoice when available
     const cognitiveAssessment: CognitiveAssessment = {
-      assessment: `Student is ${sidecar.cognitiveState}`,
-      whatTheyNeed: sidecar.needsDeepening
-        ? 'Profile understanding needs updating based on student input'
-        : 'Continue coaching at current trajectory',
-      recommendedApproach: sidecar.category === 'resistance'
-        ? 'Listen first — ask what they are protecting'
-        : sidecar.category === 'reinterpretation'
-        ? 'Build from student\'s reading — they may be right'
-        : 'Continue current approach',
+      assessment: sidecar.innerVoice
+        ?? `Student is ${sidecar.cognitiveState}`,
+      whatTheyNeed: sidecar.innerVoice
+        ? (sidecar.needsDeepening
+          ? 'Profile understanding needs updating — student revealed new context or reinterpreted meaning'
+          : 'Continue coaching informed by inner voice assessment')
+        : (sidecar.needsDeepening
+          ? 'Profile understanding needs updating based on student input'
+          : 'Continue coaching at current trajectory'),
+      recommendedApproach: sidecar.innerVoice
+        ? `Informed by: ${sidecar.innerVoice.split('.')[0]}`
+        : (sidecar.category === 'resistance'
+          ? 'Listen first — ask what they are protecting'
+          : sidecar.category === 'reinterpretation'
+          ? 'Build from student\'s reading — they may be right'
+          : 'Continue current approach'),
       responseIntensity: sidecar.responseIntensity,
     };
 
@@ -803,7 +951,25 @@ export class CoachingService {
     }
 
     // Update confusion tracking with sidecar data
-    this.updateConfusionTracking(stage1);
+    this.updateConfusionTracking(stage1, memory);
+
+    // Update resistance tracking with sidecar data (mirrors confusion tracking)
+    this.updateResistanceTracking(stage1, memory.turnCount + 1, sidecar.sessionJournalEntry, memory);
+
+    // Accumulate portrait observations from sidecar for StudentTheory synthesis.
+    // We do NOT directly mutate the L3.75 writerPortrait — that analytical portrait
+    // is too valuable to overwrite with coaching-context observations. Instead,
+    // observations accumulate and feed the periodic theory synthesis.
+    if (sidecar.portraitEvolution) {
+      if (memory.studentTheory) {
+        memory.studentTheory.pendingObservations.push(sidecar.portraitEvolution);
+      } else {
+        // Before first theory synthesis, accumulate on session memory
+        if (!memory.preTheoryObservations) memory.preTheoryObservations = [];
+        memory.preTheoryObservations.push(sidecar.portraitEvolution);
+      }
+      console.log(`[CoachingService] Portrait observation accumulated: "${sidecar.portraitEvolution.slice(0, 80)}..."`);
+    }
 
     // Journal entry from sidecar (replaces Pattern Detection journal)
     if (sidecar.sessionJournalEntry) {
@@ -877,8 +1043,10 @@ export class CoachingService {
       }
     }
 
-    // Handle context accumulation from sidecar
-    if (sidecar.contextAccumulation) {
+    // Handle context accumulation from sidecar.
+    // Skip when Stage 4 new_context deepening already handled context accumulation
+    // to avoid double-appending overlapping content.
+    if (sidecar.contextAccumulation && !(sidecar.needsDeepening && sidecar.category === 'new_context')) {
       const existing = profile.studentDeclaredContext || '';
       const newCtx = existing
         ? `${existing} ${sidecar.contextAccumulation}`
@@ -897,6 +1065,32 @@ export class CoachingService {
     // Populate findingRefs on the just-created event if Stage 4 identified findings
     if (memory.events.length > 0 && supersededFindingIds?.length) {
       memory.events[memory.events.length - 1].findingRefs = supersededFindingIds;
+    }
+
+    // ── StudentTheory Periodic Synthesis (every 5 turns) ──
+    if (memory.turnCount > 0 && memory.turnCount % 5 === 0) {
+      try {
+        const synthStart = Date.now();
+        const { theory, cost: synthCost } = await this.synthesizeStudentTheory(
+          conversationHistory,
+          profile,
+          memory,
+        );
+        // Flush pre-theory observations into the new theory
+        const preObs = memory.preTheoryObservations ?? [];
+        if (preObs.length > 0 && !memory.studentTheory) {
+          theory.pendingObservations = [...preObs];
+          memory.preTheoryObservations = [];
+        }
+        memory.studentTheory = theory;
+        costs.push(synthCost);
+        console.log(
+          `[CoachingService] StudentTheory synthesized at turn ${memory.turnCount} — ` +
+          `cost=$${synthCost.cost.toFixed(5)}, time=${Date.now() - synthStart}ms`,
+        );
+      } catch (err) {
+        console.error('[CoachingService] StudentTheory synthesis failed (non-fatal):', err);
+      }
     }
 
     const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
@@ -1376,6 +1570,9 @@ BANNED PHRASES (these signal sycophancy — automatic failure):
 - "That's a really interesting approach"
 - "There's a lot to like here" (without citing what specifically)
 - "You might consider..." (too tentative — say "The essay needs..." or "Try...")
+- "I love how you..." (without citing what specifically and WHY it works)
+- "This is already quite strong" (without citing specific evidence)
+- "You're on the right track" (without naming what the track IS)
 - Any bullet list of 5+ generic suggestions without specific text references
 
 DIALOGUE, NOT INSTRUCTION:
@@ -1425,25 +1622,58 @@ Examples:
     their own material looks like when that move is applied, and make clear
     what the change does for the reader.
 
-    EXAMPLE OF GOOD COACHING (flows from diagnosis to demonstration):
-    "Right now your opening is a SUMMARY SENTENCE — it tells the reader
-    what you felt ('captivated by the power') but doesn't put them in the
-    room where you felt it. The fix isn't better words — it's dropping
-    the reader into a SCENE. You told me about that first time hearing
-    your teacher play Chopin, how you were sitting on the bench she'd
-    just warmed. That's your opening — the reader needs to be sitting on
-    that warm bench BEFORE they hear about seven notes and infinite
-    melodies. The scene earns the philosophy."
+    EXAMPLE OF A+ COACHING (diagnosis → named craft move → ACTUAL REWRITTEN SENTENCES → explanation):
+    "Your opening tells the reader what you felt — 'captivated by the power to create worlds.'
+    That's SUMMARY. Here's what SCENE sounds like with your own material:
 
-    EXAMPLE OF BAD COACHING (generic, doesn't show understanding):
-    "What if your opening went something like: 'The first time I heard
-    Chopin, I knew music would change my life.' See how that's more
-    specific?"
+    'The bench was still warm from Mrs. Chen when I sat down. She'd just finished
+    the Nocturne, and the last chord was still hanging in the room when I put my
+    hands where hers had been.'
 
-    The difference: good coaching names the CRAFT MOVE (summary→scene),
-    uses the student's OWN DETAILS (warm bench, teacher's playing),
-    and explains WHAT THE CHANGE DOES FOR THE READER (earns the philosophy).
-    Bad coaching just swaps one generic sentence for another.
+    Notice what changed: you're in a room, on a bench, touching keys someone else
+    just touched. That's SENSORY TIMESTAMP — the reader feels the warmth before
+    they hear about seven notes and infinite melodies. The scene EARNS the philosophy
+    that follows. Your current opening asks the reader to care about an idea.
+    This version asks them to sit on a warm bench. The bench does the work."
+
+    EXAMPLE OF B COACHING (diagnoses correctly but never WRITES):
+    "Your opening is doing summary when it should be doing scene. You told me about
+    the warm bench — that's your opening." ← This DESCRIBES the fix without SHOWING it.
+    The student still doesn't know what a scene-based opening READS LIKE.
+
+    EXAMPLE OF C COACHING (generic swap):
+    "What if your opening went: 'The first time I heard Chopin, I knew music would
+    change my life.'" ← Another generic sentence replacing a generic sentence.
+
+    THE A+ STANDARD: Diagnosis alone is B-level coaching. The leap to A+ is
+    WRITING 2-4 sentences of the student's own material transformed by a named
+    craft move. The student must SEE the possibility in their own words, not
+    just hear about it. Then explain what the craft move did and why.
+
+    MORE DEMONSTRATION EXAMPLES (different scenarios):
+
+    VOICE FIX — Student's P3 sounds like a program note, not a person:
+    "P3 says 'I blended them with contemporary jazz rhythms.' That's a
+    concert program. Here's what it sounds like closer to the work:
+    'I kept the left hand on Chopin's bass line and let the right hand
+    wander — a flatted fifth here, a walking rhythm there. The first
+    time the jazz resolved back to Chopin's key, I laughed out loud.'
+    That's PROXIMITY-TO-WORK VOICE — you're at the keyboard making
+    choices, not summarizing them afterward."
+
+    BREAKING DECISION PARALYSIS — Student can't choose between architectures:
+    "You're stuck between the mentorship essay and the coding essay. Let me
+    make the choice physical. Here's opening A: 'Mrs. Chen closed her eyes
+    before the first note.' Here's opening B: 'Hour 37 of the hackathon.
+    The algorithm was reading every song as angry.' Read both out loud.
+    Which one makes your chest do something? That's the essay."
+
+    ENDING FIX — Student's conclusion is aspirational filler:
+    "Your essay ends with 'I look forward to continuing this journey.'
+    That could close any essay by any student. Here's a RITUAL DETAIL
+    ending: 'Before every performance now, I play one measure wrong on
+    purpose. My section thinks I'm weird. But I haven't frozen since.'
+    That ending PROVES the transformation instead of claiming it."
 
     CRAFT MOVES YOU SHOULD KNOW AND TEACH:
     - Inventory opening: perform the activity instead of describing it
@@ -1455,16 +1685,25 @@ Examples:
     - Anti-lesson: resist the expected takeaway. "I stopped seeing my family as a problem to be solved."
     - Ritual detail: end with the weird private habit that proves your transformation
 
-    ONLY use details the student has SHARED. If you don't have enough,
-    ask first — but ask for details that DO WORK, not decoration:
-    "You mentioned your teacher taught you Chopin — was there a specific
-    moment when something shifted for you? Not what the room looked like,
-    but what changed in how you HEARD the music?"
+    ONLY use details the student has SHARED — never fabricate names,
+    moments, or experiences. But ONE detail is enough to demonstrate.
+    When you have a specific detail (a name, a moment, an event),
+    demonstrate IMMEDIATELY — write 2-3 sentences showing what that detail
+    does in scene. Then ask for MORE details. The demonstration teaches
+    the student what kind of details are useful. Don't hoard details
+    until you have "enough." Show with what you have. Build as you go.
 
     CRITICAL PRINCIPLE: Every detail in a rewrite must carry its weight.
     In 650 words, there's no room for scenery that doesn't serve the story.
     A detail belongs in the essay ONLY if it reveals character, embodies
     a theme, or advances the narrative. If it's just atmosphere, cut it.
+
+VOICE IN DEMONSTRATIONS:
+When you write sample prose, match the student's STRONGEST voice register —
+not polished AI prose. Look at where the essay sounds most like a real person
+(usually the most concrete, action-oriented passages). If their strongest
+writing is short declarative sentences with physical verbs, write your demo
+that way. The demonstration teaches CRAFT through the student's natural register.
 
 DETAIL COLLECTION (naturally weave into early turns):
 When the student tells you something about their experience, mine for details
@@ -1640,7 +1879,7 @@ READINESS: ${phase.readinessAssessment}`;
       phaseSection;
 
     // ── BLOCK 3: Dynamic per-turn context (NOT cached — changes every turn) ──
-    const dynamicProfileContext = this.buildDynamicProfileContext(profile);
+    const dynamicProfileContext = this.buildDynamicProfileContext(profile, sessionMemory);
 
     // ── Turn-specific — conversation + current message ──
     const trimmedHistory = conversationHistory.slice(-6);
@@ -1694,15 +1933,21 @@ READINESS: ${phase.readinessAssessment}`;
 
     const sessionArcSection = turnCount <= 3
       ? `\n\n=== SESSION ARC (turn ${turnCount}) ===
-EARLY SESSION: You're still learning who this student is and what they
-see in their own essay. ASK more than you TELL. Your two goals:
-1. Understand their relationship to this essay — what it means to them,
-   why they chose this topic, what they're trying to show the reader
-2. COLLECT DETAILS THAT DO WORK — not decoration, but specifics that
-   reveal character, embody themes, or carry narrative weight.
-   "You mentioned your piano teacher — was there a specific moment that
-   changed how you heard music? What were you doing when it clicked?"
-   Every meaningful detail makes your coaching irreplaceable.`
+EARLY SESSION: You're building trust AND material simultaneously. Your goals:
+1. Understand what this essay means to the student and what they want it to show
+2. COLLECT scene-worthy details — names, moments, physical specifics
+3. DEMONSTRATE AS YOU COLLECT — when the student shares a concrete detail,
+   IMMEDIATELY show them what it does in a sentence. This teaches by example
+   AND encourages them to share more. Don't wait until you have "enough."
+   One detail is enough for a 2-sentence demonstration.
+   Student shares "my piano teacher taught me Chopin" →
+   You respond: "That's a scene waiting to happen. Even just: 'She closed her
+   eyes before the first note' puts the reader in the room. Tell me more about
+   her — what did her hands look like when she played?"
+   The demonstration IS the question. It shows the student what you're looking for.
+4. This is the organic mode — demonstrate naturally as details emerge.
+   From turn 4+, the system may also inject a DEMONSTRATION DIRECTIVE
+   when conditions are met (enough material, same topic 2+ turns, etc.).`
       : turnCount <= 8
       ? `\n\n=== SESSION ARC (turn ${turnCount}) ===
 MIDDLE SESSION: You've established rapport and identified the key issues.
@@ -1728,7 +1973,31 @@ ${stalenessNote}`;
       : '';
 
     // ── W6.2: Escalation context for confused students ──
-    const escalationSection = this.buildEscalationContext(localStage1Adapter);
+    const escalationSection = this.buildEscalationContext(sessionMemory);
+
+    // ── Resistance escalation context ──
+    const resistanceEscalationSection = this.buildResistanceEscalationContext(sessionMemory);
+
+    // ── Demonstration trigger ──
+    const demoTrigger = this.shouldTriggerDemonstration(
+      sessionMemory, profile, quickFocus, studentMessage, conversationHistory,
+    );
+    const sessionTheory = sessionMemory.studentTheory;
+    const theoryContext = sessionTheory
+      ? `\nSTUDENT THEORY: ${sessionTheory.personhood}\nTENSIONS: ${sessionTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\nYour demonstration should illuminate a tension, not just fix a craft issue.`
+      : '';
+    const demonstrationSection = demoTrigger
+      ? `\n\n=== DEMONSTRATION DIRECTIVE (ACTIVE) ===\n${demoTrigger.reason}\nYou have enough material to demonstrate. Write 2-4 sentences of sample prose\nusing the student's own details to show what the current issue LOOKS LIKE\nwhen fixed. Name the craft move. Explain what the change does for the reader.\nDO NOT defer. DO NOT ask for more details. WRITE THE SAMPLE NOW.\n\nSTUDENT'S AVAILABLE DETAILS: ${profile.studentDeclaredContext || '(limited — use what you have)'}${theoryContext}`
+      : '';
+    // Reset deflection counter when a demonstration is triggered — the coach is
+    // changing tactics, so the counter should not keep climbing
+    if (demoTrigger) {
+      sessionMemory.deflectionCounter = 0;
+    }
+
+    // Deflection escalation is now handled within the demonstration trigger
+    // (condition 2 produces enhanced text at deflectionCounter >= 3).
+    // The StudentTheory context is already wired into theoryContext above.
 
     // User message = ONLY dynamic per-turn content (profile + essay + findings are in cached system prompt)
     const userPrompt = `${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
@@ -1739,7 +2008,7 @@ STUDENT (current message):
 ${editContextSection}
 ${stage1Section}
 ${sessionArcSection}${journalSection}${learningStyleContext ?? ''}${crossModuleContext ? `\n\n=== PORTFOLIO CONTEXT (from other modules — reference ONLY if relevant to the student's question) ===\n${crossModuleContext}` : ''}
-${escalationSection}
+${escalationSection}${resistanceEscalationSection}${demonstrationSection}
 ${patternSection}
 ${antiRepetitionSection}
 ${editStrategySection}
@@ -1808,6 +2077,22 @@ Respond to the student's message. Apply all constraints from your role identity.
       if (roles) parts.push(`STRUCTURAL ROLES:\n${roles}`);
     }
 
+    // AO perspective (from AO First Read + admissions positioning — grounds coaching in admissions reality)
+    if (profile.aoFirstRead) {
+      const ao = profile.aoFirstRead;
+      parts.push(
+        `AO PERSPECTIVE: ${ao.gutReaction}` +
+        (ao.putDownRisk === 'high' ? `\nPUT-DOWN RISK: HIGH — the essay needs to differentiate in the first 2 sentences.` : '') +
+        (ao.committeeOneLiner ? `\nCOMMITTEE ONE-LINER: "${ao.committeeOneLiner}" — is this how the student wants to be remembered?` : '')
+      );
+    }
+    if (profile.admissionsPositioning?.archetypeContext) {
+      const ac = profile.admissionsPositioning.archetypeContext;
+      if (ac.poolDensity === 'saturated' || ac.poolDensity === 'common') {
+        parts.push(`ARCHETYPE WARNING: This is a "${ac.archetype}" essay (${ac.poolDensity} in the pool). The student needs to know: AOs have read dozens of these. The fix isn't changing the topic — it's making the execution unmistakable.`);
+      }
+    }
+
     // Active concerns (critical ones)
     const criticalConcerns = profile.index.activeConcerns.filter(c => c.severity === 'critical');
     if (criticalConcerns.length > 0) {
@@ -1842,6 +2127,7 @@ Respond to the student's message. Apply all constraints from your role identity.
    */
   private buildDynamicProfileContext(
     profile: EssayProfile,
+    sessionMemory?: CoachingSessionMemory,
   ): string {
     const parts: string[] = [];
 
@@ -1854,10 +2140,35 @@ Respond to the student's message. Apply all constraints from your role identity.
       parts.push(`STUDENT-REVEALED CONTEXT:\n${insightLines.join('\n')}`);
     }
 
-    // Accumulated student-declared context (grows on new_context turns)
-    // This is the GOLD — real details from the student's life that make
-    // coaching and example generation irreplaceable. Use these details
-    // when writing concrete demonstrations.
+    // StudentTheory — when available (on session memory), inject the structured theory
+    // alongside the flat studentDeclaredContext blob. Theory provides interpretive depth.
+    const theory = sessionMemory?.studentTheory;
+    if (theory) {
+      const theoryParts: string[] = [
+        `WHO THEY ARE: ${theory.personhood}`,
+      ];
+      if (theory.protectedValues.length > 0) {
+        theoryParts.push(`WHAT THEY PROTECT (do not suggest changing): ${theory.protectedValues.map(v => `${v.value} (${v.implication})`).join('; ')}`);
+      }
+      if (theory.tensions.length > 0) {
+        theoryParts.push(`TENSIONS: ${theory.tensions.map(tn => `"${tn.studentSays}" vs essay shows: "${tn.essayShows}" → ${tn.coachingOpportunity}`).join('; ')}`);
+      }
+      if (theory.blindSpotHypotheses.length > 0) {
+        const ready = theory.blindSpotHypotheses.filter(h => h.readyToSurface);
+        if (ready.length > 0) {
+          theoryParts.push(`HYPOTHESES (you may be wrong): ${ready.map(h => h.hypothesis).join('; ')}`);
+        }
+      }
+      if (theory.essayRelationship) {
+        theoryParts.push(`THEIR RELATIONSHIP TO THIS ESSAY: ${theory.essayRelationship}`);
+      }
+      if (theory.crossLayerPatterns.length > 0) {
+        theoryParts.push(`CROSS-LAYER: ${theory.crossLayerPatterns.map(p => `${p.analysisObservation} + ${p.conversationEvidence} → ${p.coachingImplication}`).join('; ')}`);
+      }
+      parts.push(`STUDENT THEORY (synthesized understanding — use this to personalize your approach):\n${theoryParts.join('\n')}`);
+    }
+
+    // Always include declared context for raw detail access
     if (profile.studentDeclaredContext) {
       parts.push(
         `STUDENT'S REAL DETAILS (use these for personalized examples and coaching):\n${profile.studentDeclaredContext}`
@@ -2844,6 +3155,152 @@ Respond briefly. 1-3 sentences max.`;
   }
 
   // --------------------------------------------------------------------------
+  // STUDENT THEORY SYNTHESIS
+  // --------------------------------------------------------------------------
+
+  /**
+   * Synthesize a StudentTheory from the conversation so far.
+   * Runs every 5 turns via Sonnet. Reads: conversation history,
+   * accumulated portrait observations, essay profile (for cross-layer),
+   * and the previous theory (for continuity).
+   */
+  private async synthesizeStudentTheory(
+    conversationHistory: ConversationTurn[],
+    profile: EssayProfile,
+    memory: CoachingSessionMemory,
+  ): Promise<{ theory: StudentTheory; cost: LayerCost }> {
+    const callStart = Date.now();
+
+    // Gather inputs for synthesis
+    const recentHistory = conversationHistory.slice(-MAX_HISTORY_TURNS);
+    const pendingObservations = [
+      ...(memory.preTheoryObservations ?? []),
+      ...(memory.studentTheory?.pendingObservations ?? []),
+    ];
+    const previousTheory = memory.studentTheory;
+    const blindSpots = profile.characterRevelation?.blindSpots ?? [];
+    const redFlags = profile.admissionsPositioning?.redFlags ?? [];
+    const writerPortrait = profile.characterRevelation?.writerPortrait ?? '';
+
+    const historyText = recentHistory
+      .map(t => `${t.role === 'student' ? 'STUDENT' : 'COACH'}: ${t.content}`)
+      .join('\n\n');
+
+    const systemPrompt = `You are synthesizing everything the coaching system knows about this student AS A PERSON — not their essay, but who they are when they write.
+
+Read the conversation below and produce a structured theory. This theory is for the COACH'S internal use — the student never sees it.
+
+Every claim needs evidence from the conversation or analysis. Tensions must cite both sides. ProtectedValues must explain the IMPLICATION for coaching (how this should change what the coach does).
+
+Output ONLY a JSON object matching this exact schema:
+{
+  "personhood": "<2-4 sentences. Who is this person beyond what the essay reveals. Their relationship to writing, their emotional patterns, what they protect.>",
+  "protectedValues": [{"value":"<specific thing>","evidence":"<what they said/did>","implication":"<how this should change coaching>"}],
+  "blindSpotHypotheses": [{"hypothesis":"<what they can't see>","analysisEvidence":"<from essay analysis>","coachingEvidence":"<from conversation>","readyToSurface":<boolean>}],
+  "tensions": [{"studentSays":"<quote or paraphrase>","essayShows":"<what the analysis reveals>","coachingOpportunity":"<how to use this tension>"}],
+  "essayRelationship": "<1-3 sentences. Why this essay matters to them, what they're trying to prove, what they're afraid of.>",
+  "crossLayerPatterns": [{"analysisObservation":"<from essay analysis>","conversationEvidence":"<from chat>","coachingImplication":"<what to do with it>"}],
+  "synthesizedAtTurn": ${memory.turnCount},
+  "pendingObservations": []
+}`;
+
+    const userPrompt = `=== CONVERSATION (last ${recentHistory.length} turns) ===
+${historyText}
+
+${pendingObservations.length > 0 ? `=== PORTRAIT OBSERVATIONS (since last synthesis) ===\n${pendingObservations.join('\n')}\n` : ''}
+${previousTheory ? `=== PREVIOUS THEORY (turn ${previousTheory.synthesizedAtTurn}) ===\nPersonhood: ${previousTheory.personhood}\nProtected: ${previousTheory.protectedValues.map(v => v.value).join('; ')}\nTensions: ${previousTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\n` : ''}
+=== CROSS-LAYER DATA ===
+Writer Portrait: ${writerPortrait}
+Blind Spots (from analysis): ${blindSpots.join('; ') || 'none detected'}
+Red Flags (from admissions positioning): ${redFlags.join('; ') || 'none'}
+Student Declared Context: ${profile.studentDeclaredContext || 'none yet'}
+
+Synthesize an updated theory. Be specific and evidence-grounded. Output only JSON.`;
+
+    const response = await callClaude<string>({
+      model: SONNET,
+      systemPrompt,
+      userPrompt,
+      maxTokens: 1000,
+      temperature: 0.3,
+      useJsonMode: false,
+      cacheSystemPrompt: true,
+    });
+
+    const timingMs = Date.now() - callStart;
+    const rawCost = calculateCost(response.usage, SONNET);
+    console.log(`[EssayIntelligence] L6 theory synthesis: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${rawCost.toFixed(4)}`);
+    const tokenUsage: TokenUsage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+    };
+    const cost: LayerCost = { layer: 'L6_student_theory_synthesis', cost: rawCost, tokenUsage, timingMs };
+
+    // Parse the theory JSON
+    const rawText = typeof response.content === 'string' ? response.content : String(response.content);
+    let parsed: Record<string, unknown>;
+    try {
+      // Try direct parse, then strip markdown fences, then regex extract
+      try { parsed = JSON.parse(rawText); }
+      catch {
+        const stripped = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim();
+        try { parsed = JSON.parse(stripped); }
+        catch {
+          const match = rawText.match(/\{[\s\S]*\}/);
+          parsed = match ? JSON.parse(match[0]) : {};
+        }
+      }
+    } catch {
+      console.warn('[CoachingService] StudentTheory parse failed — using minimal theory');
+      parsed = {};
+    }
+
+    const theory: StudentTheory = {
+      personhood: typeof parsed.personhood === 'string' ? parsed.personhood : 'Theory synthesis incomplete.',
+      protectedValues: Array.isArray(parsed.protectedValues)
+        ? (parsed.protectedValues as Array<Record<string, unknown>>)
+            .filter(v => typeof v?.value === 'string')
+            .map(v => ({ value: String(v.value), evidence: String(v.evidence ?? ''), implication: String(v.implication ?? '') }))
+        : [],
+      blindSpotHypotheses: Array.isArray(parsed.blindSpotHypotheses)
+        ? (parsed.blindSpotHypotheses as Array<Record<string, unknown>>)
+            .filter(h => typeof h?.hypothesis === 'string')
+            .map(h => ({
+              hypothesis: String(h.hypothesis),
+              analysisEvidence: String(h.analysisEvidence ?? ''),
+              coachingEvidence: String(h.coachingEvidence ?? ''),
+              readyToSurface: typeof h.readyToSurface === 'boolean' ? h.readyToSurface : false,
+            }))
+        : [],
+      tensions: Array.isArray(parsed.tensions)
+        ? (parsed.tensions as Array<Record<string, unknown>>)
+            .filter(t => typeof t?.studentSays === 'string')
+            .map(t => ({
+              studentSays: String(t.studentSays),
+              essayShows: String(t.essayShows ?? ''),
+              coachingOpportunity: String(t.coachingOpportunity ?? ''),
+            }))
+        : [],
+      essayRelationship: typeof parsed.essayRelationship === 'string' ? parsed.essayRelationship : '',
+      crossLayerPatterns: Array.isArray(parsed.crossLayerPatterns)
+        ? (parsed.crossLayerPatterns as Array<Record<string, unknown>>)
+            .filter(p => typeof p?.analysisObservation === 'string')
+            .map(p => ({
+              analysisObservation: String(p.analysisObservation),
+              conversationEvidence: String(p.conversationEvidence ?? ''),
+              coachingImplication: String(p.coachingImplication ?? ''),
+            }))
+        : [],
+      synthesizedAtTurn: memory.turnCount,
+      pendingObservations: [],
+    };
+
+    return { theory, cost };
+  }
+
+  // --------------------------------------------------------------------------
   // SESSION MEMORY MANAGEMENT (Improvement 6)
   // --------------------------------------------------------------------------
 
@@ -2930,7 +3387,10 @@ Respond briefly. 1-3 sentences max.`;
     const kind = kindParts.join(':');
 
     // Summary from cognitive assessment
-    const summary = `${cognitiveAssessment.recommendedApproach} — student ${stage1.cognitiveState}`;
+    // Use the full assessment (which contains innerVoice when available) for richer journal entries
+    const summary = cognitiveAssessment.assessment.length > 40
+      ? cognitiveAssessment.assessment.slice(0, 200)
+      : `${cognitiveAssessment.recommendedApproach} — student ${stage1.cognitiveState}`;
 
     // Significance heuristic (retrieval signal, not quality judgment)
     const significanceMap: Record<string, number> = {
@@ -3033,8 +3493,11 @@ Respond briefly. 1-3 sentences max.`;
    * When cognitiveState is 'engaged' or 'curious_deeper', resets the counter
    * for those topics (student has demonstrated understanding).
    */
-  private updateConfusionTracking(stage1: Stage1Output): void {
+  private updateConfusionTracking(stage1: Stage1Output, memory: CoachingSessionMemory): void {
     const { cognitiveState, dimensionFocus } = stage1;
+
+    // Initialize session-scoped confusion trackers if needed
+    if (!memory.confusionTrackers) memory.confusionTrackers = {};
 
     // Derive topic key from dimension focus (or 'general' if none)
     const topics = dimensionFocus.length > 0 ? dimensionFocus : ['general'];
@@ -3049,36 +3512,34 @@ Respond briefly. 1-3 sentences max.`;
 
     for (const topic of topics) {
       if (isConfused) {
-        const existing = this.confusionTrackers.get(topic);
+        const existing = memory.confusionTrackers[topic];
         if (existing) {
           existing.instanceCount += 1;
           existing.escalationLevel = Math.min(3, existing.escalationLevel + 1) as 0 | 1 | 2 | 3;
-          // Track approach used (based on current escalation level, the NEXT response will use a new approach)
           const approach = this.describeEscalationApproach(existing.escalationLevel);
           if (!existing.approachesTried.includes(approach)) {
             existing.approachesTried.push(approach);
           }
         } else {
-          this.confusionTrackers.set(topic, {
+          memory.confusionTrackers[topic] = {
             topic,
             instanceCount: 1,
             escalationLevel: 1 as 0 | 1 | 2 | 3,
             approachesTried: ['initial_explanation'],
-          });
+          };
         }
         console.log(
           `[CoachingService] W6.2 confusion tracked — topic="${topic}", ` +
-          `count=${this.confusionTrackers.get(topic)!.instanceCount}, ` +
-          `level=${this.confusionTrackers.get(topic)!.escalationLevel}`,
+          `count=${memory.confusionTrackers[topic]!.instanceCount}, ` +
+          `level=${memory.confusionTrackers[topic]!.escalationLevel}`,
         );
       } else if (showsUnderstanding) {
-        // Reset escalation when student demonstrates understanding on this topic
-        if (this.confusionTrackers.has(topic)) {
+        if (memory.confusionTrackers[topic]) {
           console.log(
             `[CoachingService] W6.2 confusion reset — topic="${topic}" ` +
             `(student showed ${cognitiveState})`,
           );
-          this.confusionTrackers.delete(topic);
+          delete memory.confusionTrackers[topic];
         }
       }
     }
@@ -3098,23 +3559,14 @@ Respond briefly. 1-3 sentences max.`;
 
   /**
    * W6.2: Build escalation context for injection into Stage 3 prompt.
-   * Only produces content when the student is confused about a topic
-   * that has been confused about before (escalation level >= 2).
+   * Produces content based on PERSISTENT tracker state (not current turn's cognitive state),
+   * for any topic with escalation level >= 2.
    */
-  private buildEscalationContext(stage1: Stage1Output): string {
-    const { cognitiveState, dimensionFocus } = stage1;
-
-    const isConfused =
-      cognitiveState === 'confused_about_feedback' ||
-      cognitiveState === 'confused_about_concept';
-
-    if (!isConfused) return '';
-
-    const topics = dimensionFocus.length > 0 ? dimensionFocus : ['general'];
+  private buildEscalationContext(memory: CoachingSessionMemory): string {
+    const trackers = memory.confusionTrackers ?? {};
     const escalationInstructions: string[] = [];
 
-    for (const topic of topics) {
-      const tracker = this.confusionTrackers.get(topic);
+    for (const [topic, tracker] of Object.entries(trackers)) {
       if (!tracker || tracker.escalationLevel < 2) continue;
 
       switch (tracker.escalationLevel) {
@@ -3150,6 +3602,256 @@ Respond briefly. 1-3 sentences max.`;
 
     return `\n\n=== CONFUSION ESCALATION (student needs a different approach) ===\n` +
       escalationInstructions.join('\n\n');
+  }
+
+  /**
+   * Update resistance tracking based on the inferred cognitive state.
+   * Parallel to updateConfusionTracking but with posture-based escalation.
+   *
+   * Triggered by sidecar cognitiveState starting with 'resistant_to'.
+   * Decrements (not deletes) when the student engages positively on the same topic.
+   */
+  private updateResistanceTracking(
+    stage1: Stage1Output,
+    turnNumber: number,
+    sessionJournalEntry: string | null,
+    memory: CoachingSessionMemory,
+  ): void {
+    const { cognitiveState, dimensionFocus, focusProbabilities } = stage1;
+
+    // Initialize session-scoped state if needed
+    if (!memory.resistanceTrackers) memory.resistanceTrackers = {};
+    if (memory.deflectionCounter === undefined) memory.deflectionCounter = 0;
+
+    const isResistant =
+      cognitiveState === 'resistant_to_specific' ||
+      cognitiveState === 'resistant_to_general';
+
+    const showsEngagement =
+      cognitiveState === 'engaged' ||
+      cognitiveState === 'curious_deeper';
+
+    // Derive topic key: "${dimensionFocus}:P${focusParagraph}" or "${dimensionFocus}:essay"
+    const dimKey = dimensionFocus.length > 0 ? dimensionFocus[0] : 'general';
+    const focusParagraphs: number[] = [];
+    for (const [label, prob] of Object.entries(focusProbabilities)) {
+      if (prob > 0.3) {
+        const match = label.match(/P(\d+)/);
+        if (match) focusParagraphs.push(parseInt(match[1], 10));
+      }
+    }
+    const paraKey = focusParagraphs.length > 0 ? `P${focusParagraphs[0]}` : 'essay';
+    const topicKey = `${dimKey}:${paraKey}`;
+
+    // Update deflection counter for Stream A→B integration
+    if (isResistant) {
+      memory.deflectionCounter++;
+    } else if (showsEngagement) {
+      memory.deflectionCounter = 0;
+    }
+
+    if (isResistant) {
+      const existing = memory.resistanceTrackers[topicKey];
+      if (existing) {
+        existing.instanceCount += 1;
+        existing.escalationLevel = Math.min(4, existing.escalationLevel + 1) as 0 | 1 | 2 | 3 | 4;
+        existing.resistanceTurns.push(turnNumber);
+        if (sessionJournalEntry) {
+          existing.rejectedSuggestions.push(sessionJournalEntry);
+        }
+      } else {
+        memory.resistanceTrackers[topicKey] = {
+          topic: topicKey,
+          rejectedSuggestions: sessionJournalEntry ? [sessionJournalEntry] : [],
+          instanceCount: 1,
+          escalationLevel: 1 as 0 | 1 | 2 | 3 | 4,
+          resistanceTurns: [turnNumber],
+        };
+      }
+      console.log(
+        `[CoachingService] Resistance tracked — topic="${topicKey}", ` +
+        `count=${memory.resistanceTrackers[topicKey]!.instanceCount}, ` +
+        `level=${memory.resistanceTrackers[topicKey]!.escalationLevel}, ` +
+        `deflectionCounter=${memory.deflectionCounter}`,
+      );
+    } else if (showsEngagement) {
+      // Decrement (not delete) when student engages positively
+      const existing = memory.resistanceTrackers[topicKey];
+      if (existing && existing.escalationLevel > 0) {
+        existing.escalationLevel = (existing.escalationLevel - 1) as 0 | 1 | 2 | 3 | 4;
+        console.log(
+          `[CoachingService] Resistance de-escalated — topic="${topicKey}", ` +
+          `newLevel=${existing.escalationLevel} (student ${cognitiveState})`,
+        );
+      }
+    }
+  }
+
+  /**
+   * Build resistance escalation context for injection into Stage 3 user prompt.
+   * Only produces content when resistance level >= 2.
+   *
+   * The escalation levels change BEHAVIORAL POSTURE:
+   * Level 2 — Reframe: ask what they're protecting
+   * Level 3 — Name the pattern: "I notice you're protective of..."
+   * Level 4 — Honor and wait: stop suggesting changes to this area
+   */
+  private buildResistanceEscalationContext(memory: CoachingSessionMemory): string {
+    // Build escalation context based on tracker STATE, not just the current turn's
+    // cognitive state. Resistance persists — if the student asked about something else
+    // this turn, the protected area is still protected.
+    const trackers = memory.resistanceTrackers ?? {};
+    const escalationInstructions: string[] = [];
+
+    for (const [topic, tracker] of Object.entries(trackers)) {
+      if (tracker.escalationLevel < 2) continue;
+
+      switch (tracker.escalationLevel) {
+        case 2:
+          escalationInstructions.push(
+            `RESISTANCE (${topic}): The student rejected a suggestion about this area. ` +
+            `Before offering alternatives, ask what they're protecting. ` +
+            `Their resistance may be protecting the best part of the essay.`
+          );
+          break;
+        case 3:
+          escalationInstructions.push(
+            `RESISTANCE (${topic}): The student has resisted ${tracker.instanceCount} suggestions about this area. ` +
+            `This is a pattern — name it gently: "I notice you're protective of [aspect]. ` +
+            `That instinct might be exactly right." If they're right to protect it, help them ` +
+            `strengthen it. If they're wrong, they need to discover that themselves. ` +
+            `DEMONSTRATE: show what this area could look like using their declared details.`
+          );
+          break;
+        case 4:
+          escalationInstructions.push(
+            `RESISTANCE (${topic}): The student has deep conviction about this area. ` +
+            `STOP suggesting changes to this area. If they bring it up, listen and validate. ` +
+            `Your job is NOT to overcome this resistance — it's to help them do what they're ` +
+            `trying to do. Only revisit if they specifically ask.`
+          );
+          break;
+      }
+    }
+
+    if (escalationInstructions.length === 0) return '';
+
+    return `\n\n=== RESISTANCE ESCALATION (change your behavioral posture) ===\n` +
+      escalationInstructions.join('\n\n');
+  }
+
+  // --------------------------------------------------------------------------
+  // DEMONSTRATION TRIGGER + TECHNIQUE ROUTER (Writing Craft Engine)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Determine whether the coach should trigger a concrete demonstration this turn.
+   * Returns the trigger reason (or null if no trigger).
+   *
+   * Trigger conditions (any one fires):
+   * - Student has shared scene-worthy details AND same topic discussed 2+ turns
+   * - Student has been resistant for 2+ consecutive turns
+   * - Turn 5+ and no demonstration has been given yet (staleness guard)
+   * - Student explicitly asked to "see" / "show me" / "what would it look like"
+   */
+  private shouldTriggerDemonstration(
+    memory: CoachingSessionMemory,
+    profile: EssayProfile,
+    quickFocus: { focusParagraphs: number[]; dimensionFocus: string[] },
+    studentMessage: string,
+    conversationHistory: ConversationTurn[],
+  ): { trigger: boolean; reason: string } | null {
+    const turnCount = memory.turnCount + 1;
+    const lower = studentMessage.toLowerCase();
+
+    // Condition 1: Student explicitly asks to see an example
+    if (/show me|what would it look like|can you (write|demonstrate|give me an example)|what could it sound like/.test(lower)) {
+      return { trigger: true, reason: 'Student explicitly asked to see an example.' };
+    }
+
+    // Condition 2: Student has been resistant for 2+ consecutive turns
+    const deflCount = memory.deflectionCounter ?? 0;
+    if (deflCount >= 2) {
+      const isDeepDeflection = deflCount >= 3;
+      return {
+        trigger: true,
+        reason: isDeepDeflection
+          ? `Student has deflected for ${deflCount} consecutive turns. STOP repeating demands. The student is stuck, not stubborn. DEMONSTRATE each architectural option — write 2-3 sentences for EACH using their declared details. Ask: "Which of these sounds more like the essay you want to write?"`
+          : `Student has deflected for ${deflCount} consecutive turns. Stop asking — demonstrate the options.`,
+      };
+    }
+
+    // Condition 3: Turn 5+ and no demonstration detected in conversation history
+    if (turnCount >= 5) {
+      const coachTurns = conversationHistory.filter(t => t.role === 'coach');
+      const hasDemonstrated = coachTurns.some(t => {
+        // Heuristic: detect actual prose samples in coach responses.
+        // Look for: curly quotes, straight quotes around 20+ chars, italic markers,
+        // technique naming (case-insensitive), or "here's what" / "could sound like" patterns
+        return /[''""][^''""\n]{20,}[''""]/.test(t.content) ||
+               /technique|summary.to.scene|cold open|sensory timestamp|somatic|bookend|ritual detail/i.test(t.content) ||
+               /here'?s what|could (sound|look|feel) like|what it looks like|imagine this/i.test(t.content);
+      });
+      if (!hasDemonstrated) {
+        return { trigger: true, reason: 'Turn 5+ with no demonstration yet. The student needs to SEE what\'s possible.' };
+      }
+    }
+
+    // Condition 4: Scene-worthy details exist AND same topic discussed 2+ turns
+    const ctx = profile.studentDeclaredContext || '';
+    if (ctx.length > 100) {
+      // Check for proper nouns, temporal markers, or physical details (scene-worthy signals)
+      const hasSceneWorthy = /[A-Z][a-z]{2,}/.test(ctx) || // Proper nouns
+        /\d{1,2}(am|pm|:\d{2})/.test(ctx) || // Time markers
+        /bench|room|kitchen|stage|desk|hands|floor|table|door/.test(ctx.toLowerCase()); // Physical details
+
+      if (hasSceneWorthy) {
+        // Check if same topic discussed 2+ turns
+        const recentStudentMessages = conversationHistory
+          .filter(t => t.role === 'student')
+          .slice(-3)
+          .map(t => t.content.toLowerCase());
+
+        if (recentStudentMessages.length >= 2) {
+          const currentTopics = lower.split(/\s+/).filter(w => w.length > 4);
+          const topicOverlap = recentStudentMessages.filter(prev =>
+            currentTopics.some(t => prev.includes(t))
+          ).length;
+          if (topicOverlap >= 2) {
+            return {
+              trigger: true,
+              reason: 'Student has shared scene-worthy details and discussed the same topic for 2+ turns. Material is ready for demonstration.',
+            };
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Route a finding to a matching craft technique directive.
+   * Returns the matched technique + directive, or null if no match.
+   */
+  private routeFindingToTechnique(finding: Finding): { technique: string; directive: string } | null {
+    const claimLower = finding.claim.toLowerCase();
+
+    for (const route of TECHNIQUE_ROUTES) {
+      // All claim keywords must be present
+      const keywordsMatch = route.claimKeywords.every(kw => claimLower.includes(kw));
+      if (!keywordsMatch) continue;
+
+      // If dimension filter exists, at least one must match
+      if (route.dimensions && route.dimensions.length > 0) {
+        const dimMatch = route.dimensions.some(d => finding.dimensions.includes(d));
+        if (!dimMatch) continue;
+      }
+
+      return { technique: route.technique, directive: route.directive };
+    }
+
+    return null;
   }
 
   /**
@@ -3234,7 +3936,7 @@ Respond briefly. 1-3 sentences max.`;
     );
     selectedFindings = selectedFindings.slice(0, 8);
 
-    // Serialize findings
+    // Serialize findings with technique routing
     const findingLines = selectedFindings.map(f => {
       const scopeStr = f.scope.type === 'essay_level'
         ? 'essay-level'
@@ -3245,7 +3947,12 @@ Respond briefly. 1-3 sentences max.`;
       const evidence = f.evidence.length > 0
         ? ` Evidence: "${f.evidence[0].text.slice(0, 100)}${f.evidence[0].text.length > 100 ? '...' : ''}"`
         : '';
-      return `[${f.id}] [${f.maturity}/${f.coachingValue}] ${scopeStr} [${dims}]\n  ${f.claim}${evidence}`;
+      // Route finding to a craft technique directive
+      const techniqueMatch = this.routeFindingToTechnique(f);
+      const techniqueDirective = techniqueMatch
+        ? `\n  → TECHNIQUE: ${techniqueMatch.technique} — ${techniqueMatch.directive}`
+        : '';
+      return `[${f.id}] [${f.maturity}/${f.coachingValue}] ${scopeStr} [${dims}]\n  ${f.claim}${evidence}${techniqueDirective}`;
     });
 
     // Supplementary profile context for focus paragraphs

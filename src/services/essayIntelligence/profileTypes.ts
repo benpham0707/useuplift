@@ -819,6 +819,9 @@ export interface NarrativeStrategy {
 export interface CharacterRevelation {
   /** Who is this writer (the person behind the words) */
   writerPortrait: string;
+  /** The original essay-only portrait before coaching revelations enriched it.
+   *  Preserved so cross-layer comparison remains possible. */
+  essayOnlyPortrait?: string;
   /** Values revealed — shown, not told */
   valuesRevealed: string[];
   /** Growth arc detected in the essay */
@@ -2024,6 +2027,101 @@ export interface TopicConfusionTracker {
   approachesTried: string[];
 }
 
+/**
+ * Tracks repeated resistance to specific coaching suggestions.
+ * Parallel to TopicConfusionTracker but with posture-based escalation.
+ *
+ * Escalation levels change the coach's BEHAVIORAL POSTURE, not just technique:
+ * 0 = no resistance
+ * 1 = noted — record the resistance, no special handling
+ * 2 = reframe — ask what they're protecting before offering alternatives
+ * 3 = name_pattern — explicitly name the pattern of resistance
+ * 4 = honor_and_wait — stop suggesting changes to this area entirely
+ */
+export interface TopicResistanceTracker {
+  /** Key format: "${dimensionFocus}:P${paragraphIndex}" or "${dimensionFocus}:essay" */
+  topic: string;
+  /** What specific suggestion(s) were rejected */
+  rejectedSuggestions: string[];
+  /** Number of resistance instances */
+  instanceCount: number;
+  /** Current escalation level (0-4) */
+  escalationLevel: 0 | 1 | 2 | 3 | 4;
+  /** Turn numbers where resistance was detected */
+  resistanceTurns: number[];
+}
+
+/**
+ * The coach's evolving hypothesis about who this student is.
+ * NOT analysis of the essay — analysis of the PERSON writing it.
+ * Synthesized every 5 turns by Sonnet, with inter-synthesis updates
+ * from the Sonnet sidecar's portraitEvolution field.
+ *
+ * Design principle: descriptive, not prescriptive. The theory
+ * describes what the coach OBSERVES. The Stage 3 Sonnet decides
+ * what to DO with these observations.
+ */
+export interface StudentTheory {
+  /**
+   * Who this person is — beyond what the essay reveals.
+   * 2-4 sentences. The coach's empathetic read of the student.
+   */
+  personhood: string;
+
+  /**
+   * What the student is protecting — topics, phrasings, or approaches
+   * they've resisted changing. Each entry is a specific thing, not a category.
+   */
+  protectedValues: Array<{
+    value: string;
+    evidence: string;
+    implication: string;
+  }>;
+
+  /**
+   * Hypotheses about what the student can't see about their own essay.
+   * These are HYPOTHESES — the coach may be wrong.
+   */
+  blindSpotHypotheses: Array<{
+    hypothesis: string;
+    analysisEvidence: string;
+    coachingEvidence: string;
+    readyToSurface: boolean;
+  }>;
+
+  /**
+   * Tensions between what the student says and what the essay does,
+   * or between different things the student has said.
+   */
+  tensions: Array<{
+    studentSays: string;
+    essayShows: string;
+    coachingOpportunity: string;
+  }>;
+
+  /**
+   * The student's relationship to this essay — why it matters to them,
+   * what they're trying to prove, what they're afraid of. 1-3 sentences.
+   */
+  essayRelationship: string;
+
+  /**
+   * Cross-layer observations — connections between essay-level analysis
+   * and conversation behavior that neither layer alone can see.
+   */
+  crossLayerPatterns: Array<{
+    analysisObservation: string;
+    conversationEvidence: string;
+    coachingImplication: string;
+  }>;
+
+  /** Turn number when this theory was last synthesized */
+  synthesizedAtTurn: number;
+
+  /** Raw inter-synthesis observations from Sonnet sidecar (cleared on synthesis) */
+  pendingObservations: string[];
+}
+
 // ============================================================================
 // COGNITIVE ASSESSMENT TYPES (Improvement 6 — LLM-First Coaching)
 // ============================================================================
@@ -2168,6 +2266,29 @@ export interface CoachingSessionMemory {
 
   /** Turns since strategicQuestion was last updated. At 4+, escalation note appears. */
   questionStaleness: number;
+
+  /** The coach's evolving theory about WHO this student is as a person.
+   *  Synthesized every 5 coaching turns. Ephemeral to the session — not persisted
+   *  across sessions. Lives on session memory, not the profile. */
+  studentTheory?: StudentTheory;
+
+  /** Consecutive deflection turns counter (for demonstration trigger).
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  deflectionCounter?: number;
+
+  /** Portrait observations accumulated before the first StudentTheory synthesis.
+   *  Flushed into pendingObservations when the first theory is created at turn 5.
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  preTheoryObservations?: string[];
+
+  /** Per-topic resistance trackers (parallel to confusion tracking).
+   *  Keyed by "${dimensionFocus}:P${paragraph}" or "${dimensionFocus}:essay".
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  resistanceTrackers?: Record<string, TopicResistanceTracker>;
+
+  /** Per-topic confusion trackers for escalation ladder.
+   *  Session-scoped to avoid cross-contamination in concurrent sessions. */
+  confusionTrackers?: Record<string, TopicConfusionTracker>;
 }
 
 /**
