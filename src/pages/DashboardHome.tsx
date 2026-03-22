@@ -15,6 +15,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
 // Import all widgets
+import WelcomeProfileWidget from '@/components/dashboard/WelcomeProfileWidget';
 import CharacterStatsWidget from '@/components/dashboard/widgets/CharacterStatsWidget';
 import EnhancedCalendarWidget from '@/components/dashboard/widgets/EnhancedCalendarWidget';
 import ActivityPortfolioWidget from '@/components/dashboard/widgets/ActivityPortfolioWidget';
@@ -91,6 +92,11 @@ export default function DashboardHome() {
 
       {/* Main Dashboard Grid - Maximum Efficiency */}
       <div className="p-4 max-w-[1600px] mx-auto">
+        {/* Welcome + Profile Progress Widget - Top Priority */}
+        <div className="mb-4">
+          <WelcomeProfileWidget />
+        </div>
+
         {/* Top Priority Section - 3 columns */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
           {/* Left: Application Progress & Key Metrics */}
