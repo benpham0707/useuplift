@@ -32,6 +32,7 @@ import TestTeachingUnit from "./pages/TestTeachingUnit";
 import TestTeachingUnitSimple from "./pages/TestTeachingUnitSimple";
 const WorkshopDemo = lazy(() => import("./pages/WorkshopDemo"));
 const VaporChatDemoPage = lazy(() => import("./pages/VaporChatDemo"));
+const AnnotationV2Demo = lazy(() => import("./pages/AnnotationV2Demo"));
 const ActivityWorkshop = lazy(() => import("./pages/ActivityWorkshop"));
 import Pricing from "./pages/Pricing";
 const PIQWorkshop = lazy(() => import("./pages/PIQWorkshop"));
@@ -82,6 +83,7 @@ const AppRoutes = () => (
       <Route path="/vapor-demo" element={<VaporChatDemoPage />} />
       <Route path="/chat-demo" element={<div className="flex h-screen"><div className="flex-1 bg-slate-50" /><div className="w-[480px] shrink-0"><ChatPanel /></div></div>} />
       <Route path="/workshop-demo" element={<WorkshopDemo />} />
+      <Route path="/annotation-v2-demo" element={<Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading workshop...</div>}><AnnotationV2Demo /></Suspense>} />
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
       <Route path="/activity-workshop/:sessionId" element={<ActivityWorkshop />} />
 

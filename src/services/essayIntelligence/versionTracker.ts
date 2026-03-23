@@ -869,6 +869,49 @@ export class VersionTracker {
   }
 
   // --------------------------------------------------------------------------
+  // PARAGRAPH-LEVEL EDIT TRACKING (for coaching mode detection)
+  // --------------------------------------------------------------------------
+
+  /**
+   * Get the baseline (pre-edit) text of a specific paragraph.
+   * Used by revision coaching to build structured before/after comparisons.
+   * Returns null if no active version or paragraph index is out of range.
+   */
+  getBaselineParagraphText(paragraphIndex: number): string | null {
+    if (!this.activeVersion) return null;
+    const paragraphs = this.activeVersion.baselineText.split(/\n\n+/);
+    return paragraphs[paragraphIndex] ?? null;
+  }
+
+  /**
+   * Get the full baseline text (for multi-paragraph comparisons).
+   */
+  getBaselineText(): string | null {
+    return this.activeVersion?.baselineText ?? null;
+  }
+
+  /**
+   * Count how many edits have targeted a specific paragraph in the active version.
+   * Used by coaching mode detection to determine iteration_deep (3+ edits = deep iteration).
+   */
+  getEditCountForParagraph(paragraphIndex: number): number {
+    if (!this.activeVersion) return 0;
+    return this.activeVersion.changes.filter(
+      c => c.location.paragraph === paragraphIndex,
+    ).length;
+  }
+
+  /**
+   * Whether the student has made ANY edits (active or completed versions).
+   * Used by coaching mode detection to distinguish first_encounter from conversation.
+   */
+  hasAnyEdits(): boolean {
+    if (this.completedVersions.length > 0) return true;
+    if (!this.activeVersion) return false;
+    return this.activeVersion.changes.length > 0;
+  }
+
+  // --------------------------------------------------------------------------
   // W9.2: EDIT STRATEGY DETECTION (programmatic — no LLM)
   // --------------------------------------------------------------------------
 

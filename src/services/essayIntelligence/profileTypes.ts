@@ -92,6 +92,18 @@ export type ImprovementPhaseLevel =
   | 'distinction';
 
 /**
+ * CoachingMode — which coaching behavior the system should use for this turn.
+ * Detected by ReanalysisOrchestrator based on edit context, iteration depth,
+ * and message analysis. Drives prompt block composition in promptBlocks.ts.
+ */
+export type CoachingMode =
+  | 'first_encounter'    // No edits yet, or student is conversing (not revising)
+  | 'revision_response'  // Student just revised (recentEditContext present, 1-2 edits to section)
+  | 'iteration_deep'     // Same section revised 3+ times
+  | 'architecture'       // Structural reorganization (paragraph insert/delete/reorder)
+  | 'polish';            // Word-level refinement during polish/distinction phase
+
+/**
  * Profile confidence level — how deep the system's understanding has grown.
  */
 export type ConfidenceLevel = 'initial' | 'developing' | 'deep' | 'comprehensive';
@@ -2289,6 +2301,10 @@ export interface CoachingSessionMemory {
   /** Per-topic confusion trackers for escalation ladder.
    *  Session-scoped to avoid cross-contamination in concurrent sessions. */
   confusionTrackers?: Record<string, TopicConfusionTracker>;
+
+  /** Number of demonstrations the coach has written this session.
+   *  After 2, the demo trigger switches to asking the student to write. */
+  demonstrationCount?: number;
 }
 
 /**

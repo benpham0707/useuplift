@@ -3,8 +3,254 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { motion } from "motion/react";
 import { Sparkles, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import "./HologramBubble.css";
 
-// --- CVA Definitions: Layout & Aesthetics ---
+// ═══════════════════════════════════════════
+// HUD Panel Shape System
+// ═══════════════════════════════════════════
+
+const CHAMFER = 14;
+
+// User clip — notches at top-left (25%) and bottom-right (70%)
+const USER_CLIP = `polygon(
+  ${CHAMFER}px 0%,
+  25% 0%, 25% 4px, calc(25% + 40px) 4px, calc(25% + 40px) 0%,
+  calc(100% - ${CHAMFER}px) 0%,
+  100% ${CHAMFER}px,
+  100% calc(100% - ${CHAMFER}px),
+  calc(100% - ${CHAMFER}px) 100%,
+  calc(70% + 30px) 100%, calc(70% + 30px) calc(100% - 3px), 70% calc(100% - 3px), 70% 100%,
+  ${CHAMFER}px 100%,
+  0% calc(100% - ${CHAMFER}px),
+  0% ${CHAMFER}px
+)`;
+
+// Assistant clip — mirrored notches at top-right (70%) and bottom-left (25%)
+const BOT_CLIP = `polygon(
+  ${CHAMFER}px 0%,
+  70% 0%, 70% 4px, calc(70% + 40px) 4px, calc(70% + 40px) 0%,
+  calc(100% - ${CHAMFER}px) 0%,
+  100% ${CHAMFER}px,
+  100% calc(100% - ${CHAMFER}px),
+  calc(100% - ${CHAMFER}px) 100%,
+  calc(25% + 30px) 100%, calc(25% + 30px) calc(100% - 3px), 25% calc(100% - 3px), 25% 100%,
+  ${CHAMFER}px 100%,
+  0% calc(100% - ${CHAMFER}px),
+  0% ${CHAMFER}px
+)`;
+
+// ═══════════════════════════════════════════
+// Color Palettes
+// ═══════════════════════════════════════════
+
+interface FrameColors {
+  border: string;
+  borderBright: string;
+  accent: string;
+  accentSoft: string;
+  detail: string;
+  detailSoft: string;
+  innerFrame: string;
+  tick: string;
+}
+
+// User — orchid-violet with rose accents (fairy)
+const USER_COLORS: FrameColors = {
+  border: "hsla(280, 65%, 75%, 0.5)",
+  borderBright: "hsla(280, 65%, 75%, 0.6)",
+  accent: "hsla(325, 60%, 78%, 0.4)",
+  accentSoft: "hsla(325, 60%, 78%, 0.25)",
+  detail: "hsla(280, 60%, 77%, 0.35)",
+  detailSoft: "hsla(280, 60%, 80%, 0.2)",
+  innerFrame: "hsla(280, 55%, 80%, 0.16)",
+  tick: "hsla(280, 60%, 77%, 0.25)",
+};
+
+// Assistant — soft blue with periwinkle accents (mystical)
+const BOT_COLORS: FrameColors = {
+  border: "hsla(220, 70%, 72%, 0.5)",
+  borderBright: "hsla(220, 70%, 72%, 0.6)",
+  accent: "hsla(220, 65%, 78%, 0.4)",
+  accentSoft: "hsla(220, 65%, 78%, 0.25)",
+  detail: "hsla(220, 65%, 75%, 0.35)",
+  detailSoft: "hsla(220, 65%, 78%, 0.2)",
+  innerFrame: "hsla(220, 60%, 78%, 0.16)",
+  tick: "hsla(220, 65%, 75%, 0.25)",
+};
+
+// ═══════════════════════════════════════════
+// SVG HUD Frame (shared, parameterized)
+// ═══════════════════════════════════════════
+
+interface HoloFrameProps {
+  w: number;
+  h: number;
+  colors: FrameColors;
+  topNotchPct: number;
+  bottomNotchPct: number;
+  mirror?: boolean;
+}
+
+function HoloFrameSvg({
+  w,
+  h,
+  colors,
+  topNotchPct,
+  bottomNotchPct,
+  mirror,
+}: HoloFrameProps) {
+  if (w < 40 || h < 40) return null;
+
+  const c = CHAMFER;
+  const s = 1;
+
+  const tnX = Math.round(w * topNotchPct);
+  const tnW = 40;
+  const tnD = 4;
+
+  const bnX = Math.round(w * bottomNotchPct);
+  const bnW = 30;
+  const bnD = 3;
+
+  const outerPoints = [
+    `${c + s},${s}`,
+    `${tnX},${s}`,
+    `${tnX},${s + tnD}`,
+    `${tnX + tnW},${s + tnD}`,
+    `${tnX + tnW},${s}`,
+    `${w - c - s},${s}`,
+    `${w - s},${c + s}`,
+    `${w - s},${h - c - s}`,
+    `${w - c - s},${h - s}`,
+    `${bnX + bnW},${h - s}`,
+    `${bnX + bnW},${h - s - bnD}`,
+    `${bnX},${h - s - bnD}`,
+    `${bnX},${h - s}`,
+    `${c + s},${h - s}`,
+    `${s},${h - c - s}`,
+    `${s},${c + s}`,
+  ].join(" ");
+
+  const ig = 7;
+  const ci = 10;
+  const innerPoints = [
+    `${ci + ig},${ig}`,
+    `${w - ci - ig},${ig}`,
+    `${w - ig},${ci + ig}`,
+    `${w - ig},${h - ci - ig}`,
+    `${w - ci - ig},${h - ig}`,
+    `${ci + ig},${h - ig}`,
+    `${ig},${h - ci - ig}`,
+    `${ig},${ci + ig}`,
+  ].join(" ");
+
+  return (
+    <svg
+      width={w}
+      height={h}
+      className="absolute inset-0 z-[5] pointer-events-none"
+      aria-hidden="true"
+    >
+      {/* Outer frame */}
+      <polygon
+        points={outerPoints}
+        fill="none"
+        stroke={colors.border}
+        strokeWidth="2"
+      />
+      {/* Inner frame */}
+      <polygon
+        points={innerPoints}
+        fill="none"
+        stroke={colors.innerFrame}
+        strokeWidth="1"
+      />
+
+      {/* ── Corner Accents (mirrored between roles) ── */}
+
+      {/* TL */}
+      {mirror ? (
+        <>
+          <line x1={18} y1={8} x2={30} y2={20} stroke={colors.accent} strokeWidth="1.5" />
+          <line x1={24} y1={8} x2={36} y2={20} stroke={colors.accentSoft} strokeWidth="1.5" />
+        </>
+      ) : (
+        <line x1={c + 4} y1={3} x2={c + 28} y2={3} stroke={colors.borderBright} strokeWidth="2" strokeLinecap="round" />
+      )}
+
+      {/* TR */}
+      {mirror ? (
+        <line x1={w - c - 28} y1={3} x2={w - c - 4} y2={3} stroke={colors.borderBright} strokeWidth="2" strokeLinecap="round" />
+      ) : (
+        <>
+          <line x1={w - 32} y1={8} x2={w - 20} y2={20} stroke={colors.accent} strokeWidth="1.5" />
+          <line x1={w - 26} y1={8} x2={w - 14} y2={20} stroke={colors.accentSoft} strokeWidth="1.5" />
+        </>
+      )}
+
+      {/* BL */}
+      {mirror ? (
+        <line x1={c + 4} y1={h - 3} x2={c + 28} y2={h - 3} stroke={colors.accent} strokeWidth="2" strokeLinecap="round" />
+      ) : (
+        <polyline
+          points={`10,${h - 26} 10,${h - 10} 26,${h - 10}`}
+          fill="none"
+          stroke={colors.detail}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+
+      {/* BR */}
+      {mirror ? (
+        <polyline
+          points={`${w - 10},${h - 26} ${w - 10},${h - 10} ${w - 26},${h - 10}`}
+          fill="none"
+          stroke={colors.detail}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      ) : (
+        <line x1={w - c - 28} y1={h - 3} x2={w - c - 4} y2={h - 3} stroke={colors.accent} strokeWidth="2" strokeLinecap="round" />
+      )}
+
+      {/* ── Edge Ticks ── */}
+      <line x1={1} y1={Math.round(h * 0.5)} x2={9} y2={Math.round(h * 0.5)} stroke={colors.tick} strokeWidth="1.5" />
+      <line x1={w - 1} y1={Math.round(h * 0.35)} x2={w - 9} y2={Math.round(h * 0.35)} stroke={colors.detailSoft} strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+// ═══════════════════════════════════════════
+// Shared hook
+// ═══════════════════════════════════════════
+
+function useElementSize(ref: React.RefObject<HTMLElement | null>) {
+  const [size, setSize] = React.useState({ w: 0, h: 0 });
+
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setSize({ w: Math.round(rect.width), h: Math.round(rect.height) });
+    };
+
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return size;
+}
+
+// ═══════════════════════════════════════════
+// CVA (only messageRow + avatar remain)
+// ═══════════════════════════════════════════
 
 const messageRowVariants = cva(
   "flex w-full items-end gap-4 mb-8 group",
@@ -15,67 +261,40 @@ const messageRowVariants = cva(
         user: "flex-row-reverse",
       },
     },
-    defaultVariants: {
-      role: "assistant",
-    },
-  }
-);
-
-const messageBubbleVariants = cva(
-  "relative px-6 py-5 text-[16px] leading-[1.75] tracking-[0.01em] transition-all duration-300",
-  {
-    variants: {
-      role: {
-        assistant: [
-          // Solid, highly readable system panel (anchor)
-          "max-w-[85%]",
-          "bg-white",
-          "text-slate-800",
-          "rounded-[20px] rounded-bl-sm",
-          "border border-[hsl(250_70%_80%_/_0.5)]",
-          "shadow-[0_8px_30px_-6px_hsl(250_70%_60%_/_0.08)]",
-          "[&_p]:mb-4 [&_p:last-child]:mb-0",
-          "[&_strong]:font-semibold [&_strong]:text-[hsl(250_70%_50%)]",
-          "selection:bg-[hsl(185_80%_55%_/_0.2)] selection:text-[hsl(250_70%_40%)]",
-        ],
-        user: [
-          // True Holographic Glass — premium card
-          "max-w-[75%]",
-          "bg-white/30",
-          "backdrop-blur-xl",
-          "text-slate-800 font-medium",
-          "rounded-[20px] rounded-br-sm",
-          // Physical glass edge and thick shadow
-          "border border-white/60",
-          "shadow-[0_12px_40px_-10px_rgba(31,38,135,0.15)]",
-          "ring-1 ring-inset ring-white/40",
-          "[&_p]:mb-4 [&_p:last-child]:mb-0",
-          "selection:bg-[hsl(250_70%_60%_/_0.2)] selection:text-[hsl(250_70%_40%)]",
-        ],
-      },
-    },
-    defaultVariants: {
-      role: "assistant",
-    },
+    defaultVariants: { role: "assistant" },
   }
 );
 
 const avatarVariants = cva(
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm ring-4 ring-white relative z-10",
+  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm relative z-10",
   {
     variants: {
       role: {
-        assistant: "bg-[hsl(250_70%_95%)] border border-[hsl(250_70%_80%)] text-[hsl(250_70%_60%)]",
-        user: "bg-white/80 backdrop-blur-sm border border-[hsl(185_80%_85%)] text-[hsl(185_80%_55%)] shadow-[inset_0_1px_2px_rgba(255,255,255,0.9)]",
+        assistant: [
+          "bg-[hsla(220,60%,95%,0.7)]",
+          "backdrop-blur-sm",
+          "border border-[hsla(220,65%,72%,0.35)]",
+          "text-[hsl(220,50%,36%)]",
+          "ring-2 ring-[hsla(220,65%,72%,0.1)]",
+          "shadow-[0_0_8px_hsla(220,65%,72%,0.12)]",
+        ],
+        user: [
+          "bg-[hsla(280,55%,95%,0.7)]",
+          "backdrop-blur-sm",
+          "border border-[hsla(280,60%,75%,0.35)]",
+          "text-[hsl(280,50%,48%)]",
+          "ring-2 ring-[hsla(280,60%,75%,0.1)]",
+          "shadow-[0_0_8px_hsla(280,60%,75%,0.12)]",
+        ],
       },
     },
-    defaultVariants: {
-      role: "assistant",
-    },
+    defaultVariants: { role: "assistant" },
   }
 );
 
-// --- Component Interface ---
+// ═══════════════════════════════════════════
+// Component
+// ═══════════════════════════════════════════
 
 export interface MessageBubbleProps
   extends React.HTMLAttributes<HTMLDivElement>,
@@ -84,7 +303,65 @@ export interface MessageBubbleProps
   role: "assistant" | "user";
 }
 
-// --- Implementation ---
+// Per-role config for the HUD panel
+const ROLE_CONFIG = {
+  user: {
+    clip: USER_CLIP,
+    colors: USER_COLORS,
+    topNotchPct: 0.25,
+    bottomNotchPct: 0.70,
+    mirror: false,
+    glowAnim: "holo-glow-pulse-user",
+    maxWidth: "75%",
+    borderFill: "hsla(280, 60%, 78%, 0.35)",
+    panelGradient: `linear-gradient(
+      145deg,
+      hsla(280, 55%, 97%, 0.78) 0%,
+      hsla(290, 50%, 96%, 0.7) 35%,
+      hsla(300, 45%, 97%, 0.72) 65%,
+      hsla(320, 40%, 97%, 0.75) 100%
+    )`,
+    shimmer: `linear-gradient(
+      105deg,
+      transparent 40%,
+      hsla(280, 60%, 82%, 0.07) 46%,
+      hsla(0, 0%, 100%, 0.14) 50%,
+      hsla(325, 55%, 84%, 0.06) 54%,
+      transparent 60%
+    )`,
+    selectionBg: "hsla(280,55%,75%,0.18)",
+    textColor: "hsl(280, 35%, 30%)",
+    textShadow: "0 0 12px hsla(280, 55%, 75%, 0.2)",
+  },
+  assistant: {
+    clip: BOT_CLIP,
+    colors: BOT_COLORS,
+    topNotchPct: 0.70,
+    bottomNotchPct: 0.25,
+    mirror: true,
+    glowAnim: "holo-glow-pulse-bot",
+    maxWidth: "85%",
+    borderFill: "hsla(220, 65%, 75%, 0.35)",
+    panelGradient: `linear-gradient(
+      145deg,
+      hsla(220, 65%, 97%, 0.78) 0%,
+      hsla(225, 45%, 96%, 0.7) 35%,
+      hsla(230, 42%, 97%, 0.72) 65%,
+      hsla(235, 42%, 97%, 0.75) 100%
+    )`,
+    shimmer: `linear-gradient(
+      105deg,
+      transparent 40%,
+      hsla(220, 65%, 78%, 0.07) 46%,
+      hsla(0, 0%, 100%, 0.14) 50%,
+      hsla(220, 60%, 80%, 0.06) 54%,
+      transparent 60%
+    )`,
+    selectionBg: "hsla(220,60%,72%,0.18)",
+    textColor: "hsl(220, 40%, 28%)",
+    textShadow: "0 0 12px hsla(220, 60%, 72%, 0.2)",
+  },
+} as const;
 
 export function MessageBubble({
   content,
@@ -92,6 +369,10 @@ export function MessageBubble({
   className,
   ...props
 }: MessageBubbleProps) {
+  const panelRef = React.useRef<HTMLDivElement>(null);
+  const { w, h } = useElementSize(panelRef);
+  const cfg = ROLE_CONFIG[role];
+
   return (
     <div className={cn(messageRowVariants({ role }), className)} {...props}>
       {/* Avatar */}
@@ -107,61 +388,65 @@ export function MessageBubble({
         )}
       </motion.div>
 
-      {/* Bubble */}
-      <motion.div className={cn(messageBubbleVariants({ role }), "overflow-hidden")}>
-        {/* True Holographic Foil layers — only on user bubble */}
-        {role === "user" && (
-          <>
-            {/* LAYER 1: Iridescent Pools — ambient holographic colors via color-burn blending */}
-            <div
-              className="absolute inset-0 z-0 pointer-events-none mix-blend-color-burn opacity-60"
-              style={{
-                background: `
-                  radial-gradient(120% 120% at 100% 0%, hsla(185, 80%, 55%, 0.4) 0%, transparent 60%),
-                  radial-gradient(120% 120% at 0% 100%, hsla(280, 90%, 65%, 0.3) 0%, transparent 60%),
-                  radial-gradient(100% 100% at 50% 50%, hsla(250, 70%, 65%, 0.2) 0%, transparent 80%)
-                `,
-              }}
-              aria-hidden="true"
-            />
+      {/* ──── HUD Panel (both roles) ──── */}
+      <div
+        ref={panelRef}
+        className="relative holo-panel-wrapper"
+        style={{
+          maxWidth: cfg.maxWidth,
+          animation: `${cfg.glowAnim} 4s ease-in-out infinite`,
+        }}
+      >
+        {/* Border fill — outer clip */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{ clipPath: cfg.clip, background: cfg.borderFill }}
+          aria-hidden="true"
+        />
 
-            {/* LAYER 2: Conic Facets — sweeping planes of light mimicking faceted crinkles */}
-            <div
-              className="absolute inset-0 z-0 pointer-events-none mix-blend-overlay opacity-90"
-              style={{
-                background: `
-                  conic-gradient(from 120deg at 70% 30%, transparent 0, rgba(255,255,255,0.8) 10deg, transparent 35deg),
-                  conic-gradient(from 260deg at 20% 80%, transparent 0, hsla(185, 80%, 70%, 0.5) 15deg, transparent 45deg),
-                  conic-gradient(from 45deg at 50% -10%, transparent 0, rgba(255,255,255,0.6) 20deg, transparent 60deg)
-                `,
-              }}
-              aria-hidden="true"
-            />
+        {/* Panel fill — inset 2px */}
+        <div
+          className="absolute overflow-hidden pointer-events-none"
+          style={{
+            inset: "2px",
+            clipPath: cfg.clip,
+            background: cfg.panelGradient,
+            backdropFilter: "blur(12px)",
+          }}
+          aria-hidden="true"
+        >
+          {/* Shimmer sweep */}
+          <div
+            className="absolute inset-0 holo-shimmer-layer"
+            style={{
+              background: cfg.shimmer,
+              backgroundSize: "200% 100%",
+              animation: "holo-shimmer 6s ease-in-out infinite",
+            }}
+          />
+        </div>
 
-            {/* LAYER 3: Sharp Crinkles — ultra-thin intersecting specular highlights */}
-            <div
-              className="absolute inset-0 z-0 pointer-events-none mix-blend-plus-lighter opacity-70"
-              style={{
-                background: `
-                  linear-gradient(115deg, transparent 25%, rgba(255,255,255,0.9) 25.5%, hsla(185, 80%, 60%, 0.4) 26%, transparent 27%),
-                  linear-gradient(45deg, transparent 65%, hsla(280, 90%, 70%, 0.5) 65.2%, rgba(255,255,255,0.8) 65.6%, transparent 66%),
-                  linear-gradient(165deg, transparent 40%, rgba(255,255,255,0.4) 40.2%, transparent 40.8%)
-                `,
-              }}
-              aria-hidden="true"
-            />
+        {/* SVG frame overlay */}
+        <HoloFrameSvg
+          w={w}
+          h={h}
+          colors={cfg.colors}
+          topNotchPct={cfg.topNotchPct}
+          bottomNotchPct={cfg.bottomNotchPct}
+          mirror={cfg.mirror}
+        />
 
-            {/* LAYER 4: 3D Glass Rim — catch-light on the physical top/left edge */}
-            <div
-              className="absolute inset-0 rounded-[inherit] shadow-[inset_1px_1px_3px_rgba(255,255,255,0.9),_inset_-1px_-1px_3px_rgba(0,0,0,0.05)] z-0 pointer-events-none"
-              aria-hidden="true"
-            />
-          </>
-        )}
-
-        {/* Text content — elevated above holographic layers */}
-        <div className="relative z-10 break-words drop-shadow-sm">{content}</div>
-      </motion.div>
+        {/* Text content */}
+        <div
+          className="relative z-10 px-6 py-5 text-[16px] leading-[1.75] tracking-[0.02em] font-medium break-words [&_p]:mb-4 [&_p:last-child]:mb-0"
+          style={{
+            color: cfg.textColor,
+            textShadow: cfg.textShadow,
+          }}
+        >
+          {content}
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,49 @@
+/* ============================================
+   Cybernetic Hologram Bubble — Animated Effects
+   ============================================ */
+
+/* Shimmer sweep */
+@keyframes holo-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* User glow pulse — orchid-violet */
+@keyframes holo-glow-pulse-user {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 5px hsla(280, 60%, 78%, 0.2))
+      drop-shadow(0 0 12px hsla(280, 60%, 78%, 0.08));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 8px hsla(280, 60%, 78%, 0.35))
+      drop-shadow(0 0 20px hsla(325, 55%, 82%, 0.12));
+  }
+}
+
+/* Assistant glow pulse — soft blue */
+@keyframes holo-glow-pulse-bot {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 5px hsla(220, 65%, 75%, 0.2))
+      drop-shadow(0 0 12px hsla(220, 65%, 75%, 0.08));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 8px hsla(220, 65%, 75%, 0.35))
+      drop-shadow(0 0 20px hsla(230, 55%, 80%, 0.12));
+  }
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .holo-shimmer-layer,
+  .holo-panel-wrapper {
+    animation: none !important;
+  }
+}

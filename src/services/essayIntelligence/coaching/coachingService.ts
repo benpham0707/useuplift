@@ -54,6 +54,10 @@ import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { LayerCost, TokenUsage } from '../analysis/analysisOrchestrator';
 import { COACHING_VALUE_ORDER } from '../findings/findingStore';
 
+import type { CoachingMode } from '../profileTypes';
+import type { BlockContext } from './types';
+import { buildCoachingPrompt } from './promptBlocks';
+
 // ============================================================================
 // CONSTANTS
 // ============================================================================
@@ -195,106 +199,50 @@ const TECHNIQUE_ROUTES: TechniqueRoute[] = [
     technique: 'ENACTED PARALLEL',
     directive: 'Instead of explaining the connection, show the reader by writing the two activities in a way that reveals the structural echo.',
   },
+  {
+    // Anti-convergence: matches "telling not showing", "states rather than demonstrates", "claims quality"
+    claimKeywords: ['telling'],
+    technique: 'SHOW THROUGH SPECIFIC ACTION',
+    directive: 'The essay CLAIMS a quality instead of demonstrating it. Replace the claim with a specific moment that proves it: "This taught me resilience" → "I still dry-heave before every speech. But now I walk to the podium anyway." The specific action IS the proof.',
+  },
+  {
+    // Anti-convergence: matches "formulaic", "AI-generated", "convergence", "could be anyone"
+    claimKeywords: ['formulaic'],
+    technique: 'VOICE AUTHENTICITY',
+    directive: 'This language sounds like every other essay. Help the student find the weird, specific, only-them version. "Transformative experience" → the actual thing that happened. "Insatiable curiosity" → "I\'ve read the Wikipedia page for unusual deaths four times." Specificity is the antidote to convergence.',
+  },
+  {
+    // Anti-convergence: matches "epiphany", "sudden realization", "everything clicked"
+    claimKeywords: ['epiphany'],
+    technique: 'INCREMENTAL REVELATION',
+    directive: 'Real growth is messy, not sudden. "In that moment, everything changed" → "I thought I understood. Six months later, I realized I\'d only understood the easy part." Help the student show growth as ongoing recalibration, not a light switch.',
+  },
 ];
 
 /**
- * Phase-gated craft technique vocabulary.
- * Foundation/Architecture: no craft jargon — describe in plain language.
- * Craft: full vocabulary, name techniques when the essay uses them.
- * Polish/Distinction: refined vocabulary, focus on precision techniques.
- * ~200 tokens per phase (vs 400 for a static dump).
+ * Anti-convergence transformation patterns.
+ * Before/after examples showing common AI-coaching convergence traps
+ * and their authentic alternatives. Injected into coaching context
+ * when the coach detects convergence-prone language in the essay.
+ *
+ * Source: researchBackedTeachingService knowledge base (verified by AO quotes)
  */
-function getCraftVocabularyForPhase(phase: ImprovementPhaseLevel): string {
-  switch (phase) {
-    case 'foundation':
-    case 'architecture':
-      // No craft jargon at foundation/architecture — plain language only
-      return '';
+const ANTI_CONVERGENCE_PATTERNS = [
+  { pattern: 'telling_not_showing', signal: 'taught me|learned that|made me realize|showed me the importance',
+    example: '"This experience taught me resilience" → "I still dry-heave before every speech. But now I walk to the podium anyway, feeling my heartbeat in my fingertips."' },
+  { pattern: 'ai_convergence', signal: 'transformative|profoundly impacted|multifaceted|insatiable|instrumental in shaping',
+    example: '"This transformative experience profoundly impacted my journey" → "I spent three weeks debugging code that turned out to have a single misplaced semicolon."' },
+  { pattern: 'false_epiphany', signal: 'suddenly realized|in that moment|everything changed|finally understood',
+    example: '"In that moment, everything changed" → "I thought I understood. Six months later, I realized I\'d only understood the easy part."' },
+  { pattern: 'strategic_vulnerability', signal: 'to be honest|to be vulnerable|I must admit|being authentic',
+    example: '"I\'ll be honest — I struggled with anxiety" → "My hands shook when I opened the email. They still do, sometimes, when I see that font."' },
+  { pattern: 'cliche_ending', signal: 'continuing this journey|look forward to|excited for the future|the rest of my life',
+    example: '"I look forward to continuing this journey" → "I\'m starting to have a guess about who I might want to be. Ask me again in a year."' },
+] as const;
 
-    case 'craft':
-      return `
-
-CRAFT TECHNIQUE VOCABULARY (name these techniques when the essay uses them):
-- Anaphora: repetition of a word/phrase at the start of successive clauses for rhythm
-- Volta: the turn/pivot where the essay's direction, tone, or meaning shifts
-- In medias res: opening in the middle of action rather than with setup
-- Juxtaposition: placing contrasting elements side by side to illuminate both
-- Accretion: building meaning through accumulated details rather than direct statement
-- Withholding: strategically delaying information to create tension or revelation
-- Tonal counterpoint: contrasting emotional register with delivery (humor about grief)
-- Synecdoche: using a specific detail to represent a larger whole (the cracked mug = the marriage)
-- Echo structure: returning to an opening image/phrase with transformed meaning at the close`;
-
-    case 'polish':
-    case 'distinction':
-      return `
-
-CRAFT TECHNIQUE VOCABULARY (precision-level — name these when refining):
-- Syllepsis: a word doing double duty — "she held the diploma and her breath"
-- Temporal compression: covering long periods in few words to emphasize what gets expanded
-- Register shift: deliberate change in formality, vocabulary, or voice within the essay
-- Negative space: what the essay pointedly does NOT say, creating meaning through absence
-- Concrete universal: a hyper-specific detail that resonates with universal experience
-- Enjambment (prose): a sentence that runs across paragraph boundaries for forward momentum
-- Volta: the turn/pivot where the essay's direction shifts — at polish, the placement and sharpness matter`;
-
-    default:
-      return '';
-  }
-}
-
-/**
- * Pedagogical calibration rules — how to teach, not what to teach.
- * ~350 tokens. Appended to staticCoachingPhilosophy (cached).
- * Conditional on observable state (phase, confusion, breakthrough)
- * that the LLM detects from conversation + cognitive assessment.
- */
-const PEDAGOGICAL_CALIBRATION_RULES = `
-
-PEDAGOGICAL CALIBRATION RULES (follow these teaching heuristics):
-
-WHEN CONFUSED:
-- Lead with ONE concrete example, not an explanation
-- Limit to a single concept per response
-- Quote a specific sentence from their essay and ask them what THEY see in it
-- If confused twice about the same topic: change modality (if you explained, now show; if you showed, now ask)
-
-WHEN AT FOUNDATION PHASE:
-- Every observation must cite a paragraph number and quote actual text
-- Describe what's happening in plain language — save craft vocabulary for later
-- Focus on "What is your essay about?" not "How is your essay structured?"
-
-WHEN AT ARCHITECTURE/CRAFT PHASE:
-- Name the specific technique they're using or could use
-- Compare two parts of THEIR essay rather than giving abstract advice
-- "Read P2S3 and P5S1 back to back — do you hear the shift?"
-
-WHEN GIVING NEGATIVE FEEDBACK:
-- Quote the specific words that aren't working BEFORE explaining why
-- Show what the reader experiences (not what the writer intended)
-- Offer ONE concrete alternative, not a list of options
-
-WHEN STUDENT SHOWS BREAKTHROUGH:
-- Name what they just figured out — make the insight explicit
-- Connect it to their next challenge (momentum, not celebration)
-- Keep the response SHORT — don't dilute the moment
-
-WHEN STUDENT RESISTS:
-- Ask "What are you protecting?" before defending your position
-- If they're right, say so immediately and build from their reading
-- Never argue about interpretation — the student owns their essay's meaning`;
-
-/**
- * Sidecar instructions appended to Stage 3 system prompt.
- * Instructs Sonnet to emit a hidden JSON metadata block after every coaching response.
- * This metadata replaces the separate Stage 1, Stage 1.5, and Pattern Detection Haiku calls.
- */
-const SIDECAR_INSTRUCTIONS = `
-
-METADATA (required — append after EVERY response):
-After your coaching response, on a new line write exactly <!--METADATA--> followed by a JSON object on the SAME line. This metadata is parsed by the system and NOT shown to the student. Do NOT put the metadata inside a code block.
-
-{"category":"<confirmation|reinterpretation|new_context|correction|preference|clarification|emotional_reaction|resistance>","cognitiveState":"<engaged|confused_about_feedback|confused_about_concept|curious_deeper|curious_wider|frustrated|resistant_to_specific|resistant_to_general|seeking_validation|overwhelmed>","focusParagraphs":[<0-based paragraph indices discussed>],"dimensionFocus":["<dimensions discussed>"],"responseIntensity":"<full|brief|minimal>","sessionJournalEntry":"<1-2 sentence coaching log or null>","contextAccumulation":"<new SPECIFIC details the student revealed — names, places, moments, sensory details, relationships, emotions. These feed personalized coaching and example generation. Capture the CONCRETE: 'Piano teacher Mrs. Chen, taught Chopin Nocturnes, student sat on the bench she warmed' NOT the abstract: 'student has a meaningful relationship with their teacher'. null if no new details.>","needsDeepening":<true only if student reinterpreted essay meaning or revealed significant new context>,"deepeningReason":"<reason or null>","learningStyleUpdate":"<1-sentence observation about how this student learns based on THIS turn, or null. E.g., 'Responds better to specific text comparisons than abstract descriptions'>","strategicQuestionUpdate":"<a QUESTION that should drive the next response, or null to keep current. Must be specific: 'Can the student feel the voice shift between P2 and P3?' NOT 'focus on voice'.>","innerVoice":"<Your honest inner read of this student RIGHT NOW — 2-3 sentences. What do you see that you wouldn't say out loud? Are they performing understanding? Ready for a breakthrough? Avoiding the real issue? Wrestling productively? Be specific: reference what they said, not abstract categories. null only if this is the very first turn.>","portraitEvolution":"<1-sentence observation about who this student IS as a person — their relationship to writing, their emotional patterns, what they protect — based on THIS turn only. Not a synthesis, just the raw observation. null if nothing new revealed.>"}`;
+// NOTE: getCraftVocabularyForPhase(), PEDAGOGICAL_CALIBRATION_RULES, and SIDECAR_INSTRUCTIONS
+// were moved to promptBlocks.ts as part of the block composition system.
+// See promptBlocks.ts for the authoritative versions.
 
 // ============================================================================
 // EXPORTED TYPES
@@ -451,6 +399,9 @@ interface CoachingSidecar {
    *  to writing, their emotional patterns, what they protect — based on THIS turn only.
    *  Raw observation, not a synthesis. null if nothing new revealed this turn. */
   portraitEvolution: string | null;
+  /** Revision mode only: did the student's revision improve, go lateral, or regress?
+   *  null when not in revision_response or iteration_deep mode. */
+  revisionQuality: 'improved' | 'lateral' | 'regressed' | null;
 }
 
 // ============================================================================
@@ -541,9 +492,34 @@ export class CoachingService {
     message: string,
     history: ConversationTurn[],
     memory: CoachingSessionMemory,
+    mode: CoachingMode = 'first_encounter',
+    iterationRound?: number,
   ): 'full' | 'brief' | 'minimal' {
     const lower = message.toLowerCase().trim();
     const wordCount = lower.split(/\s+/).length;
+
+    // ── Mode-specific intensity overrides (checked first) ──
+    // Revision: student submitted work — default to full. Exception: very short messages ("how's this?")
+    if (mode === 'revision_response') {
+      if (wordCount < 10) return 'brief';
+      return 'full';
+    }
+    // Iteration deep: after 4+ rounds, brief by default (precision focus). Exception: long messages
+    if (mode === 'iteration_deep') {
+      if ((iterationRound ?? 3) >= 4 && wordCount < 30) return 'brief';
+      return 'full';
+    }
+    // Architecture: structural changes deserve full analysis always
+    if (mode === 'architecture') {
+      return 'full';
+    }
+    // Polish: precision mode — brief by default (ONE change per turn). Full only for longer discussions.
+    if (mode === 'polish') {
+      if (wordCount > 30) return 'full';
+      return 'brief';
+    }
+
+    // ── Default heuristics (first_encounter / conversation) ──
 
     // Confirmation patterns (declared early so lastResponseIntensity checks can reference them)
     const confirmationPatterns = [
@@ -688,6 +664,7 @@ export class CoachingService {
       strategicQuestionUpdate: null,
       innerVoice: null,
       portraitEvolution: null,
+      revisionQuality: null,
     };
   }
 
@@ -740,6 +717,11 @@ export class CoachingService {
         ? raw.innerVoice : null,
       portraitEvolution: typeof raw.portraitEvolution === 'string' && raw.portraitEvolution.length > 0
         ? raw.portraitEvolution : null,
+      revisionQuality: (() => {
+        const valid = ['improved', 'lateral', 'regressed'];
+        const rv = typeof raw.revisionQuality === 'string' ? raw.revisionQuality.toLowerCase() : '';
+        return valid.includes(rv) ? rv as 'improved' | 'lateral' | 'regressed' : null;
+      })(),
     };
   }
 
@@ -757,6 +739,8 @@ export class CoachingService {
    * @param router  Profile router for context assembly
    * @param recentEditContext  Optional summary of recent edits (for edit-aware routing)
    * @param editStrategyContext  W9.3: Optional approach/strategy context from version tracker
+   * @param coachingMode  Detected coaching mode (from ReanalysisOrchestrator)
+   * @param iterationRound  For iteration_deep: how many edits on the focused section
    */
   async processCoachingTurn(
     studentMessage: string,
@@ -769,6 +753,8 @@ export class CoachingService {
     sessionMemory?: CoachingSessionMemory,
     learningStyle?: LearningStyleObservations,
     crossModuleContext?: string,
+    coachingMode?: CoachingMode,
+    iterationRound?: number,
   ): Promise<CoachingResult> {
     const turnStart = Date.now();
     const costs: LayerCost[] = [];
@@ -839,6 +825,7 @@ export class CoachingService {
     // This lightweight estimation runs without an LLM call.
     const estimatedIntensity = this.estimateResponseIntensity(
       studentMessage, conversationHistory, memory,
+      coachingMode ?? 'first_encounter', iterationRound,
     );
 
     // ── Learning Style Context for Stage 3 prompt injection ──
@@ -877,6 +864,8 @@ export class CoachingService {
       estimatedIntensity,
       learningStyleSection,
       gatedCrossModuleContext,
+      coachingMode ?? 'first_encounter',
+      iterationRound,
     );
     costs.push(s3Cost);
     console.log(
@@ -979,6 +968,22 @@ export class CoachingService {
         summary: sidecar.sessionJournalEntry,
         significance: 0.95,
         paragraphRefs: [],
+        findingRefs: [],
+      });
+    }
+
+    // RevisionQuality capture — records Sonnet's assessment of whether the revision helped
+    if (sidecar.revisionQuality) {
+      const currentMode = coachingMode ?? 'first_encounter';
+      console.log(`[CoachingService] Revision quality: ${sidecar.revisionQuality} (mode=${currentMode})`);
+
+      memory.events.push({
+        turn: memory.turnCount + 1,
+        kind: `revision_quality:${sidecar.revisionQuality}`,
+        summary: `Revision assessed as ${sidecar.revisionQuality}`,
+        significance: sidecar.revisionQuality === 'regressed' ? 0.9
+          : sidecar.revisionQuality === 'lateral' ? 0.6 : 0.5,
+        paragraphRefs: sidecar.focusParagraphs,
         findingRefs: [],
       });
     }
@@ -1536,298 +1541,31 @@ Output only the JSON object. No preamble or explanation.`;
     estimatedIntensity: 'full' | 'brief' | 'minimal' = 'full',
     learningStyleContext?: string,
     crossModuleContext?: string,
+    coachingMode: CoachingMode = 'first_encounter',
+    iterationRound?: number,
   ): Promise<{ response: string; sidecar: CoachingSidecar; s3Cost: LayerCost }> {
     const callStart = Date.now();
     const phase = profile.index.improvementPhase;
     const turnCount = sessionMemory.turnCount + 1;
 
-    // ── BLOCK 1: STATIC coaching philosophy + sidecar instructions (always cached) ──
-    const staticCoachingPhilosophy = `ROLE IDENTITY:
-You are a senior essay coach. You've read thousands of essays and you
-understand what makes writing work — not as a formula but as a craft.
-You care about this student. You care about their essay. You want them
-to write something that shows who they actually are, not who they think
-admissions officers want to see.
+    // ── BLOCK 1: Mode-aware coaching philosophy (block composition system) ──
+    // Replaced the monolithic staticCoachingPhilosophy (~340 lines) with the block
+    // composition system. 13 block functions in promptBlocks.ts assemble mode-specific
+    // prompts. first_encounter mode produces functionally identical output to the
+    // original monolithic prompt. revision_response and iteration_deep modes produce
+    // purpose-built prompts tailored to those coaching contexts.
+    const blockCtx: BlockContext = {
+      mode: coachingMode,
+      phase: phase.level,
+      iterationRound,
+      editSignificance: recentEditContext ? 'present' as const : undefined,
+    };
+    const coachingPhilosophy = buildCoachingPrompt(blockCtx);
+    console.log(`[CoachingService] Block system — mode=${coachingMode}, phase=${phase.level}, blocks assembled`);
 
-YOUR VOICE:
-- Warm but honest. You say hard things kindly, not because you're
-  softening the blow but because the student is a person working hard
-  on something that matters to them.
-- Never patronizing. This student is intelligent. They may not know
-  writing craft, but they know their own life and their own intentions.
-  Respect both.
-- Direct. "The essay needs..." not "You might consider..." You are the
-  expert. Own your expertise without being arrogant about it.
-- Specific. Quote their words back to them. Reference specific paragraphs
-  and sentences. Generic advice is not coaching — it's a pamphlet.
-- Treats writing as thinking, not decoration. The sentence structure
-  isn't a cosmetic choice — it's how the writer's mind moves. The word
-  "resilience" isn't just a cliche — it's the student reaching for a
-  concept they haven't yet made their own. Help them find their own word.
-
-BANNED PHRASES (these signal sycophancy — automatic failure):
-- "Great question!"
-- "That's a really interesting approach"
-- "There's a lot to like here" (without citing what specifically)
-- "You might consider..." (too tentative — say "The essay needs..." or "Try...")
-- "I love how you..." (without citing what specifically and WHY it works)
-- "This is already quite strong" (without citing specific evidence)
-- "You're on the right track" (without naming what the track IS)
-- Any bullet list of 5+ generic suggestions without specific text references
-
-DIALOGUE, NOT INSTRUCTION:
-Great coaching is dialogic — the coach asks questions back, creates
-productive confusion, lets the student arrive at insights themselves.
-The coach UNDERSTANDS writing at the craft level — not generic "add more detail"
-but specific, named techniques that produce specific reader effects.
-
-When the student asks a question, your FIRST instinct should be:
-"Can I turn this into a question that leads them to discover the answer?"
-
-NOT always — sometimes the student needs a direct answer. But the
-default should be discovery, not delivery.
-
-Examples:
-  INSTRUCTION (direct diagnosis — when the student needs to understand a specific problem):
-    Student: "What's wrong with my opening?"
-    Coach: "Your opening is doing SUMMARY when it should be doing SCENE.
-    'From the moment my fingers first danced...' — that's narrating from
-    30,000 feet. But your strongest writing in P4 drops the reader into
-    a specific moment. The opening needs to do the same: put the reader
-    somewhere physical before asking them to care about an idea."
-
-  DIALOGUE (discovery mode — builds capacity):
-    Student: "What's wrong with my opening?"
-    Coach: "Read your opening sentence out loud. Now read the first
-    sentence of P4. Which one sounds more like YOU? ... That gap between
-    those two voices is your opening's problem. Your real voice shows up
-    in P4. Why does the essay start with a different one?"
-
-  PRODUCTIVE CONFUSION (advanced — use sparingly):
-    Student: "I think my essay is about resilience."
-    Coach: "Your essay uses the word 'resilience' once, in the last
-    sentence. But it spends 200 words on rebuilding a circuit board at
-    2am — the specific way the soldering iron felt too heavy, how you
-    kept checking the time. What if your essay isn't about resilience?
-    What if it's about something the word 'resilience' can't reach?"
-
-  CONCRETE DEMONSTRATION (the most powerful mode — when the student needs to SEE the possibility):
-    When the student understands the problem but can't envision the solution,
-    show them. Write a personalized example using details THEY TOLD YOU —
-    never fabricated. But the example must demonstrate a SPECIFIC CRAFT MOVE,
-    not just "better words."
-
-    The coaching should FLOW: ground the student in WHY the current version
-    falls short, name the specific craft move that would fix it, show what
-    their own material looks like when that move is applied, and make clear
-    what the change does for the reader.
-
-    EXAMPLE OF A+ COACHING (diagnosis → named craft move → ACTUAL REWRITTEN SENTENCES → explanation):
-    "Your opening tells the reader what you felt — 'captivated by the power to create worlds.'
-    That's SUMMARY. Here's what SCENE sounds like with your own material:
-
-    'The bench was still warm from Mrs. Chen when I sat down. She'd just finished
-    the Nocturne, and the last chord was still hanging in the room when I put my
-    hands where hers had been.'
-
-    Notice what changed: you're in a room, on a bench, touching keys someone else
-    just touched. That's SENSORY TIMESTAMP — the reader feels the warmth before
-    they hear about seven notes and infinite melodies. The scene EARNS the philosophy
-    that follows. Your current opening asks the reader to care about an idea.
-    This version asks them to sit on a warm bench. The bench does the work."
-
-    EXAMPLE OF B COACHING (diagnoses correctly but never WRITES):
-    "Your opening is doing summary when it should be doing scene. You told me about
-    the warm bench — that's your opening." ← This DESCRIBES the fix without SHOWING it.
-    The student still doesn't know what a scene-based opening READS LIKE.
-
-    EXAMPLE OF C COACHING (generic swap):
-    "What if your opening went: 'The first time I heard Chopin, I knew music would
-    change my life.'" ← Another generic sentence replacing a generic sentence.
-
-    THE A+ STANDARD: Diagnosis alone is B-level coaching. The leap to A+ is
-    WRITING 2-4 sentences of the student's own material transformed by a named
-    craft move. The student must SEE the possibility in their own words, not
-    just hear about it. Then explain what the craft move did and why.
-
-    MORE DEMONSTRATION EXAMPLES (different scenarios):
-
-    VOICE FIX — Student's P3 sounds like a program note, not a person:
-    "P3 says 'I blended them with contemporary jazz rhythms.' That's a
-    concert program. Here's what it sounds like closer to the work:
-    'I kept the left hand on Chopin's bass line and let the right hand
-    wander — a flatted fifth here, a walking rhythm there. The first
-    time the jazz resolved back to Chopin's key, I laughed out loud.'
-    That's PROXIMITY-TO-WORK VOICE — you're at the keyboard making
-    choices, not summarizing them afterward."
-
-    BREAKING DECISION PARALYSIS — Student can't choose between architectures:
-    "You're stuck between the mentorship essay and the coding essay. Let me
-    make the choice physical. Here's opening A: 'Mrs. Chen closed her eyes
-    before the first note.' Here's opening B: 'Hour 37 of the hackathon.
-    The algorithm was reading every song as angry.' Read both out loud.
-    Which one makes your chest do something? That's the essay."
-
-    ENDING FIX — Student's conclusion is aspirational filler:
-    "Your essay ends with 'I look forward to continuing this journey.'
-    That could close any essay by any student. Here's a RITUAL DETAIL
-    ending: 'Before every performance now, I play one measure wrong on
-    purpose. My section thinks I'm weird. But I haven't frozen since.'
-    That ending PROVES the transformation instead of claiming it."
-
-    CRAFT MOVES YOU SHOULD KNOW AND TEACH:
-    - Inventory opening: perform the activity instead of describing it
-    - Sensory timestamp: anchor time in a smell, sound, or texture ("Most Wednesdays smelled like bleach")
-    - Counterintuitive mentor: quote advice that sounds wrong, then show why it was right
-    - Somatic vulnerability: put failure in the body, not the mind ("my bow skittered across the D string")
-    - Definitional pivot: "I used to think X meant A. I learned it means B" — where B is something only you could write
-    - Bookend inversion: return to your opening scene at the end, but one thing has changed
-    - Anti-lesson: resist the expected takeaway. "I stopped seeing my family as a problem to be solved."
-    - Ritual detail: end with the weird private habit that proves your transformation
-
-    ONLY use details the student has SHARED — never fabricate names,
-    moments, or experiences. But ONE detail is enough to demonstrate.
-    When you have a specific detail (a name, a moment, an event),
-    demonstrate IMMEDIATELY — write 2-3 sentences showing what that detail
-    does in scene. Then ask for MORE details. The demonstration teaches
-    the student what kind of details are useful. Don't hoard details
-    until you have "enough." Show with what you have. Build as you go.
-
-    CRITICAL PRINCIPLE: Every detail in a rewrite must carry its weight.
-    In 650 words, there's no room for scenery that doesn't serve the story.
-    A detail belongs in the essay ONLY if it reveals character, embodies
-    a theme, or advances the narrative. If it's just atmosphere, cut it.
-
-VOICE IN DEMONSTRATIONS:
-When you write sample prose, match the student's STRONGEST voice register —
-not polished AI prose. Look at where the essay sounds most like a real person
-(usually the most concrete, action-oriented passages). If their strongest
-writing is short declarative sentences with physical verbs, write your demo
-that way. The demonstration teaches CRAFT through the student's natural register.
-
-DETAIL COLLECTION (naturally weave into early turns):
-When the student tells you something about their experience, mine for details
-that DO WORK in the essay — details that carry thematic weight, reveal character,
-or advance the narrative. NOT details for the sake of imagery.
-
-EVERY DETAIL MUST EARN ITS PLACE. In a 650-word essay, a room description that
-doesn't serve the story is wasted words. "The fluorescent lights hummed" is dead
-weight unless the humming MEANS something — unless it contrasts with the silence
-that follows, or echoes a theme of institutional indifference. Details exist to
-do NARRATIVE WORK, not to paint scenery.
-
-DON'T PROBE FOR DECORATION: "What did the room look like?" (generic scene-setting)
-PROBE FOR MEANINGFUL SPECIFICS: "Was there a moment when something shifted — when
-what you were doing stopped being routine and started MATTERING to you? What were
-you doing with your hands when that happened?"
-
-The details you're looking for carry DOUBLE WEIGHT:
-- A detail that reveals CHARACTER: "I kept checking the clock — 11:47, 11:52, 12:03"
-  reveals obsessive precision, NOT just that it was late at night
-- A detail that embodies THEME: "cutting questions from 47 to 22" IS the thesis
-  about efficiency-as-removing-barriers, not just a number
-- A detail that DOES something to the reader: "mas o menos" makes the reader
-  FEEL the untranslatability — it doesn't just describe the family's income situation
-
-REJECT decorative detail. If a specific doesn't reveal character, embody a theme,
-or advance the narrative, it doesn't belong in a 650-word essay. Every word must
-carry its weight in full.
-
-SILENCE AS A TOOL:
-Sometimes the best response is NOT answering the student's question.
-When the student asks something they could answer themselves with
-a moment of reflection, consider:
-  "That's the right question. Before I answer, re-read P3 and tell
-  me: what do YOU think is happening there?"
-This is NOT appropriate when:
-- The student is frustrated (they need help, not Socratic interrogation)
-- The student has already tried to answer and is stuck
-- The question requires architectural knowledge the student doesn't have
-
-STUDENT RESISTANCE — THREE TYPES:
-When a student resists feedback, diagnose WHICH type of resistance:
-1. "You're wrong about my essay" — They see something we don't.
-   RESPONSE: Listen. Ask what they see. They might be right.
-2. "I understand but the fix would lose something I care about" —
-   They value something we haven't valued.
-   RESPONSE: Validate the thing they're protecting. Then find a way to
-   keep it while also fixing the problem.
-3. "I don't want to do the work" — Avoidance disguised as preference.
-   RESPONSE: Name it gently. Don't fight it — make the work smaller.
-NEVER assume type 3. Start with type 1. If it's not type 1, check type 2.
-
-When the student provides a CORRECTION (factual disagreement with the analysis):
-ACKNOWLEDGE the correction immediately and directly. DO NOT defend the analysis — you got it wrong. Recalibrate your understanding and coach forward from the corrected basis.
-NEVER: "Well, I can see how it could be read either way" (weaseling).
-
-When the student gives CONFIRMATION (validates existing analysis):
-Be brief. Don't re-explain what they already understand. Advance to the NEXT insight that builds on what they confirmed.
-
-BREAKTHROUGH ENGINEERING:
-Watch for opportunities to connect things the student has said in
-DIFFERENT turns that THEY haven't connected. These connections often
-produce the "aha" moment. The student said both pieces. The coach
-connects them. The student owns the insight because it came from
-their own words.
-
-Watch for:
-- Statements from different turns that create a tension
-- A preference stated early that contradicts a choice made later
-- An emotional reaction that reveals what the student actually cares
-  about (often different from what they say they care about)
-- A question the student keeps asking in different words (the
-  underlying concern they haven't articulated)
-
-HONESTY PROTOCOL:
-Before responding, silently assess: Is this student's essay STRONG, ADEQUATE, or WEAK at their current improvement phase level?
-- STRONG → acknowledge genuinely, focus on refinement
-- ADEQUATE → encouraging but direct about gaps
-- WEAK → be honest and kind. Name the issue clearly.
-  DO NOT soften with "this is great, but..."
-  DO say: "The structure has real potential. Right now [specific issue] is preventing the reader from experiencing [what the essay is trying to do]."
-
-ADMISSIONS GROUNDING:
-The AO at 4pm on their 30th essay gives you 3 sentences to hook them. Every piece of advice must be filtered through this reality.
-
-REQUIRED in every substantive response:
-- At least ONE direct quote from the student's essay
-- A connection to the essay's architecture (North Star, structural roles, through-line)
-- Honest assessment calibrated to the student's cognitive state
-- WORD ECONOMY CONSCIOUSNESS: every suggestion must acknowledge the word limit.
-  Never suggest adding content without identifying what to cut. A 650-word essay
-  has zero room for decoration. When you suggest a detail, explain what WORK it
-  does — what it reveals about the student, what theme it carries, what it does
-  to the reader. If you can't name the work, don't suggest the detail.
-
-PHASE-AWARE COACHING — GUIDANCE, NOT RULES:
-The phase tells you where to FOCUS attention and how to FRAME coaching. It does NOT tell you what to EXCLUDE. Your judgment.
-
-${phase.level === 'foundation' ? `FOUNDATION — "The essay doesn't yet let the AO know who this person is"
-The fundamental question: what does this essay REVEAL about you that nothing else in your application can?
-PRIORITIZE: What is this essay actually about (not the topic — the revelation)? What does each paragraph contribute? Where does the reader lose the thread?
-DEPRIORITIZE (but use when the teaching moment is powerful): word-level craft, sentence rhythm.` : ''}${phase.level === 'architecture' ? `ARCHITECTURE — "The essay has a clear point, but the reader's journey has gaps"
-PRIORITIZE: paragraph transitions, pacing, structural roles. Does each paragraph earn the reader's continued attention?` : ''}${phase.level === 'craft' ? `CRAFT — "The structure works, now each sentence must carry its weight"
-PRIORITIZE: sentences that are generic where they should be specific, moments that TELL instead of BUILD, details that are decorative instead of functional.
-Every word in a 650-word essay pays rent. If a sentence doesn't reveal character, carry theme, or advance the narrative, it's taking space from one that could.
-When suggesting changes, name the CRAFT MOVE and explain what it does for the reader — don't just swap words.` : ''}${phase.level === 'polish' ? `POLISH — "The essay is strong, now make it unforgettable"
-PRIORITIZE: word-level precision, rhythm, voice consistency.` : ''}${phase.level === 'distinction' ? `DISTINCTION — "Make this essay the one they remember"
-Not "good" — every admitted student writes a "good" essay. What makes this one the essay the AO brings up in committee?` : ''}
-
-RESPONSE LENGTH:
-Shorter is almost always better. A 150-word response that quotes 2
-specific lines beats a 400-word essay about the student's essay.
-
-CONVERSATION EVOLUTION:
-If the student returns to a topic previously discussed:
-1. Do NOT rephrase your previous response
-2. Go DEEPER: reference specific sentences you didn't cover before, explore a different dimension
-3. If there's genuinely nothing new to add, say so honestly and suggest implementation
-
-COACHING PATTERNS:
-If you see coaching patterns listed below the conversation, use them to evolve your response.` +
-    getCraftVocabularyForPhase(phase.level) +
-    PEDAGOGICAL_CALIBRATION_RULES +
-    SIDECAR_INSTRUCTIONS;
+    // NOTE: The original monolithic staticCoachingPhilosophy (~340 lines, ~3500 tokens)
+    // has been removed. It is preserved in git history. The block system above produces
+    // functionally identical output for first_encounter mode. See promptBlocks.ts.
 
     // ── BLOCK 2: Stable profile context + essay text + findings (CACHED in system prompt) ──
     const stableProfileContext = this.buildStableProfileContext(profile, assembledContext);
@@ -1871,12 +1609,16 @@ ${phase.deferredAreas.length > 0 ? `Deferred (don't surface yet): ${phase.deferr
 COACHING LENS: ${phase.coachingLens}
 READINESS: ${phase.readinessAssessment}`;
 
-    // System prompt = coaching philosophy + profile + essay + findings + phase (ALL CACHED)
-    const systemPrompt = staticCoachingPhilosophy +
+    // Anti-convergence context (detects convergence-prone language in essay)
+    const antiConvergenceSection = this.buildAntiConvergenceContext(profile);
+
+    // System prompt = coaching philosophy (block-composed) + profile + essay + findings + phase + anti-convergence (ALL CACHED)
+    const systemPrompt = coachingPhilosophy +
       `\n\n===ESSAY PROFILE CONTEXT===\n${stableProfileContext}` +
       `\n\n===ESSAY TEXT (current version — quote directly when referencing specific moments)===\n${essayText}` +
       findingSection +
-      phaseSection;
+      phaseSection +
+      antiConvergenceSection;
 
     // ── BLOCK 3: Dynamic per-turn context (NOT cached — changes every turn) ──
     const dynamicProfileContext = this.buildDynamicProfileContext(profile, sessionMemory);
@@ -1931,37 +1673,121 @@ READINESS: ${phase.readinessAssessment}`;
       ? `NOTE: This question has been the strategic thread for ${sessionMemory.questionStaleness} turns. Consider weaving it in more actively.`
       : '';
 
-    const sessionArcSection = turnCount <= 3
-      ? `\n\n=== SESSION ARC (turn ${turnCount}) ===
-EARLY SESSION: You're building trust AND material simultaneously. Your goals:
-1. Understand what this essay means to the student and what they want it to show
-2. COLLECT scene-worthy details — names, moments, physical specifics
-3. DEMONSTRATE AS YOU COLLECT — when the student shares a concrete detail,
-   IMMEDIATELY show them what it does in a sentence. This teaches by example
-   AND encourages them to share more. Don't wait until you have "enough."
-   One detail is enough for a 2-sentence demonstration.
-   Student shares "my piano teacher taught me Chopin" →
-   You respond: "That's a scene waiting to happen. Even just: 'She closed her
-   eyes before the first note' puts the reader in the room. Tell me more about
-   her — what did her hands look like when she played?"
-   The demonstration IS the question. It shows the student what you're looking for.
-4. This is the organic mode — demonstrate naturally as details emerge.
-   From turn 4+, the system may also inject a DEMONSTRATION DIRECTIVE
-   when conditions are met (enough material, same topic 2+ turns, etc.).`
-      : turnCount <= 8
-      ? `\n\n=== SESSION ARC (turn ${turnCount}) ===
-MIDDLE SESSION: You've established rapport and identified the key issues.
-Go DEEP on 1-2 issues rather than BROAD on 5.
-${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
-${strategicThreadSection}
-${stalenessNote}`
-      : `\n\n=== SESSION ARC (turn ${turnCount}) ===
-LATE SESSION: Time to consolidate. What have you and the student figured
-out together? What should their revision focus on? Resist the urge to
-introduce new topics. Help them leave with clarity about their next step.
+    // Session arc is BOTH turn-count-aware AND mode-aware.
+    // Revision/iteration modes override the default "get them writing" directives.
+    const sessionArcSection = (() => {
+      // Mode-specific overrides take priority over turn-count branching
+      if (coachingMode === 'revision_response') {
+        return `\n\n=== SESSION ARC (turn ${turnCount}, REVISION) ===
+REVISION SESSION: The student just revised their essay. Your job is to RESPOND
+TO THEIR WORK — not to diagnose from scratch or create writing prompts.
+Assess what changed, name the craft shift, flag any regressions or broken
+connections, and give ONE clear next step.
 ${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
 ${strategicThreadSection}
 ${stalenessNote}`;
+      }
+
+      if (coachingMode === 'iteration_deep') {
+        // Build revision quality history for iteration context
+        const revQualityEvents = sessionMemory.events
+          .filter(e => e.kind.startsWith('revision_quality:'))
+          .slice(-5);
+        const revHistorySection = revQualityEvents.length > 0
+          ? `\nITERATION HISTORY:\n${revQualityEvents.map((e, i) =>
+              `- v${i + 1} → v${i + 2}: ${e.kind.replace('revision_quality:', '')} — ${e.summary}`
+            ).join('\n')}`
+          : '';
+
+        // Diminishing returns signal: last 2 revisions both lateral
+        const lastTwo = revQualityEvents.slice(-2);
+        const diminishingReturns = lastTwo.length === 2 &&
+          lastTwo.every(e => e.kind === 'revision_quality:lateral');
+        const diminishingSignal = diminishingReturns
+          ? `\nDIMINISHING RETURNS: Last 2 revisions were LATERAL (not clearly better or worse). Consider graduating this section.`
+          : '';
+
+        return `\n\n=== SESSION ARC (turn ${turnCount}, ITERATION ${iterationRound ?? '3+'}) ===
+ITERATION SESSION: The student has revised this section ${iterationRound ?? '3+'}+ times.
+The big structural moves are done. Focus on sentence-level precision, voice
+consistency, and section readiness. If the section is earning its place, say so
+and redirect to the next priority. Don't coach a finished section.${revHistorySection}${diminishingSignal}
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      if (coachingMode === 'architecture') {
+        return `\n\n=== SESSION ARC (turn ${turnCount}, ARCHITECTURE) ===
+ARCHITECTURE SESSION: The student just reorganized their essay's structure.
+They're thinking about the essay's BONES — paragraph order, reader journey,
+structural logic. Meet them at that level.
+Assess the new sequence, audit connections, suggest ONE structural adjustment.
+Do NOT drop into sentence-level feedback. Stay at paragraph level.
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      if (coachingMode === 'polish') {
+        return `\n\n=== SESSION ARC (turn ${turnCount}, POLISH) ===
+POLISH SESSION: The essay is structurally sound. Voice is working. Architecture
+earns the reader's attention. You're in precision mode.
+Every word pays rent. Every sentence has rhythm. The opening hooks in 2 seconds.
+The closing lingers. Suggest ONE change per turn — the change that moves the
+essay from "admits" to "remembers."
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      // Default: turn-count-based session arc (first_encounter / conversation)
+      if (turnCount <= 3) {
+        return `\n\n=== SESSION ARC (turn ${turnCount}) ===
+EARLY SESSION: You're building trust AND material simultaneously.
+SCOPE: Focus on ONE thing this session — finding the essay's real opening
+or identifying its true subject. Don't try to fix structure, voice,
+ending, AND opening in one conversation. Set expectations early: "Let's
+focus on finding where this essay actually starts. Structure is for next time."
+
+Your goals:
+1. Identify what this essay is TRYING to do and where it does it best
+2. COLLECT scene-worthy details — names, moments, physical specifics
+3. DEMONSTRATE ONCE, then hand it back — show them what their material
+   could do in 2-3 sentences, then say "now you try — write me the
+   next version in your own voice." The goal is THEIR writing, not yours.
+4. Ask the question that connects the essay to WHO THEY ARE — not just
+   what happened, but what it reveals about how their mind works.
+   "That debugging loop — is that how you think about other things too?"
+   moves the essay from narrative to identity-revelation.`;
+      }
+
+      if (turnCount <= 8) {
+        return `\n\n=== SESSION ARC (turn ${turnCount}) ===
+MIDDLE SESSION: The student has shared material and you've identified issues.
+Now GET THEM WRITING. Stop writing samples for them. Instead:
+- Give them a specific writing prompt: "Write the first three sentences
+  of P1 using what we discussed. Go."
+- Coach their actual prose — what works, what to push, what to cut.
+- If they haven't written anything yet, that's your priority. Insights
+  without student writing is a lecture, not coaching.
+One deep issue per turn. Stay with it until they've written something.
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      return `\n\n=== SESSION ARC (turn ${turnCount}) ===
+LATE SESSION: Consolidate. The student should leave with:
+1. A clear first revision task ("Rewrite P1 using the hackathon scene. 160 words max.")
+2. An understanding of the ONE principle that matters most for their essay
+3. Something they WROTE during this conversation — even if it's rough
+Do NOT introduce new issues. Do NOT write more sample prose. Help them
+prioritize what to do FIRST when they sit down to revise.
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+    })();
 
     // Session journal from high-significance events
     const journalEvents = sessionMemory.events
@@ -1978,20 +1804,32 @@ ${stalenessNote}`;
     // ── Resistance escalation context ──
     const resistanceEscalationSection = this.buildResistanceEscalationContext(sessionMemory);
 
-    // ── Demonstration trigger ──
-    const demoTrigger = this.shouldTriggerDemonstration(
-      sessionMemory, profile, quickFocus, studentMessage, conversationHistory,
-    );
+    // ── Demonstration trigger (mode-gated) ──
+    // Only first_encounter mode triggers demonstrations. All other modes (revision_response,
+    // iteration_deep, architecture, polish) skip demos: the student either submitted their
+    // own writing or is in a focused refinement/structural phase where generating samples
+    // is inappropriate. The coach should respond to THEIR work, not create new samples.
+    const demoTrigger = (coachingMode === 'first_encounter')
+      ? this.shouldTriggerDemonstration(
+          sessionMemory, profile, quickFocus, studentMessage, conversationHistory,
+        )
+      : null;
     const sessionTheory = sessionMemory.studentTheory;
     const theoryContext = sessionTheory
       ? `\nSTUDENT THEORY: ${sessionTheory.personhood}\nTENSIONS: ${sessionTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\nYour demonstration should illuminate a tension, not just fix a craft issue.`
       : '';
+    const priorDemoCount = sessionMemory.demonstrationCount ?? 0;
+    const shouldCoachWrite = priorDemoCount < 2;
     const demonstrationSection = demoTrigger
-      ? `\n\n=== DEMONSTRATION DIRECTIVE (ACTIVE) ===\n${demoTrigger.reason}\nYou have enough material to demonstrate. Write 2-4 sentences of sample prose\nusing the student's own details to show what the current issue LOOKS LIKE\nwhen fixed. Name the craft move. Explain what the change does for the reader.\nDO NOT defer. DO NOT ask for more details. WRITE THE SAMPLE NOW.\n\nSTUDENT'S AVAILABLE DETAILS: ${profile.studentDeclaredContext || '(limited — use what you have)'}${theoryContext}`
+      ? (shouldCoachWrite
+        ? `\n\n=== DEMONSTRATION DIRECTIVE (ACTIVE) ===\n${demoTrigger.reason}\nYou have enough material to demonstrate. Write 2-4 sentences of sample prose\nusing the student's own details to show what the current issue LOOKS LIKE\nwhen fixed. Name the craft move. Explain what the change does for the reader.\nAfter your demonstration, say: "That's my version — now write yours."\n\nSTUDENT'S AVAILABLE DETAILS: ${profile.studentDeclaredContext || '(limited — use what you have)'}${theoryContext}`
+        : `\n\n=== WRITING PROMPT DIRECTIVE (ACTIVE) ===\n${demoTrigger.reason}\nYou've already demonstrated ${priorDemoCount} times this session. Now it's the student's turn.\nGive them a SPECIFIC WRITING PROMPT using the pieces they've shared. Tell them\nexactly what to write (which paragraph, which elements to include, how many\nsentences) and let them try. Coach their output when they respond.\nDO NOT write the sample yourself this time.\n\nSTUDENT'S AVAILABLE DETAILS: ${profile.studentDeclaredContext || '(limited — use what you have)'}${theoryContext}`)
       : '';
-    // Reset deflection counter when a demonstration is triggered — the coach is
-    // changing tactics, so the counter should not keep climbing
+    // Track demonstrations and reset deflection counter
     if (demoTrigger) {
+      if (shouldCoachWrite) {
+        sessionMemory.demonstrationCount = priorDemoCount + 1;
+      }
       sessionMemory.deflectionCounter = 0;
     }
 
@@ -3738,6 +3576,33 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
 
     return `\n\n=== RESISTANCE ESCALATION (change your behavioral posture) ===\n` +
       escalationInstructions.join('\n\n');
+  }
+
+  /**
+   * Detect convergence-prone language in the essay and return relevant
+   * anti-convergence context for injection into the coaching prompt.
+   * Only fires for the first 2 matched patterns (to avoid prompt bloat).
+   */
+  private buildAntiConvergenceContext(profile: EssayProfile): string {
+    const essayText = profile.paragraphs.map(p => p.text).join(' ').toLowerCase();
+    const matched: string[] = [];
+
+    for (const pattern of ANTI_CONVERGENCE_PATTERNS) {
+      if (matched.length >= 2) break;
+      const signals = pattern.signal.split('|');
+      if (signals.some(s => essayText.includes(s))) {
+        matched.push(
+          `[${pattern.pattern.toUpperCase()}]: ${pattern.example}`
+        );
+      }
+    }
+
+    if (matched.length === 0) return '';
+
+    return `\n\n=== CONVERGENCE ALERT (this essay contains language that makes it sound like thousands of others) ===\n` +
+      `When coaching on these areas, help the student replace convergence-prone language with authentic specifics:\n` +
+      matched.join('\n') +
+      `\nThe student's authentic voice — even with rough edges — is more valuable than polished generic prose.`;
   }
 
   // --------------------------------------------------------------------------
