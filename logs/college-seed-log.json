@@ -1,0 +1,11 @@
+{
+  "successCount": 18,
+  "errorCount": 1,
+  "errors": [
+    {
+      "college": "Howard University",
+      "error": "Unknown error"
+    }
+  ],
+  "timestamp": "2026-03-25T06:20:35.872Z"
+}

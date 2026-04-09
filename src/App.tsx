@@ -38,6 +38,9 @@ const PIQWorkshop = lazy(() => import("./pages/PIQWorkshop"));
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import Settings from "./pages/Settings";
+import CollegesGallery from "./pages/CollegesGallery";
+import CollegeDetail from "./pages/CollegeDetail";
+import MyCollegeList from "./pages/MyCollegeList";
 import DashboardLayout from "./layouts/DashboardLayout";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { CLERK_PUBLISHABLE_KEY, hasClerkKey } from "@/config/clerk";
@@ -93,6 +96,9 @@ const AppRoutes = () => (
         <Route path="/dashboard" element={<DashboardHome />} />
         <Route path="/dashboard/scanner" element={<PortfolioScanner />} />
         <Route path="/dashboard/insights" element={<PortfolioInsightsNew />} />
+        <Route path="/dashboard/colleges" element={<CollegesGallery />} />
+        <Route path="/dashboard/colleges/:slug" element={<CollegeDetail />} />
+        <Route path="/dashboard/colleges/my-list" element={<MyCollegeList />} />
         <Route path="/dashboard/workshop" element={<PIQWorkshop />} />
         <Route path="/dashboard/workshop/:piqNumber" element={<PIQWorkshop />} />
         <Route path="/dashboard/pricing" element={<Pricing />} />
