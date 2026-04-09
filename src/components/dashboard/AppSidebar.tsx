@@ -22,6 +22,7 @@ import {
   Home,
   BarChart3,
   Target,
+  GraduationCap,
   PenTool,
   Zap,
   Settings,
@@ -51,6 +52,11 @@ const navItems = [
     title: 'Insights',
     href: '/dashboard/insights',
     icon: Target,
+  },
+  {
+    title: 'Colleges',
+    href: '/dashboard/colleges',
+    icon: GraduationCap,
   },
   {
     title: 'Workshop',
