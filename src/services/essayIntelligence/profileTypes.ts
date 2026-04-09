@@ -1674,6 +1674,21 @@ export interface EssayUnderstanding {
   }>;
 }
 
+/**
+ * Structured student context — parsed from the flat contextAccumulation string.
+ * Enables writing prompt generation with specific names, places, and moments.
+ */
+export interface StructuredStudentContext {
+  /** People mentioned — names + relationship to student */
+  people: Array<{ name: string; relationship: string; firstMentionedTurn: number }>;
+  /** Physical places with sensory potential */
+  places: Array<{ place: string; sensoryDetail?: string; firstMentionedTurn: number }>;
+  /** Specific moments with narrative weight */
+  moments: Array<{ moment: string; emotionalWeight?: string; firstMentionedTurn: number }>;
+  /** Concrete details that could anchor writing prompts */
+  concreteDetails: Array<{ detail: string; firstMentionedTurn: number }>;
+}
+
 export interface EssayProfile {
   /** Profile Index (always loaded — ~250-350 tokens) */
   index: ProfileIndex;
@@ -1752,6 +1767,17 @@ export interface EssayProfile {
    *  category is 'new_context'. Unlike conversationInsights (individual records),
    *  this is a synthesized narrative the LLM reads as a single block. */
   studentDeclaredContext: string;
+
+  /** Structured version of student-declared context — parsed from the flat
+   *  contextAccumulation string for writing prompt generation. Names, places,
+   *  moments, and details are separated for targeted use in scaffolded prompts. */
+  structuredContext?: StructuredStudentContext;
+
+  // -- IMPROVEMENT MANIFEST (analysis-produced improvement queue) --
+  /** Ordered improvements from the analysis system. The conversator workshops these
+   *  with the student. Generated after L4 (or after whatever layer completes).
+   *  Every finding, growth edge, red flag, and AO observation maps to at least one entry. */
+  improvementManifest?: ImprovementManifest;
 
   // -- PROFILE METADATA --
   metadata: {
@@ -2305,6 +2331,100 @@ export interface CoachingSessionMemory {
   /** Number of demonstrations the coach has written this session.
    *  After 2, the demo trigger switches to asking the student to write. */
   demonstrationCount?: number;
+
+  /** Live revision checklist — populated from top findings after turn 1,
+   *  updated as the student addresses tasks through coaching or revisions.
+   *  Injected into the coaching prompt so the coach references progress. */
+  revisionChecklist?: RevisionTask[];
+
+  /** Workshop progress — tracks which ImprovementManifest items have been
+   *  discussed, demonstrated, attempted by student, or fully addressed.
+   *  Keyed by ImprovementEntry.id. */
+  improvementProgress?: Record<string, 'queued' | 'discussed' | 'demonstrated' | 'student_attempted' | 'addressed'>;
+}
+
+/**
+ * A single revision task on the student's checklist.
+ * Projected from findings — the student-facing version of what needs fixing.
+ */
+export interface RevisionTask {
+  /** Task ID (e.g., 'RT_1') */
+  id: string;
+  /** Target paragraph (0-based index) */
+  paragraph: number;
+  /** Student-facing task description */
+  task: string;
+  /** Named craft technique, if applicable */
+  technique: string | null;
+  /** Finding ID this task originated from */
+  findingRef: string | null;
+  /** Current status */
+  status: 'pending' | 'in_progress' | 'addressed';
+  /** Priority (1 = highest) */
+  priority: number;
+  /** Turn when status changed to 'addressed' */
+  addressedAtTurn?: number;
+}
+
+// ============================================================================
+// IMPROVEMENT MANIFEST — Analysis-produced improvement queue for coaching
+// ============================================================================
+
+/**
+ * A single improvement derived from the analysis system.
+ * Every finding, growth edge, observation, and annotation should map to at least
+ * one ImprovementEntry. The conversator's job is to workshop these with the student.
+ *
+ * Understanding is the fuel — improvements are the output.
+ */
+export interface ImprovementEntry {
+  /** Unique ID (e.g., 'IMP_1') */
+  id: string;
+  /** Target paragraph (0-based index, -1 for essay-level) */
+  paragraph: number;
+  /** What the analysis observed — the diagnosis */
+  observation: string;
+  /** What the student should DO about it — always actionable, never just diagnostic */
+  action: string;
+  /** WHY this matters — framed in reader/AO impact, not abstract quality */
+  stakes: string;
+  /** Named craft technique from TECHNIQUE_ROUTES, if one matches */
+  technique: string | null;
+  /** Sample rewrite demonstrating the improvement (2-4 sentences) */
+  demonstration: string | null;
+  /** What to CUT to make room for the addition (word economy) */
+  wordEconomyCut: string | null;
+  /** Where this improvement came from */
+  source: 'l4_priority' | 'l35_finding' | 'l375_growth_edge' | 'l3_observation' | 'l5_annotation' | 'red_flag' | 'ao_first_read';
+  /** Reference ID (finding ID, annotation ID, etc.) */
+  sourceRef: string | null;
+  /** Priority (1 = highest, from analysis) */
+  priority: number;
+  /** Expected impact on essay quality */
+  impact: 'transformative' | 'significant' | 'incremental';
+  /** Context enrichments added by conversator as student reveals details */
+  conversatorEnrichments: string[];
+}
+
+/**
+ * ImprovementManifest — the ordered list of improvements the analysis system
+ * produces for the coaching system to workshop with the student.
+ *
+ * Populated after L4 (or after whatever layer completes if L4 fails).
+ * Sources: L4 priorities → L3.5 findings → L3.75 growth edges → L3 red flags → AO first read.
+ * The conversator consumes this and helps the student execute each improvement.
+ */
+export interface ImprovementManifest {
+  /** Ordered improvements — highest priority first */
+  items: ImprovementEntry[];
+  /** ISO timestamp when manifest was generated */
+  generatedAt: string;
+  /** Which analysis layers contributed items */
+  sources: string[];
+  /** Essay word count at generation time (for word economy tracking) */
+  wordCount: number;
+  /** Essay word limit */
+  wordLimit: number;
 }
 
 /**

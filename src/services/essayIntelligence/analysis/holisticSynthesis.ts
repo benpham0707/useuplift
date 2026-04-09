@@ -656,7 +656,9 @@ Produce connectionUpgrades for any connections whose strengthCategory should cha
 FINDINGS (W1.4):
 Review existing findings from the walk. With the complete essay understanding, some findings may now be confirmed, deepened, or superseded. Produce findingEvolutions where warranted.
 If synthesis reveals NEW essay-level findings — cross-essay patterns, structural strategies, identity-level observations — produce those in newFindings. Focus on findings that require the full-text simultaneous view (the walk could not have seen them paragraph-by-paragraph).
-DO NOT duplicate findings the walk already produced. Use buildsOn/relatedTo to reference existing findings.`;
+DO NOT duplicate findings the walk already produced. Use buildsOn/relatedTo to reference existing findings.
+
+SUPERSESSION IS RARE: Prefer 'confirmed' or 'deepened' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED by the holistic view — not when it's incomplete or narrow. If a finding captured a partial truth, deepen it rather than superseding it. The coaching system depends on active findings — if you supersede everything, the student gets no improvement targets. When you DO supersede, you MUST produce a replacement finding in newFindings.`;
 
 // ============================================================================
 // CONTEXT BUILDERS
@@ -713,9 +715,18 @@ You describe WHAT IS, not how WELL. No evaluative language.
 CONVERGENCE GUIDANCE:
 - You are the PRIMARY convergence signal — the system trusts your judgment.
 - Budget and iteration caps are backstops only.
-- Be honest: if further iteration would not meaningfully improve coaching quality, say so.
-- Name SPECIFIC remaining opportunities, not generic "could go deeper."
-- For simple essays, converge after 1 iteration. Complex essays may need 2-3.
+- CONVERGENCE BAR: "Would coaching give WRONG advice without another iteration?"
+  NOT "Could we learn more?" (the answer to that is always yes).
+- After iteration 0: converge UNLESS you can name a specific finding that would
+  REVERSE a coaching recommendation (not refine it — REVERSE it). Refinements
+  and nuances do not justify another iteration.
+- For essays under 500 words with a clear central theme: converge after iteration 0.
+- For complex essays with multiple themes or structural issues: 1-2 iterations max.
+- When in doubt, CONVERGE. The coaching layer is robust enough to work with
+  partial understanding — it's better to coach with 90% understanding now
+  than 95% understanding after burning $0.25 and 4 more minutes.
+- Name SPECIFIC remaining opportunities if NOT converging. Generic statements
+  like "could explore voice further" are not sufficient justification.
 
 WALK VALIDATION GUIDANCE:
 - HIGH CONFIDENCE (>0.7): Your reading wins — the walk missed what full context reveals.

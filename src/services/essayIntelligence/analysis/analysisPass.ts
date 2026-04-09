@@ -1329,7 +1329,11 @@ export class AnalysisPassService {
 
     // Build cached context blocks (shared across all parallel calls)
     const systemPrompt = buildSystemPrompt();
-    const profileContext = buildProfileContext(profile);
+    // Smart context: compact shared digest (replaces full profile dump)
+    // + pre-computed paragraph relevance for per-call filtering
+    const { analysisContextBuilder } = await import('./analysisContextBuilder');
+    const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
+    const profileContext = analysisContextBuilder.buildSharedDigest(profile, 'l3_5');
 
     // ── Anchor-then-parallel scoring (anti-clustering) ──
     // Step 1: Select and score the anchor paragraph first (sequential)
@@ -1356,6 +1360,10 @@ export class AnalysisPassService {
         : undefined;
 
       try {
+        const anchorRelevance = relevanceIndex.get(anchorPara.index);
+        const anchorRelevantContext = anchorRelevance
+          ? analysisContextBuilder.buildParagraphContext(profile, anchorPara.index, anchorRelevance, 'l3_5')
+          : '';
         const anchorResult = await this.analyzeSingleParagraph(
           anchorPara,
           profile.paragraphs.length,
@@ -1364,6 +1372,7 @@ export class AnalysisPassService {
           staleAreaHints,
           anchorFindingContext || undefined,
           { isAnchor: true, anchorReason: anchor.reason },
+          anchorRelevantContext,
         );
         results.push(anchorResult.analysis);
         totalCost += anchorResult.cost;
@@ -1408,6 +1417,10 @@ export class AnalysisPassService {
         ? buildAnnotationFindingContext(findingStore, para.index)
         : undefined;
 
+      const paraRelevance = relevanceIndex.get(para.index);
+      const paraRelevantContext = paraRelevance
+        ? analysisContextBuilder.buildParagraphContext(profile, para.index, paraRelevance, 'l3_5')
+        : '';
       const task = this.analyzeSingleParagraph(
         para,
         profile.paragraphs.length,
@@ -1416,6 +1429,7 @@ export class AnalysisPassService {
         staleAreaHints,
         paraFindingContext || undefined,
         anchorContextStr ? { isAnchor: false, context: anchorContextStr } : undefined,
+        paraRelevantContext,
       )
         .then((result) => {
           results.push(result.analysis);
@@ -1762,6 +1776,7 @@ export class AnalysisPassService {
     staleAreaHints?: string[],
     findingContext?: string,
     anchorConfig?: { isAnchor: boolean; anchorReason?: string; context?: string },
+    paragraphRelevantContext?: string,
   ): Promise<{
     analysis: AnalysisPassOutput;
     cost: number;
@@ -1771,12 +1786,16 @@ export class AnalysisPassService {
 
     // 3-block prompt caching pattern:
     // Block 1: System prompt (static, cached forever via cacheSystemPrompt)
-    // Block 2: Profile context (essay-specific, cached across parallel calls via user message cache_control)
-    // Block 3: Paragraph-specific prompt (not cached)
+    // Block 2: Shared digest (essay text + holistic digest + paragraph roles — cached across parallel calls)
+    // Block 3: Paragraph-relevant context + paragraph-specific prompt (NOT cached)
     //
-    // We combine Block 2 + Block 3 into the user message, but Block 2 is the
-    // same across all calls so Anthropic's automatic prompt prefix caching kicks in.
-    const userPrompt = `${profileContext}\n\n---\n\n${paragraphPrompt}`;
+    // Block 2 is the COMPACT shared digest (~1200 tokens) instead of the full profile dump (~4000 tokens).
+    // Paragraph-relevant holistic data is in Block 3 alongside the paragraph prompt,
+    // filtered by the AnalysisContextBuilder to only include dimensions relevant to THIS paragraph.
+    const relevantSection = paragraphRelevantContext
+      ? `${paragraphRelevantContext}\n\n`
+      : '';
+    const userPrompt = `${profileContext}\n\n---\n\n${relevantSection}${paragraphPrompt}`;
 
     const response = await callClaude<string>(
       {
@@ -1830,7 +1849,14 @@ export class AnalysisPassService {
     }
 
     const systemPrompt = buildSystemPrompt();
-    const profileContext = buildProfileContext(profile);
+    // Smart context for reanalysis too
+    const { analysisContextBuilder } = await import('./analysisContextBuilder');
+    const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
+    const profileContext = analysisContextBuilder.buildSharedDigest(profile, 'l3_5');
+    const paraRelevance = relevanceIndex.get(paragraphIndex);
+    const paraRelevantContext = paraRelevance
+      ? analysisContextBuilder.buildParagraphContext(profile, paragraphIndex, paraRelevance, 'l3_5')
+      : '';
 
     // Use prior anchor context for calibration if available and this isn't the anchor itself
     let anchorConfig: { isAnchor: boolean; context?: string } | undefined;
@@ -1840,7 +1866,7 @@ export class AnalysisPassService {
 
     return this.analyzeSingleParagraph(
       para, profile.paragraphs.length, systemPrompt, profileContext,
-      undefined, undefined, anchorConfig,
+      undefined, undefined, anchorConfig, paraRelevantContext,
     );
   }
 }

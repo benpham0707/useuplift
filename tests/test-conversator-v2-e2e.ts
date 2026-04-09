@@ -267,10 +267,45 @@ async function main(): Promise<void> {
   const pipelineTime = Date.now() - pipelineStart;
   const profile = pipelineResult.profile as EssayProfile;
 
+  // ── CRITICAL PIPELINE GATE ──
+  // L3, L3.75, L3.5 are always critical — coaching without them is broken.
+  // L4 is critical for full intelligence (North Star, findings, technique router, phase detection).
+  // With the sequential split fix (North Star 3500 tokens + Score Matrix 3500 tokens),
+  // L4 should reliably complete within 120s per call. If it still fails, abort —
+  // coaching without L4 loses 7 capabilities.
+  const criticalLayers = ['L3', 'L3.75', 'L3.5'];
+  const failedCritical = pipelineResult.layersFailed.filter(f =>
+    criticalLayers.some(cl => f.layer.includes(cl))
+  );
+  if (failedCritical.length > 0) {
+    const failMsg = failedCritical.map(f => `${f.layer}: ${f.message}`).join(', ');
+    console.error(`[V2 Audit] CRITICAL PIPELINE FAILURE — ${failMsg}`);
+    console.error(`[V2 Audit] Pipeline cost: $${pipelineResult.costSummary.totalCost.toFixed(4)} in ${pipelineTime}ms`);
+    console.error(`[V2 Audit] Aborting — coaching without ${failedCritical.map(f => f.layer).join(', ')} would produce degraded results.`);
+    console.error(`[V2 Audit] Layers that DID complete: ${pipelineResult.layersCompleted.join(', ')}`);
+    process.exit(1);
+  }
+  // L4 failure is non-fatal — coaching works at reduced quality without North Star.
+  // Log loudly so we know, but continue to test coaching capabilities.
+  const l4Failed = pipelineResult.layersFailed.some(f => f.layer === 'L4');
+  if (l4Failed) {
+    console.warn(`[V2 Audit] WARNING: L4 failed — North Star, structural roles, technique router, and phase detection degraded. Continuing anyway.`);
+  }
+
+  // Save the initial analysis profile before coaching modifies it
+  const initialProfilePath = path.join(OUTPUT_DIR, 'conversator-v2-initial-profile.json');
+  try {
+    const initialJson = JSON.stringify(profile, null, 2);
+    fs.writeFileSync(initialProfilePath, initialJson, 'utf-8');
+    console.log(`[V2 Audit] Initial profile saved: ${initialProfilePath} (${(initialJson.length / 1024).toFixed(0)}KB)`);
+  } catch (err) {
+    console.error('[V2 Audit] Failed to save initial profile:', err instanceof Error ? err.message : String(err));
+  }
+
   output.push(separator('PHASE 1: INITIAL ANALYSIS (L1→L4)'));
   output.push(`Layers completed: ${pipelineResult.layersCompleted.join(', ')}`);
   output.push(
-    `Layers failed: ${pipelineResult.layersFailed.map(f => `${f.layer}: ${f.error}`).join(', ') || 'none'}`,
+    `Layers failed: ${pipelineResult.layersFailed.map(f => `${f.layer}: ${f.message}`).join(', ') || 'none'}`,
   );
   output.push(
     `Improvement phase: ${pipelineResult.improvementPhase?.level ?? 'unknown'}`,
@@ -351,6 +386,91 @@ async function main(): Promise<void> {
     }
   }
   output.push(`OBSERVATION COUNT: ${totalObservations} (target: 30-50 for 7 paragraphs)`);
+
+  // ── EXPANDED PROFILE OUTPUT ──
+
+  // Findings (L3.5 analysis)
+  output.push('\nFINDINGS:');
+  if (profile.findings.length > 0) {
+    const activeFindings = profile.findings.filter(f => f.status === 'active');
+    output.push(`  Total: ${profile.findings.length} (${activeFindings.length} active)`);
+    for (const f of activeFindings.slice(0, 10)) {
+      const scopeStr = f.scope.type === 'essay_level' ? 'essay-level'
+        : f.scope.type === 'cross_paragraph' ? `P${(f.scope.paragraphs ?? []).map(p => p + 1).join('+')}`
+        : `P${(f.scope.paragraph ?? 0) + 1}`;
+      output.push(`  [${f.id}] [${f.maturity}/${f.coachingValue}] ${scopeStr} [${f.dimensions.join(',')}]`);
+      output.push(`    ${f.claim}`);
+    }
+  } else {
+    output.push('  (no findings)');
+  }
+
+  // Voice Identity
+  if (profile.voiceIdentity) {
+    output.push('\nVOICE IDENTITY:');
+    output.push(`  Primary register: ${profile.voiceIdentity.primaryRegister ?? '(unknown)'}`);
+    output.push(`  Authenticity: ${profile.voiceIdentity.authenticityLevel ?? '(unknown)'}`);
+  }
+
+  // Thematic Architecture
+  if (profile.thematicArchitecture) {
+    output.push('\nTHEMATIC ARCHITECTURE:');
+    output.push(`  Central thesis: ${profile.thematicArchitecture.centralThesis ?? '(none)'}`);
+    const threads = profile.thematicArchitecture.threads ?? [];
+    if (threads.length > 0) {
+      output.push(`  Threads: ${threads.map((t: any) => t.name ?? t.theme ?? JSON.stringify(t).slice(0, 60)).join('; ')}`);
+    }
+  }
+
+  // Narrative Strategy
+  if (profile.narrativeStrategy) {
+    output.push('\nNARRATIVE STRATEGY:');
+    output.push(`  Primary strategy: ${profile.narrativeStrategy.primaryStrategy ?? '(unknown)'}`);
+  }
+
+  // Connections
+  if (profile.connections) {
+    const allConns = [
+      ...(profile.connections.crossParagraph ?? []),
+      ...(profile.connections.thematic ?? []),
+      ...(profile.connections.structural ?? []),
+    ];
+    output.push(`\nCONNECTIONS: ${allConns.length} total`);
+    for (const c of allConns.slice(0, 5)) {
+      output.push(`  ${(c as any).type ?? 'unknown'}: ${(c as any).description?.slice(0, 100) ?? JSON.stringify(c).slice(0, 100)}`);
+    }
+  }
+
+  // Entanglements
+  if (profile.entanglements?.length > 0) {
+    output.push(`\nENTANGLEMENTS: ${profile.entanglements.length}`);
+    for (const e of profile.entanglements.slice(0, 3)) {
+      output.push(`  ${e.dimensions.join('+')} at P${e.location.paragraph + 1}: ${e.description.slice(0, 80)}`);
+    }
+  }
+
+  // North Star Intent Bridge
+  if (profile.northStar?.intentBridge?.studentIntent) {
+    output.push('\nINTENT BRIDGE:');
+    output.push(`  Student intent: "${profile.northStar.intentBridge.studentIntent}"`);
+    const alignments = profile.northStar.intentBridge.alignments ?? [];
+    for (const a of alignments.slice(0, 3)) {
+      output.push(`  ${a.alignment}: ${a.detail}`);
+    }
+  }
+
+  // Word count
+  const totalWords = profile.paragraphs.reduce((sum, p) => sum + p.text.split(/\s+/).length, 0);
+  output.push(`\nWORD COUNT: ${totalWords}/650`);
+
+  // Per-paragraph digest
+  output.push('\nPARAGRAPH DIGEST:');
+  for (let i = 0; i < profile.paragraphs.length; i++) {
+    const para = profile.paragraphs[i];
+    const words = para.text.split(/\s+/).length;
+    const sentCount = para.sentences?.length ?? 0;
+    output.push(`  P${i + 1}: ${words} words, ${sentCount} sentences`);
+  }
 
   // Per-layer cost breakdown
   output.push('\nPIPELINE COST BREAKDOWN:');
@@ -448,19 +568,38 @@ async function main(): Promise<void> {
       }
     }
 
-    // ── COACHING TURN ────────────────────────────────────────────────────
+    // ── COACHING TURN (fail-fast: save output and abort on any error) ───
     console.log(
       `\n[V2 Audit] Turn ${turnNum}: "${turnDef.message.slice(0, 60)}..."`,
     );
 
     const turnStart = Date.now();
-    const result = await reanalysisOrchestrator.processCoachingTurn(
-      turnDef.message,
-      conversationHistory,
-      undefined, // recentEditSummary — handled via lastEditUnderstanding internally
-      sessionMemory,
-      learningStyle,
-    );
+    let result: CoachingTurnResult;
+    try {
+      result = await reanalysisOrchestrator.processCoachingTurn(
+        turnDef.message,
+        conversationHistory,
+        undefined, // recentEditSummary — handled via lastEditUnderstanding internally
+        sessionMemory,
+        learningStyle,
+      );
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errStack = err instanceof Error ? err.stack : '';
+      output.push(separator(`TURN ${turnNum}: FATAL ERROR`));
+      output.push(`Message: "${turnDef.message}"`);
+      output.push(`Error: ${errMsg}`);
+      output.push(`Stack: ${errStack}`);
+      output.push(`\nCost so far: $${(pipelineResult.costSummary.totalCost + totalCoachingCost).toFixed(4)}`);
+      output.push(`Turns completed before failure: ${turnNum - 1}`);
+      // Save partial output for debugging
+      fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+      fs.writeFileSync(OUTPUT_FILE, output.join('\n'), 'utf-8');
+      console.error(`[V2 Audit] FATAL: Turn ${turnNum} failed — ${errMsg}`);
+      console.error(`[V2 Audit] Partial output saved to ${OUTPUT_FILE}`);
+      console.error(`[V2 Audit] Cost so far: $${(pipelineResult.costSummary.totalCost + totalCoachingCost).toFixed(4)}`);
+      process.exit(1);
+    }
     const turnTime = Date.now() - turnStart;
 
     turnTimings.push(turnTime);
@@ -687,8 +826,156 @@ async function main(): Promise<void> {
     output.push(`  Turn ${snap.turn}: ${snap.arc}`);
   }
 
-  // V2 FEATURE VERIFICATION
-  output.push('\nV2 FEATURE VERIFICATION:');
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ANALYSIS & PROFILING VERIFICATION (checks A1-A12)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  output.push('\nANALYSIS & PROFILING VERIFICATION:');
+
+  // A1. Pipeline completed all layers
+  const expectedLayers = ['L1', 'L2', 'L2.5', 'L3', 'L3.75', 'L3.5', 'L4'];
+  const completedSet = new Set(pipelineResult.layersCompleted);
+  const allLayersComplete = expectedLayers.every(l => completedSet.has(l));
+  output.push(
+    `  [${allLayersComplete ? 'x' : ' '}] A1: Pipeline completed all layers — ${pipelineResult.layersCompleted.join(', ')} (expected: ${expectedLayers.join(', ')})`,
+  );
+
+  // A2. North Star produced with through-line
+  const hasNorthStar = !!(ns.throughLineSummary && ns.throughLineSummary.length > 20);
+  output.push(
+    `  [${hasNorthStar ? 'x' : ' '}] A2: North Star through-line — ${hasNorthStar ? ns.throughLineSummary?.slice(0, 80) + '...' : '(missing)'}`,
+  );
+
+  // A3. Structural roles assigned to paragraphs
+  const rolesAssigned = ns.structuralRoles?.length ?? 0;
+  output.push(
+    `  [${rolesAssigned >= 3 ? 'x' : ' '}] A3: Structural roles assigned — ${rolesAssigned} paragraphs have roles (min 3 expected)`,
+  );
+
+  // A4. AO First Read produced with all fields
+  const aoComplete = !!(profile.aoFirstRead?.gutReaction &&
+    profile.aoFirstRead?.committeeOneLiner &&
+    profile.aoFirstRead?.putDownRisk);
+  output.push(
+    `  [${aoComplete ? 'x' : ' '}] A4: AO First Read complete — gutReaction=${!!profile.aoFirstRead?.gutReaction}, ` +
+    `oneLiner=${!!profile.aoFirstRead?.committeeOneLiner}, putDownRisk=${profile.aoFirstRead?.putDownRisk ?? 'missing'}`,
+  );
+
+  // A5. Character revelation is human (person portrait, not writing description)
+  const analysisPortrait = profile.characterRevelation?.writerPortrait ?? '';
+  const analysisPortraitIsHuman = analysisPortrait.length > 50 &&
+    !analysisPortrait.toLowerCase().includes('the writer') &&
+    !analysisPortrait.toLowerCase().includes('the author') &&
+    !analysisPortrait.toLowerCase().includes('the essay demonstrates');
+  output.push(
+    `  [${analysisPortraitIsHuman ? 'x' : ' '}] A5: Person portrait (human, not writing analysis) — ${analysisPortraitIsHuman ? analysisPortrait.slice(0, 80) + '...' : '(not human-sounding)'}`,
+  );
+
+  // A6. Findings produced with coaching value
+  const activeFindings = profile.findings.filter(f => f.status === 'active');
+  const highValueFindings = activeFindings.filter(f => f.coachingValue === 'high' || f.coachingValue === 'critical');
+  output.push(
+    `  [${activeFindings.length >= 5 ? 'x' : ' '}] A6: Findings produced — ${activeFindings.length} active (${highValueFindings.length} high/critical value)`,
+  );
+
+  // A7. Improvement phase detected
+  const phaseDetected = !!(pipelineResult.improvementPhase?.level);
+  output.push(
+    `  [${phaseDetected ? 'x' : ' '}] A7: Improvement phase — ${pipelineResult.improvementPhase?.level ?? 'NOT DETECTED'} (reasoning: ${pipelineResult.improvementPhase?.reasoning?.slice(0, 60) ?? 'none'}...)`,
+  );
+
+  // A8. Archetype detected with pool density
+  const analysisArchetypeDetected = !!(profile.admissionsPositioning?.archetypeContext?.archetype);
+  output.push(
+    `  [${analysisArchetypeDetected ? 'x' : ' '}] A8: Archetype — ${profile.admissionsPositioning?.archetypeContext?.archetype ?? 'none'} (${profile.admissionsPositioning?.archetypeContext?.poolDensity ?? 'unknown'})`,
+  );
+
+  // A9. Observation economy (not too few, not too many)
+  const analysisObsInRange = totalObservations >= 20 && totalObservations <= 80;
+  output.push(
+    `  [${analysisObsInRange ? 'x' : ' '}] A9: Observation economy — ${totalObservations} observations (target: 20-80)`,
+  );
+
+  // A10. Voice identity populated
+  const voicePopulated = !!(profile.voiceIdentity?.primaryRegister);
+  output.push(
+    `  [${voicePopulated ? 'x' : ' '}] A10: Voice identity — register=${profile.voiceIdentity?.primaryRegister ?? 'missing'}`,
+  );
+
+  // A11. Emotional topography populated
+  const emotionPopulated = !!(profile.emotionalTopography?.authenticityAssessment);
+  output.push(
+    `  [${emotionPopulated ? 'x' : ' '}] A11: Emotional topography — ${emotionPopulated ? profile.emotionalTopography?.authenticityAssessment?.slice(0, 60) + '...' : 'missing'}`,
+  );
+
+  // A12. Findings reference specific paragraphs (not all essay-level)
+  const paragraphScopedFindings = activeFindings.filter(f => f.scope.type === 'paragraph' || f.scope.type === 'cross_paragraph');
+  const hasParagraphScope = paragraphScopedFindings.length >= 3;
+  output.push(
+    `  [${hasParagraphScope ? 'x' : ' '}] A12: Paragraph-scoped findings — ${paragraphScopedFindings.length} paragraph-level findings (min 3 expected)`,
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PROFILE→COACHING INTEGRATION VERIFICATION (checks I1-I5)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  output.push('\nPROFILE→COACHING INTEGRATION:');
+
+  // I1. Coach references the essay's North Star / through-line
+  const anyCoachRefsNorthStar = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    return resp.includes('through-line') || resp.includes('north star') ||
+           resp.includes('the essay is about') || resp.includes('the essay is really about') ||
+           resp.includes('central') || resp.includes('thesis');
+  });
+  output.push(
+    `  [${anyCoachRefsNorthStar ? 'x' : ' '}] I1: Coach references essay's through-line/subject — ${anyCoachRefsNorthStar}`,
+  );
+
+  // I2. Coach references specific findings (by claim, not by ID)
+  const anyCoachRefsFinding = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    // Check if coach mentions finding-related concepts
+    return resp.includes('summary') || resp.includes('scene') || resp.includes('scope') ||
+           resp.includes('generic') || resp.includes('voice shift') || resp.includes('people');
+  });
+  output.push(
+    `  [${anyCoachRefsFinding ? 'x' : ' '}] I2: Coach references analysis findings in coaching — ${anyCoachRefsFinding}`,
+  );
+
+  // I3. Coach uses AO perspective / admissions grounding
+  const anyCoachRefsAO = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    return resp.includes('admissions') || resp.includes('ao ') || resp.includes('reader') ||
+           resp.includes('committee') || resp.includes('application');
+  });
+  output.push(
+    `  [${anyCoachRefsAO ? 'x' : ' '}] I3: Coach uses admissions grounding — ${anyCoachRefsAO}`,
+  );
+
+  // I4. Coach references specific paragraph roles/architecture
+  const anyCoachRefsStructure = turnCaptures.some(c => {
+    const resp = (c.result.response ?? '').toLowerCase();
+    return (resp.includes('p1') || resp.includes('p2') || resp.includes('p3') ||
+            resp.includes('paragraph 1') || resp.includes('opening') || resp.includes('ending')) &&
+           (resp.includes('does') || resp.includes('role') || resp.includes('job') || resp.includes('work'));
+  });
+  output.push(
+    `  [${anyCoachRefsStructure ? 'x' : ' '}] I4: Coach references paragraph roles/structure — ${anyCoachRefsStructure}`,
+  );
+
+  // I5. Student theory synthesis produced (requires analysis + coaching integration)
+  const finalTheory = sessionMemory?.studentTheory;
+  const theoryIntegration = !!(finalTheory?.personhood && finalTheory.personhood.length > 30);
+  output.push(
+    `  [${theoryIntegration ? 'x' : ' '}] I5: Student theory synthesized — ${theoryIntegration ? `turn ${finalTheory?.synthesizedAtTurn}, personhood: "${finalTheory?.personhood.slice(0, 60)}..."` : 'not produced'}`,
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // V2 COACHING FEATURE VERIFICATION (checks 1-27)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  output.push('\nV2 COACHING FEATURE VERIFICATION:');
 
   // 1. Session events created per turn
   const totalEvents = sessionMemory?.events.length ?? 0;
@@ -1009,10 +1296,48 @@ async function main(): Promise<void> {
   output.push(`  Total wall time: ${totalWallTime}ms`);
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // FINAL SCORECARD
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  output.push(separator('SCORECARD'));
+
+  // Count passing checks
+  const analysisChecks = [allLayersComplete, hasNorthStar, rolesAssigned >= 3, aoComplete,
+    analysisPortraitIsHuman, activeFindings.length >= 5, phaseDetected, analysisArchetypeDetected,
+    analysisObsInRange, voicePopulated, emotionPopulated, hasParagraphScope];
+  const analysisPass = analysisChecks.filter(Boolean).length;
+
+  const integrationChecks = [anyCoachRefsNorthStar, anyCoachRefsFinding, anyCoachRefsAO,
+    anyCoachRefsStructure, theoryIntegration];
+  const integrationPass = integrationChecks.filter(Boolean).length;
+
+  output.push(`ANALYSIS & PROFILING: ${analysisPass}/${analysisChecks.length} checks passed`);
+  output.push(`PROFILE→COACHING INTEGRATION: ${integrationPass}/${integrationChecks.length} checks passed`);
+  output.push(`V2 COACHING FEATURES: (27 checks — see above)`);
+  output.push(`TOTAL: ${analysisPass + integrationPass}/17 analysis+integration checks`);
+
+  output.push(`\nSYSTEM COST: $${(pipelineResult.costSummary.totalCost + editCost + totalCoachingCost).toFixed(4)}`);
+  output.push(`SYSTEM TIME: ${totalWallTime}ms (${(totalWallTime / 1000).toFixed(1)}s)`);
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // WRITE OUTPUT
   // ═══════════════════════════════════════════════════════════════════════════
 
   writeOutput(output.join('\n'));
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FULL PROFILE DUMP — save the complete analysis profile as JSON
+  // so we never lose expensive analysis data again
+  // ═══════════════════════════════════════════════════════════════════════════
+  const profileDumpPath = path.join(OUTPUT_DIR, 'conversator-v2-profile-dump.json');
+  const finalProfileForDump = reanalysisOrchestrator.getProfile();
+  try {
+    const profileJson = JSON.stringify(finalProfileForDump, null, 2);
+    fs.writeFileSync(profileDumpPath, profileJson, 'utf-8');
+    console.log(`[V2 Audit] Full profile saved to: ${profileDumpPath} (${(profileJson.length / 1024).toFixed(0)}KB)`);
+  } catch (err) {
+    console.error('[V2 Audit] Failed to dump profile:', err instanceof Error ? err.message : String(err));
+  }
 
   console.log(
     `\n[V2 Audit] COMPLETE — Grand total: $${(pipelineResult.costSummary.totalCost + editCost + totalCoachingCost).toFixed(4)} in ${totalWallTime}ms`,
@@ -1023,7 +1348,16 @@ async function main(): Promise<void> {
 // RUN
 // ============================================================================
 
+// Global safety timeout — kill the process if it exceeds 35 minutes.
+// Expected run time: ~23-25 min. This prevents infinite hangs from stuck API calls.
+const GLOBAL_TIMEOUT_MS = 35 * 60 * 1000;
+const globalTimer = setTimeout(() => {
+  console.error(`[V2 Audit] GLOBAL TIMEOUT — process exceeded ${GLOBAL_TIMEOUT_MS / 60000} minutes. Killing.`);
+  process.exit(2);
+}, GLOBAL_TIMEOUT_MS);
+globalTimer.unref(); // Don't keep process alive just for this timer
+
 main().catch((err) => {
   console.error('[V2 Audit] FATAL ERROR:', err);
   process.exit(1);
-});
+}).finally(() => clearTimeout(globalTimer));

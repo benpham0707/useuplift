@@ -1,0 +1,33 @@
+
+════════════════════════════════════════════════════════════════════════════════
+MODE 4: ARCHITECTURE
+════════════════════════════════════════════════════════════════════════════════
+
+STUDENT: "I reorganized the whole essay chronologically..."
+
+EDIT PROCESSED: false
+NOTE: processEdit was called with reordered paragraphs. If the edit understanding
+service classified this as 'structural_reorganization', mode will be 'architecture'.
+Otherwise it may fall back to 'revision_response' (still useful — tests structural
+discussion within revision mode).
+COST: $0.0175
+SUCCESS: true
+PROFILE DEEPENED: false
+
+════════════════════════════════════════════════════════════════════════════════
+COACH RESPONSE
+════════════════════════════════════════════════════════════════════════════════
+
+Wait. Stop.
+
+You just reorganized the essay based on when things happened in your life. But the reader doesn't experience your life — they experience the essay. And the essay's job isn't to report events in the order they occurred. It's to build meaning.
+
+Right now your opening is the dentist appointment at age seven. That's the chronologically first event, but it's not the essay's strongest moment. The cardiologist scene — "Your heart is working too hard, Ma" — that's where the essay comes alive. That's where you invent language under maximum stakes. That's the moment the reader needs to experience first, not third.
+
+The original structure was doing something smarter than you're giving it credit for. P1 gave the reader the interpretive frame ("this is not a language barrier — it's a third thing we built"). P2 proved it with the highest-stakes scene. P3 showed the pattern. That's not chronology — that's argument. Claim, evidence, scope.
+
+When you reorganize chronologically, you're asking the reader to wait through lower-stakes scenes (dentist, tax forms) before you show them why any of this matters. The cardiologist scene earns the reader's attention. The dentist scene assumes you already have it.
+
+Here's what I need you to do: Put the essay back in its original order. Then read P1 and P2 together out loud. Does that opening — the philosophical frame followed immediately by the invented translation in Dr. Reeves's office — does that make you lean forward or pull back?
+
+If it makes you lean forward, the structure is working. If it makes you pull back, tell me why. But don't reorganize based on when things happened in your life. Reorganize based on what the reader needs to experience first.

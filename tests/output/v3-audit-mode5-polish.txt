@@ -1,0 +1,32 @@
+
+════════════════════════════════════════════════════════════════════════════════
+MODE 5: POLISH
+════════════════════════════════════════════════════════════════════════════════
+
+STUDENT: "I changed 'last option' to 'only option' in P4. 'Only' felt stronger. What do you think?"
+
+EDIT PROCESSED: false
+ESSAY PHASE: foundation
+NOTE: Polish mode requires significance='minor' AND phase='polish'|'distinction'.
+The essay's detected phase is 'foundation'. If not polish/distinction, mode
+will be 'revision_response' instead — still tests word-level revision coaching.
+COST: $0.0667
+SUCCESS: true
+
+════════════════════════════════════════════════════════════════════════════════
+COACH RESPONSE
+════════════════════════════════════════════════════════════════════════════════
+
+"Last option" is the right word. Don't change it.
+
+Here's why: "only option" means there's no one else. "Last option" means there were other options and they all failed first. That's the weight you're naming — not that you're the sole translator, but that you're the person people call *after* they've tried everything else. You're the safety net, not the first choice. That structural position — being needed because nothing else worked — is what makes P4 land.
+
+"Only option" makes you sound essential. "Last option" makes you sound like what you actually were: fifteen years old and carrying responsibility that shouldn't have been yours yet. The reader feels the disproportionate weight in "last option." They don't feel it in "only option."
+
+Keep "last option." It's doing exactly what the sentence needs it to do.
+
+Now — you said the essay "feels almost done." Let me test that. Read P3 and P5 back to back. Out loud if you can. Do you hear how P3 says "translation is about what the person needs to feel" and then P5 says "I already know what it feels like to be the person standing between someone and the thing they need to understand"? You've said the same insight twice, in slightly different words. That's not refinement — that's the essay circling back instead of moving forward.
+
+The essay has 305 words. You have 345 words of room. But before you fill that space, you need to decide: is this essay about translation work across contexts (the current structure), or is it about one specific moment when you realized what that work meant? Right now it's trying to do both, and P3 is where they split apart.
+
+Which version feels more true to what you're trying to say?

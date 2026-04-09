@@ -237,11 +237,12 @@ Observations to PRODUCE (these require genuine analytical insight):
 - "P2's puzzle metaphor isn't just a comparison — it pre-justifies the coding bridge in P4 by establishing music as analytical practice" (strategic architectural function that requires tracking across paragraphs)
 
 QUANTITY GUIDANCE:
-- A transitional paragraph should produce 2-4 observations total across all sentence fields
-- A contributing paragraph should produce 4-7 observations
-- A pivotal paragraph should produce 6-10 observations
-- An entire 7-paragraph essay should produce 30-50 total observations, not 100+
-If you're producing more than 50 observations, you're including obvious material. Cut the observations a competent reader would already know.
+- A transitional paragraph should produce 3-5 observations total across all sentence fields
+- A contributing paragraph should produce 5-8 observations
+- A pivotal paragraph should produce 7-12 observations
+- An entire 7-paragraph essay should produce 35-60 total observations
+- Each observation should map to a potential IMPROVEMENT — if it doesn't suggest something the student could change, it's not useful
+Observations are the raw material for the coaching system's improvement pipeline. Too few observations = too few improvement targets for the student. When in doubt, include the observation.
 
 === BACK-PROPAGATION ===
 
@@ -282,6 +283,8 @@ Every paragraph serves a purpose — that purpose IS a finding.
 MATURITY: assess honestly. A first sighting is 'hypothesis'. If confirmed by multiple evidence locations, 'developing' or 'confirmed'. If it reveals something deeper, 'deepened'.
 
 FINDING EVOLUTIONS: If existing findings should be updated based on what this paragraph reveals — confirmed, deepened, or superseded — produce finding evolutions.
+
+SUPERSESSION IS RARE: On a first analysis pass, prefer 'deepened' or 'confirmed' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED — not when a later paragraph adds nuance. If P3 reveals that a P1 finding was incomplete, that's 'deepened', not 'superseded'. Supersession means the original claim is no longer true. If you supersede a finding, you MUST produce a replacement finding in newFindings that captures the corrected understanding.
 
 === INDEX CONVENTION ===
 

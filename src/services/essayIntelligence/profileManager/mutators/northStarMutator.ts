@@ -7,12 +7,18 @@
  *
  * Five dimensions, scaled by essay type:
  * - Supplement (<250 words): 2 dims — structuralRolesMap + distinctivenessSignature
- * - PIQ (~350 words): 3 dims — + trajectory
+ * - PIQ (~350 words): 4 dims — + trajectory + throughLineMap
  * - Personal Statement (~650 words): all 5 dims — + throughLineMap + intentBridge
  *
+ * NOTE: PIQ through-lines differ from personal statement through-lines. A personal
+ * statement traces a transformation arc (how meaning CHANGES across the narrative).
+ * A PIQ through-line traces a central insight or experience — the thread that unifies
+ * a shorter, focused response. Both use the same ThroughLineMap structure, but the
+ * journey is typically shorter and the narrative moves more concentrated.
+ *
  * CRITICAL: The mutator validates essay-type scaling. Supplements MUST NOT have
- * throughLineMap, trajectory, or intentBridge. PIQs MUST NOT have throughLineMap
- * or intentBridge. Violations are rejected.
+ * throughLineMap, trajectory, or intentBridge. PIQs MUST NOT have intentBridge.
+ * Violations are rejected.
  *
  * Profile Manager spec: docs/plan-sections/04-profile-manager.md
  */
@@ -39,7 +45,7 @@ type NorthStarOutput = EssayNorthStar;
  */
 const ACTIVE_DIMENSIONS: Record<NorthStarScale, string[]> = {
   supplement: ['structuralRolesMap', 'distinctivenessSignature'],
-  piq: ['structuralRolesMap', 'distinctivenessSignature', 'trajectory'],
+  piq: ['structuralRolesMap', 'distinctivenessSignature', 'trajectory', 'throughLineMap'],
   personal_statement: [
     'throughLineMap',
     'structuralRolesMap',
@@ -59,7 +65,7 @@ export class NorthStarMutator {
    *
    * Validates that dimensions present match the essay type:
    * - supplement: throughLineMap=null, trajectory=null, intentBridge=null
-   * - piq: throughLineMap=null, intentBridge=null
+   * - piq: intentBridge=null (throughLineMap + trajectory allowed)
    * - personal_statement: all 5 dimensions allowed
    *
    * If the output contains dimensions invalid for the essay type, those dimensions
@@ -85,7 +91,7 @@ export class NorthStarMutator {
       profile.northStar.throughLineMap = output.throughLineMap;
     } else if (output.throughLineMap !== null) {
       console.warn(
-        `[NorthStarMutator] throughLineMap provided for ${scale} essay — forcibly nulled (only personal_statement supports this dimension)`,
+        `[NorthStarMutator] throughLineMap provided for ${scale} essay — forcibly nulled (only piq and personal_statement support this dimension)`,
       );
       profile.northStar.throughLineMap = null;
     } else {

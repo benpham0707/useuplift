@@ -82,6 +82,14 @@ const BOT_COLORS: FrameColors = {
 // SVG HUD Frame (shared, parameterized)
 // ═══════════════════════════════════════════
 
+/** A single sample in the positional glow gradient */
+export interface GlowStop {
+  /** 0 = top of box, 1 = bottom of box */
+  offset: number;
+  /** 0–1 glow intensity at this point */
+  opacity: number;
+}
+
 interface HoloFrameProps {
   w: number;
   h: number;
@@ -89,7 +97,29 @@ interface HoloFrameProps {
   topNotchPct: number;
   bottomNotchPct: number;
   mirror?: boolean;
+  /** Multi-stop glow profile (empty = no glow) */
+  glowStops?: GlowStop[];
 }
+
+// Rainbow-within-palette glow stops — more stops = richer shimmer
+const FRAME_GLOW_STOPS = {
+  bot: [
+    { offset: "0%",   color: "hsla(185, 90%, 65%, 1)" },
+    { offset: "20%",  color: "hsla(200, 85%, 68%, 1)" },
+    { offset: "40%",  color: "hsla(220, 82%, 70%, 1)" },
+    { offset: "60%",  color: "hsla(245, 78%, 72%, 1)" },
+    { offset: "80%",  color: "hsla(265, 75%, 74%, 1)" },
+    { offset: "100%", color: "hsla(200, 80%, 68%, 1)" },
+  ],
+  user: [
+    { offset: "0%",   color: "hsla(320, 85%, 72%, 1)" },
+    { offset: "20%",  color: "hsla(300, 80%, 70%, 1)" },
+    { offset: "40%",  color: "hsla(280, 78%, 68%, 1)" },
+    { offset: "60%",  color: "hsla(260, 82%, 72%, 1)" },
+    { offset: "80%",  color: "hsla(240, 80%, 74%, 1)" },
+    { offset: "100%", color: "hsla(310, 82%, 70%, 1)" },
+  ],
+};
 
 function HoloFrameSvg({
   w,
@@ -98,11 +128,16 @@ function HoloFrameSvg({
   topNotchPct,
   bottomNotchPct,
   mirror,
+  glowStops = [],
 }: HoloFrameProps) {
+  // Stable unique ID for SVG defs (masks, filters, gradients)
+  const uid = React.useRef(`hf-${Math.random().toString(36).slice(2, 8)}`).current;
+
   if (w < 40 || h < 40) return null;
 
   const c = CHAMFER;
   const s = 1;
+  const showGlow = glowStops.length > 0;
 
   const tnX = Math.round(w * topNotchPct);
   const tnW = 40;
@@ -144,14 +179,54 @@ function HoloFrameSvg({
     `${ig},${ci + ig}`,
   ].join(" ");
 
+  const stops = mirror ? FRAME_GLOW_STOPS.bot : FRAME_GLOW_STOPS.user;
+
   return (
     <svg
       width={w}
       height={h}
       className="absolute inset-0 z-[5] pointer-events-none"
+      style={{ overflow: "visible" }}
       aria-hidden="true"
     >
-      {/* Outer frame */}
+      {showGlow && (
+        <defs>
+          {/* Multi-stop rainbow-within-palette gradient (diagonal sweep) */}
+          <linearGradient id={`${uid}-grad`} x1="0" y1="0" x2="1" y2="1">
+            {stops.map((s) => (
+              <stop key={s.offset} offset={s.offset} stopColor={s.color} />
+            ))}
+          </linearGradient>
+          {/* Multi-stop positional mask — accurately maps the cloud zone onto the box.
+              Rect extends 40px beyond the box so that blurred glow bleeds out softly
+              instead of being hard-clipped at the SVG boundary.
+              gradientUnits=userSpaceOnUse with y1=0,y2=h maps the 0-1 stop offsets
+              to the box height in absolute coords; the oversized rect inherits the
+              edge colors (first/last stop) outside the box — no hard clip. */}
+          <linearGradient id={`${uid}-mg`} x1="0" y1="0" x2="0" y2={h} gradientUnits="userSpaceOnUse">
+            {glowStops.map((gs, i) => (
+              <stop key={i} offset={gs.offset} stopColor="white" stopOpacity={gs.opacity} />
+            ))}
+          </linearGradient>
+          <mask id={`${uid}-mask`}>
+            <rect x="-40" y="-40" width={w + 80} height={h + 80} fill={`url(#${uid}-mg)`} />
+          </mask>
+          {/* Soft wide bloom — larger stdDeviation for visible aura */}
+          <filter id={`${uid}-bloom`} x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          {/* Extra-wide outer aura */}
+          <filter id={`${uid}-aura`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="12" />
+          </filter>
+        </defs>
+      )}
+
+      {/* Outer frame — always normal colors */}
       <polygon
         points={outerPoints}
         fill="none"
@@ -219,6 +294,21 @@ function HoloFrameSvg({
       {/* ── Edge Ticks ── */}
       <line x1={1} y1={Math.round(h * 0.5)} x2={9} y2={Math.round(h * 0.5)} stroke={colors.tick} strokeWidth="1.5" />
       <line x1={w - 1} y1={Math.round(h * 0.35)} x2={w - 9} y2={Math.round(h * 0.35)} stroke={colors.detailSoft} strokeWidth="1.5" />
+
+      {/* ═══ Glow overlay — positionally masked to cloud zone ═══ */}
+      {showGlow && (
+        <g mask={`url(#${uid}-mask)`}>
+          {/* Layer 1: Wide diffuse aura behind the frame */}
+          <g opacity={0.5} filter={`url(#${uid}-aura)`}>
+            <polygon points={outerPoints} fill="none" stroke={`url(#${uid}-grad)`} strokeWidth="6" />
+          </g>
+          {/* Layer 2: Crisp bloomed frame lines */}
+          <g filter={`url(#${uid}-bloom)`}>
+            <polygon points={outerPoints} fill="none" stroke={`url(#${uid}-grad)`} strokeWidth="3" />
+            <polygon points={innerPoints} fill="none" stroke={`url(#${uid}-grad)`} strokeWidth="2" />
+          </g>
+        </g>
+      )}
     </svg>
   );
 }
@@ -253,7 +343,7 @@ function useElementSize(ref: React.RefObject<HTMLElement | null>) {
 // ═══════════════════════════════════════════
 
 const messageRowVariants = cva(
-  "flex w-full items-end gap-4 mb-8 group",
+  "flex w-full items-end gap-3 mb-5 group",
   {
     variants: {
       role: {
@@ -266,7 +356,7 @@ const messageRowVariants = cva(
 );
 
 const avatarVariants = cva(
-  "flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-sm relative z-10",
+  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full shadow-sm relative z-10",
   {
     variants: {
       role: {
@@ -301,6 +391,8 @@ export interface MessageBubbleProps
     VariantProps<typeof messageRowVariants> {
   content: string | React.ReactNode;
   role: "assistant" | "user";
+  /** Multi-stop glow profile — empty array = no glow */
+  glowStops?: GlowStop[];
 }
 
 // Per-role config for the HUD panel
@@ -312,14 +404,22 @@ const ROLE_CONFIG = {
     bottomNotchPct: 0.70,
     mirror: false,
     glowAnim: "holo-glow-pulse-user",
-    maxWidth: "75%",
+    maxWidth: "78%",
     borderFill: "hsla(280, 60%, 78%, 0.35)",
     panelGradient: `linear-gradient(
       145deg,
-      hsla(280, 55%, 97%, 0.78) 0%,
-      hsla(290, 50%, 96%, 0.7) 35%,
-      hsla(300, 45%, 97%, 0.72) 65%,
-      hsla(320, 40%, 97%, 0.75) 100%
+      hsla(280, 55%, 97%, 0.92) 0%,
+      hsla(290, 50%, 96%, 0.88) 35%,
+      hsla(300, 45%, 97%, 0.9) 65%,
+      hsla(320, 40%, 97%, 0.92) 100%
+    )`,
+    auraGradient: `linear-gradient(
+      135deg,
+      hsla(320, 85%, 72%, 0.6) 0%,
+      hsla(290, 80%, 70%, 0.5) 30%,
+      hsla(270, 78%, 68%, 0.5) 50%,
+      hsla(250, 82%, 74%, 0.5) 70%,
+      hsla(310, 80%, 70%, 0.6) 100%
     )`,
     shimmer: `linear-gradient(
       105deg,
@@ -330,8 +430,10 @@ const ROLE_CONFIG = {
       transparent 60%
     )`,
     selectionBg: "hsla(280,55%,75%,0.18)",
-    textColor: "hsl(280, 35%, 30%)",
-    textShadow: "0 0 12px hsla(280, 55%, 75%, 0.2)",
+    textColor: "hsl(260, 20%, 18%)",
+    textShadow: "none",
+    strongColor: "hsl(260, 30%, 14%)",
+    emColor: "hsl(270, 40%, 52%)",
   },
   assistant: {
     clip: BOT_CLIP,
@@ -340,14 +442,22 @@ const ROLE_CONFIG = {
     bottomNotchPct: 0.25,
     mirror: true,
     glowAnim: "holo-glow-pulse-bot",
-    maxWidth: "85%",
+    maxWidth: "88%",
     borderFill: "hsla(220, 65%, 75%, 0.35)",
     panelGradient: `linear-gradient(
       145deg,
-      hsla(220, 65%, 97%, 0.78) 0%,
-      hsla(225, 45%, 96%, 0.7) 35%,
-      hsla(230, 42%, 97%, 0.72) 65%,
-      hsla(235, 42%, 97%, 0.75) 100%
+      hsla(220, 65%, 97%, 0.92) 0%,
+      hsla(225, 45%, 96%, 0.88) 35%,
+      hsla(230, 42%, 97%, 0.9) 65%,
+      hsla(235, 42%, 97%, 0.92) 100%
+    )`,
+    auraGradient: `linear-gradient(
+      135deg,
+      hsla(185, 90%, 65%, 0.5) 0%,
+      hsla(210, 85%, 68%, 0.5) 25%,
+      hsla(235, 80%, 70%, 0.5) 50%,
+      hsla(260, 78%, 72%, 0.5) 75%,
+      hsla(200, 82%, 68%, 0.5) 100%
     )`,
     shimmer: `linear-gradient(
       105deg,
@@ -358,20 +468,30 @@ const ROLE_CONFIG = {
       transparent 60%
     )`,
     selectionBg: "hsla(220,60%,72%,0.18)",
-    textColor: "hsl(220, 40%, 28%)",
-    textShadow: "0 0 12px hsla(220, 60%, 72%, 0.2)",
+    textColor: "hsl(230, 20%, 18%)",
+    textShadow: "none",
+    strongColor: "hsl(235, 28%, 14%)",
+    emColor: "hsl(255, 40%, 52%)",
   },
 } as const;
+
+/** Convert GlowStop[] to a CSS linear-gradient mask string */
+function glowStopsToCSS(stops: GlowStop[]): string {
+  const parts = stops.map(s => `rgba(0,0,0,${s.opacity}) ${s.offset * 100}%`);
+  return `linear-gradient(to bottom, ${parts.join(', ')})`;
+}
 
 export function MessageBubble({
   content,
   role,
   className,
+  glowStops = [],
   ...props
 }: MessageBubbleProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const { w, h } = useElementSize(panelRef);
   const cfg = ROLE_CONFIG[role];
+  const showAura = glowStops.length > 0;
 
   return (
     <div className={cn(messageRowVariants({ role }), className)} {...props}>
@@ -382,9 +502,9 @@ export function MessageBubble({
         className={cn(avatarVariants({ role }))}
       >
         {role === "assistant" ? (
-          <Sparkles className="h-[18px] w-[18px]" strokeWidth={2} />
+          <Sparkles className="h-4 w-4" strokeWidth={2} />
         ) : (
-          <User className="h-[18px] w-[18px]" strokeWidth={2} />
+          <User className="h-4 w-4" strokeWidth={2} />
         )}
       </motion.div>
 
@@ -397,6 +517,23 @@ export function MessageBubble({
           animation: `${cfg.glowAnim} 4s ease-in-out infinite`,
         }}
       >
+        {/* ── Background aura: positionally masked to cloud zone ── */}
+        {showAura && (
+          <div
+            className="absolute pointer-events-none rounded-2xl"
+            style={{
+              inset: "-8px",
+              background: cfg.auraGradient,
+              opacity: 0.6,
+              filter: "blur(14px)",
+              transition: "opacity 0.4s ease-out",
+              maskImage: glowStopsToCSS(glowStops),
+              WebkitMaskImage: glowStopsToCSS(glowStops),
+            }}
+            aria-hidden="true"
+          />
+        )}
+
         {/* Border fill — outer clip */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -411,13 +548,12 @@ export function MessageBubble({
             inset: "2px",
             clipPath: cfg.clip,
             background: cfg.panelGradient,
-            backdropFilter: "blur(12px)",
           }}
           aria-hidden="true"
         >
-          {/* Shimmer sweep */}
+          {/* Shimmer sweep — low opacity so it doesn't wash out text */}
           <div
-            className="absolute inset-0 holo-shimmer-layer"
+            className="absolute inset-0 holo-shimmer-layer opacity-40"
             style={{
               background: cfg.shimmer,
               backgroundSize: "200% 100%",
@@ -434,14 +570,34 @@ export function MessageBubble({
           topNotchPct={cfg.topNotchPct}
           bottomNotchPct={cfg.bottomNotchPct}
           mirror={cfg.mirror}
+          glowStops={glowStops}
         />
 
         {/* Text content */}
         <div
-          className="relative z-10 px-6 py-5 text-[16px] leading-[1.75] tracking-[0.02em] font-medium break-words [&_p]:mb-4 [&_p:last-child]:mb-0"
+          className={cn(
+            "relative z-10 px-5 py-4 break-words",
+            // Base typography — compact, readable for long-form
+            "text-[13.5px] leading-[1.7] tracking-[0.01em]",
+            // Role-specific text weight
+            role === "user" ? "font-[450]" : "font-normal",
+            // Rich text styling for assistant long-form responses
+            "[&_p]:mb-2.5 [&_p:last-child]:mb-0",
+            "[&_strong]:font-[570] [&_strong]:tracking-[0.01em] [&_strong]:[color:var(--strong-color)]",
+            "[&_em]:italic [&_em]:font-[420] [&_em]:[color:var(--em-color)]",
+            // Lists
+            "[&_ul]:my-2 [&_ul]:ml-1 [&_ul]:space-y-1.5",
+            "[&_li]:pl-1 [&_li]:text-[13px] [&_li]:leading-[1.65]",
+            // Headings inside messages
+            "[&_h3]:text-[14px] [&_h3]:font-semibold [&_h3]:tracking-tight [&_h3]:mb-1.5 [&_h3]:mt-3 [&_h3:first-child]:mt-0",
+            // Blockquotes for pulled essay text
+            "[&_blockquote]:border-l-2 [&_blockquote]:pl-3 [&_blockquote]:my-2 [&_blockquote]:text-[12.5px] [&_blockquote]:italic [&_blockquote]:opacity-75",
+          )}
           style={{
             color: cfg.textColor,
             textShadow: cfg.textShadow,
+            ["--strong-color" as string]: cfg.strongColor,
+            ["--em-color" as string]: cfg.emColor,
           }}
         >
           {content}

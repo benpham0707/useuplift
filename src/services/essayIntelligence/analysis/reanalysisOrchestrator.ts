@@ -337,6 +337,8 @@ export class ReanalysisOrchestrator {
     recentEditSummary?: string,
     sessionMemory?: CoachingSessionMemory,
     learningStyle?: LearningStyleObservations,
+    crossModuleContext?: string,
+    collegeId?: string,
   ): Promise<CoachingTurnResult> {
     console.log('[ReanalysisOrchestrator] Processing coaching turn');
 
@@ -403,7 +405,13 @@ export class ReanalysisOrchestrator {
       );
       const iterationRound = coachingMode === 'iteration_deep' ? maxEditCount : undefined;
 
-      console.log(`[ReanalysisOrchestrator] Coaching mode: ${coachingMode}${iterationRound ? `, iteration round ${iterationRound}` : ''}`);
+      // Detect in-session draft prose (student writing during the coaching session)
+      const isInSessionDraft = !richEditContext && coachingMode === 'revision_response' &&
+        !this.versionTracker.hasAnyEdits() // No prior edits = this is in-session writing, not a revision
+        ? true
+        : (coachingMode === 'revision_response' && !richEditContext); // revision_response without edit context = draft
+
+      console.log(`[ReanalysisOrchestrator] Coaching mode: ${coachingMode}${iterationRound ? `, iteration round ${iterationRound}` : ''}${isInSessionDraft ? ', in-session draft detected' : ''}`);
 
       const coachingResult: CoachingResult = await coachingService.processCoachingTurn(
         studentMessage,
@@ -415,9 +423,11 @@ export class ReanalysisOrchestrator {
         editStrategyContext,
         sessionMemory,
         learningStyle,
-        undefined, // crossModuleContext — not wired here yet
+        crossModuleContext, // Assembled by caller (e.g., HTTP route) from studentNarrativeBridge
         coachingMode,
         iterationRound,
+        isInSessionDraft,
+        collegeId,
       );
 
       // FIX 1.4: cost is LayerCost[] (the breakdown array itself); totalCost is separate

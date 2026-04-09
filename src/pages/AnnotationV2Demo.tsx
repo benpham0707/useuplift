@@ -150,29 +150,108 @@ const PHASE_COLORS: Record<string, { bg: string; text: string; dot: string }> = 
 
 function Toolbar({ wordCount, data }: { wordCount: number; data: MockEssayData }) {
   const pc = PHASE_COLORS[data.phase.level] ?? PHASE_COLORS.craft;
+  const wordLimit = 650;
+  const wordProgress = Math.min(wordCount / wordLimit, 1);
+  const annotationCount = data.annotations.filter(a => !a.isDeferred).length;
+
   return (
-    <div className="flex items-center justify-between px-5 py-2 border-b border-slate-200/60 bg-white/80 backdrop-blur-2xl z-20 relative">
+    <div className="relative z-20 flex items-center justify-between px-5 py-2.5 border-b border-slate-200/40 bg-white/70 backdrop-blur-2xl">
+      {/* Animated light sweep */}
+      <motion.div
+        animate={{ x: ['110%', '-110%'] }}
+        transition={{ repeat: Infinity, duration: 14, ease: 'linear' }}
+        className="absolute inset-0 z-[-1] pointer-events-none overflow-hidden"
+      >
+        <div className="absolute -top-1/2 left-0 h-[200%] w-40 bg-gradient-to-r from-transparent via-[hsl(250,70%,60%,0.04)] to-transparent skew-x-[-15deg]" />
+      </motion.div>
+
+      {/* Left: Brand + Essay Context */}
       <div className="flex items-center gap-3.5">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center shadow-sm">
-            <span className="text-white text-[10px] font-bold">U</span>
+        <div className="relative group">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[hsl(250,70%,60%)] to-[hsl(185,80%,55%)] flex items-center justify-center shadow-md shadow-purple-500/20 transition-shadow group-hover:shadow-purple-500/30">
+            <Sparkles className="w-4 h-4 text-white" strokeWidth={2} />
           </div>
-          <span className="text-sm font-semibold text-slate-800">Essay Workshop</span>
+          <div className="absolute -inset-1 rounded-xl bg-gradient-to-br from-purple-400 to-cyan-400 opacity-15 blur-md -z-10" />
         </div>
-        <div className="w-px h-4 bg-slate-200" />
-        <span className="text-xs text-slate-500 tabular-nums">{wordCount} words</span>
-        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider"
-          style={{ background: pc.bg, color: pc.text }} title={data.phase.reasoning}>
-          <span className="w-1.5 h-1.5 rounded-full" style={{ background: pc.dot, animation: 'phase-pulse 3s ease-in-out infinite' }} />
-          {data.phase.level}
+
+        <div className="flex flex-col gap-0.5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-[13px] font-bold text-slate-800 tracking-tight">Essay Workshop</h1>
+            <div className="h-3 w-px bg-slate-200" />
+            <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-[0.1em]">Common App</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] text-slate-500 tabular-nums font-medium">{wordCount}<span className="text-slate-300">/{wordLimit}</span></span>
+            <div className="w-14 h-[3px] bg-slate-100 rounded-full overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${wordProgress * 100}%` }}
+                transition={{ duration: 1, ease: 'easeOut' }}
+                style={{ background: wordProgress > 0.92 ? 'hsl(350,75%,60%)' : wordProgress > 0.75 ? 'hsl(35,85%,55%)' : 'hsl(185,80%,55%)' }}
+              />
+            </div>
+          </div>
         </div>
       </div>
-      <span className="text-xs text-slate-500">
-        EQI <span className="font-bold tabular-nums px-1.5 py-0.5 rounded"
-          style={{ background: data.eqi >= 80 ? 'hsla(160,70%,55%,0.1)' : 'hsla(35,85%,60%,0.1)', color: data.eqi >= 80 ? 'hsl(160,70%,32%)' : 'hsl(35,85%,38%)' }}>
-          {data.eqi}
-        </span>
-      </span>
+
+      {/* Center: Phase + Insights + Confidence */}
+      <div className="flex items-center gap-2">
+        {/* Phase badge */}
+        <div
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl border transition-colors"
+          style={{ background: pc.bg, borderColor: `${pc.dot}25` }}
+          title={data.phase.reasoning}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full opacity-60" style={{ background: pc.dot, animation: 'phase-pulse 3s ease-in-out infinite' }} />
+            <span className="relative inline-flex rounded-full h-2 w-2" style={{ background: pc.dot }} />
+          </span>
+          <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: pc.text }}>
+            {data.phase.level}
+          </span>
+          <span className="text-[9px] font-medium opacity-60" style={{ color: pc.text }}>Phase</span>
+        </div>
+
+        <div className="h-4 w-px bg-slate-150" />
+
+        {/* Active annotations */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50/80 border border-slate-100/80">
+          <Lightbulb className="w-3 h-3 text-amber-400" />
+          <span className="text-[10px] text-slate-600 font-semibold tabular-nums">{annotationCount}</span>
+          <span className="text-[10px] text-slate-400 font-medium">insights</span>
+        </div>
+
+        {/* Confidence depth */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-50/60 border border-purple-100/50">
+          <Shield className="w-3 h-3 text-purple-400" />
+          <span className="text-[10px] text-purple-600 font-semibold">{data.confidence}</span>
+        </div>
+      </div>
+
+      {/* Right: EQI Gauge */}
+      <div className="flex items-center gap-2.5">
+        <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.12em]">EQI</span>
+        <div className="relative flex items-center justify-center w-10 h-10">
+          <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 36 36">
+            <circle cx="18" cy="18" r="14.5" fill="none" stroke="hsl(0,0%,93%)" strokeWidth="2.5" />
+            <motion.circle
+              cx="18" cy="18" r="14.5" fill="none"
+              stroke={data.eqi >= 80 ? 'hsl(160,70%,50%)' : data.eqi >= 60 ? 'hsl(35,85%,55%)' : 'hsl(350,75%,60%)'}
+              strokeWidth="2.5" strokeLinecap="round"
+              initial={{ strokeDasharray: '0 91.1' }}
+              animate={{ strokeDasharray: `${(data.eqi / 100) * 91.1} 91.1` }}
+              transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+            />
+          </svg>
+          <span
+            className="relative text-sm font-bold tabular-nums"
+            style={{ color: data.eqi >= 80 ? 'hsl(160,70%,32%)' : data.eqi >= 60 ? 'hsl(35,85%,38%)' : 'hsl(350,75%,42%)' }}
+          >
+            {data.eqi}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -213,8 +292,54 @@ function HoverPopup({
   const mode = modeConfig[annotation.teachingMode] ?? modeConfig.awareness;
 
   const popupWidth = 460;
+  const panelTop = leftPanelRect.top;
+  const panelBottom = leftPanelRect.top + leftPanelRect.height;
+  const panelPadding = 12; // breathing room from panel edges
+
+  // Horizontal: center on highlight, clamp within left panel
   const centeredLeft = position.left + position.width / 2 - popupWidth / 2;
-  const clampedLeft = Math.max(24, Math.min(centeredLeft, leftPanelRect.width - popupWidth + leftPanelRect.left - 8));
+  const clampedLeft = Math.max(
+    leftPanelRect.left + panelPadding,
+    Math.min(centeredLeft, leftPanelRect.left + leftPanelRect.width - popupWidth - panelPadding),
+  );
+
+  // Vertical: position so the popup OVERLAPS the highlight line (mouse stays inside).
+  // The highlight line sits at position.top. We want the popup's bottom edge to
+  // overlap with the highlight when showing above, or top edge to overlap when below.
+  const highlightLineY = position.top; // top of the highlighted text line
+  const highlightBottom = position.top + 24; // approximate bottom of text line
+
+  // Available space
+  const spaceAbove = highlightLineY - panelTop - panelPadding;
+  const spaceBelow = panelBottom - highlightBottom - panelPadding;
+
+  // Prefer above. Only show below if very little space above AND more space below.
+  const showBelow = spaceAbove < 200 && spaceBelow > spaceAbove;
+
+  // Compute position so the popup OVERLAPS the highlight — mouse never falls through a gap.
+  // We use bottom-anchoring for "above" popups: set `bottom` style instead of `top + translateY(-100%)`.
+  let popupTop: number | undefined;
+  let popupBottom: number | undefined;
+  let maxH: number;
+  if (showBelow) {
+    // Popup top edge overlaps highlight bottom by 4px
+    popupTop = highlightBottom - 4;
+    popupBottom = undefined;
+    maxH = panelBottom - popupTop - panelPadding;
+  } else {
+    // Popup bottom edge overlaps highlight top by 4px.
+    // Use `bottom` positioning: distance from viewport bottom to the popup's bottom edge.
+    // popup bottom edge = highlightLineY + 4  →  bottom = viewportHeight - (highlightLineY + 4)
+    popupTop = undefined;
+    popupBottom = window.innerHeight - highlightLineY - 4;
+    maxH = highlightLineY + 4 - panelTop - panelPadding;
+  }
+
+  // Arrow position (points toward highlight text)
+  const arrowLeft = Math.min(
+    Math.max(position.left - clampedLeft + position.width / 2 - 8, 24),
+    popupWidth - 48,
+  );
 
   return (
     <>
@@ -237,22 +362,29 @@ function HoverPopup({
         onClick={onClose}
       />
 
-      {/* Popup card — clean hierarchy with breathing room */}
+      {/* Popup card */}
       <motion.div
-        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+        initial={{ opacity: 0, y: showBelow ? -8 : 8, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 6, scale: 0.97 }}
+        exit={{ opacity: 0, y: showBelow ? -4 : 4, scale: 0.97 }}
         transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-        className="fixed z-50 pointer-events-auto"
+        className="fixed z-50 pointer-events-auto flex flex-col"
         style={{
-          top: position.top - 16,
+          ...(popupTop !== undefined ? { top: popupTop } : {}),
+          ...(popupBottom !== undefined ? { bottom: popupBottom } : {}),
           left: clampedLeft,
-          transform: 'translateY(-100%)',
           width: popupWidth,
+          maxHeight: Math.max(maxH, 200),
         }}
       >
+        {/* Arrow above card (when popup is BELOW the highlight) */}
+        {showBelow && (
+          <div className="flex mb-[-1px]" style={{ paddingLeft: arrowLeft }}>
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[8px] border-b-white" />
+          </div>
+        )}
         <div
-          className="rounded-2xl bg-white border border-slate-200/70 overflow-hidden"
+          className="rounded-2xl bg-white border border-slate-200/70 overflow-y-auto"
           style={{ boxShadow: `0 25px 50px -12px ${hs.accentColor}15, 0 0 0 1px ${hs.accentColor}08, 0 10px 25px -5px rgba(0,0,0,0.08)` }}
           onMouseEnter={onMouseEnter}
           onMouseLeave={onMouseLeave}
@@ -340,11 +472,12 @@ function HoverPopup({
           </div>
         </div>
 
-        {/* Arrow */}
-        <div className="flex mt-[-1px]"
-          style={{ paddingLeft: Math.min(Math.max(position.left - clampedLeft + position.width / 2 - 8, 24), popupWidth - 48) }}>
-          <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white" />
-        </div>
+        {/* Arrow below card (when popup is ABOVE the highlight) */}
+        {!showBelow && (
+          <div className="flex mt-[-1px]" style={{ paddingLeft: arrowLeft }}>
+            <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white" />
+          </div>
+        )}
       </motion.div>
     </>
   );
@@ -518,14 +651,33 @@ function RightTabBar({ active, onChange }: { active: RightTab; onChange: (t: Rig
     { id: 'roadmap', label: 'Roadmap', icon: <Target className="w-3.5 h-3.5" /> },
   ];
   return (
-    <div className="flex items-center gap-0.5 px-3 py-1.5 border-b border-white/40 bg-white/30 backdrop-blur-sm">
-      {tabs.map((t) => (
-        <button key={t.id} onClick={() => onChange(t.id)}
-          className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all',
-            active === t.id ? 'bg-white/80 shadow-sm text-slate-800 border border-white/80' : 'text-slate-500 hover:text-slate-700 hover:bg-white/40')}>
-          {t.icon}{t.label}
-        </button>
-      ))}
+    <div className="flex items-center gap-1 px-3 py-2 border-b border-slate-200/40 bg-white/50 backdrop-blur-sm">
+      <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-slate-100/60 ring-1 ring-slate-950/[0.03]">
+        {tabs.map((t) => {
+          const isActive = t.id === active;
+          return (
+            <motion.button
+              key={t.id}
+              onClick={() => onChange(t.id)}
+              whileHover={!isActive ? { scale: 1.02 } : undefined}
+              className={cn(
+                'relative flex items-center gap-1.5 px-3.5 py-2 rounded-[10px] text-[11px] font-semibold tracking-tight transition-colors duration-150',
+                isActive ? 'text-white' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="rightTabIndicator"
+                  className="absolute inset-0 rounded-[10px] bg-gradient-to-r from-[hsl(250,70%,60%)] to-[hsl(185,80%,55%)] shadow-md shadow-purple-500/20"
+                  transition={{ type: 'spring', bounce: 0.15, duration: 0.45 }}
+                />
+              )}
+              <span className={cn('relative z-10 transition-opacity', isActive ? 'opacity-100' : 'opacity-70')}>{t.icon}</span>
+              <span className="relative z-10">{t.label}</span>
+            </motion.button>
+          );
+        })}
+      </div>
     </div>
   );
 }

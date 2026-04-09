@@ -25,7 +25,7 @@ import type {
 // ============================================================================
 
 /** Safety cap on iterations — backstop only, not the primary stopping criterion */
-export const MAX_ITERATIONS = 8;
+export const MAX_ITERATIONS = 3;
 
 /** Total budget ceiling for the entire growth cycle in USD */
 export const GROWTH_BUDGET_CEILING = 0.60;

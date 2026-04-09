@@ -9,7 +9,8 @@ import { AuthProvider } from "@/hooks/useAuth";
 import { FraudTrackingProvider } from "@/hooks/useFraudTracking";
 import ClerkErrorBoundary from "@/components/ClerkErrorBoundary";
 import ClickSparkGlobal from "@/components/ui/ClickSparkGlobal";
-import BugReportWidget from "@/components/BugReportWidget";
+// ARCHIVED: BugReportWidget moved to src/components/_archived/BugReportWidget.tsx
+// import BugReportWidget from "@/components/_archived/BugReportWidget";
 import Index from "./pages/Index";
 import DashboardHome from "./pages/DashboardHome";
 import PortfolioScanner from "./pages/PortfolioScanner";
@@ -55,6 +56,24 @@ const queryClient = new QueryClient({
   },
 });
 
+// Routes that are pure UI demos — no auth, no Clerk hooks, no session context.
+// These render outside ClerkProvider so a Clerk CDN failure can't blank them out.
+const AuthFreeRoutes = () => (
+  <BrowserRouter>
+    <Routes>
+      <Route
+        path="/chat-demo"
+        element={
+          <div className="flex h-screen">
+            <div className="flex-1 bg-slate-50" />
+            <div className="w-[480px] shrink-0"><ChatPanel /></div>
+          </div>
+        }
+      />
+    </Routes>
+  </BrowserRouter>
+);
+
 const AppRoutes = () => (
   <BrowserRouter>
     <Routes>
@@ -81,7 +100,7 @@ const AppRoutes = () => (
       <Route path="/test-teaching-unit" element={<TestTeachingUnit />} />
       <Route path="/test-simple" element={<TestTeachingUnitSimple />} />
       <Route path="/vapor-demo" element={<VaporChatDemoPage />} />
-      <Route path="/chat-demo" element={<div className="flex h-screen"><div className="flex-1 bg-slate-50" /><div className="w-[480px] shrink-0"><ChatPanel /></div></div>} />
+      {/* /chat-demo is rendered via AuthFreeRoutes above — outside ClerkProvider */}
       <Route path="/workshop-demo" element={<WorkshopDemo />} />
       <Route path="/annotation-v2-demo" element={<Suspense fallback={<div className="h-screen flex items-center justify-center text-purple-400">Loading workshop...</div>}><AnnotationV2Demo /></Suspense>} />
       <Route path="/activity-workshop/demo" element={<ActivityWorkshop />} />
@@ -111,7 +130,7 @@ const AppRoutes = () => (
       <Route path="*" element={<NotFound />} />
     </Routes>
     <ClickSparkGlobal />
-    <BugReportWidget />
+    {/* ARCHIVED: BugReportWidget — restore from src/components/_archived/BugReportWidget.tsx */}
   </BrowserRouter>
 );
 
@@ -133,6 +152,19 @@ const App = () => {
     window.addEventListener('unhandledrejection', handler);
     return () => window.removeEventListener('unhandledrejection', handler);
   }, []);
+
+  // Pure UI demo routes bypass the Clerk wrapper entirely so a Clerk CDN
+  // failure can't blank them out. Must be checked BEFORE the Clerk key
+  // guard below — /chat-demo should render even if Clerk config is missing.
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/chat-demo')) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthFreeRoutes />
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
 
   // If Clerk key is missing even after fallback, show in-app error instead of crashing
   if (!hasClerkKey()) {

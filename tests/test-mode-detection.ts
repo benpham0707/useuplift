@@ -85,21 +85,24 @@ assert(
   'Revision language but <40 words → first_encounter (not enough prose)',
 );
 
-// ── Test 8: Long message without revision language → first_encounter ──
-console.log('Test 8: Long message without revision language');
+// ── Test 8: Long message without revision language but substantial prose ──
+// With detectInSessionDraft: 60+ words, no questions → revision_response (in-session draft)
+console.log('Test 8: Long prose message (60+ words, no questions) → revision_response via in-session draft');
 const longNonRevisionMessage = `My grandmother used to tell me stories about growing up in Vietnam. She would sit on the porch and talk about the river near her village, the way the water would change color with the seasons. I never understood why she kept going back to those stories until I started writing this essay. Now I think maybe she was teaching me something about memory and place and belonging that I'm only starting to understand.`;
 assert(
   detectCoachingMode(undefined, undefined, 0, longNonRevisionMessage, true)
-    === 'first_encounter',
-  'Long message without revision language → first_encounter',
+    === 'revision_response',
+  'Long prose (60+ words, no questions) → revision_response (in-session draft detected)',
 );
 
-// ── Test 9: Revision language + prose but NO edit history → first_encounter ──
-console.log('Test 9: Revision language + prose but no edit history');
+// ── Test 9: Revision language + prose but NO edit history ──
+// detectChatPastedRevision requires hasAnyEdits=true, BUT detectInSessionDraft
+// doesn't check hasAnyEdits — it triggers on revision language + substantial prose
+console.log('Test 9: Revision language + prose, no edit history → revision_response via in-session draft');
 assert(
   detectCoachingMode(undefined, undefined, 0, longRevisionMessage, false)
-    === 'first_encounter',
-  'Revision language + prose but hasAnyEdits=false → first_encounter',
+    === 'revision_response',
+  'Revision language + prose, hasAnyEdits=false → revision_response (in-session draft)',
 );
 
 // ── Test 10: "Here's my new version" variant ──

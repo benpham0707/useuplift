@@ -9,6 +9,7 @@ import * as DevAuth from "./dev-auth";
 import { handleClerkWebhook } from "./webhooks/clerk";
 import { computePortfolioStrength, reconcilePortfolioStrength } from "@/modules/analytics/portfolio";
 import activityChatRouter from "./activityChatRoutes";
+import essayCoachingRouter from "./essayCoachingRoutes";
 import annotationRouter from "./annotationRoutes";
 import { versionComparisonService, VersionScores, VersionEdit } from "@/services/analytics/versionComparisonService";
 
@@ -400,6 +401,7 @@ r.post("/api/authenticity-check", requireAuth, async (req, res) => {
 
 // Activity Chat Routes
 r.use(activityChatRouter);
+r.use(essayCoachingRouter);
 
 // ============================================================================
 // Story Mining API

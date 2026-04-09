@@ -22,4 +22,12 @@ export interface BlockContext {
   iterationRound?: number;
   /** For revision_response: significance of the edit (from EditUnderstanding) */
   editSignificance?: 'minor' | 'moderate' | 'significant' | 'transformative';
+  /** True when student sent draft prose in chat (not an essay edit) */
+  isInSessionDraft?: boolean;
+  /** Essay type — determines type-specific coaching guidance */
+  essayType?: 'common_app' | 'supplement' | 'piq' | 'activity_description' | 'narrative';
+  /** College ID for supplement essays — used to load college-specific overlay */
+  collegeId?: string;
+  /** The essay prompt the student is responding to */
+  promptText?: string;
 }

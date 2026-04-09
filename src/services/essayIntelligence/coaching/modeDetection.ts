@@ -108,6 +108,39 @@ export function detectCoachingMode(
     return 'revision_response';
   }
 
+  // ── Signal 3: Student sent draft prose in chat (writing during session) ──
+  if (detectInSessionDraft(studentMessage)) {
+    return 'revision_response'; // Uses revision_response blocks with in-session flag
+  }
+
   // ── Default: first encounter / conversation ──
   return 'first_encounter';
+}
+
+/**
+ * Detect whether the student sent substantial draft prose in the chat.
+ * Different from chat-pasted revision: this is NEW writing (not a revision of
+ * existing essay text) produced during the coaching session.
+ *
+ * Detection: substantial prose (30+ words) that isn't primarily questions,
+ * with either draft-submission language or high prose density (60+ words, no questions).
+ */
+function detectInSessionDraft(message: string): boolean {
+  const wordCount = message.split(/\s+/).filter(w => w.length > 0).length;
+  if (wordCount < 30) return false;
+
+  const questionMarks = (message.match(/\?/g) || []).length;
+  const sentences = message.split(/[.!?]+/).filter(s => s.trim().length > 0).length;
+
+  // Not primarily a question
+  if (questionMarks > 0 && sentences > 0 && questionMarks >= sentences * 0.4) return false;
+
+  // Draft-submission language
+  const DRAFT_LANGUAGE = /\b(here'?s (what|my|a) (draft|attempt|version|try)|i (wrote|tried|drafted)|what (do you think|about this)|how('?s| is| does) this (sound|read|look|work)|take a look|let me know|feedback on this)\b/i;
+  if (DRAFT_LANGUAGE.test(message)) return true;
+
+  // High prose density without questions (narrative text pasted raw)
+  if (wordCount >= 60 && questionMarks === 0) return true;
+
+  return false;
 }

@@ -298,7 +298,17 @@ class DeepAnnotationService {
 
     // ── Build the cached context blocks ──
     const systemPrompt = this.buildSystemPrompt(phase, phaseGuidance, readingStrategy);
-    const sharedContext = this.buildSharedContext(profile, essayText, northStar, reanalysisBrief, contradictionFlags);
+    // Smart context: compact shared digest + pre-computed paragraph relevance
+    const { analysisContextBuilder } = await import('./analysisContextBuilder');
+    const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
+    const smartSharedDigest = analysisContextBuilder.buildSharedDigest(profile, 'l5');
+    // Append reanalysis/contradiction context to the shared digest (these apply to all paragraphs)
+    const additionalShared: string[] = [];
+    if (reanalysisBrief) additionalShared.push(`\n=== REANALYSIS BRIEF ===\n${reanalysisBrief}`);
+    if (contradictionFlags && contradictionFlags.length > 0) {
+      additionalShared.push(`\n=== CONTRADICTION FLAGS ===\n${contradictionFlags.join('\n')}`);
+    }
+    const sharedContext = smartSharedDigest + additionalShared.join('');
 
     // Batch paragraphs in groups of 2 to prevent rate limit storms
     const L5_BATCH_SIZE = 2;
@@ -306,8 +316,13 @@ class DeepAnnotationService {
     for (let batchStart = 0; batchStart < profile.paragraphs.length; batchStart += L5_BATCH_SIZE) {
       const batch = profile.paragraphs.slice(batchStart, batchStart + L5_BATCH_SIZE);
       const batchResults = await Promise.allSettled(
-        batch.map((para) =>
-          this.annotateParagraph(
+        batch.map((para) => {
+          // Build paragraph-relevant holistic context
+          const paraRelevance = relevanceIndex.get(para.index);
+          const paraRelevantContext = paraRelevance
+            ? analysisContextBuilder.buildParagraphContext(profile, para.index, paraRelevance, 'l5')
+            : '';
+          return this.annotateParagraph(
             para,
             profile,
             northStar,
@@ -318,8 +333,9 @@ class DeepAnnotationService {
             essayText,
             findingStore,
             priorAnnotations?.get(para.index),
-          ),
-        ),
+            paraRelevantContext,
+          );
+        }),
       );
       paragraphResults.push(...batchResults);
     }
@@ -1283,6 +1299,7 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     _essayText: string,
     findingStore?: FindingStore,
     priorAnnotationCtx?: PriorAnnotationContext,
+    paragraphRelevantContext?: string,
   ): Promise<{
     paragraphAnnotations: ParagraphAnnotations;
     cost: number;
@@ -1312,12 +1329,14 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       priorAnnotationCtx,
     );
 
-    // 3-block caching: system (cached) + shared context (cached) + paragraph-specific (not cached)
-    // The Anthropic API caches system prompt when cacheSystemPrompt=true.
-    // For the user message, we concatenate shared context + paragraph prompt.
-    // The shared context portion will benefit from prompt caching because it's
-    // identical across all parallel calls and starts at the same token boundary.
-    const userMessage = `${sharedContext}\n\n===\n\nTARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
+    // 3-block caching: system (cached) + shared digest (cached) + paragraph context (not cached)
+    // Block 2 is the COMPACT shared digest (~1800 tokens for L5) instead of the full profile dump.
+    // Paragraph-relevant holistic data is injected between the shared context and the paragraph prompt,
+    // filtered by the AnalysisContextBuilder to only include dimensions relevant to THIS paragraph.
+    const relevantSection = paragraphRelevantContext
+      ? `${paragraphRelevantContext}\n\n`
+      : '';
+    const userMessage = `${sharedContext}\n\n===\n\n${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
 
     const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaude<RawParagraphAnnotationOutput>(
       {

@@ -57,6 +57,8 @@ import type {
   SynthesisIterationOutput,
   DeepDiveRequest,
   UnderstandingQuestion,
+  ImprovementManifest,
+  ImprovementEntry,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -738,6 +740,34 @@ export class AnalysisOrchestrator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 7: Build Improvement Manifest
+    //
+    // Every finding, growth edge, red flag, and AO observation maps to at
+    // least one ImprovementEntry. The conversator workshops these with the
+    // student. Understanding is the fuel — improvements are the output.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    try {
+      const profileForManifest = coordinator.getProfile() as EssayProfile;
+      const manifest = this.buildImprovementManifest(
+        profileForManifest,
+        coordinator.getFindingStore(),
+        input.essayText,
+        input.essayType,
+      );
+      profileForManifest.improvementManifest = manifest;
+      console.log(
+        `[Orchestrator] ImprovementManifest: ${manifest.items.length} items from ${manifest.sources.join(', ')}`,
+      );
+    } catch (error) {
+      // Manifest generation is NOT fatal — log and continue
+      console.error(
+        '[Orchestrator] ImprovementManifest generation failed (non-fatal):',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // BUILD RESULT
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -945,14 +975,13 @@ export class AnalysisOrchestrator {
         }
       }
 
-      // ── Step 2: L3.75 says converged? Trust it (after at least 1 iteration). ──
-      if (currentSynthesis.selfAssessedConvergence.hasConverged && state.iteration >= 1) {
-        state.isConverged = true;
-        state.convergenceReason = 'llm_converged';
-        break;
-      }
+      // ── Step 2: Re-reads run BEFORE convergence check ──
+      // Re-read findings enter the FindingStore (coaching's data source) and connections
+      // enter the profile (router's data source). These are valuable even when L3.75
+      // reports convergence. Running them before the convergence break ensures they
+      // always execute.
 
-      // ── Step 3: Run re-reads L3.75 flagged ──
+      // ── Step 2a: Run re-reads L3.75 flagged ──
       // L3.75 curated these candidates — respect its ordering. Budget check stops when
       // we can't afford more. No hard cap beyond the budget backstop. (LLM-first Rule 2)
       for (const reRead of currentSynthesis.reReadCandidates) {
@@ -1110,82 +1139,29 @@ export class AnalysisOrchestrator {
         );
       }
 
-      // ── Step 4: Dispatch deep dives (persistent queue as primary signal) ──
-      // Gap 2: Use persistent queue's open questions for dispatch instead of ephemeral curated queue
+      // ── Step 3: Convergence check (after re-reads, before deep dives) ──
+      // Moved here from Step 2 so re-reads always run (their findings enter FindingStore).
+      // Deep dives are skipped regardless, so convergence here stops the loop cleanly.
+      if (currentSynthesis.selfAssessedConvergence.hasConverged) {
+        state.isConverged = true;
+        state.convergenceReason = 'llm_converged';
+        break;
+      }
+
+      // ── Step 4: Deep dives SKIPPED ──
+      // Deep dive findings never enter the FindingStore (coaching's data source) and
+      // only feed subsequent synthesis iterations. Since iteration 0's synthesis is
+      // complete and coaching reads findings from FindingStore, deep dives add cost
+      // (~$0.15) without proportional quality improvement. Re-reads (Step 3) are kept
+      // because their findings DO enter the FindingStore.
+      // To re-enable deep dives, uncomment the dispatchDeepDives block below.
+      /*
       const dives = dispatchDeepDives(
         currentSynthesis.questionCuration.curatedQueue,
         state.budgetRemaining,
       );
-
-      for (const dive of dives) {
-        if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) break;
-
-        try {
-          const diveResult = await runDeepDive(
-            dive,
-            essayText,
-            profile,
-            currentSynthesis.synthesis,
-            currentSynthesis.readingStrategy,
-            findingStore,
-          );
-
-          state.budgetRemaining -= diveResult.cost;
-          costTracker.record(
-            `deep_dive_${dive.promptType}`,
-            diveResult.cost,
-            diveResult.tokenUsage,
-            diveResult.timingMs,
-          );
-
-          // Merge findings from deep dive
-          if (diveResult.findings.length > 0) {
-            const newFindingObjects = diveResult.findings.map((f, idx) => ({
-              ...f,
-              id: `FD${state.iteration}_${dive.promptType}_${idx}`,
-              source: 'deep_dive' as const,
-              buildsOn: f.buildsOn ?? [],
-              relatedTo: f.relatedTo ?? [],
-              raisesQuestions: f.raisesQuestions ?? [],
-              lineage: [],
-              createdAt: new Date().toISOString(),
-              lastUpdated: new Date().toISOString(),
-            })) as Finding[];
-            cumulativeFindings = mergeFindingsFromDeepDive(cumulativeFindings, newFindingObjects);
-          }
-
-          // Gap 2: Mark the question as resolved if deep dive answered it
-          if (dive.question.id) {
-            queueManager.resolve(
-              dive.question.id,
-              `deep_dive_${dive.promptType}`,
-              diveResult.discoveryNote || 'Investigated via deep dive',
-            );
-          }
-
-          // Gap 2: Add new questions from deep dive to persistent queue
-          for (const newQ of diveResult.questionsRaised) {
-            if (dive.question.id) {
-              queueManager.spawnChild(dive.question.id, newQ);
-            } else {
-              queueManager.addQuestion(newQ);
-            }
-          }
-
-          const diveStep: StepResult = {
-            findingsAdded: diveResult.findings.length,
-            questionsRaised: diveResult.questionsRaised.length,
-            cost: diveResult.cost,
-            discoveryNote: diveResult.discoveryNote,
-          };
-          state.activityLog.push(buildStepRecord(`deep_dive_${dive.promptType}`, diveStep));
-        } catch (error) {
-          console.warn(
-            `[Orchestrator] Deep dive ${dive.promptType} failed (non-fatal):`,
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
+      // ... deep dive execution loop ...
+      */
 
       // ── Step 5: Budget backstop ──
       if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) {
@@ -1429,6 +1405,262 @@ export class AnalysisOrchestrator {
       scoreMatrix: null,
       coherenceReport: null,
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIVATE: Improvement Manifest Builder
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build an ImprovementManifest from ALL available analysis sources.
+   * Every finding, growth edge, red flag, and AO observation maps to at least
+   * one ImprovementEntry. Understanding is fuel — improvements are output.
+   *
+   * Sources (waterfall — uses whatever is available):
+   *   1. L4 coachingMap.priorities (richest)
+   *   2. L3.5 findings (active, critical/high coaching value)
+   *   3. AO First Read red flags
+   *   4. L3.75 craft assessment growth edges
+   *   5. L3 paragraph-level growth edges
+   */
+  private buildImprovementManifest(
+    profile: EssayProfile,
+    findingStore: FindingStore,
+    essayText: string,
+    essayType: EssayType,
+  ): ImprovementManifest {
+    const items: ImprovementEntry[] = [];
+    const sources: string[] = [];
+    let priority = 1;
+
+    const WORD_LIMITS: Record<string, number> = { supplement: 250, piq: 350, personal_statement: 650 };
+    const wordLimit = WORD_LIMITS[profile.northStar?.activeScale ?? ''] ?? 650;
+    const wordCount = profile.paragraphs.reduce((sum, p) => sum + p.text.split(/\s+/).length, 0);
+
+    // ── Source 1: L4 CoachingMap Priorities ──
+    const coachingMap = profile.scoreMatrix?.coachingMap;
+    if (coachingMap?.priorities && coachingMap.priorities.length > 0) {
+      sources.push('l4_priorities');
+      for (const p of coachingMap.priorities.slice(0, 5)) {
+        const targetPara = p.target?.paragraphs?.[0] ?? -1;
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: targetPara,
+          observation: p.architecturalReason,
+          action: p.priority,
+          stakes: p.unlocksNext,
+          technique: null, // L4 doesn't route to techniques — downstream enrichment
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l4_priority',
+          sourceRef: null,
+          priority: priority++,
+          impact: p.expectedImpact,
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 2: L3.5 Active Findings ──
+    const activeFindings = findingStore.getActiveSortedByCoachingValue();
+    if (activeFindings.length > 0) {
+      sources.push('l35_findings');
+      for (const f of activeFindings.slice(0, 8)) {
+        // Skip if already covered by an L4 priority targeting the same paragraph
+        const para = f.scope.type === 'paragraph' ? (f.scope.paragraph ?? -1) : -1;
+        const alreadyCovered = items.some(i => i.paragraph === para && i.source === 'l4_priority');
+        if (alreadyCovered) continue;
+
+        // Technique match via keyword routing
+        const technique = this.matchClaimToTechnique(f.claim);
+
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: para,
+          observation: f.claim,
+          action: technique
+            ? `Apply ${technique.name}: ${technique.directive}`
+            : `Address: ${f.claim}`,
+          stakes: f.evidence.length > 0
+            ? `Evidence: "${f.evidence[0].text.slice(0, 120)}"`
+            : '',
+          technique: technique?.name ?? null,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l35_finding',
+          sourceRef: f.id,
+          priority: priority++,
+          impact: f.coachingValue === 'critical' ? 'transformative'
+            : f.coachingValue === 'high' ? 'significant' : 'incremental',
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 3: AO First Read Red Flags ──
+    if (profile.aoFirstRead) {
+      sources.push('ao_first_read');
+      const ao = profile.aoFirstRead;
+
+      // People absence
+      if (ao.gutReaction?.includes('no named individuals') ||
+          ao.gutReaction?.includes('people absence') ||
+          ao.gutReaction?.toLowerCase().includes('no teacher') ||
+          ao.gutReaction?.toLowerCase().includes('no mentor')) {
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: -1,
+          observation: 'No named individuals appear in the essay. Every experience is described in isolation.',
+          action: 'Add ONE named person — teacher, teammate, mentor — with one physical detail. Show them in one sentence.',
+          stakes: 'People absence is a red flag AOs catch in 30 seconds. It makes the essay feel like a philosophy paper, not a personal statement.',
+          technique: 'NAMED CHARACTER',
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'red_flag',
+          sourceRef: null,
+          priority: priority++,
+          impact: 'significant',
+          conversatorEnrichments: [],
+        });
+      }
+
+      // Put-down risk
+      if (ao.putDownRisk === 'high' && ao.committeeOneLiner) {
+        const alreadyHasHookItem = items.some(i =>
+          i.observation.toLowerCase().includes('opening') || i.observation.toLowerCase().includes('hook'));
+        if (!alreadyHasHookItem) {
+          items.push({
+            id: `IMP_${priority}`,
+            paragraph: 0,
+            observation: `AO committee one-liner: "${ao.committeeOneLiner}". Put-down risk: HIGH.`,
+            action: 'The opening must stop the AO from skimming in 3 sentences. Replace abstract opening with a physical moment.',
+            stakes: `The AO will reduce this essay to "${ao.committeeOneLiner}" in committee. The opening must force them to stop and read.`,
+            technique: 'COLD OPEN / SENSORY TIMESTAMP',
+            demonstration: null,
+            wordEconomyCut: null,
+            source: 'ao_first_read',
+            sourceRef: null,
+            priority: priority++,
+            impact: 'transformative',
+            conversatorEnrichments: [],
+          });
+        }
+      }
+    }
+
+    // ── Source 4: L3.75 Craft Assessment Growth Edges ──
+    const growthEdges = profile.craftAssessment?.growthEdges;
+    if (growthEdges && growthEdges.length > 0) {
+      sources.push('l375_growth_edges');
+      for (const edge of growthEdges.slice(0, 4)) {
+        const para = edge.paragraphs?.[0] ?? -1;
+        const alreadyCovered = items.some(i => i.paragraph === para);
+        if (alreadyCovered) continue;
+
+        const technique = this.matchClaimToTechnique(edge.quality + ' ' + edge.description);
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: para,
+          observation: `${edge.quality}: ${edge.description}`,
+          action: technique
+            ? `Apply ${technique.name}: ${technique.directive}`
+            : `Improve: ${edge.description}`,
+          stakes: '',
+          technique: technique?.name ?? null,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l375_growth_edge',
+          sourceRef: null,
+          priority: priority++,
+          impact: 'incremental',
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 5: L3 Paragraph-Level Growth Edges ──
+    for (const para of profile.paragraphs) {
+      if (!para.analysis?.growthEdges) continue;
+      for (const edge of para.analysis.growthEdges.slice(0, 2)) {
+        const alreadyCovered = items.some(i => i.paragraph === para.index);
+        if (alreadyCovered) continue;
+
+        const technique = this.matchClaimToTechnique(edge.quality + ' ' + edge.description);
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: para.index,
+          observation: `P${para.index + 1}: ${edge.quality}: ${edge.description}`,
+          action: technique
+            ? `Apply ${technique.name}: ${technique.directive}`
+            : `Improve P${para.index + 1}: ${edge.description}`,
+          stakes: '',
+          technique: technique?.name ?? null,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l3_observation',
+          sourceRef: null,
+          priority: priority++,
+          impact: 'incremental',
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Word Economy: Identify cuttable paragraphs ──
+    // Tag redundant/supporting paragraphs as potential cuts
+    const structuralRoles = profile.northStar?.structuralRolesMap ?? [];
+    for (const role of structuralRoles) {
+      if (role.weight === 'supporting' || role.role.toLowerCase().includes('redundant')) {
+        // Find items that could use this space
+        for (const item of items) {
+          if (!item.wordEconomyCut && item.paragraph !== role.paragraphs[0]) {
+            const cutParaIdx = role.paragraphs[0];
+            const cutParaWords = profile.paragraphs[cutParaIdx]?.text.split(/\s+/).length ?? 0;
+            item.wordEconomyCut = `Cut P${cutParaIdx + 1} (${cutParaWords} words — ${role.role}). Use the space for this improvement.`;
+            break; // Only assign one cut per supporting paragraph
+          }
+        }
+      }
+    }
+
+    return {
+      items: items.slice(0, 10), // Cap at 10 improvements
+      generatedAt: new Date().toISOString(),
+      sources,
+      wordCount,
+      wordLimit,
+    };
+  }
+
+  /**
+   * Match a claim/observation string to a TECHNIQUE_ROUTES entry using keyword matching.
+   * Returns null if no route matches. Reuses the same routing logic as coachingService.
+   */
+  private matchClaimToTechnique(claim: string): { name: string; directive: string } | null {
+    const lower = claim.toLowerCase();
+    const routes: Array<{ keywords: string[]; name: string; directive: string }> = [
+      { keywords: ['summary'], name: 'SUMMARY-TO-SCENE', directive: 'Identify the MOMENT buried in the summary. Write a 2-sentence scene version.' },
+      { keywords: ['opening'], name: 'COLD OPEN / SENSORY TIMESTAMP', directive: 'The opening needs a physical anchor before any philosophy.' },
+      { keywords: ['emotion'], name: 'SOMATIC VULNERABILITY', directive: 'Replace the named emotion with what the BODY did.' },
+      { keywords: ['named', 'individuals', 'people'], name: 'NAMED CHARACTER', directive: 'A person needs to be ON THE PAGE. One name + one physical detail.' },
+      { keywords: ['evidence', 'claim', 'without'], name: 'EVIDENCE ANCHORING', directive: 'The claim exceeds the evidence. Identify the SPECIFIC, SMALL thing.' },
+      { keywords: ['conclusion', 'ending'], name: 'RITUAL DETAIL / BOOKEND INVERSION', directive: 'Replace aspirational closing with a specific image that PROVES the transformation.' },
+      { keywords: ['voice', 'shift', 'register'], name: 'VOICE COMPARISON', directive: 'Quote 2 sentences from different registers. Name which sounds more like them.' },
+      { keywords: ['telling', 'showing'], name: 'SHOW THROUGH SPECIFIC ACTION', directive: 'Replace the claim with a specific moment that proves it.' },
+      { keywords: ['formulaic', 'generic', 'template'], name: 'VOICE AUTHENTICITY', directive: 'Help the student find the weird, specific, only-them version.' },
+      { keywords: ['cliche', 'overused'], name: 'DEFINITIONAL PIVOT', directive: 'Quote the cliche. Ask: what does this word actually mean to YOU?' },
+      { keywords: ['stakes', 'risk'], name: 'STAKES ESTABLISHMENT', directive: 'What could the student LOSE? What was at risk?' },
+      { keywords: ['compress', 'rushed'], name: 'SCENE EXPANSION', directive: 'The most important moment needs more space. The reader needs to LINGER.' },
+      { keywords: ['transition', 'disconnected'], name: 'BRIDGE SENTENCE', directive: 'Write a 1-sentence bridge using a detail that lives in BOTH worlds.' },
+      { keywords: ['parallel', 'connection'], name: 'ENACTED PARALLEL', directive: 'Instead of explaining the connection, show it through structural echo.' },
+    ];
+
+    for (const route of routes) {
+      if (route.keywords.some(kw => lower.includes(kw))) {
+        return { name: route.name, directive: route.directive };
+      }
+    }
+    return null;
   }
 }
 

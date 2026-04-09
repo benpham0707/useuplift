@@ -161,6 +161,18 @@ export class FindingStore {
     finding.maturityReasoning = reasoning;
     finding.lastUpdated = new Date().toISOString();
 
+    // Guard: warn if this supersession would leave 0 active findings
+    if (newMaturity === 'superseded') {
+      const activeAfter = this.getActive();
+      if (activeAfter.length === 0) {
+        console.warn(
+          `[FindingStore] WARNING: Superseding ${id} leaves 0 active findings. ` +
+          `The coaching system will have no improvement targets. ` +
+          `Consider 'deepened' instead of 'superseded' when a finding is incomplete but not wrong.`
+        );
+      }
+    }
+
     // Handle supersession pointer on the target
     if (supersedes) {
       const supersededFinding = this.findings.get(supersedes);
