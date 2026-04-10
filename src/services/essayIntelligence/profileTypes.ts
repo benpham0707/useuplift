@@ -1568,6 +1568,24 @@ export interface ProfileIndex {
   /** Timestamp of last comprehensive analysis */
   lastComprehensiveAt: string | null;
 
+  /**
+   * Phase 1.5 (Doctrine Operationalization): Signals that the profile was loaded
+   * from a legacy persisted state without an `improvementCandidateSnapshot`, AND
+   * the one-shot migration in `profileMigration.ts` found no source data to
+   * reshape into the new candidate store. Callers (coaching service, UI) should
+   * surface an explicit re-analysis prompt rather than silently proceeding with
+   * degraded behavior. See FORGE_PLAN_ARTIFACTS.md Section 2.
+   *
+   * Set by: `EssayProfileCoordinator.fromCheckpoint()` when it catches
+   *   `PipelineError.noMigrationSource` from the migration function.
+   * Read by: `coachingService.processCoachingTurn()` gate check, which throws
+   *   `CoachingBlockedError.requiresReanalysis(...)` if true.
+   * Never set: by fresh analysis runs — fresh runs with empty candidate stores
+   *   throw `PipelineError.emptyCandidateStore(...)` instead (real bug, not
+   *   legacy migration).
+   */
+  requiresReanalysis?: boolean;
+
   /** W1.1: Compact finding summary for context routing (computed from FindingStore) */
   findingSummary?: {
     totalActive: number;
@@ -1689,9 +1707,96 @@ export interface StructuredStudentContext {
   concreteDetails: Array<{ detail: string; firstMentionedTurn: number }>;
 }
 
+// ============================================================================
+// IMPROVEMENT CANDIDATE TYPES (Scope 2 — defined in Phase 1.5 for migration)
+//
+// The types below are the shared contract between Phase 1.5's migration
+// function, Phase 4's ImprovementCandidateStore class, Phase 5's inline
+// candidate emission from L3/L3.5/L3.75, and Phase 6's L4 consolidation +
+// L5 materialization. Phase 1.5 needs the types defined so profileMigration.ts
+// can reference them; Phase 4 implements the runtime store class against
+// these types; later phases add the lifecycle transitions and read paths.
+//
+// See FORGE_PLAN_UNIFIED.md "Shared types" for the canonical definitions
+// and FORGE_PLAN_SCOPE2.md for the lifecycle rules.
+// ============================================================================
+
+/**
+ * ImprovementCandidate — a prescriptive improvement emitted by an analysis
+ * layer (L3 walk, L3.5 analysis pass, L3.75 holistic synthesis) alongside
+ * its descriptive observations. L4 later consolidates duplicates into
+ * CoachingMap.priorities; L5 materializes consolidated targets with required
+ * rewriteExample; the manifest projection finalizes them into ImprovementEntry.
+ *
+ * Lifecycle:
+ *   candidate (just emitted) → consolidated (L4 absorbed it into a priority)
+ *   → finalized (L5 materialized it with a rewrite) OR superseded (a later
+ *   candidate dominated this one).
+ */
+export interface ImprovementCandidate {
+  /** Deterministic ID: e.g., `CAND_L3_P2S4_a3f7` */
+  id: string;
+  /** Which analysis layer emitted this candidate */
+  sourceLayer: 'L3' | 'L3.5' | 'L3.75';
+  /** 0-based paragraph index; -1 for essay-level candidates */
+  paragraph: number;
+  /** 0-based sentence index within the paragraph, or null for paragraph-scope */
+  sentence: number | null;
+  /** ID of the Finding that motivated this candidate (for lineage), or null */
+  sourceFindingId: string | null;
+  /** What the analysis layer observed (descriptive, evidence-backed) */
+  observation: string;
+  /** What the student should DO about it (prescriptive — the whole point) */
+  suggestedChange: string;
+  /** Named craft technique from TECHNIQUE_VOCABULARY_LIST, or null if unassigned */
+  technique: string | null;
+  /** Optional rewrite sketch — becomes the seed for L5's REQUIRED rewriteExample */
+  demonstrationSketch: string | null;
+  /** Coaching priority — drives which candidates surface in the improvement queue */
+  coachingValue: 'critical' | 'high' | 'medium' | 'contextual' | 'diagnostic';
+  /** Lifecycle state — drives consolidation and finalization decisions */
+  lifecycleState: 'candidate' | 'consolidated' | 'superseded' | 'finalized';
+  /** If superseded, ID of the candidate that replaced this one; null otherwise */
+  supersededBy: string | null;
+  /** ISO 8601 timestamp of emission */
+  createdAt: string;
+}
+
+/**
+ * ImprovementCandidateStoreSnapshot — serializable form of the runtime
+ * ImprovementCandidateStore (Phase 4 class). Stored on EssayProfile so the
+ * candidate lifecycle survives checkpoint persistence.
+ *
+ * Phase 4 implements ImprovementCandidateStore.toSnapshot() / fromSnapshot()
+ * around this shape. Phase 1.5's profileMigration.ts constructs snapshots
+ * directly from legacy persisted data.
+ */
+export interface ImprovementCandidateStoreSnapshot {
+  /** All candidates the store has seen (active + consolidated + superseded + finalized) */
+  candidates: ImprovementCandidate[];
+  /** Next numeric counter for ID generation (monotonic) */
+  nextId: number;
+}
+
+// ============================================================================
+
 export interface EssayProfile {
   /** Profile Index (always loaded — ~250-350 tokens) */
   index: ProfileIndex;
+
+  /**
+   * Scope 2 (defined in Phase 1.5): Serializable snapshot of the runtime
+   * ImprovementCandidateStore. Undefined on fresh profiles before any
+   * analysis layer has run; populated incrementally by L3/L3.5/L3.75.
+   *
+   * Legacy profiles persisted before Phase 1.5 have this as undefined —
+   * EssayProfileCoordinator.fromCheckpoint() runs the one-shot migration
+   * from profileMigration.ts to backfill it from existing findings /
+   * coachingMap.priorities / growthEdges / redFlags. If migration finds
+   * zero source data, `index.requiresReanalysis` is set to true and this
+   * field stays undefined until the coaching gate triggers re-analysis.
+   */
+  improvementCandidateSnapshot?: ImprovementCandidateStoreSnapshot;
 
   // -- HOLISTIC UNDERSTANDING (essay-level — 8 sections) --
 

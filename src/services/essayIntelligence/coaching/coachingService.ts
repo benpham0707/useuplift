@@ -59,6 +59,7 @@ import type { CoachingMode } from '../profileTypes';
 import type { BlockContext } from './types';
 import { buildCoachingPrompt } from './promptBlocks';
 import { getTeachingContentForContext } from './teachingContentRouter';
+import { CoachingBlockedError } from '../errors';
 
 // ============================================================================
 // CONSTANTS
@@ -834,6 +835,15 @@ export class CoachingService {
     isInSessionDraft?: boolean,
     collegeId?: string,
   ): Promise<CoachingResult> {
+    // ── Phase 1.5: Fail-fast gate — block coaching on legacy profiles that
+    // failed migration (no source data to reshape into the candidate store).
+    // This is NOT a silent fallback — it surfaces an explicit error that the
+    // UI should handle by offering the user a "Refresh analysis" action.
+    // See FORGE_PLAN_ARTIFACTS.md Section 2, FORGE_PLAN_UNIFIED.md doctrine.
+    if (profile.index?.requiresReanalysis) {
+      throw CoachingBlockedError.requiresReanalysis();
+    }
+
     const turnStart = Date.now();
     const costs: LayerCost[] = [];
 

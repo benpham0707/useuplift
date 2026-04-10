@@ -82,6 +82,7 @@ import type {
 } from '../profileTypes';
 
 import { FindingStore } from '../findings/findingStore';
+import { isPipelineError } from '../errors';
 
 /**
  * Minimal StructuralCartography shape needed by the coordinator for dispatch.
@@ -1032,6 +1033,22 @@ export class EssayProfileCoordinator {
 
   /**
    * Create a coordinator from a persisted profile (resume from checkpoint).
+   *
+   * PHASE 1.5 MIGRATION HOOK: If the persisted profile lacks an
+   * `improvementCandidateSnapshot`, runs the one-shot deterministic migration
+   * from legacy data shapes (findings, coachingMap.priorities, growthEdges,
+   * redFlags). Zero LLM calls — pure data-shape conversion.
+   *
+   * Three outcomes:
+   *   1. Snapshot was already populated → migration skipped (idempotent).
+   *   2. Migration succeeds → snapshot populated, requiresReanalysis cleared.
+   *   3. Migration finds zero source data → profile flagged
+   *      `index.requiresReanalysis = true`; the coaching gate in
+   *      `processCoachingTurn()` throws CoachingBlockedError so the UI can
+   *      prompt the user for re-analysis. No silent degradation.
+   *
+   * Only PipelineError.noMigrationSource is caught here — any other error
+   * propagates unmodified (fail-fast for real bugs).
    */
   static fromCheckpoint(
     profile: EssayProfile,
@@ -1047,6 +1064,56 @@ export class EssayProfileCoordinator {
       insight: IInsightMutator;
     }>,
   ): EssayProfileCoordinator {
+    // ── Phase 1.5: Legacy profile migration hook ──────────────────────────
+    if (!profile.improvementCandidateSnapshot) {
+      try {
+        // Lazy require to avoid circular-import risk: profileMigration imports
+        // from profileTypes (which essayProfileManager also imports). A
+        // top-level `import` can trigger circular module initialization in
+        // some bundler configurations. require() defers resolution to call
+        // time, sidestepping the cycle. Phase 4 may refactor to a top-level
+        // import if the import graph is confirmed clean.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { migrateLegacyProfileToCandidateStore } =
+          require('../improvements/profileMigration') as {
+            migrateLegacyProfileToCandidateStore: typeof import('../improvements/profileMigration').migrateLegacyProfileToCandidateStore;
+          };
+        profile.improvementCandidateSnapshot =
+          migrateLegacyProfileToCandidateStore(profile);
+
+        // Migration succeeded — clear any stale reanalysis flag.
+        if (profile.index) {
+          profile.index.requiresReanalysis = false;
+        }
+        console.log(
+          `[EssayProfileCoordinator.fromCheckpoint] Legacy profile migrated: ` +
+            `${profile.improvementCandidateSnapshot.candidates.length} candidates`,
+        );
+      } catch (err: unknown) {
+        // ONLY PipelineError with layer='profile_migration' should land here.
+        // That means migration ran but found zero source data across all 4
+        // legacy sources. The profile is usable for non-coaching features
+        // but the coaching gate will block until re-analysis runs.
+        //
+        // ANY OTHER error is a real bug (type mismatch, missing import, etc.)
+        // and must propagate — fail-fast, not silent.
+        if (isPipelineError(err) && err.layer === 'profile_migration') {
+          console.warn(
+            `[EssayProfileCoordinator.fromCheckpoint] Migration found no source data. ` +
+              `Profile flagged requiresReanalysis=true. Coaching will be blocked.`,
+          );
+          if (profile.index) {
+            profile.index.requiresReanalysis = true;
+          }
+          // Leave improvementCandidateSnapshot undefined — the coaching
+          // gate reads requiresReanalysis directly. The profile still
+          // constructs and loads successfully; only coaching is blocked.
+        } else {
+          throw err;
+        }
+      }
+    }
+
     return new EssayProfileCoordinator(profile, checkpointStore, mutators);
   }
 
