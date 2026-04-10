@@ -82,6 +82,8 @@ import type {
 } from '../profileTypes';
 
 import { FindingStore } from '../findings/findingStore';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import type { ImprovementCandidate } from '../profileTypes';
 import { isPipelineError } from '../errors';
 
 /**
@@ -916,6 +918,15 @@ export class EssayProfileCoordinator {
   // ── FindingStore (W1.2) ──
   private findingStore: FindingStore;
 
+  // ── ImprovementCandidateStore (Scope 2 Phase 4) ──
+  // Append-only lifecycle store for improvement candidates emitted inline by
+  // L3/L3.5/L3.75 layers. L4 consolidates these into CoachingMap priorities;
+  // L5 materializes consolidated targets with rewrite examples; manifest
+  // projection finalizes them. Phase 1.5 already defined the type contract
+  // (ImprovementCandidate + ImprovementCandidateStoreSnapshot) so this class
+  // slots in without disturbing the existing profileMigration backfill path.
+  private candidateStore: ImprovementCandidateStore;
+
   // ── Domain mutators ──
   private sentenceMutator: ISentenceMutator;
   private paragraphMutator: IParagraphMutator;
@@ -975,6 +986,22 @@ export class EssayProfileCoordinator {
       });
     } else {
       this.findingStore = new FindingStore();
+    }
+
+    // Scope 2 Phase 4: Initialize ImprovementCandidateStore from the
+    // persisted snapshot (if any) or empty. Phase 1.5's fromCheckpoint()
+    // migration hook ensures legacy profiles get a backfilled snapshot
+    // before the constructor runs, so by this point
+    // `profile.improvementCandidateSnapshot` is either (a) a genuine
+    // snapshot from a post-Phase-4 run, (b) a migration-built snapshot
+    // from Phase 1.5 for legacy profiles, or (c) undefined only if
+    // `index.requiresReanalysis === true` (migration found nothing).
+    if (profile.improvementCandidateSnapshot) {
+      this.candidateStore = ImprovementCandidateStore.deserialize(
+        profile.improvementCandidateSnapshot,
+      );
+    } else {
+      this.candidateStore = new ImprovementCandidateStore();
     }
 
     // Inject mutators — use real implementations by default, allow overrides for testing
@@ -2208,6 +2235,100 @@ export class EssayProfileCoordinator {
     return this.findingStore;
   }
 
+  // ══════════════════════════════════════════════════════════════════════
+  // Scope 2 Phase 4: ImprovementCandidateStore accessors + lifecycle methods
+  //
+  // These methods parallel the existing applyInsight/applyScoreMatrix style:
+  // delegate to the store, log with [Coordinator] layer prefix, and keep
+  // the field private so the orchestrator can't mutate candidates directly.
+  //
+  // Phase 5 will call addImprovementCandidates() after each L3/L3.5/L3.75
+  // apply. Phase 6 will call applyConsolidation() after L4 and
+  // markImprovementsFinalized() after L5.
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Scope 2 Phase 4: Add improvement candidates harvested from a layer result.
+   *
+   * Called by analysisOrchestrator immediately after L3, L3.5, or L3.75
+   * applies its output. Idempotent — duplicate IDs are skipped with a
+   * debug log inside the store (not an error; re-runs produce stable IDs).
+   */
+  addImprovementCandidates(
+    candidates: ImprovementCandidate[],
+    options: { source: 'L3' | 'L3.5' | 'L3.75' },
+  ): void {
+    this.candidateStore.addAll(candidates);
+    console.log(
+      `[Coordinator] ${options.source}: added ${candidates.length} improvement candidates ` +
+        `(total active: ${this.candidateStore.getActive().length})`,
+    );
+  }
+
+  /**
+   * Scope 2 Phase 4: Direct read access to the candidate store.
+   * Orchestrator uses this when it needs lifecycle-state-aware queries
+   * (e.g., getBySource, markConsolidated) that the convenience methods
+   * don't expose directly.
+   */
+  getImprovementCandidateStore(): ImprovementCandidateStore {
+    return this.candidateStore;
+  }
+
+  /**
+   * Scope 2 Phase 4: Get active (non-superseded) candidates sorted by
+   * coachingValue. Convenience reader for downstream consumers that want
+   * a pre-sorted list.
+   */
+  getImprovementCandidates(): ImprovementCandidate[] {
+    return this.candidateStore.getActiveSortedByCoachingValue();
+  }
+
+  /**
+   * Scope 2 Phase 4: Build the L4 prompt context block from active
+   * candidates. Called by the orchestrator when assembling the L4b
+   * crystallization prompt in Phase 6.
+   */
+  getImprovementCandidateContextBlock(): string {
+    return this.candidateStore.toL4ContextBlock();
+  }
+
+  /**
+   * Scope 2 Phase 4: Apply L4's consolidation decisions to the candidate store.
+   * Called by orchestrator after the L4 result is parsed in Phase 6.
+   *
+   * For each CoachingMap priority:
+   *   - Candidates in priority.consolidatedFrom → lifecycleState='consolidated'
+   *   - Candidates NOT referenced by any priority → lifecycleState='superseded'
+   *     (L4 saw them and chose not to use them; they are dominated by other
+   *     candidates or the priority list L4 generated.)
+   *
+   * Callers supply the full set of IDs for each transition group — this
+   * method is a pure bookkeeping helper, not a policy maker.
+   */
+  applyConsolidation(consolidatedIds: string[], supersededIds: string[]): void {
+    this.candidateStore.markConsolidated(consolidatedIds);
+    this.candidateStore.markSuperseded(supersededIds);
+    console.log(
+      `[Coordinator] Consolidation applied: ${consolidatedIds.length} consolidated, ` +
+        `${supersededIds.length} superseded. Remaining active: ${this.candidateStore.getActive().length}`,
+    );
+  }
+
+  /**
+   * Scope 2 Phase 4: Mark candidates as finalized (L5 wrote rewriteExamples).
+   * Called by orchestrator after the L5 result is harvested into the manifest
+   * in Phase 6.
+   */
+  markImprovementsFinalized(ids: string[]): void {
+    this.candidateStore.markFinalized(ids);
+    console.log(
+      `[Coordinator] Finalized ${ids.length} improvement candidates (active: ${this.candidateStore.getActive().length})`,
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+
   /**
    * Seed prior findings for comprehensive re-analysis evolution.
    *
@@ -2292,6 +2413,12 @@ export class EssayProfileCoordinator {
   async checkpoint(reason: CheckpointReason): Promise<void> {
     // W1.2: Sync findings back to profile before persisting
     this.profile.findings = this.findingStore.serialize().findings;
+
+    // Scope 2 Phase 4: Sync improvement candidate store back to profile
+    // before persisting. Mirrors the findings-sync pattern above. Enables
+    // the Phase 5+ candidate lifecycle to survive checkpoint boundaries
+    // and the migration backfill from Phase 1.5 to persist cleanly.
+    this.profile.improvementCandidateSnapshot = this.candidateStore.serialize();
 
     const validationResult = reason === 'circuit_breaker' ? this.validateQuick() : this.validateFull();
 

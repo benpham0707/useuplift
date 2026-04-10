@@ -1800,11 +1800,18 @@ export interface ImprovementCandidate {
 }
 
 /**
+ * ImprovementCandidateState — alias for the `lifecycleState` field values.
+ * Exported for callers that want to narrow on the state union
+ * (e.g. guards in the store, filters in the orchestrator).
+ */
+export type ImprovementCandidateState = ImprovementCandidate['lifecycleState'];
+
+/**
  * ImprovementCandidateStoreSnapshot — serializable form of the runtime
  * ImprovementCandidateStore (Phase 4 class). Stored on EssayProfile so the
  * candidate lifecycle survives checkpoint persistence.
  *
- * Phase 4 implements ImprovementCandidateStore.toSnapshot() / fromSnapshot()
+ * Phase 4 implements ImprovementCandidateStore.serialize() / deserialize()
  * around this shape. Phase 1.5's profileMigration.ts constructs snapshots
  * directly from legacy persisted data.
  */
