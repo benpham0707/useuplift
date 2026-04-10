@@ -735,6 +735,23 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
           .join('\n');
         cmParts.push(`  PROTECTED STRENGTHS:\n${strengthLines}`);
       }
+      // Scope 1 Phase 2: surface L4 emergentPatterns and scoreTensions as
+      // coaching hooks. These were dead fields in the legacy object shape
+      // (generated but never read downstream). Now compressed to string[]
+      // and wired into L5 paragraph annotation prompts so the patterns
+      // actually reach the student's coaching surface.
+      if (coachingMap.emergentPatterns.length > 0) {
+        cmParts.push(
+          `  EMERGENT PATTERNS:\n` +
+          coachingMap.emergentPatterns.map((p) => `    • ${p}`).join('\n'),
+        );
+      }
+      if (coachingMap.scoreTensions.length > 0) {
+        cmParts.push(
+          `  SCORE TENSIONS:\n` +
+          coachingMap.scoreTensions.map((t) => `    • ${t}`).join('\n'),
+        );
+      }
       sections.push(`COACHING MAP (from L4 score matrix):\n${cmParts.join('\n')}`);
     } else if (profile.scoreMatrix?.prioritizedImprovements?.length) {
       // Fallback to flat prioritized improvements when coaching map isn't available
@@ -745,6 +762,18 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         )
         .join('\n');
       sections.push(`PRIORITIZED IMPROVEMENTS (from L4 score matrix):\n${improvements}`);
+    }
+
+    // ── L4 Cross-paragraph patterns (Scope 1 Phase 2: activated as coaching hooks) ──
+    // Previously generated but never surfaced in L5 context. Compressed to
+    // ≤15 words per entry, max 3 entries, and now threaded through as
+    // direct annotation fuel.
+    const crossPatterns = profile.scoreMatrix?.crossParagraphPatterns ?? [];
+    if (crossPatterns.length > 0) {
+      sections.push(
+        `CROSS-PARAGRAPH PATTERNS (from L4 score matrix):\n` +
+        crossPatterns.map((p) => `  • ${p}`).join('\n'),
+      );
     }
 
     // ── L4 Coherence Issues (blocking contradictions are annotation-worthy) ──

@@ -355,15 +355,6 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
         "paragraphs": [<paragraph indices where voice holds steady>],
         "voiceCharacter": "<what characterizes the voice in this stable region>"
       }
-    ],
-    "codeSwitching": [
-      {
-        "location": { "paragraph": <n>, "sentence": <n> },
-        "language": "<language or register being switched to>",
-        "trigger": "<what triggered the switch>",
-        "culturalFunction": "<the cultural function the switch serves>",
-        "text": "<the code-switched passage>"
-      }
     ]
   },
 
@@ -391,7 +382,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
         "detail": "<what is shown or told and how>"
       }
     ],
-    "authenticityAssessment": "<describe how emotion is conveyed — through sensory detail, through abstraction, through dialogue, through action. If emotion is largely ABSENT (the essay operates through intellectual assertion without emotional exposure), describe that absence and what the essay uses INSTEAD of emotion. Map what IS there, not what should be.>"
+    "authenticityAssessment": "<ONE sentence (≤40 words): how emotion is conveyed (sensory detail / abstraction / dialogue / action) OR what replaces it if largely absent. Map what IS there, not what should be.>"
   },
 
   "momentEarnednessMap": {
@@ -462,7 +453,19 @@ If a claimed mechanism is stock language, a cliché, or a summary that doesn't c
 - GAPS are as important as mechanisms. Identify moments that AREN'T earned: "P3S5 claims 'it changed everything' but no prior passage established what 'everything' was or why it mattered." If a moment claims devastation but no earlier passage established emotional proximity to the object, name that gap. If a realization appears without the reasoning steps that would make it feel inevitable, name that gap.
 - Be skeptical of "confirmation" moments — where the writer claims external validation ("reaffirmed my belief," "proved that," "showed me that") without showing the validation being tested or earned. If the belief was never challenged or the connection was never demonstrated through specific detail, that's a gap. Having setup mechanisms doesn't mean the payoff moment is earned — the payoff must also be grounded, not just asserted.
 - Arrow DENSITY is the diagnosis. Many arrows converging on a moment = well-earned. Sparse arrows = unearned. Do NOT use scores or "well-earned"/"unearned" labels — describe WHAT mechanisms exist or are absent.
-- structuralObservation should describe the essay's overall setup-payoff architecture.`;
+- structuralObservation should describe the essay's overall setup-payoff architecture.
+
+=== SCHEMA COMPRESSION CONSTRAINTS (Scope 1 Phase 2) ===
+
+Output brevity is ENFORCED. These caps prevent the output from being 10× its useful size:
+
+voiceMap observations cap:
+- Each voiceMap dimension (register, vocabularyFingerprint, sentenceRhythm, perspectiveDistance, tonalDisposition) MUST emit at most 2 observations. Pick the 2 that best represent the dimension's behavior across the full essay — do NOT enumerate every instance.
+- The codeSwitching field has been REMOVED from the voiceMap schema. Do not emit it; downstream consumers no longer read it. If the essay genuinely switches languages/registers, capture that as a "shifts" entry or a register "observation" instead.
+
+emotionalTopography caps:
+- showVsTell MUST emit at most 4 entries. Pick the 4 moments that best represent the essay's show/tell pattern — do NOT enumerate every sentence.
+- authenticityAssessment MUST be ONE sentence, ≤40 words. It is a headline, not a description.`;
 
 /**
  * Phase B system prompt — Theme, Narrative, Character, Craft, Admissions

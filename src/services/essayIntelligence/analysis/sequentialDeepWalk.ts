@@ -324,8 +324,7 @@ Return a JSON object matching this EXACT structure:
       "tags": ["semantic tags for routing: opening_hook, sensory_grounding, thesis_crystallization, voice_shift, emotional_peak, turning_point, callback, image_anchor, frame_establishment, resolution"],
       "connectionRefs": [],
       "craft": {
-        "rhythm": "ONLY for pivotal/contributing sentences. Describe the sentence's rhythmic character: length, clause structure, pacing effect.",
-        "voiceAlignment": "How this sentence's voice relates to the essay's dominant voice — same register, shifted, code-switched.",
+        "rhythm": "ONLY for pivotal/contributing sentences. ONE enum value from: short_punch | medium_flow | long_build | fragment | staccato | anaphora_series | parallel_build | subordinate_delay. Pick the closest match. Empty string for transitional sentences.",
         "techniques": ["anaphora", "imagery", "juxtaposition", "concrete_detail", "metaphor", "personification", "alliteration", "parallel_structure", "fragment", "polysyndeton", "asyndeton", "chiasmus", "synesthesia"]
       },
       "significantChoices": [

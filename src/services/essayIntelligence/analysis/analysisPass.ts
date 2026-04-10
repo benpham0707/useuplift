@@ -190,6 +190,37 @@ function selectAnchorParagraph(
  * Extracts the anchor's calibration reflection, strongest/weakest sentences, and scores.
  * Appended to Block 3 for all non-anchor paragraphs.
  */
+/**
+ * Extract the first complete sentence from a reasoning string.
+ *
+ * Scope 1 Phase 2 (GAP-3): `buildAnchorContext()` previously truncated
+ * `effectivenessReasoning` at 120/150 characters, cutting mid-word and
+ * losing the end of the first sentence. R4 flagged this as load-bearing:
+ * `effectivenessReasoning` is consumed full-length downstream by coaching
+ * (`coachingService.ts:2355` via `profile.activeConcerns`), so the
+ * GENERATION must stay uncapped — only the RE-INJECTION into anchor
+ * context needs a tighter budget.
+ *
+ * This helper extracts the first complete sentence (up to the first `.`,
+ * `?`, or `!` followed by whitespace or end-of-string) and returns it as-is.
+ * If the reasoning has no sentence boundary, returns the full string.
+ * This preserves readable context while bounding size to ~120-250 chars
+ * (the natural length of a first sentence) instead of mid-word truncation.
+ *
+ * Exported for testability — tests/test-scope1-phase2-runtime.ts exercises
+ * the regex edge cases directly.
+ */
+export function extractFirstSentence(text: string): string {
+  if (!text) return '';
+  // Match text up to the first sentence-ending punctuation followed by
+  // whitespace or end-of-string. Handles common abbreviations by requiring
+  // whitespace after the punctuation (so "P1S2." inside a reference doesn't
+  // end the sentence early — but "first claim." followed by " second claim"
+  // does).
+  const match = text.match(/^[^.?!]*[.?!](?=\s|$)/);
+  return match ? match[0].trim() : text.trim();
+}
+
 function buildAnchorContext(anchorResult: AnalysisPassOutput): string {
   const lines: string[] = [];
 
@@ -205,12 +236,13 @@ function buildAnchorContext(anchorResult: AnalysisPassOutput): string {
     lines.push('');
   }
 
-  // Anchor scores
+  // Anchor scores — extract first complete sentence from each reasoning
+  // rather than char-slicing. See extractFirstSentence() doc above.
   lines.push(`ANCHOR SCORES (P${anchorResult.paragraphIndex}):`);
   for (const sa of anchorResult.sentenceAnalyses) {
     const confLevel = sa.confidence?.level ?? 'not assessed';
-    const reasoning = sa.effectivenessReasoning.slice(0, 120);
-    lines.push(`  S${sa.sentenceIndex}: effectiveness=${sa.effectiveness} — "${reasoning}${sa.effectivenessReasoning.length > 120 ? '...' : ''}"`);
+    const firstSentence = extractFirstSentence(sa.effectivenessReasoning);
+    lines.push(`  S${sa.sentenceIndex}: effectiveness=${sa.effectiveness} — "${firstSentence}"`);
     lines.push(`  Confidence: ${confLevel}`);
   }
   lines.push(`Paragraph effectiveness: ${anchorResult.paragraphEffectiveness}`);
@@ -224,9 +256,9 @@ function buildAnchorContext(anchorResult: AnalysisPassOutput): string {
   if (strongest && weakest) {
     lines.push('ESSAY-SPECIFIC EXAMPLES (from anchor scoring):');
     lines.push(`  STRONGEST in anchor: P${anchorResult.paragraphIndex}S${strongest.sentenceIndex} scored ${strongest.effectiveness}`);
-    lines.push(`    "${strongest.effectivenessReasoning.slice(0, 150)}${strongest.effectivenessReasoning.length > 150 ? '...' : ''}"`);
+    lines.push(`    "${extractFirstSentence(strongest.effectivenessReasoning)}"`);
     lines.push(`  WEAKEST in anchor: P${anchorResult.paragraphIndex}S${weakest.sentenceIndex} scored ${weakest.effectiveness}`);
-    lines.push(`    "${weakest.effectivenessReasoning.slice(0, 150)}${weakest.effectivenessReasoning.length > 150 ? '...' : ''}"`);
+    lines.push(`    "${extractFirstSentence(weakest.effectivenessReasoning)}"`);
     lines.push('');
   }
 
@@ -465,13 +497,13 @@ Respond with a single JSON object matching this schema EXACTLY:
   "sentenceAnalyses": [
     {
       "sentenceIndex": 0,
-      "effectivenessReasoning": "string — WHY this score, referencing understanding",
+      "effectivenessReasoning": "string — WHY this score, referencing understanding (uncapped: this IS your reasoning chain and is consumed by downstream coaching)",
       "effectiveness": 65,
       "strengths": [
-        { "observation": "string — what works", "evidence": "string — specific text cited", "confidence": 0.9 }
+        { "observation": "string — what works", "evidence": "string — specific text cited, MAX 10 WORDS", "confidence": 0.9 }
       ],
       "weaknesses": [
-        { "observation": "string — what doesn't work", "evidence": "string — specific text cited", "confidence": 0.85 }
+        { "observation": "string — what doesn't work", "evidence": "string — specific text cited, MAX 10 WORDS", "confidence": 0.85 }
       ],
       "isStrength": false,
       "isProblem": false,
@@ -487,11 +519,17 @@ Respond with a single JSON object matching this schema EXACTLY:
   "paragraphVerdict": "string — one-sentence assessment of how well this paragraph fulfills its role",
   "comparativeNotes": "string | null — how this paragraph compares to the anchor. Null for the anchor itself.",
   "holisticAnalysisEvolution": {
-    "strengthSignatures": [{ "quality": "string", "evidence": "string", "paragraphs": [0] }],
+    "strengthSignatures": [{ "quality": "string", "evidence": "string (MAX 10 WORDS)", "paragraphs": [0] }],
     "growthEdges": [{ "quality": "string", "description": "string", "paragraphs": [0] }],
     "aoTakeaway": "string — what an AO would think after reading this paragraph in context"
   }
-}`;
+}
+
+SCHEMA BREVITY CAPS (Scope 1 Phase 2):
+- strengths[].evidence: MAX 10 words — a specific text quote, not commentary
+- weaknesses[].evidence: MAX 10 words — same
+- strengthSignatures[].evidence: MAX 10 words — same
+- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.`;
 }
 
 // ============================================================================
@@ -631,7 +669,7 @@ Respond with a single JSON object:
   "essayStrengths": [
     {
       "quality": "string — what works at the essay level",
-      "evidence": "string — specific text cited",
+      "evidence": "string — specific text cited, MAX 10 WORDS",
       "paragraphs": [0, 2]
     }
   ],

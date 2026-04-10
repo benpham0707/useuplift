@@ -303,8 +303,9 @@ ${scoringCalibration}
 
    priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
 
-   crossParagraphPatterns: Observations that only emerge when viewing scores across paragraphs.
-   Example: "Emotional intensity builds linearly — consider a dip before the climax to make it more earned."
+   crossParagraphPatterns: Max 3 items, each ≤15 words. Single-line observations across paragraphs.
+   Example: "P1-P4: emotional intensity builds linearly — no dip before climax reduces earned weight".
+   These strings are surfaced directly as coaching hooks in L5. Do NOT produce long prose.
 
 Do NOT produce prioritizedImprovements, coachingMap, or coherenceReport — those are produced in a follow-up analysis call.
 
@@ -497,8 +498,9 @@ GOOD: "Carries the essay's emotional load but underearns P4's revelation by tell
 
 priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
 
-crossParagraphPatterns: Observations that only emerge when viewing scores across paragraphs.
-Example: "Emotional intensity builds linearly — consider a dip before the climax to make it more earned."
+crossParagraphPatterns: Max 3 items, each ≤15 words. Single-line observations across paragraphs.
+Example: "P1-P4: emotional intensity builds linearly — no dip before climax reduces earned weight".
+These strings are surfaced directly as coaching hooks in L5. Do NOT produce long prose.
 
 Do NOT produce prioritizedImprovements, coachingMap, or coherenceReport — those are produced in a follow-up analysis call.
 
@@ -584,12 +586,13 @@ YOUR THREE OUTPUTS:
    protectedStrengths: Things that MUST NOT be damaged during improvement.
    These are the essay's current assets. Include locations and WHY they must be protected.
 
-   emergentPatterns: Observations that only emerge when viewing the complete scoring picture.
-   Pattern + evidence + implication for coaching.
+   emergentPatterns: Max 3 items. Each ≤20 words, single line. Format: "Pattern: {name} — {observation with P refs}".
+   Example: "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)".
+   These strings are surfaced directly as coaching hooks in L5. Do NOT produce object structures — emit flat strings ONLY.
 
-   scoreTensions: Paragraphs where the 5 scores tell a story of tension.
-   E.g., high structural importance (90) but low effectiveness (55) = high-priority gap.
-   Include the paragraph index, tension description, interpretation, and coaching implication.
+   scoreTensions: Max 3 items. Each ≤15 words. Format: "P{n}: {dim1}({score}) >> {dim2}({score}) — {one-line hook}".
+   Example: "P2: structural(92) >> effectiveness(55) — pivot telegraphed, not enacted".
+   These strings are surfaced directly as coaching hooks in L5. Do NOT produce object structures — emit flat strings ONLY.
 
 OUTPUT FORMAT:
 Respond with a single JSON object. No markdown, no explanation, no code blocks.
@@ -602,8 +605,12 @@ Respond with a single JSON object. No markdown, no explanation, no code blocks.
     "transformativeInsight": { "insight": "...", "evidenceLocations": [{"paragraph": 0, "sentence": 2}], "whyThisTransforms": "...", "requiresStudentAwareness": true|false },
     "priorities": [{ "priority": "...", "target": { "paragraphs": [0], "description": "..." }, "architecturalReason": "...", "unlocksNext": "...", "expectedImpact": "transformative"|"significant"|"incremental" }],
     "protectedStrengths": [{ "description": "...", "locations": [{"paragraph": 0}], "whyProtect": "..." }],
-    "emergentPatterns": [{ "pattern": "...", "evidence": "...", "implication": "..." }],
-    "scoreTensions": [{ "paragraph": 0, "tension": "...", "interpretation": "...", "coachingImplication": "..." }]
+    "emergentPatterns": [
+      "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)"
+    ],
+    "scoreTensions": [
+      "P2: structural(92) >> effectiveness(55) — pivot telegraphed, not enacted"
+    ]
   },
   "coherenceReport": {
     "contradictions": [
@@ -1245,9 +1252,14 @@ function buildScoreMatrix(
     }
   }
 
-  // --- Cross-paragraph patterns ---
+  // --- Cross-paragraph patterns (Scope 1 Phase 2: hard cap at 3 entries) ---
+  // The prompt instructs the LLM to produce max 3, but the runtime cap is
+  // the enforcement layer. Empty/whitespace strings are filtered out.
   const crossParagraphPatterns = Array.isArray(raw.crossParagraphPatterns)
-    ? raw.crossParagraphPatterns.map((p: unknown) => String(p))
+    ? raw.crossParagraphPatterns
+        .map((p: unknown) => String(p).trim())
+        .filter((s) => s.length > 0)
+        .slice(0, 3)
     : [];
 
   // --- Prioritized improvements ---

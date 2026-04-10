@@ -121,8 +121,7 @@ Return a JSON object matching this EXACT structure:
         "primaryFunction": "One-line: the single most important thing this sentence does in the essay's architecture, updated with full-context knowledge",
         "significance": "pivotal | contributing | transitional",
         "craft": {
-          "rhythm": "short_punch | flowing | staccato | measured | etc.",
-          "voiceAlignment": "How this sentence's voice aligns with the essay's dominant voice",
+          "rhythm": "ONE enum value from: short_punch | medium_flow | long_build | fragment | staccato | anaphora_series | parallel_build | subordinate_delay. Empty string for transitional sentences.",
           "techniques": ["technique1", "technique2"]
         },
         "significantChoices": [

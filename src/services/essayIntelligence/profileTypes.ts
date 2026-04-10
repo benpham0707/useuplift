@@ -614,8 +614,18 @@ export interface VoiceMap {
   /** Recorded voice shifts — where one or more voice dimensions change */
   shifts: VoiceShift[];
 
-  /** Code-switching events — language/register shifts with cultural roots */
-  codeSwitching: CodeSwitchEvent[];
+  /**
+   * Code-switching events — language/register shifts with cultural roots.
+   *
+   * @deprecated Scope 1 Phase 2 — removed from the L3.75 Phase A prompt because
+   * no downstream consumer reads beyond length-checks. Kept optional for
+   * backward compat with profiles persisted before Phase 2. New profiles
+   * emit `undefined` (or empty array via the coercer); legacy profiles
+   * still carry populated entries but those entries are ignored by the
+   * pipeline. Genuine language/register shifts are now captured as
+   * `shifts[]` entries instead.
+   */
+  codeSwitching?: CodeSwitchEvent[];
 }
 
 /** Base voice map dimension with baseline and observations */

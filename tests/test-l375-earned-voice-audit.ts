@@ -216,10 +216,13 @@ function buildSummary(
   lines.push(`  Dominant qualities: ${voiceMap.tonalDisposition.dominantQualities.join(', ')}`);
   lines.push('');
 
-  // Code switching
-  if (voiceMap.codeSwitching.length > 0) {
+  // Code switching — Scope 1 Phase 2: field is optional (removed from
+  // L3.75 schema). Legacy profiles may still carry entries; new profiles
+  // emit an empty array or undefined. `?? []` handles both.
+  const codeSwitchingEvents = voiceMap.codeSwitching ?? [];
+  if (codeSwitchingEvents.length > 0) {
     lines.push('Code-switching events:');
-    for (const cs of voiceMap.codeSwitching) {
+    for (const cs of codeSwitchingEvents) {
       lines.push(`  P${cs.location.paragraph}S${cs.location.sentence}: ${cs.language} — ${cs.trigger}`);
     }
   } else {
