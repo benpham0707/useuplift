@@ -8,7 +8,7 @@
  * - Array fields (observedFunctions, inferredIntents, narrativeContributions) are
  *   REPLACED entirely, never appended. Later paragraphs have more context = deeper
  *   understanding = the new array IS the better one.
- * - Scalar fields (paragraphContribution, rhythm, voiceAlignment) are overwritten.
+ * - Scalar fields (paragraphContribution, rhythm) are overwritten.
  * - Collection fields (tags, connectionRefs, techniques) are ADDED with deduplication.
  *
  * Understanding and Analysis are NEVER mixed — separate sub-objects on SentenceProfile.
@@ -68,7 +68,6 @@ function ensureUnderstanding(sentence: SentenceProfile): SentenceUnderstanding {
       paragraphContribution: '',
       craft: {
         rhythm: '',
-        voiceAlignment: '',
         techniques: [],
       },
       significantChoices: [],
@@ -152,9 +151,9 @@ export class SentenceMutator {
       if (update.craft.rhythm !== undefined) {
         understanding.craft.rhythm = update.craft.rhythm;
       }
-      if (update.craft.voiceAlignment !== undefined) {
-        understanding.craft.voiceAlignment = update.craft.voiceAlignment;
-      }
+      // voiceAlignment write branch removed in Scope 1 Phase 1 — the field
+      // is @deprecated and has no downstream consumers. Legacy profiles
+      // that still carry the field are ignored (the type makes it optional).
       if (update.craft.techniques !== undefined) {
         // techniques is a collection field -- additive, deduplicated
         for (const technique of update.craft.techniques) {

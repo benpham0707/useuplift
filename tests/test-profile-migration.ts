@@ -177,7 +177,12 @@ console.log('Test 1: Happy path — 4 sources populated');
           },
         ],
         protectedStrengths: [],
-        emergentPatterns: [{ pattern: 'test', evidence: 'test', implication: 'test' }],
+        // Phase 1: CoachingMap.emergentPatterns and scoreTensions are
+        // now string[] (Scope 1 compression). The legacy object shape is
+        // still ACCEPTED by buildCoachingMap()'s backward-compat parser,
+        // but this test's fixture uses the new shape since it's constructing
+        // the type directly without going through the parser.
+        emergentPatterns: ['Pattern: test — test fixture pattern'],
         scoreTensions: [],
       },
     } as unknown as EssayProfile['scoreMatrix'],

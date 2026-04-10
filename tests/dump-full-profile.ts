@@ -322,17 +322,20 @@ function renderScoreMatrix(profile: EssayProfile): string {
       lines.push(`  - Why protect: ${s.whyProtect}`);
     }
 
+    // Scope 1 Phase 1: emergentPatterns and scoreTensions are now string[]
+    // (flattened from the legacy Array<{pattern, evidence, implication}> and
+    // Array<{paragraph, tension, interpretation, coachingImplication}> shapes
+    // for ~10x token reduction). Backward compat: profiles persisted before
+    // Phase 1 are flattened by buildCoachingMap() at load time, so by the
+    // time this renderer sees them they're always strings.
     lines.push('\n**Emergent Patterns:**\n');
     for (const p of cm.emergentPatterns) {
-      lines.push(`- **${p.pattern}**: ${p.evidence}`);
-      lines.push(`  - Implication: ${p.implication}`);
+      lines.push(`- ${p}`);
     }
 
     lines.push('\n**Score Tensions:**\n');
     for (const t of cm.scoreTensions) {
-      lines.push(`- **P${t.paragraph + 1}**: ${t.tension}`);
-      lines.push(`  - Interpretation: ${t.interpretation}`);
-      lines.push(`  - Coaching implication: ${t.coachingImplication}`);
+      lines.push(`- ${t}`);
     }
   }
 
@@ -822,7 +825,9 @@ function renderParagraphProfiles(profile: EssayProfile): string {
         lines.push(`- Finding refs: ${su.findingRefs.join(', ') || '(none)'}`);
 
         if (su.craft) {
-          lines.push(`- Craft: rhythm=${su.craft.rhythm}, voiceAlignment=${su.craft.voiceAlignment}, techniques=[${su.craft.techniques.join(', ')}]`);
+          // Scope 1 Phase 1: voiceAlignment dropped from SentenceCraft.
+          // Legacy profiles that still carry the field are ignored.
+          lines.push(`- Craft: rhythm=${su.craft.rhythm || '(uncharacterized)'}, techniques=[${su.craft.techniques.join(', ')}]`);
         }
         if (su.significantChoices.length > 0) {
           lines.push('- Significant word choices:');

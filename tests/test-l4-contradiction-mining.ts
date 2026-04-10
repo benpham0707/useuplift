@@ -184,16 +184,19 @@ async function runTests(): Promise<void> {
       );
     }
 
-    // Validate score tension structure
+    // Scope 1 Phase 1: scoreTensions is now string[] (flattened from the
+    // legacy object shape for ~10x token reduction). Each entry follows the
+    // format "P{n}: {dim1}({score}) >> {dim2}({score}) — {hook}". Validation
+    // is now string-shape: length > 0 and contains a paragraph reference.
     if (coachingMap.scoreTensions.length > 0) {
       const firstTension = coachingMap.scoreTensions[0];
       assert(
-        'Score tension has valid paragraph index',
-        firstTension.paragraph >= 0 && firstTension.paragraph < scoreMatrix.paragraphs.length,
+        'Score tension is a non-empty string',
+        typeof firstTension === 'string' && firstTension.length > 0,
       );
       assert(
-        'Score tension has interpretation',
-        firstTension.interpretation.length > 0,
+        'Score tension mentions a paragraph (P{n} format)',
+        /P\d+/.test(firstTension),
       );
     }
   }

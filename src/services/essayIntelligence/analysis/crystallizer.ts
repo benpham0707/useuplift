@@ -1266,7 +1266,18 @@ function buildScoreMatrix(
  * Build validated CoachingMap from raw LLM output.
  * Returns undefined if raw is falsy or parsing fails entirely.
  */
-function buildCoachingMap(raw: unknown, paragraphCount: number): CoachingMap | undefined {
+/**
+ * Parse a raw LLM coachingMap JSON object into a typed CoachingMap.
+ *
+ * Scope 1 Phase 1: `emergentPatterns` and `scoreTensions` are now `string[]`.
+ * This function's backward-compat parser accepts both the new string shape
+ * (post-Phase-2 LLM output) AND the legacy object shape (persisted pre-Phase-1
+ * profiles loaded from checkpoints). Legacy objects are flattened to strings.
+ *
+ * Exported for testability — tests/test-scope1-phase1-runtime.ts exercises
+ * the backward-compat branches directly.
+ */
+export function buildCoachingMap(raw: unknown, paragraphCount: number): CoachingMap | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const r = raw as Record<string, unknown>;
 
@@ -1314,26 +1325,51 @@ function buildCoachingMap(raw: unknown, paragraphCount: number): CoachingMap | u
       whyProtect: String(s.whyProtect ?? ''),
     }));
 
-  // --- Emergent Patterns ---
+  // --- Emergent Patterns (Scope 1 Phase 1: string[] format) ─────────────
+  // Backward compat: accepts both the new string shape (preferred, after
+  // Phase 2 prompt update) AND the legacy object shape (for profiles
+  // persisted before Phase 1). Legacy objects are flattened to
+  // "{pattern} — {evidence}" strings. Empty entries are filtered out and
+  // the result is hard-capped at 3 items per the CoachingMap contract.
   const rawPatterns = Array.isArray(r.emergentPatterns) ? r.emergentPatterns : [];
-  const emergentPatterns = rawPatterns
-    .filter((p: unknown) => p && typeof p === 'object')
-    .map((p: Record<string, unknown>) => ({
-      pattern: String(p.pattern ?? ''),
-      evidence: String(p.evidence ?? ''),
-      implication: String(p.implication ?? ''),
-    }));
+  const emergentPatterns: string[] = rawPatterns
+    .map((p: unknown): string => {
+      if (typeof p === 'string') return p.trim();
+      if (p && typeof p === 'object') {
+        const obj = p as Record<string, unknown>;
+        // Legacy object → compressed string
+        const pattern = String(obj.pattern ?? '').trim();
+        const evidence = String(obj.evidence ?? '').trim();
+        if (pattern && evidence) return `${pattern} — ${evidence}`;
+        return pattern;
+      }
+      return '';
+    })
+    .filter((s) => s.length > 0)
+    .slice(0, 3); // Hard cap: max 3 entries
 
-  // --- Score Tensions ---
+  // --- Score Tensions (Scope 1 Phase 1: string[] format) ───────────────
+  // Backward compat: same as emergentPatterns. Legacy `{ paragraph, tension,
+  // interpretation, coachingImplication }` objects are flattened to
+  // "P{n}: {tension} — {coachingImplication}".
   const rawTensions = Array.isArray(r.scoreTensions) ? r.scoreTensions : [];
-  const scoreTensions = rawTensions
-    .filter((t: unknown) => t && typeof t === 'object')
-    .map((t: Record<string, unknown>) => ({
-      paragraph: clampInt(t.paragraph as number, 0, paragraphCount - 1),
-      tension: String(t.tension ?? ''),
-      interpretation: String(t.interpretation ?? ''),
-      coachingImplication: String(t.coachingImplication ?? ''),
-    }));
+  const scoreTensions: string[] = rawTensions
+    .map((t: unknown): string => {
+      if (typeof t === 'string') return t.trim();
+      if (t && typeof t === 'object') {
+        const obj = t as Record<string, unknown>;
+        const para = clampInt((obj.paragraph as number) ?? 0, 0, paragraphCount - 1);
+        const tension = String(obj.tension ?? '').trim();
+        const impl = String(obj.coachingImplication ?? '').trim();
+        if (tension) {
+          return impl ? `P${para}: ${tension} — ${impl}` : `P${para}: ${tension}`;
+        }
+        return '';
+      }
+      return '';
+    })
+    .filter((s) => s.length > 0)
+    .slice(0, 3);
 
   return {
     transformativeInsight,

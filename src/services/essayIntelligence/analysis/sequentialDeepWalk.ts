@@ -57,6 +57,7 @@ import {
   buildParagraphFindingContext,
   buildFindingReferenceContext,
 } from '../findings/findingContextBuilder';
+import { normalizeRhythmTag } from './rhythmTag';
 
 // ============================================================================
 // CONSTANTS
@@ -1132,14 +1133,24 @@ export class SequentialDeepWalkService {
       .filter(entry => entry.observation.length > 0);
   }
 
+  /**
+   * Parse a SentenceCraft block from raw LLM output.
+   *
+   * Scope 1 Phase 1:
+   *   - `rhythm` is a closed enum (RhythmTag). Since strict mode is off,
+   *     the type contract is not enforced at compile time — this parser
+   *     actively normalizes arbitrary LLM prose to a valid RhythmTag value,
+   *     falling back to '' (uncharacterized) when no match.
+   *   - `voiceAlignment` is dropped from output. Persisted old profiles
+   *     that still carry the field are ignored (optional on the type).
+   */
   private parseSentenceCraft(raw: unknown): SentenceCraft {
     if (!raw || typeof raw !== 'object') {
-      return { rhythm: '', voiceAlignment: '', techniques: [] };
+      return { rhythm: '', techniques: [] };
     }
     const obj = raw as Record<string, unknown>;
     return {
-      rhythm: this.safeString(obj.rhythm, ''),
-      voiceAlignment: this.safeString(obj.voiceAlignment, ''),
+      rhythm: normalizeRhythmTag(obj.rhythm),
       techniques: this.safeStringArray(obj.techniques),
     };
   }
@@ -1727,7 +1738,7 @@ export class SequentialDeepWalkService {
       narrativeContributions: [],
       rhetoricalFunctions: [],
       paragraphContribution: '',
-      craft: { rhythm: '', voiceAlignment: '', techniques: [] },
+      craft: { rhythm: '', techniques: [] },
       significantChoices: [],
       connectionRefs: [],
       findingRefs: [],

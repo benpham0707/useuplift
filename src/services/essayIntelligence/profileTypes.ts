@@ -399,15 +399,42 @@ export interface SentenceUnderstanding {
 }
 
 /**
+ * RhythmTag — closed enum for sentence rhythm classification.
+ *
+ * Scope 1 Phase 1 converted this from a free-form prose field to an enum
+ * to cut ~50-85 output tokens per sentence while preserving the single
+ * downstream consumer at `deepAnnotationService.ts:910` which renders
+ * `rhythm=${value}` as a label in the L5 paragraph prompt.
+ *
+ * Empty string = uncharacterized. Use this for transitional sentences
+ * or when the LLM output doesn't match any known tag (parser fallback).
+ */
+export type RhythmTag =
+  | ''
+  | 'short_punch'
+  | 'medium_flow'
+  | 'long_build'
+  | 'fragment'
+  | 'staccato'
+  | 'anaphora_series'
+  | 'parallel_build'
+  | 'subordinate_delay';
+
+/**
  * SentenceCraft — craft-level observations about a sentence.
  */
 export interface SentenceCraft {
-  /** Rhythm classification: short_punch, medium_flow, long_build, etc. */
-  rhythm: string;
-  /** How well voice aligns with the essay's dominant voice */
-  voiceAlignment: string;
+  /** Rhythm classification tag (see RhythmTag). Empty for transitional sentences. */
+  rhythm: RhythmTag;
   /** Specific craft techniques used */
   techniques: string[];
+  /**
+   * @deprecated Scope 1 removed `voiceAlignment` — no downstream consumers.
+   * Voice alignment is synthesized holistically by L3.75 voiceMap.
+   * Field kept optional for backward compat with profiles stored before
+   * the change. Writers no longer set it; readers see `undefined`.
+   */
+  voiceAlignment?: string;
 }
 
 /**
@@ -2058,19 +2085,29 @@ export interface CoachingMap {
     locations: Array<{ paragraph: number; sentence?: number }>;
     whyProtect: string;
   }>;
-  /** Patterns that emerge from viewing the essay holistically */
-  emergentPatterns: Array<{
-    pattern: string;
-    evidence: string;
-    implication: string;
-  }>;
-  /** Score tensions that have coaching implications */
-  scoreTensions: Array<{
-    paragraph: number;
-    tension: string;
-    interpretation: string;
-    coachingImplication: string;
-  }>;
+  /**
+   * Patterns that emerge from viewing the essay holistically.
+   *
+   * Scope 1 Phase 1 compressed format: one-line coaching signals.
+   * Previously `Array<{ pattern, evidence, implication }>`; flattened to
+   * `string[]` for ~10x token reduction while preserving signal. Wired into
+   * L5 sharedContext as coaching hooks (Phase 2 work).
+   *
+   * Format: `"Pattern: {name} — {observation with P refs}"`. Max 3 entries,
+   * each ≤20 words. The backward-compat parser in `buildCoachingMap()` at
+   * `crystallizer.ts:1317-1345` accepts both the legacy object shape (from
+   * persisted pre-Phase-1 profiles) and the new string shape.
+   */
+  emergentPatterns: string[];
+  /**
+   * Score tensions that have coaching implications.
+   *
+   * Scope 1 Phase 1 compressed format:
+   *   `"P{n}: {dim1}({score}) >> {dim2}({score}) — {one-line hook}"`
+   * Previously `Array<{ paragraph, tension, interpretation, coachingImplication }>`.
+   * Max 3 entries, each ≤15 words.
+   */
+  scoreTensions: string[];
 }
 
 /**
