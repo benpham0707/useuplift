@@ -1631,6 +1631,10 @@ export class EssayProfileCoordinator {
     const allMutations: MutationType[] = [];
 
     // SentenceMutator: store analysis for each sentence
+    // Scope 2 Phase 5: also harvest inline improvementCandidates into the
+    // candidate store so L4 consolidation sees them. The field is propagated
+    // into SentenceAnalysis for checkpoint persistence.
+    const harvestedL35Candidates: ImprovementCandidate[] = [];
     for (const sa of result.sentenceAnalyses) {
       const mutations = this.sentenceMutator.applySentenceAnalysis(
         this.profile,
@@ -1644,9 +1648,18 @@ export class EssayProfileCoordinator {
           isStrength: sa.isStrength,
           isProblem: sa.isProblem,
           priorityForImprovement: sa.priorityForImprovement,
+          improvementCandidate: sa.improvementCandidate,
         },
       );
       allMutations.push(...mutations);
+
+      if (sa.improvementCandidate) {
+        harvestedL35Candidates.push(sa.improvementCandidate);
+      }
+    }
+
+    if (harvestedL35Candidates.length > 0) {
+      this.addImprovementCandidates(harvestedL35Candidates, { source: 'L3.5' });
     }
 
     // ParagraphMutator: store paragraph-level analysis

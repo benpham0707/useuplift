@@ -71,6 +71,10 @@ import { FindingStore } from '../findings/findingStore';
 import {
   buildFindingReferenceContext,
 } from '../findings/findingContextBuilder';
+import {
+  TECHNIQUE_VOCABULARY_PROMPT_BLOCK,
+  normalizeTechnique,
+} from './techniqueVocabulary';
 
 // ============================================================================
 // CONSTANTS
@@ -473,6 +477,12 @@ emotionalTopography caps:
  */
 const SYSTEM_PROMPT_PHASE_B = `${SHARED_PREAMBLE}
 
+=== PRESCRIPTIVE CARVE-OUT (Scope 2 Phase 5) ===
+
+The "Understanding Only" rule above governs every descriptive field. ONE structured exception exists in Phase B: \`craftAssessment.craftPatterns[].pairedImprovement\`. When a craft pattern has a clear architectural fix, you MAY emit an imperative directive there — this is the single slot where L3.75 gets to be prescriptive, because it is the ONLY layer with full-essay architectural visibility, and downstream coaching needs that visibility pinned to specific technique names. The forbidden vocabulary list still governs every OTHER field in this phase.
+
+${TECHNIQUE_VOCABULARY_PROMPT_BLOCK}
+
 === OUTPUT SCHEMA (Phase B: Theme + Narrative + Character + Craft + Admissions) ===
 
 Return a single JSON object with EXACTLY these 6 top-level keys:
@@ -535,8 +545,15 @@ RIGHT: 'The person who stays late not because they have to but because they got 
     "craftPatterns": [
       {
         "quality": "<name of the craft pattern observed>",
-        "description": "<describe WHAT the pattern is and WHERE it appears — do NOT evaluate it>",
-        "paragraphs": [<paragraph indices>]
+        "description": "<describe WHAT the pattern is and WHERE it appears>",
+        "paragraphs": [<paragraph indices>],
+        "pairedImprovement": {
+          "technique": "<one of the TECHNIQUE VOCABULARY names above OR null>",
+          "directive": "<one-sentence action the student should take, imperative voice>",
+          "architecturalReason": "<why this matters to THIS essay's architecture specifically>",
+          "demonstrationSketch": "<1-2 sentence sketch of the improved version, or null>",
+          "expectedImpact": "transformative" | "significant" | "incremental"
+        }
       }
     ],
     "imageSystem": "<describe the image/metaphor system — what images appear, how they recur or transform, what connections exist between them>",
@@ -630,7 +647,7 @@ IMPORTANT: "newFindings" and "findingEvolutions" are OPTIONAL. Omit them entirel
 === QUALITY STANDARDS ===
 
 - craftAssessment.craftSignatures: Describe WHAT techniques are present and WHERE (e.g., "Uses anaphora in P3S1-S3, sentence fragments in P5S2-S4, extended metaphor linking P1 and P4"). Do NOT evaluate how well they work.
-- craftAssessment.craftPatterns: Describe WHAT patterns exist (e.g., "P2 and P4 use abstract nouns where P1 and P3 use concrete imagery"). Do NOT label them as weaknesses.
+- craftAssessment.craftPatterns: Describe WHAT patterns exist (e.g., "P2 and P4 use abstract nouns where P1 and P3 use concrete imagery"). For each pattern that has a clear architectural fix, populate "pairedImprovement" with the technique name (from the TECHNIQUE VOCABULARY above), a one-sentence directive, the architecturalReason specific to THIS essay, and an optional 1-2 sentence demonstrationSketch. Leave pairedImprovement=null when the pattern is descriptive-only with no clear fix. Do not force pairings.
 - admissionsPositioning: Describe WHAT an admissions reader would notice. Do NOT evaluate whether it is effective.
 - admissionsPositioning.redFlags: Describe WHAT might draw attention. Do NOT prescribe fixes. CHECK FOR THESE STRUCTURAL PATTERNS:
   * SCOPE INFLATION: Do claims get BIGGER while evidence gets THINNER across the essay? If P1 claims "I created" and P7 claims "I'll change the world" without proportional evidence escalation, flag: "Scope inflation: language escalates from [early claim] to [late claim] without proportional evidence."
@@ -1452,10 +1469,57 @@ function coerceCraftAssessment(raw: Record<string, unknown>): CraftAssessment {
       quality: String(item.quality ?? ''),
       description: String(item.description ?? ''),
       paragraphs: ensureNumberArray(item.paragraphs),
+      // Scope 2 Phase 5: parse optional pairedImprovement block
+      pairedImprovement: coercePairedImprovement(item.pairedImprovement),
     })),
     imageSystem: String(raw.imageSystem ?? ''),
     sentencePatterns: String(raw.sentencePatterns ?? ''),
     wordPatterns: String(raw.wordPatterns ?? ''),
+  };
+}
+
+/**
+ * Scope 2 Phase 5: parse the optional pairedImprovement slot on a
+ * CraftAssessment growth edge. Returns null when absent, malformed, or
+ * missing the required directive + architecturalReason fields.
+ *
+ * Treats unknown expectedImpact values as 'incremental' (safest default).
+ * Normalizes the technique name through the closed vocabulary so unknown
+ * or misspelled names collapse to null rather than propagating garbage.
+ */
+function coercePairedImprovement(
+  raw: unknown,
+): CraftAssessment['growthEdges'][number]['pairedImprovement'] | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const directive = typeof r.directive === 'string' ? r.directive.trim() : '';
+  const architecturalReason =
+    typeof r.architecturalReason === 'string' ? r.architecturalReason.trim() : '';
+  if (directive.length === 0 || architecturalReason.length === 0) return null;
+
+  const technique = normalizeTechnique(
+    typeof r.technique === 'string' ? r.technique : null,
+  );
+
+  const demonstrationSketch =
+    typeof r.demonstrationSketch === 'string' && r.demonstrationSketch.trim().length > 0
+      ? r.demonstrationSketch.trim()
+      : null;
+
+  const rawImpact = typeof r.expectedImpact === 'string' ? r.expectedImpact : 'incremental';
+  const expectedImpact: 'transformative' | 'significant' | 'incremental' =
+    rawImpact === 'transformative' || rawImpact === 'significant'
+      ? rawImpact
+      : 'incremental';
+
+  return {
+    technique,
+    directive,
+    architecturalReason,
+    demonstrationSketch,
+    expectedImpact,
   };
 }
 

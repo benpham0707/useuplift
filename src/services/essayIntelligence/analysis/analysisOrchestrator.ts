@@ -59,6 +59,7 @@ import type {
   UnderstandingQuestion,
   ImprovementManifest,
   ImprovementEntry,
+  ImprovementCandidate,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -110,6 +111,7 @@ import { detectProgrammaticContradictions } from '../profileManager/validation/c
 
 // Profile manager
 import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
 
 // Finding store (for contradiction → finding pipeline)
@@ -429,6 +431,16 @@ export class AnalysisOrchestrator {
         coordinator.applyUnderstandingWalkStep(walkOutput);
       }
 
+      // Scope 2 Phase 5: Harvest L3 improvement candidates from sentence
+      // understandings into the candidate store. L3 emits at most one
+      // candidate per sentence (prompt-constrained); total across the walk
+      // is typically 3-10. These enter the store as lifecycleState='candidate'
+      // with sourceLayer='L3' and flow through L4 consolidation in Phase 6.
+      const l3Candidates = this.extractL3Candidates(l3Result);
+      if (l3Candidates.length > 0) {
+        coordinator.addImprovementCandidates(l3Candidates, { source: 'L3' });
+      }
+
       costTracker.record('L3', l3Result.cost, l3Result.tokenUsage, l3Result.timingMs);
       layersCompleted.push('L3');
 
@@ -436,6 +448,7 @@ export class AnalysisOrchestrator {
         `[Orchestrator] L3 complete: ${l3Result.walkOutputs.length} paragraphs walked, ` +
         `${l3Result.skippedParagraphs.length} skipped, ` +
         `${l3Result.backPropagations.length} back-props, ` +
+        `${l3Candidates.length} improvement candidates harvested, ` +
         `cost=$${l3Result.cost.toFixed(4)}, time=${l3Result.timingMs}ms`,
       );
     } catch (error) {
@@ -472,6 +485,15 @@ export class AnalysisOrchestrator {
       coordinator.applyHolisticSynthesis(growthResult.finalSynthesis);
       growthReadingStrategy = growthResult.readingStrategy;
 
+      // Scope 2 Phase 5: Harvest L3.75 improvement candidates from the
+      // craftAssessment.growthEdges[].pairedImprovement slots. L3.75 is the
+      // only layer with full-essay architectural visibility, so candidates
+      // here carry architectural reasoning that per-sentence candidates cannot.
+      const l375Candidates = this.extractL375Candidates(growthResult.finalSynthesis);
+      if (l375Candidates.length > 0) {
+        coordinator.addImprovementCandidates(l375Candidates, { source: 'L3.75' });
+      }
+
       // Record aggregate L3.75 cost
       costTracker.record('L3.75', growthResult.totalCost, {
         inputTokens: 0, outputTokens: 0,
@@ -487,7 +509,8 @@ export class AnalysisOrchestrator {
           ? ` (${growthResult.growthState.convergenceReason})`
           : ' (llm_converged)') + `, ` +
         `cost=$${growthResult.totalCost.toFixed(4)}, ` +
-        `${growthResult.growthState.activityLog.length} activity records`,
+        `${growthResult.growthState.activityLog.length} activity records, ` +
+        `${l375Candidates.length} improvement candidates harvested`,
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3.75', error, costTracker.summarize(0).totalCost));
@@ -1198,6 +1221,101 @@ export class AnalysisOrchestrator {
   // ═══════════════════════════════════════════════════════════════════════════
   // PRIVATE: Helpers
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Scope 2 Phase 5: Harvest improvement candidates from a completed L3 walk.
+   *
+   * Reads every sentence understanding that carries an inline
+   * `improvementCandidate` (emitted by the walk prompt's IMPROVEMENT
+   * CANDIDATE EMISSION section) and returns the flat list for the
+   * coordinator to add to its ImprovementCandidateStore.
+   *
+   * Pure function of the walk result — no mutation, no side effects,
+   * no LLM calls. Candidates already have deterministic IDs assigned by
+   * `parseSentenceUnderstanding` via `ImprovementCandidateStore.buildId`.
+   *
+   * Shape note: skipped or failed paragraphs never reach this extractor
+   * because the fail-fast walk loop (sequentialDeepWalk.ts) throws
+   * PipelineError before returning if any paragraph failed.
+   */
+  private extractL3Candidates(walkResult: L3WalkResult): ImprovementCandidate[] {
+    const out: ImprovementCandidate[] = [];
+    for (const walkOutput of walkResult.walkOutputs) {
+      for (const entry of walkOutput.sentenceUnderstandings) {
+        const candidate = entry.understanding.improvementCandidate;
+        if (candidate) {
+          out.push(candidate);
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Scope 2 Phase 5: Harvest improvement candidates from a completed L3.75
+   * holistic synthesis. Reads `craftAssessment.growthEdges[].pairedImprovement`
+   * and converts each populated entry into an `ImprovementCandidate` with
+   * sourceLayer='L3.75'.
+   *
+   * Unlike L3 (per-sentence) and L3.5 (per-sentence with evaluation), L3.75
+   * operates at paragraph/essay scope, so candidate `sentence` is always null
+   * and `paragraph` defaults to the first paragraph in the growth edge's
+   * `paragraphs[]` array (or 0 if empty). The architectural reasoning lives
+   * in `observation`, the directive lives in `suggestedChange`.
+   *
+   * Pure function — no mutation, no LLM calls. ID is built deterministically
+   * via `ImprovementCandidateStore.buildId` so re-runs produce stable IDs.
+   */
+  private extractL375Candidates(synthesis: HolisticSynthesisOutput): ImprovementCandidate[] {
+    const out: ImprovementCandidate[] = [];
+    const growthEdges = synthesis.craftAssessment?.growthEdges ?? [];
+    const now = new Date().toISOString();
+
+    for (const edge of growthEdges) {
+      const paired = edge.pairedImprovement;
+      if (!paired) continue;
+
+      // Use the first paragraph in the edge's scope as the candidate's
+      // paragraph anchor. L3.75 growth edges are paragraph-scoped, so this
+      // is the canonical location for coaching to hang the suggestion on.
+      const paragraph = edge.paragraphs.length > 0 ? edge.paragraphs[0] : 0;
+
+      // Observation combines the descriptive pattern + architectural reason
+      // so downstream consumers see both the WHAT and the WHY in one slot.
+      const observation = `${edge.description} — ${paired.architecturalReason}`;
+
+      // Map expectedImpact → coachingValue. Transformative edges become
+      // 'critical', significant edges 'high', incremental edges 'medium'.
+      // L3.75 does not emit 'diagnostic' — by definition, a pairedImprovement
+      // has enough architectural weight to suggest concrete action.
+      const coachingValue: ImprovementCandidate['coachingValue'] =
+        paired.expectedImpact === 'transformative'
+          ? 'critical'
+          : paired.expectedImpact === 'significant'
+            ? 'high'
+            : 'medium';
+
+      const id = ImprovementCandidateStore.buildId('L3.75', paragraph, null, observation);
+
+      out.push({
+        id,
+        sourceLayer: 'L3.75',
+        paragraph,
+        sentence: null,
+        sourceFindingId: null,
+        observation,
+        suggestedChange: paired.directive,
+        technique: paired.technique,
+        demonstrationSketch: paired.demonstrationSketch,
+        coachingValue,
+        lifecycleState: 'candidate',
+        supersededBy: null,
+        createdAt: now,
+      });
+    }
+
+    return out;
+  }
 
   /**
    * Build a LayerError from a caught exception AND log full diagnostics.

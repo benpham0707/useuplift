@@ -396,6 +396,19 @@ export interface SentenceUnderstanding {
   /** Phase 0: How architecturally significant this sentence is to the essay.
    *  Drives downstream attention allocation. */
   significance?: 'pivotal' | 'contributing' | 'transitional';
+
+  /**
+   * Scope 2 Phase 5: Inline improvement candidate emitted by L3 walk alongside
+   * the per-sentence understanding. Null for the majority of sentences; the
+   * L3 walk prompt explicitly instructs the LLM to emit only when the
+   * understanding reveals a concrete localized improvement opportunity.
+   *
+   * The orchestrator harvests these into the ImprovementCandidateStore after
+   * each walk output is applied. The candidate is copied here for
+   * checkpoint persistence via applySentenceUnderstanding (mutator handles
+   * the optional-field propagation).
+   */
+  improvementCandidate?: ImprovementCandidate | null;
 }
 
 /**
@@ -457,6 +470,19 @@ export interface SentenceAnalysis {
   isProblem: boolean;
   /** Priority for improvement (0 = fine, 5 = urgent) */
   priorityForImprovement: number;
+
+  /**
+   * Scope 2 Phase 5: Inline improvement candidate emitted by L3.5 when the
+   * analysis identifies a problem sentence. Populated when `isProblem=true`
+   * OR `priorityForImprovement >= 4`. The L3.5 prompt already asks for the
+   * fix content inside weakness observations; this field pulls that same
+   * content into a structured slot for downstream routing (zero new
+   * reasoning burden).
+   *
+   * Null when isProblem=false AND priorityForImprovement <= 3, or when the
+   * LLM chose not to produce a concrete suggestedChange.
+   */
+  improvementCandidate?: ImprovementCandidate | null;
 }
 
 /**
@@ -900,6 +926,27 @@ export interface CraftAssessment {
     quality: string;
     description: string;
     paragraphs: number[];
+    /**
+     * Scope 2 Phase 5: Optional architectural fix the L3.75 synthesis paired
+     * with this growth edge. L3.75 has the full-essay holistic view, so it
+     * can name technique + architectural reasoning that L3's per-sentence
+     * walk cannot. Null when the edge is descriptive-only with no clear fix.
+     *
+     * When populated, the orchestrator harvests this into the
+     * ImprovementCandidateStore as an L3.75-sourced candidate.
+     */
+    pairedImprovement?: {
+      /** TECHNIQUE_VOCABULARY entry or null when no standard technique applies */
+      technique: string | null;
+      /** One-sentence action the student should take */
+      directive: string;
+      /** Why this matters to the essay's architecture specifically */
+      architecturalReason: string;
+      /** 1-2 sentence sketch of the improved version, or null */
+      demonstrationSketch: string | null;
+      /** Magnitude of the impact if applied */
+      expectedImpact: 'transformative' | 'significant' | 'incremental';
+    } | null;
   }>;
   /** Image/metaphor system analysis */
   imageSystem: string;
@@ -3135,6 +3182,12 @@ export interface AnalysisPassOutput {
     priorityForImprovement: number;
     /** LLM-assessed confidence in this sentence's effectiveness score. Optional for backward compat. */
     confidence?: SentenceAnalysisConfidence;
+    /**
+     * Scope 2 Phase 5: Inline improvement candidate from the L3.5 analysis.
+     * Populated when isProblem=true or priorityForImprovement >= 4.
+     * See SentenceAnalysis.improvementCandidate for the fuller contract.
+     */
+    improvementCandidate?: ImprovementCandidate | null;
   }>;
 
   /** Paragraph-level analysis */
