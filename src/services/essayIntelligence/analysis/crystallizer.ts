@@ -35,6 +35,8 @@ import { ProfileRouter } from '../profileManager/profileRouter';
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
 import { FindingStore, buildFindingContext } from '../findings';
 import { ConnectionGraph, buildHolisticConnectionContext } from '../connections';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import { PipelineError } from '../errors';
 import type {
   EssayProfile,
   EssayType,
@@ -56,6 +58,7 @@ import type {
   CoachingMap,
   NorthStarEvolution,
   NorthStarAssessment,
+  ImprovementCandidate,
 } from '../profileTypes';
 
 // ============================================================================
@@ -528,16 +531,72 @@ Respond with a single JSON object. No markdown, no explanation, no code blocks.
  * L4b receives the L4a output (North Star + Score Matrix core) as context and produces
  * the coaching strategy and coherence investigation. NON-FATAL — graceful degradation on failure.
  */
-function buildSystemPromptL4b(scale: NorthStarScale): string {
-  return `You are the Interpreter — you receive a crystallized North Star and Paragraph Score Matrix and produce the coaching strategy and coherence investigation.
+/**
+ * Scope 2 Phase 6a: Serialize the active candidate set for L4b injection.
+ *
+ * Produces a compact table the LLM can read and reference by ID. Candidates
+ * are sorted by coachingValue (critical → high → medium → diagnostic) so L4b
+ * sees the most urgent improvements first.
+ *
+ * Truncates observation and suggestedChange to 120 chars each to keep the
+ * block under ~2K tokens even with 15+ candidates. Full text is available
+ * in the store if L4b asks for it — but the prompt format forces terse
+ * consolidation, not re-interpretation.
+ *
+ * Empty-store case returns a marker string; the orchestrator's pre-L4b gate
+ * should already have thrown PipelineError.emptyCandidateStore before we
+ * ever call this function on an empty store. The marker exists as belt-
+ * and-suspenders for Phase 8 debugging.
+ */
+function buildL4bCandidateContext(candidateStore: ImprovementCandidateStore): string {
+  const active = candidateStore.getActiveSortedByCoachingValue();
+  if (active.length === 0) {
+    return `=== IMPROVEMENT CANDIDATES (source of truth for coaching) ===
+(none — no layers emitted candidates; orchestrator should have thrown before this call)`;
+  }
 
-You are given the authoritative North Star (structural roles, distinctiveness, trajectory) and the scored Paragraph Score Matrix (5-dimensional per-paragraph scores, verdicts, crossParagraphPatterns). Your job is to produce three outputs that BUILD ON that foundation.
+  const truncate = (s: string, max: number): string =>
+    s.length > max ? `${s.slice(0, max - 1)}…` : s;
+
+  const lines = active.map((c) => {
+    const scope = c.sentence != null ? `P${c.paragraph}S${c.sentence}` : `P${c.paragraph}`;
+    const tech = c.technique ? `technique=${c.technique}` : 'technique=null';
+    const obs = truncate(c.observation, 120);
+    const change = truncate(c.suggestedChange, 120);
+    return `[${c.id}] [${c.sourceLayer}|${scope}|${c.coachingValue}] observation=${obs} | suggestedChange=${change} | ${tech}`;
+  });
+
+  const byLayer = {
+    L3: active.filter((c) => c.sourceLayer === 'L3').length,
+    'L3.5': active.filter((c) => c.sourceLayer === 'L3.5').length,
+    'L3.75': active.filter((c) => c.sourceLayer === 'L3.75').length,
+  };
+
+  return `=== IMPROVEMENT CANDIDATES (source of truth for coaching) ===
+Total: ${active.length} active candidates (L3=${byLayer.L3}, L3.5=${byLayer['L3.5']}, L3.75=${byLayer['L3.75']})
+Sorted by coachingValue: critical → high → medium → diagnostic.
+
+${lines.join('\n')}
+
+Each candidate was produced by the layer indicated in the source tag, grounded in specific text evidence from the essay. The candidate ID in brackets is the stable handle you will use in \`consolidatedFrom\` when building priorities.`;
+}
+
+function buildSystemPromptL4b(scale: NorthStarScale): string {
+  return `You are the Consolidator — you receive a pre-generated set of improvement candidates from L3 (sentence understanding walk), L3.5 (paragraph analysis), and L3.75 (holistic synthesis), along with the authoritative North Star and Paragraph Score Matrix. Your job is to CONSOLIDATE those candidates into 3-7 prioritized improvements, produce the coherence investigation, and assemble the coaching map.
+
+=== CRITICAL — YOU CONSOLIDATE, YOU DO NOT INVENT ===
+
+Every priority you output MUST cite \`consolidatedFrom: [candidate IDs]\` — the specific candidate(s) it absorbs. You are NOT permitted to invent improvements not grounded in the candidate set. The upstream layers already did the analytical work of identifying problems; your job is to group, prioritize, and frame them architecturally.
+
+If two candidates point at the same architectural theme (e.g., "P2 summarizes" from L3 and "P2 is the load-bearing pivot but stays abstract" from L3.75), merge them into ONE priority with both candidate IDs in \`consolidatedFrom\`. A single priority CAN and SHOULD absorb multiple candidates when they share a theme.
+
+If a candidate doesn't make it into any priority, that's fine — it will be marked \`superseded\` in the lifecycle. Be intentional: pick the 3-7 highest-leverage priorities, let the rest supersede. Do NOT list every candidate as a separate priority — that's the opposite of consolidation.
 
 YOUR THREE OUTPUTS:
 
-1. PRIORITIZED IMPROVEMENTS — Reference North Star structural roles in whyThisMatters.
-   BAD: "Improve the opening paragraph."
-   GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value."
+1. PRIORITIZED IMPROVEMENTS — Consolidate candidates into 3-7 priorities. Reference North Star structural roles in \`architecturalReason\` (re-derive this framing from the North Star — candidates don't carry it). Each priority MUST have non-empty \`consolidatedFrom\`.
+   BAD: "Improve the opening paragraph." (ungrounded, no consolidatedFrom)
+   GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value." consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]
 
 2. COHERENCE REPORT — ACTIVE INVESTIGATION of contradictions ACROSS profile sections.
    You are not passively checking for problems. You are ACTIVELY INVESTIGATING coherence.
@@ -603,7 +662,7 @@ Respond with a single JSON object. No markdown, no explanation, no code blocks.
   ],
   "coachingMap": {
     "transformativeInsight": { "insight": "...", "evidenceLocations": [{"paragraph": 0, "sentence": 2}], "whyThisTransforms": "...", "requiresStudentAwareness": true|false },
-    "priorities": [{ "priority": "...", "target": { "paragraphs": [0], "description": "..." }, "architecturalReason": "...", "unlocksNext": "...", "expectedImpact": "transformative"|"significant"|"incremental" }],
+    "priorities": [{ "priority": "...", "target": { "paragraphs": [0], "description": "..." }, "architecturalReason": "...", "unlocksNext": "...", "expectedImpact": "transformative"|"significant"|"incremental", "consolidatedFrom": ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"] }],
     "protectedStrengths": [{ "description": "...", "locations": [{"paragraph": 0}], "whyProtect": "..." }],
     "emergentPatterns": [
       "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)"
@@ -831,7 +890,13 @@ function buildCallInstructionL4b(
   l4aNorthStar: EssayNorthStar,
   l4aScoreMatrix: ParagraphScoreMatrix,
   paragraphCount: number,
+  candidateStore: ImprovementCandidateStore,
 ): string {
+  // Scope 2 Phase 6a: Candidate context is the PRIMARY input — the LLM
+  // consolidates these into priorities rather than re-deriving from profile
+  // residue. Appears first so it's most salient in the prompt.
+  const candidateContext = buildL4bCandidateContext(candidateStore);
+
   // Serialize L4a output as authoritative context
   const l4aContext = JSON.stringify({
     northStar: l4aNorthStar,
@@ -848,25 +913,30 @@ function buildCallInstructionL4b(
     `priority=${p.priorityForImprovement} | "${p.verdict}"`
   ).join('\n');
 
-  return `=== L4a CRYSTALLIZATION OUTPUT (AUTHORITATIVE) ===
+  return `${candidateContext}
+
+=== L4a CRYSTALLIZATION OUTPUT (AUTHORITATIVE for architectural framing) ===
 ${l4aContext}
 
 === PER-PARAGRAPH SCORE SUMMARY ===
 ${scoresSummary}
 
-TASK: Using the structural roles and scores above as your foundation, produce:
+TASK: Using the candidate set above as your SOURCE OF TRUTH for what needs to improve, and the North Star + scores as your ARCHITECTURAL FRAMING, produce:
 
-1. prioritizedImprovements — Reference the North Star's structural roles in whyThisMatters. Each improvement should explain WHY the paragraph's architectural role makes fixing it urgent.
+1. prioritizedImprovements — 3-7 flat improvements (legacy shape retained for backward compat). Reference the North Star's structural roles in whyThisMatters.
 
-2. coherenceReport — ACTIVELY investigate consistency across the profile sections provided earlier. Zero contradictions is valid if the profile is truly consistent.
+2. coachingMap.priorities — CONSOLIDATED priorities. Each MUST have non-empty \`consolidatedFrom: [candidate IDs]\`. Candidates not cited in any priority will be marked \`superseded\` after this call — be intentional about what matters.
+
+3. coachingMap.transformativeInsight, protectedStrengths, emergentPatterns, scoreTensions — These come from your holistic read of North Star + score matrix. They are NOT derived from candidates and do NOT need lineage. emergentPatterns compare ACROSS paragraphs; scoreTensions compare the 5 dimensions WITHIN paragraphs.
+
+4. coherenceReport — ACTIVELY investigate consistency across the profile sections provided earlier. Zero contradictions is valid if the profile is truly consistent.
    - For each tension: classify with routingCategory, canCoexist, evidence from both sides
    - isCoherent = false ONLY if blocking contradictions exist
 
-3. coachingMap — The transformativeInsight should be the SINGLE most important thing the student needs to understand. scoreTensions should compare the 5 dimensions within paragraphs to find diagnostic gaps (e.g., high structural=90 but low effectiveness=55).
-
 REMINDERS:
-- The structural roles and scores above are authoritative. Use them to produce prioritizedImprovements that reference architectural roles.
-- The coaching map's scoreTensions should compare the 5 dimensions within each paragraph.
+- Every \`coachingMap.priorities[i].consolidatedFrom\` MUST contain at least one valid candidate ID from the candidate list above. Do not invent IDs.
+- Prefer MERGING candidates into fewer, higher-leverage priorities over enumerating every candidate. 3-7 priorities total.
+- The structural roles and scores are authoritative framing. Use them to produce architecturalReason that ties each priority to the paragraph's role.
 - Score matrix has ${paragraphCount} paragraphs (indices 0 through ${paragraphCount - 1}).
 - Coherence investigation should surface genuine internal tensions. Report honestly — zero is fine if consistent.`;
 }
@@ -1313,6 +1383,16 @@ export function buildCoachingMap(raw: unknown, paragraphCount: number): Coaching
       const expectedImpact = validImpacts.includes(rawImpact as typeof validImpacts[number])
         ? (rawImpact as typeof validImpacts[number])
         : 'significant' as const;
+
+      // Scope 2 Phase 6a: consolidatedFrom lineage. Accept string[] only;
+      // filter to non-empty strings. Invalid entries get dropped silently
+      // (validator at the orchestrator level checks that cited IDs exist
+      // in the store).
+      const rawConsolidatedFrom = Array.isArray(p.consolidatedFrom) ? p.consolidatedFrom : [];
+      const consolidatedFrom: string[] = rawConsolidatedFrom
+        .map((id: unknown) => (typeof id === 'string' ? id.trim() : ''))
+        .filter((id: string) => id.length > 0);
+
       return {
         priority: String(p.priority ?? ''),
         target: {
@@ -1324,6 +1404,7 @@ export function buildCoachingMap(raw: unknown, paragraphCount: number): Coaching
         architecturalReason: String(p.architecturalReason ?? ''),
         unlocksNext: String(p.unlocksNext ?? ''),
         expectedImpact,
+        consolidatedFrom,
       };
     });
 
@@ -1961,6 +2042,10 @@ export class CrystallizerService {
     profile: Readonly<EssayProfile>,
     essayType: EssayType,
     essayText: string,
+    // Scope 2 Phase 6a: candidateStore is the PRIMARY source of truth for L4b
+    // consolidation. Passed as a required parameter so the orchestrator can't
+    // accidentally skip wiring it.
+    candidateStore: ImprovementCandidateStore,
     priorNorthStar?: EssayNorthStar,
     findingStore?: FindingStore,
     connectionGraph?: ConnectionGraph,
@@ -2081,20 +2166,37 @@ export class CrystallizerService {
     // W3.3: Post-parse anti-clustering detection for score matrix dimensions
     detectScoreClustering(scoreMatrix);
 
-    // ── Phase 3: L4b call (NON-FATAL — coaching strategy + coherence investigation) ──
+    // ── Phase 3: L4b call (FAIL-FAST — Scope 2 Phase 6a) ──
+    // Scope 2 Phase 6a converted this from graceful-degradation to fail-fast.
+    // The prior path defaulted to empty coherenceReport + no priorities +
+    // l4bDegraded=true on any Sonnet failure. Doctrine forbids this. L4b is
+    // now a hard dependency of the pipeline: if it fails, PipelineError.
     let coherenceReport: CoherenceReport;
     let l4bCost = 0;
     let l4bTimingMs: number | undefined;
-    let l4bDegraded = false;
     let l4bInputTokens = 0;
     let l4bOutputTokens = 0;
     let l4bCacheReadTokens = 0;
     let l4bCacheWriteTokens = 0;
 
+    // Scope 2 Phase 6a: fail-fast on empty candidate store before we even
+    // make the L4b call. This should be impossible in a fresh run (Phase 5
+    // ensured L3/L3.5/L3.75 emit candidates), but the belt-and-suspenders
+    // check catches systemic regressions loudly rather than letting L4b run
+    // on an empty set and invent ungrounded priorities.
+    if (candidateStore.size === 0) {
+      throw PipelineError.emptyCandidateStore(0, ['L3', 'L3.5', 'L3.75']);
+    }
+
     try {
       const l4bStartTime = Date.now();
       const l4bSystemPrompt = buildSystemPromptL4b(scale);
-      const l4bCallInstruction = buildCallInstructionL4b(northStar, scoreMatrix, paragraphCount);
+      const l4bCallInstruction = buildCallInstructionL4b(
+        northStar,
+        scoreMatrix,
+        paragraphCount,
+        candidateStore,
+      );
 
       const l4bResponse = await callClaude<RawL4bOutput>({
         model: SONNET,
@@ -2162,16 +2264,17 @@ export class CrystallizerService {
         );
       }
     } catch (l4bError) {
-      // L4b is NON-FATAL — graceful degradation
-      l4bDegraded = true;
-      console.warn(
-        '[Crystallizer] L4b failed (non-fatal — degrading gracefully):',
-        l4bError instanceof Error ? l4bError.message : String(l4bError),
+      // Scope 2 Phase 6a: FAIL-FAST — no graceful degradation.
+      // Previous behavior defaulted to empty coherenceReport + no priorities
+      // + l4bDegraded=true, silently producing a degraded profile downstream
+      // consumers treated as successful. PipelineError lets the orchestrator
+      // surface the failure to logs/UI and skip downstream layers entirely.
+      const inner = l4bError instanceof Error ? l4bError : new Error(String(l4bError));
+      console.error(
+        '[Crystallizer] L4b failed — fail-fast per doctrine:',
+        inner.message,
       );
-
-      // Defaults: empty coherence, no prioritizedImprovements, no coachingMap
-      coherenceReport = { contradictions: [], isCoherent: true };
-      // scoreMatrix already has empty prioritizedImprovements and undefined coachingMap from L4a
+      throw PipelineError.l4bConsolidationFailed(inner, candidateStore.size);
     }
 
     // ── Phase 4: Adversarial Haiku Pass (non-fatal — graceful degradation) ──
@@ -2244,7 +2347,12 @@ export class CrystallizerService {
       adversarialTimingMs,
       l4aTimingMs,
       l4bTimingMs,
-      l4bDegraded,
+      // Scope 2 Phase 6a: l4bDegraded removed — L4b is now fail-fast, so
+      // a result returning from crystallize() always has a valid L4b output.
+      // Field kept on the result type (L4CrystallizationResult.l4bDegraded?)
+      // for backward compat with downstream consumers that still read it;
+      // always undefined on fresh runs.
+      l4bDegraded: undefined,
     };
   }
 

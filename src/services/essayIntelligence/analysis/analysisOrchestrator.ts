@@ -588,10 +588,16 @@ export class AnalysisOrchestrator {
         (profileForCrystal as EssayProfile).connections.all,
       );
 
+      // Scope 2 Phase 6a: pass the candidate store into L4 so L4b can
+      // consolidate instead of re-derive. crystallizer.ts fails fast if
+      // the store is empty (should be impossible post-Phase-5).
+      const candidateStoreForL4 = coordinator.getImprovementCandidateStore();
+
       l4Result = await crystallizerService.crystallize(
         profileForCrystal as EssayProfile,
         input.essayType,
         input.essayText,
+        candidateStoreForL4,
         priorNorthStar,
         findingStoreForL4.size > 0 ? findingStoreForL4 : undefined,
         connectionGraphForL4.totalCount > 0 ? connectionGraphForL4 : undefined,
@@ -602,6 +608,46 @@ export class AnalysisOrchestrator {
       coordinator.applyScoreMatrix(l4Result.scoreMatrix);
       coordinator.applyCoherenceReport(l4Result.coherenceReport);
 
+      // Scope 2 Phase 6a: drive the candidate lifecycle based on L4b's
+      // consolidation decisions. Every candidate cited in a priority's
+      // consolidatedFrom becomes `consolidated`; every active candidate
+      // NOT cited becomes `superseded`. Candidates stay in the store
+      // (not deleted) so Phase 8 can diagnose what L4b skipped.
+      const coachingMap = l4Result.scoreMatrix.coachingMap;
+      if (coachingMap) {
+        const citedIds = new Set(
+          coachingMap.priorities.flatMap((p) => p.consolidatedFrom ?? []),
+        );
+        const activeIds = candidateStoreForL4.getActive().map((c) => c.id);
+        const consolidatedIds = activeIds.filter((id) => citedIds.has(id));
+        const supersededIds = activeIds.filter((id) => !citedIds.has(id));
+
+        coordinator.applyConsolidation(consolidatedIds, supersededIds);
+
+        // Diagnostic: priorities with empty consolidatedFrom are ungrounded
+        // (LLM invented them despite the prompt forbidding it). Log loudly.
+        const ungroundedPriorities = coachingMap.priorities.filter(
+          (p) => !p.consolidatedFrom || p.consolidatedFrom.length === 0,
+        );
+        if (ungroundedPriorities.length > 0) {
+          console.warn(
+            `[Orchestrator] L4b emitted ${ungroundedPriorities.length}/${coachingMap.priorities.length} ` +
+              `ungrounded priorities (no consolidatedFrom). Phase 8 should flag these.`,
+          );
+        }
+
+        // Diagnostic: unknown candidate IDs in consolidatedFrom indicate
+        // LLM hallucination. Filter to known IDs for a count comparison.
+        const storeIds = new Set(activeIds);
+        const unknownCited = [...citedIds].filter((id) => !storeIds.has(id));
+        if (unknownCited.length > 0) {
+          console.warn(
+            `[Orchestrator] L4b cited ${unknownCited.length} unknown candidate IDs (hallucinated). ` +
+              `First 3: ${unknownCited.slice(0, 3).join(', ')}`,
+          );
+        }
+      }
+
       costTracker.record('L4', l4Result.cost, l4Result.tokenUsage, l4Result.timingMs);
       layersCompleted.push('L4');
 
@@ -610,6 +656,7 @@ export class AnalysisOrchestrator {
         `coherent=${l4Result.coherenceReport.isCoherent}, ` +
         `contradictions=${l4Result.coherenceReport.contradictions.length}, ` +
         `scoreMatrix=${l4Result.scoreMatrix.paragraphs.length} paragraphs, ` +
+        `priorities=${coachingMap?.priorities.length ?? 0}, ` +
         `cost=$${l4Result.cost.toFixed(4)}, time=${l4Result.timingMs}ms`,
       );
     } catch (error) {
@@ -734,12 +781,19 @@ export class AnalysisOrchestrator {
         const profileForAnnotations = coordinator.getProfile();
         // W7.1: Pass FindingStore to L5 for per-paragraph finding references
         const findingStoreForL5 = coordinator.getFindingStore();
+        // Scope 2 Phase 6a: pass the candidate store so L5 can resolve
+        // priority.consolidatedFrom IDs back to full candidate observations
+        // when rendering the coaching map lineage block.
+        const candidateStoreForL5 = coordinator.getImprovementCandidateStore();
+
         l5Result = await deepAnnotationService.generateAnnotations(
           profileForAnnotations as EssayProfile,
           input.reanalysisBrief,
           contradictionAnnotationFlags,
           findingStoreForL5.size > 0 ? findingStoreForL5 : undefined,
           growthReadingStrategy,
+          undefined, // priorAnnotations
+          candidateStoreForL5,
         );
 
         costTracker.record('L5', l5Result.cost, l5Result.tokenUsage, l5Result.timingMs);

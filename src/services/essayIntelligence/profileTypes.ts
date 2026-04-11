@@ -2142,6 +2142,23 @@ export interface CoachingMap {
     architecturalReason: string;
     unlocksNext: string;
     expectedImpact: 'transformative' | 'significant' | 'incremental';
+    /**
+     * Scope 2 Phase 6a: Lineage — the ImprovementCandidate IDs (from L3/L3.5/L3.75
+     * inline emission) that L4b consolidated into this priority. Enables L5 to
+     * cite the exact candidate that surfaced the problem when writing annotations,
+     * and lets downstream consumers trace priorities back to specific analytical
+     * observations.
+     *
+     * After L4b completes, the orchestrator marks every cited candidate as
+     * `consolidated` and every uncited active candidate as `superseded`. L4b
+     * must be intentional — an empty or missing `consolidatedFrom` means the
+     * priority is ungrounded (the LLM invented it from profile residue rather
+     * than consolidating existing candidates), which the validator flags.
+     *
+     * Optional for backward compat with pre-Phase-6a profiles; fresh runs
+     * always populate it.
+     */
+    consolidatedFrom?: string[];
   }>;
   /** Strengths that must NOT be damaged during improvement */
   protectedStrengths: Array<{

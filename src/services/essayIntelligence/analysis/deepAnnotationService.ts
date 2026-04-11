@@ -48,6 +48,8 @@ import type {
 } from '../profileTypes';
 import type { FindingStore } from '../findings/findingStore';
 import { buildAnnotationFindingContext } from '../findings/findingContextBuilder';
+import type { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import type { CoachingMap, ImprovementCandidate } from '../profileTypes';
 
 // ============================================================================
 // CONSTANTS
@@ -336,6 +338,112 @@ interface RawParagraphAnnotationOutput {
 }
 
 // ============================================================================
+// COACHING MAP + CANDIDATE LINEAGE RENDERING (Scope 2 Phase 6a)
+// ============================================================================
+
+/**
+ * Scope 2 Phase 6a: Render the coaching map with candidate lineage for L5.
+ *
+ * Produces a compact block the LLM can read inside the cached shared
+ * context. Each priority carries its consolidatedFrom candidate IDs
+ * resolved back to full candidate text so the LLM can write annotations
+ * that reference the specific analytical observation behind the priority.
+ *
+ * If `candidateStore` is undefined (backward-compat callers), the block
+ * still renders priorities + supporting sections without lineage — the
+ * same content the legacy dead-code `buildSharedContext` produced.
+ *
+ * Performance: candidate lineage is capped at top 5 candidates per priority
+ * to keep the block under ~1.5K tokens even with 7 priorities × 15 candidates.
+ * Observation text is truncated to 140 chars per candidate.
+ */
+function buildCoachingMapContextBlock(
+  coachingMap: CoachingMap,
+  candidateStore?: ImprovementCandidateStore,
+): string {
+  const parts: string[] = [];
+
+  // Transformative insight (the single most important framing)
+  if (coachingMap.transformativeInsight.insight) {
+    parts.push(
+      `TRANSFORMATIVE INSIGHT: ${coachingMap.transformativeInsight.insight}\n` +
+        `  WHY THIS TRANSFORMS: ${coachingMap.transformativeInsight.whyThisTransforms}` +
+        (coachingMap.transformativeInsight.requiresStudentAwareness
+          ? '\n  [REQUIRES STUDENT AWARENESS before specific feedback makes sense]'
+          : ''),
+    );
+  }
+
+  // Priorities with candidate lineage
+  if (coachingMap.priorities.length > 0) {
+    const priorityBlocks = coachingMap.priorities.map((p, i) => {
+      const target = p.target.paragraphs.length > 0 ? `P[${p.target.paragraphs.join(',')}]` : 'essay-level';
+      const header =
+        `PRIORITY ${i + 1} [${p.expectedImpact}] ${target}: ${p.priority}\n` +
+        `  Architecture: ${p.architecturalReason}\n` +
+        `  Unlocks next: ${p.unlocksNext}`;
+
+      // Resolve consolidatedFrom candidate IDs to full candidate records
+      const candidateIds = p.consolidatedFrom ?? [];
+      if (candidateIds.length === 0 || !candidateStore) {
+        return header;
+      }
+
+      const resolved: ImprovementCandidate[] = [];
+      for (const id of candidateIds.slice(0, 5)) {
+        // cap at 5 per priority
+        const candidate = candidateStore.get(id);
+        if (candidate) resolved.push(candidate);
+      }
+
+      if (resolved.length === 0) return header;
+
+      const lineageLines = resolved.map((c) => {
+        const scope = c.sentence != null ? `P${c.paragraph}S${c.sentence}` : `P${c.paragraph}`;
+        const obs =
+          c.observation.length > 140 ? `${c.observation.slice(0, 139)}…` : c.observation;
+        const tech = c.technique ? ` [${c.technique}]` : '';
+        return `    • [${c.sourceLayer}|${scope}|${c.coachingValue}]${tech} ${obs}`;
+      });
+
+      const moreCount = candidateIds.length > 5 ? ` (+${candidateIds.length - 5} more)` : '';
+      return `${header}\n  Consolidated from ${candidateIds.length} candidate(s)${moreCount}:\n${lineageLines.join('\n')}`;
+    });
+
+    parts.push(`PRIORITIES:\n${priorityBlocks.join('\n\n')}`);
+  }
+
+  // Protected strengths (never damage)
+  if (coachingMap.protectedStrengths.length > 0) {
+    const strengthLines = coachingMap.protectedStrengths
+      .map((s) => {
+        const loc = s.locations.length > 0 ? ` @ ${s.locations.map((l) => `P${l.paragraph}`).join(',')}` : '';
+        return `  • ${s.description}${loc} — PROTECT because: ${s.whyProtect}`;
+      })
+      .join('\n');
+    parts.push(`PROTECTED STRENGTHS (never damage during improvement):\n${strengthLines}`);
+  }
+
+  // Emergent patterns (essay-wide coaching hooks)
+  if (coachingMap.emergentPatterns.length > 0) {
+    parts.push(
+      `EMERGENT PATTERNS (essay-wide coaching hooks):\n` +
+        coachingMap.emergentPatterns.map((p) => `  • ${p}`).join('\n'),
+    );
+  }
+
+  // Score tensions (intra-paragraph dimension mismatches)
+  if (coachingMap.scoreTensions.length > 0) {
+    parts.push(
+      `SCORE TENSIONS (intra-paragraph dimension gaps):\n` +
+        coachingMap.scoreTensions.map((t) => `  • ${t}`).join('\n'),
+    );
+  }
+
+  return parts.join('\n\n');
+}
+
+// ============================================================================
 // DEEP ANNOTATION SERVICE
 // ============================================================================
 
@@ -360,6 +468,11 @@ class DeepAnnotationService {
     findingStore?: FindingStore,
     readingStrategy?: ReadingStrategy,
     priorAnnotations?: Map<number, PriorAnnotationContext>,
+    // Scope 2 Phase 6a: candidate store is the lineage source — L5 uses it
+    // to cite the specific candidate that surfaced each improvement when
+    // writing teaching annotations. Optional for backward compat with old
+    // callers; modern flow passes it from the orchestrator.
+    candidateStore?: ImprovementCandidateStore,
   ): Promise<L5AnnotationResult> {
     const startTime = Date.now();
 
@@ -379,6 +492,36 @@ class DeepAnnotationService {
     const smartSharedDigest = analysisContextBuilder.buildSharedDigest(profile, 'l5');
     // Append reanalysis/contradiction context to the shared digest (these apply to all paragraphs)
     const additionalShared: string[] = [];
+
+    // Scope 2 Phase 6a: Append the coaching map + candidate lineage block.
+    //
+    // Prior bug: the live L5 flow used `buildSharedDigest` which never read
+    // `coachingMap` at all, so transformativeInsight, priorities,
+    // protectedStrengths, emergentPatterns, and scoreTensions never reached
+    // the L5 prompt in production. The legacy `buildSharedContext` method at
+    // deepAnnotationService.ts:857 that rendered these WAS dead code (no
+    // callers). This augmentation fixes that pre-existing gap AND adds
+    // candidate-store lineage so each priority carries the specific candidate
+    // IDs L4b consolidated into it.
+    const coachingMap = profile.scoreMatrix?.coachingMap;
+    if (coachingMap) {
+      additionalShared.push(
+        `\n=== COACHING MAP (from L4b consolidation) ===\n` +
+          buildCoachingMapContextBlock(coachingMap, candidateStore),
+      );
+    }
+
+    // Scope 1 Phase 2 re-wired: cross-paragraph patterns (previously dead in
+    // the live path for the same reason as coachingMap — buildSharedDigest
+    // never read them). Re-enabled here.
+    const crossPatterns = profile.scoreMatrix?.crossParagraphPatterns ?? [];
+    if (crossPatterns.length > 0) {
+      additionalShared.push(
+        `\n=== CROSS-PARAGRAPH PATTERNS (from L4a score matrix) ===\n` +
+          crossPatterns.map((p) => `  • ${p}`).join('\n'),
+      );
+    }
+
     if (reanalysisBrief) additionalShared.push(`\n=== REANALYSIS BRIEF ===\n${reanalysisBrief}`);
     if (contradictionFlags && contradictionFlags.length > 0) {
       additionalShared.push(`\n=== CONTRADICTION FLAGS ===\n${contradictionFlags.join('\n')}`);
@@ -851,8 +994,22 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
   }
 
   /**
-   * Block 2: Shared context — essay text + complete understanding/analysis + North Star.
-   * Cached across all parallel paragraph calls for the same essay.
+   * ⚠️ LEGACY — DEAD CODE. Kept in place for Phase 6b deletion reference.
+   *
+   * The live L5 flow uses `analysisContextBuilder.buildSharedDigest(profile, 'l5')`
+   * plus the Phase 6a `buildCoachingMapContextBlock` augmentation (see
+   * `generateAnnotations` above). This method has NO callers in the live
+   * path — verified by grep sweep during Phase 6a audit.
+   *
+   * Prior to Phase 6a, this method was believed to be the L5 shared-context
+   * builder; Phase 2's "wiring" of emergentPatterns/scoreTensions into L5
+   * was added here and therefore never reached production. Phase 6a fixes
+   * that latent bug by augmenting the actual live path.
+   *
+   * DO NOT delete this method yet — Phase 6b deletes it alongside the
+   * crystallizer scraper code paths after Phase 8 E2E validates the new
+   * flow. Leaving it here preserves the ability to diff-compare the
+   * legacy vs live output shapes if Phase 8 reveals a regression.
    */
   private buildSharedContext(
     profile: Readonly<EssayProfile>,
