@@ -856,6 +856,24 @@ export class CoachingService {
       memory.events = [];
     }
 
+    // ── Scope 3 Phase 7: Research Database Enrichment (one-time per session) ──
+    // Fills demonstration, researchBacking, stakes (when thin), and collegeNote
+    // fields that buildImprovementManifest() leaves empty. Zero LLM calls.
+    // Idempotent via manifest._enriched — subsequent turns are instant no-ops.
+    // Dynamic import keeps the coldpath free for sessions without a manifest.
+    // Fail-open on unexpected errors so enrichment issues don't break coaching.
+    if (profile.improvementManifest && !profile.improvementManifest._enriched) {
+      try {
+        const { enrichWithResearchDatabase } = await import('../analysis/researchEnrichment');
+        enrichWithResearchDatabase(profile.improvementManifest, collegeId);
+      } catch (err) {
+        console.warn(
+          '[CoachingService] Research enrichment failed (non-fatal):',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
     const phase = profile.index.improvementPhase;
 
     console.log(
@@ -4157,6 +4175,18 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
       ? `\n  WORD ECONOMY: ${current.wordEconomyCut}`
       : '';
 
+    // Scope 3 Phase 7: research-backed principle + college-specific tailoring
+    // note. Both fields are populated (when available) by
+    // enrichWithResearchDatabase() at coaching session init. Each is absent
+    // for items with no IssueType mapping or no collegeId — the empty string
+    // contributes zero tokens in miss cases.
+    const principleLine = current.researchBacking?.principle
+      ? `\n  PRINCIPLE: ${current.researchBacking.principle}`
+      : '';
+    const collegeNoteLine = current.collegeNote
+      ? `\n  COLLEGE NOTE: ${current.collegeNote}`
+      : '';
+
     const nextItems = active.slice(1, 4).map((item, i) => {
       const techNote = item.technique ? ` (${item.technique})` : '';
       const enrichNote = item.conversatorEnrichments.length > 0
@@ -4174,12 +4204,24 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
       `\n  ACTION: ${current.action}` +
       (current.stakes ? `\n  STAKES: ${current.stakes}` : '') +
       (current.technique ? `\n  TECHNIQUE: ${current.technique}` : '') +
-      enrichments + demo + cut +
+      enrichments + demo + cut + principleLine + collegeNoteLine +
       (nextItems ? `\n\nNEXT IN QUEUE:\n${nextItems}` : '') +
       `\n\nRULE: Help the student understand and execute the CURRENT PRIORITY.` +
       `\nIf they're stuck, DEMONSTRATE it using their details.` +
       `\nIf they share new context, enrich the improvement with their specifics.` +
-      `\nWhen they've addressed it, advance to the next item.`;
+      `\nWhen they've addressed it, advance to the next item.` +
+      // Scope 3 Phase 7: force verbatim technique emission when present.
+      // Without this, Sonnet paraphrases technique names ("try writing in
+      // scene mode" instead of "SUMMARY-TO-SCENE") — the student loses the
+      // transferable vocabulary handle. The mandate mirrors the ACTION-mode
+      // rewriteExample requirement so the coaching layer preserves craft
+      // vocabulary the same way it preserves concrete rewrites.
+      (current.technique
+        ? `\n\nVOCABULARY RULE: When offering a rewrite or teaching moment for this priority, ` +
+          `name the technique in ALL-CAPS verbatim (e.g., "This is a ${current.technique} move"). ` +
+          `Say it exactly once per response. This gives the student a transferable ` +
+          `vocabulary handle they can carry to future essays.`
+        : '');
   }
 
   /**

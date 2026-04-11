@@ -2627,6 +2627,35 @@ export interface ImprovementEntry {
   impact: 'transformative' | 'significant' | 'incremental';
   /** Context enrichments added by conversator as student reveals details */
   conversatorEnrichments: string[];
+
+  /**
+   * Scope 3 Phase 7: Research-backed principle + mechanism explanation,
+   * populated at coaching session init by `enrichWithResearchDatabase()`
+   * from `TEACHING_KNOWLEDGE_BASE` in `researchBackedTeachingService`.
+   *
+   * Null when no IssueType mapping was resolved for this item (graceful
+   * skip — per-item misses are legitimate, not errors).
+   *
+   * @see src/services/essayIntelligence/analysis/researchEnrichment.ts
+   */
+  researchBacking?: {
+    /** Core principle behind the transformation (e.g., "Start at the point of highest tension") */
+    principle: string;
+    /** Mechanism explanation — why the "after" version works */
+    whyItWorks: string;
+    /** IssueType string used for the lookup (provenance trail) */
+    sourceRef: string;
+    /** Optional SourceCitation.source_id when getWhyThisMatters returned one */
+    citationId?: string;
+  } | null;
+
+  /**
+   * Scope 3 Phase 7: College-specific tailoring note for supplement essays.
+   * Populated only when `collegeId` is present at coaching session init AND
+   * `researchBackedTeachingService.getCollegeSpecificGuidance()` returns an
+   * insight. Null is the correct "not applicable" value — not a failure.
+   */
+  collegeNote?: string | null;
 }
 
 /**
@@ -2648,6 +2677,19 @@ export interface ImprovementManifest {
   wordCount: number;
   /** Essay word limit */
   wordLimit: number;
+
+  /**
+   * Scope 3 Phase 7: Idempotency flag set by `enrichWithResearchDatabase()`
+   * on first run. Prevents re-running enrichment on every coaching turn.
+   *
+   * NOT PERSISTED: `SupabaseCheckpointStore.save()` strips this key via
+   * a JSON replacer so every session reload starts with unset flag and
+   * re-runs enrichment against the current `collegeId` and research DB.
+   * Without that strip, the flag would survive the JSONB round-trip and
+   * permanently short-circuit enrichment when a student switches college
+   * mid-thread or the research DB is updated.
+   */
+  _enriched?: boolean;
 }
 
 /**

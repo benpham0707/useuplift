@@ -52,6 +52,19 @@ export class SupabaseCheckpointStore implements CheckpointStore {
       const baselineText = profile.paragraphs.map(p => p.text).join('\n\n');
       const textHash = hashEssayText(baselineText);
 
+      // Scope 3 Phase 7: strip transient Scope 3 fields before persisting.
+      // `improvementManifest._enriched` is the session-local idempotency
+      // flag for research enrichment — persisting it would permanently
+      // short-circuit enrichment when the student switches collegeId
+      // mid-thread or the research DB is updated. The JSON-replacer
+      // pattern scales if more keys need to be stripped later.
+      const sanitizedProfile = JSON.parse(
+        JSON.stringify(profile, (key, value) => {
+          if (key === '_enriched') return undefined;
+          return value;
+        }),
+      );
+
       const { error } = await supabase
         .from('essay_understanding')
         .upsert(
@@ -60,7 +73,7 @@ export class SupabaseCheckpointStore implements CheckpointStore {
             user_id: this.userId,
             essay_type: 'common_app', // Default; overwritten if row exists
             text_hash: textHash,
-            profile_cache: profile as unknown as Record<string, unknown>,
+            profile_cache: sanitizedProfile as Record<string, unknown>,
             total_cost_usd: metadata.costSoFar,
             version: metadata.writeVersion,
             last_analysis_at: new Date().toISOString(),

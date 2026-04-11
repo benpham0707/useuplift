@@ -188,6 +188,49 @@ export async function getCollegeCoachingOverlay(collegeId: string): Promise<stri
     }
   }
 
+  // --- Elite teaching patterns (Scope 3 Phase 7, top 2 examples) ---
+  //
+  // 10 of 13 college data files have populated `eliteExamples` with
+  // `pattern`, `anonymizedDescription`, and `whatMakesItEffective[]`
+  // (Brown, Dartmouth, UChicago, Northwestern, Penn, USC, Caltech, CMU,
+  // Cornell, NYU). The remaining 3 (Harvard, MIT, Stanford) have empty
+  // arrays — the `if` guard below skips them without rendering an empty
+  // section.
+  //
+  // `CollegeEliteExample` in types/collegeResearch.ts uses
+  // `[key: string]: unknown` as an escape hatch, so `pattern`,
+  // `anonymizedDescription`, and `whatMakesItEffective` are reachable
+  // via guarded property reads without a type widening.
+  if (research.eliteExamples && research.eliteExamples.length > 0) {
+    const topExamples = research.eliteExamples.slice(0, 2);
+    const exampleLines: string[] = [];
+
+    for (const ex of topExamples) {
+      // Prefer typed field reads, fall back via the [key: string]: unknown
+      // escape hatch. Any missing required field → skip the example.
+      const pattern =
+        (ex as { pattern?: string }).pattern ?? ex.exampleId;
+      const description =
+        (ex as { anonymizedDescription?: string }).anonymizedDescription;
+      const strengths =
+        (ex as { whatMakesItEffective?: string[] }).whatMakesItEffective;
+
+      if (!description) continue;
+      let line = `  [${pattern}]: ${description}`;
+      if (strengths && strengths.length > 0) {
+        line += `\n    Effective because: ${strengths.slice(0, 2).join('; ')}`;
+      }
+      exampleLines.push(line);
+    }
+
+    if (exampleLines.length > 0) {
+      parts.push(
+        `ELITE TEACHING PATTERNS (observed in admitted essays at this college):\n` +
+          exampleLines.join('\n'),
+      );
+    }
+  }
+
   return parts.join('\n');
 }
 
