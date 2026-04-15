@@ -60,11 +60,15 @@ import type {
   ImprovementManifest,
   ImprovementEntry,
   ImprovementCandidate,
+  ImprovementCandidateStoreSnapshot,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
 import { classifyError } from '../../../lib/llm/claude';
 import type { LayerError } from '../../../lib/llm/claude';
+import { PipelineError } from '../errors';
+import { runHowlerPass } from './howlerPass';
+import { mergeL5IntoManifest } from './l5ManifestMerger';
 
 // Layer services
 import { firstImpressionsService } from './firstImpressions';
@@ -824,24 +828,86 @@ export class AnalysisOrchestrator {
     // student. Understanding is the fuel — improvements are the output.
     // ═══════════════════════════════════════════════════════════════════════
 
+    // classified: systemic
+    //   Manifest generation is load-bearing for downstream coaching. Silent
+    //   fallback to "no manifest" was the MISCLASSIFIED case that led to
+    //   (a) the reference audit's "(no manifest on post-coaching profile)"
+    //   observation and (b) coaching running without a priority queue, which
+    //   erased the entire Scope 1-3 value prop. Now: fail-fast with structured
+    //   context. Callers can catch PipelineError at the pipeline boundary if
+    //   they want to degrade; the orchestrator no longer silently degrades.
     try {
       const profileForManifest = coordinator.getProfile() as EssayProfile;
+
+      // ── Root-cause fix for S3/V14/S6/partial-S5 ──
+      // Force a fresh candidate-store snapshot onto the profile before
+      // buildImprovementManifest runs. Without this, L4 priorities'
+      // `consolidatedFrom` candidate-ID lookups return null because the
+      // snapshot on the profile is only synced inside checkpoint(). The
+      // drift between checkpoint cadence and manifest-build timing produced
+      // the "4/9 items with technique" regression in the reference audit.
+      (profileForManifest as EssayProfile).improvementCandidateSnapshot =
+        coordinator.snapshotCandidateStore();
+
       const manifest = this.buildImprovementManifest(
         profileForManifest,
         coordinator.getFindingStore(),
         input.essayText,
         input.essayType,
       );
+
+      // ── Efficiency: plumb L5 output into the manifest ──
+      // L5 spends ~$0.50/run producing rewriteExample + transferablePrinciple
+      // + stakes + wordEconomyCut per annotation. Pre-merger, these fields
+      // never reached coaching. Now they seed matching manifest items BEFORE
+      // research enrichment runs, so L5's essay-specific rewrites take
+      // precedence over the research DB's generic BEFORE/AFTER/PRINCIPLE
+      // boilerplate. Non-destructive: only fills null fields.
+      if (l5Result) {
+        try {
+          const mergeStats = mergeL5IntoManifest(manifest, l5Result);
+          if (mergeStats.itemsMerged > 0) {
+            console.log(
+              `[Orchestrator] L5→Manifest merge: ${mergeStats.itemsMerged} items, ` +
+                `demonstrations=${mergeStats.demonstrationsFilled}, ` +
+                `techniques=${mergeStats.techniquesFilled}, ` +
+                `stakes=${mergeStats.stakesFilled}`,
+            );
+          }
+        } catch (err) {
+          // classified: recoverable — merger is an enhancement pass; if it
+          // fails, manifest still has its structural content. Log loudly.
+          console.warn(
+            '[Orchestrator] L5→Manifest merge failed (non-fatal):',
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+
       profileForManifest.improvementManifest = manifest;
+
+      const withTechnique = manifest.items.filter(i => i.technique).length;
       console.log(
-        `[Orchestrator] ImprovementManifest: ${manifest.items.length} items from ${manifest.sources.join(', ')}`,
+        `[Orchestrator] ImprovementManifest: ${manifest.items.length} items ` +
+          `(${withTechnique}/${manifest.items.length} with technique) ` +
+          `from ${manifest.sources.join(', ')}`,
       );
     } catch (error) {
-      // Manifest generation is NOT fatal — log and continue
-      console.error(
-        '[Orchestrator] ImprovementManifest generation failed (non-fatal):',
-        error instanceof Error ? error.message : String(error),
+      // classified: systemic
+      // Fail-fast — wrap non-PipelineError exceptions so callers get
+      // structured diagnostics. Manifest generation is load-bearing for
+      // coaching; silent fallback erased the entire Scope 1-3 value prop.
+      if (error instanceof PipelineError) {
+        console.error('[Orchestrator] ImprovementManifest generation failed:', error.toString());
+        throw error;
+      }
+      const wrapped = PipelineError.wrap(
+        'manifest_projection',
+        error instanceof Error ? error : new Error(String(error)),
+        'ImprovementManifest generation failed',
       );
+      console.error('[Orchestrator] ImprovementManifest generation failed:', wrapped.toString());
+      throw wrapped;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -876,6 +942,23 @@ export class AnalysisOrchestrator {
       `time=${totalTimingMs}ms`,
     );
 
+    const computedConfidence = this.computeConfidenceLevel(layersCompleted, l4Result.coherenceReport);
+
+    // ── Phase 1.4 root-cause fix: mirror computed confidence onto the profile.
+    // Previously this was computed only as a PipelineResult field, never written
+    // back to `profile.index.confidenceLevel` or `profile.metadata.confidenceLevel`,
+    // so persisted profiles always stored `confidenceLevel: 'initial'`. On the
+    // next edit, FocusedAnalyzer's selectAnalysisMode() hit Rule 1 ("confidence
+    // =initial → comprehensive") and routed every edit to full re-analysis
+    // (~$0.75 / 10min in the reference audit) even when the profile had clearly
+    // completed L1→L5.
+    //
+    // Both fields must be set because refreshIndex() (essayProfileManager.ts:
+    // 2605) copies metadata.confidenceLevel → index.confidenceLevel on every
+    // mutation — updating only index would be clobbered by the next refresh.
+    (finalProfile as EssayProfile).index.confidenceLevel = computedConfidence;
+    (finalProfile as EssayProfile).metadata.confidenceLevel = computedConfidence;
+
     return {
       profile: finalProfile,
       completedAllLayers,
@@ -884,7 +967,7 @@ export class AnalysisOrchestrator {
       layersCompleted,
       layersFailed,
       improvementPhase: l35Result.improvementPhase,
-      confidenceLevel: this.computeConfidenceLevel(layersCompleted, l4Result.coherenceReport),
+      confidenceLevel: computedConfidence,
       annotations: l5Result,
       scoreMatrix: l4Result.scoreMatrix,
       coherenceReport: l4Result.coherenceReport,
@@ -1595,7 +1678,20 @@ export class AnalysisOrchestrator {
    *   4. L3.75 craft assessment growth edges
    *   5. L3 paragraph-level growth edges
    */
-  private buildImprovementManifest(
+  /**
+   * Build the ImprovementManifest from the profile's L4 priorities + findings
+   * + AO red flags + L3.75 growth edges + L3 paragraph-level edges.
+   *
+   * PUBLIC so post-edit re-analysis paths (focused mode in
+   * `reanalysisOrchestrator.runFocusedMode`) can rebuild the manifest after
+   * mutating the profile, instead of leaving coaching with a stale or absent
+   * manifest. See reference audit line 611 — "(no manifest on post-coaching
+   * profile)" — for the regression this guards against.
+   *
+   * Caller must ensure `profile.improvementCandidateSnapshot` is fresh
+   * (call `coordinator.snapshotCandidateStore()` immediately before).
+   */
+  buildImprovementManifest(
     profile: EssayProfile,
     findingStore: FindingStore,
     essayText: string,
@@ -1613,19 +1709,31 @@ export class AnalysisOrchestrator {
     const coachingMap = profile.scoreMatrix?.coachingMap;
     if (coachingMap?.priorities && coachingMap.priorities.length > 0) {
       sources.push('l4_priorities');
+      const candidateSnapshot = profile.improvementCandidateSnapshot;
       for (const p of coachingMap.priorities.slice(0, 5)) {
         const targetPara = p.target?.paragraphs?.[0] ?? -1;
+        // Scope 2 Phase 6a: resolve technique from first consolidated candidate.
+        // Priorities cite candidates via `consolidatedFrom`; candidates carry the
+        // LLM-assigned technique. Fall back to keyword match on the priority text
+        // when consolidation lineage is missing (pre-Phase-6a profiles).
+        const techniqueFromCandidate = this.getTechniqueFromConsolidatedCandidates(
+          p.consolidatedFrom,
+          candidateSnapshot,
+        );
+        const technique = techniqueFromCandidate
+          ?? this.matchClaimToTechnique(`${p.priority} ${p.architecturalReason}`)?.name
+          ?? null;
         items.push({
           id: `IMP_${priority}`,
           paragraph: targetPara,
           observation: p.architecturalReason,
           action: p.priority,
           stakes: p.unlocksNext,
-          technique: null, // L4 doesn't route to techniques — downstream enrichment
+          technique,
           demonstration: null,
           wordEconomyCut: null,
           source: 'l4_priority',
-          sourceRef: null,
+          sourceRef: p.consolidatedFrom?.[0] ?? null,
           priority: priority++,
           impact: p.expectedImpact,
           conversatorEnrichments: [],
@@ -1778,6 +1886,227 @@ export class AnalysisOrchestrator {
       }
     }
 
+    // ── Source 6: Howler Pass (Phase 4.1 quality floor) ──
+    // Cheap deterministic pass that catches specific howlers the LLM layers
+    // systematically miss: cliché bigrams, near-duplicate paragraphs, known-
+    // wrong factual hooks. Each becomes a MUST_ADDRESS manifest item with
+    // impact=transformative so the coach surfaces them early.
+    //
+    // BUG FIX (Critical #1 from E2E audit, Apr 14): on rebuild-after-edit the
+    // passed `essayText` parameter may be truncated or paragraph-scoped (seen
+    // in the conversator V2 E2E test where processEdit receives paragraph-only
+    // text and currentText ends up 460 chars instead of the full 2309-char
+    // essay). Result: re-analysis ran howlerPass against a single paragraph
+    // that had no clichés, so every red_flag item detected in the initial
+    // pass silently disappeared from the rebuilt manifest — 60-70% of howler
+    // protection lost on a single edit.
+    //
+    // Two-pronged fix:
+    //   (a) Run howler pass against paragraph-reconstructed text, which is
+    //       the authoritative source of truth for the CURRENT paragraph
+    //       content inside the profile regardless of what `essayText` was.
+    //   (b) Carry forward prior manifest red_flag items whose evidence
+    //       substring still appears in the current essay. This preserves
+    //       howlers detected on a prior pass even if (a) misses them due to
+    //       input anomaly or detector regression. Dedup key: observation+
+    //       paragraph — never emit the same howler twice.
+    try {
+      const paragraphTexts = profile.paragraphs.map((p) => p.text);
+      const fullEssayText = paragraphTexts.join('\n\n');
+      const howlerResult = runHowlerPass(fullEssayText, paragraphTexts);
+      if (howlerResult.howlers.length > 0) {
+        sources.push('howler_pass');
+        console.log(
+          `[Orchestrator] HowlerPass: ${howlerResult.howlers.length} howlers ` +
+            `(cliche=${howlerResult.counts.cliche}, duplicate=${howlerResult.counts.duplicate_paragraph}, ` +
+            `factual=${howlerResult.counts.factual_hook})`,
+        );
+        // Prioritize factual > duplicate > cliché (factual errors are the most
+        // damaging; clichés are most common so they dominate raw count). Cap
+        // at 6 items so a cliché-heavy essay doesn't blow up the manifest and
+        // starve the structural L4 priorities from coaching attention.
+        const HOWLER_CAP = 6;
+        const ordered = [
+          ...howlerResult.howlers.filter((h) => h.kind === 'factual_hook'),
+          ...howlerResult.howlers.filter((h) => h.kind === 'duplicate_paragraph'),
+          ...howlerResult.howlers.filter((h) => h.kind === 'cliche'),
+        ].slice(0, HOWLER_CAP);
+        if (ordered.length < howlerResult.howlers.length) {
+          console.log(
+            `[Orchestrator] HowlerPass: truncated to top ${HOWLER_CAP} howlers (factual > duplicate > cliché)`,
+          );
+        }
+        for (const h of ordered) {
+          const paragraphIdx =
+            h.location.type === 'paragraph' ? h.location.index :
+            h.location.type === 'paragraph_pair' ? h.location.a :
+            -1;
+
+          // Dedup guard for paragraph-scoped howlers: if a paragraph already
+          // has an L4 priority, emitting a duplicate-paragraph howler for it
+          // would produce two items for the same paragraph (the audit
+          // reviewer flagged this). Range-based clichés (paragraphIdx=-1)
+          // and factual hooks are always allowed through since they address
+          // different concerns.
+          if (
+            paragraphIdx !== -1 &&
+            h.kind === 'duplicate_paragraph' &&
+            items.some((i) => i.paragraph === paragraphIdx && i.source === 'l4_priority')
+          ) {
+            continue;
+          }
+
+          const kindLabel = h.kind === 'cliche' ? 'Cliché'
+            : h.kind === 'duplicate_paragraph' ? 'Structural redundancy'
+            : h.kind === 'factual_hook' ? 'Factual issue'
+            : h.kind;
+          // Technique routing for howler items. Every howler now carries a
+          // named technique so the planner can prioritize it alongside L4/
+          // L3.5 items (audit surfaced howlers stranded as technique=null,
+          // which made the planner skip them — defeating the quality-floor
+          // goal). These names intentionally mirror the craft-technique
+          // vocabulary used elsewhere in the pipeline; research enrichment
+          // either finds a matching teaching bundle or gracefully skips.
+          //   cliche              → VOICE AUTHENTICITY (stock phrase, student
+          //                         must find the only-them version).
+          //   factual_hook        → FACTUAL ACCURACY (the opening claim is
+          //                         wrong and undermines the reader's trust).
+          //   duplicate_paragraph → STRUCTURAL REDUNDANCY (two paragraphs
+          //                         saying the same thing — consolidate or
+          //                         differentiate).
+          const technique = h.kind === 'cliche' ? 'VOICE AUTHENTICITY'
+            : h.kind === 'factual_hook' ? 'FACTUAL ACCURACY'
+            : h.kind === 'duplicate_paragraph' ? 'STRUCTURAL REDUNDANCY'
+            : null;
+          items.push({
+            id: `IMP_${priority}`,
+            paragraph: paragraphIdx,
+            observation: `${kindLabel}: ${h.description}`,
+            action: h.suggestion,
+            stakes: `Surface-level howlers undermine the reader\'s trust in the essay\'s craft even when the underlying ideas are strong. AOs flag these in seconds.`,
+            technique,
+            demonstration: null,
+            wordEconomyCut: null,
+            source: 'red_flag',
+            sourceRef: null,
+            priority: priority++,
+            impact: 'significant',
+            conversatorEnrichments: [`[howler:${h.kind}] evidence: ${h.evidence.slice(0, 120)}`],
+          });
+        }
+      }
+    } catch (err) {
+      // classified: recoverable
+      // Howler pass is a quality-floor enhancement; its failure should not
+      // block manifest generation. Log for observability.
+      console.warn(
+        '[Orchestrator] HowlerPass failed (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    // ── Source 6b: Carry-forward red_flag items from prior manifest ──
+    // Safety net for howler persistence across rebuilds. Even with the
+    // paragraph-reconstructed howler pass above, edge cases can leave howlers
+    // undetected on rebuild (e.g., paragraph text mutated in a way that
+    // preserves the cliché but bypasses the detector; duplicate-pair thresh-
+    // old drift after structural edits). This block scans the prior manifest
+    // for red_flag items whose evidence substring is still present in the
+    // current essay, and re-emits them if they weren't already produced by
+    // the fresh howler pass. Dedup key: observation+paragraph pair.
+    //
+    // Acceptance per audit: "IMP_11 and IMP_12 reference clichés in P6/P7
+    // which were never edited. The howler pass on rebuild is either not
+    // running or returning zero for unchanged text." This is the belt to
+    // the howler pass's suspenders — if the pass fails or mis-fires, the
+    // prior detection survives.
+    try {
+      const priorManifest = profile.improvementManifest;
+      if (priorManifest?.items?.length) {
+        const existingKey = new Set(
+          items.map((i) => `${i.paragraph}|${i.observation}`),
+        );
+        const paragraphTextsForCarry = profile.paragraphs.map((p) => p.text);
+        const fullEssayTextForCarry = paragraphTextsForCarry.join('\n\n').toLowerCase();
+        let carried = 0;
+        for (const prior of priorManifest.items) {
+          if (prior.source !== 'red_flag') continue;
+          const key = `${prior.paragraph}|${prior.observation}`;
+          if (existingKey.has(key)) continue;
+
+          // Evidence survival check: the howler's evidence excerpt appears
+          // in the annotation payload (conversatorEnrichments or the
+          // observation itself after the kind label). If we can't find the
+          // distinctive phrase in the current text, drop — the student
+          // already fixed it.
+          const evidenceMarker = (prior.conversatorEnrichments ?? [])
+            .find((e) => e.startsWith('[howler:'))
+            ?? '';
+          // Extract the distinctive phrase. For cliché observations the
+          // phrase is quoted inside the observation ("..."); for factual
+          // issues, the quoted phrase is the marker. Fall back to the
+          // evidence tail of the enrichment string.
+          const quotedMatch = prior.observation.match(/"([^"]{3,80})"/);
+          const evidenceTail = evidenceMarker.includes('evidence:')
+            ? evidenceMarker.split('evidence:')[1]?.trim().toLowerCase() ?? ''
+            : '';
+          const needle = (quotedMatch?.[1] ?? evidenceTail).trim().toLowerCase();
+          if (needle.length < 3) continue;
+
+          // Duplicate-paragraph howlers: both paragraph indices referenced
+          // in the observation (e.g., "P5 and P6 share 82% ...") must still
+          // exist AND still be near-duplicates. We conservatively keep them
+          // if both paragraphs still exist — the fresh howler pass would
+          // have redetected them on its own if the threshold still held.
+          if (prior.observation.startsWith('Structural redundancy')) {
+            const pairMatch = prior.observation.match(/P(\d+) and P(\d+)/);
+            if (pairMatch) {
+              const a = Number(pairMatch[1]) - 1;
+              const b = Number(pairMatch[2]) - 1;
+              if (a < 0 || b < 0 || a >= profile.paragraphs.length || b >= profile.paragraphs.length) {
+                continue; // paragraph removed — howler no longer applies
+              }
+            }
+          } else if (!fullEssayTextForCarry.includes(needle)) {
+            continue; // cliché/factual phrase removed by student — drop
+          }
+
+          items.push({
+            id: `IMP_${priority}`,
+            paragraph: prior.paragraph,
+            observation: prior.observation,
+            action: prior.action,
+            stakes: prior.stakes,
+            technique: prior.technique,
+            demonstration: prior.demonstration,
+            wordEconomyCut: prior.wordEconomyCut,
+            source: 'red_flag',
+            sourceRef: prior.sourceRef,
+            priority: priority++,
+            impact: prior.impact,
+            conversatorEnrichments: [
+              ...(prior.conversatorEnrichments ?? []),
+              '[howler:carry-forward] preserved from prior manifest across rebuild',
+            ],
+          });
+          existingKey.add(key);
+          carried++;
+        }
+        if (carried > 0) {
+          if (!sources.includes('howler_pass')) sources.push('howler_pass');
+          if (!sources.includes('howler_carry_forward')) sources.push('howler_carry_forward');
+          console.log(
+            `[Orchestrator] HowlerPass: carried forward ${carried} red_flag items from prior manifest (evidence still present in current text)`,
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(
+        '[Orchestrator] Howler carry-forward failed (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
+
     // ── Word Economy: Identify cuttable paragraphs ──
     // Tag redundant/supporting paragraphs as potential cuts
     const structuralRoles = profile.northStar?.structuralRolesMap ?? [];
@@ -1795,13 +2124,38 @@ export class AnalysisOrchestrator {
       }
     }
 
+    // Phase 4.1: cap raised 10 → 12 to leave room for quality-floor howler
+    // items (factual hooks + top cliché matches) alongside the 10 structural
+    // priorities. Higher caps bloat the coaching prompt; 12 is the practical
+    // sweet-spot after measuring the piano-essay fixture (9 structural + 1-3
+    // howlers comfortably fit). The planner only deploys ONE item per turn
+    // regardless of cap, so the cap is purely a prompt-length bound.
     return {
-      items: items.slice(0, 10), // Cap at 10 improvements
+      items: items.slice(0, 12),
       generatedAt: new Date().toISOString(),
       sources,
       wordCount,
       wordLimit,
     };
+  }
+
+  /**
+   * Scope 2 Phase 6a: resolve the technique for an L4 priority by walking its
+   * `consolidatedFrom` lineage back to the candidate store. Candidates carry
+   * the LLM-assigned technique name; priorities do not. Returns the technique
+   * of the first consolidated candidate (ordering mirrors LLM citation order,
+   * so this is the most-relevant technique for the priority).
+   */
+  private getTechniqueFromConsolidatedCandidates(
+    consolidatedFrom: string[] | undefined,
+    snapshot: ImprovementCandidateStoreSnapshot | undefined,
+  ): string | null {
+    if (!consolidatedFrom?.length || !snapshot?.candidates?.length) return null;
+    for (const candidateId of consolidatedFrom) {
+      const candidate = snapshot.candidates.find((c) => c.id === candidateId);
+      if (candidate?.technique) return candidate.technique;
+    }
+    return null;
   }
 
   /**
