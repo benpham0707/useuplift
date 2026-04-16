@@ -82,6 +82,15 @@ import type {
 } from '../profileTypes';
 
 import { FindingStore } from '../findings/findingStore';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import type {
+  ImprovementCandidate,
+  ImprovementCandidateStoreSnapshot,
+} from '../profileTypes';
+import { isPipelineError } from '../errors';
+import { writeSnapshot } from '../history/snapshotStore';
+import { computeRevisionIntelligence } from '../history/revisionIntelligence';
+import { computeVoiceEvolution } from '../history/voiceEvolution';
 
 /**
  * Minimal StructuralCartography shape needed by the coordinator for dispatch.
@@ -646,8 +655,15 @@ export function createInitialProfile(input: {
     wordCount: number;
     promptText?: string;
   };
+  /**
+   * Target college identifier for supplement / PIQ essays. Normalized
+   * lowercase (e.g. "stanford"). Leave undefined for common_app essays.
+   * Threaded through to `EssayProfile.collegeId` so research enrichment
+   * can look up college-specific guidance on every coaching turn.
+   */
+  collegeId?: string;
 }): EssayProfile {
-  const { paragraphTexts, sentenceTexts, metadata } = input;
+  const { paragraphTexts, sentenceTexts, metadata, collegeId } = input;
 
   const now = new Date().toISOString();
 
@@ -884,6 +900,10 @@ export function createInitialProfile(input: {
     patternInsights: [],
     studentDeclaredContext: '',
 
+    // College target (supplement/PIQ only; undefined for common_app) — consumed
+    // by researchEnrichment for college-specific coachingNote lookups.
+    collegeId,
+
     // Metadata
     metadata: {
       confidenceLevel: 'initial',
@@ -914,6 +934,30 @@ export class EssayProfileCoordinator {
 
   // ── FindingStore (W1.2) ──
   private findingStore: FindingStore;
+
+  // ── ImprovementCandidateStore (Scope 2 Phase 4) ──
+  // Append-only lifecycle store for improvement candidates emitted inline by
+  // L3/L3.5/L3.75 layers. L4 consolidates these into CoachingMap priorities;
+  // L5 materializes consolidated targets with rewrite examples; manifest
+  // projection finalizes them. Phase 1.5 already defined the type contract
+  // (ImprovementCandidate + ImprovementCandidateStoreSnapshot) so this class
+  // slots in without disturbing the existing profileMigration backfill path.
+  private candidateStore: ImprovementCandidateStore;
+
+  // ── Revision History (Phase 1 — cross-session snapshot chain) ──
+  // Stable per-coordinator session identifier. The current profile layer
+  // lacks an explicit session-id field, so we synthesize one deterministically
+  // at coordinator construction: createdAt + a construction-time epoch. The
+  // id is stable for the coordinator's lifetime, which matches how the
+  // coordinator maps to a single session in the current layering. Re-hydrated
+  // coordinators (fromCheckpoint) get a fresh id — that's the correct
+  // boundary behavior (a new server-side session).
+  private readonly revisionSessionId: string;
+  // Cached essay text captured at the last writeSnapshot call, kept in
+  // memory so detectResetCondition can compute token-overlap against a
+  // known-prior essay text (we intentionally don't persist full text on
+  // snapshots — only the hash — to keep snapshot size minimal).
+  private priorSnapshotEssayText: string | null = null;
 
   // ── Domain mutators ──
   private sentenceMutator: ISentenceMutator;
@@ -960,6 +1004,16 @@ export class EssayProfileCoordinator {
       isFirstSession: true,
     };
 
+    // Synthesize a stable session id for revision-history snapshots.
+    // Combines profile createdAt (stable for profile lifetime) with
+    // construction epoch — uniqueness across coordinator instances,
+    // stability across writes within one coordinator.
+    const createdAtStamp =
+      profile.metadata && typeof profile.metadata.createdAt === 'string'
+        ? profile.metadata.createdAt
+        : new Date().toISOString();
+    this.revisionSessionId = `${createdAtStamp}-${Date.now()}`;
+
     // W1.2: Initialize FindingStore from persisted findings (or empty)
     if (profile.findings.length > 0) {
       // Determine nextId from existing findings
@@ -974,6 +1028,22 @@ export class EssayProfileCoordinator {
       });
     } else {
       this.findingStore = new FindingStore();
+    }
+
+    // Scope 2 Phase 4: Initialize ImprovementCandidateStore from the
+    // persisted snapshot (if any) or empty. Phase 1.5's fromCheckpoint()
+    // migration hook ensures legacy profiles get a backfilled snapshot
+    // before the constructor runs, so by this point
+    // `profile.improvementCandidateSnapshot` is either (a) a genuine
+    // snapshot from a post-Phase-4 run, (b) a migration-built snapshot
+    // from Phase 1.5 for legacy profiles, or (c) undefined only if
+    // `index.requiresReanalysis === true` (migration found nothing).
+    if (profile.improvementCandidateSnapshot) {
+      this.candidateStore = ImprovementCandidateStore.deserialize(
+        profile.improvementCandidateSnapshot,
+      );
+    } else {
+      this.candidateStore = new ImprovementCandidateStore();
     }
 
     // Inject mutators — use real implementations by default, allow overrides for testing
@@ -1009,6 +1079,8 @@ export class EssayProfileCoordinator {
       wordCount: number;
       promptText?: string;
     };
+    /** Target college (supplement/PIQ only). Normalized lowercase. */
+    collegeId?: string;
     checkpointStore: CheckpointStore;
     mutators?: Partial<{
       sentence: ISentenceMutator;
@@ -1026,12 +1098,29 @@ export class EssayProfileCoordinator {
       paragraphTexts: input.paragraphTexts,
       sentenceTexts: input.sentenceTexts,
       metadata: input.metadata,
+      collegeId: input.collegeId,
     });
     return new EssayProfileCoordinator(profile, input.checkpointStore, input.mutators);
   }
 
   /**
    * Create a coordinator from a persisted profile (resume from checkpoint).
+   *
+   * PHASE 1.5 MIGRATION HOOK: If the persisted profile lacks an
+   * `improvementCandidateSnapshot`, runs the one-shot deterministic migration
+   * from legacy data shapes (findings, coachingMap.priorities, growthEdges,
+   * redFlags). Zero LLM calls — pure data-shape conversion.
+   *
+   * Three outcomes:
+   *   1. Snapshot was already populated → migration skipped (idempotent).
+   *   2. Migration succeeds → snapshot populated, requiresReanalysis cleared.
+   *   3. Migration finds zero source data → profile flagged
+   *      `index.requiresReanalysis = true`; the coaching gate in
+   *      `processCoachingTurn()` throws CoachingBlockedError so the UI can
+   *      prompt the user for re-analysis. No silent degradation.
+   *
+   * Only PipelineError.noMigrationSource is caught here — any other error
+   * propagates unmodified (fail-fast for real bugs).
    */
   static fromCheckpoint(
     profile: EssayProfile,
@@ -1047,6 +1136,56 @@ export class EssayProfileCoordinator {
       insight: IInsightMutator;
     }>,
   ): EssayProfileCoordinator {
+    // ── Phase 1.5: Legacy profile migration hook ──────────────────────────
+    if (!profile.improvementCandidateSnapshot) {
+      try {
+        // Lazy require to avoid circular-import risk: profileMigration imports
+        // from profileTypes (which essayProfileManager also imports). A
+        // top-level `import` can trigger circular module initialization in
+        // some bundler configurations. require() defers resolution to call
+        // time, sidestepping the cycle. Phase 4 may refactor to a top-level
+        // import if the import graph is confirmed clean.
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { migrateLegacyProfileToCandidateStore } =
+          require('../improvements/profileMigration') as {
+            migrateLegacyProfileToCandidateStore: typeof import('../improvements/profileMigration').migrateLegacyProfileToCandidateStore;
+          };
+        profile.improvementCandidateSnapshot =
+          migrateLegacyProfileToCandidateStore(profile);
+
+        // Migration succeeded — clear any stale reanalysis flag.
+        if (profile.index) {
+          profile.index.requiresReanalysis = false;
+        }
+        console.log(
+          `[EssayProfileCoordinator.fromCheckpoint] Legacy profile migrated: ` +
+            `${profile.improvementCandidateSnapshot.candidates.length} candidates`,
+        );
+      } catch (err: unknown) {
+        // ONLY PipelineError with layer='profile_migration' should land here.
+        // That means migration ran but found zero source data across all 4
+        // legacy sources. The profile is usable for non-coaching features
+        // but the coaching gate will block until re-analysis runs.
+        //
+        // ANY OTHER error is a real bug (type mismatch, missing import, etc.)
+        // and must propagate — fail-fast, not silent.
+        if (isPipelineError(err) && err.layer === 'profile_migration') {
+          console.warn(
+            `[EssayProfileCoordinator.fromCheckpoint] Migration found no source data. ` +
+              `Profile flagged requiresReanalysis=true. Coaching will be blocked.`,
+          );
+          if (profile.index) {
+            profile.index.requiresReanalysis = true;
+          }
+          // Leave improvementCandidateSnapshot undefined — the coaching
+          // gate reads requiresReanalysis directly. The profile still
+          // constructs and loads successfully; only coaching is blocked.
+        } else {
+          throw err;
+        }
+      }
+    }
+
     return new EssayProfileCoordinator(profile, checkpointStore, mutators);
   }
 
@@ -1537,6 +1676,10 @@ export class EssayProfileCoordinator {
     const allMutations: MutationType[] = [];
 
     // SentenceMutator: store analysis for each sentence
+    // Scope 2 Phase 5: also harvest inline improvementCandidates into the
+    // candidate store so L4 consolidation sees them. The field is propagated
+    // into SentenceAnalysis for checkpoint persistence.
+    const harvestedL35Candidates: ImprovementCandidate[] = [];
     for (const sa of result.sentenceAnalyses) {
       const mutations = this.sentenceMutator.applySentenceAnalysis(
         this.profile,
@@ -1550,9 +1693,18 @@ export class EssayProfileCoordinator {
           isStrength: sa.isStrength,
           isProblem: sa.isProblem,
           priorityForImprovement: sa.priorityForImprovement,
+          improvementCandidate: sa.improvementCandidate,
         },
       );
       allMutations.push(...mutations);
+
+      if (sa.improvementCandidate) {
+        harvestedL35Candidates.push(sa.improvementCandidate);
+      }
+    }
+
+    if (harvestedL35Candidates.length > 0) {
+      this.addImprovementCandidates(harvestedL35Candidates, { source: 'L3.5' });
     }
 
     // ParagraphMutator: store paragraph-level analysis
@@ -1583,6 +1735,78 @@ export class EssayProfileCoordinator {
     // generates the authoritative essay-level AO impression.
 
     this.afterMutation(allMutations, { paragraphIndex: result.paragraphIndex });
+
+    // Phase 1 revision-history hook. Snapshot failures MUST NOT break the
+    // analysis cycle — wrap in try/catch, log, and return. Idempotent when
+    // writeSnapshot is called multiple times within one session (same
+    // revisionSessionId replaces in place).
+    this.captureRevisionSnapshot();
+  }
+
+  /**
+   * Capture a cross-session revision snapshot of the current profile.
+   *
+   * Called at the end of each L3.5 analysis pass. Uses the stable
+   * `revisionSessionId` for idempotency — multiple writes within one
+   * coordinator lifetime REPLACE a single stored entry rather than
+   * stacking duplicates. The revision-history cap (10) and reset
+   * semantics (substantial_rewrite / topic_change / manual_reset) are
+   * enforced by `writeSnapshot`.
+   *
+   * Failure policy: any extraction / write failure is caught and logged.
+   * The analysis cycle never fails because of a snapshot.
+   */
+  private captureRevisionSnapshot(): void {
+    try {
+      const currentEssayText = (this.profile.paragraphs ?? [])
+        .map((p) => (typeof p.text === 'string' ? p.text : ''))
+        .join('\n\n');
+
+      const result = writeSnapshot({
+        history: this.profile.revisionHistory,
+        profile: this.profile,
+        sessionId: this.revisionSessionId,
+        version: this.writeVersion,
+        priorEssayText: this.priorSnapshotEssayText,
+      });
+
+      this.profile.revisionHistory = result.history;
+      // Cache this snapshot's essay text so the NEXT write can honestly
+      // compute token overlap against the prior snapshot's content.
+      this.priorSnapshotEssayText = currentEssayText;
+
+      if (result.resetSignal.triggered) {
+        console.log(
+          `[EssayProfileCoordinator] revision reset fired: ` +
+            `reason=${result.resetSignal.reason}` +
+            (typeof result.resetSignal.tokenOverlap === 'number'
+              ? ` overlap=${result.resetSignal.tokenOverlap.toFixed(3)}`
+              : ''),
+        );
+      }
+
+      // Phase 2 — Derive cross-session intelligence from the snapshot chain
+      // PLUS the live profile. Both computes tolerate history.length < 2 by
+      // returning null (session one, or post-reset). The intelligence is
+      // attached to the profile so the coaching prompt can read it. Wrap in
+      // try/catch at the outer layer (this try) — compute failures are
+      // non-fatal, identical to snapshot write failures.
+      //
+      // Ordering note: these run AFTER the snapshot write so
+      // `result.history` contains the current-session snapshot at its tail.
+      // computeRevisionIntelligence / computeVoiceEvolution strip the
+      // current-session entry by essayTextHash match before comparing.
+      const snapshotsForCompute = result.history.snapshots;
+      const revIntel = computeRevisionIntelligence(this.profile, snapshotsForCompute);
+      const voiceEvo = computeVoiceEvolution(this.profile, snapshotsForCompute);
+      this.profile.revisionIntelligence = revIntel;
+      this.profile.voiceEvolution = voiceEvo;
+    } catch (err) {
+      console.error(
+        '[EssayProfileCoordinator] revision snapshot write failed (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 
   /**
@@ -2142,6 +2366,117 @@ export class EssayProfileCoordinator {
   }
 
   /**
+   * Return a fresh serialization of the candidate store. Used by the
+   * orchestrator immediately before `buildImprovementManifest()` so that
+   * L4 priority → candidate technique resolution (via `consolidatedFrom`
+   * IDs) has a guaranteed-non-stale view of the store — without waiting
+   * for the next full checkpoint.
+   *
+   * Root cause of the S3/V14/S6/partial-S5 audit failures: the manifest
+   * builder reads `profile.improvementCandidateSnapshot`, which is only
+   * synced inside `checkpoint()`. When the checkpoint cadence and the
+   * manifest-build timing drift, manifest items end up with
+   * `technique: null` despite every candidate in the store carrying one.
+   */
+  snapshotCandidateStore(): ImprovementCandidateStoreSnapshot {
+    return this.candidateStore.serialize();
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // Scope 2 Phase 4: ImprovementCandidateStore accessors + lifecycle methods
+  //
+  // These methods parallel the existing applyInsight/applyScoreMatrix style:
+  // delegate to the store, log with [Coordinator] layer prefix, and keep
+  // the field private so the orchestrator can't mutate candidates directly.
+  //
+  // Phase 5 will call addImprovementCandidates() after each L3/L3.5/L3.75
+  // apply. Phase 6 will call applyConsolidation() after L4 and
+  // markImprovementsFinalized() after L5.
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
+   * Scope 2 Phase 4: Add improvement candidates harvested from a layer result.
+   *
+   * Called by analysisOrchestrator immediately after L3, L3.5, or L3.75
+   * applies its output. Idempotent — duplicate IDs are skipped with a
+   * debug log inside the store (not an error; re-runs produce stable IDs).
+   */
+  addImprovementCandidates(
+    candidates: ImprovementCandidate[],
+    options: { source: 'L3' | 'L3.5' | 'L3.75' },
+  ): void {
+    this.candidateStore.addAll(candidates);
+    console.log(
+      `[Coordinator] ${options.source}: added ${candidates.length} improvement candidates ` +
+        `(total active: ${this.candidateStore.getActive().length})`,
+    );
+  }
+
+  /**
+   * Scope 2 Phase 4: Direct read access to the candidate store.
+   * Orchestrator uses this when it needs lifecycle-state-aware queries
+   * (e.g., getBySource, markConsolidated) that the convenience methods
+   * don't expose directly.
+   */
+  getImprovementCandidateStore(): ImprovementCandidateStore {
+    return this.candidateStore;
+  }
+
+  /**
+   * Scope 2 Phase 4: Get active (non-superseded) candidates sorted by
+   * coachingValue. Convenience reader for downstream consumers that want
+   * a pre-sorted list.
+   */
+  getImprovementCandidates(): ImprovementCandidate[] {
+    return this.candidateStore.getActiveSortedByCoachingValue();
+  }
+
+  /**
+   * Scope 2 Phase 4: Build the L4 prompt context block from active
+   * candidates. Called by the orchestrator when assembling the L4b
+   * crystallization prompt in Phase 6.
+   */
+  getImprovementCandidateContextBlock(): string {
+    return this.candidateStore.toL4ContextBlock();
+  }
+
+  /**
+   * Scope 2 Phase 4: Apply L4's consolidation decisions to the candidate store.
+   * Called by orchestrator after the L4 result is parsed in Phase 6.
+   *
+   * For each CoachingMap priority:
+   *   - Candidates in priority.consolidatedFrom → lifecycleState='consolidated'
+   *   - Candidates NOT referenced by any priority → lifecycleState='superseded'
+   *     (L4 saw them and chose not to use them; they are dominated by other
+   *     candidates or the priority list L4 generated.)
+   *
+   * Callers supply the full set of IDs for each transition group — this
+   * method is a pure bookkeeping helper, not a policy maker.
+   */
+  applyConsolidation(consolidatedIds: string[], supersededIds: string[]): void {
+    this.candidateStore.markConsolidated(consolidatedIds);
+    this.candidateStore.markSuperseded(supersededIds);
+    console.log(
+      `[Coordinator] Consolidation applied: ${consolidatedIds.length} consolidated, ` +
+        `${supersededIds.length} superseded. Remaining active: ${this.candidateStore.getActive().length}`,
+    );
+  }
+
+  /**
+   * Scope 2 Phase 4: Mark candidates as finalized (L5 wrote rewriteExamples).
+   * Called by orchestrator after the L5 result is harvested into the manifest
+   * in Phase 6.
+   */
+  markImprovementsFinalized(ids: string[]): void {
+    this.candidateStore.markFinalized(ids);
+    console.log(
+      `[Coordinator] Finalized ${ids.length} improvement candidates (active: ${this.candidateStore.getActive().length})`,
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+
+  /**
    * Seed prior findings for comprehensive re-analysis evolution.
    *
    * Must be called immediately after coordinator creation, before any
@@ -2225,6 +2560,12 @@ export class EssayProfileCoordinator {
   async checkpoint(reason: CheckpointReason): Promise<void> {
     // W1.2: Sync findings back to profile before persisting
     this.profile.findings = this.findingStore.serialize().findings;
+
+    // Scope 2 Phase 4: Sync improvement candidate store back to profile
+    // before persisting. Mirrors the findings-sync pattern above. Enables
+    // the Phase 5+ candidate lifecycle to survive checkpoint boundaries
+    // and the migration backfill from Phase 1.5 to persist cleanly.
+    this.profile.improvementCandidateSnapshot = this.candidateStore.serialize();
 
     const validationResult = reason === 'circuit_breaker' ? this.validateQuick() : this.validateFull();
 

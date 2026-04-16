@@ -57,6 +57,14 @@ import {
   buildParagraphFindingContext,
   buildFindingReferenceContext,
 } from '../findings/findingContextBuilder';
+import { normalizeRhythmTag } from './rhythmTag';
+import {
+  TECHNIQUE_VOCABULARY_PROMPT_BLOCK,
+  normalizeTechnique,
+} from './techniqueVocabulary';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import type { ImprovementCandidate } from '../profileTypes';
+import { PipelineError } from '../errors';
 
 // ============================================================================
 // CONSTANTS
@@ -152,7 +160,21 @@ export interface L3WalkResult {
  * UNDERSTANDING ONLY. The prompt contains structural forcing functions to
  * prevent evaluation contamination.
  */
-const SYSTEM_PROMPT = `You are a Literature PhD who has read 10,000 college application essays and can articulate what a casual reader feels but cannot name. You read like an expert: you notice not just WHAT techniques appear, but what their presence REVEALS about the essay's architecture of meaning. Your task is to deeply UNDERSTAND one paragraph at a time, building compound understanding across the essay.
+/**
+ * Scope 2 Phase 5: buildSystemPrompt() wraps what used to be a const
+ * template literal so we can substitute {TECHNIQUE_VOCABULARY_PROMPT_BLOCK}
+ * from the shared `techniqueVocabulary.ts` module. Called once per L3 walk
+ * (the result is cached by Claude's prompt caching automatically, so the
+ * substitution cost is one set of cache-write tokens per day).
+ */
+function buildSystemPrompt(): string {
+  return SYSTEM_PROMPT_TEMPLATE.replace(
+    '{TECHNIQUE_VOCABULARY_PROMPT_BLOCK}',
+    TECHNIQUE_VOCABULARY_PROMPT_BLOCK,
+  );
+}
+
+const SYSTEM_PROMPT_TEMPLATE = `You are a Literature PhD who has read 10,000 college application essays and can articulate what a casual reader feels but cannot name. You read like an expert: you notice not just WHAT techniques appear, but what their presence REVEALS about the essay's architecture of meaning. Your task is to deeply UNDERSTAND one paragraph at a time, building compound understanding across the essay.
 
 === YOUR SOLE JOB: UNDERSTANDING (NOT EVALUATION) ===
 
@@ -237,11 +259,12 @@ Observations to PRODUCE (these require genuine analytical insight):
 - "P2's puzzle metaphor isn't just a comparison — it pre-justifies the coding bridge in P4 by establishing music as analytical practice" (strategic architectural function that requires tracking across paragraphs)
 
 QUANTITY GUIDANCE:
-- A transitional paragraph should produce 2-4 observations total across all sentence fields
-- A contributing paragraph should produce 4-7 observations
-- A pivotal paragraph should produce 6-10 observations
-- An entire 7-paragraph essay should produce 30-50 total observations, not 100+
-If you're producing more than 50 observations, you're including obvious material. Cut the observations a competent reader would already know.
+- A transitional paragraph should produce 3-5 observations total across all sentence fields
+- A contributing paragraph should produce 5-8 observations
+- A pivotal paragraph should produce 7-12 observations
+- An entire 7-paragraph essay should produce 35-60 total observations
+- Each observation should map to a potential IMPROVEMENT — if it doesn't suggest something the student could change, it's not useful
+Observations are the raw material for the coaching system's improvement pipeline. Too few observations = too few improvement targets for the student. When in doubt, include the observation.
 
 === BACK-PROPAGATION ===
 
@@ -283,6 +306,8 @@ MATURITY: assess honestly. A first sighting is 'hypothesis'. If confirmed by mul
 
 FINDING EVOLUTIONS: If existing findings should be updated based on what this paragraph reveals — confirmed, deepened, or superseded — produce finding evolutions.
 
+SUPERSESSION IS RARE: On a first analysis pass, prefer 'deepened' or 'confirmed' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED — not when a later paragraph adds nuance. If P3 reveals that a P1 finding was incomplete, that's 'deepened', not 'superseded'. Supersession means the original claim is no longer true. If you supersede a finding, you MUST produce a replacement finding in newFindings that captures the corrected understanding.
+
 === INDEX CONVENTION ===
 
 The essay is labeled with 1-based indices (P1, S1, P2, S2) for human readability in the prompt,
@@ -320,8 +345,7 @@ Return a JSON object matching this EXACT structure:
       "tags": ["semantic tags for routing: opening_hook, sensory_grounding, thesis_crystallization, voice_shift, emotional_peak, turning_point, callback, image_anchor, frame_establishment, resolution"],
       "connectionRefs": [],
       "craft": {
-        "rhythm": "ONLY for pivotal/contributing sentences. Describe the sentence's rhythmic character: length, clause structure, pacing effect.",
-        "voiceAlignment": "How this sentence's voice relates to the essay's dominant voice — same register, shifted, code-switched.",
+        "rhythm": "ONLY for pivotal/contributing sentences. ONE enum value from: short_punch | medium_flow | long_build | fragment | staccato | anaphora_series | parallel_build | subordinate_delay. Pick the closest match. Empty string for transitional sentences.",
         "techniques": ["anaphora", "imagery", "juxtaposition", "concrete_detail", "metaphor", "personification", "alliteration", "parallel_structure", "fragment", "polysyndeton", "asyndeton", "chiasmus", "synesthesia"]
       },
       "significantChoices": [
@@ -391,6 +415,74 @@ Return a JSON object matching this EXACT structure:
 
 IMPORTANT: "newFindings" is MANDATORY — produce at least one finding for this paragraph. "findingEvolutions" remains optional — produce them when earlier findings should be updated based on this paragraph's evidence.
 
+=== IMPROVEMENT CANDIDATE EMISSION (the one prescriptive field in L3) ===
+
+The rest of this layer is UNDERSTANDING ONLY (zero evaluative language).
+The improvementCandidate field on each sentenceUnderstandings entry is the
+ONE exception: it captures concrete improvement opportunities that the
+understanding revealed at this specific sentence.
+
+EMIT a candidate ONLY when ALL of these are true:
+1. Your understanding of THIS sentence revealed that it is attempting something
+   it cannot fully accomplish with its current wording (e.g., claiming emotional
+   weight it hasn't earned through specificity).
+2. You can name a SPECIFIC, localized change — not "make it better" but
+   "replace the abstract verb with a physical anchor."
+3. The fix lives in THIS sentence, not across paragraphs. Cross-essay or
+   structural fixes belong to L3.75, not here.
+
+EMIT null (or omit the field) for the majority of sentences. A candidate on
+every sentence means you are not discriminating — re-read and remove the
+ones that don't meet the bar. Target: 20-40% of sentences in a weak essay,
+5-15% in a strong essay.
+
+=== FORBIDDEN VOCABULARY CARVE-OUT (CRITICAL — THIS IS THE ONE PLACE) ===
+
+The FORBIDDEN VOCABULARY rule defined earlier in this prompt ("effective",
+"weak", "strong", "compelling", "poor", "stock", "unearned", "fails to",
+"succeeds in", etc.) explicitly does NOT apply to the
+improvementCandidate.observation and improvementCandidate.suggestedChange
+fields. These two fields are the ONE permitted evaluative surface in this layer.
+
+Use banned words inside these two fields when your understanding reveals them.
+Example observations you ARE permitted to write inside improvementCandidate:
+- "Relies on stock metaphor 'fingers danced' without a physical anchor"
+- "Claims emotional weight the earlier specifics haven't earned"
+- "Opening is weak because the abstract noun 'passion' carries the whole load"
+
+All other L3 output fields (primaryFunction, significance, significantChoices,
+craft.*, tags, connectionRefs) remain UNDERSTANDING ONLY — no evaluative words.
+This carve-out is surgical: it unlocks prescription exactly where Scope 2
+needs it and nowhere else.
+
+SCHEMA (per sentenceUnderstandings entry):
+{
+  "improvementCandidate": null
+  // OR — when the understanding genuinely reveals a specific sentence-local improvement:
+  "improvementCandidate": {
+    "observation": "What the understanding reveals the sentence is trying but failing to do (diagnostic — may use banned evaluative vocabulary)",
+    "suggestedChange": "The specific, named change that would address what the understanding identified",
+    "technique": "TECHNIQUE_NAME_FROM_VOCABULARY or null",
+    "demonstrationSketch": "1-3 sentence sketch of the improved version, or null",
+    "coachingValue": "critical | high | medium | contextual | diagnostic"
+  }
+}
+
+{TECHNIQUE_VOCABULARY_PROMPT_BLOCK}
+
+EXAMPLE — P1S1 of a piano essay:
+Primary function (descriptive): "Opens the essay with an abstract aesthetic claim,
+using stock metaphor to gesture at musical transformation"
+
+Improvement candidate:
+{
+  "observation": "Opening leans on stock metaphor 'fingers danced' without a physical anchor",
+  "suggestedChange": "Replace with the specific physical sensation of the keys — the weight, a particular practice room, one concrete detail",
+  "technique": "COLD OPEN / SENSORY TIMESTAMP",
+  "demonstrationSketch": null,
+  "coachingValue": "high"
+}
+
 === CRITICAL REMINDERS ===
 
 1. UNDERSTANDING ONLY. Zero evaluative language. If you write "effectively", "strong", or any banned word, rewrite immediately.
@@ -458,22 +550,29 @@ export class SequentialDeepWalkService {
     const walkOutputs: UnderstandingWalkOutput[] = [];
     const allBackPropagations: L3WalkResult['backPropagations'] = [];
     const skippedParagraphs: number[] = [];
+    // Scope 2 Phase 5: fail-fast accumulators. Indices of paragraphs whose
+    // LLM call or parse failed. If non-empty at loop end (or if
+    // MAX_CONSECUTIVE_FAILURES trips), throw PipelineError.paragraphLoopFailed
+    // instead of the old push-empty-shell anti-pattern.
+    const failedWalkParagraphs: number[] = [];
+    let firstWalkError: Error | undefined;
     let holisticEvolution: L3WalkResult['holisticEvolution'] = {};
     let totalCost = 0;
     const totalTokens = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
     let consecutiveFailures = 0;
 
     for (let pIdx = startIndex; pIdx < paragraphs.length; pIdx++) {
-      // Check consecutive failure threshold
+      // Check consecutive failure threshold — fail fast instead of silently
+      // marking remaining paragraphs skipped (which used to produce a
+      // "successful" result with empty walkOutputs).
       if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
         console.error(
           `[SequentialDeepWalk] Aborting walk: ${consecutiveFailures} consecutive failures. ` +
           `Last successful paragraph: P${pIdx - consecutiveFailures}. Remaining: P${pIdx}-P${paragraphs.length}.`,
         );
-        // Mark remaining paragraphs as skipped
+        // Record remaining paragraphs as failed so PipelineError carries the full set
         for (let remaining = pIdx; remaining < paragraphs.length; remaining++) {
-          skippedParagraphs.push(remaining);
-          this.markParagraphSkipped(profile, remaining, 'Walk aborted after consecutive failures');
+          failedWalkParagraphs.push(remaining);
         }
         break;
       }
@@ -521,7 +620,10 @@ export class SequentialDeepWalkService {
         const walkMaxTokens = computeWalkMaxTokens(sentenceCount);
         const response = await callClaude<Record<string, unknown>>({
           model: SONNET,
-          systemPrompt: SYSTEM_PROMPT,
+          // Scope 2 Phase 5: buildSystemPrompt() substitutes the technique
+          // vocabulary block into the template. Still cached across calls
+          // because the substituted result is stable within a deploy.
+          systemPrompt: buildSystemPrompt(),
           userPrompt,
           maxTokens: walkMaxTokens,
           temperature: WALK_TEMPERATURE,
@@ -547,9 +649,15 @@ export class SequentialDeepWalkService {
         consecutiveFailures = 0;
 
       } catch (error) {
-        // No retry — count as consecutive failure immediately
+        // Scope 2 Phase 5 fail-fast: accumulate failed index, preserve first
+        // error for diagnostic chain. Do NOT push emptyWalkOutput — the L3
+        // equivalent of the L5 "push-empty" anti-pattern that masked real
+        // per-paragraph failures as successes in the aggregate result.
         consecutiveFailures++;
-        skippedParagraphs.push(pIdx);
+        failedWalkParagraphs.push(pIdx);
+        if (!firstWalkError) {
+          firstWalkError = error instanceof Error ? error : new Error(String(error));
+        }
 
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(
@@ -557,11 +665,23 @@ export class SequentialDeepWalkService {
           `(consecutive: ${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES}): ${errorMessage}`,
         );
 
+        // Still mark the paragraph on the profile so any partial consumer
+        // that reads profile state before the throw sees the skip marker.
         this.markParagraphSkipped(profile, pIdx, errorMessage);
-
-        // Push a minimal walk output so indices stay aligned
-        walkOutputs.push(this.emptyWalkOutput(pIdx));
       }
+    }
+
+    // Scope 2 Phase 5 fail-fast gate: if any paragraph failed, raise a single
+    // PipelineError carrying the full failed-index set and the first inner
+    // error. Callers (analysisOrchestrator) are responsible for surfacing this
+    // to the UI / logs — there is no silent "partial walk result" path.
+    if (failedWalkParagraphs.length > 0) {
+      throw PipelineError.paragraphLoopFailed(
+        'L3_walk',
+        failedWalkParagraphs,
+        paragraphs.length,
+        firstWalkError,
+      );
     }
 
     return {
@@ -948,6 +1068,7 @@ export class SequentialDeepWalkService {
       sentenceUnderstandings: this.parseSentenceUnderstandings(
         raw.sentenceUnderstandings,
         sentences,
+        paragraphIndex, // Scope 2 Phase 5: thread through for candidate ID generation
       ),
       holisticEvolution: this.parseHolisticEvolution(raw.holisticEvolution),
       priorSentenceUpdates: this.parsePriorSentenceUpdates(raw.priorSentenceUpdates),
@@ -1033,6 +1154,7 @@ export class SequentialDeepWalkService {
   private parseSentenceUnderstandings(
     raw: unknown,
     sentences: string[],
+    paragraphIndex: number, // Scope 2 Phase 5: needed for candidate ID generation
   ): UnderstandingWalkOutput['sentenceUnderstandings'] {
     const parsed: UnderstandingWalkOutput['sentenceUnderstandings'] = [];
     const rawArray = Array.isArray(raw) ? raw : [];
@@ -1057,7 +1179,7 @@ export class SequentialDeepWalkService {
       const source = llmData?.primaryFunction !== undefined ? llmData : llmData?.understanding;
       parsed.push({
         index: i,
-        understanding: this.parseSentenceUnderstanding(source),
+        understanding: this.parseSentenceUnderstanding(source, paragraphIndex, i),
       });
     }
 
@@ -1069,8 +1191,16 @@ export class SequentialDeepWalkService {
    * Phase 1: builds backward-compatible SentenceUnderstanding from lightweight fields.
    * Bridge: synthesizes minimal ObservationEntry[] from primaryFunction for consumers
    * not yet migrated from observation arrays.
+   *
+   * Scope 2 Phase 5: Also parses the optional `improvementCandidate` field
+   * when the LLM emits one. Requires paragraphIndex + sentenceIndex for
+   * deterministic candidate ID generation.
    */
-  private parseSentenceUnderstanding(raw: unknown): SentenceUnderstanding {
+  private parseSentenceUnderstanding(
+    raw: unknown,
+    paragraphIndex: number,
+    sentenceIndex: number,
+  ): SentenceUnderstanding {
     if (!raw || typeof raw !== 'object') {
       return this.emptySentenceUnderstanding();
     }
@@ -1112,6 +1242,54 @@ export class SequentialDeepWalkService {
       result.significance = significance;
     }
 
+    // Scope 2 Phase 5: parse improvementCandidate if present
+    const rawCand = obj.improvementCandidate;
+    if (rawCand && typeof rawCand === 'object' && rawCand !== null) {
+      const c = rawCand as Record<string, unknown>;
+      const observation = typeof c.observation === 'string' ? c.observation.trim() : '';
+      const suggestedChange = typeof c.suggestedChange === 'string' ? c.suggestedChange.trim() : '';
+
+      // Only emit if both required fields carry substantive content
+      if (observation.length > 0 && suggestedChange.length > 0) {
+        const techniqueRaw = typeof c.technique === 'string' ? c.technique : null;
+        const technique = normalizeTechnique(techniqueRaw);
+        const validCV: ReadonlyArray<ImprovementCandidate['coachingValue']> = [
+          'critical',
+          'high',
+          'medium',
+          'contextual',
+          'diagnostic',
+        ];
+        const coachingValue: ImprovementCandidate['coachingValue'] =
+          typeof c.coachingValue === 'string' &&
+          (validCV as readonly string[]).includes(c.coachingValue)
+            ? (c.coachingValue as ImprovementCandidate['coachingValue'])
+            : 'medium';
+        result.improvementCandidate = {
+          id: ImprovementCandidateStore.buildId('L3', paragraphIndex, sentenceIndex, observation),
+          sourceLayer: 'L3',
+          paragraph: paragraphIndex,
+          sentence: sentenceIndex,
+          sourceFindingId: null,
+          observation,
+          suggestedChange,
+          technique,
+          demonstrationSketch:
+            typeof c.demonstrationSketch === 'string' && c.demonstrationSketch.trim().length > 0
+              ? c.demonstrationSketch.trim()
+              : null,
+          coachingValue,
+          lifecycleState: 'candidate',
+          supersededBy: null,
+          createdAt: new Date().toISOString(),
+        };
+      } else {
+        result.improvementCandidate = null;
+      }
+    } else {
+      result.improvementCandidate = null;
+    }
+
     return result;
   }
 
@@ -1129,14 +1307,24 @@ export class SequentialDeepWalkService {
       .filter(entry => entry.observation.length > 0);
   }
 
+  /**
+   * Parse a SentenceCraft block from raw LLM output.
+   *
+   * Scope 1 Phase 1:
+   *   - `rhythm` is a closed enum (RhythmTag). Since strict mode is off,
+   *     the type contract is not enforced at compile time — this parser
+   *     actively normalizes arbitrary LLM prose to a valid RhythmTag value,
+   *     falling back to '' (uncharacterized) when no match.
+   *   - `voiceAlignment` is dropped from output. Persisted old profiles
+   *     that still carry the field are ignored (optional on the type).
+   */
   private parseSentenceCraft(raw: unknown): SentenceCraft {
     if (!raw || typeof raw !== 'object') {
-      return { rhythm: '', voiceAlignment: '', techniques: [] };
+      return { rhythm: '', techniques: [] };
     }
     const obj = raw as Record<string, unknown>;
     return {
-      rhythm: this.safeString(obj.rhythm, ''),
-      voiceAlignment: this.safeString(obj.voiceAlignment, ''),
+      rhythm: normalizeRhythmTag(obj.rhythm),
       techniques: this.safeStringArray(obj.techniques),
     };
   }
@@ -1724,7 +1912,7 @@ export class SequentialDeepWalkService {
       narrativeContributions: [],
       rhetoricalFunctions: [],
       paragraphContribution: '',
-      craft: { rhythm: '', voiceAlignment: '', techniques: [] },
+      craft: { rhythm: '', techniques: [] },
       significantChoices: [],
       connectionRefs: [],
       findingRefs: [],

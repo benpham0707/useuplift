@@ -2555,6 +2555,13 @@ export const stanfordSocraticQuestions: CollegeSocraticQuestionBank = {
 // ============================================================================
 
 export const stanfordEliteExamples: CollegeEliteExample[] = [
+  // TODO(scope3-content): Populate with 3-4 elite Stanford essay patterns
+  // following the shape in brown.ts:1181 — each entry needs `exampleId`,
+  // `pattern`, `anonymizedDescription`, and `whatMakesItEffective[]`.
+  // Scope 3 Phase 7 already wires these through
+  // `getCollegeCoachingOverlay()` (collegeOverlay.ts) so Stanford students
+  // automatically see elite teaching patterns once populated.
+  //
   // Note: These would be populated with actual elite essay examples
   // with full text, annotations, and teachable techniques
 ];

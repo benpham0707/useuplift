@@ -1,286 +1,365 @@
-# FORGE_DEBATES.md — Compressed Record: Agent Designs, Verification, Synthesis
+# FORGE_DEBATES: Direct Path vs Rethink Path -- ChatHeader Redesign
 
-**Date**: 2026-03-18
-**Pipeline**: Analyst -> Agent A (Direct) + Agent B (Rethink) -> Reality Checker (this doc)
-**Scope**: 13 gaps in Essay Intelligence + Activity Workshop + PIQ systems
-
----
-
-## GAP-1: Response Intensity (Coaching Length Control)
-
-### Agent A Design
-Use PREVIOUS turn's sidecar `responseIntensity` to set current turn's `maxTokens`. Add `lastResponseIntensity` to `CoachingSessionMemory`. Dynamic: full=2200, brief=1200, minimal=600.
-
-### Agent B Design
-Pre-Sonnet keyword heuristics (`estimateResponseIntensity()`) -- detect confirmations, short messages, prior-turn length. Dynamic: full=2200, brief=800, minimal=300.
-
-### Verification Findings
-- **V1.1**: The sidecar already outputs `responseIntensity` (line 310, coachingService.ts: `responseIntensity: 'full' | 'brief' | 'minimal'`). Agent A's claim is correct.
-- **V1.2**: Stage 1.5 (`runStage1_5CognitiveAssessment`, line 2357) already produces a `responseIntensity` field (line 2393: `"responseIntensity": "<full|brief|minimal>"`). This is a SEPARATE signal from the sidecar -- Stage 1.5 is a Haiku call that runs BEFORE Stage 3.
-- **V1.3**: `maxTokens` is currently hardcoded at 2200 (line 1487). Both agents correctly identify this.
-- **V1.4**: Agent B's keyword heuristics violate the LLM-first principle from `feedback_llm-first-design.md`. Stage 1.5 already does this via LLM.
-- **V1.5**: `CoachingSessionMemory` (line 2108) has no `lastResponseIntensity` field. Agent A's addition is feasible.
-
-### Decision: HYBRID (A's wiring + Stage 1.5 signal)
-Agent A's approach of using the PREVIOUS sidecar to inform the NEXT turn is sound, but Stage 1.5 already produces a responseIntensity. Use Stage 1.5's intensity (already LLM-assessed, already runs before Stage 3) as the PRIMARY signal for maxTokens. Store the PREVIOUS turn's sidecar intensity in session memory as a consistency check. No keyword heuristics needed.
+**Date**: 2026-04-05
+**Scope**: ChatHeader.tsx redesign to surface 7 required elements within 448px max panel width
 
 ---
 
-## GAP-2: Learning Style Accumulation
+## AGENT A (Direct Path) -- Compressed Design
 
-### Agent A Design
-Add `learningStyleUpdate` field to sidecar schema. Push into `style.observations` when non-null. Zero new LLM calls.
+### Layout
+- **Two-row layout**: Row 1 = Avatar + Name + SessionBadge + icon-only action buttons. Row 2 = EssaySwitcher + CoachingModeBadge, left-aligned with `pl-[42px]`
+- Estimated header height: ~92px (current ~52px)
 
-### Agent B Design
-Derive from sidecar cognitive states and session events every 3 turns. Analyze confusion->breakthrough cycles, depth vs breadth preference. Cap at 8 observations.
+### Components
+- `SessionBadge`: shadcn Badge component, animated green dot for "live", "Archived" text for archived, ~52px wide
+- `CoachingModeBadge`: shadcn Badge with per-mode color map, null-returns for `first_encounter`, ~60-80px wide
+- `HeaderIconButton`: 32x32 icon-only button wrapped in Radix Tooltip, focus-visible ring
+- `COACHING_MODE_DISPLAY` and `ESSAY_TYPE_LABELS` lookup maps
 
-### Verification Findings
-- **V2.1**: `learningStyleUpdate` already exists in the pattern detection Haiku call (line 2202, 2231). It's a field on the pattern detection output, NOT on the sidecar.
-- **V2.2**: The sidecar (line 305-315) does NOT currently have `learningStyleUpdate`. Agent A proposes adding it there, which is redundant with the existing pattern detection field.
-- **V2.3**: `LearningStyleObservations` (line 2154) has a cap-less `observations` array. Agent B's cap at 8 is sensible.
-- **V2.4**: The existing pattern detection already runs every 3+ turns (line 67-68: `PATTERN_DETECTION_MIN_TURNS = 3`). It already produces `learningStyleUpdate`.
+### Width Budget
+- Row 1: Avatar(34) + gap(8) + Name(48) + flex-1 spacer + SessionBadge(52) + History(32) + Settings(32) = ~206px fixed, ~218px spacer
+- Row 2: pl-42 + EssaySwitcher(flex-1) + gap(8) + CoachingBadge(80) = fits in ~382px
 
-### Decision: REFINED (fix the existing wiring)
-Neither agent realized the `learningStyleUpdate` already exists in pattern detection. The real gap is that pattern detection only runs every 3+ turns. Solution: add `learningStyleUpdate` to the sidecar (as Agent A proposes) for turn-by-turn accumulation. Cap observations at 8 with oldest-tentative eviction (Agent B's insight). This is NOT a new feature -- it's completing an existing one.
-
----
-
-## GAP-3: Phase Detector (Narrative Essay Calibration)
-
-### Agent A Design
-Add narrative strategy context to `buildHolisticDigest()`. Add ~150 tokens of narrative arc detection (chronological, reflective, montage, bracket, lyrical) and flag that thesis may be implicit.
-
-### Agent B Design
-Remove thesis confidence as primary signal for narrative essays. Detect narrative strategy from profile, reframe thesis as "emergent theme."
-
-### Verification Findings
-- **V3.1**: `buildHolisticDigest()` (line 192-267) already includes `thematicArchitecture.thesisConfidence` (line 198-200) and `narrativeStrategy.arcMomentum` (line 217). It does NOT include `narrativeStrategy.arcType` (line 808) or `narrativeStrategy.primaryStrategy` (line 795).
-- **V3.2**: `NarrativeStrategy.arcType` is a free string field (line 808: `arcType: string`). It already captures the narrative arc type. The data EXISTS in the profile; `buildHolisticDigest()` just doesn't surface it.
-- **V3.3**: The phase system prompt (line 88-147) mentions "thesis is unclear or absent" in foundation phase definition but has no narrative-aware calibration. Agent B's concern is valid.
-
-### Decision: HYBRID (A's data surfacing + B's reframe)
-Surface `narrativeStrategy.arcType` and `primaryStrategy` in `buildHolisticDigest()` (Agent A's approach -- the data is already there). Add a narrative calibration note to the phase system prompt: "For narrative essays, 'thesis' manifests as an emergent theme or revelation. A narrative essay at Architecture phase may have a powerful through-line but no stated thesis -- this is by design, not a weakness" (Agent B's insight). ~80 extra tokens in the system prompt.
+### Props
+- All optional with defaults: `essayType='common_app'`, `sessionStatus='live'`, `coachingMode=undefined`, `onHistoryClick`, `onSettingsClick`, `onEssaySwitch`, `onClose`
 
 ---
 
-## GAP-4: AO First Read Simulation
+## AGENT B (Rethink Path) -- Compressed Design
 
-### Agent A Design
-NEW Haiku call (~$0.003) parallel with L1. Produces AOFirstRead: hookMoment, committeeOneLiner, distinctivenessSignal, putDownRisk, gutReaction. New file `aoFirstRead.ts`.
+### Layout
+- **Single-row layout**: Avatar + Name block (Luna + dynamic subtitle) + EssaySwitcher + labeled action buttons
+- Estimated header height: ~54px (virtually unchanged)
 
-### Agent B Design
-NO new call. Add `aoGutReaction` field to existing L3.75 Phase B output. "YOU ARE THE AO. It's 4pm. You've read 29 essays today." ~50 extra output tokens.
+### Key Decisions
+- Session status and coaching mode ABSORBED into the subtitle line (replaces "essay coach")
+- Status dot rendered inline (green=live, Archive icon=archived)
+- Labeled action buttons: icon + "History", icon + "Settings" (26px tall)
+- Vertical divider removed (saves 9px)
+- AnimatePresence on subtitle for mode transitions
+- Popover on EssaySwitcher for dropdown
 
-### Verification Findings
-- **V4.1**: L3.75 (holisticSynthesis.ts) already produces `admissionsPositioning` (line 515-523) with `tellabilitySummary`, `distinctivenessFactors`, `redFlags`, `memorability`, `portfolioPosition`, `aoTakeaway`. These overlap significantly with Agent A's proposed fields.
-- **V4.2**: L3.75 is Phase A + Phase B, called AFTER the full walk. Adding an AO gut reaction HERE means it benefits from complete understanding -- but it's NOT a "first read" simulation anymore. The AO first read is valuable BECAUSE it captures the naive reaction.
-- **V4.3**: L1 (firstImpressions) is Haiku and runs first. A parallel Haiku call would add ~1-2 seconds but $0.003. The question is whether a naive AO read provides signal that the deep L3.75 admissions analysis cannot replicate.
-- **V4.4**: The unique value of an AO first read is the "4pm, 29th essay" framing -- attention fatigue, gut reaction. L3.75 sees the essay with deep understanding and cannot simulate NOT knowing what it already knows. This is a genuine distinct signal.
+### Width Budget
+- Avatar(34) + gap(8) + Name(46) + gap(8) + EssaySwitcher(flex-1, ~174px) + gap(4) + Actions(~150px) = 424px
 
-### Decision: AGENT A (new Haiku call, parallel with L1)
-The AO first read provides a signal that L3.75 fundamentally cannot -- the naive gut reaction under attention fatigue. L3.75's `admissionsPositioning` is deep and complete but lacks the raw "would I keep reading after paragraph 1?" signal. A Haiku call parallel with L1 adds negligible cost ($0.003) and zero latency (parallel). The new file is justified.
-
----
-
-## GAP-5: Person Portrait (Human Behind the Essay)
-
-### Agent A Design
-Modify L3.75 `writerPortrait` prompt with BAD/GOOD examples. "Not as a writer, as a human being." ~80 extra tokens.
-
-### Agent B Design
-Reframe prompt question: "who would you want to have lunch with after reading this?" with WRONG/RIGHT examples. Same zero-cost approach, different framing.
-
-### Verification Findings
-- **V5.1**: `writerPortrait` prompt (line 487): `"<who is this writer -- the person behind the words, not the essay>"`. The prompt already distinguishes person from essay. Both agents' improvements are refinements.
-- **V5.2**: The existing prompt produces serviceable but generic portraits. The issue is quality of output, not missing infrastructure.
-- **V5.3**: Agent B's "lunch" framing is more vivid and likely to produce better LLM output than Agent A's abstract "as a human being" directive.
-
-### Decision: AGENT B (lunch framing)
-Agent B's "who would you want to have lunch with?" framing is more concrete and will generate more distinctive portraits. Add WRONG/RIGHT examples per Agent A's suggestion but use Agent B's prompt question.
+### Props
+- `essayType` and `sessionStatus` REQUIRED, callbacks optional
 
 ---
 
-## GAP-6: Strategic Thread (Persistent Coaching Direction)
+## REALITY VERIFICATION FINDINGS
 
-### Agent A Design
-Add `strategicPriority` to `CoachingSessionMemory`. Computed from `focusAreas[0]` at turn 2. Inject as persistent directive. Track `studentAcknowledged` and resolution.
+### Finding A-LAYOUT-1
+**Severity**: concern
+**Issue**: Agent A's two-row layout increases header from ~52px to ~92px. The ChatPanel.tsx (line 122) has an absolutely positioned cloud valley `h-56` (224px) at the bottom, plus the input area. A 40px taller header directly reduces the visible message area. In an 800px tall ChatWidget, this leaves only ~484px for messages (vs 524px currently). Functionally fine but the scrollable area shrinks noticeably.
+**Impact**: Real cost but not blocking. Vertical real estate is premium in a chat panel.
 
-### Agent B Design
-Replace `nextFocus` (topic) with `strategicQuestion` (curiosity). "Does the student hear the voice shift between P2 and P3?" Natural infiltration into responses. Add `questionStaleness` counter for gentle escalation at 4+ turns.
+### Finding A-LAYOUT-2
+**Severity**: fragile
+**Issue**: Agent A's Row 2 uses `pl-[42px]` to align under the name block. This magic number depends on Avatar(34px) + gap(8px) = 42px. If the avatar size ever changes (currently hardcoded `width: 34, height: 34` in CoachAvatar), the alignment breaks silently. No way to enforce this coupling declaratively.
+**Impact**: Works now but creates invisible coupling.
 
-### Verification Findings
-- **V6.1**: `CoachingSessionMemory` already has `nextFocus` (line 2146): "What the session should focus on next -- LLM-assessed after each turn." Agent B proposes replacing this; Agent A adds a parallel field.
-- **V6.2**: `nextFocus` is already injected into the session arc section (line 1444, 1450): `SUGGESTED NEXT FOCUS: ${sessionMemory.nextFocus}`. It's a label ("voice consistency"), not a question.
-- **V6.3**: Agent B's observation is sharp: a topic label ("voice") is less generative than a question ("Does the student hear the voice shift between P2 and P3?"). Questions naturally infiltrate responses better than directives.
-- **V6.4**: Agent A's `studentAcknowledged` tracking adds complexity for moderate value. Agent B's staleness counter is simpler and equally effective.
+### Finding A-ICONS-1
+**Severity**: deviation
+**Issue**: Agent A specifies icon-ONLY action buttons with tooltips. The requirement says "labeled" for History and Settings. Icon-only with tooltip is a common pattern but does not meet the spec. A tooltip requires hover/delay and is invisible on mobile.
+**Impact**: Does not satisfy requirement #6 ("History button (labeled)") and #7 ("Settings button (labeled)").
 
-### Decision: AGENT B (strategic question + staleness)
-Replace `nextFocus` string with `strategicQuestion` string. The question framing is more generative and natural for the LLM to work with. Add a `questionStaleness` counter (incremented each turn the question remains unchanged, reset when updated). At 4+ staleness, the pattern detection prompt includes a gentle escalation note. No separate `studentAcknowledged` tracking needed -- if the student engages the question, pattern detection will naturally update it.
+### Finding B-SUBTITLE-1
+**Severity**: concern
+**Issue**: Agent B absorbs session status AND coaching mode into the subtitle line. But the subtitle can only show one thing at a time. When `sessionStatus='archived'` AND `coachingMode='iteration_deep'`, which wins? The design says archived wins, but then the coaching mode is invisible in archived sessions. For live sessions, the coaching mode replaces "essay coach" -- so the user never sees "essay coach" after the first encounter phase.
+**Impact**: Acceptable tradeoff. The subtitle is small text (8.5px) that most users don't read closely. The coaching mode IS more useful than a static "essay coach" label.
 
----
+### Finding B-SUBTITLE-2
+**Severity**: weak
+**Issue**: Agent B removes the static "essay coach" identity text entirely. For new users who haven't seen Luna before, the header would show "Luna" + dynamic mode text. The identity anchor ("this is an essay coach") is lost.
+**Impact**: Minor -- the entire context of the application makes it clear this is an essay coach. The branding is environmental.
 
-## GAP-7: Emotional Cues (Activity Workshop)
+### Finding B-POPOVER-1
+**Severity**: premature
+**Issue**: Agent B adds a Popover from `@/components/ui/popover` to the EssaySwitcher for real essay selection. But the current implementation has NO essay list data, no selection handler, and no state management for which essay is active. The Popover would be an empty shell. The current button with a chevron already communicates "switchable."
+**Impact**: The Popover adds complexity for zero current functionality. The button shape should be preserved and the Popover can be added when the essay switching feature is actually built.
 
-### Agent A Design
-Change "DON'T ASK ABOUT" to "DON'T INITIATE QUESTIONS ABOUT" + add "WHEN STUDENT VOLUNTEERS EMOTIONAL CONTEXT" section. Add `mentioned_passion` follow-up template + passion marker detection.
+### Finding SHARED-CONSUMERS-1
+**Severity**: critical
+**Issue**: ChatHeader has exactly 2 consumers that both use `<ChatHeader />` with zero props:
+  - `ChatPanel.tsx` line 105: `<ChatHeader />`
+  - `ChatWidget.tsx` line 31: `<ChatHeader />`
+Both are zero-prop calls. ANY new required props will break both consumers. Agent B making `essayType` and `sessionStatus` required would cause TypeScript errors in both files.
+**Impact**: All new props MUST be optional with sensible defaults to avoid breaking consumers.
 
-### Agent B Design
-Don't remove the ban -- reframe emotion as EVIDENCE OF STAKES. "Terrified = stakes were real and high." Emotion-to-description translation table in the prompt.
+### Finding SHARED-CONSUMERS-2
+**Severity**: verified
+**Issue**: ChatWidget.tsx at line 31 uses `<ChatHeader />`. The file is a demo/playground component (`max-w-2xl`, 800px height, "Awaiting Input" placeholder). It passes `isAnalyzing` and `onReset` to ChatInput but NOT to ChatHeader. ChatHeader redesign props will need defaults that work for this demo context.
+**Impact**: The worktree versions (agent-aad54784, agent-af7a4873) of ChatWidget.tsx pass `isAnalyzing` and `onReset` to ChatHeader, but the main branch version does not. We must code against the main branch version.
 
-### Verification Findings
-- **V7.1**: The current prompt (line 574-578) bans: "What was hardest/most challenging?", "What obstacles/barriers did you face?", "How did you feel?". These bans exist in `dynamicConversationEngine.ts`, not `questionGenerator.ts`.
-- **V7.2**: The `FOLLOW_UP_TEMPLATES` (line 279-306) have categories: `mentioned_number`, `mentioned_challenge`, `mentioned_person`, `mentioned_achievement`, `vague_response`, `short_response`. No `mentioned_passion` or `mentioned_emotion` templates.
-- **V7.3**: Agent A's change to "DON'T INITIATE QUESTIONS" is a subtle but important distinction -- it allows leveraging emotional context students volunteer.
-- **V7.4**: Agent B's emotion-to-description translation table is the real innovation. "Terrified" -> "the stakes were high enough that you felt personal risk" converts emotion into admissions-relevant evidence.
+### Finding SHARED-BUTTON-1
+**Severity**: verified
+**Issue**: The shadcn Button component (`src/components/ui/button.tsx`) wraps every button in a `ClickSpark` component that adds a purple spark animation on click. Using shadcn Button for header action buttons would add spark effects on every History/Settings click. This is likely undesired for utility buttons.
+**Impact**: Action buttons should use plain `<button>` elements (like the existing `ActionButton` component does), NOT shadcn Button.
 
-### Decision: HYBRID (A's softened ban + B's translation table)
-Change "DON'T ASK ABOUT" to "DON'T INITIATE QUESTIONS ABOUT" (Agent A). Add Agent B's emotion-to-description translation table as a prompt section: when a student volunteers emotional context, translate it into evidence of stakes/commitment for the description. Add `mentioned_emotion` to `FOLLOW_UP_TEMPLATES` that triggers the translation behavior.
+### Finding SHARED-TYPES-1
+**Severity**: verified
+**Issue**: Both `EssayType` and `CoachingMode` types are importable from `src/services/essayIntelligence/profileTypes.ts`. EssayType = `'common_app' | 'supplement' | 'piq'`. CoachingMode = `'first_encounter' | 'revision_response' | 'iteration_deep' | 'architecture' | 'polish'`. Both are string literal unions, stable, and appropriate for prop types.
+**Impact**: No issues. Import path is clean.
 
----
+### Finding SHARED-MOTION-1
+**Severity**: verified
+**Issue**: `AnimatePresence` is imported from `motion/react` (NOT `framer-motion`) across 10+ files in the codebase. The import `{ motion, AnimatePresence } from 'motion/react'` is the established pattern.
+**Impact**: No issues. Both designs correctly reference the package.
 
-## GAP-8: Scoring Bias (Admissions Relevance in Craft Scores)
+### Finding SHARED-LUCIDE-1
+**Severity**: verified
+**Issue**: All five lucide-react icons referenced by both designs exist: `History`, `Settings`, `FileText`, `ChevronDown`, `Archive`. Verified in node_modules. The codebase already uses lucide-react extensively (25+ components).
+**Impact**: No issues. All icons are available.
 
-### Agent A Design
-Add 2 admissions dimensions (admissions resonance, revelation density) to 6 existing craft criteria. Add GPA-drop calibration example (score 78). "When craft and admissions conflict, admissions carries MORE weight."
-
-### Agent B Design
-SCORING MODIFIER: +5 to +15 effectiveness boost for admissions-rich sentences. Applied AFTER craft scoring. Add `admissionsRelevance` and `admissionsRelevanceNote` to SentenceAnalysis.
-
-### Verification Findings
-- **V8.1**: The current 6 evaluation criteria (line 358-364): specificity vs vagueness, show vs tell, voice authenticity, structural contribution, earned emotional moments, memorable craft. These are pure craft criteria.
-- **V8.2**: Agent A proposes adding criteria to the evaluation method, which means the LLM considers admissions IN PARALLEL with craft during scoring. This is architecturally cleaner.
-- **V8.3**: Agent B's post-hoc modifier (+5 to +15 after craft scoring) introduces a two-pass problem: the LLM scores craft, then the system adjusts. This violates LLM-first design (system overriding LLM judgment with arithmetic).
-- **V8.4**: `SentenceAnalysis` (line 406-421) has: effectiveness, effectivenessReasoning, strengths, weaknesses, isStrength, isProblem, priorityForImprovement. Agent B's `admissionsRelevance` field addition would require LLM schema change + analysis prompt change anyway.
-- **V8.5**: The calibration examples (line 315-337) are craft-focused. Agent A's GPA-drop example (score 78: "My GPA dropped from 3.9 to 2.1 the semester my parents divorced") adds admissions calibration context.
-
-### Decision: AGENT A (integrated criteria, not post-hoc modifier)
-Agent B's scoring modifier violates LLM-first design by having the system arithmetically adjust LLM scores. Agent A's approach -- adding admissions criteria to the evaluation method so the LLM considers admissions natively during scoring -- is architecturally correct. Add an admissions calibration example and the "admissions carries MORE weight" directive to the scoring prompt. No new fields on SentenceAnalysis needed -- the LLM simply considers admissions as part of its holistic effectiveness judgment.
-
----
-
-## GAP-9: False Precision (Score Presentation)
-
-### Agent A Design
-Keep 0-100 internal, present 5 effectiveness bands (masterful/strong/functional/developing/problematic) at user-facing layer. `toEffectivenessBand()` utility.
-
-### Agent B Design
-Keep 0-100 + add confidence intervals derived from existing `confidence` field. Display tiers with range. `deriveDisplayTier()` function.
-
-### Verification Findings
-- **V9.1**: `SentenceAnalysisConfidence` (line 2667) already has `level: 'high' | 'moderate' | 'low'` and `reasoning`. This data already exists for confidence-aware display.
-- **V9.2**: The confidence field is optional (`confidence?: SentenceAnalysisConfidence`, line 2697). Not all sentences will have it.
-- **V9.3**: Agent A's bands map directly to the existing calibration table (line 315-322): 96-100=masterful, 86-95=exceptional, 76-85=strong, 55-75=functional, 40-54=developing, <40=problematic. This is a straightforward presentation layer change.
-- **V9.4**: Agent B's confidence intervals add complexity (displaying "72 +/- 8") that may confuse students more than help. The bands are simpler and sufficient.
-
-### Decision: AGENT A (effectiveness bands)
-Bands are simpler, sufficient, and map directly to the existing calibration table. The confidence data remains available internally for coaching decisions. A `toEffectivenessBand()` utility is a small, self-contained addition. Agent B's intervals add display complexity without proportional UX benefit.
+### Finding SHARED-SHADCN-1
+**Severity**: verified
+**Issue**: All referenced shadcn components exist: `Badge` (`src/components/ui/badge.tsx`), `Tooltip` (`src/components/ui/tooltip.tsx`), `Popover` (`src/components/ui/popover.tsx`), `Button` (`src/components/ui/button.tsx`). Badge has `default`, `secondary`, `destructive`, `outline` variants. Tooltip uses Radix `@radix-ui/react-tooltip`. Popover uses `@radix-ui/react-popover` with Portal.
+**Impact**: All available and functional.
 
 ---
 
-## GAP-10: Essay Archetype Classification
+## FORCED-CHOICE SYNTHESIS
 
-### Agent A Design
-Add `archetypeContext` (archetype name, `poolDensity`, differentiator) to `AdmissionsPositioning`. ~80 extra tokens in L3.75 schema.
+### Layout Strategy: RETHINK (refined)
+Agent B's single-row layout wins decisively. Zero vertical cost (54px vs 92px) is critical for a chat panel where every pixel of message area matters. The two-row approach (Agent A) is a 77% height increase for information that fits cleanly in a single row.
 
-### Agent B Design
-Add `archetypeClassification` + `archetypeFrequency` to L3.75 + inject archetype calibration note into L3.5 scoring prompt ("common archetype + generic execution = score 10-15 points lower").
+**Refinement**: Keep the single-row structure but preserve the existing visual grid spacing. Don't remove the vertical divider entirely -- it costs only 9px and provides a clean break between identity and navigation.
 
-### Verification Findings
-- **V10.1**: `AdmissionsPositioning` (line 890-905) has `distinctivenessFactors`, `memorability`, `portfolioPosition`. These partially cover archetype analysis but never NAME the archetype.
-- **V10.2**: Agent B's scoring penalty ("common archetype + generic execution = 10-15 points lower") is a deterministic rule injected into an LLM prompt -- it's guidance, not a hard rule, so it's acceptable within LLM-first design.
-- **V10.3**: Agent A adds archetype to the profile (accessible to coaching). Agent B injects it into scoring (affects scores). Both are needed -- archetype should be known AND should influence scoring.
+### Session Status Display: RETHINK
+Agent B's approach of absorbing status into the subtitle is the right call at 448px. A separate 52px badge (Agent A) consumes 12% of the row for information that is almost always "live." The subtitle naturally accommodates both states and the green dot provides at-a-glance status.
 
-### Decision: HYBRID (A's profile field + B's scoring calibration)
-Add `archetypeContext` to `AdmissionsPositioning` (Agent A) so coaching can reference it. Also inject archetype-aware calibration into L3.5 scoring prompt (Agent B) so scores reflect archetype saturation. The archetype is produced by L3.75, consumed by L3.5 scoring and L6 coaching.
+### Coaching Mode Display: HYBRID
+Neither design is ideal. Agent A's separate badge is too expensive (60-80px). Agent B's subtitle absorption works but makes the mode invisible when archived. **Decision**: Show coaching mode in the subtitle for live sessions (replacing "essay coach" with mode text). For archived sessions, show "Archived" in the subtitle. This is Agent B's approach, with the refinement that `first_encounter` shows "essay coach" as the default subtitle (preserving the identity text for new users).
 
----
+### Action Buttons: RETHINK (refined)
+Agent B's labeled buttons are correct per the requirements (labeled = text visible, not just tooltip). **Refinement**: Use compact labels -- `icon + "History"` and `icon + "Settings"` at 12px font, keeping buttons around 60-68px wide each. Use plain `<button>` elements (NOT shadcn Button, due to ClickSpark -- Finding SHARED-BUTTON-1).
 
-## GAP-11: School/Competition Context (Activity Workshop)
+### Essay Switcher: HYBRID
+Keep the existing crafted visual shape from the current ChatHeader (it's carefully designed with gradients and shadows). Add typed props (`essayType: EssayType`). Keep the lucide FileText icon from Agent B instead of the custom SVG document glyph (simpler, consistent with codebase). Do NOT add Popover yet (Finding B-POPOVER-1 -- premature).
 
-### Agent A Design
-Add `context.schoolEnvironment` and `context.competitionLevel` templates. Add `mentioned_first` and `mentioned_competition` follow-up templates with regex detection.
+### Props Interface: DIRECT (refined)
+Agent A's all-optional approach is correct per Finding SHARED-CONSUMERS-1. Both consumers call `<ChatHeader />` with zero props. All new props must be optional with defaults.
 
-### Agent B Design
-Frame as "building your case" not "collecting data." Questions like "how big was the team you were leading?" feel like advocacy. Add context-trigger when leadership/competitive signals appear.
-
-### Verification Findings
-- **V11.1**: The question templates (line 45-274) cover scale, recognition, artifacts, story, meaning, impact, connections. No templates for school size, competition selectivity, or comparative context.
-- **V11.2**: Agent A's regex detection violates LLM-first design principles. The LLM (via dynamicConversationEngine) already detects and follows up on context clues.
-- **V11.3**: Agent B's "building your case" framing aligns with the existing workshop philosophy: "WORKSHOPPING MODE (not just data collection!)" (line 557).
-- **V11.4**: The real gap is that the LLM doesn't know to ask about competitive context (school size, selectivity, field competitiveness) because no template suggests it.
-
-### Decision: HYBRID (A's new templates + B's framing)
-Add new question templates for school/competitive context (Agent A's contribution) but frame them as advocacy rather than data collection (Agent B's insight). No regex detection -- let the LLM's dynamicConversationEngine handle context detection naturally (it already does this for other categories). Add templates like: `facts.context.schoolSize`, `facts.context.competitionLevel`, `facts.context.fieldSelectivity`.
+### Divider: HYBRID
+Keep the vertical divider (contra Agent B's removal) but only between the identity block and the essay switcher. It costs 9px and provides visual structure. Remove the divider that Agent A doesn't mention (between action cluster items).
 
 ---
 
-## GAP-12: PIQ Portfolio Synthesis
+## Rejected Approaches
 
-### Agent A Design
-New Haiku call (~$0.004) for portfolio synthesis. New `PIQPortfolioSynthesis` type. Called after 2nd PIQ.
+1. **Two-row layout** (Agent A): 40px vertical cost for separating elements that fit in one row. Chat panels need message area real estate.
 
-### Agent B Design
-NO separate call. Inject prior PIQ summaries as `portfolioContext` into each subsequent PIQ's analysis prompt. Incremental portfolio awareness.
+2. **Icon-only action buttons** (Agent A): Requirements explicitly say "labeled." Tooltips are not labels -- they require hover and are invisible on mobile.
 
-### Verification Findings
-- **V12.1**: PIQ types (`src/services/piq/types.ts`) have no cross-PIQ awareness. Each PIQ is analyzed in complete isolation.
-- **V12.2**: `PIQWorkshopResult` has `overallScore`, `dimensions`, `topIssues`, `quickSummary`. The `quickSummary` is a one-line diagnosis -- good material for injection into subsequent PIQ prompts.
-- **V12.3**: Agent B's approach (inject prior PIQ summaries into subsequent analysis) is simpler and provides portfolio awareness WITHOUT a separate call. The key insight is that students benefit most from portfolio awareness DURING analysis, not as a separate post-hoc synthesis.
-- **V12.4**: Agent A's separate synthesis call produces a standalone artifact but adds cost and a new code path. The value of the standalone artifact is questionable -- students care about "how should my next PIQ be different?" not "here's a synthesis document."
+3. **Popover on EssaySwitcher** (Agent B): No essay list data exists yet. The button shape already communicates interactivity. Add Popover when essay switching is implemented.
 
-### Decision: AGENT B (embedded portfolio context)
-Injecting prior PIQ summaries into subsequent PIQ analysis is simpler, cheaper (zero new calls), and more actionable -- the analysis itself becomes portfolio-aware. Add a `portfolioContext` parameter to the PIQ analysis prompt that includes `quickSummary` and `topIssues` from prior PIQs, plus a directive: "This student has already written about X in their other PIQs. This PIQ should reveal DIFFERENT dimensions."
+4. **Required props** (Agent B): Would break both existing consumers that call `<ChatHeader />` with zero props.
+
+5. **Remove vertical divider** (Agent B): The 9px cost is trivial and the visual separation between identity and navigation areas is worth it.
+
+6. **shadcn Button for actions** (both indirectly): ClickSpark animation on utility buttons is inappropriate.
+
+7. **Custom SVG document glyph** (current implementation): The handcrafted 10x10 SVG doc icon works but lucide FileText is simpler, matches codebase conventions, and is easier to maintain.
+
+8. **Full ClickSpark-wrapped shadcn Badge** for session/coaching mode: Badges are display-only, not interactive. Using shadcn Badge is fine (no ClickSpark) but the extra div wrapper and variant system add weight for simple text display.
+
+---
+---
+
+# FORGE_DEBATES Round 2: Progress Pulse + Cloud Avatar
+
+**Date**: 2026-04-05
+**Scope**: Adding essay progress tracking and cloud avatar to ChatHeader within 448px `max-w-md` panel
+**User requirements** (quoted):
+- "intuitive like from 72 -> 78 or points they're collecting"
+- "keeps track of how much they have done and changed"
+- "offers a suggested score improvement that our system think they will see"
+- Makes them "engaged" and "evokes emotion"
+- Shows "where their college is at right now like around T20 colleges level"
 
 ---
 
-## GAP-13: Cross-Module Bridge
+## AGENT A (Direct Path) -- Compressed Design
 
-### Agent A Design
-New `StudentCrossModuleContext` type. Each module populates its section after analysis. Inject ~100-200 tokens into downstream prompts.
+### Progress Pulse
+- Separate pill element (~68px) between divider and essay switcher
+- Phase short label (FND/ARC/CRT/POL/DST) + colored dot + momentum arrow
+- Popover expansion: 240x180px with progress arc SVG, effectiveness band, competitive tier, momentum label
+- `BAND_TO_TIER` map: masterful->Ivy/Elite, strong->Highly Selective, functional->Selective, developing->Competitive
+- Momentum heuristic: `(transformativeCount*10 + significantCount*5 + moderateCount*2) / totalEdits`
+- Props: `{ phase, avgEffectiveness, editStats, hasAnalysis }`
 
-### Agent B Design
-Prose narrative bridge (`studentNarrativeBridge.ts`). Pure deterministic text assembly from available module outputs, ~80 lines. No LLM call. Decoupled -- modules don't need to know each other's types.
+### Cloud Avatar
+- SVG-based cloud path with filter blur
+- Two dot-eyes with 4 mood states (idle/thinking/happy/listening)
+- Happy blush (ellipse), breathing + bobbing via framer-motion
+- Same 34px footprint, status dot preserved
+- ~65 lines
 
-### Verification Findings
-- **V13.1**: There is no cross-module context sharing currently. Activity workshop, essay intelligence, PIQ, and academic advisor operate in complete isolation.
-- **V13.2**: Agent A's typed approach requires each module to know about a shared type. This creates coupling -- if the type changes, all modules need updating.
-- **V13.3**: Agent B's prose bridge approach is more robust: read available outputs, assemble a narrative string, inject it. Modules produce strings; the bridge consumes strings. No type coupling.
-- **V13.4**: The bridge file (~80 lines) is justified because it encapsulates the assembly logic in one place rather than scattering it across modules.
-
-### Decision: AGENT B (prose narrative bridge)
-The decoupled prose bridge is architecturally cleaner. Modules produce their outputs; the bridge reads whatever is available and assembles a prose context string. No shared types needed. Each module's prompt gets an optional `studentContext` string -- if the bridge has data, it's injected. If not, it's omitted. Maximum decoupling, minimum complexity.
-
----
-
-## VERIFICATION SUMMARY
-
-| Gap | Decision | New Files | New LLM Calls | Prompt Changes | Type Changes |
-|-----|----------|-----------|----------------|----------------|--------------|
-| 1 | Hybrid (A+1.5) | 0 | 0 | 0 | 1 field on CoachingSessionMemory |
-| 2 | Refined | 0 | 0 | 1 sidecar line | 0 |
-| 3 | Hybrid (A+B) | 0 | 0 | 2 (digest + system) | 0 |
-| 4 | Agent A | 1 | 1 Haiku | 0 | 1 new interface |
-| 5 | Agent B | 0 | 0 | 1 (~80 tokens) | 0 |
-| 6 | Agent B | 0 | 0 | 1 | 2 fields on CoachingSessionMemory |
-| 7 | Hybrid (A+B) | 0 | 0 | 2 | 0 |
-| 8 | Agent A | 0 | 0 | 1 (~200 tokens) | 0 |
-| 9 | Agent A | 0 | 0 | 0 | 1 utility function |
-| 10 | Hybrid (A+B) | 0 | 0 | 2 | 1 field on AdmissionsPositioning |
-| 11 | Hybrid (A+B) | 0 | 0 | 1 | 0 |
-| 12 | Agent B | 0 | 0 | 1 | 0 |
-| 13 | Agent B | 1 | 0 | 0 | 0 |
-| **TOTAL** | | **2 new files** | **1 new Haiku call** | **12 prompt changes** | **~6 type additions** |
+### Trade-offs Acknowledged
+- Pill consumes 68px, squeezing EssaySwitcher from ~166px to ~88px
+- Phase abbreviations (FND, CRT) not immediately intuitive
+- SVG path cloud untested at 34px
 
 ---
 
-## META-OBSERVATIONS
+## AGENT B (Rethink Path) -- Compressed Design
 
-1. **Agent A consistently overestimated infrastructure needed.** Many proposed "new fields" or "new calls" turned out to already exist in slightly different forms. The codebase is richer than Agent A's audit suggested.
+### Progress = Cloud State (NO separate element)
+- Cloud avatar IS the progress indicator -- no new width consumed
+- `computeCloudState(vitals)` pure function maps EssayVitals to 14 visual parameters (hue, saturation, lightness, density, drift, wisps, glow, breathing range, sparkle)
+- 5 phase atmospheres: foundation(gray-lavender) -> distinction(luminous gold-violet)
+- Vitality modifies saturation/lightness, editing injects energy, transformative edits sparkle
 
-2. **Agent B consistently provided better prompt engineering.** The "lunch" framing (GAP-5), "strategic question" reframe (GAP-6), "emotion as evidence of stakes" (GAP-7), and "building your case" advocacy framing (GAP-11) are all more generative than Agent A's more mechanical approaches.
+### Cloud Avatar
+- CSS-based: 3 overlapping `rounded-full` divs with radial gradients + blur(0.5px)
+- Floating wisp particles (0-4 based on phase)
+- NO face/eyes -- personality through physics (drift, density, color)
 
-3. **Agent A was right about separate calls when domain separation matters.** GAP-4 (AO first read) genuinely needs a separate call because the naive gut reaction cannot be simulated after deep understanding.
+### Phase Subtitle
+- Replaces "ESSAY COACH" with phase name in AnimatePresence crossfade
 
-4. **Agent B violated LLM-first design in GAP-8.** The post-hoc scoring modifier was the one clear case where Agent B's approach was architecturally wrong.
+### Expansion
+- Click cloud -> header expands by 28px showing transformative insight text
+- No popover -- in-flow expansion
 
-5. **Both agents missed existing infrastructure in GAP-2.** The `learningStyleUpdate` field already exists in pattern detection. This is a wiring completion, not a new feature.
+### Trade-offs Acknowledged
+- 0px new width (all embedded)
+- Cloud as data viz may be too subtle for students to notice
+- No explicit score numbers or college tier labels
+- No face -- personality through physics alone
+
+---
+
+## REALITY VERIFICATION FINDINGS
+
+### Finding TYPES-1: ImprovementPhaseLevel EXISTS
+**Severity**: verified
+`profileTypes.ts:87`: `'foundation' | 'architecture' | 'craft' | 'polish' | 'distinction'`. Both designs reference correctly.
+
+### Finding TYPES-2: EffectivenessBand EXISTS, BAND_TO_TIER does NOT
+**Severity**: verified
+`effectivenessBands.ts` has 6 bands (masterful/exceptional/strong/functional/developing/problematic) with `toEffectivenessBand()` converter. Agent A's `BAND_TO_TIER` is a novel mapping -- no code connects essay effectiveness to college tiers. However, `tierCalibration.ts` uses the same 6-tier hierarchy (Ivy/Elite -> Accessible) for academics, so the naming convention exists. The mapping is new but conceptually consistent.
+
+### Finding TYPES-3: No pre-computed avgEffectiveness
+**Severity**: concern
+`ParagraphScoreMatrix.paragraphs[i].scores.effectiveness` exists (0-100 per paragraph) but no aggregate. Must be computed: `sum(paragraphs[i].scores.effectiveness) / paragraphs.length`. Both designs assume this value exists as a prop -- it must be derived.
+
+### Finding TYPES-4: Edit stats exist in VersionTracker
+**Severity**: verified
+`StalenessAccumulator` in `versionTracker.ts:70-78` has `transformativeCount`, `significantCount`, `moderateCount`, `totalEdits`. Also serialized in `ProfileIndex.accumulatedStaleness` (`profileTypes.ts:1400-1408`). Agent A's momentum formula is viable.
+
+### Finding TYPES-5: ImprovementPhase is richer than either design assumed
+**Severity**: verified
+`ImprovementPhase` (`profileTypes.ts:1428-1477`) has: `level`, `reasoning`, `focusAreas[]`, `deferredAreas[]`, `readinessAssessment` (LLM prose), `dimensionPhases[]`, `coachingLens`, `transition`, `nearBoundary`. The `readinessAssessment` is especially useful for the popover -- LLM-generated prose about how close the essay is to the next level.
+
+### Finding AVATAR-1: Codebase uses CSS clouds, not SVG
+**Severity**: verified
+`ChatPanel.tsx:127-173` renders decorative clouds using overlapping `rounded-full` divs with blur. This is the established cloud technique. Agent B's approach matches this pattern. Agent A's SVG path is a novel technique with no precedent.
+
+### Finding LAYOUT-1: 68px pill is too wide
+**Severity**: concern
+With Items 1-6 layout: Avatar(34) + Name(46) + Divider(9) + EssaySwitcher(flex-1) + Actions(129) = 218px fixed. EssaySwitcher gets ~206px. Adding 68px pill -> EssaySwitcher shrinks to ~138px. "Common App" needs ~125px minimum (icon+label+chevron+padding). Technically fits but is uncomfortable. A 48px badge is safer.
+
+### Finding DATA-FLOW-1: No essay data flows to ChatHeader today
+**Severity**: critical
+ChatHeader takes ZERO props. Both designs require backend integration to surface EssayProfile data to the frontend. This is infrastructure work independent of the visual design.
+
+### Finding POPOVER-1: shadcn Popover works via Portal
+**Severity**: verified
+`components/ui/popover.tsx` wraps Radix popover with Portal rendering. Zero layout impact on the header row. Enter/exit animations built in.
+
+### Finding SCORE-PHILOSOPHY-1: effectivenessBands.ts discourages raw numbers
+**Severity**: tension
+The effectivenessBands module comment says: "a score of 71 vs 73 carries zero signal given LLM variance of 8-15 points." Showing `78` in the badge contradicts this philosophy. However, the user explicitly requested "72 -> 78" style display. User requirement wins -- the band context is provided in the popover to ground the number.
+
+---
+
+## FORCED-CHOICE SYNTHESIS (6 key decisions)
+
+### 1. Score Display: HYBRID -- Explicit badge (Agent A) + ambient cloud (Agent B)
+
+**Winner**: Agent A's explicit approach, refined to 48px badge.
+
+**Why**: The user's words are unambiguous: "intuitive like from 72 -> 78", "where their college is at." This is a request for NUMBERS. Agent B's ambient approach (cloud saturation shifts) is elegant engineering but invisible to students. A 17-year-old seeing a slightly more saturated lavender cloud will not think "my essay improved 6 points." They will think "that's a purple blob."
+
+**Refinement**: Badge shows `78 +6` (48px) instead of Agent A's full pill with phase abbreviation (68px). Phase moves to subtitle (from Agent B). The cloud color shift (Agent B) is a SECONDARY reinforcement: the number is what drives emotional engagement, the cloud vibe is subconscious atmospherics.
+
+**Width math**: 48px badge + 8px gap = 56px. EssaySwitcher shrinks from ~182px to ~126px. Still fits "Common App" (~125px). Tight but workable.
+
+### 2. College Tier: POPOVER detail (Agent A), not border tint (Agent B)
+
+**Winner**: Agent A's explicit text, in a popover.
+
+**Why**: "where their college is at right now like around T20 colleges level" -- this requires TEXT. "Your essay is competitive at Highly Selective schools (Northwestern, UCLA, UC Berkeley)" is the answer. A subtle border tint (Agent B) communicates nothing to a student who doesn't know the color-to-tier mapping.
+
+**Refinement**: Use the SAME tier names as `tierCalibration.ts` (Ivy/Elite, Highly Selective, Very Selective, Selective, Competitive, Accessible) for cross-product consistency. The popover shows tier + school examples + band description.
+
+### 3. Cloud Shape: CSS overlapping divs (Agent B)
+
+**Winner**: Agent B.
+
+**Why**: The codebase already uses this technique for the cloud valley in `ChatPanel.tsx:127-173`. `rounded-full` divs with `blur(0.5px)` and radial gradients are a proven pattern here. Agent A's SVG path is novel with no precedent. Consistency and maintainability favor Agent B.
+
+### 4. Expansion: POPOVER (Agent A)
+
+**Winner**: Agent A.
+
+**Why**: Agent B's 28px header row expansion pushes all chat messages down on every click. In a chat interface, layout shifts are disruptive -- the user's scroll position changes. A Popover renders via Portal with zero layout impact. The shadcn Popover (`components/ui/popover.tsx`) is ready to use with enter/exit animations.
+
+### 5. Cloud Personality: HYBRID -- Dot eyes (Agent A) + phase color (Agent B)
+
+**Winner**: Two dot-eyes from Agent A. Phase-driven coloring from Agent B. No blush, no wisps.
+
+**Why**: At 34px, Agent B's faceless cloud is indistinguishable from the decorative clouds in the chat valley. Two 2.5px dot-eyes are the minimum viable personality -- they transform a "blob" into a "character." Agent A's 4 mood states (idle/thinking/happy/listening) are over-specified -- simplified to 2: default (neutral) and thinking (dots shift Y during analysis).
+
+Agent B's phase colors ARE used -- the cloud body shifts from gray-lavender (foundation) to gold-violet (distinction). This is the ambient layer that reinforces the explicit score.
+
+Agent A's blush, wisp particles, and happy state are cut. At 34px these details are noise, not signal.
+
+### 6. Subtitle: DYNAMIC phase name (Agent B), already in Items 1-6
+
+**Winner**: Agent B, extended.
+
+**Why**: Items 1-6 already implemented Agent B's dynamic subtitle. For Progress Pulse, the priority chain extends: `archived > coaching_mode > improvement_phase > "essay coach"`. When no coaching mode is active, the subtitle shows "craft phase" / "polishing" / "distinction". Foundation shows "essay coach" (calling out "foundation phase" to a new user is confusing -- it is the default state).
+
+---
+
+## Summary of Design Decisions
+
+| Aspect | Agent A | Agent B | Decision |
+|--------|---------|---------|----------|
+| Score display | 68px pill with phase abbrev | Cloud color only | **HYBRID**: 48px number badge + cloud color |
+| College tier | Text label in popover | Border tint | **Agent A**: Text in popover |
+| Momentum | Popover detail | Cloud energy/drift | **HYBRID**: Popover text + cloud is secondary |
+| Cloud shape | SVG path | CSS rounded-full divs | **Agent B**: CSS (matches codebase) |
+| Cloud face | Dot eyes + blush + 4 moods | No face (physics only) | **HYBRID**: Dot eyes, 2 moods, no blush |
+| Expansion | Popover (Portal) | Header row +28px | **Agent A**: Popover (no layout shift) |
+| Subtitle | Static "essay coach" | Dynamic phase name | **Agent B**: Dynamic (from Items 1-6) |
+| Phase display | Abbreviations (FND/CRT) | Subtitle text | **Agent B**: Full words in subtitle |
+
+---
+
+## Rejected Approaches
+
+1. **Ambient-only progress (Agent B)**: User explicitly requested numbers ("72 -> 78"), college tier labels ("around T20 level"), and visible tracking. Ambient cloud color shifts are invisible to most users and fail all three requirements.
+
+2. **68px progress pill (Agent A)**: Consumes too much width. EssaySwitcher drops to ~88px (Agent A's own measurement), making "Common App" + icon + chevron uncomfortable. 48px badge is the better compromise.
+
+3. **SVG path cloud (Agent A)**: No precedent in codebase. The chat panel's cloud valley uses CSS `rounded-full` divs -- proven technique. SVG path requires custom drawing, filter tuning, and may alias differently across screens.
+
+4. **Header row expansion (Agent B)**: Layout shift in a scrollable chat panel is disruptive. Every expansion pushes messages down and changes the user's scroll position. Portal-rendered Popover has zero layout cost.
+
+5. **Full progress arc SVG (Agent A)**: A radial arc visualization for 5 data points is over-engineered. Text layout in a popover is more informative and 10x easier to maintain.
+
+6. **Faceless cloud (Agent B)**: At 34px in a panel that already has decorative clouds (the valley), a faceless cloud blends in rather than standing out as a character. Two dot-eyes are the minimum viable identity.
+
+7. **Phase abbreviations (Agent A)**: FND/ARC/CRT/POL/DST require learning. Full words in the subtitle and popover are immediately readable.
+
+8. **Wisp particles (Agent B)**: At 34px, 1-4 floating wisps of 1-2px are visual noise. The phase color shift communicates the same information more clearly.
+
+9. **4 mood states (Agent A)**: Idle/thinking/happy/listening is over-specified for 2.5px dots. Reduced to 2: neutral and thinking (slight Y offset during analysis). Happy and listening are not distinguishable at this scale.
+
+10. **Raw 0-100 score display**: The effectivenessBands module was designed to avoid false precision ("71 vs 73 carries zero signal"). However, the user explicitly requested "72 -> 78" style feedback. The number drives emotional engagement ("I improved!") even if the precision is technically imperfect. The popover provides band context to ground the number honestly.

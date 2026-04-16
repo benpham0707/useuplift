@@ -71,6 +71,10 @@ import { FindingStore } from '../findings/findingStore';
 import {
   buildFindingReferenceContext,
 } from '../findings/findingContextBuilder';
+import {
+  TECHNIQUE_VOCABULARY_PROMPT_BLOCK,
+  normalizeTechnique,
+} from './techniqueVocabulary';
 
 // ============================================================================
 // CONSTANTS
@@ -355,15 +359,6 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
         "paragraphs": [<paragraph indices where voice holds steady>],
         "voiceCharacter": "<what characterizes the voice in this stable region>"
       }
-    ],
-    "codeSwitching": [
-      {
-        "location": { "paragraph": <n>, "sentence": <n> },
-        "language": "<language or register being switched to>",
-        "trigger": "<what triggered the switch>",
-        "culturalFunction": "<the cultural function the switch serves>",
-        "text": "<the code-switched passage>"
-      }
     ]
   },
 
@@ -391,7 +386,7 @@ Return a single JSON object with EXACTLY these 4 top-level keys:
         "detail": "<what is shown or told and how>"
       }
     ],
-    "authenticityAssessment": "<describe how emotion is conveyed — through sensory detail, through abstraction, through dialogue, through action. If emotion is largely ABSENT (the essay operates through intellectual assertion without emotional exposure), describe that absence and what the essay uses INSTEAD of emotion. Map what IS there, not what should be.>"
+    "authenticityAssessment": "<ONE sentence (≤40 words): how emotion is conveyed (sensory detail / abstraction / dialogue / action) OR what replaces it if largely absent. Map what IS there, not what should be.>"
   },
 
   "momentEarnednessMap": {
@@ -462,13 +457,31 @@ If a claimed mechanism is stock language, a cliché, or a summary that doesn't c
 - GAPS are as important as mechanisms. Identify moments that AREN'T earned: "P3S5 claims 'it changed everything' but no prior passage established what 'everything' was or why it mattered." If a moment claims devastation but no earlier passage established emotional proximity to the object, name that gap. If a realization appears without the reasoning steps that would make it feel inevitable, name that gap.
 - Be skeptical of "confirmation" moments — where the writer claims external validation ("reaffirmed my belief," "proved that," "showed me that") without showing the validation being tested or earned. If the belief was never challenged or the connection was never demonstrated through specific detail, that's a gap. Having setup mechanisms doesn't mean the payoff moment is earned — the payoff must also be grounded, not just asserted.
 - Arrow DENSITY is the diagnosis. Many arrows converging on a moment = well-earned. Sparse arrows = unearned. Do NOT use scores or "well-earned"/"unearned" labels — describe WHAT mechanisms exist or are absent.
-- structuralObservation should describe the essay's overall setup-payoff architecture.`;
+- structuralObservation should describe the essay's overall setup-payoff architecture.
+
+=== SCHEMA COMPRESSION CONSTRAINTS (Scope 1 Phase 2) ===
+
+Output brevity is ENFORCED. These caps prevent the output from being 10× its useful size:
+
+voiceMap observations cap:
+- Each voiceMap dimension (register, vocabularyFingerprint, sentenceRhythm, perspectiveDistance, tonalDisposition) MUST emit at most 2 observations. Pick the 2 that best represent the dimension's behavior across the full essay — do NOT enumerate every instance.
+- The codeSwitching field has been REMOVED from the voiceMap schema. Do not emit it; downstream consumers no longer read it. If the essay genuinely switches languages/registers, capture that as a "shifts" entry or a register "observation" instead.
+
+emotionalTopography caps:
+- showVsTell MUST emit at most 4 entries. Pick the 4 moments that best represent the essay's show/tell pattern — do NOT enumerate every sentence.
+- authenticityAssessment MUST be ONE sentence, ≤40 words. It is a headline, not a description.`;
 
 /**
  * Phase B system prompt — Theme, Narrative, Character, Craft, Admissions
  * These are the structural/interpretive dimensions that trace WHAT the essay is.
  */
 const SYSTEM_PROMPT_PHASE_B = `${SHARED_PREAMBLE}
+
+=== PRESCRIPTIVE CARVE-OUT (Scope 2 Phase 5) ===
+
+The "Understanding Only" rule above governs every descriptive field. ONE structured exception exists in Phase B: \`craftAssessment.craftPatterns[].pairedImprovement\`. When a craft pattern has a clear architectural fix, you MAY emit an imperative directive there — this is the single slot where L3.75 gets to be prescriptive, because it is the ONLY layer with full-essay architectural visibility, and downstream coaching needs that visibility pinned to specific technique names. The forbidden vocabulary list still governs every OTHER field in this phase.
+
+${TECHNIQUE_VOCABULARY_PROMPT_BLOCK}
 
 === OUTPUT SCHEMA (Phase B: Theme + Narrative + Character + Craft + Admissions) ===
 
@@ -532,8 +545,15 @@ RIGHT: 'The person who stays late not because they have to but because they got 
     "craftPatterns": [
       {
         "quality": "<name of the craft pattern observed>",
-        "description": "<describe WHAT the pattern is and WHERE it appears — do NOT evaluate it>",
-        "paragraphs": [<paragraph indices>]
+        "description": "<describe WHAT the pattern is and WHERE it appears>",
+        "paragraphs": [<paragraph indices>],
+        "pairedImprovement": {
+          "technique": "<one of the TECHNIQUE VOCABULARY names above OR null>",
+          "directive": "<one-sentence action the student should take, imperative voice>",
+          "architecturalReason": "<why this matters to THIS essay's architecture specifically>",
+          "demonstrationSketch": "<1-2 sentence sketch of the improved version, or null>",
+          "expectedImpact": "transformative" | "significant" | "incremental"
+        }
       }
     ],
     "imageSystem": "<describe the image/metaphor system — what images appear, how they recur or transform, what connections exist between them>",
@@ -627,7 +647,7 @@ IMPORTANT: "newFindings" and "findingEvolutions" are OPTIONAL. Omit them entirel
 === QUALITY STANDARDS ===
 
 - craftAssessment.craftSignatures: Describe WHAT techniques are present and WHERE (e.g., "Uses anaphora in P3S1-S3, sentence fragments in P5S2-S4, extended metaphor linking P1 and P4"). Do NOT evaluate how well they work.
-- craftAssessment.craftPatterns: Describe WHAT patterns exist (e.g., "P2 and P4 use abstract nouns where P1 and P3 use concrete imagery"). Do NOT label them as weaknesses.
+- craftAssessment.craftPatterns: Describe WHAT patterns exist (e.g., "P2 and P4 use abstract nouns where P1 and P3 use concrete imagery"). For each pattern that has a clear architectural fix, populate "pairedImprovement" with the technique name (from the TECHNIQUE VOCABULARY above), a one-sentence directive, the architecturalReason specific to THIS essay, and an optional 1-2 sentence demonstrationSketch. Leave pairedImprovement=null when the pattern is descriptive-only with no clear fix. Do not force pairings.
 - admissionsPositioning: Describe WHAT an admissions reader would notice. Do NOT evaluate whether it is effective.
 - admissionsPositioning.redFlags: Describe WHAT might draw attention. Do NOT prescribe fixes. CHECK FOR THESE STRUCTURAL PATTERNS:
   * SCOPE INFLATION: Do claims get BIGGER while evidence gets THINNER across the essay? If P1 claims "I created" and P7 claims "I'll change the world" without proportional evidence escalation, flag: "Scope inflation: language escalates from [early claim] to [late claim] without proportional evidence."
@@ -656,7 +676,9 @@ Produce connectionUpgrades for any connections whose strengthCategory should cha
 FINDINGS (W1.4):
 Review existing findings from the walk. With the complete essay understanding, some findings may now be confirmed, deepened, or superseded. Produce findingEvolutions where warranted.
 If synthesis reveals NEW essay-level findings — cross-essay patterns, structural strategies, identity-level observations — produce those in newFindings. Focus on findings that require the full-text simultaneous view (the walk could not have seen them paragraph-by-paragraph).
-DO NOT duplicate findings the walk already produced. Use buildsOn/relatedTo to reference existing findings.`;
+DO NOT duplicate findings the walk already produced. Use buildsOn/relatedTo to reference existing findings.
+
+SUPERSESSION IS RARE: Prefer 'confirmed' or 'deepened' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED by the holistic view — not when it's incomplete or narrow. If a finding captured a partial truth, deepen it rather than superseding it. The coaching system depends on active findings — if you supersede everything, the student gets no improvement targets. When you DO supersede, you MUST produce a replacement finding in newFindings.`;
 
 // ============================================================================
 // CONTEXT BUILDERS
@@ -713,9 +735,18 @@ You describe WHAT IS, not how WELL. No evaluative language.
 CONVERGENCE GUIDANCE:
 - You are the PRIMARY convergence signal — the system trusts your judgment.
 - Budget and iteration caps are backstops only.
-- Be honest: if further iteration would not meaningfully improve coaching quality, say so.
-- Name SPECIFIC remaining opportunities, not generic "could go deeper."
-- For simple essays, converge after 1 iteration. Complex essays may need 2-3.
+- CONVERGENCE BAR: "Would coaching give WRONG advice without another iteration?"
+  NOT "Could we learn more?" (the answer to that is always yes).
+- After iteration 0: converge UNLESS you can name a specific finding that would
+  REVERSE a coaching recommendation (not refine it — REVERSE it). Refinements
+  and nuances do not justify another iteration.
+- For essays under 500 words with a clear central theme: converge after iteration 0.
+- For complex essays with multiple themes or structural issues: 1-2 iterations max.
+- When in doubt, CONVERGE. The coaching layer is robust enough to work with
+  partial understanding — it's better to coach with 90% understanding now
+  than 95% understanding after burning $0.25 and 4 more minutes.
+- Name SPECIFIC remaining opportunities if NOT converging. Generic statements
+  like "could explore voice further" are not sufficient justification.
 
 WALK VALIDATION GUIDANCE:
 - HIGH CONFIDENCE (>0.7): Your reading wins — the walk missed what full context reveals.
@@ -1438,10 +1469,57 @@ function coerceCraftAssessment(raw: Record<string, unknown>): CraftAssessment {
       quality: String(item.quality ?? ''),
       description: String(item.description ?? ''),
       paragraphs: ensureNumberArray(item.paragraphs),
+      // Scope 2 Phase 5: parse optional pairedImprovement block
+      pairedImprovement: coercePairedImprovement(item.pairedImprovement),
     })),
     imageSystem: String(raw.imageSystem ?? ''),
     sentencePatterns: String(raw.sentencePatterns ?? ''),
     wordPatterns: String(raw.wordPatterns ?? ''),
+  };
+}
+
+/**
+ * Scope 2 Phase 5: parse the optional pairedImprovement slot on a
+ * CraftAssessment growth edge. Returns null when absent, malformed, or
+ * missing the required directive + architecturalReason fields.
+ *
+ * Treats unknown expectedImpact values as 'incremental' (safest default).
+ * Normalizes the technique name through the closed vocabulary so unknown
+ * or misspelled names collapse to null rather than propagating garbage.
+ */
+function coercePairedImprovement(
+  raw: unknown,
+): CraftAssessment['growthEdges'][number]['pairedImprovement'] | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const directive = typeof r.directive === 'string' ? r.directive.trim() : '';
+  const architecturalReason =
+    typeof r.architecturalReason === 'string' ? r.architecturalReason.trim() : '';
+  if (directive.length === 0 || architecturalReason.length === 0) return null;
+
+  const technique = normalizeTechnique(
+    typeof r.technique === 'string' ? r.technique : null,
+  );
+
+  const demonstrationSketch =
+    typeof r.demonstrationSketch === 'string' && r.demonstrationSketch.trim().length > 0
+      ? r.demonstrationSketch.trim()
+      : null;
+
+  const rawImpact = typeof r.expectedImpact === 'string' ? r.expectedImpact : 'incremental';
+  const expectedImpact: 'transformative' | 'significant' | 'incremental' =
+    rawImpact === 'transformative' || rawImpact === 'significant'
+      ? rawImpact
+      : 'incremental';
+
+  return {
+    technique,
+    directive,
+    architecturalReason,
+    demonstrationSketch,
+    expectedImpact,
   };
 }
 

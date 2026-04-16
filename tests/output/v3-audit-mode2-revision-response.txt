@@ -1,0 +1,24 @@
+
+════════════════════════════════════════════════════════════════════════════════
+MODE 2: REVISION RESPONSE
+════════════════════════════════════════════════════════════════════════════════
+
+STUDENT: "I rewrote P3 like you suggested. I picked the dentist moment. What do you think?"
+
+OLD P3: "I've been translating since I was seven. Dentist appointments, tax forms, parent-teacher conferences..."
+NEW P3: "At the dentist when I was nine, I told my mother the hygienist said 'no cavities' when what she actu..."
+
+MODE DETECTED: revision_response (edit processed before coaching turn)
+COST: $0.0577
+SUCCESS: true
+PROFILE DEEPENED: false
+
+════════════════════════════════════════════════════════════════════════════════
+COACH RESPONSE
+════════════════════════════════════════════════════════════════════════════════
+
+I need to see what you wrote. Show me the new P3.
+
+Before I can coach on whether it works, I need to read your actual sentences — not your description of them. The craft is in the execution, not the concept.
+
+Paste the revised P3 here.

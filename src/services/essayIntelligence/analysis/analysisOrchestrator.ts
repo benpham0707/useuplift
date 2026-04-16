@@ -57,11 +57,18 @@ import type {
   SynthesisIterationOutput,
   DeepDiveRequest,
   UnderstandingQuestion,
+  ImprovementManifest,
+  ImprovementEntry,
+  ImprovementCandidate,
+  ImprovementCandidateStoreSnapshot,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
 import { classifyError } from '../../../lib/llm/claude';
 import type { LayerError } from '../../../lib/llm/claude';
+import { PipelineError } from '../errors';
+import { runHowlerPass } from './howlerPass';
+import { mergeL5IntoManifest } from './l5ManifestMerger';
 
 // Layer services
 import { firstImpressionsService } from './firstImpressions';
@@ -108,6 +115,7 @@ import { detectProgrammaticContradictions } from '../profileManager/validation/c
 
 // Profile manager
 import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
 
 // Finding store (for contradiction → finding pipeline)
@@ -427,6 +435,16 @@ export class AnalysisOrchestrator {
         coordinator.applyUnderstandingWalkStep(walkOutput);
       }
 
+      // Scope 2 Phase 5: Harvest L3 improvement candidates from sentence
+      // understandings into the candidate store. L3 emits at most one
+      // candidate per sentence (prompt-constrained); total across the walk
+      // is typically 3-10. These enter the store as lifecycleState='candidate'
+      // with sourceLayer='L3' and flow through L4 consolidation in Phase 6.
+      const l3Candidates = this.extractL3Candidates(l3Result);
+      if (l3Candidates.length > 0) {
+        coordinator.addImprovementCandidates(l3Candidates, { source: 'L3' });
+      }
+
       costTracker.record('L3', l3Result.cost, l3Result.tokenUsage, l3Result.timingMs);
       layersCompleted.push('L3');
 
@@ -434,6 +452,7 @@ export class AnalysisOrchestrator {
         `[Orchestrator] L3 complete: ${l3Result.walkOutputs.length} paragraphs walked, ` +
         `${l3Result.skippedParagraphs.length} skipped, ` +
         `${l3Result.backPropagations.length} back-props, ` +
+        `${l3Candidates.length} improvement candidates harvested, ` +
         `cost=$${l3Result.cost.toFixed(4)}, time=${l3Result.timingMs}ms`,
       );
     } catch (error) {
@@ -470,6 +489,15 @@ export class AnalysisOrchestrator {
       coordinator.applyHolisticSynthesis(growthResult.finalSynthesis);
       growthReadingStrategy = growthResult.readingStrategy;
 
+      // Scope 2 Phase 5: Harvest L3.75 improvement candidates from the
+      // craftAssessment.growthEdges[].pairedImprovement slots. L3.75 is the
+      // only layer with full-essay architectural visibility, so candidates
+      // here carry architectural reasoning that per-sentence candidates cannot.
+      const l375Candidates = this.extractL375Candidates(growthResult.finalSynthesis);
+      if (l375Candidates.length > 0) {
+        coordinator.addImprovementCandidates(l375Candidates, { source: 'L3.75' });
+      }
+
       // Record aggregate L3.75 cost
       costTracker.record('L3.75', growthResult.totalCost, {
         inputTokens: 0, outputTokens: 0,
@@ -485,7 +513,8 @@ export class AnalysisOrchestrator {
           ? ` (${growthResult.growthState.convergenceReason})`
           : ' (llm_converged)') + `, ` +
         `cost=$${growthResult.totalCost.toFixed(4)}, ` +
-        `${growthResult.growthState.activityLog.length} activity records`,
+        `${growthResult.growthState.activityLog.length} activity records, ` +
+        `${l375Candidates.length} improvement candidates harvested`,
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3.75', error, costTracker.summarize(0).totalCost));
@@ -563,10 +592,16 @@ export class AnalysisOrchestrator {
         (profileForCrystal as EssayProfile).connections.all,
       );
 
+      // Scope 2 Phase 6a: pass the candidate store into L4 so L4b can
+      // consolidate instead of re-derive. crystallizer.ts fails fast if
+      // the store is empty (should be impossible post-Phase-5).
+      const candidateStoreForL4 = coordinator.getImprovementCandidateStore();
+
       l4Result = await crystallizerService.crystallize(
         profileForCrystal as EssayProfile,
         input.essayType,
         input.essayText,
+        candidateStoreForL4,
         priorNorthStar,
         findingStoreForL4.size > 0 ? findingStoreForL4 : undefined,
         connectionGraphForL4.totalCount > 0 ? connectionGraphForL4 : undefined,
@@ -577,6 +612,46 @@ export class AnalysisOrchestrator {
       coordinator.applyScoreMatrix(l4Result.scoreMatrix);
       coordinator.applyCoherenceReport(l4Result.coherenceReport);
 
+      // Scope 2 Phase 6a: drive the candidate lifecycle based on L4b's
+      // consolidation decisions. Every candidate cited in a priority's
+      // consolidatedFrom becomes `consolidated`; every active candidate
+      // NOT cited becomes `superseded`. Candidates stay in the store
+      // (not deleted) so Phase 8 can diagnose what L4b skipped.
+      const coachingMap = l4Result.scoreMatrix.coachingMap;
+      if (coachingMap) {
+        const citedIds = new Set(
+          coachingMap.priorities.flatMap((p) => p.consolidatedFrom ?? []),
+        );
+        const activeIds = candidateStoreForL4.getActive().map((c) => c.id);
+        const consolidatedIds = activeIds.filter((id) => citedIds.has(id));
+        const supersededIds = activeIds.filter((id) => !citedIds.has(id));
+
+        coordinator.applyConsolidation(consolidatedIds, supersededIds);
+
+        // Diagnostic: priorities with empty consolidatedFrom are ungrounded
+        // (LLM invented them despite the prompt forbidding it). Log loudly.
+        const ungroundedPriorities = coachingMap.priorities.filter(
+          (p) => !p.consolidatedFrom || p.consolidatedFrom.length === 0,
+        );
+        if (ungroundedPriorities.length > 0) {
+          console.warn(
+            `[Orchestrator] L4b emitted ${ungroundedPriorities.length}/${coachingMap.priorities.length} ` +
+              `ungrounded priorities (no consolidatedFrom). Phase 8 should flag these.`,
+          );
+        }
+
+        // Diagnostic: unknown candidate IDs in consolidatedFrom indicate
+        // LLM hallucination. Filter to known IDs for a count comparison.
+        const storeIds = new Set(activeIds);
+        const unknownCited = [...citedIds].filter((id) => !storeIds.has(id));
+        if (unknownCited.length > 0) {
+          console.warn(
+            `[Orchestrator] L4b cited ${unknownCited.length} unknown candidate IDs (hallucinated). ` +
+              `First 3: ${unknownCited.slice(0, 3).join(', ')}`,
+          );
+        }
+      }
+
       costTracker.record('L4', l4Result.cost, l4Result.tokenUsage, l4Result.timingMs);
       layersCompleted.push('L4');
 
@@ -585,6 +660,7 @@ export class AnalysisOrchestrator {
         `coherent=${l4Result.coherenceReport.isCoherent}, ` +
         `contradictions=${l4Result.coherenceReport.contradictions.length}, ` +
         `scoreMatrix=${l4Result.scoreMatrix.paragraphs.length} paragraphs, ` +
+        `priorities=${coachingMap?.priorities.length ?? 0}, ` +
         `cost=$${l4Result.cost.toFixed(4)}, time=${l4Result.timingMs}ms`,
       );
     } catch (error) {
@@ -709,12 +785,19 @@ export class AnalysisOrchestrator {
         const profileForAnnotations = coordinator.getProfile();
         // W7.1: Pass FindingStore to L5 for per-paragraph finding references
         const findingStoreForL5 = coordinator.getFindingStore();
+        // Scope 2 Phase 6a: pass the candidate store so L5 can resolve
+        // priority.consolidatedFrom IDs back to full candidate observations
+        // when rendering the coaching map lineage block.
+        const candidateStoreForL5 = coordinator.getImprovementCandidateStore();
+
         l5Result = await deepAnnotationService.generateAnnotations(
           profileForAnnotations as EssayProfile,
           input.reanalysisBrief,
           contradictionAnnotationFlags,
           findingStoreForL5.size > 0 ? findingStoreForL5 : undefined,
           growthReadingStrategy,
+          undefined, // priorAnnotations
+          candidateStoreForL5,
         );
 
         costTracker.record('L5', l5Result.cost, l5Result.tokenUsage, l5Result.timingMs);
@@ -735,6 +818,96 @@ export class AnalysisOrchestrator {
       }
     } else {
       console.log('[Orchestrator] L5 skipped: annotations disabled');
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 7: Build Improvement Manifest
+    //
+    // Every finding, growth edge, red flag, and AO observation maps to at
+    // least one ImprovementEntry. The conversator workshops these with the
+    // student. Understanding is the fuel — improvements are the output.
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // classified: systemic
+    //   Manifest generation is load-bearing for downstream coaching. Silent
+    //   fallback to "no manifest" was the MISCLASSIFIED case that led to
+    //   (a) the reference audit's "(no manifest on post-coaching profile)"
+    //   observation and (b) coaching running without a priority queue, which
+    //   erased the entire Scope 1-3 value prop. Now: fail-fast with structured
+    //   context. Callers can catch PipelineError at the pipeline boundary if
+    //   they want to degrade; the orchestrator no longer silently degrades.
+    try {
+      const profileForManifest = coordinator.getProfile() as EssayProfile;
+
+      // ── Root-cause fix for S3/V14/S6/partial-S5 ──
+      // Force a fresh candidate-store snapshot onto the profile before
+      // buildImprovementManifest runs. Without this, L4 priorities'
+      // `consolidatedFrom` candidate-ID lookups return null because the
+      // snapshot on the profile is only synced inside checkpoint(). The
+      // drift between checkpoint cadence and manifest-build timing produced
+      // the "4/9 items with technique" regression in the reference audit.
+      (profileForManifest as EssayProfile).improvementCandidateSnapshot =
+        coordinator.snapshotCandidateStore();
+
+      const manifest = this.buildImprovementManifest(
+        profileForManifest,
+        coordinator.getFindingStore(),
+        input.essayText,
+        input.essayType,
+      );
+
+      // ── Efficiency: plumb L5 output into the manifest ──
+      // L5 spends ~$0.50/run producing rewriteExample + transferablePrinciple
+      // + stakes + wordEconomyCut per annotation. Pre-merger, these fields
+      // never reached coaching. Now they seed matching manifest items BEFORE
+      // research enrichment runs, so L5's essay-specific rewrites take
+      // precedence over the research DB's generic BEFORE/AFTER/PRINCIPLE
+      // boilerplate. Non-destructive: only fills null fields.
+      if (l5Result) {
+        try {
+          const mergeStats = mergeL5IntoManifest(manifest, l5Result);
+          if (mergeStats.itemsMerged > 0) {
+            console.log(
+              `[Orchestrator] L5→Manifest merge: ${mergeStats.itemsMerged} items, ` +
+                `demonstrations=${mergeStats.demonstrationsFilled}, ` +
+                `techniques=${mergeStats.techniquesFilled}, ` +
+                `stakes=${mergeStats.stakesFilled}`,
+            );
+          }
+        } catch (err) {
+          // classified: recoverable — merger is an enhancement pass; if it
+          // fails, manifest still has its structural content. Log loudly.
+          console.warn(
+            '[Orchestrator] L5→Manifest merge failed (non-fatal):',
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
+
+      profileForManifest.improvementManifest = manifest;
+
+      const withTechnique = manifest.items.filter(i => i.technique).length;
+      console.log(
+        `[Orchestrator] ImprovementManifest: ${manifest.items.length} items ` +
+          `(${withTechnique}/${manifest.items.length} with technique) ` +
+          `from ${manifest.sources.join(', ')}`,
+      );
+    } catch (error) {
+      // classified: systemic
+      // Fail-fast — wrap non-PipelineError exceptions so callers get
+      // structured diagnostics. Manifest generation is load-bearing for
+      // coaching; silent fallback erased the entire Scope 1-3 value prop.
+      if (error instanceof PipelineError) {
+        console.error('[Orchestrator] ImprovementManifest generation failed:', error.toString());
+        throw error;
+      }
+      const wrapped = PipelineError.wrap(
+        'manifest_projection',
+        error instanceof Error ? error : new Error(String(error)),
+        'ImprovementManifest generation failed',
+      );
+      console.error('[Orchestrator] ImprovementManifest generation failed:', wrapped.toString());
+      throw wrapped;
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -769,6 +942,23 @@ export class AnalysisOrchestrator {
       `time=${totalTimingMs}ms`,
     );
 
+    const computedConfidence = this.computeConfidenceLevel(layersCompleted, l4Result.coherenceReport);
+
+    // ── Phase 1.4 root-cause fix: mirror computed confidence onto the profile.
+    // Previously this was computed only as a PipelineResult field, never written
+    // back to `profile.index.confidenceLevel` or `profile.metadata.confidenceLevel`,
+    // so persisted profiles always stored `confidenceLevel: 'initial'`. On the
+    // next edit, FocusedAnalyzer's selectAnalysisMode() hit Rule 1 ("confidence
+    // =initial → comprehensive") and routed every edit to full re-analysis
+    // (~$0.75 / 10min in the reference audit) even when the profile had clearly
+    // completed L1→L5.
+    //
+    // Both fields must be set because refreshIndex() (essayProfileManager.ts:
+    // 2605) copies metadata.confidenceLevel → index.confidenceLevel on every
+    // mutation — updating only index would be clobbered by the next refresh.
+    (finalProfile as EssayProfile).index.confidenceLevel = computedConfidence;
+    (finalProfile as EssayProfile).metadata.confidenceLevel = computedConfidence;
+
     return {
       profile: finalProfile,
       completedAllLayers,
@@ -777,7 +967,7 @@ export class AnalysisOrchestrator {
       layersCompleted,
       layersFailed,
       improvementPhase: l35Result.improvementPhase,
-      confidenceLevel: this.computeConfidenceLevel(layersCompleted, l4Result.coherenceReport),
+      confidenceLevel: computedConfidence,
       annotations: l5Result,
       scoreMatrix: l4Result.scoreMatrix,
       coherenceReport: l4Result.coherenceReport,
@@ -945,14 +1135,13 @@ export class AnalysisOrchestrator {
         }
       }
 
-      // ── Step 2: L3.75 says converged? Trust it (after at least 1 iteration). ──
-      if (currentSynthesis.selfAssessedConvergence.hasConverged && state.iteration >= 1) {
-        state.isConverged = true;
-        state.convergenceReason = 'llm_converged';
-        break;
-      }
+      // ── Step 2: Re-reads run BEFORE convergence check ──
+      // Re-read findings enter the FindingStore (coaching's data source) and connections
+      // enter the profile (router's data source). These are valuable even when L3.75
+      // reports convergence. Running them before the convergence break ensures they
+      // always execute.
 
-      // ── Step 3: Run re-reads L3.75 flagged ──
+      // ── Step 2a: Run re-reads L3.75 flagged ──
       // L3.75 curated these candidates — respect its ordering. Budget check stops when
       // we can't afford more. No hard cap beyond the budget backstop. (LLM-first Rule 2)
       for (const reRead of currentSynthesis.reReadCandidates) {
@@ -1110,82 +1299,29 @@ export class AnalysisOrchestrator {
         );
       }
 
-      // ── Step 4: Dispatch deep dives (persistent queue as primary signal) ──
-      // Gap 2: Use persistent queue's open questions for dispatch instead of ephemeral curated queue
+      // ── Step 3: Convergence check (after re-reads, before deep dives) ──
+      // Moved here from Step 2 so re-reads always run (their findings enter FindingStore).
+      // Deep dives are skipped regardless, so convergence here stops the loop cleanly.
+      if (currentSynthesis.selfAssessedConvergence.hasConverged) {
+        state.isConverged = true;
+        state.convergenceReason = 'llm_converged';
+        break;
+      }
+
+      // ── Step 4: Deep dives SKIPPED ──
+      // Deep dive findings never enter the FindingStore (coaching's data source) and
+      // only feed subsequent synthesis iterations. Since iteration 0's synthesis is
+      // complete and coaching reads findings from FindingStore, deep dives add cost
+      // (~$0.15) without proportional quality improvement. Re-reads (Step 3) are kept
+      // because their findings DO enter the FindingStore.
+      // To re-enable deep dives, uncomment the dispatchDeepDives block below.
+      /*
       const dives = dispatchDeepDives(
         currentSynthesis.questionCuration.curatedQueue,
         state.budgetRemaining,
       );
-
-      for (const dive of dives) {
-        if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) break;
-
-        try {
-          const diveResult = await runDeepDive(
-            dive,
-            essayText,
-            profile,
-            currentSynthesis.synthesis,
-            currentSynthesis.readingStrategy,
-            findingStore,
-          );
-
-          state.budgetRemaining -= diveResult.cost;
-          costTracker.record(
-            `deep_dive_${dive.promptType}`,
-            diveResult.cost,
-            diveResult.tokenUsage,
-            diveResult.timingMs,
-          );
-
-          // Merge findings from deep dive
-          if (diveResult.findings.length > 0) {
-            const newFindingObjects = diveResult.findings.map((f, idx) => ({
-              ...f,
-              id: `FD${state.iteration}_${dive.promptType}_${idx}`,
-              source: 'deep_dive' as const,
-              buildsOn: f.buildsOn ?? [],
-              relatedTo: f.relatedTo ?? [],
-              raisesQuestions: f.raisesQuestions ?? [],
-              lineage: [],
-              createdAt: new Date().toISOString(),
-              lastUpdated: new Date().toISOString(),
-            })) as Finding[];
-            cumulativeFindings = mergeFindingsFromDeepDive(cumulativeFindings, newFindingObjects);
-          }
-
-          // Gap 2: Mark the question as resolved if deep dive answered it
-          if (dive.question.id) {
-            queueManager.resolve(
-              dive.question.id,
-              `deep_dive_${dive.promptType}`,
-              diveResult.discoveryNote || 'Investigated via deep dive',
-            );
-          }
-
-          // Gap 2: Add new questions from deep dive to persistent queue
-          for (const newQ of diveResult.questionsRaised) {
-            if (dive.question.id) {
-              queueManager.spawnChild(dive.question.id, newQ);
-            } else {
-              queueManager.addQuestion(newQ);
-            }
-          }
-
-          const diveStep: StepResult = {
-            findingsAdded: diveResult.findings.length,
-            questionsRaised: diveResult.questionsRaised.length,
-            cost: diveResult.cost,
-            discoveryNote: diveResult.discoveryNote,
-          };
-          state.activityLog.push(buildStepRecord(`deep_dive_${dive.promptType}`, diveStep));
-        } catch (error) {
-          console.warn(
-            `[Orchestrator] Deep dive ${dive.promptType} failed (non-fatal):`,
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
+      // ... deep dive execution loop ...
+      */
 
       // ── Step 5: Budget backstop ──
       if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) {
@@ -1222,6 +1358,101 @@ export class AnalysisOrchestrator {
   // ═══════════════════════════════════════════════════════════════════════════
   // PRIVATE: Helpers
   // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Scope 2 Phase 5: Harvest improvement candidates from a completed L3 walk.
+   *
+   * Reads every sentence understanding that carries an inline
+   * `improvementCandidate` (emitted by the walk prompt's IMPROVEMENT
+   * CANDIDATE EMISSION section) and returns the flat list for the
+   * coordinator to add to its ImprovementCandidateStore.
+   *
+   * Pure function of the walk result — no mutation, no side effects,
+   * no LLM calls. Candidates already have deterministic IDs assigned by
+   * `parseSentenceUnderstanding` via `ImprovementCandidateStore.buildId`.
+   *
+   * Shape note: skipped or failed paragraphs never reach this extractor
+   * because the fail-fast walk loop (sequentialDeepWalk.ts) throws
+   * PipelineError before returning if any paragraph failed.
+   */
+  private extractL3Candidates(walkResult: L3WalkResult): ImprovementCandidate[] {
+    const out: ImprovementCandidate[] = [];
+    for (const walkOutput of walkResult.walkOutputs) {
+      for (const entry of walkOutput.sentenceUnderstandings) {
+        const candidate = entry.understanding.improvementCandidate;
+        if (candidate) {
+          out.push(candidate);
+        }
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Scope 2 Phase 5: Harvest improvement candidates from a completed L3.75
+   * holistic synthesis. Reads `craftAssessment.growthEdges[].pairedImprovement`
+   * and converts each populated entry into an `ImprovementCandidate` with
+   * sourceLayer='L3.75'.
+   *
+   * Unlike L3 (per-sentence) and L3.5 (per-sentence with evaluation), L3.75
+   * operates at paragraph/essay scope, so candidate `sentence` is always null
+   * and `paragraph` defaults to the first paragraph in the growth edge's
+   * `paragraphs[]` array (or 0 if empty). The architectural reasoning lives
+   * in `observation`, the directive lives in `suggestedChange`.
+   *
+   * Pure function — no mutation, no LLM calls. ID is built deterministically
+   * via `ImprovementCandidateStore.buildId` so re-runs produce stable IDs.
+   */
+  private extractL375Candidates(synthesis: HolisticSynthesisOutput): ImprovementCandidate[] {
+    const out: ImprovementCandidate[] = [];
+    const growthEdges = synthesis.craftAssessment?.growthEdges ?? [];
+    const now = new Date().toISOString();
+
+    for (const edge of growthEdges) {
+      const paired = edge.pairedImprovement;
+      if (!paired) continue;
+
+      // Use the first paragraph in the edge's scope as the candidate's
+      // paragraph anchor. L3.75 growth edges are paragraph-scoped, so this
+      // is the canonical location for coaching to hang the suggestion on.
+      const paragraph = edge.paragraphs.length > 0 ? edge.paragraphs[0] : 0;
+
+      // Observation combines the descriptive pattern + architectural reason
+      // so downstream consumers see both the WHAT and the WHY in one slot.
+      const observation = `${edge.description} — ${paired.architecturalReason}`;
+
+      // Map expectedImpact → coachingValue. Transformative edges become
+      // 'critical', significant edges 'high', incremental edges 'medium'.
+      // L3.75 does not emit 'diagnostic' — by definition, a pairedImprovement
+      // has enough architectural weight to suggest concrete action.
+      const coachingValue: ImprovementCandidate['coachingValue'] =
+        paired.expectedImpact === 'transformative'
+          ? 'critical'
+          : paired.expectedImpact === 'significant'
+            ? 'high'
+            : 'medium';
+
+      const id = ImprovementCandidateStore.buildId('L3.75', paragraph, null, observation);
+
+      out.push({
+        id,
+        sourceLayer: 'L3.75',
+        paragraph,
+        sentence: null,
+        sourceFindingId: null,
+        observation,
+        suggestedChange: paired.directive,
+        technique: paired.technique,
+        demonstrationSketch: paired.demonstrationSketch,
+        coachingValue,
+        lifecycleState: 'candidate',
+        supersededBy: null,
+        createdAt: now,
+      });
+    }
+
+    return out;
+  }
 
   /**
    * Build a LayerError from a caught exception AND log full diagnostics.
@@ -1429,6 +1660,533 @@ export class AnalysisOrchestrator {
       scoreMatrix: null,
       coherenceReport: null,
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PRIVATE: Improvement Manifest Builder
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build an ImprovementManifest from ALL available analysis sources.
+   * Every finding, growth edge, red flag, and AO observation maps to at least
+   * one ImprovementEntry. Understanding is fuel — improvements are output.
+   *
+   * Sources (waterfall — uses whatever is available):
+   *   1. L4 coachingMap.priorities (richest)
+   *   2. L3.5 findings (active, critical/high coaching value)
+   *   3. AO First Read red flags
+   *   4. L3.75 craft assessment growth edges
+   *   5. L3 paragraph-level growth edges
+   */
+  /**
+   * Build the ImprovementManifest from the profile's L4 priorities + findings
+   * + AO red flags + L3.75 growth edges + L3 paragraph-level edges.
+   *
+   * PUBLIC so post-edit re-analysis paths (focused mode in
+   * `reanalysisOrchestrator.runFocusedMode`) can rebuild the manifest after
+   * mutating the profile, instead of leaving coaching with a stale or absent
+   * manifest. See reference audit line 611 — "(no manifest on post-coaching
+   * profile)" — for the regression this guards against.
+   *
+   * Caller must ensure `profile.improvementCandidateSnapshot` is fresh
+   * (call `coordinator.snapshotCandidateStore()` immediately before).
+   */
+  buildImprovementManifest(
+    profile: EssayProfile,
+    findingStore: FindingStore,
+    essayText: string,
+    essayType: EssayType,
+  ): ImprovementManifest {
+    const items: ImprovementEntry[] = [];
+    const sources: string[] = [];
+    let priority = 1;
+
+    const WORD_LIMITS: Record<string, number> = { supplement: 250, piq: 350, personal_statement: 650 };
+    const wordLimit = WORD_LIMITS[profile.northStar?.activeScale ?? ''] ?? 650;
+    const wordCount = profile.paragraphs.reduce((sum, p) => sum + p.text.split(/\s+/).length, 0);
+
+    // ── Source 1: L4 CoachingMap Priorities ──
+    const coachingMap = profile.scoreMatrix?.coachingMap;
+    if (coachingMap?.priorities && coachingMap.priorities.length > 0) {
+      sources.push('l4_priorities');
+      const candidateSnapshot = profile.improvementCandidateSnapshot;
+      for (const p of coachingMap.priorities.slice(0, 5)) {
+        const targetPara = p.target?.paragraphs?.[0] ?? -1;
+        // Scope 2 Phase 6a: resolve technique from first consolidated candidate.
+        // Priorities cite candidates via `consolidatedFrom`; candidates carry the
+        // LLM-assigned technique. Fall back to keyword match on the priority text
+        // when consolidation lineage is missing (pre-Phase-6a profiles).
+        const techniqueFromCandidate = this.getTechniqueFromConsolidatedCandidates(
+          p.consolidatedFrom,
+          candidateSnapshot,
+        );
+        const technique = techniqueFromCandidate
+          ?? this.matchClaimToTechnique(`${p.priority} ${p.architecturalReason}`)?.name
+          ?? null;
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: targetPara,
+          observation: p.architecturalReason,
+          action: p.priority,
+          stakes: p.unlocksNext,
+          technique,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l4_priority',
+          sourceRef: p.consolidatedFrom?.[0] ?? null,
+          priority: priority++,
+          impact: p.expectedImpact,
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 2: L3.5 Active Findings ──
+    const activeFindings = findingStore.getActiveSortedByCoachingValue();
+    if (activeFindings.length > 0) {
+      sources.push('l35_findings');
+      for (const f of activeFindings.slice(0, 8)) {
+        // Skip if already covered by an L4 priority targeting the same paragraph
+        const para = f.scope.type === 'paragraph' ? (f.scope.paragraph ?? -1) : -1;
+        const alreadyCovered = items.some(i => i.paragraph === para && i.source === 'l4_priority');
+        if (alreadyCovered) continue;
+
+        // Technique match via keyword routing
+        const technique = this.matchClaimToTechnique(f.claim);
+
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: para,
+          observation: f.claim,
+          action: technique
+            ? `Apply ${technique.name}: ${technique.directive}`
+            : `Address: ${f.claim}`,
+          stakes: f.evidence.length > 0
+            ? `Evidence: "${f.evidence[0].text.slice(0, 120)}"`
+            : '',
+          technique: technique?.name ?? null,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l35_finding',
+          sourceRef: f.id,
+          priority: priority++,
+          impact: f.coachingValue === 'critical' ? 'transformative'
+            : f.coachingValue === 'high' ? 'significant' : 'incremental',
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 3: AO First Read Red Flags ──
+    if (profile.aoFirstRead) {
+      sources.push('ao_first_read');
+      const ao = profile.aoFirstRead;
+
+      // People absence
+      if (ao.gutReaction?.includes('no named individuals') ||
+          ao.gutReaction?.includes('people absence') ||
+          ao.gutReaction?.toLowerCase().includes('no teacher') ||
+          ao.gutReaction?.toLowerCase().includes('no mentor')) {
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: -1,
+          observation: 'No named individuals appear in the essay. Every experience is described in isolation.',
+          action: 'Add ONE named person — teacher, teammate, mentor — with one physical detail. Show them in one sentence.',
+          stakes: 'People absence is a red flag AOs catch in 30 seconds. It makes the essay feel like a philosophy paper, not a personal statement.',
+          technique: 'NAMED CHARACTER',
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'red_flag',
+          sourceRef: null,
+          priority: priority++,
+          impact: 'significant',
+          conversatorEnrichments: [],
+        });
+      }
+
+      // Put-down risk
+      if (ao.putDownRisk === 'high' && ao.committeeOneLiner) {
+        const alreadyHasHookItem = items.some(i =>
+          i.observation.toLowerCase().includes('opening') || i.observation.toLowerCase().includes('hook'));
+        if (!alreadyHasHookItem) {
+          items.push({
+            id: `IMP_${priority}`,
+            paragraph: 0,
+            observation: `AO committee one-liner: "${ao.committeeOneLiner}". Put-down risk: HIGH.`,
+            action: 'The opening must stop the AO from skimming in 3 sentences. Replace abstract opening with a physical moment.',
+            stakes: `The AO will reduce this essay to "${ao.committeeOneLiner}" in committee. The opening must force them to stop and read.`,
+            technique: 'COLD OPEN / SENSORY TIMESTAMP',
+            demonstration: null,
+            wordEconomyCut: null,
+            source: 'ao_first_read',
+            sourceRef: null,
+            priority: priority++,
+            impact: 'transformative',
+            conversatorEnrichments: [],
+          });
+        }
+      }
+    }
+
+    // ── Source 4: L3.75 Craft Assessment Growth Edges ──
+    const growthEdges = profile.craftAssessment?.growthEdges;
+    if (growthEdges && growthEdges.length > 0) {
+      sources.push('l375_growth_edges');
+      for (const edge of growthEdges.slice(0, 4)) {
+        const para = edge.paragraphs?.[0] ?? -1;
+        const alreadyCovered = items.some(i => i.paragraph === para);
+        if (alreadyCovered) continue;
+
+        const technique = this.matchClaimToTechnique(edge.quality + ' ' + edge.description);
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: para,
+          observation: `${edge.quality}: ${edge.description}`,
+          action: technique
+            ? `Apply ${technique.name}: ${technique.directive}`
+            : `Improve: ${edge.description}`,
+          stakes: '',
+          technique: technique?.name ?? null,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l375_growth_edge',
+          sourceRef: null,
+          priority: priority++,
+          impact: 'incremental',
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 5: L3 Paragraph-Level Growth Edges ──
+    for (const para of profile.paragraphs) {
+      if (!para.analysis?.growthEdges) continue;
+      for (const edge of para.analysis.growthEdges.slice(0, 2)) {
+        const alreadyCovered = items.some(i => i.paragraph === para.index);
+        if (alreadyCovered) continue;
+
+        const technique = this.matchClaimToTechnique(edge.quality + ' ' + edge.description);
+        items.push({
+          id: `IMP_${priority}`,
+          paragraph: para.index,
+          observation: `P${para.index + 1}: ${edge.quality}: ${edge.description}`,
+          action: technique
+            ? `Apply ${technique.name}: ${technique.directive}`
+            : `Improve P${para.index + 1}: ${edge.description}`,
+          stakes: '',
+          technique: technique?.name ?? null,
+          demonstration: null,
+          wordEconomyCut: null,
+          source: 'l3_observation',
+          sourceRef: null,
+          priority: priority++,
+          impact: 'incremental',
+          conversatorEnrichments: [],
+        });
+      }
+    }
+
+    // ── Source 6: Howler Pass (Phase 4.1 quality floor) ──
+    // Cheap deterministic pass that catches specific howlers the LLM layers
+    // systematically miss: cliché bigrams, near-duplicate paragraphs, known-
+    // wrong factual hooks. Each becomes a MUST_ADDRESS manifest item with
+    // impact=transformative so the coach surfaces them early.
+    //
+    // BUG FIX (Critical #1 from E2E audit, Apr 14): on rebuild-after-edit the
+    // passed `essayText` parameter may be truncated or paragraph-scoped (seen
+    // in the conversator V2 E2E test where processEdit receives paragraph-only
+    // text and currentText ends up 460 chars instead of the full 2309-char
+    // essay). Result: re-analysis ran howlerPass against a single paragraph
+    // that had no clichés, so every red_flag item detected in the initial
+    // pass silently disappeared from the rebuilt manifest — 60-70% of howler
+    // protection lost on a single edit.
+    //
+    // Two-pronged fix:
+    //   (a) Run howler pass against paragraph-reconstructed text, which is
+    //       the authoritative source of truth for the CURRENT paragraph
+    //       content inside the profile regardless of what `essayText` was.
+    //   (b) Carry forward prior manifest red_flag items whose evidence
+    //       substring still appears in the current essay. This preserves
+    //       howlers detected on a prior pass even if (a) misses them due to
+    //       input anomaly or detector regression. Dedup key: observation+
+    //       paragraph — never emit the same howler twice.
+    try {
+      const paragraphTexts = profile.paragraphs.map((p) => p.text);
+      const fullEssayText = paragraphTexts.join('\n\n');
+      const howlerResult = runHowlerPass(fullEssayText, paragraphTexts);
+      if (howlerResult.howlers.length > 0) {
+        sources.push('howler_pass');
+        console.log(
+          `[Orchestrator] HowlerPass: ${howlerResult.howlers.length} howlers ` +
+            `(cliche=${howlerResult.counts.cliche}, duplicate=${howlerResult.counts.duplicate_paragraph}, ` +
+            `factual=${howlerResult.counts.factual_hook})`,
+        );
+        // Prioritize factual > duplicate > cliché (factual errors are the most
+        // damaging; clichés are most common so they dominate raw count). Cap
+        // at 6 items so a cliché-heavy essay doesn't blow up the manifest and
+        // starve the structural L4 priorities from coaching attention.
+        const HOWLER_CAP = 6;
+        const ordered = [
+          ...howlerResult.howlers.filter((h) => h.kind === 'factual_hook'),
+          ...howlerResult.howlers.filter((h) => h.kind === 'duplicate_paragraph'),
+          ...howlerResult.howlers.filter((h) => h.kind === 'cliche'),
+        ].slice(0, HOWLER_CAP);
+        if (ordered.length < howlerResult.howlers.length) {
+          console.log(
+            `[Orchestrator] HowlerPass: truncated to top ${HOWLER_CAP} howlers (factual > duplicate > cliché)`,
+          );
+        }
+        for (const h of ordered) {
+          const paragraphIdx =
+            h.location.type === 'paragraph' ? h.location.index :
+            h.location.type === 'paragraph_pair' ? h.location.a :
+            -1;
+
+          // Dedup guard for paragraph-scoped howlers: if a paragraph already
+          // has an L4 priority, emitting a duplicate-paragraph howler for it
+          // would produce two items for the same paragraph (the audit
+          // reviewer flagged this). Range-based clichés (paragraphIdx=-1)
+          // and factual hooks are always allowed through since they address
+          // different concerns.
+          if (
+            paragraphIdx !== -1 &&
+            h.kind === 'duplicate_paragraph' &&
+            items.some((i) => i.paragraph === paragraphIdx && i.source === 'l4_priority')
+          ) {
+            continue;
+          }
+
+          const kindLabel = h.kind === 'cliche' ? 'Cliché'
+            : h.kind === 'duplicate_paragraph' ? 'Structural redundancy'
+            : h.kind === 'factual_hook' ? 'Factual issue'
+            : h.kind;
+          // Technique routing for howler items. Every howler now carries a
+          // named technique so the planner can prioritize it alongside L4/
+          // L3.5 items (audit surfaced howlers stranded as technique=null,
+          // which made the planner skip them — defeating the quality-floor
+          // goal). These names intentionally mirror the craft-technique
+          // vocabulary used elsewhere in the pipeline; research enrichment
+          // either finds a matching teaching bundle or gracefully skips.
+          //   cliche              → VOICE AUTHENTICITY (stock phrase, student
+          //                         must find the only-them version).
+          //   factual_hook        → FACTUAL ACCURACY (the opening claim is
+          //                         wrong and undermines the reader's trust).
+          //   duplicate_paragraph → STRUCTURAL REDUNDANCY (two paragraphs
+          //                         saying the same thing — consolidate or
+          //                         differentiate).
+          const technique = h.kind === 'cliche' ? 'VOICE AUTHENTICITY'
+            : h.kind === 'factual_hook' ? 'FACTUAL ACCURACY'
+            : h.kind === 'duplicate_paragraph' ? 'STRUCTURAL REDUNDANCY'
+            : null;
+          items.push({
+            id: `IMP_${priority}`,
+            paragraph: paragraphIdx,
+            observation: `${kindLabel}: ${h.description}`,
+            action: h.suggestion,
+            stakes: `Surface-level howlers undermine the reader\'s trust in the essay\'s craft even when the underlying ideas are strong. AOs flag these in seconds.`,
+            technique,
+            demonstration: null,
+            wordEconomyCut: null,
+            source: 'red_flag',
+            sourceRef: null,
+            priority: priority++,
+            impact: 'significant',
+            conversatorEnrichments: [`[howler:${h.kind}] evidence: ${h.evidence.slice(0, 120)}`],
+          });
+        }
+      }
+    } catch (err) {
+      // classified: recoverable
+      // Howler pass is a quality-floor enhancement; its failure should not
+      // block manifest generation. Log for observability.
+      console.warn(
+        '[Orchestrator] HowlerPass failed (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    // ── Source 6b: Carry-forward red_flag items from prior manifest ──
+    // Safety net for howler persistence across rebuilds. Even with the
+    // paragraph-reconstructed howler pass above, edge cases can leave howlers
+    // undetected on rebuild (e.g., paragraph text mutated in a way that
+    // preserves the cliché but bypasses the detector; duplicate-pair thresh-
+    // old drift after structural edits). This block scans the prior manifest
+    // for red_flag items whose evidence substring is still present in the
+    // current essay, and re-emits them if they weren't already produced by
+    // the fresh howler pass. Dedup key: observation+paragraph pair.
+    //
+    // Acceptance per audit: "IMP_11 and IMP_12 reference clichés in P6/P7
+    // which were never edited. The howler pass on rebuild is either not
+    // running or returning zero for unchanged text." This is the belt to
+    // the howler pass's suspenders — if the pass fails or mis-fires, the
+    // prior detection survives.
+    try {
+      const priorManifest = profile.improvementManifest;
+      if (priorManifest?.items?.length) {
+        const existingKey = new Set(
+          items.map((i) => `${i.paragraph}|${i.observation}`),
+        );
+        const paragraphTextsForCarry = profile.paragraphs.map((p) => p.text);
+        const fullEssayTextForCarry = paragraphTextsForCarry.join('\n\n').toLowerCase();
+        let carried = 0;
+        for (const prior of priorManifest.items) {
+          if (prior.source !== 'red_flag') continue;
+          const key = `${prior.paragraph}|${prior.observation}`;
+          if (existingKey.has(key)) continue;
+
+          // Evidence survival check: the howler's evidence excerpt appears
+          // in the annotation payload (conversatorEnrichments or the
+          // observation itself after the kind label). If we can't find the
+          // distinctive phrase in the current text, drop — the student
+          // already fixed it.
+          const evidenceMarker = (prior.conversatorEnrichments ?? [])
+            .find((e) => e.startsWith('[howler:'))
+            ?? '';
+          // Extract the distinctive phrase. For cliché observations the
+          // phrase is quoted inside the observation ("..."); for factual
+          // issues, the quoted phrase is the marker. Fall back to the
+          // evidence tail of the enrichment string.
+          const quotedMatch = prior.observation.match(/"([^"]{3,80})"/);
+          const evidenceTail = evidenceMarker.includes('evidence:')
+            ? evidenceMarker.split('evidence:')[1]?.trim().toLowerCase() ?? ''
+            : '';
+          const needle = (quotedMatch?.[1] ?? evidenceTail).trim().toLowerCase();
+          if (needle.length < 3) continue;
+
+          // Duplicate-paragraph howlers: both paragraph indices referenced
+          // in the observation (e.g., "P5 and P6 share 82% ...") must still
+          // exist AND still be near-duplicates. We conservatively keep them
+          // if both paragraphs still exist — the fresh howler pass would
+          // have redetected them on its own if the threshold still held.
+          if (prior.observation.startsWith('Structural redundancy')) {
+            const pairMatch = prior.observation.match(/P(\d+) and P(\d+)/);
+            if (pairMatch) {
+              const a = Number(pairMatch[1]) - 1;
+              const b = Number(pairMatch[2]) - 1;
+              if (a < 0 || b < 0 || a >= profile.paragraphs.length || b >= profile.paragraphs.length) {
+                continue; // paragraph removed — howler no longer applies
+              }
+            }
+          } else if (!fullEssayTextForCarry.includes(needle)) {
+            continue; // cliché/factual phrase removed by student — drop
+          }
+
+          items.push({
+            id: `IMP_${priority}`,
+            paragraph: prior.paragraph,
+            observation: prior.observation,
+            action: prior.action,
+            stakes: prior.stakes,
+            technique: prior.technique,
+            demonstration: prior.demonstration,
+            wordEconomyCut: prior.wordEconomyCut,
+            source: 'red_flag',
+            sourceRef: prior.sourceRef,
+            priority: priority++,
+            impact: prior.impact,
+            conversatorEnrichments: [
+              ...(prior.conversatorEnrichments ?? []),
+              '[howler:carry-forward] preserved from prior manifest across rebuild',
+            ],
+          });
+          existingKey.add(key);
+          carried++;
+        }
+        if (carried > 0) {
+          if (!sources.includes('howler_pass')) sources.push('howler_pass');
+          if (!sources.includes('howler_carry_forward')) sources.push('howler_carry_forward');
+          console.log(
+            `[Orchestrator] HowlerPass: carried forward ${carried} red_flag items from prior manifest (evidence still present in current text)`,
+          );
+        }
+      }
+    } catch (err) {
+      console.warn(
+        '[Orchestrator] Howler carry-forward failed (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
+
+    // ── Word Economy: Identify cuttable paragraphs ──
+    // Tag redundant/supporting paragraphs as potential cuts
+    const structuralRoles = profile.northStar?.structuralRolesMap ?? [];
+    for (const role of structuralRoles) {
+      if (role.weight === 'supporting' || role.role.toLowerCase().includes('redundant')) {
+        // Find items that could use this space
+        for (const item of items) {
+          if (!item.wordEconomyCut && item.paragraph !== role.paragraphs[0]) {
+            const cutParaIdx = role.paragraphs[0];
+            const cutParaWords = profile.paragraphs[cutParaIdx]?.text.split(/\s+/).length ?? 0;
+            item.wordEconomyCut = `Cut P${cutParaIdx + 1} (${cutParaWords} words — ${role.role}). Use the space for this improvement.`;
+            break; // Only assign one cut per supporting paragraph
+          }
+        }
+      }
+    }
+
+    // Phase 4.1: cap raised 10 → 12 to leave room for quality-floor howler
+    // items (factual hooks + top cliché matches) alongside the 10 structural
+    // priorities. Higher caps bloat the coaching prompt; 12 is the practical
+    // sweet-spot after measuring the piano-essay fixture (9 structural + 1-3
+    // howlers comfortably fit). The planner only deploys ONE item per turn
+    // regardless of cap, so the cap is purely a prompt-length bound.
+    return {
+      items: items.slice(0, 12),
+      generatedAt: new Date().toISOString(),
+      sources,
+      wordCount,
+      wordLimit,
+    };
+  }
+
+  /**
+   * Scope 2 Phase 6a: resolve the technique for an L4 priority by walking its
+   * `consolidatedFrom` lineage back to the candidate store. Candidates carry
+   * the LLM-assigned technique name; priorities do not. Returns the technique
+   * of the first consolidated candidate (ordering mirrors LLM citation order,
+   * so this is the most-relevant technique for the priority).
+   */
+  private getTechniqueFromConsolidatedCandidates(
+    consolidatedFrom: string[] | undefined,
+    snapshot: ImprovementCandidateStoreSnapshot | undefined,
+  ): string | null {
+    if (!consolidatedFrom?.length || !snapshot?.candidates?.length) return null;
+    for (const candidateId of consolidatedFrom) {
+      const candidate = snapshot.candidates.find((c) => c.id === candidateId);
+      if (candidate?.technique) return candidate.technique;
+    }
+    return null;
+  }
+
+  /**
+   * Match a claim/observation string to a TECHNIQUE_ROUTES entry using keyword matching.
+   * Returns null if no route matches. Reuses the same routing logic as coachingService.
+   */
+  private matchClaimToTechnique(claim: string): { name: string; directive: string } | null {
+    const lower = claim.toLowerCase();
+    const routes: Array<{ keywords: string[]; name: string; directive: string }> = [
+      { keywords: ['summary'], name: 'SUMMARY-TO-SCENE', directive: 'Identify the MOMENT buried in the summary. Write a 2-sentence scene version.' },
+      { keywords: ['opening'], name: 'COLD OPEN / SENSORY TIMESTAMP', directive: 'The opening needs a physical anchor before any philosophy.' },
+      { keywords: ['emotion'], name: 'SOMATIC VULNERABILITY', directive: 'Replace the named emotion with what the BODY did.' },
+      { keywords: ['named', 'individuals', 'people'], name: 'NAMED CHARACTER', directive: 'A person needs to be ON THE PAGE. One name + one physical detail.' },
+      { keywords: ['evidence', 'claim', 'without'], name: 'EVIDENCE ANCHORING', directive: 'The claim exceeds the evidence. Identify the SPECIFIC, SMALL thing.' },
+      { keywords: ['conclusion', 'ending'], name: 'RITUAL DETAIL / BOOKEND INVERSION', directive: 'Replace aspirational closing with a specific image that PROVES the transformation.' },
+      { keywords: ['voice', 'shift', 'register'], name: 'VOICE COMPARISON', directive: 'Quote 2 sentences from different registers. Name which sounds more like them.' },
+      { keywords: ['telling', 'showing'], name: 'SHOW THROUGH SPECIFIC ACTION', directive: 'Replace the claim with a specific moment that proves it.' },
+      { keywords: ['formulaic', 'generic', 'template'], name: 'VOICE AUTHENTICITY', directive: 'Help the student find the weird, specific, only-them version.' },
+      { keywords: ['cliche', 'overused'], name: 'DEFINITIONAL PIVOT', directive: 'Quote the cliche. Ask: what does this word actually mean to YOU?' },
+      { keywords: ['stakes', 'risk'], name: 'STAKES ESTABLISHMENT', directive: 'What could the student LOSE? What was at risk?' },
+      { keywords: ['compress', 'rushed'], name: 'SCENE EXPANSION', directive: 'The most important moment needs more space. The reader needs to LINGER.' },
+      { keywords: ['transition', 'disconnected'], name: 'BRIDGE SENTENCE', directive: 'Write a 1-sentence bridge using a detail that lives in BOTH worlds.' },
+      { keywords: ['parallel', 'connection'], name: 'ENACTED PARALLEL', directive: 'Instead of explaining the connection, show it through structural echo.' },
+    ];
+
+    for (const route of routes) {
+      if (route.keywords.some(kw => lower.includes(kw))) {
+        return { name: route.name, directive: route.directive };
+      }
+    }
+    return null;
   }
 }
 

@@ -260,8 +260,10 @@ function checkVoiceShiftEntries(profile: Readonly<EssayProfile>): ValidationChec
     }
   }
 
-  // Also check code-switching events
-  for (const event of profile.voiceMap.codeSwitching) {
+  // Also check code-switching events.
+  // Scope 1 Phase 2: codeSwitching is optional (removed from L3.75 schema);
+  // legacy profiles may still carry entries. `?? []` handles both cases.
+  for (const event of profile.voiceMap.codeSwitching ?? []) {
     const loc = event.location;
     if (loc.paragraph < 0 || loc.paragraph >= paragraphCount) {
       locations.push({ paragraph: loc.paragraph, sentence: loc.sentence });

@@ -21,6 +21,7 @@
 import { callClaude, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
+import { normalizeRhythmTag } from './rhythmTag';
 import type {
   ReReadResult,
   EssayProfile,
@@ -120,8 +121,7 @@ Return a JSON object matching this EXACT structure:
         "primaryFunction": "One-line: the single most important thing this sentence does in the essay's architecture, updated with full-context knowledge",
         "significance": "pivotal | contributing | transitional",
         "craft": {
-          "rhythm": "short_punch | flowing | staccato | measured | etc.",
-          "voiceAlignment": "How this sentence's voice aligns with the essay's dominant voice",
+          "rhythm": "ONE enum value from: short_punch | medium_flow | long_build | fragment | staccato | anaphora_series | parallel_build | subordinate_delay. Empty string for transitional sentences.",
           "techniques": ["technique1", "technique2"]
         },
         "significantChoices": [
@@ -543,7 +543,7 @@ function coerceSentenceUnderstanding(raw: Record<string, unknown> | undefined): 
       narrativeContributions: [],
       rhetoricalFunctions: [],
       paragraphContribution: '(not provided)',
-      craft: { rhythm: '', voiceAlignment: '', techniques: [] },
+      craft: { rhythm: '', techniques: [] },
       significantChoices: [],
       connectionRefs: [],
       findingRefs: [],
@@ -604,10 +604,13 @@ function coerceObservation(raw: Record<string, unknown>): ObservationEntry {
 }
 
 function coerceSentenceCraft(raw: Record<string, unknown> | undefined): SentenceCraft {
-  if (!raw) return { rhythm: '', voiceAlignment: '', techniques: [] };
+  // Scope 1 Phase 1: rhythm is normalized to a RhythmTag enum value at
+  // runtime (strict mode is off, so the type alone can't enforce it).
+  // voiceAlignment is dropped from output; legacy profiles that still
+  // carry it pass through via the optional field on the type.
+  if (!raw) return { rhythm: '', techniques: [] };
   return {
-    rhythm: ensureString(raw.rhythm),
-    voiceAlignment: ensureString(raw.voiceAlignment),
+    rhythm: normalizeRhythmTag(raw.rhythm),
     techniques: Array.isArray(raw.techniques) ? (raw.techniques as unknown[]).map(String) : [],
   };
 }

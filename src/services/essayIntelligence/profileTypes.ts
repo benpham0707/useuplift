@@ -23,6 +23,171 @@
  */
 
 // ============================================================================
+// CROSS-FILE TYPE IMPORTS
+// ============================================================================
+// Phase 1 revision-history types live in ./history/profileSnapshot.ts as
+// pure types + extraction + hashing (no profile dependency). We import
+// RevisionHistory here because EssayProfile references it below; the full
+// surface is re-exported at the bottom of this file for consumer convenience.
+import type { RevisionHistory } from './history/profileSnapshot';
+
+// ============================================================================
+// PHASE 2 — HISTORICAL INTELLIGENCE SIGNALS
+// ============================================================================
+// These types capture DERIVED cross-session intelligence computed from the
+// Phase 1 RevisionHistory chain. They are populated by the coordinator after
+// a new snapshot has been written so that coaching prompts can surface
+// multi-session trends (addressed findings, persistent craft issues,
+// regressions, voice erosion). Zero LLM calls — pure computation over
+// existing snapshot + profile state.
+//
+// Forward declarations: full definitions live below, next to the EssayProfile
+// shape they are attached to. Re-exported at the bottom of this file.
+
+/**
+ * RevisionIntelligenceSignals — cross-session trend intelligence derived
+ * from the RevisionHistory chain PLUS the current profile. Populated by
+ * `computeRevisionIntelligence` in `./history/revisionIntelligence.ts`.
+ *
+ * The top-level object is non-null only when there is SOMETHING to say
+ * (history.length >= 2). Individual arrays inside MAY still be empty —
+ * an empty array means "no such signal this session," which is a real
+ * datum the coach can still use.
+ */
+export interface RevisionIntelligenceSignals {
+  /**
+   * Findings whose anchor text appeared in a prior snapshot but is now
+   * absent from the current essay text. Treated as "resolved."
+   */
+  addressedFindings: Array<{
+    findingId: string;
+    craftCategory: string;
+    paragraph: number;
+    turnsToAddress: number;
+    anchorTextBefore: string;
+    anchorTextAfter: string;
+  }>;
+
+  /**
+   * Findings with the same (craftCategory, paragraph) signature in BOTH
+   * a prior snapshot AND the current profile. Matched by category+
+   * paragraph (NOT findingId — IDs may be reassigned across sessions).
+   */
+  persistentFindings: Array<{
+    findingId: string;
+    craftCategory: string;
+    paragraph: number;
+    sessionsPersisted: number;
+    anchorText: string;
+    /**
+     * When the finding matched a prior snapshot by (category, anchorText)
+     * rather than (category, paragraph) — i.e. the paragraph it sits in
+     * has changed. Set to the paragraph index it occupied in the most-
+     * recent prior snapshot where it appeared. `undefined` when the match
+     * was by (category, paragraph) in place (no move detected).
+     */
+    movedFromParagraph?: number;
+  }>;
+
+  /**
+   * Categories that were addressed in an earlier session, absent for one
+   * or more snapshots, and have now returned. Signals revision regression.
+   */
+  regressionEvents: Array<{
+    craftCategory: string;
+    paragraph: number;
+    previouslyAddressedAtSession: number;
+    reappearedAtSession: number;
+    reasoning: string;
+  }>;
+
+  /**
+   * A category that appears across >=3 paragraphs in the current profile
+   * AND has at least one prior-snapshot appearance (>=2 session signal).
+   * Surfaced as a question-framed prompt for the coach.
+   */
+  patternLevelIssues: Array<{
+    craftCategory: string;
+    instances: Array<{ paragraph: number; findingId: string }>;
+    persistenceSignal: 'new' | 'persistent' | 'regression';
+    /** Question-framed prompt. MUST contain '?'. */
+    humanFraming: string;
+  }>;
+
+  /**
+   * Velocity metrics — only populated when there is data to populate.
+   * fastestAddress is null iff addressedFindings is empty; similarly for
+   * slowestPersisting (persistentFindings empty) and medianTurnsToAddress
+   * (addressedFindings empty).
+   */
+  revisionVelocity: {
+    fastestAddress: { findingId: string; craftCategory: string; turns: number } | null;
+    slowestPersisting: { findingId: string; craftCategory: string; sessionsUnaddressed: number } | null;
+    medianTurnsToAddress: number | null;
+  } | null;
+
+  /**
+   * 2–4 sentence deterministic summary for coach prompt injection.
+   * Empty string when no signals worth surfacing. Sentences end in .?!
+   */
+  summaryForCoach: string;
+}
+
+/**
+ * VoiceEvolutionSignals — cross-session voice trajectory derived from
+ * VoiceIdentitySnapshot comparisons. Populated by `computeVoiceEvolution`
+ * in `./history/voiceEvolution.ts`. Null when history.length < 2.
+ *
+ * Key use case: detect over-revision (voice erosion from polish) and
+ * intentional voice shifts (markers swapped on purpose while register
+ * stays controlled).
+ */
+export interface VoiceEvolutionSignals {
+  /** Voice markers present in the most-recent prior snapshot but gone now. */
+  markersLostSincePrior: string[];
+  /** Voice markers present in the current profile that were not there prior. */
+  markersGainedSincePrior: string[];
+  /**
+   * registerShifts[].length trend across snapshots + current:
+   *   - monotonically non-increasing with final < initial → 'improving'
+   *   - monotonically non-decreasing with final > initial → 'regressing'
+   *   - flat or equal → 'stable'
+   *   - non-monotonic → 'unknown'
+   */
+  registerStabilityTrend: 'improving' | 'stable' | 'regressing' | 'unknown';
+  /**
+   * vividnessSignal transition from prior to current:
+   *   - vivid → flattened = 'flattening'
+   *   - flattened → vivid = 'sharpening'
+   *   - same value = 'maintained'
+   *   - missing signal = 'unknown'
+   */
+  vividnessTrajectory: 'sharpening' | 'maintained' | 'flattening' | 'unknown';
+  /**
+   * Over-revision warning — fires ONLY when vividness has been flattening
+   * across >=2 consecutive transitions (>=3 snapshots worth of signal).
+   * Sticky across calls until vividness recovers. Pre-composed framingForCoach
+   * contains '?' so the coach surfaces it as a question.
+   */
+  overRevisionWarning: {
+    triggered: boolean;
+    reasoning: string | null;
+    framingForCoach: string | null;
+  };
+  /**
+   * Intentional voice shift — markers lost AND gained while register stays
+   * stable/improving. Takes precedence over over-revision: intentional shifts
+   * should NOT trigger the warning even if vividness dipped during the swap.
+   */
+  intentionalShift: {
+    detected: boolean;
+    reasoning: string | null;
+  };
+  /** 2–4 sentence summary for coach prompt. Empty when nothing worth surfacing. */
+  summaryForCoach: string;
+}
+
+// ============================================================================
 // ENUMS & UNION TYPES
 // ============================================================================
 
@@ -90,6 +255,18 @@ export type ImprovementPhaseLevel =
   | 'craft'
   | 'polish'
   | 'distinction';
+
+/**
+ * CoachingMode — which coaching behavior the system should use for this turn.
+ * Detected by ReanalysisOrchestrator based on edit context, iteration depth,
+ * and message analysis. Drives prompt block composition in promptBlocks.ts.
+ */
+export type CoachingMode =
+  | 'first_encounter'    // No edits yet, or student is conversing (not revising)
+  | 'revision_response'  // Student just revised (recentEditContext present, 1-2 edits to section)
+  | 'iteration_deep'     // Same section revised 3+ times
+  | 'architecture'       // Structural reorganization (paragraph insert/delete/reorder)
+  | 'polish';            // Word-level refinement during polish/distinction phase
 
 /**
  * Profile confidence level — how deep the system's understanding has grown.
@@ -384,18 +561,58 @@ export interface SentenceUnderstanding {
   /** Phase 0: How architecturally significant this sentence is to the essay.
    *  Drives downstream attention allocation. */
   significance?: 'pivotal' | 'contributing' | 'transitional';
+
+  /**
+   * Scope 2 Phase 5: Inline improvement candidate emitted by L3 walk alongside
+   * the per-sentence understanding. Null for the majority of sentences; the
+   * L3 walk prompt explicitly instructs the LLM to emit only when the
+   * understanding reveals a concrete localized improvement opportunity.
+   *
+   * The orchestrator harvests these into the ImprovementCandidateStore after
+   * each walk output is applied. The candidate is copied here for
+   * checkpoint persistence via applySentenceUnderstanding (mutator handles
+   * the optional-field propagation).
+   */
+  improvementCandidate?: ImprovementCandidate | null;
 }
+
+/**
+ * RhythmTag — closed enum for sentence rhythm classification.
+ *
+ * Scope 1 Phase 1 converted this from a free-form prose field to an enum
+ * to cut ~50-85 output tokens per sentence while preserving the single
+ * downstream consumer at `deepAnnotationService.ts:910` which renders
+ * `rhythm=${value}` as a label in the L5 paragraph prompt.
+ *
+ * Empty string = uncharacterized. Use this for transitional sentences
+ * or when the LLM output doesn't match any known tag (parser fallback).
+ */
+export type RhythmTag =
+  | ''
+  | 'short_punch'
+  | 'medium_flow'
+  | 'long_build'
+  | 'fragment'
+  | 'staccato'
+  | 'anaphora_series'
+  | 'parallel_build'
+  | 'subordinate_delay';
 
 /**
  * SentenceCraft — craft-level observations about a sentence.
  */
 export interface SentenceCraft {
-  /** Rhythm classification: short_punch, medium_flow, long_build, etc. */
-  rhythm: string;
-  /** How well voice aligns with the essay's dominant voice */
-  voiceAlignment: string;
+  /** Rhythm classification tag (see RhythmTag). Empty for transitional sentences. */
+  rhythm: RhythmTag;
   /** Specific craft techniques used */
   techniques: string[];
+  /**
+   * @deprecated Scope 1 removed `voiceAlignment` — no downstream consumers.
+   * Voice alignment is synthesized holistically by L3.75 voiceMap.
+   * Field kept optional for backward compat with profiles stored before
+   * the change. Writers no longer set it; readers see `undefined`.
+   */
+  voiceAlignment?: string;
 }
 
 /**
@@ -418,6 +635,19 @@ export interface SentenceAnalysis {
   isProblem: boolean;
   /** Priority for improvement (0 = fine, 5 = urgent) */
   priorityForImprovement: number;
+
+  /**
+   * Scope 2 Phase 5: Inline improvement candidate emitted by L3.5 when the
+   * analysis identifies a problem sentence. Populated when `isProblem=true`
+   * OR `priorityForImprovement >= 4`. The L3.5 prompt already asks for the
+   * fix content inside weakness observations; this field pulls that same
+   * content into a structured slot for downstream routing (zero new
+   * reasoning burden).
+   *
+   * Null when isProblem=false AND priorityForImprovement <= 3, or when the
+   * LLM chose not to produce a concrete suggestedChange.
+   */
+  improvementCandidate?: ImprovementCandidate | null;
 }
 
 /**
@@ -524,11 +754,19 @@ export interface ParagraphProfile {
  * WHERE the voice lives and HOW it moves.
  *
  * NO consistencyScore — replaced by VoiceMap's spatial, dimensional tracking.
+ *
+ * DEPTH FIELDS (primaryRegister / authenticity / registerShifts / voiceMarkers /
+ * voiceWeaknesses) are the downstream-facing surface — coaching, the audit
+ * renderer, and L4 stakes composition read these directly. The legacy fields
+ * (register, signature, evolution, distinctivePatterns, authenticVsPerformed)
+ * are retained for backward compat with existing consumers (analysisPass,
+ * profileRouter, deepAnnotationService) and with profiles persisted before
+ * the depth fields were introduced.
  */
 export interface VoiceIdentity {
   /** One-paragraph description of the writer's voice */
   signature: string;
-  /** Primary register */
+  /** Primary register (legacy single-word form — e.g. 'conversational') */
   register: string;
   /** What makes this voice distinctive */
   distinctivePatterns: string[];
@@ -543,6 +781,70 @@ export interface VoiceIdentity {
     assessment: 'authentic' | 'performed';
     reasoning: string;
   }>;
+
+  // ── Depth fields (voice identity depth expansion) ────────────────────────
+  // Optional so legacy profiles persisted before these fields existed still
+  // typecheck. The L3.75 Phase A prompt produces them; downstream consumers
+  // (coaching, L4 stakes, audit render) prefer these over legacy fields.
+
+  /**
+   * Primary register as a compound descriptor — e.g. "contemplative-technical",
+   * "earnest-ironic", "lyrical-reportorial". Two adjectives is the sweet spot:
+   * captures the voice's DNA without collapsing to a single vague word.
+   */
+  primaryRegister?: string;
+
+  /**
+   * Authenticity signal: a short phrase (≤8 words) naming what reads genuine
+   * about the voice, OR null when the voice reads uniformly performed. Example
+   * phrases: "specificity of concrete nouns", "self-correction mid-sentence".
+   *
+   * Also used by coachingPlanner as a coarse authenticity level string
+   * ("high" | "moderate" | "low") in legacy profiles — accept either shape.
+   */
+  authenticity?: string | null;
+
+  /**
+   * Compatibility alias for renderers that expect a single-word level.
+   * Optional — produced by Phase A when the audit renderer needs a coarse tag.
+   */
+  authenticityLevel?: string;
+
+  /**
+   * Register shifts — paragraph-level register changes with the driver.
+   * Populated even when the shift is unintentional. Complements VoiceMap.shifts
+   * by offering a coaching-facing summary (register ONLY, not all 5 dimensions)
+   * with an explicit driver the coach can name to the student.
+   */
+  registerShifts?: Array<{
+    paragraph: number;
+    from: string;
+    to: string;
+    driver: string;
+  }>;
+
+  /**
+   * Distinctive linguistic tics — the positive side of voice. Examples:
+   * "em-dash pivots", "rhetorical questions before reflections",
+   * "fragmentary lists when emotion rises". Load-bearing for coaching:
+   * these become the things the student should PROTECT on revision.
+   */
+  voiceMarkers?: string[];
+
+  /**
+   * Voice weaknesses — the negative side of voice. Specific linguistic
+   * reaches-for: "defaults to 'captivated' when emotion is abstract",
+   * "falls into philosophical abstraction in closings". Coaching uses these
+   * verbatim in stakes: "your voice reaches for X when Y — P2 is an instance."
+   */
+  voiceWeaknesses?: string[];
+
+  /**
+   * Legacy tolerance: read by crossDomainValidation as a free-text claim about
+   * consistency. Not produced by the current Phase A prompt; present on the
+   * type so existing validators continue to compile.
+   */
+  consistency?: string;
 }
 
 /**
@@ -575,8 +877,18 @@ export interface VoiceMap {
   /** Recorded voice shifts — where one or more voice dimensions change */
   shifts: VoiceShift[];
 
-  /** Code-switching events — language/register shifts with cultural roots */
-  codeSwitching: CodeSwitchEvent[];
+  /**
+   * Code-switching events — language/register shifts with cultural roots.
+   *
+   * @deprecated Scope 1 Phase 2 — removed from the L3.75 Phase A prompt because
+   * no downstream consumer reads beyond length-checks. Kept optional for
+   * backward compat with profiles persisted before Phase 2. New profiles
+   * emit `undefined` (or empty array via the coercer); legacy profiles
+   * still carry populated entries but those entries are ignored by the
+   * pipeline. Genuine language/register shifts are now captured as
+   * `shifts[]` entries instead.
+   */
+  codeSwitching?: CodeSwitchEvent[];
 }
 
 /** Base voice map dimension with baseline and observations */
@@ -851,6 +1163,27 @@ export interface CraftAssessment {
     quality: string;
     description: string;
     paragraphs: number[];
+    /**
+     * Scope 2 Phase 5: Optional architectural fix the L3.75 synthesis paired
+     * with this growth edge. L3.75 has the full-essay holistic view, so it
+     * can name technique + architectural reasoning that L3's per-sentence
+     * walk cannot. Null when the edge is descriptive-only with no clear fix.
+     *
+     * When populated, the orchestrator harvests this into the
+     * ImprovementCandidateStore as an L3.75-sourced candidate.
+     */
+    pairedImprovement?: {
+      /** TECHNIQUE_VOCABULARY entry or null when no standard technique applies */
+      technique: string | null;
+      /** One-sentence action the student should take */
+      directive: string;
+      /** Why this matters to the essay's architecture specifically */
+      architecturalReason: string;
+      /** 1-2 sentence sketch of the improved version, or null */
+      demonstrationSketch: string | null;
+      /** Magnitude of the impact if applied */
+      expectedImpact: 'transformative' | 'significant' | 'incremental';
+    } | null;
   }>;
   /** Image/metaphor system analysis */
   imageSystem: string;
@@ -1556,6 +1889,24 @@ export interface ProfileIndex {
   /** Timestamp of last comprehensive analysis */
   lastComprehensiveAt: string | null;
 
+  /**
+   * Phase 1.5 (Doctrine Operationalization): Signals that the profile was loaded
+   * from a legacy persisted state without an `improvementCandidateSnapshot`, AND
+   * the one-shot migration in `profileMigration.ts` found no source data to
+   * reshape into the new candidate store. Callers (coaching service, UI) should
+   * surface an explicit re-analysis prompt rather than silently proceeding with
+   * degraded behavior. See FORGE_PLAN_ARTIFACTS.md Section 2.
+   *
+   * Set by: `EssayProfileCoordinator.fromCheckpoint()` when it catches
+   *   `PipelineError.noMigrationSource` from the migration function.
+   * Read by: `coachingService.processCoachingTurn()` gate check, which throws
+   *   `CoachingBlockedError.requiresReanalysis(...)` if true.
+   * Never set: by fresh analysis runs — fresh runs with empty candidate stores
+   *   throw `PipelineError.emptyCandidateStore(...)` instead (real bug, not
+   *   legacy migration).
+   */
+  requiresReanalysis?: boolean;
+
   /** W1.1: Compact finding summary for context routing (computed from FindingStore) */
   findingSummary?: {
     totalActive: number;
@@ -1662,9 +2013,118 @@ export interface EssayUnderstanding {
   }>;
 }
 
+/**
+ * Structured student context — parsed from the flat contextAccumulation string.
+ * Enables writing prompt generation with specific names, places, and moments.
+ */
+export interface StructuredStudentContext {
+  /** People mentioned — names + relationship to student */
+  people: Array<{ name: string; relationship: string; firstMentionedTurn: number }>;
+  /** Physical places with sensory potential */
+  places: Array<{ place: string; sensoryDetail?: string; firstMentionedTurn: number }>;
+  /** Specific moments with narrative weight */
+  moments: Array<{ moment: string; emotionalWeight?: string; firstMentionedTurn: number }>;
+  /** Concrete details that could anchor writing prompts */
+  concreteDetails: Array<{ detail: string; firstMentionedTurn: number }>;
+}
+
+// ============================================================================
+// IMPROVEMENT CANDIDATE TYPES (Scope 2 — defined in Phase 1.5 for migration)
+//
+// The types below are the shared contract between Phase 1.5's migration
+// function, Phase 4's ImprovementCandidateStore class, Phase 5's inline
+// candidate emission from L3/L3.5/L3.75, and Phase 6's L4 consolidation +
+// L5 materialization. Phase 1.5 needs the types defined so profileMigration.ts
+// can reference them; Phase 4 implements the runtime store class against
+// these types; later phases add the lifecycle transitions and read paths.
+//
+// See FORGE_PLAN_UNIFIED.md "Shared types" for the canonical definitions
+// and FORGE_PLAN_SCOPE2.md for the lifecycle rules.
+// ============================================================================
+
+/**
+ * ImprovementCandidate — a prescriptive improvement emitted by an analysis
+ * layer (L3 walk, L3.5 analysis pass, L3.75 holistic synthesis) alongside
+ * its descriptive observations. L4 later consolidates duplicates into
+ * CoachingMap.priorities; L5 materializes consolidated targets with required
+ * rewriteExample; the manifest projection finalizes them into ImprovementEntry.
+ *
+ * Lifecycle:
+ *   candidate (just emitted) → consolidated (L4 absorbed it into a priority)
+ *   → finalized (L5 materialized it with a rewrite) OR superseded (a later
+ *   candidate dominated this one).
+ */
+export interface ImprovementCandidate {
+  /** Deterministic ID: e.g., `CAND_L3_P2S4_a3f7` */
+  id: string;
+  /** Which analysis layer emitted this candidate */
+  sourceLayer: 'L3' | 'L3.5' | 'L3.75';
+  /** 0-based paragraph index; -1 for essay-level candidates */
+  paragraph: number;
+  /** 0-based sentence index within the paragraph, or null for paragraph-scope */
+  sentence: number | null;
+  /** ID of the Finding that motivated this candidate (for lineage), or null */
+  sourceFindingId: string | null;
+  /** What the analysis layer observed (descriptive, evidence-backed) */
+  observation: string;
+  /** What the student should DO about it (prescriptive — the whole point) */
+  suggestedChange: string;
+  /** Named craft technique from TECHNIQUE_VOCABULARY_LIST, or null if unassigned */
+  technique: string | null;
+  /** Optional rewrite sketch — becomes the seed for L5's REQUIRED rewriteExample */
+  demonstrationSketch: string | null;
+  /** Coaching priority — drives which candidates surface in the improvement queue */
+  coachingValue: 'critical' | 'high' | 'medium' | 'contextual' | 'diagnostic';
+  /** Lifecycle state — drives consolidation and finalization decisions */
+  lifecycleState: 'candidate' | 'consolidated' | 'superseded' | 'finalized';
+  /** If superseded, ID of the candidate that replaced this one; null otherwise */
+  supersededBy: string | null;
+  /** ISO 8601 timestamp of emission */
+  createdAt: string;
+}
+
+/**
+ * ImprovementCandidateState — alias for the `lifecycleState` field values.
+ * Exported for callers that want to narrow on the state union
+ * (e.g. guards in the store, filters in the orchestrator).
+ */
+export type ImprovementCandidateState = ImprovementCandidate['lifecycleState'];
+
+/**
+ * ImprovementCandidateStoreSnapshot — serializable form of the runtime
+ * ImprovementCandidateStore (Phase 4 class). Stored on EssayProfile so the
+ * candidate lifecycle survives checkpoint persistence.
+ *
+ * Phase 4 implements ImprovementCandidateStore.serialize() / deserialize()
+ * around this shape. Phase 1.5's profileMigration.ts constructs snapshots
+ * directly from legacy persisted data.
+ */
+export interface ImprovementCandidateStoreSnapshot {
+  /** All candidates the store has seen (active + consolidated + superseded + finalized) */
+  candidates: ImprovementCandidate[];
+  /** Next numeric counter for ID generation (monotonic) */
+  nextId: number;
+}
+
+// ============================================================================
+
 export interface EssayProfile {
   /** Profile Index (always loaded — ~250-350 tokens) */
   index: ProfileIndex;
+
+  /**
+   * Scope 2 (defined in Phase 1.5): Serializable snapshot of the runtime
+   * ImprovementCandidateStore. Undefined on fresh profiles before any
+   * analysis layer has run; populated incrementally by L3/L3.5/L3.75.
+   *
+   * Legacy profiles persisted before Phase 1.5 have this as undefined —
+   * EssayProfileCoordinator.fromCheckpoint() runs the one-shot migration
+   * from profileMigration.ts to backfill it from existing findings /
+   * coachingMap.priorities / growthEdges / redFlags. If migration finds
+   * zero source data, `index.requiresReanalysis` is set to true and this
+   * field stays undefined until the coaching gate triggers re-analysis.
+   */
+  improvementCandidateSnapshot?: ImprovementCandidateStoreSnapshot;
 
   // -- HOLISTIC UNDERSTANDING (essay-level — 8 sections) --
 
@@ -1741,6 +2201,35 @@ export interface EssayProfile {
    *  this is a synthesized narrative the LLM reads as a single block. */
   studentDeclaredContext: string;
 
+  /** Structured version of student-declared context — parsed from the flat
+   *  contextAccumulation string for writing prompt generation. Names, places,
+   *  moments, and details are separated for targeted use in scaffolded prompts. */
+  structuredContext?: StructuredStudentContext;
+
+  // -- IMPROVEMENT MANIFEST (analysis-produced improvement queue) --
+  /** Ordered improvements from the analysis system. The conversator workshops these
+   *  with the student. Generated after L4 (or after whatever layer completes).
+   *  Every finding, growth edge, red flag, and AO observation maps to at least one entry. */
+  improvementManifest?: ImprovementManifest;
+
+  /**
+   * Target college identifier for supplement / PIQ essays (e.g. "stanford",
+   * "mit", "harvard"). Normalized to lowercase at the API boundary.
+   *
+   * Scope 3 Phase 7: consumed by `enrichWithResearchDatabase()` to look up
+   * college-specific guidance from `researchBackedTeachingService.getCollegeSpecificGuidance()`.
+   * Must be present for supplement/PIQ essays targeting colleges with
+   * guidance data; is correctly absent for common_app essays (no target
+   * college known at common-app drafting time).
+   *
+   * Persisted here (not just in transient in-memory session state) so that
+   * once the student has bound a supplement draft to a college, every
+   * subsequent coaching turn — including turns served after a server
+   * restart or a session TTL expiry — automatically enriches with the
+   * right college note.
+   */
+  collegeId?: string;
+
   // -- PROFILE METADATA --
   metadata: {
     confidenceLevel: ConfidenceLevel;
@@ -1753,6 +2242,43 @@ export interface EssayProfile {
     /** Whether this was migrated from the legacy system (needs re-analysis) */
     legacyProfile: boolean;
   };
+
+  /**
+   * Phase 1 — Cross-session revision history. Append-only, capped at 10
+   * snapshots; excess entries are dropped (counted in archivedSnapshots).
+   *
+   * Distinct from `editHistory` (per-turn in-session changes) and from
+   * `versioning/` (per-turn VersionRecord[] under editHistory). This
+   * records the MINIMAL profile subset needed for cross-revision trend
+   * analysis (Phase 2 Voice Evolution, Phase 3+ craft trajectory).
+   *
+   * Optional so legacy / in-memory test profiles lacking this field
+   * continue to typecheck; `snapshotStore` treats undefined as an empty
+   * history on write.
+   */
+  revisionHistory?: RevisionHistory;
+
+  /**
+   * Phase 2a — Derived cross-session revision intelligence. Recomputed by
+   * the coordinator after every snapshot write. Null when there is no basis
+   * for comparison (history.length < 2) or the most recent compute failed
+   * (caught + logged; the analysis cycle never fails because of this).
+   *
+   * Read by `historicalIntelligenceSection` to surface pattern-level issues,
+   * regressions, and revision velocity to the coach prompt.
+   */
+  revisionIntelligence?: RevisionIntelligenceSignals | null;
+
+  /**
+   * Phase 2b — Derived cross-session voice trajectory. Recomputed by the
+   * coordinator after every snapshot write. Null when history.length < 2.
+   *
+   * Read by `historicalIntelligenceSection` to surface voice evolution and
+   * over-revision warnings. Stickiness of `overRevisionWarning.triggered`
+   * is implemented by reading the PRIOR value off this field before the
+   * next compute — see `computeVoiceEvolution` docs.
+   */
+  voiceEvolution?: VoiceEvolutionSignals | null;
 }
 
 // ============================================================================
@@ -1908,6 +2434,23 @@ export interface CoachingMap {
     architecturalReason: string;
     unlocksNext: string;
     expectedImpact: 'transformative' | 'significant' | 'incremental';
+    /**
+     * Scope 2 Phase 6a: Lineage — the ImprovementCandidate IDs (from L3/L3.5/L3.75
+     * inline emission) that L4b consolidated into this priority. Enables L5 to
+     * cite the exact candidate that surfaced the problem when writing annotations,
+     * and lets downstream consumers trace priorities back to specific analytical
+     * observations.
+     *
+     * After L4b completes, the orchestrator marks every cited candidate as
+     * `consolidated` and every uncited active candidate as `superseded`. L4b
+     * must be intentional — an empty or missing `consolidatedFrom` means the
+     * priority is ungrounded (the LLM invented it from profile residue rather
+     * than consolidating existing candidates), which the validator flags.
+     *
+     * Optional for backward compat with pre-Phase-6a profiles; fresh runs
+     * always populate it.
+     */
+    consolidatedFrom?: string[];
   }>;
   /** Strengths that must NOT be damaged during improvement */
   protectedStrengths: Array<{
@@ -1915,19 +2458,29 @@ export interface CoachingMap {
     locations: Array<{ paragraph: number; sentence?: number }>;
     whyProtect: string;
   }>;
-  /** Patterns that emerge from viewing the essay holistically */
-  emergentPatterns: Array<{
-    pattern: string;
-    evidence: string;
-    implication: string;
-  }>;
-  /** Score tensions that have coaching implications */
-  scoreTensions: Array<{
-    paragraph: number;
-    tension: string;
-    interpretation: string;
-    coachingImplication: string;
-  }>;
+  /**
+   * Patterns that emerge from viewing the essay holistically.
+   *
+   * Scope 1 Phase 1 compressed format: one-line coaching signals.
+   * Previously `Array<{ pattern, evidence, implication }>`; flattened to
+   * `string[]` for ~10x token reduction while preserving signal. Wired into
+   * L5 sharedContext as coaching hooks (Phase 2 work).
+   *
+   * Format: `"Pattern: {name} — {observation with P refs}"`. Max 3 entries,
+   * each ≤20 words. The backward-compat parser in `buildCoachingMap()` at
+   * `crystallizer.ts:1317-1345` accepts both the legacy object shape (from
+   * persisted pre-Phase-1 profiles) and the new string shape.
+   */
+  emergentPatterns: string[];
+  /**
+   * Score tensions that have coaching implications.
+   *
+   * Scope 1 Phase 1 compressed format:
+   *   `"P{n}: {dim1}({score}) >> {dim2}({score}) — {one-line hook}"`
+   * Previously `Array<{ paragraph, tension, interpretation, coachingImplication }>`.
+   * Max 3 entries, each ≤15 words.
+   */
+  scoreTensions: string[];
 }
 
 /**
@@ -2120,6 +2673,19 @@ export interface StudentTheory {
 
   /** Raw inter-synthesis observations from Sonnet sidecar (cleared on synthesis) */
   pendingObservations: string[];
+
+  /**
+   * Confidence stage of this theory. Reflects how much conversation evidence
+   * the synthesis has had to draw on. Injected into the next synthesis prompt
+   * so the LLM calibrates hedging language accordingly and into the coach
+   * prompt so `personhood` framing is not over-trusted too early.
+   *
+   *   - 'nascent'   — synthesized at T2, 2 turns of evidence. Hedge aggressively.
+   *   - 'hypothesis' — synthesized at T3, still provisional.
+   *   - 'growing'   — synthesized at T4, patterns are repeating.
+   *   - 'confirmed' — synthesized at T5+, broadly stable.
+   */
+  maturity?: 'nascent' | 'hypothesis' | 'growing' | 'confirmed';
 }
 
 // ============================================================================
@@ -2196,7 +2762,6 @@ export interface CognitiveAssessment {
 
 /**
  * A single coaching session event — unified record of what happened.
- * Replaces the separate approachesUsed[], studentStances[], topicsDiscussed[] arrays.
  * kind is a free-form string — the LLM describes what happened in its own words.
  */
 export interface SessionEvent {
@@ -2222,29 +2787,10 @@ export interface CoachingSessionMemory {
   /** Total turns in this session */
   turnCount: number;
 
-  /** Unified session event log — replaces topicsDiscussed, approachesUsed, studentStances */
+  /** Unified session event log — authoritative record of session activity.
+   *  Each event carries kind/summary/significance/paragraphRefs/findingRefs
+   *  which are read into prompt blocks, retrieval scoring, and journal synthesis. */
   events: SessionEvent[];
-
-  /** @deprecated Use events[] instead */
-  topicsDiscussed: Array<{
-    topic: string;
-    turnNumbers: number[];
-    summary: string;
-    resolution: 'understood' | 'partially_understood' | 'unresolved' | 'rejected';
-  }>;
-
-  /** @deprecated Use events[] instead */
-  approachesUsed: Array<{
-    turnNumber: number;
-    approach: string;
-    outcome: string;
-  }>;
-
-  /** @deprecated Use events[] instead */
-  studentStances: Array<{
-    stance: string;
-    turnNumber: number;
-  }>;
 
   /**
    * LLM-generated session arc summary — updated every 3-5 turns.
@@ -2289,6 +2835,284 @@ export interface CoachingSessionMemory {
   /** Per-topic confusion trackers for escalation ladder.
    *  Session-scoped to avoid cross-contamination in concurrent sessions. */
   confusionTrackers?: Record<string, TopicConfusionTracker>;
+
+  /** Number of demonstrations the coach has written this session.
+   *  After 2, the demo trigger switches to asking the student to write. */
+  demonstrationCount?: number;
+
+  /** Live revision checklist — populated from top findings after turn 1,
+   *  updated as the student addresses tasks through coaching or revisions.
+   *  Injected into the coaching prompt so the coach references progress. */
+  revisionChecklist?: RevisionTask[];
+
+  /** Workshop progress — tracks which ImprovementManifest items have been
+   *  discussed, demonstrated, attempted by student, or fully addressed.
+   *  Keyed by ImprovementEntry.id. */
+  improvementProgress?: Record<string, 'queued' | 'discussed' | 'demonstrated' | 'student_attempted' | 'addressed'>;
+
+  /**
+   * Phase 2: Ledger of improvements explicitly deployed (taught) in prior turns.
+   * Keyed by ImprovementEntry.id. Enables the coachingPlanner to rotate across
+   * different principle categories instead of repeating the same lesson ("be
+   * specific") every turn — the regression the blind-spot hunter flagged at
+   * 0% wordform-overlap-but-5-turns-of-same-principle.
+   *
+   * Written to by coachingPlanner.recordDeployment() after each turn. Read by
+   * coachingPlanner.selectNextDeployment() to skip already-taught items and
+   * diversify across PrincipleCategory.
+   */
+  taughtLedger?: Record<string, TaughtEntry>;
+
+  /**
+   * Phase 3: number of times the coach has deployed a calibrated pushback
+   * (firm artifact request) this session. Hard cap at 1 — a second pushback
+   * is the regression pattern the OLD system fell into at T7–T9. See
+   * edgeProtocol.shouldAllowPushback().
+   */
+  pushbackCount?: number;
+
+  /**
+   * Phase 3: number of times the coach has surfaced a blindSpotHypothesis
+   * this session. Hard cap at 1 — repeated surfacing would move from
+   * observation to psychoanalysis. See edgeProtocol.shouldSurfaceBlindSpot().
+   */
+  blindSpotDeployedCount?: number;
+
+  /**
+   * Round-3 Coaching Integration: the strategic question produced by the
+   * PRIOR turn's sidecar. Distinct from `strategicQuestion` (which is the
+   * CURRENT live thread, possibly updated this turn). The prior-turn value
+   * is what the coach "handed the student" at the end of the previous turn;
+   * the next-turn prompt surfaces it verbatim so the coach either satisfies
+   * it or explicitly chooses to abandon it — no silent drops.
+   *
+   * Cleared to null when the student's turn addresses it (detected heuristically
+   * by the sidecar re-issuing a new strategicQuestionUpdate).
+   */
+  priorTurnStrategicQuestion?: string | null;
+
+  /**
+   * Round-3 Coaching Integration: the cognitive/inner-voice assessment from
+   * the PRIOR turn's sidecar (raw `innerVoice` field). Used to build the
+   * "MIRROR OPPORTUNITY" directive in the next coach prompt when the
+   * assessment contains a testable hypothesis (marked by "suggests", "either…or",
+   * "might be", "I'm betting", etc.). Cleared after it's mirrored or after
+   * 2 turns of non-use.
+   */
+  priorTurnCognitiveAssessment?: string | null;
+
+  /**
+   * Round-3 Coaching Integration: the last turn when a mirror from the
+   * prior-turn cognitive assessment was surfaced to the student. Rate-limits
+   * mirrors to at most 1 per 3 turns to avoid making the session feel
+   * therapeutic.
+   */
+  mirrorSurfacedAtTurn?: number;
+}
+
+/**
+ * A record of when an ImprovementEntry was deployed as the primary focus of
+ * a coaching turn. Persisted in CoachingSessionMemory.taughtLedger.
+ */
+export interface TaughtEntry {
+  /** Turn number when this improvement was deployed as primary focus (1-based) */
+  turn: number;
+  /** Technique name deployed (e.g., "SUMMARY-TO-SCENE"), or null if keyword-only */
+  technique: string | null;
+  /** Coarse principle category — drives cross-turn rotation */
+  principleCategory: PrincipleCategory;
+  /** How prominently it was deployed */
+  deploymentMode: 'explicit' | 'contextual';
+  /** The ImprovementEntry.id this ledger entry refers to */
+  impId: string;
+}
+
+/**
+ * Coarse principle category used by coachingPlanner for cross-turn rotation.
+ * Finer granularity than technique names but coarser than issue types — a
+ * single session should teach different categories across turns to avoid
+ * "5 turns of show-don't-tell" repetition.
+ */
+export type PrincipleCategory =
+  | 'scene_grounding'       // Summary → scene, sensory timestamp, show-through-action
+  | 'evidence_anchoring'    // Claim needs evidence, specificity ladder
+  | 'voice_authenticity'    // Voice comparison, formulaic → personal
+  | 'narrative_structure'   // Arc, pacing, paragraph roles, bridge sentences
+  | 'character_presence'    // Named characters, collaborative specificity
+  | 'craft_compression'     // Word economy, cutting, sentence rhythm
+  | 'emotional_stakes'      // Somatic vulnerability, stakes establishment
+  | 'admissions_framing'    // AO impact, cliche convergence, distinctiveness
+  | 'thematic_coherence';   // North Star alignment, theme grounding
+
+/**
+ * A single revision task on the student's checklist.
+ * Projected from findings — the student-facing version of what needs fixing.
+ */
+export interface RevisionTask {
+  /** Task ID (e.g., 'RT_1') */
+  id: string;
+  /** Target paragraph (0-based index) */
+  paragraph: number;
+  /** Student-facing task description */
+  task: string;
+  /** Named craft technique, if applicable */
+  technique: string | null;
+  /** Finding ID this task originated from */
+  findingRef: string | null;
+  /** Current status */
+  status: 'pending' | 'in_progress' | 'addressed';
+  /** Priority (1 = highest) */
+  priority: number;
+  /** Turn when status changed to 'addressed' */
+  addressedAtTurn?: number;
+}
+
+// ============================================================================
+// IMPROVEMENT MANIFEST — Analysis-produced improvement queue for coaching
+// ============================================================================
+
+/**
+ * A single improvement derived from the analysis system.
+ * Every finding, growth edge, observation, and annotation should map to at least
+ * one ImprovementEntry. The conversator's job is to workshop these with the student.
+ *
+ * Understanding is the fuel — improvements are the output.
+ */
+export interface ImprovementEntry {
+  /** Unique ID (e.g., 'IMP_1') */
+  id: string;
+  /** Target paragraph (0-based index, -1 for essay-level) */
+  paragraph: number;
+  /** What the analysis observed — the diagnosis */
+  observation: string;
+  /** What the student should DO about it — always actionable, never just diagnostic */
+  action: string;
+  /** WHY this matters — framed in reader/AO impact, not abstract quality */
+  stakes: string;
+  /** Named craft technique from TECHNIQUE_ROUTES, if one matches */
+  technique: string | null;
+  /** Sample rewrite demonstrating the improvement (2-4 sentences) */
+  demonstration: string | null;
+  /**
+   * Essay-specific rewrite from L5's `rewriteExample` — in the student's voice,
+   * using the student's actual material. Populated by `mergeL5IntoManifest`.
+   * Preferred over `genericExample` in coaching prompts.
+   */
+  essaySpecificDemo: string | null;
+  /**
+   * Generic BEFORE/AFTER/PRINCIPLE boilerplate from the research DB. Fallback
+   * used only when `essaySpecificDemo` is absent. Populated by enrichment.
+   */
+  genericExample: string | null;
+  /** What to CUT to make room for the addition (word economy) */
+  wordEconomyCut: string | null;
+  /** Where this improvement came from */
+  source: 'l4_priority' | 'l35_finding' | 'l375_growth_edge' | 'l3_observation' | 'l5_annotation' | 'red_flag' | 'ao_first_read';
+  /** Reference ID (finding ID, annotation ID, etc.) */
+  sourceRef: string | null;
+  /** Priority (1 = highest, from analysis) */
+  priority: number;
+  /** Expected impact on essay quality */
+  impact: 'transformative' | 'significant' | 'incremental';
+  /** Context enrichments added by conversator as student reveals details */
+  conversatorEnrichments: string[];
+
+  /**
+   * Force-surface deadline (1-based turn number). When set, the
+   * coachingPlanner promotes this item to the front of selection if
+   * `(memory.turnCount + 1) > surfaceByTurn` AND the item has not yet
+   * appeared in the taughtLedger.
+   *
+   * Populated by the howler pass / red_flag pipeline so transformative or
+   * essay-credibility-critical items (clichés, factual howlers, AO red
+   * flags) cannot silently age out of selection while category-rotation
+   * prefers other items. Optional — items without a deadline rely on
+   * impact-tier gating + category rotation.
+   *
+   * Default convention: red_flag and howler items are tagged
+   * `surfaceByTurn: 2` at manifest-build time (must surface by turn 2 of
+   * the coaching session — i.e., overdue starting at turn 3).
+   */
+  surfaceByTurn?: number;
+
+  /**
+   * Scope 3 Phase 7: Research-backed principle + mechanism explanation,
+   * populated at coaching session init by `enrichWithResearchDatabase()`
+   * from `TEACHING_KNOWLEDGE_BASE` in `researchBackedTeachingService`.
+   *
+   * Null when no IssueType mapping was resolved for this item (graceful
+   * skip — per-item misses are legitimate, not errors).
+   *
+   * @see src/services/essayIntelligence/analysis/researchEnrichment.ts
+   */
+  researchBacking?: {
+    /** Core principle behind the transformation (e.g., "Start at the point of highest tension") */
+    principle: string;
+    /** Mechanism explanation — why the "after" version works */
+    whyItWorks: string;
+    /** IssueType string used for the lookup (provenance trail) */
+    sourceRef: string;
+    /** Optional SourceCitation.source_id when getWhyThisMatters returned one */
+    citationId?: string;
+  } | null;
+
+  /**
+   * Scope 3 Phase 7: College-specific tailoring note for supplement essays.
+   * Populated only when `collegeId` is present at coaching session init AND
+   * `researchBackedTeachingService.getCollegeSpecificGuidance()` returns an
+   * insight. Null is the correct "not applicable" value — not a failure.
+   */
+  collegeNote?: string | null;
+}
+
+/**
+ * ImprovementManifest — the ordered list of improvements the analysis system
+ * produces for the coaching system to workshop with the student.
+ *
+ * Populated after L4 (or after whatever layer completes if L4 fails).
+ * Sources: L4 priorities → L3.5 findings → L3.75 growth edges → L3 red flags → AO first read.
+ * The conversator consumes this and helps the student execute each improvement.
+ */
+export interface ImprovementManifest {
+  /** Ordered improvements — highest priority first */
+  items: ImprovementEntry[];
+  /** ISO timestamp when manifest was generated */
+  generatedAt: string;
+  /** Which analysis layers contributed items */
+  sources: string[];
+  /** Essay word count at generation time (for word economy tracking) */
+  wordCount: number;
+  /** Essay word limit */
+  wordLimit: number;
+
+  /**
+   * Scope 3 Phase 7: Idempotency flag set by `enrichWithResearchDatabase()`
+   * on first run. Prevents re-running enrichment on every coaching turn.
+   *
+   * NOT PERSISTED: `SupabaseCheckpointStore.save()` strips this key via
+   * a JSON replacer so every session reload starts with unset flag and
+   * re-runs enrichment against the current `collegeId` and research DB.
+   * Without that strip, the flag would survive the JSONB round-trip and
+   * permanently short-circuit enrichment when a student switches college
+   * mid-thread or the research DB is updated.
+   */
+  _enriched?: boolean;
+
+  /**
+   * Populated when enrichment throws a systemic error (e.g. table drift in
+   * ROUTE_TO_ISSUE_TYPE vs. TECHNIQUE_VOCABULARY_LIST). Coaching continues
+   * with a best-effort manifest, but downstream observability/audit tooling
+   * can surface this field to flag a systemic configuration regression.
+   *
+   * NOT PERSISTED: session-local diagnostic only. Stripped by the same
+   * SupabaseCheckpointStore replacer as `_enriched`.
+   */
+  _enrichmentError?: {
+    type: 'systemic_miss' | 'lookup_failure' | 'import_failure';
+    layer: string;
+    message: string;
+    at: string;
+  };
 }
 
 /**
@@ -2306,39 +3130,6 @@ export interface LearningStyleObservations {
     confidence: 'tentative' | 'growing' | 'confident';
     turnObserved: number;
   }>;
-}
-
-/**
- * Quality signals extracted from the conversation itself.
- * No essay comparison needed. Updated after each pattern detection cycle.
- */
-export interface CoachingQualitySignals {
-  /**
-   * Does the student's vocabulary evolve across the session?
-   * If they start using architectural terms naturally, coaching is building capacity.
-   */
-  vocabularyEvolution: 'adopting_architectural_language' | 'stable' | 'not_yet';
-
-  /**
-   * Is the student asking BETTER questions over time?
-   */
-  questionQualityTrend: 'improving' | 'stable' | 'declining';
-
-  /**
-   * When the student describes planned revisions, are they
-   * architecturally grounded or surface-level?
-   */
-  revisionSophistication: 'architectural' | 'surface' | 'not_yet_discussed';
-
-  /**
-   * Is the student initiating topics or only responding?
-   */
-  studentInitiation: 'high' | 'moderate' | 'low';
-
-  /**
-   * Has the student had any "aha" moments?
-   */
-  breakthroughMoments: number;
 }
 
 // ============================================================================
@@ -2411,7 +3202,8 @@ export type FindingSource =
   | 'coaching'
   | 'edit_reanalysis'
   | 'coherence_check'
-  | 'holistic_synthesis';
+  | 'holistic_synthesis'
+  | 'analysis_pass';
 
 /**
  * FindingScope — what part of the essay this finding is about.
@@ -2840,6 +3632,12 @@ export interface AnalysisPassOutput {
     priorityForImprovement: number;
     /** LLM-assessed confidence in this sentence's effectiveness score. Optional for backward compat. */
     confidence?: SentenceAnalysisConfidence;
+    /**
+     * Scope 2 Phase 5: Inline improvement candidate from the L3.5 analysis.
+     * Populated when isProblem=true or priorityForImprovement >= 4.
+     * See SentenceAnalysis.improvementCandidate for the fuller contract.
+     */
+    improvementCandidate?: ImprovementCandidate | null;
   }>;
 
   /** Paragraph-level analysis */
@@ -3766,3 +4564,100 @@ export interface SnapshotComparison {
    */
   coachingImplications: string;
 }
+
+// ============================================================================
+// DELTA CONTRACT (orphan-diagnostic enforcement)
+// ============================================================================
+
+/**
+ * Delta — the foundation of the "Delta Contract" architectural invariant.
+ *
+ * Every diagnostic the Essay Intelligence system produces MUST bind to either
+ * (a) a specific essay edit (`essayChange`) or (b) a specific change in coach
+ * behavior (`coachingChange`). A Delta with BOTH fields null is an "orphan
+ * diagnostic" — an observation with no path to changing the essay or the
+ * session — and is rejected at manifest-build time.
+ *
+ * Rationale: pre-contract, every layer emitted `Observation[]` with no schema-
+ * level enforcement that observations bind to actions. The April 14 audit
+ * found ~41% of paid LLM output never reached the student because nothing
+ * downstream consumed it. The Delta Contract makes the binding a type-level
+ * requirement: if the adapter can't derive an essay edit or a coach-prompt
+ * injection, validation fails loudly instead of silently dropping the item.
+ *
+ * Consumed by: `deltaContract.ts` (validator + adapter), analysisOrchestrator
+ * (build-time assertion), future migrations of coach/howler/AO layers.
+ */
+export interface Delta {
+  /** The diagnostic statement — what the system noticed. */
+  observation: string;
+
+  /**
+   * Bound essay edit. When present, the system is prescribing a concrete
+   * text transformation on the student's essay. `paragraph: -1` signals
+   * essay-level (e.g., global reordering, title change).
+   *
+   * `kind`:
+   *  - 'replace'          — swap `before` → `after` (both non-empty)
+   *  - 'insert'           — add `after` at a position (`before` empty)
+   *  - 'delete'           — remove `before` (`after` empty)
+   *  - 'rewrite_paragraph'— whole-paragraph replacement
+   */
+  essayChange: {
+    paragraph: number;
+    before: string;
+    after: string;
+    kind: 'replace' | 'insert' | 'delete' | 'rewrite_paragraph';
+  } | null;
+
+  /**
+   * Bound coaching behaviour change. When present, the system is prescribing
+   * a modification to the next coach prompt. `promptInjection` is the literal
+   * text to append; `gateName` identifies which test gate validates the
+   * effect (e.g., 'technique_fire', 'howler_surface').
+   */
+  coachingChange: {
+    promptInjection: string;
+    gateName: string;
+  } | null;
+
+  /** One transferable craft idea the student should take away. ≤25 words. */
+  studentTakeaway: string;
+
+  /** 1-based turn number by which this delta must have surfaced. */
+  surfaceByTurn: number;
+
+  /** Bypass coaching-rotation if true (used for red_flag / force-promote). */
+  forceSurface: boolean;
+
+  /** Condition under which this delta becomes stale / should be discarded. */
+  killCriteria: string;
+
+  /**
+   * Which layer emitted the source finding. Values match existing
+   * ImprovementEntry.source tags plus howler/ao_first_read identifiers:
+   *   'L3' | 'L3.75' | 'L3.5' | 'L4' | 'L5' | 'howler' | 'ao_first_read'
+   * Typed as `string` to stay forward-compatible with new layers.
+   */
+  sourceLayer: string;
+
+  /** Provenance ref into the originating store (finding id, annotation id…). */
+  sourceRef: string | null;
+}
+
+// ============================================================================
+// REVISION HISTORY (Phase 1 — cross-session snapshot chain)
+// ============================================================================
+// Types live in `./history/profileSnapshot.ts` (pure types + extraction).
+// Re-exported here so consumers use the central profileTypes hub.
+
+export type {
+  ProfileSnapshot,
+  SnapshotFinding,
+  SnapshotFindingSeverity,
+  SnapshotFindingMaturity,
+  VoiceIdentitySnapshot,
+  VividnessSignal,
+  RevisionResetSignal,
+  RevisionHistory,
+} from './history/profileSnapshot';

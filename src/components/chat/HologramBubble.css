@@ -1,0 +1,130 @@
+/* ============================================
+   Cybernetic Hologram Bubble — Animated Effects
+   ============================================ */
+
+/* Shimmer sweep */
+@keyframes holo-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* User glow pulse — orchid-violet (subtle, doesn't haze over text) */
+@keyframes holo-glow-pulse-user {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 4px hsla(280, 60%, 78%, 0.12))
+      drop-shadow(0 0 10px hsla(280, 60%, 78%, 0.04));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 6px hsla(280, 60%, 78%, 0.2))
+      drop-shadow(0 0 16px hsla(325, 55%, 82%, 0.06));
+  }
+}
+
+/* Assistant glow pulse — soft blue (subtle, doesn't haze over text) */
+@keyframes holo-glow-pulse-bot {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 4px hsla(220, 65%, 75%, 0.12))
+      drop-shadow(0 0 10px hsla(220, 65%, 75%, 0.04));
+  }
+  50% {
+    filter:
+      drop-shadow(0 0 6px hsla(220, 65%, 75%, 0.2))
+      drop-shadow(0 0 16px hsla(230, 55%, 80%, 0.06));
+  }
+}
+
+/* ============================================
+   Rich Text Treatments — Coaching Typography
+   Designed to BLEND with the bubble, not sit on top.
+   All treatments stay within the cool indigo/violet palette.
+   ============================================ */
+
+/* ── Essay Quote: the student's own writing referenced back ── */
+.msg-quote {
+  display: inline;
+  font-style: italic;
+  font-weight: 430;
+  letter-spacing: 0.015em;
+  color: hsl(270, 50%, 55%);
+  text-decoration: underline;
+  text-decoration-color: hsla(270, 50%, 62%, 0.3);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: hsla(270, 60%, 80%, 0.08);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* ── Key Insight: the core advice or "aha" moment ── */
+.msg-key {
+  display: inline;
+  font-weight: 580;
+  letter-spacing: 0.01em;
+  color: hsl(255, 55%, 48%);
+  text-decoration: underline;
+  text-decoration-color: hsla(255, 55%, 55%, 0.35);
+  text-underline-offset: 2.5px;
+  text-decoration-thickness: 1.5px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: hsla(255, 60%, 75%, 0.08);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* ── Action Step: "try this", "do this" directives ── */
+.msg-action {
+  display: block;
+  margin: 8px 0 4px;
+  padding: 6px 10px 6px 12px;
+  border-left: 2px solid hsla(255, 55%, 72%, 0.5);
+  border-radius: 0 4px 4px 0;
+  background: hsla(250, 50%, 78%, 0.06);
+  font-size: 0.95em;
+  line-height: 1.65;
+  color: hsl(240, 18%, 22%);
+}
+
+/* ── Concept/Term: admissions terms, writing craft vocab ── */
+.msg-term {
+  display: inline;
+  font-weight: 510;
+  letter-spacing: 0.02em;
+  color: hsl(210, 45%, 38%);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: hsla(205, 70%, 60%, 0.5);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+  padding: 1px 3px;
+  border-radius: 2px;
+  background: hsla(210, 60%, 75%, 0.07);
+  cursor: help;
+}
+
+/* ── Soft Highlight: gentler secondary emphasis ── */
+.msg-soft {
+  display: inline;
+  font-weight: 500;
+  color: hsl(245, 40%, 45%);
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: hsla(245, 50%, 78%, 0.07);
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  .holo-shimmer-layer,
+  .holo-panel-wrapper {
+    animation: none !important;
+  }
+}

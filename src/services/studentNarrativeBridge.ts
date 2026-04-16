@@ -32,7 +32,20 @@ export interface StudentModuleOutputs {
     keyMoment?: string;
     /** Authentic quotes from the student's own words during activity chat */
     authenticQuote?: string;
+    /** Origin story — how/why they got involved (from profile_data JSONB) */
+    originStory?: string;
+    /** Proudest moment in this activity (from profile_data JSONB) */
+    proudestMoment?: string;
+    /** Why this activity matters to them personally (from profile_data JSONB) */
+    whyItMatters?: string;
   }>;
+  /** Derived portfolio synthesis — computed from activity profiles, not stored */
+  portfolioSynthesis?: {
+    /** Dominant spike area (if detected) */
+    spike?: string;
+    /** Number of Tier 1-2 activities (strong signal activities) */
+    strongActivityCount: number;
+  };
   piqSummaries?: string[];
   academicContext?: {
     gpaContext?: string;
@@ -75,7 +88,10 @@ export function assembleStudentContext(outputs: StudentModuleOutputs): string {
   if (outputs.activityProfiles?.length) {
     const activityLines = outputs.activityProfiles.map(a => {
       let line = `${a.title} (Tier ${a.tier}): ${a.keyStrengths.slice(0, 2).join(', ')}`;
+      if (a.originStory) line += ` | Origin: ${a.originStory}`;
       if (a.keyMoment) line += ` | Key moment: ${a.keyMoment}`;
+      if (a.proudestMoment) line += ` | Proudest: ${a.proudestMoment}`;
+      if (a.whyItMatters) line += ` | Why it matters: ${a.whyItMatters}`;
       if (a.authenticQuote) line += ` | In their words: "${a.authenticQuote}"`;
       return line;
     });
@@ -95,6 +111,15 @@ export function assembleStudentContext(outputs: StudentModuleOutputs): string {
     if (ac.gpaContext) parts.push(ac.gpaContext);
     if (ac.courseLoadSummary) parts.push(ac.courseLoadSummary);
     if (parts.length > 0) sections.push(parts.join('. '));
+  }
+
+  // Portfolio synthesis (derived from activity profiles — holistic narrative)
+  if (outputs.portfolioSynthesis) {
+    const ps = outputs.portfolioSynthesis;
+    const parts: string[] = [];
+    if (ps.spike) parts.push(`Spike: ${ps.spike}`);
+    parts.push(`Strong activities (Tier 1-2): ${ps.strongActivityCount}`);
+    if (parts.length > 0) sections.push(`Portfolio: ${parts.join('. ')}`);
   }
 
   if (sections.length === 0) return '';

@@ -55,7 +55,8 @@ import { FocusedAnalyzer, focusedAnalyzer } from './focusedAnalyzer';
 import type { FocusedAnalysisResult } from './focusedAnalyzer';
 import { coachingService } from '../coaching/coachingService';
 import type { ConversationTurn, CoachingResult } from '../coaching/coachingService';
-import type { CoachingSessionMemory, LearningStyleObservations, CognitiveAssessment, CoachingQualitySignals } from '../profileTypes';
+import type { CoachingSessionMemory, LearningStyleObservations, CognitiveAssessment, CoachingQualitySignals, CoachingMode } from '../profileTypes';
+import { detectCoachingMode } from '../coaching/modeDetection';
 import { holisticSynthesisService } from './holisticSynthesis';
 
 // Re-export ConversationTurn so callers can use it without importing from coachingService
@@ -336,6 +337,8 @@ export class ReanalysisOrchestrator {
     recentEditSummary?: string,
     sessionMemory?: CoachingSessionMemory,
     learningStyle?: LearningStyleObservations,
+    crossModuleContext?: string,
+    collegeId?: string,
   ): Promise<CoachingTurnResult> {
     console.log('[ReanalysisOrchestrator] Processing coaching turn');
 
@@ -376,16 +379,55 @@ export class ReanalysisOrchestrator {
         });
       }
 
+      // ── Coaching mode detection (block system) ──
+      const richEditContext = this.buildRichEditContext(recentEditSummary);
+
+      // Compute max paragraph edit count for iteration detection
+      const editParagraphsForMode: number[] = [];
+      if (this.lastEditUnderstanding?.scopeRecommendation.targets) {
+        for (const target of this.lastEditUnderstanding.scopeRecommendation.targets) {
+          const match = target.match(/P(\d+)/i);
+          if (match) editParagraphsForMode.push(parseInt(match[1], 10) - 1);
+        }
+      }
+      const maxEditCount = editParagraphsForMode.length > 0
+        ? Math.max(...editParagraphsForMode.map(p => this.versionTracker.getEditCountForParagraph(p)))
+        : 0;
+
+      const coachingMode: CoachingMode = detectCoachingMode(
+        richEditContext,
+        this.lastEditUnderstanding?.significance,
+        maxEditCount,
+        studentMessage,
+        this.versionTracker.hasAnyEdits(),
+        this.lastEditUnderstanding?.changeType,
+        profile.index.improvementPhase.level,
+      );
+      const iterationRound = coachingMode === 'iteration_deep' ? maxEditCount : undefined;
+
+      // Detect in-session draft prose (student writing during the coaching session)
+      const isInSessionDraft = !richEditContext && coachingMode === 'revision_response' &&
+        !this.versionTracker.hasAnyEdits() // No prior edits = this is in-session writing, not a revision
+        ? true
+        : (coachingMode === 'revision_response' && !richEditContext); // revision_response without edit context = draft
+
+      console.log(`[ReanalysisOrchestrator] Coaching mode: ${coachingMode}${iterationRound ? `, iteration round ${iterationRound}` : ''}${isInSessionDraft ? ', in-session draft detected' : ''}`);
+
       const coachingResult: CoachingResult = await coachingService.processCoachingTurn(
         studentMessage,
         conversationHistory,
         profile,
         this.coordinator,
         this.router,
-        this.buildRichEditContext(recentEditSummary),
+        richEditContext,
         editStrategyContext,
         sessionMemory,
         learningStyle,
+        crossModuleContext, // Assembled by caller (e.g., HTTP route) from studentNarrativeBridge
+        coachingMode,
+        iterationRound,
+        isInSessionDraft,
+        collegeId,
       );
 
       // FIX 1.4: cost is LayerCost[] (the breakdown array itself); totalCost is separate
@@ -720,20 +762,21 @@ export class ReanalysisOrchestrator {
     const eu = this.lastEditUnderstanding;
     if (!eu) return fallbackSummary;
 
-    // Consume once
+    // Consume once (save ref for structured comparison before nulling)
+    const editUnderstanding = eu;
     this.lastEditUnderstanding = null;
 
     const parts: string[] = [];
 
     parts.push(
-      `Change type: ${eu.changeType.replace(/_/g, ' ')} (${eu.significance}).`,
+      `Change type: ${editUnderstanding.changeType.replace(/_/g, ' ')} (${editUnderstanding.significance}).`,
     );
     parts.push(
-      `Apparent purpose: "${eu.apparentPurpose}" (confidence: ${eu.purposeConfidence.toFixed(2)}).`,
+      `Apparent purpose: "${editUnderstanding.apparentPurpose}" (confidence: ${editUnderstanding.purposeConfidence.toFixed(2)}).`,
     );
 
-    if (eu.profileImpact.connectionImpact.length > 0) {
-      const impacts = eu.profileImpact.connectionImpact
+    if (editUnderstanding.profileImpact.connectionImpact.length > 0) {
+      const impacts = editUnderstanding.profileImpact.connectionImpact
         .filter(ci => ci.effect !== 'unchanged')
         .map(ci => `${ci.connectionId} ${ci.effect}: ${ci.reasoning}`)
         .slice(0, 3);
@@ -742,16 +785,53 @@ export class ReanalysisOrchestrator {
       }
     }
 
-    if (eu.profileImpact.directImpact) {
-      parts.push(`Direct impact: ${eu.profileImpact.directImpact}`);
+    if (editUnderstanding.profileImpact.directImpact) {
+      parts.push(`Direct impact: ${editUnderstanding.profileImpact.directImpact}`);
     }
 
-    if (eu.profileImpact.holisticImpact) {
-      parts.push(`Holistic: ${eu.profileImpact.holisticImpact}`);
+    if (editUnderstanding.profileImpact.holisticImpact) {
+      parts.push(`Holistic: ${editUnderstanding.profileImpact.holisticImpact}`);
     }
 
     if (fallbackSummary) {
       parts.push(`Summary: ${fallbackSummary}`);
+    }
+
+    // ── Structured before/after comparison for revision coaching ──
+    // When we have edit targets, include old paragraph text alongside the
+    // change assessment so the coaching prompt can juxtapose versions.
+    if (editUnderstanding.scopeRecommendation.targets) {
+      const comparisonParts: string[] = [];
+      for (const target of editUnderstanding.scopeRecommendation.targets) {
+        const match = target.match(/P(\d+)/i);
+        if (!match) continue;
+        const pIdx = parseInt(match[1], 10) - 1;
+        const oldText = this.versionTracker.getBaselineParagraphText(pIdx);
+        if (oldText) {
+          // Get current text from the profile for comparison
+          const profile = this.coordinator.getProfile();
+          const newText = profile.paragraphs[pIdx]?.text;
+          if (newText && oldText.trim() !== newText.trim()) {
+            comparisonParts.push(
+              `\nP${pIdx + 1} BEFORE: "${oldText.slice(0, 300)}${oldText.length > 300 ? '...' : ''}"` +
+              `\nP${pIdx + 1} AFTER: "${newText.slice(0, 300)}${newText.length > 300 ? '...' : ''}"`,
+            );
+          }
+        }
+      }
+      if (comparisonParts.length > 0) {
+        parts.push(`\n=== REVISION COMPARISON ===${comparisonParts.join('\n')}`);
+      }
+    }
+
+    // ── Coaching directive: name the highest-priority coaching action ──
+    const weakened = editUnderstanding.profileImpact.connectionImpact
+      .filter(ci => ci.effect === 'weakened' || ci.effect === 'broken');
+    if (weakened.length > 0) {
+      parts.push(
+        `\nCOACHING PRIORITY: ${weakened[0].connectionId} was ${weakened[0].effect} by this revision. ` +
+        `Name what was LOST and show how to reclaim it without reverting.`,
+      );
     }
 
     return parts.join(' ');

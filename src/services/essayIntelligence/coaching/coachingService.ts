@@ -42,7 +42,6 @@ import type {
   CoachingSessionMemory,
   SessionEvent,
   LearningStyleObservations,
-  CoachingQualitySignals,
   Finding,
 } from '../profileTypes';
 
@@ -51,12 +50,47 @@ import type { AssembledProfileContext } from '../profileManager/profileRouter';
 import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
 
 import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { jsonrepair } from 'jsonrepair';
 import type { LayerCost, TokenUsage } from '../analysis/analysisOrchestrator';
 import { COACHING_VALUE_ORDER } from '../findings/findingStore';
+
+import type { CoachingMode } from '../profileTypes';
+import type { BlockContext } from './types';
+import {
+  buildCoachingPrompt,
+  strategicQuestionFromPriorTurnSection,
+  innerVoiceMirrorCandidateSection,
+  learningStyleCalibrationSection,
+  strategicQuestionFromPriorTurnData,
+  innerVoiceMirrorCandidateData,
+  learningStyleCalibrationData,
+  round3DirectivesBlock,
+  historicalIntelligenceSection,
+} from './promptBlocks';
+import { normalizeParagraphRef, assertRefInRange } from './paragraphRef';
+import { getTeachingContentForContext } from './teachingContentRouter';
+import * as coachingPlanner from './coachingPlanner';
+import * as edgeProtocol from './edgeProtocol';
+import * as lengthCalibrator from './lengthCalibrator';
+import {
+  FORBIDDEN_PATTERNS_BLOCK,
+  SECTION_WORD_BUDGETS_BLOCK,
+} from './forbiddenPatterns';
+import { CoachingBlockedError } from '../errors';
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
+
+/**
+ * Extended session memory with learning style observations attached at runtime.
+ * The `LearningStyleObservations` object is tracked separately in the main method
+ * but needs to be accessible inside `runStage3CoachingResponse` for fallback
+ * context building when `learningStyleContext` isn't provided by the caller.
+ */
+interface SessionMemoryWithStyle extends CoachingSessionMemory {
+  learningStyleObservations?: LearningStyleObservations;
+}
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-5-20250929';
@@ -195,106 +229,92 @@ const TECHNIQUE_ROUTES: TechniqueRoute[] = [
     technique: 'ENACTED PARALLEL',
     directive: 'Instead of explaining the connection, show the reader by writing the two activities in a way that reveals the structural echo.',
   },
+  {
+    // Anti-convergence: matches "telling not showing", "states rather than demonstrates", "claims quality"
+    claimKeywords: ['telling'],
+    technique: 'SHOW THROUGH SPECIFIC ACTION',
+    directive: 'The essay CLAIMS a quality instead of demonstrating it. Replace the claim with a specific moment that proves it: "This taught me resilience" → "I still dry-heave before every speech. But now I walk to the podium anyway." The specific action IS the proof.',
+  },
+  {
+    // Anti-convergence: matches "formulaic", "AI-generated", "convergence", "could be anyone"
+    claimKeywords: ['formulaic'],
+    technique: 'VOICE AUTHENTICITY',
+    directive: 'This language sounds like every other essay. Help the student find the weird, specific, only-them version. "Transformative experience" → the actual thing that happened. "Insatiable curiosity" → "I\'ve read the Wikipedia page for unusual deaths four times." Specificity is the antidote to convergence.',
+  },
+  {
+    // Anti-convergence: matches "epiphany", "sudden realization", "everything clicked"
+    claimKeywords: ['epiphany'],
+    technique: 'INCREMENTAL REVELATION',
+    directive: 'Real growth is messy, not sudden. "In that moment, everything changed" → "I thought I understood. Six months later, I realized I\'d only understood the easy part." Help the student show growth as ongoing recalibration, not a light switch.',
+  },
 ];
 
 /**
- * Phase-gated craft technique vocabulary.
- * Foundation/Architecture: no craft jargon — describe in plain language.
- * Craft: full vocabulary, name techniques when the essay uses them.
- * Polish/Distinction: refined vocabulary, focus on precision techniques.
- * ~200 tokens per phase (vs 400 for a static dump).
+ * Maps TECHNIQUE_ROUTES technique names to TechniqueLibrary category IDs.
+ * Used to look up pedagogical content (WHY, HOW, EXAMPLES) for each route.
  */
-function getCraftVocabularyForPhase(phase: ImprovementPhaseLevel): string {
-  switch (phase) {
-    case 'foundation':
-    case 'architecture':
-      // No craft jargon at foundation/architecture — plain language only
-      return '';
-
-    case 'craft':
-      return `
-
-CRAFT TECHNIQUE VOCABULARY (name these techniques when the essay uses them):
-- Anaphora: repetition of a word/phrase at the start of successive clauses for rhythm
-- Volta: the turn/pivot where the essay's direction, tone, or meaning shifts
-- In medias res: opening in the middle of action rather than with setup
-- Juxtaposition: placing contrasting elements side by side to illuminate both
-- Accretion: building meaning through accumulated details rather than direct statement
-- Withholding: strategically delaying information to create tension or revelation
-- Tonal counterpoint: contrasting emotional register with delivery (humor about grief)
-- Synecdoche: using a specific detail to represent a larger whole (the cracked mug = the marriage)
-- Echo structure: returning to an opening image/phrase with transformed meaning at the close`;
-
-    case 'polish':
-    case 'distinction':
-      return `
-
-CRAFT TECHNIQUE VOCABULARY (precision-level — name these when refining):
-- Syllepsis: a word doing double duty — "she held the diploma and her breath"
-- Temporal compression: covering long periods in few words to emphasize what gets expanded
-- Register shift: deliberate change in formality, vocabulary, or voice within the essay
-- Negative space: what the essay pointedly does NOT say, creating meaning through absence
-- Concrete universal: a hyper-specific detail that resonates with universal experience
-- Enjambment (prose): a sentence that runs across paragraph boundaries for forward momentum
-- Volta: the turn/pivot where the essay's direction shifts — at polish, the placement and sharpness matter`;
-
-    default:
-      return '';
-  }
-}
+const TECHNIQUE_TO_CATEGORY: Record<string, string> = {
+  'SUMMARY-TO-SCENE': 'storytelling',
+  'COLD OPEN / SENSORY TIMESTAMP': 'storytelling',
+  'SOMATIC VULNERABILITY': 'voice_authenticity',
+  'NAMED CHARACTER': 'storytelling',
+  'EVIDENCE ANCHORING': 'evidence_impact',
+  'COLLABORATIVE SPECIFICITY': 'evidence_impact',
+  'RITUAL DETAIL / BOOKEND INVERSION': 'storytelling',
+  'VOICE COMPARISON': 'voice_authenticity',
+  'FUNCTIONAL DETAIL': 'storytelling',
+  'STAKES ESTABLISHMENT': 'storytelling',
+  'SCENE EXPANSION': 'storytelling',
+  'NARRATIVE ARC': 'storytelling',
+  'SHOW THROUGH SPECIFIC ACTION': 'evidence_impact',
+  'VOICE AUTHENTICITY': 'voice_authenticity',
+  'DEFINITIONAL PIVOT': 'voice_authenticity',
+  'SUSTAINED VULNERABILITY': 'reflection_depth',
+  'ANTI-LESSON': 'reflection_depth',
+};
 
 /**
- * Pedagogical calibration rules — how to teach, not what to teach.
- * ~350 tokens. Appended to staticCoachingPhilosophy (cached).
- * Conditional on observable state (phase, confusion, breakthrough)
- * that the LLM detects from conversation + cognitive assessment.
+ * Maps technique route names to TransformationExample.primaryCraftMove values.
+ * Used to find matching before/after examples from the research database.
  */
-const PEDAGOGICAL_CALIBRATION_RULES = `
-
-PEDAGOGICAL CALIBRATION RULES (follow these teaching heuristics):
-
-WHEN CONFUSED:
-- Lead with ONE concrete example, not an explanation
-- Limit to a single concept per response
-- Quote a specific sentence from their essay and ask them what THEY see in it
-- If confused twice about the same topic: change modality (if you explained, now show; if you showed, now ask)
-
-WHEN AT FOUNDATION PHASE:
-- Every observation must cite a paragraph number and quote actual text
-- Describe what's happening in plain language — save craft vocabulary for later
-- Focus on "What is your essay about?" not "How is your essay structured?"
-
-WHEN AT ARCHITECTURE/CRAFT PHASE:
-- Name the specific technique they're using or could use
-- Compare two parts of THEIR essay rather than giving abstract advice
-- "Read P2S3 and P5S1 back to back — do you hear the shift?"
-
-WHEN GIVING NEGATIVE FEEDBACK:
-- Quote the specific words that aren't working BEFORE explaining why
-- Show what the reader experiences (not what the writer intended)
-- Offer ONE concrete alternative, not a list of options
-
-WHEN STUDENT SHOWS BREAKTHROUGH:
-- Name what they just figured out — make the insight explicit
-- Connect it to their next challenge (momentum, not celebration)
-- Keep the response SHORT — don't dilute the moment
-
-WHEN STUDENT RESISTS:
-- Ask "What are you protecting?" before defending your position
-- If they're right, say so immediately and build from their reading
-- Never argue about interpretation — the student owns their essay's meaning`;
+const TECHNIQUE_TO_CRAFT_MOVE: Record<string, string> = {
+  'SUMMARY-TO-SCENE': 'sensory_details',
+  'COLD OPEN / SENSORY TIMESTAMP': 'sensory_details',
+  'SOMATIC VULNERABILITY': 'emotional_physical',
+  'NAMED CHARACTER': 'specific_names',
+  'EVIDENCE ANCHORING': 'statistics_data',
+  'COLLABORATIVE SPECIFICITY': 'specific_names',
+  'SHOW THROUGH SPECIFIC ACTION': 'active_verbs',
+  'STAKES ESTABLISHMENT': 'emotional_physical',
+  'VOICE AUTHENTICITY': 'active_verbs',
+  'FUNCTIONAL DETAIL': 'sensory_details',
+  'SCENE EXPANSION': 'sensory_details',
+};
 
 /**
- * Sidecar instructions appended to Stage 3 system prompt.
- * Instructs Sonnet to emit a hidden JSON metadata block after every coaching response.
- * This metadata replaces the separate Stage 1, Stage 1.5, and Pattern Detection Haiku calls.
+ * Anti-convergence transformation patterns.
+ * Before/after examples showing common AI-coaching convergence traps
+ * and their authentic alternatives. Injected into coaching context
+ * when the coach detects convergence-prone language in the essay.
+ *
+ * Source: researchBackedTeachingService knowledge base (verified by AO quotes)
  */
-const SIDECAR_INSTRUCTIONS = `
+const ANTI_CONVERGENCE_PATTERNS = [
+  { pattern: 'telling_not_showing', signal: 'taught me|learned that|made me realize|showed me the importance',
+    example: '"This experience taught me resilience" → "I still dry-heave before every speech. But now I walk to the podium anyway, feeling my heartbeat in my fingertips."' },
+  { pattern: 'ai_convergence', signal: 'transformative|profoundly impacted|multifaceted|insatiable|instrumental in shaping',
+    example: '"This transformative experience profoundly impacted my journey" → "I spent three weeks debugging code that turned out to have a single misplaced semicolon."' },
+  { pattern: 'false_epiphany', signal: 'suddenly realized|in that moment|everything changed|finally understood',
+    example: '"In that moment, everything changed" → "I thought I understood. Six months later, I realized I\'d only understood the easy part."' },
+  { pattern: 'strategic_vulnerability', signal: 'to be honest|to be vulnerable|I must admit|being authentic',
+    example: '"I\'ll be honest — I struggled with anxiety" → "My hands shook when I opened the email. They still do, sometimes, when I see that font."' },
+  { pattern: 'cliche_ending', signal: 'continuing this journey|look forward to|excited for the future|the rest of my life',
+    example: '"I look forward to continuing this journey" → "I\'m starting to have a guess about who I might want to be. Ask me again in a year."' },
+] as const;
 
-METADATA (required — append after EVERY response):
-After your coaching response, on a new line write exactly <!--METADATA--> followed by a JSON object on the SAME line. This metadata is parsed by the system and NOT shown to the student. Do NOT put the metadata inside a code block.
-
-{"category":"<confirmation|reinterpretation|new_context|correction|preference|clarification|emotional_reaction|resistance>","cognitiveState":"<engaged|confused_about_feedback|confused_about_concept|curious_deeper|curious_wider|frustrated|resistant_to_specific|resistant_to_general|seeking_validation|overwhelmed>","focusParagraphs":[<0-based paragraph indices discussed>],"dimensionFocus":["<dimensions discussed>"],"responseIntensity":"<full|brief|minimal>","sessionJournalEntry":"<1-2 sentence coaching log or null>","contextAccumulation":"<new SPECIFIC details the student revealed — names, places, moments, sensory details, relationships, emotions. These feed personalized coaching and example generation. Capture the CONCRETE: 'Piano teacher Mrs. Chen, taught Chopin Nocturnes, student sat on the bench she warmed' NOT the abstract: 'student has a meaningful relationship with their teacher'. null if no new details.>","needsDeepening":<true only if student reinterpreted essay meaning or revealed significant new context>,"deepeningReason":"<reason or null>","learningStyleUpdate":"<1-sentence observation about how this student learns based on THIS turn, or null. E.g., 'Responds better to specific text comparisons than abstract descriptions'>","strategicQuestionUpdate":"<a QUESTION that should drive the next response, or null to keep current. Must be specific: 'Can the student feel the voice shift between P2 and P3?' NOT 'focus on voice'.>","innerVoice":"<Your honest inner read of this student RIGHT NOW — 2-3 sentences. What do you see that you wouldn't say out loud? Are they performing understanding? Ready for a breakthrough? Avoiding the real issue? Wrestling productively? Be specific: reference what they said, not abstract categories. null only if this is the very first turn.>","portraitEvolution":"<1-sentence observation about who this student IS as a person — their relationship to writing, their emotional patterns, what they protect — based on THIS turn only. Not a synthesis, just the raw observation. null if nothing new revealed.>"}`;
+// NOTE: getCraftVocabularyForPhase(), PEDAGOGICAL_CALIBRATION_RULES, and SIDECAR_INSTRUCTIONS
+// were moved to promptBlocks.ts as part of the block composition system.
+// See promptBlocks.ts for the authoritative versions.
 
 // ============================================================================
 // EXPORTED TYPES
@@ -364,10 +384,6 @@ export interface CoachingResult {
    * Improvement 6: Updated learning style observations — pass back on next turn.
    */
   learningStyle: LearningStyleObservations;
-  /**
-   * Improvement 6: Quality signals extracted every 3 turns.
-   */
-  qualitySignals?: CoachingQualitySignals;
   /**
    * Improvement 6: LLM-assessed cognitive state for this turn.
    */
@@ -451,6 +467,9 @@ interface CoachingSidecar {
    *  to writing, their emotional patterns, what they protect — based on THIS turn only.
    *  Raw observation, not a synthesis. null if nothing new revealed this turn. */
   portraitEvolution: string | null;
+  /** Revision mode only: did the student's revision improve, go lateral, or regress?
+   *  null when not in revision_response or iteration_deep mode. */
+  revisionQuality: 'improved' | 'lateral' | 'regressed' | null;
 }
 
 // ============================================================================
@@ -541,9 +560,45 @@ export class CoachingService {
     message: string,
     history: ConversationTurn[],
     memory: CoachingSessionMemory,
+    mode: CoachingMode = 'first_encounter',
+    iterationRound?: number,
   ): 'full' | 'brief' | 'minimal' {
     const lower = message.toLowerCase().trim();
     const wordCount = lower.split(/\s+/).length;
+
+    // ── Mode-specific intensity overrides (checked first) ──
+    // Revision: student submitted work — default to full. Exception: very short messages ("how's this?")
+    if (mode === 'revision_response') {
+      if (wordCount < 10) return 'brief';
+      return 'full';
+    }
+    // Iteration deep: after 4+ rounds, brief by default (precision focus). Exception: long messages
+    if (mode === 'iteration_deep') {
+      if ((iterationRound ?? 3) >= 4 && wordCount < 30) return 'brief';
+      return 'full';
+    }
+    // Architecture: structural changes deserve full analysis always
+    if (mode === 'architecture') {
+      return 'full';
+    }
+    // Polish: precision mode — brief by default (ONE change per turn). Full only for longer discussions.
+    if (mode === 'polish') {
+      if (wordCount > 30) return 'full';
+      return 'brief';
+    }
+
+    // ── Default heuristics (first_encounter / conversation) ──
+
+    // Breakthrough detection → brief (name the insight, connect forward, STOP)
+    // "I just realized" / "it's really about" / "that's what I want" / "the whole essay is"
+    const breakthroughPatterns = [
+      /i just realized|it('s| is) really about|that('s| is) what i want/,
+      /the whole essay is|i finally (see|understand|get)|everything connects/,
+      /oh my god|oh wow|that('s| is) it|this changes everything/,
+    ];
+    if (breakthroughPatterns.some(p => p.test(lower))) {
+      return 'brief'; // Breakthroughs need momentum, not celebration. 3-6 sentences max.
+    }
 
     // Confirmation patterns (declared early so lastResponseIntensity checks can reference them)
     const confirmationPatterns = [
@@ -575,9 +630,11 @@ export class CoachingService {
     const resistancePatterns = [
       /is (it|that|this) (good|fine|okay|enough)/,
       /just tell me/,
-      /can (we|I) (just|move on|skip)/,
+      /can (we|you|I) (just|move on|skip)/,
       /I (don't|dont) (want|need) to/,
       /whatever you think/,
+      /can you (just )?(write|show|do|fix|rewrite)/,  // ghostwriting requests
+      /just (show|write|do|fix) (me|it)/,             // "just show me"
     ];
     if (resistancePatterns.some(p => p.test(lower))) {
       return 'brief';
@@ -605,6 +662,15 @@ export class CoachingService {
       if (overlapCount >= 2 && wordCount < 20) {
         return 'brief'; // Repeating topic without new content → be direct, not verbose
       }
+    }
+
+    // Mid-session default calibration: after the first 2 turns, short/medium
+    // student messages should get 'brief' by default, not 'full'. Full is for
+    // the first read, breakthrough moments, and long substantive student messages.
+    // This prevents every response from being a 400-word lecture.
+    const turnCount = memory.turnCount ?? 0;
+    if (turnCount >= 2 && wordCount < 40) {
+      return 'brief';
     }
 
     return 'full';
@@ -688,6 +754,7 @@ export class CoachingService {
       strategicQuestionUpdate: null,
       innerVoice: null,
       portraitEvolution: null,
+      revisionQuality: null,
     };
   }
 
@@ -740,6 +807,11 @@ export class CoachingService {
         ? raw.innerVoice : null,
       portraitEvolution: typeof raw.portraitEvolution === 'string' && raw.portraitEvolution.length > 0
         ? raw.portraitEvolution : null,
+      revisionQuality: (() => {
+        const valid = ['improved', 'lateral', 'regressed'];
+        const rv = typeof raw.revisionQuality === 'string' ? raw.revisionQuality.toLowerCase() : '';
+        return valid.includes(rv) ? rv as 'improved' | 'lateral' | 'regressed' : null;
+      })(),
     };
   }
 
@@ -757,6 +829,8 @@ export class CoachingService {
    * @param router  Profile router for context assembly
    * @param recentEditContext  Optional summary of recent edits (for edit-aware routing)
    * @param editStrategyContext  W9.3: Optional approach/strategy context from version tracker
+   * @param coachingMode  Detected coaching mode (from ReanalysisOrchestrator)
+   * @param iterationRound  For iteration_deep: how many edits on the focused section
    */
   async processCoachingTurn(
     studentMessage: string,
@@ -769,7 +843,20 @@ export class CoachingService {
     sessionMemory?: CoachingSessionMemory,
     learningStyle?: LearningStyleObservations,
     crossModuleContext?: string,
+    coachingMode?: CoachingMode,
+    iterationRound?: number,
+    isInSessionDraft?: boolean,
+    collegeId?: string,
   ): Promise<CoachingResult> {
+    // ── Phase 1.5: Fail-fast gate — block coaching on legacy profiles that
+    // failed migration (no source data to reshape into the candidate store).
+    // This is NOT a silent fallback — it surfaces an explicit error that the
+    // UI should handle by offering the user a "Refresh analysis" action.
+    // See FORGE_PLAN_ARTIFACTS.md Section 2, FORGE_PLAN_UNIFIED.md doctrine.
+    if (profile.index?.requiresReanalysis) {
+      throw CoachingBlockedError.requiresReanalysis();
+    }
+
     const turnStart = Date.now();
     const costs: LayerCost[] = [];
 
@@ -780,6 +867,57 @@ export class CoachingService {
     // Backward compat: old sessions may lack the events array
     if (!memory.events) {
       memory.events = [];
+    }
+
+    // ── Scope 3 Phase 7: Research Database Enrichment (one-time per session) ──
+    // Fills demonstration, researchBacking, stakes (when thin), and collegeNote
+    // fields that buildImprovementManifest() leaves empty. Zero LLM calls.
+    // Idempotent via manifest._enriched — subsequent turns are instant no-ops.
+    //
+    // classified: mixed (systemic + recoverable)
+    //   - PipelineError.enrichmentSystemicMiss: SYSTEMIC — table drift. Log at
+    //     ERROR level with structured diagnostic; mark _enriched=true so we
+    //     don't retry every turn; continue coaching with best-effort manifest.
+    //     This is the "fail-loud but don't block" pattern per CLAUDE.md.
+    //   - Other errors (import failure, runtime): RECOVERABLE — warn+continue.
+    if (profile.improvementManifest && !profile.improvementManifest._enriched) {
+      try {
+        const { enrichWithResearchDatabase } = await import('../analysis/researchEnrichment');
+        // Resolve collegeId in priority order:
+        //   1. Explicit param from the orchestrator (this turn's caller)
+        //   2. profile.collegeId (persisted at session init for supplement/PIQ)
+        // This keeps common_app flows working (both undefined) while
+        // guaranteeing supplement flows enrich even after server restarts
+        // (where the in-memory sessionStore forgets collegeId but the
+        // persisted profile remembers it).
+        const effectiveCollegeId = collegeId ?? profile.collegeId;
+        enrichWithResearchDatabase(profile.improvementManifest, effectiveCollegeId);
+      } catch (err) {
+        const { isPipelineError } = await import('../errors');
+        if (isPipelineError(err) && err.layer === 'research_enrichment') {
+          // Systemic miss — table drift between TECHNIQUE_VOCABULARY_LIST and
+          // ROUTE_TO_ISSUE_TYPE. Surface loudly for observability/alerts, but
+          // don't block the coaching turn. Mark enriched=true to prevent
+          // per-turn retry of a known-broken lookup.
+          console.error(
+            '[CoachingService] Research enrichment SYSTEMIC failure — ' +
+              'ROUTE_TO_ISSUE_TYPE / OBSERVATION_KEYWORD_TO_ISSUE needs audit:',
+            err.toDiagnostic(),
+          );
+          profile.improvementManifest._enriched = true;
+          profile.improvementManifest._enrichmentError = {
+            type: 'systemic_miss',
+            layer: err.layer,
+            message: err.message,
+            at: new Date().toISOString(),
+          };
+        } else {
+          console.warn(
+            '[CoachingService] Research enrichment failed (non-fatal, recoverable):',
+            err instanceof Error ? err.message : err,
+          );
+        }
+      }
     }
 
     const phase = profile.index.improvementPhase;
@@ -839,28 +977,47 @@ export class CoachingService {
     // This lightweight estimation runs without an LLM call.
     const estimatedIntensity = this.estimateResponseIntensity(
       studentMessage, conversationHistory, memory,
+      coachingMode ?? 'first_encounter', iterationRound,
     );
 
     // ── Learning Style Context for Stage 3 prompt injection ──
     // style.observations accumulate across turns but were never passed to the coaching LLM.
     // Build a prompt section from non-tentative observations (or all if <=3 total).
+    // The adaptation-rule directives live authoritatively in
+    // `learningStyleCalibrationDirective` (cached system prompt via
+    // round3DirectivesBlock). Emit only the raw observations here — Sonnet maps
+    // them to the appropriate directive itself. Dedup: removed an inline
+    // ADAPTATION RULES bullet list that restated the same guidance the
+    // directive block already carries.
     const learningStyleSection = style.observations.length > 0
       ? `\n\n=== LEARNING STYLE OBSERVATIONS ===\n` +
         style.observations
           .filter(o => o.confidence !== 'tentative' || style.observations.length <= 3)
           .map(o => `- ${o.observation} (${o.confidence})`)
           .join('\n') +
-        `\nAdapt your teaching approach to match these observed patterns.`
+        `\nApply the matching shorthand directives from LEARNING_STYLE_CALIBRATION (system prompt).`
       : undefined;
 
     // ── Cross-module context gating ──
     // Only inject cross-module context (activity profiles, PIQ insights, academic data)
-    // when the student is asking an OVERVIEW question — not when they're asking about
-    // a specific paragraph's craft or voice. Cross-module context on a paragraph question
-    // would distract the coach from the essay itself and reduce output quality.
-    const gatedCrossModuleContext = (
-      crossModuleContext && routingRule === 'l6_coaching_overview'
-    ) ? crossModuleContext : undefined;
+    // Cross-module context (activity profiles, academic data, PIQ insights) is injected
+    // when relevant to the coaching moment — not just on overview questions.
+    const turnCount = memory.turnCount + 1;
+    const lower = studentMessage.toLowerCase();
+    const shouldInjectCrossModule = crossModuleContext && (
+      // Overview questions (original gate)
+      routingRule === 'l6_coaching_overview' ||
+      // Early session (turns 1-3): broader context helps initial diagnosis
+      turnCount <= 3 ||
+      // Identity/positioning questions: student asking about who they are or competitive position
+      /who (am i|does this show)|what does this (reveal|say about)|good enough for|competitive|stanford|harvard|ivy|college/i.test(lower) ||
+      // Strategy questions: student asking about application-level decisions
+      /should i (write|focus|change)|which (essay|topic)|supplement/i.test(lower)
+    );
+    const gatedCrossModuleContext = shouldInjectCrossModule ? crossModuleContext : undefined;
+
+    // ── Attach learning style to session memory for Stage 3 fallback access ──
+    (memory as SessionMemoryWithStyle).learningStyleObservations = style;
 
     // ── Single Sonnet Call: Coaching Response + Metadata Sidecar ──
     const s3Start = Date.now();
@@ -877,6 +1034,10 @@ export class CoachingService {
       estimatedIntensity,
       learningStyleSection,
       gatedCrossModuleContext,
+      coachingMode ?? 'first_encounter',
+      iterationRound,
+      isInSessionDraft,
+      collegeId,
     );
     costs.push(s3Cost);
     console.log(
@@ -925,6 +1086,72 @@ export class CoachingService {
 
     // GAP-1: Store responseIntensity in session memory for next-turn consistency
     memory.lastResponseIntensity = sidecar.responseIntensity;
+
+    // ── Phase 3: record edge-protocol deployments ──
+    // Heuristic: if the pushback directive was emitted THIS turn (i.e., the
+    // coach was allowed to push back at prompt-assembly time), mark it as
+    // deployed. We intentionally record the ALLOWANCE, not the ACTUAL prose
+    // move — the sidecar doesn't surface "did-I-push-back", and false-
+    // positives here just mean pushback won't fire again, which is
+    // the desired cap. Same logic for blindSpot.
+    const wasAllowedPushback = edgeProtocol.shouldAllowPushback(memory);
+    if (wasAllowedPushback) {
+      edgeProtocol.recordPushback(memory);
+      console.log('[EdgeProtocol] Pushback marked as deployed this turn');
+    }
+    const wasAllowedBlindSpot = edgeProtocol.shouldSurfaceBlindSpot(
+      memory,
+      memory.studentTheory,
+      studentMessage,
+    );
+    if (wasAllowedBlindSpot) {
+      edgeProtocol.recordBlindSpotDeployed(memory);
+      console.log('[EdgeProtocol] BlindSpot marked as surfaced this turn');
+    }
+
+    // Post-turn forbidden-vocabulary audit (classified: recoverable)
+    // Surfaces coercive escalation patterns without blocking the turn. The
+    // audit scorecard can consume these to gate releases.
+    const forbidden = edgeProtocol.detectForbiddenVocabulary(response);
+    if (forbidden.length > 0) {
+      console.warn(
+        `[EdgeProtocol] Forbidden vocabulary detected (${forbidden.length} occurrences): ` +
+          forbidden.map((f) => `"${f.phrase}"`).join(', '),
+      );
+    }
+
+    // ── Phase 2: record planner deployment ──
+    // Re-run the planner with the PRE-turn memory state (ledger hasn't been
+    // written yet) to recover which improvement was deployed this turn, then
+    // record it. The planner is pure — cheap to invoke twice. Without this,
+    // the ledger never grows and future turns would not rotate away from
+    // previously-deployed categories.
+    if (profile.improvementManifest && profile.improvementManifest.items.length > 0) {
+      try {
+        const selection = coachingPlanner.selectNextDeployment(profile.improvementManifest, memory);
+        if (selection) {
+          coachingPlanner.recordDeployment(memory, {
+            selection,
+            turn: memory.turnCount + 1,
+            responseText: response,
+          });
+          console.log(
+            `[CoachingPlanner] Recorded deployment: imp=${selection.item.id} ` +
+              `category=${selection.principleCategory} ` +
+              `technique=${selection.item.technique ?? '(none)'} ` +
+              `mode=${memory.taughtLedger?.[selection.item.id]?.deploymentMode ?? 'unknown'}`,
+          );
+        }
+      } catch (err) {
+        // classified: recoverable
+        // Planner is pedagogical-layer enhancement; a failure here should
+        // not block the coaching turn. Log loudly for observability.
+        console.warn(
+          '[CoachingPlanner] recordDeployment failed (non-fatal):',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
 
     // GAP-2: Accumulate learning style observations from sidecar
     if (sidecar.learningStyleUpdate) {
@@ -983,10 +1210,70 @@ export class CoachingService {
       });
     }
 
+    // Coach suggestion tracking — extract what the coach RECOMMENDED this turn
+    // (zero LLM cost: regex extraction from the coaching response)
+    if (response) {
+      const resp = response;
+      // Extract ALL-CAPS technique names (e.g., SUMMARY-TO-SCENE, SENSORY TIMESTAMP)
+      const techniqueMatches = resp.match(/\b[A-Z]{2,}(?:[-\s][A-Z]{2,}){1,3}\b/g) ?? [];
+      const techniques = [...new Set(techniqueMatches)].slice(0, 2);
+      // Extract paragraph targets. Widened to multi-digit P10..P99 — the old
+      // /\bP\d\b/ regex silently dropped anything past P9.
+      const paraMatches = resp.match(/\bP\d{1,2}\b/g) ?? [];
+      const paragraphs = [...new Set(paraMatches)].slice(0, 3);
+
+      if (techniques.length > 0 || paragraphs.length > 0) {
+        const suggestionSummary = [
+          techniques.length > 0 ? `Technique: ${techniques.join(', ')}` : '',
+          paragraphs.length > 0 ? `Target: ${paragraphs.join(', ')}` : '',
+        ].filter(Boolean).join(' | ');
+
+        // Round-3 Coaching Integration: centralize paragraph-ref conversion.
+        // Coach prose is 1-indexed ("P1" == first paragraph); events on session
+        // memory must be 0-indexed to match the manifest convention used by
+        // per-paragraph delta telemetry and the finding store.
+        const refs0Indexed = paragraphs
+          .map((p) => normalizeParagraphRef(p, 'coach_text'))
+          .filter((n) => Number.isFinite(n));
+        for (const ref of refs0Indexed) {
+          assertRefInRange(ref, profile.paragraphs.length, 'coach_suggestion');
+        }
+
+        memory.events.push({
+          turn: memory.turnCount + 1,
+          kind: 'coach_suggestion',
+          summary: suggestionSummary,
+          significance: 0.7,
+          paragraphRefs: refs0Indexed,
+          findingRefs: [],
+        });
+      }
+    }
+
+    // RevisionQuality capture — records Sonnet's assessment of whether the revision helped
+    if (sidecar.revisionQuality) {
+      const currentMode = coachingMode ?? 'first_encounter';
+      console.log(`[CoachingService] Revision quality: ${sidecar.revisionQuality} (mode=${currentMode})`);
+
+      memory.events.push({
+        turn: memory.turnCount + 1,
+        kind: `revision_quality:${sidecar.revisionQuality}`,
+        summary: `Revision assessed as ${sidecar.revisionQuality}`,
+        significance: sidecar.revisionQuality === 'regressed' ? 0.9
+          : sidecar.revisionQuality === 'lateral' ? 0.6 : 0.5,
+        paragraphRefs: sidecar.focusParagraphs,
+        findingRefs: [],
+      });
+    }
+
     // Session arc update (simplified — from journal entries)
     if (memory.events.filter(e => e.kind === 'journal').length > 0) {
       const journals = memory.events.filter(e => e.kind === 'journal');
-      memory.sessionArcSummary = journals.slice(-3).map(j => j.summary).join(' ');
+      const journalSummary = journals.slice(-3).map(j => j.summary).join(' ');
+      const phasePrefix = memory.turnCount <= 3 ? 'EARLY SESSION: '
+        : memory.turnCount <= 8 ? 'MIDDLE SESSION: '
+        : 'LATE SESSION — CONSOLIDATE: ';
+      memory.sessionArcSummary = phasePrefix + journalSummary;
     }
 
     // ── Stage 4: Profile Deepening (ONLY when Sonnet signals needsDeepening) ──
@@ -1014,6 +1301,32 @@ export class CoachingService {
       // Stage 5: Phase Check (conditional — after deepening)
       if (profileDeepened) {
         this.runStage5PhaseCheck(profile, coordinator);
+      }
+
+      // Coaching-driven North Star update: when Stage 4 determines a
+      // reinterpretation that challenges the through-line, update immediately
+      // rather than waiting for full reanalysis.
+      if (stage4Verdict === 'superseded' && tensionDescription) {
+        const shouldUpdateNorthStar =
+          tensionDescription.toLowerCase().includes('not about') ||
+          tensionDescription.toLowerCase().includes('actually about') ||
+          tensionDescription.toLowerCase().includes('real subject') ||
+          tensionDescription.toLowerCase().includes('real essay') ||
+          tensionDescription.toLowerCase().includes('misread') ||
+          tensionDescription.toLowerCase().includes('changes the through-line') ||
+          tensionDescription.toLowerCase().includes('fundamental');
+
+        if (shouldUpdateNorthStar && profile.northStar?.throughLineMap) {
+          // Update the North Star summary with the coaching reinterpretation
+          const ns = profile.index.northStarSummary;
+          const updatedSummary = `${ns.throughLineSummary} [COACHING UPDATE: Student reinterpretation — ${tensionDescription}]`;
+          profile.index.northStarSummary = {
+            ...ns,
+            throughLineSummary: updatedSummary,
+            maturity: 'student_confirmed' as any,
+          };
+          console.log(`[CoachingService] North Star updated from coaching reinterpretation: "${tensionDescription.slice(0, 80)}..."`);
+        }
       }
     } else {
       // For non-deepening categories, still store basic insights
@@ -1052,6 +1365,27 @@ export class CoachingService {
         ? `${existing} ${sidecar.contextAccumulation}`
         : sidecar.contextAccumulation;
       coordinator.updateStudentDeclaredContext(newCtx);
+
+      // Parse into structured context for writing prompt generation
+      this.parseIntoStructuredContext(
+        sidecar.contextAccumulation,
+        memory.turnCount + 1,
+        profile,
+      );
+
+      // Context compounding: when student reveals new details, existing improvement
+      // items become MORE SPECIFIC. The understanding compounds into better improvements.
+      if (profile.improvementManifest) {
+        const focusParas = sidecar.focusParagraphs ?? [];
+        for (const item of profile.improvementManifest.items) {
+          const status = memory.improvementProgress?.[item.id] ?? 'queued';
+          if (status === 'addressed') continue;
+          // Enrich items targeting focus paragraphs or essay-level items
+          if (focusParas.includes(item.paragraph) || item.paragraph === -1) {
+            item.conversatorEnrichments.push(sidecar.contextAccumulation!);
+          }
+        }
+      }
     }
 
     // ── Update session memory with this turn's data ──
@@ -1067,8 +1401,29 @@ export class CoachingService {
       memory.events[memory.events.length - 1].findingRefs = supersededFindingIds;
     }
 
-    // ── StudentTheory Periodic Synthesis (every 5 turns) ──
-    if (memory.turnCount > 0 && memory.turnCount % 5 === 0) {
+    // ── StudentTheory Progressive Synthesis (T2 nascent → T5 confirmed, then every 5) ──
+    // Round-3 Coaching Integration: theory must be available BEFORE the turn
+    // that should be shaped by it — the old T5-only schedule produced a synthesis
+    // that could never shape the session that generated it. Firing at T2 gives
+    // the coach `blindSpotHypotheses` and `personhood` context from T3 onward.
+    //
+    // Maturity ladder:
+    //   T2 → 'nascent'     (2 turns of evidence — hedge aggressively)
+    //   T3 → 'hypothesis'  (still provisional)
+    //   T4 → 'growing'     (patterns repeating)
+    //   T5 → 'confirmed'   (broadly stable)
+    //   T10, T15, … → re-synthesize, maturity stays 'confirmed'
+    const pendingObs = [
+      ...(memory.preTheoryObservations ?? []),
+      ...(memory.studentTheory?.pendingObservations ?? []),
+    ];
+    const hasMinimumSignal = pendingObs.length >= 1 || memory.turnCount >= 2;
+    const shouldSynthesize =
+      memory.turnCount >= 2 &&
+      memory.turnCount <= 5
+        ? true // fire every turn from T2..T5
+        : memory.turnCount > 5 && memory.turnCount % 5 === 0; // then every 5 turns
+    if (shouldSynthesize && hasMinimumSignal) {
       try {
         const synthStart = Date.now();
         const { theory, cost: synthCost } = await this.synthesizeStudentTheory(
@@ -1082,6 +1437,13 @@ export class CoachingService {
           theory.pendingObservations = [...preObs];
           memory.preTheoryObservations = [];
         }
+        // Assign maturity based on turn number at synthesis time.
+        const maturityByTurn: Record<number, NonNullable<StudentTheory['maturity']>> = {
+          2: 'nascent',
+          3: 'hypothesis',
+          4: 'growing',
+        };
+        theory.maturity = maturityByTurn[memory.turnCount] ?? 'confirmed';
         memory.studentTheory = theory;
         costs.push(synthCost);
         console.log(
@@ -1092,6 +1454,71 @@ export class CoachingService {
         console.error('[CoachingService] StudentTheory synthesis failed (non-fatal):', err);
       }
     }
+
+    // ── Revision Checklist Management ──
+    // Populate on turn 1 from top findings; update on subsequent turns from revision quality
+    if (memory.turnCount === 1 && !memory.revisionChecklist) {
+      // Initial population from findings
+      const findingStore = coordinator.getFindingStore();
+      const activeForChecklist = findingStore.getActiveSortedByCoachingValue()
+        .filter(f => f.coachingValue === 'critical' || f.coachingValue === 'high')
+        .slice(0, 5);
+      if (activeForChecklist.length > 0) {
+        memory.revisionChecklist = activeForChecklist.map((f, idx) => {
+          // Check if a technique route matches this finding
+          const techMatch = this.matchFindingToTechnique(f);
+          const scopeStr = f.scope.type === 'paragraph'
+            ? `P${(f.scope.paragraph ?? 0) + 1}`
+            : f.scope.type === 'cross_paragraph'
+            ? `P${(f.scope.paragraphs ?? []).map(p => p + 1).join('+')}`
+            : 'Essay-wide';
+          return {
+            id: `RT_${idx + 1}`,
+            paragraph: f.scope.type === 'paragraph' ? (f.scope.paragraph ?? 0) : 0,
+            task: `${scopeStr}: ${f.claim}`,
+            technique: techMatch?.technique ?? null,
+            findingRef: f.id,
+            status: 'pending' as const,
+            priority: idx + 1,
+          };
+        });
+        console.log(
+          `[CoachingService] Revision checklist populated — ${memory.revisionChecklist.length} tasks from findings`,
+        );
+      }
+    } else if (memory.revisionChecklist && sidecar.revisionQuality === 'improved') {
+      // Update checklist when revision improves a targeted paragraph
+      const focusParas = sidecar.focusParagraphs;
+      for (const task of memory.revisionChecklist) {
+        if (task.status === 'pending' && focusParas.includes(task.paragraph)) {
+          task.status = 'addressed';
+          task.addressedAtTurn = memory.turnCount;
+          console.log(`[CoachingService] Checklist task ${task.id} addressed at turn ${memory.turnCount}`);
+        }
+      }
+    }
+    // Also update from superseded findings
+    if (memory.revisionChecklist && supersededFindingIds?.length) {
+      for (const task of memory.revisionChecklist) {
+        if (task.findingRef && supersededFindingIds.includes(task.findingRef) && task.status === 'pending') {
+          task.status = 'addressed';
+          task.addressedAtTurn = memory.turnCount;
+        }
+      }
+    }
+
+    // ── Round-3 Coaching Integration: roll prior-turn handoff state ──
+    // Capture this turn's strategicQuestion + innerVoice so the NEXT turn's
+    // prompt can surface them literally (see strategicQuestionFromPriorTurnSection
+    // and innerVoiceMirrorCandidateSection in promptBlocks.ts).
+    //
+    // Note: memory.strategicQuestion is the live session thread and may have
+    // been updated this turn from sidecar.strategicQuestionUpdate. It's the
+    // correct value to propagate — an unchanged strategicQuestion simply
+    // re-appears on the next turn's prompt, which is the desired behavior
+    // (unresolved → re-anchor).
+    memory.priorTurnStrategicQuestion = memory.strategicQuestion || null;
+    memory.priorTurnCognitiveAssessment = sidecar.innerVoice ?? null;
 
     const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
     console.log(
@@ -1230,6 +1657,15 @@ PREFERENCE DURABILITY — ONLY for category=preference. Is this preference about
   general — applies across all essays: "I always want short sentences", "I never use semicolons"
   essay_specific — about this essay only: "I want to keep the ending ambiguous", "I don't want to use 'growth' in this essay"
   null — for all non-preference categories
+
+EMOTIONAL VALENCE — calibrate from these signals (rate the STRONGEST one):
+  -1.0: Angry, dismissive, cynical ("This feedback is useless", "You don't understand")
+  -0.5: Frustrated, resistant ("I've tried this and it doesn't work", "I disagree")
+  -0.2: Defensive, tentative ("I guess you're right, but...", "Maybe I should just...")
+   0.0: Neutral, matter-of-fact ("Okay, I'll try that", factual questions)
+   0.2: Hopeful, curious ("I want to understand this better", "What if I...")
+   0.5: Excited, energized ("Oh! I see what you mean", "This changes everything")
+   1.0: Vulnerable, grateful ("This completely changed how I see my essay", sharing personal material)
 
 OUTPUT JSON (strict schema — all category values must be lowercase):
 {
@@ -1536,304 +1972,50 @@ Output only the JSON object. No preamble or explanation.`;
     estimatedIntensity: 'full' | 'brief' | 'minimal' = 'full',
     learningStyleContext?: string,
     crossModuleContext?: string,
+    coachingMode: CoachingMode = 'first_encounter',
+    iterationRound?: number,
+    isInSessionDraft?: boolean,
+    sessionCollegeId?: string,
   ): Promise<{ response: string; sidecar: CoachingSidecar; s3Cost: LayerCost }> {
     const callStart = Date.now();
     const phase = profile.index.improvementPhase;
     const turnCount = sessionMemory.turnCount + 1;
 
-    // ── BLOCK 1: STATIC coaching philosophy + sidecar instructions (always cached) ──
-    const staticCoachingPhilosophy = `ROLE IDENTITY:
-You are a senior essay coach. You've read thousands of essays and you
-understand what makes writing work — not as a formula but as a craft.
-You care about this student. You care about their essay. You want them
-to write something that shows who they actually are, not who they think
-admissions officers want to see.
+    // ── BLOCK 1: Mode-aware coaching philosophy (block composition system) ──
+    // Derive essay type from profile's activeScale (the source of truth set at analysis time)
+    const SCALE_TO_ESSAY_TYPE: Record<string, BlockContext['essayType']> = {
+      supplement: 'supplement',
+      piq: 'piq',
+      personal_statement: 'common_app',
+    };
+    const derivedEssayType = SCALE_TO_ESSAY_TYPE[profile.northStar.activeScale] ?? 'common_app';
 
-YOUR VOICE:
-- Warm but honest. You say hard things kindly, not because you're
-  softening the blow but because the student is a person working hard
-  on something that matters to them.
-- Never patronizing. This student is intelligent. They may not know
-  writing craft, but they know their own life and their own intentions.
-  Respect both.
-- Direct. "The essay needs..." not "You might consider..." You are the
-  expert. Own your expertise without being arrogant about it.
-- Specific. Quote their words back to them. Reference specific paragraphs
-  and sentences. Generic advice is not coaching — it's a pamphlet.
-- Treats writing as thinking, not decoration. The sentence structure
-  isn't a cosmetic choice — it's how the writer's mind moves. The word
-  "resilience" isn't just a cliche — it's the student reaching for a
-  concept they haven't yet made their own. Help them find their own word.
+    const blockCtx: BlockContext = {
+      mode: coachingMode,
+      phase: phase.level,
+      iterationRound,
+      editSignificance: recentEditContext ? 'present' as const : undefined,
+      isInSessionDraft,
+      essayType: derivedEssayType,
+      collegeId: sessionCollegeId,
+    };
+    const coachingPhilosophy = await buildCoachingPrompt(blockCtx);
+    console.log(`[CoachingService] Block system — mode=${coachingMode}, phase=${phase.level}, blocks assembled`);
 
-BANNED PHRASES (these signal sycophancy — automatic failure):
-- "Great question!"
-- "That's a really interesting approach"
-- "There's a lot to like here" (without citing what specifically)
-- "You might consider..." (too tentative — say "The essay needs..." or "Try...")
-- "I love how you..." (without citing what specifically and WHY it works)
-- "This is already quite strong" (without citing specific evidence)
-- "You're on the right track" (without naming what the track IS)
-- Any bullet list of 5+ generic suggestions without specific text references
-
-DIALOGUE, NOT INSTRUCTION:
-Great coaching is dialogic — the coach asks questions back, creates
-productive confusion, lets the student arrive at insights themselves.
-The coach UNDERSTANDS writing at the craft level — not generic "add more detail"
-but specific, named techniques that produce specific reader effects.
-
-When the student asks a question, your FIRST instinct should be:
-"Can I turn this into a question that leads them to discover the answer?"
-
-NOT always — sometimes the student needs a direct answer. But the
-default should be discovery, not delivery.
-
-Examples:
-  INSTRUCTION (direct diagnosis — when the student needs to understand a specific problem):
-    Student: "What's wrong with my opening?"
-    Coach: "Your opening is doing SUMMARY when it should be doing SCENE.
-    'From the moment my fingers first danced...' — that's narrating from
-    30,000 feet. But your strongest writing in P4 drops the reader into
-    a specific moment. The opening needs to do the same: put the reader
-    somewhere physical before asking them to care about an idea."
-
-  DIALOGUE (discovery mode — builds capacity):
-    Student: "What's wrong with my opening?"
-    Coach: "Read your opening sentence out loud. Now read the first
-    sentence of P4. Which one sounds more like YOU? ... That gap between
-    those two voices is your opening's problem. Your real voice shows up
-    in P4. Why does the essay start with a different one?"
-
-  PRODUCTIVE CONFUSION (advanced — use sparingly):
-    Student: "I think my essay is about resilience."
-    Coach: "Your essay uses the word 'resilience' once, in the last
-    sentence. But it spends 200 words on rebuilding a circuit board at
-    2am — the specific way the soldering iron felt too heavy, how you
-    kept checking the time. What if your essay isn't about resilience?
-    What if it's about something the word 'resilience' can't reach?"
-
-  CONCRETE DEMONSTRATION (the most powerful mode — when the student needs to SEE the possibility):
-    When the student understands the problem but can't envision the solution,
-    show them. Write a personalized example using details THEY TOLD YOU —
-    never fabricated. But the example must demonstrate a SPECIFIC CRAFT MOVE,
-    not just "better words."
-
-    The coaching should FLOW: ground the student in WHY the current version
-    falls short, name the specific craft move that would fix it, show what
-    their own material looks like when that move is applied, and make clear
-    what the change does for the reader.
-
-    EXAMPLE OF A+ COACHING (diagnosis → named craft move → ACTUAL REWRITTEN SENTENCES → explanation):
-    "Your opening tells the reader what you felt — 'captivated by the power to create worlds.'
-    That's SUMMARY. Here's what SCENE sounds like with your own material:
-
-    'The bench was still warm from Mrs. Chen when I sat down. She'd just finished
-    the Nocturne, and the last chord was still hanging in the room when I put my
-    hands where hers had been.'
-
-    Notice what changed: you're in a room, on a bench, touching keys someone else
-    just touched. That's SENSORY TIMESTAMP — the reader feels the warmth before
-    they hear about seven notes and infinite melodies. The scene EARNS the philosophy
-    that follows. Your current opening asks the reader to care about an idea.
-    This version asks them to sit on a warm bench. The bench does the work."
-
-    EXAMPLE OF B COACHING (diagnoses correctly but never WRITES):
-    "Your opening is doing summary when it should be doing scene. You told me about
-    the warm bench — that's your opening." ← This DESCRIBES the fix without SHOWING it.
-    The student still doesn't know what a scene-based opening READS LIKE.
-
-    EXAMPLE OF C COACHING (generic swap):
-    "What if your opening went: 'The first time I heard Chopin, I knew music would
-    change my life.'" ← Another generic sentence replacing a generic sentence.
-
-    THE A+ STANDARD: Diagnosis alone is B-level coaching. The leap to A+ is
-    WRITING 2-4 sentences of the student's own material transformed by a named
-    craft move. The student must SEE the possibility in their own words, not
-    just hear about it. Then explain what the craft move did and why.
-
-    MORE DEMONSTRATION EXAMPLES (different scenarios):
-
-    VOICE FIX — Student's P3 sounds like a program note, not a person:
-    "P3 says 'I blended them with contemporary jazz rhythms.' That's a
-    concert program. Here's what it sounds like closer to the work:
-    'I kept the left hand on Chopin's bass line and let the right hand
-    wander — a flatted fifth here, a walking rhythm there. The first
-    time the jazz resolved back to Chopin's key, I laughed out loud.'
-    That's PROXIMITY-TO-WORK VOICE — you're at the keyboard making
-    choices, not summarizing them afterward."
-
-    BREAKING DECISION PARALYSIS — Student can't choose between architectures:
-    "You're stuck between the mentorship essay and the coding essay. Let me
-    make the choice physical. Here's opening A: 'Mrs. Chen closed her eyes
-    before the first note.' Here's opening B: 'Hour 37 of the hackathon.
-    The algorithm was reading every song as angry.' Read both out loud.
-    Which one makes your chest do something? That's the essay."
-
-    ENDING FIX — Student's conclusion is aspirational filler:
-    "Your essay ends with 'I look forward to continuing this journey.'
-    That could close any essay by any student. Here's a RITUAL DETAIL
-    ending: 'Before every performance now, I play one measure wrong on
-    purpose. My section thinks I'm weird. But I haven't frozen since.'
-    That ending PROVES the transformation instead of claiming it."
-
-    CRAFT MOVES YOU SHOULD KNOW AND TEACH:
-    - Inventory opening: perform the activity instead of describing it
-    - Sensory timestamp: anchor time in a smell, sound, or texture ("Most Wednesdays smelled like bleach")
-    - Counterintuitive mentor: quote advice that sounds wrong, then show why it was right
-    - Somatic vulnerability: put failure in the body, not the mind ("my bow skittered across the D string")
-    - Definitional pivot: "I used to think X meant A. I learned it means B" — where B is something only you could write
-    - Bookend inversion: return to your opening scene at the end, but one thing has changed
-    - Anti-lesson: resist the expected takeaway. "I stopped seeing my family as a problem to be solved."
-    - Ritual detail: end with the weird private habit that proves your transformation
-
-    ONLY use details the student has SHARED — never fabricate names,
-    moments, or experiences. But ONE detail is enough to demonstrate.
-    When you have a specific detail (a name, a moment, an event),
-    demonstrate IMMEDIATELY — write 2-3 sentences showing what that detail
-    does in scene. Then ask for MORE details. The demonstration teaches
-    the student what kind of details are useful. Don't hoard details
-    until you have "enough." Show with what you have. Build as you go.
-
-    CRITICAL PRINCIPLE: Every detail in a rewrite must carry its weight.
-    In 650 words, there's no room for scenery that doesn't serve the story.
-    A detail belongs in the essay ONLY if it reveals character, embodies
-    a theme, or advances the narrative. If it's just atmosphere, cut it.
-
-VOICE IN DEMONSTRATIONS:
-When you write sample prose, match the student's STRONGEST voice register —
-not polished AI prose. Look at where the essay sounds most like a real person
-(usually the most concrete, action-oriented passages). If their strongest
-writing is short declarative sentences with physical verbs, write your demo
-that way. The demonstration teaches CRAFT through the student's natural register.
-
-DETAIL COLLECTION (naturally weave into early turns):
-When the student tells you something about their experience, mine for details
-that DO WORK in the essay — details that carry thematic weight, reveal character,
-or advance the narrative. NOT details for the sake of imagery.
-
-EVERY DETAIL MUST EARN ITS PLACE. In a 650-word essay, a room description that
-doesn't serve the story is wasted words. "The fluorescent lights hummed" is dead
-weight unless the humming MEANS something — unless it contrasts with the silence
-that follows, or echoes a theme of institutional indifference. Details exist to
-do NARRATIVE WORK, not to paint scenery.
-
-DON'T PROBE FOR DECORATION: "What did the room look like?" (generic scene-setting)
-PROBE FOR MEANINGFUL SPECIFICS: "Was there a moment when something shifted — when
-what you were doing stopped being routine and started MATTERING to you? What were
-you doing with your hands when that happened?"
-
-The details you're looking for carry DOUBLE WEIGHT:
-- A detail that reveals CHARACTER: "I kept checking the clock — 11:47, 11:52, 12:03"
-  reveals obsessive precision, NOT just that it was late at night
-- A detail that embodies THEME: "cutting questions from 47 to 22" IS the thesis
-  about efficiency-as-removing-barriers, not just a number
-- A detail that DOES something to the reader: "mas o menos" makes the reader
-  FEEL the untranslatability — it doesn't just describe the family's income situation
-
-REJECT decorative detail. If a specific doesn't reveal character, embody a theme,
-or advance the narrative, it doesn't belong in a 650-word essay. Every word must
-carry its weight in full.
-
-SILENCE AS A TOOL:
-Sometimes the best response is NOT answering the student's question.
-When the student asks something they could answer themselves with
-a moment of reflection, consider:
-  "That's the right question. Before I answer, re-read P3 and tell
-  me: what do YOU think is happening there?"
-This is NOT appropriate when:
-- The student is frustrated (they need help, not Socratic interrogation)
-- The student has already tried to answer and is stuck
-- The question requires architectural knowledge the student doesn't have
-
-STUDENT RESISTANCE — THREE TYPES:
-When a student resists feedback, diagnose WHICH type of resistance:
-1. "You're wrong about my essay" — They see something we don't.
-   RESPONSE: Listen. Ask what they see. They might be right.
-2. "I understand but the fix would lose something I care about" —
-   They value something we haven't valued.
-   RESPONSE: Validate the thing they're protecting. Then find a way to
-   keep it while also fixing the problem.
-3. "I don't want to do the work" — Avoidance disguised as preference.
-   RESPONSE: Name it gently. Don't fight it — make the work smaller.
-NEVER assume type 3. Start with type 1. If it's not type 1, check type 2.
-
-When the student provides a CORRECTION (factual disagreement with the analysis):
-ACKNOWLEDGE the correction immediately and directly. DO NOT defend the analysis — you got it wrong. Recalibrate your understanding and coach forward from the corrected basis.
-NEVER: "Well, I can see how it could be read either way" (weaseling).
-
-When the student gives CONFIRMATION (validates existing analysis):
-Be brief. Don't re-explain what they already understand. Advance to the NEXT insight that builds on what they confirmed.
-
-BREAKTHROUGH ENGINEERING:
-Watch for opportunities to connect things the student has said in
-DIFFERENT turns that THEY haven't connected. These connections often
-produce the "aha" moment. The student said both pieces. The coach
-connects them. The student owns the insight because it came from
-their own words.
-
-Watch for:
-- Statements from different turns that create a tension
-- A preference stated early that contradicts a choice made later
-- An emotional reaction that reveals what the student actually cares
-  about (often different from what they say they care about)
-- A question the student keeps asking in different words (the
-  underlying concern they haven't articulated)
-
-HONESTY PROTOCOL:
-Before responding, silently assess: Is this student's essay STRONG, ADEQUATE, or WEAK at their current improvement phase level?
-- STRONG → acknowledge genuinely, focus on refinement
-- ADEQUATE → encouraging but direct about gaps
-- WEAK → be honest and kind. Name the issue clearly.
-  DO NOT soften with "this is great, but..."
-  DO say: "The structure has real potential. Right now [specific issue] is preventing the reader from experiencing [what the essay is trying to do]."
-
-ADMISSIONS GROUNDING:
-The AO at 4pm on their 30th essay gives you 3 sentences to hook them. Every piece of advice must be filtered through this reality.
-
-REQUIRED in every substantive response:
-- At least ONE direct quote from the student's essay
-- A connection to the essay's architecture (North Star, structural roles, through-line)
-- Honest assessment calibrated to the student's cognitive state
-- WORD ECONOMY CONSCIOUSNESS: every suggestion must acknowledge the word limit.
-  Never suggest adding content without identifying what to cut. A 650-word essay
-  has zero room for decoration. When you suggest a detail, explain what WORK it
-  does — what it reveals about the student, what theme it carries, what it does
-  to the reader. If you can't name the work, don't suggest the detail.
-
-PHASE-AWARE COACHING — GUIDANCE, NOT RULES:
-The phase tells you where to FOCUS attention and how to FRAME coaching. It does NOT tell you what to EXCLUDE. Your judgment.
-
-${phase.level === 'foundation' ? `FOUNDATION — "The essay doesn't yet let the AO know who this person is"
-The fundamental question: what does this essay REVEAL about you that nothing else in your application can?
-PRIORITIZE: What is this essay actually about (not the topic — the revelation)? What does each paragraph contribute? Where does the reader lose the thread?
-DEPRIORITIZE (but use when the teaching moment is powerful): word-level craft, sentence rhythm.` : ''}${phase.level === 'architecture' ? `ARCHITECTURE — "The essay has a clear point, but the reader's journey has gaps"
-PRIORITIZE: paragraph transitions, pacing, structural roles. Does each paragraph earn the reader's continued attention?` : ''}${phase.level === 'craft' ? `CRAFT — "The structure works, now each sentence must carry its weight"
-PRIORITIZE: sentences that are generic where they should be specific, moments that TELL instead of BUILD, details that are decorative instead of functional.
-Every word in a 650-word essay pays rent. If a sentence doesn't reveal character, carry theme, or advance the narrative, it's taking space from one that could.
-When suggesting changes, name the CRAFT MOVE and explain what it does for the reader — don't just swap words.` : ''}${phase.level === 'polish' ? `POLISH — "The essay is strong, now make it unforgettable"
-PRIORITIZE: word-level precision, rhythm, voice consistency.` : ''}${phase.level === 'distinction' ? `DISTINCTION — "Make this essay the one they remember"
-Not "good" — every admitted student writes a "good" essay. What makes this one the essay the AO brings up in committee?` : ''}
-
-RESPONSE LENGTH:
-Shorter is almost always better. A 150-word response that quotes 2
-specific lines beats a 400-word essay about the student's essay.
-
-CONVERSATION EVOLUTION:
-If the student returns to a topic previously discussed:
-1. Do NOT rephrase your previous response
-2. Go DEEPER: reference specific sentences you didn't cover before, explore a different dimension
-3. If there's genuinely nothing new to add, say so honestly and suggest implementation
-
-COACHING PATTERNS:
-If you see coaching patterns listed below the conversation, use them to evolve your response.` +
-    getCraftVocabularyForPhase(phase.level) +
-    PEDAGOGICAL_CALIBRATION_RULES +
-    SIDECAR_INSTRUCTIONS;
+    // NOTE: The original monolithic staticCoachingPhilosophy (~340 lines, ~3500 tokens)
+    // has been removed. It is preserved in git history. The block system above produces
+    // functionally identical output for first_encounter mode. See promptBlocks.ts.
 
     // ── BLOCK 2: Stable profile context + essay text + findings (CACHED in system prompt) ──
     const stableProfileContext = this.buildStableProfileContext(profile, assembledContext);
 
-    // Scope essay text to focus paragraphs +/-1 context window
-    const essayText = this.scopeEssayText(profile.paragraphs, quickFocus.focusParagraphs);
+    // CACHE FIX: Send the FULL essay text in the system prompt (stable across turns
+    // within a session). Per-turn focus is a small hint emitted in the user prompt
+    // (FOCUS_PARAGRAPHS payload) — keeping the system prefix byte-identical between
+    // turns is what unlocks Anthropic's prompt cache. Previously, we scoped essay
+    // text to focusParagraphs+/-1 each turn, which mutated the cached prefix and
+    // forced a cache write on nearly every turn (audit T1/T2/T4/T5 cache_read=0).
+    const essayText = profile.paragraphs.map((p, i) => `P${i + 1}: ${p.text}`).join('\n\n');
 
     // Build a minimal Stage1Output adapter for finding context, anti-repetition, and escalation
     // Declared early so it's available for buildFindingCoachingContext below.
@@ -1858,8 +2040,8 @@ If you see coaching patterns listed below the conversation, use them to evolve y
       preferenceDurability: null,
     } satisfies Stage1Output;
 
-    // Finding-aware coaching context (scoped to focus)
-    const findingSection = this.buildFindingCoachingContext(coordinator, localStage1Adapter, profile);
+    // Finding-aware coaching context (scoped to focus, lifecycle-aware)
+    const findingSection = await this.buildFindingCoachingContext(coordinator, localStage1Adapter, profile, sessionMemory);
 
     // Phase info (stable within session — phase only changes via L3.5 re-analysis)
     const phaseSection = `
@@ -1871,18 +2053,47 @@ ${phase.deferredAreas.length > 0 ? `Deferred (don't surface yet): ${phase.deferr
 COACHING LENS: ${phase.coachingLens}
 READINESS: ${phase.readinessAssessment}`;
 
-    // System prompt = coaching philosophy + profile + essay + findings + phase (ALL CACHED)
-    const systemPrompt = staticCoachingPhilosophy +
+    // Anti-convergence context (detects convergence-prone language in essay)
+    const antiConvergenceSection = this.buildAntiConvergenceContext(profile);
+
+    // System prompt = coaching philosophy + profile + essay + phase + anti-convergence
+    //                 + round-3 directive blocks (HOW to handle prior-turn payloads)
+    // STABLE across turns within a session → enables Anthropic prompt caching
+    // ($0.30/M read vs $3.75/M write — ~10x discount on the cached portion).
+    //
+    // Round-3 split: directive TEXT (how to interpret payloads) lives here; only
+    // the per-turn payload VALUES (the specific quoted question / hypothesis /
+    // observation list) go in the user prompt. This pushes ~600-900 tokens of
+    // stable directive text into the cache and keeps the user-prompt delta small.
+    //
+    // findingSection (findings + teaching content) goes in USER prompt — it changes per turn
+    // based on focus paragraphs, so putting it here would break the cache prefix every turn.
+    // Round 7 — Historical intelligence section. Pulls pre-computed
+    // cross-session signals (revision intelligence + voice evolution) off
+    // the profile. Coordinator recomputes these after every L3.5 analysis
+    // pass; this call is a pure string assemble. Empty string on session
+    // one (both inputs null) = zero prompt bloat.
+    const historicalSection = historicalIntelligenceSection(
+      profile.revisionIntelligence ?? null,
+      profile.voiceEvolution ?? null,
+    );
+
+    const systemPrompt = coachingPhilosophy +
+      FORBIDDEN_PATTERNS_BLOCK +
+      SECTION_WORD_BUDGETS_BLOCK +
+      round3DirectivesBlock() +
+      historicalSection +
       `\n\n===ESSAY PROFILE CONTEXT===\n${stableProfileContext}` +
       `\n\n===ESSAY TEXT (current version — quote directly when referencing specific moments)===\n${essayText}` +
-      findingSection +
-      phaseSection;
+      phaseSection +
+      antiConvergenceSection;
 
     // ── BLOCK 3: Dynamic per-turn context (NOT cached — changes every turn) ──
     const dynamicProfileContext = this.buildDynamicProfileContext(profile, sessionMemory);
 
     // ── Turn-specific — conversation + current message ──
-    const trimmedHistory = conversationHistory.slice(-6);
+    // 10 turns ensures the coach doesn't forget early revelations (Mrs. Chen, hackathon)
+    const trimmedHistory = conversationHistory.slice(-10);
     const conversationText = trimmedHistory.length > 0
       ? trimmedHistory.map(t => `${t.role === 'student' ? 'STUDENT' : 'COACH'}: ${t.content}`).join('\n\n')
       : '(No prior conversation — this is the first turn)';
@@ -1900,12 +2111,26 @@ READINESS: ${phase.readinessAssessment}`;
 
     // FIX 1: Inject pattern insights so the coach can reference observed patterns
     const patternInsights = profile.patternInsights;
-    const patternSection = patternInsights.length > 0
+    const deflCount = sessionMemory.deflectionCounter ?? 0;
+    let patternSection = patternInsights.length > 0
       ? `\n\n=== COACHING PATTERNS (observed across this conversation) ===\n` +
         patternInsights.map(p =>
-          `- ${p.implication} (observed ${p.instanceCount} times)`
+          `- ${p.implication} (observed ${p.instanceCount} times)` +
+          `\n  WHEN to raise: If the student's next revision repeats this pattern, name it directly.` +
+          `\n  HOW to raise: Not as criticism but as a lever — "Remember how we discussed X?"` +
+          `\n  WHY: Helps the student see their own blind spots without shame.`
         ).join('\n')
       : '';
+    // Surface deflection count when it's meaningful (2+ turns of avoidance)
+    if (deflCount >= 2) {
+      patternSection += `\n\n=== DEFLECTION ALERT ===\n` +
+        `Student has deflected from writing tasks ${deflCount} consecutive turns. ` +
+        (deflCount >= 3
+          ? `This is persistent avoidance. Drop the original task. Try a completely different entry point — ` +
+            `a smaller ask, a different paragraph, a "just tell me what happened" prompt.`
+          : `Change your approach — the current ask isn't working. Make it smaller, more specific, ` +
+            `or try a different angle. "Forget the three sentences. Just tell me about [specific moment]."`);
+    }
 
     // localStage1Adapter is declared above (before findingSection) to avoid temporal dead zone
 
@@ -1931,37 +2156,121 @@ READINESS: ${phase.readinessAssessment}`;
       ? `NOTE: This question has been the strategic thread for ${sessionMemory.questionStaleness} turns. Consider weaving it in more actively.`
       : '';
 
-    const sessionArcSection = turnCount <= 3
-      ? `\n\n=== SESSION ARC (turn ${turnCount}) ===
-EARLY SESSION: You're building trust AND material simultaneously. Your goals:
-1. Understand what this essay means to the student and what they want it to show
-2. COLLECT scene-worthy details — names, moments, physical specifics
-3. DEMONSTRATE AS YOU COLLECT — when the student shares a concrete detail,
-   IMMEDIATELY show them what it does in a sentence. This teaches by example
-   AND encourages them to share more. Don't wait until you have "enough."
-   One detail is enough for a 2-sentence demonstration.
-   Student shares "my piano teacher taught me Chopin" →
-   You respond: "That's a scene waiting to happen. Even just: 'She closed her
-   eyes before the first note' puts the reader in the room. Tell me more about
-   her — what did her hands look like when she played?"
-   The demonstration IS the question. It shows the student what you're looking for.
-4. This is the organic mode — demonstrate naturally as details emerge.
-   From turn 4+, the system may also inject a DEMONSTRATION DIRECTIVE
-   when conditions are met (enough material, same topic 2+ turns, etc.).`
-      : turnCount <= 8
-      ? `\n\n=== SESSION ARC (turn ${turnCount}) ===
-MIDDLE SESSION: You've established rapport and identified the key issues.
-Go DEEP on 1-2 issues rather than BROAD on 5.
-${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
-${strategicThreadSection}
-${stalenessNote}`
-      : `\n\n=== SESSION ARC (turn ${turnCount}) ===
-LATE SESSION: Time to consolidate. What have you and the student figured
-out together? What should their revision focus on? Resist the urge to
-introduce new topics. Help them leave with clarity about their next step.
+    // Session arc is BOTH turn-count-aware AND mode-aware.
+    // Revision/iteration modes override the default "get them writing" directives.
+    const sessionArcSection = (() => {
+      // Mode-specific overrides take priority over turn-count branching
+      if (coachingMode === 'revision_response') {
+        return `\n\n=== SESSION ARC (turn ${turnCount}, REVISION) ===
+REVISION SESSION: The student just revised their essay. Your job is to RESPOND
+TO THEIR WORK — not to diagnose from scratch or create writing prompts.
+Assess what changed, name the craft shift, flag any regressions or broken
+connections, and give ONE clear next step.
 ${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
 ${strategicThreadSection}
 ${stalenessNote}`;
+      }
+
+      if (coachingMode === 'iteration_deep') {
+        // Build revision quality history for iteration context
+        const revQualityEvents = sessionMemory.events
+          .filter(e => e.kind.startsWith('revision_quality:'))
+          .slice(-5);
+        const revHistorySection = revQualityEvents.length > 0
+          ? `\nITERATION HISTORY:\n${revQualityEvents.map((e, i) =>
+              `- v${i + 1} → v${i + 2}: ${e.kind.replace('revision_quality:', '')} — ${e.summary}`
+            ).join('\n')}`
+          : '';
+
+        // Diminishing returns signal: last 2 revisions both lateral
+        const lastTwo = revQualityEvents.slice(-2);
+        const diminishingReturns = lastTwo.length === 2 &&
+          lastTwo.every(e => e.kind === 'revision_quality:lateral');
+        const diminishingSignal = diminishingReturns
+          ? `\nDIMINISHING RETURNS: Last 2 revisions were LATERAL (not clearly better or worse). Consider graduating this section.`
+          : '';
+
+        return `\n\n=== SESSION ARC (turn ${turnCount}, ITERATION ${iterationRound ?? '3+'}) ===
+ITERATION SESSION: The student has revised this section ${iterationRound ?? '3+'}+ times.
+The big structural moves are done. Focus on sentence-level precision, voice
+consistency, and section readiness. If the section is earning its place, say so
+and redirect to the next priority. Don't coach a finished section.${revHistorySection}${diminishingSignal}
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      if (coachingMode === 'architecture') {
+        return `\n\n=== SESSION ARC (turn ${turnCount}, ARCHITECTURE) ===
+ARCHITECTURE SESSION: The student just reorganized their essay's structure.
+They're thinking about the essay's BONES — paragraph order, reader journey,
+structural logic. Meet them at that level.
+Assess the new sequence, audit connections, suggest ONE structural adjustment.
+Do NOT drop into sentence-level feedback. Stay at paragraph level.
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      if (coachingMode === 'polish') {
+        return `\n\n=== SESSION ARC (turn ${turnCount}, POLISH) ===
+POLISH SESSION: The essay is structurally sound. Voice is working. Architecture
+earns the reader's attention. You're in precision mode.
+Every word pays rent. Every sentence has rhythm. The opening hooks in 2 seconds.
+The closing lingers. Suggest ONE change per turn — the change that moves the
+essay from "admits" to "remembers."
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      // Default: turn-count-based session arc (first_encounter / conversation)
+      if (turnCount <= 3) {
+        return `\n\n=== SESSION ARC (turn ${turnCount}) ===
+EARLY SESSION: You're building trust AND material simultaneously.
+SCOPE: Focus on ONE thing this session — finding the essay's real opening
+or identifying its true subject. Don't try to fix structure, voice,
+ending, AND opening in one conversation. Set expectations early: "Let's
+focus on finding where this essay actually starts. Structure is for next time."
+
+Your goals:
+1. Identify what this essay is TRYING to do and where it does it best
+2. COLLECT scene-worthy details — names, moments, physical specifics
+3. DEMONSTRATE ONCE, then hand it back — show them what their material
+   could do in 2-3 sentences, then say "now you try — write me the
+   next version in your own voice." The goal is THEIR writing, not yours.
+4. Ask the question that connects the essay to WHO THEY ARE — not just
+   what happened, but what it reveals about how their mind works.
+   "That debugging loop — is that how you think about other things too?"
+   moves the essay from narrative to identity-revelation.`;
+      }
+
+      if (turnCount <= 8) {
+        return `\n\n=== SESSION ARC (turn ${turnCount}) ===
+MIDDLE SESSION: The student has shared material and you've identified issues.
+Now GET THEM WRITING. Stop writing samples for them. Instead:
+- Give them a specific writing prompt: "Write the first three sentences
+  of P1 using what we discussed. Go."
+- Coach their actual prose — what works, what to push, what to cut.
+- If they haven't written anything yet, that's your priority. Insights
+  without student writing is a lecture, not coaching.
+One deep issue per turn. Stay with it until they've written something.
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+      }
+
+      return `\n\n=== SESSION ARC (turn ${turnCount}) ===
+LATE SESSION: Consolidate. The student should leave with:
+1. A clear first revision task ("Rewrite P1 using the hackathon scene. 160 words max.")
+2. An understanding of the ONE principle that matters most for their essay
+3. Something they WROTE during this conversation — even if it's rough
+Do NOT introduce new issues. Do NOT write more sample prose. Help them
+prioritize what to do FIRST when they sit down to revise.
+${sessionMemory.sessionArcSummary ? `ARC SO FAR: ${sessionMemory.sessionArcSummary}` : ''}
+${strategicThreadSection}
+${stalenessNote}`;
+    })();
 
     // Session journal from high-significance events
     const journalEvents = sessionMemory.events
@@ -1972,44 +2281,244 @@ ${stalenessNote}`;
         journalEvents.map(e => e.summary).join(' ')
       : '';
 
+    // ── Session Momentum Signal ──
+    // High-level progress metric so the coach calibrates push vs. celebrate
+    const momentumSignal = (() => {
+      if (turnCount <= 2) return ''; // Too early
+
+      const cl = sessionMemory.revisionChecklist ?? [];
+      const addressedCount = cl.filter(t => t.status === 'addressed').length;
+      const totalCount = cl.length;
+
+      const revEvents = sessionMemory.events
+        .filter(e => e.kind.startsWith('revision_quality:'))
+        .slice(-3);
+      const revTrend = revEvents.length > 0
+        ? revEvents.map(e => e.kind.replace('revision_quality:', '')).join(' → ')
+        : null;
+
+      const parts: string[] = [];
+      if (totalCount > 0) parts.push(`Checklist: ${addressedCount}/${totalCount} addressed`);
+      if (revTrend) parts.push(`Revisions: ${revTrend}`);
+
+      const defl = sessionMemory.deflectionCounter ?? 0;
+      const isStalled = defl >= 2 || (revEvents.length >= 2 && revEvents.every(e => e.kind.includes('lateral')));
+      const isProgressing = addressedCount > 0 || revEvents.some(e => e.kind.includes('improved'));
+      const status = isStalled ? 'STALLED' : isProgressing ? 'PROGRESSING' : 'BUILDING';
+
+      return parts.length > 0
+        ? `\n\nSESSION MOMENTUM [${status}]: ${parts.join(' | ')}` +
+          (isStalled ? '\nChange approach — what you\'ve been trying isn\'t landing.' : '') +
+          (isProgressing ? '\nMomentum is building. Push slightly harder each turn.' : '')
+        : '';
+    })();
+
+    // ── Revision Checklist context ──
+    const checklist = sessionMemory.revisionChecklist;
+    const checklistSection = checklist && checklist.length > 0
+      ? `\n\n=== REVISION CHECKLIST ===\n` +
+        checklist.map(t => {
+          const statusIcon = t.status === 'addressed' ? '[DONE]' : t.status === 'in_progress' ? '[IN PROGRESS]' : `[${t.priority}]`;
+          const techNote = t.technique ? ` (${t.technique})` : '';
+          return `  ${statusIcon} ${t.task}${techNote}`;
+        }).join('\n') +
+        `\nReference tasks by number when coaching. Current priority: ${
+          checklist.find(t => t.status === 'pending')?.task ?? 'all tasks addressed'
+        }` +
+        (turnCount >= 9 ? `\nLATE SESSION: Output remaining PENDING tasks as "Your revision plan" with specific instructions for each.` : '')
+      : '';
+
+    // ── Improvement Queue (from analysis manifest) ──
+    const improvementQueueSection = this.buildImprovementQueueSection(profile, sessionMemory);
+
+    // ── Phase 3: edge-protocol directives ──
+    // Three bounded edge behaviors, each conditionally emits a prompt
+    // directive. All guards are pure and unit-tested in
+    // tests/unit/test-edge-protocol.ts — the regression surface is small.
+    //   3.1 killer diagnostic — turn 1 only, uses AO first-read data
+    //   3.2 calibrated pushback — first deflection, max once per session
+    //   3.3 blindSpot surfacing — emotional opening + ready hypothesis, max once
+    let edgeProtocolSection = '';
+    const turnNumberForEdge = (sessionMemory.turnCount ?? 0) + 1;
+    edgeProtocolSection += edgeProtocol.killerDiagnosticDirective(
+      turnNumberForEdge,
+      profile.aoFirstRead,
+    );
+    if (edgeProtocol.shouldAllowPushback(sessionMemory)) {
+      edgeProtocolSection += edgeProtocol.pushbackDirective();
+    }
+    if (edgeProtocol.shouldSurfaceBlindSpot(sessionMemory, sessionMemory.studentTheory, studentMessage)) {
+      edgeProtocolSection += edgeProtocol.blindSpotDirective(sessionMemory.studentTheory!);
+    }
+
+    // ── Phase 4.3: length calibration hint ──
+    // V2 T5 was 490 words (overload). Giving the LLM a numeric target it can
+    // follow keeps response density tuned to turn position + session state.
+    // Pass the pre-estimated intensity so the calibrator's wordBudget aligns
+    // with the maxTokens we send to Anthropic (no more 1500-token ceilings on
+    // a turn we already classified as 'minimal').
+    const lengthBudget = lengthCalibrator.calibrateLengthBudget(
+      {
+        turnNumber: turnNumberForEdge,
+        estimatedIntensity,
+        isInSessionDraftFeedback: isInSessionDraft,
+      },
+      sessionMemory,
+    );
+    const lengthHintSection = lengthCalibrator.budgetHintForPrompt(lengthBudget);
+
     // ── W6.2: Escalation context for confused students ──
     const escalationSection = this.buildEscalationContext(sessionMemory);
 
     // ── Resistance escalation context ──
     const resistanceEscalationSection = this.buildResistanceEscalationContext(sessionMemory);
 
-    // ── Demonstration trigger ──
-    const demoTrigger = this.shouldTriggerDemonstration(
-      sessionMemory, profile, quickFocus, studentMessage, conversationHistory,
-    );
+    // ── Demonstration trigger (mode + deflection gated) ──
+    // First_encounter mode always allows demonstrations. Other modes allow demos
+    // when the student is deflecting (deflectionCounter >= 2) — if the current
+    // approach isn't working, demonstrating the next improvement breaks the deadlock.
+    const demoDeflCount = sessionMemory.deflectionCounter ?? 0;
+    const demoTrigger = (coachingMode === 'first_encounter' || demoDeflCount >= 2)
+      ? this.shouldTriggerDemonstration(
+          sessionMemory, profile, quickFocus, studentMessage, conversationHistory,
+        )
+      : null;
     const sessionTheory = sessionMemory.studentTheory;
+    // Round-3 Coaching Integration: expose theory maturity so the coach
+    // calibrates trust in the personhood read. At 'nascent' (T2), the theory
+    // is a hypothesis — coach should not stake coaching moves on it. At
+    // 'confirmed' (T5+), it can drive framing.
+    const theoryMaturityNote = sessionTheory?.maturity
+      ? ` [maturity=${sessionTheory.maturity}${sessionTheory.maturity === 'nascent' ? ' — hypothesis only, do NOT stake major coaching moves on this' : ''}]`
+      : '';
     const theoryContext = sessionTheory
-      ? `\nSTUDENT THEORY: ${sessionTheory.personhood}\nTENSIONS: ${sessionTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\nYour demonstration should illuminate a tension, not just fix a craft issue.`
+      ? `\nSTUDENT THEORY${theoryMaturityNote}: ${sessionTheory.personhood}\nTENSIONS: ${sessionTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\nYour demonstration should illuminate a tension, not just fix a craft issue.`
       : '';
+    const priorDemoCount = sessionMemory.demonstrationCount ?? 0;
+    // Demo budget is improvement-driven, not count-driven. Always allow demonstrations.
+    // After 2+ demos, write brief (2 sentences) then give a writing prompt.
+    const shouldCoachWrite = true;
     const demonstrationSection = demoTrigger
-      ? `\n\n=== DEMONSTRATION DIRECTIVE (ACTIVE) ===\n${demoTrigger.reason}\nYou have enough material to demonstrate. Write 2-4 sentences of sample prose\nusing the student's own details to show what the current issue LOOKS LIKE\nwhen fixed. Name the craft move. Explain what the change does for the reader.\nDO NOT defer. DO NOT ask for more details. WRITE THE SAMPLE NOW.\n\nSTUDENT'S AVAILABLE DETAILS: ${profile.studentDeclaredContext || '(limited — use what you have)'}${theoryContext}`
+      ? `\n\n=== DEMONSTRATION DIRECTIVE (ACTIVE) ===\n${demoTrigger.reason}\n` +
+        `Write 2-4 sentences of sample prose using the student's own details to show\n` +
+        `what the current issue LOOKS LIKE when fixed. Name the craft move.\n` +
+        `After your demonstration, say: "That's my version — now write yours."\n` +
+        (priorDemoCount >= 2
+          ? `You've demonstrated ${priorDemoCount} times. THIS TIME: demonstrate briefly (2 sentences max),\n` +
+            `then give a SPECIFIC writing prompt with constraints: which paragraph, how many\n` +
+            `sentences, what details to include. The demo calibrates; the prompt gets them writing.\n`
+          : '') +
+        `\nSTUDENT'S AVAILABLE DETAILS: ${profile.studentDeclaredContext || '(limited — use what you have)'}${theoryContext}`
       : '';
-    // Reset deflection counter when a demonstration is triggered — the coach is
-    // changing tactics, so the counter should not keep climbing
+    // Track demonstrations. Only reset deflection counter if the demo was
+    // for a non-deflection reason (explicit ask, staleness, context). For
+    // deflection-triggered demos, keep the counter at 1 so one more
+    // deflection turn immediately triggers again (prevents repeating demands).
     if (demoTrigger) {
-      sessionMemory.deflectionCounter = 0;
+      if (shouldCoachWrite) {
+        sessionMemory.demonstrationCount = priorDemoCount + 1;
+      }
+      const postDemoDeflCount = sessionMemory.deflectionCounter ?? 0;
+      if (postDemoDeflCount >= 2) {
+        // Deflection-triggered: keep counter at 1 for quick re-trigger
+        sessionMemory.deflectionCounter = 1;
+      } else {
+        sessionMemory.deflectionCounter = 0;
+      }
     }
 
     // Deflection escalation is now handled within the demonstration trigger
     // (condition 2 produces enhanced text at deflectionCounter >= 3).
     // The StudentTheory context is already wired into theoryContext above.
 
-    // User message = ONLY dynamic per-turn content (profile + essay + findings are in cached system prompt)
-    const userPrompt = `${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
+    // ── GAP-2 FIX: Learning Style Activation fallback ──
+    // Build learning style context from accumulated observations if the caller
+    // didn't provide an explicit learningStyleContext string. This ensures the
+    // coach adapts to observed learning patterns even in code paths that skip
+    // the external section builder.
+    let builtLearningStyleContext: string | undefined;
+    const memWithStyle = sessionMemory as SessionMemoryWithStyle;
+    if (memWithStyle.learningStyleObservations?.observations?.length) {
+      const confidentObs = memWithStyle.learningStyleObservations.observations
+        .filter(o => o.confidence === 'confident' || o.confidence === 'growing')
+        .slice(-3); // Last 3 confident/growing observations
+      if (confidentObs.length > 0) {
+        builtLearningStyleContext =
+          `\n\n=== LEARNING STYLE (observed across ${sessionMemory.turnCount} turns) ===\n` +
+          confidentObs.map(o => `- [${o.confidence}] ${o.observation}`).join('\n') +
+          `\nAdapt your coaching delivery to match these patterns.`;
+      }
+    }
+    // Use caller-provided context if available, otherwise fall back to built context
+    const effectiveLearningStyle = learningStyleContext ?? builtLearningStyleContext;
+
+    // ── Round-3 Coaching Integration: prior-turn session-memory surfacing ──
+    // CACHE-OPTIMIZED SPLIT: directive text (how to handle each payload) is in
+    // the system prompt via round3DirectivesBlock(). Here we emit ONLY the
+    // per-turn variable values — the quoted question, hypothesis, observation
+    // list — keeping the user-prompt delta as small as possible.
+    // Each *Data() call emits '' when its triggering condition is not met;
+    // safe to concat unconditionally.
+    const priorStrategicSection = strategicQuestionFromPriorTurnData(
+      sessionMemory.priorTurnStrategicQuestion,
+    );
+    const mirrorSection = innerVoiceMirrorCandidateData(
+      sessionMemory.priorTurnCognitiveAssessment,
+      turnCount,
+      sessionMemory.mirrorSurfacedAtTurn,
+    );
+    // If the mirror opportunity was surfaced to the coach this turn, record it
+    // so the 3-turn cooldown kicks in. We intentionally record on OPPORTUNITY,
+    // not on confirmed-use, because we can't observe whether the coach actually
+    // mirrored (same logic as edgeProtocol.pushback). Under-firing is preferred
+    // to over-firing for this section — it controls a psychological-register
+    // move that degrades quickly under repetition.
+    if (mirrorSection.length > 0) {
+      sessionMemory.mirrorSurfacedAtTurn = turnCount;
+    }
+    const learningStyleCalibration = learningStyleCalibrationData(
+      memWithStyle.learningStyleObservations?.observations,
+    );
+
+    // User message = dynamic per-turn content + findings + teaching content
+    // Findings are here (not in system prompt) because they change per turn based on focus paragraphs.
+    // This keeps the system prompt stable for Anthropic prompt caching.
+    const userPrompt = `${findingSection ? `${findingSection}\n\n` : ''}${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
 ${conversationText}
 
 STUDENT (current message):
 "${studentMessage}"
 ${editContextSection}
 ${stage1Section}
-${sessionArcSection}${journalSection}${learningStyleContext ?? ''}${crossModuleContext ? `\n\n=== PORTFOLIO CONTEXT (from other modules — reference ONLY if relevant to the student's question) ===\n${crossModuleContext}` : ''}
-${escalationSection}${resistanceEscalationSection}${demonstrationSection}
+${sessionArcSection}${journalSection}${momentumSignal}${checklistSection}${improvementQueueSection}${edgeProtocolSection}${priorStrategicSection}${mirrorSection}${learningStyleCalibration}${lengthHintSection}${effectiveLearningStyle ?? ''}${crossModuleContext ? `\n\n=== PORTFOLIO CONTEXT (from other modules — reference ONLY if relevant to the student's question) ===\n${crossModuleContext}` : ''}
+${escalationSection}${resistanceEscalationSection}${demonstrationSection}${isInSessionDraft ? `
+
+=== IN-SESSION DRAFT DETECTED ===
+The student just wrote draft prose in the chat. Coach their ACTUAL WRITING:
+
+SENTENCE-BY-SENTENCE:
+Walk through each sentence in their draft:
+- S1: What does it do for the reader? Does it earn its place?
+- S2: Does it advance from S1? What craft move is it attempting?
+- Continue for each sentence.
+
+Name what's WORKING and why (not just "good" — what specific craft effect).
+Name the ONE sentence that needs the most work and demonstrate the fix.
+Then: "Which sentence felt easiest to write? Which felt forced?"
+
+Compare against the essay's profile: Does the voice match? Does it address
+a finding from the checklist? Does it move the committee one-liner?` : ''}
 ${patternSection}
+${(() => {
+  // Prior coaching suggestions — tell the coach what it already recommended
+  const suggestions = sessionMemory.events
+    .filter(e => e.kind === 'coach_suggestion')
+    .slice(-3);
+  if (suggestions.length === 0) return '';
+  return '\n\n=== YOUR PRIOR SUGGESTIONS (do NOT repeat these verbatim — reference them or build on them) ===\n' +
+    suggestions.map(s => `Turn ${s.turn}: ${s.summary}`).join('\n') +
+    '\nIf the student hasn\'t acted on a prior suggestion, you may reference it: "In our earlier discussion, I suggested X for P2 — have you had a chance to try that?"';
+})()}
 ${antiRepetitionSection}
 ${editStrategySection}
 
@@ -2022,10 +2531,14 @@ Respond to the student's message. Apply all constraints from your role identity.
         : '' // 'full' — existing "shorter is better" guidance in the philosophy block applies
     }`;
 
-    // GAP-1: Dynamic maxTokens based on pre-estimated intensity
-    // full=2200 (current default), brief=1200, minimal=600 (still fits sidecar ~150 tokens)
-    const maxTokensByIntensity = { full: 2200, brief: 1200, minimal: 600 } as const;
-    const dynamicMaxTokens = maxTokensByIntensity[estimatedIntensity];
+    // Cost-cut: bind maxTokens to lengthCalibrator.wordBudget (≈1.6 tokens/word
+    // + 200 cushion for the sidecar). The previous fixed ladder
+    // (full=1500, brief=1000, minimal=500) let Sonnet write 600w when its
+    // word budget was 240w, blowing through both the cap and the cost target.
+    // Using lengthBudget.maxTokens keeps the API ceiling honest:
+    //   full(240w) → 584 tokens   brief(110w) → 376 tokens   minimal(45w) → 350 tokens
+    // Add a ~200-token sidecar cushion above the budget for safety on full/brief.
+    const dynamicMaxTokens = lengthBudget.maxTokens;
 
     // temperature 0.4 (lower reduces constraint violations)
     const response = await callClaude<string>(
@@ -2093,6 +2606,34 @@ Respond to the student's message. Apply all constraints from your role identity.
       }
     }
 
+    // Word count — derive limit from essay type (PIQ=350, supplement=250, Common App=650)
+    const WORD_LIMITS: Record<string, number> = {
+      supplement: 250,
+      piq: 350,
+      personal_statement: 650,
+    };
+    const wordLimit = WORD_LIMITS[profile.northStar.activeScale] ?? 650;
+    const totalWords = profile.paragraphs.reduce((sum, p) => sum + p.text.split(/\s+/).length, 0);
+    const pctUsed = totalWords / wordLimit;
+    parts.push(
+      `WORD COUNT: ${totalWords}/${wordLimit}` +
+      (pctUsed > 0.92 ? ' — TIGHT. Every addition requires a specific cut.' :
+       pctUsed > 0.77 ? ' — some room, but word economy still applies.' :
+       ' — room to expand, but resist filling it with decoration.'),
+    );
+
+    // Intent vs text tension (powerful coaching material when present)
+    if (profile.northStar.intentBridge?.studentIntent) {
+      const bridge = profile.northStar.intentBridge;
+      const divergent = bridge.alignments?.filter(a => a.alignment === 'divergent') ?? [];
+      if (divergent.length > 0) {
+        parts.push(
+          `INTENT vs TEXT: Student says this essay is about "${bridge.studentIntent}." ` +
+          `The text actually communicates: ${divergent[0].detail}. This gap is coaching material.`,
+        );
+      }
+    }
+
     // Active concerns (critical ones)
     const criticalConcerns = profile.index.activeConcerns.filter(c => c.severity === 'critical');
     if (criticalConcerns.length > 0) {
@@ -2104,13 +2645,165 @@ Respond to the student's message. Apply all constraints from your role identity.
       );
     }
 
-    // Assembled profile sections from router (stable analysis data)
+    // Coherence contradictions — internal tensions the coach should be aware of
+    // These are from L4 crystallization: places where the profile contradicts itself
+    if (profile.coherenceReport?.contradictions) {
+      const notable = profile.coherenceReport.contradictions
+        .filter((c: any) => c.severity === 'blocking' || c.severity === 'notable')
+        .slice(0, 3);
+      if (notable.length > 0) {
+        parts.push(
+          `INTERNAL TENSIONS (the analysis found contradictions — use these as coaching material):\n` +
+          notable.map((c: any) =>
+            `  "${c.claimA}" vs "${c.claimB}" — ${c.suggestedResolution || c.nature || 'unresolved tension'}`
+          ).join('\n'),
+        );
+      }
+    }
+
+    // Analysis digest — tells the coach what the student has already seen
+    // so the coach skips diagnosis and starts workshopping
+    const revPriorities = this.buildRevisionPrioritySummary(profile);
+    if (revPriorities) {
+      parts.push(
+        `STUDENT HAS ALREADY SEEN:\n` +
+        `The student read the full analysis before this conversation. They know:\n` +
+        (profile.aoFirstRead?.committeeOneLiner
+          ? `- Committee one-liner: "${profile.aoFirstRead.committeeOneLiner}"\n`
+          : '') +
+        (profile.aoFirstRead?.putDownRisk
+          ? `- Put-down risk: ${profile.aoFirstRead.putDownRisk}\n`
+          : '') +
+        `- Improvement phase: ${profile.index.improvementPhase?.level ?? 'foundation'}\n` +
+        revPriorities +
+        `\nCOACHING RULE: Reference priorities by number ("Let's work on Priority #1"). ` +
+        `Do NOT re-diagnose what the analysis document already covers. ` +
+        `Your job is to EXECUTE on the priorities — present options, help them write, ` +
+        `coach their sentences. Diagnosis is done. Workshopping starts now.`,
+      );
+    }
+
+    // Assembled profile sections — SIGNAL EXTRACTION, not full JSON dump.
+    // The hand-crafted sections above already cover North Star, AO perspective,
+    // archetype, word count, intent, critical concerns, and coherence tensions.
+    // From the router's assembled sections, extract only the coaching-relevant
+    // signals that aren't already covered. This reduces system prompt from ~17K
+    // to ~6K tokens while preserving every signal the coach actually uses.
     for (const section of assembledContext.sections) {
-      if (section.name === 'profileIndex') continue;
-      const sectionText = typeof section.content === 'string'
-        ? section.content
-        : JSON.stringify(section.content, null, 2);
-      parts.push(`[${section.name.toUpperCase()}]\n${sectionText}`);
+      const content = section.content as Record<string, unknown>;
+      if (!content || typeof content !== 'object') continue;
+
+      switch (section.name) {
+        case 'profileIndex':
+        case 'northStar':
+        case 'admissionsPositioning':
+          // Already covered by hand-crafted sections above — skip to avoid duplication
+          break;
+
+        case 'voiceIdentity': {
+          // Coach needs: primary register, authenticity markers, signature moves
+          // VoiceIdentity fields: register, signature, distinctivePatterns, evolution, authenticVsPerformed
+          const vi = content as Record<string, unknown>;
+          const register = vi.register ?? '';
+          const authenticity = vi.authenticVsPerformed ?? '';
+          const signature = vi.signature ?? vi.distinctivePatterns ?? '';
+          if (register || authenticity) {
+            parts.push(
+              `VOICE: ${typeof register === 'string' ? register : JSON.stringify(register)}` +
+              (authenticity ? ` | Authenticity: ${typeof authenticity === 'string' ? authenticity : JSON.stringify(authenticity).slice(0, 200)}` : '') +
+              (signature ? ` | Signature: ${typeof signature === 'string' ? signature : JSON.stringify(signature).slice(0, 150)}` : ''),
+            );
+          }
+          break;
+        }
+
+        case 'emotionalTopography': {
+          // Coach needs: where emotion peaks/valleys are, overall arc
+          const et = content as Record<string, unknown>;
+          const arc = et.emotionalArc ?? et.arc ?? '';
+          const peaks = et.peaks ?? et.emotionalPeaks ?? [];
+          if (arc || (Array.isArray(peaks) && peaks.length > 0)) {
+            parts.push(
+              `EMOTION: ${typeof arc === 'string' ? arc : JSON.stringify(arc).slice(0, 200)}` +
+              (Array.isArray(peaks) && peaks.length > 0
+                ? ` | Peaks: ${peaks.slice(0, 3).map((p: any) => typeof p === 'string' ? p : `P${p.paragraph ?? '?'}: ${p.description ?? p.moment ?? ''}`).join('; ').slice(0, 200)}`
+                : ''),
+            );
+          }
+          break;
+        }
+
+        case 'thematicArchitecture': {
+          // Coach needs: central thesis + thread names (not full evidence chains)
+          const ta = content as Record<string, unknown>;
+          const thesis = ta.centralThesis ?? ta.thesis ?? '';
+          const threads = ta.threads ?? ta.thematicThreads ?? [];
+          if (thesis) {
+            parts.push(
+              `THEMES: ${typeof thesis === 'string' ? thesis : JSON.stringify(thesis).slice(0, 200)}` +
+              (Array.isArray(threads) && threads.length > 0
+                ? ` | Threads: ${threads.slice(0, 4).map((t: any) => typeof t === 'string' ? t : (t.thread ?? t.name ?? '')).join(', ')}`
+                : ''),
+            );
+          }
+          break;
+        }
+
+        case 'narrativeStrategy': {
+          // Coach needs: strategy name + execution quality assessment
+          const ns2 = content as Record<string, unknown>;
+          const strategy = ns2.primaryStrategy ?? ns2.strategy ?? '';
+          const execution = ns2.executionQuality ?? ns2.effectiveness ?? '';
+          if (strategy) {
+            parts.push(
+              `NARRATIVE: ${typeof strategy === 'string' ? strategy : JSON.stringify(strategy).slice(0, 300)}` +
+              (execution ? ` | Execution: ${typeof execution === 'string' ? execution : JSON.stringify(execution).slice(0, 150)}` : ''),
+            );
+          }
+          break;
+        }
+
+        case 'characterRevelation': {
+          // Writer portrait is already in hand-crafted section via profile.characterRevelation.writerPortrait
+          // Only add blind spots and growth areas if present
+          const cr = content as Record<string, unknown>;
+          const blindSpots = cr.blindSpots ?? [];
+          if (Array.isArray(blindSpots) && blindSpots.length > 0) {
+            parts.push(
+              `BLIND SPOTS: ${blindSpots.slice(0, 3).map((b: any) => typeof b === 'string' ? b : JSON.stringify(b).slice(0, 100)).join('; ')}`,
+            );
+          }
+          break;
+        }
+
+        case 'craftAssessment': {
+          // Coach needs: top strengths and top weaknesses (not full dimension scores)
+          const ca = content as Record<string, unknown>;
+          const strengths = ca.strengths ?? ca.topStrengths ?? [];
+          const weaknesses = ca.weaknesses ?? ca.topWeaknesses ?? ca.growthAreas ?? [];
+          if ((Array.isArray(strengths) && strengths.length > 0) || (Array.isArray(weaknesses) && weaknesses.length > 0)) {
+            let craftLine = 'CRAFT: ';
+            if (Array.isArray(strengths) && strengths.length > 0) {
+              craftLine += `Strengths: ${strengths.slice(0, 3).map((s: any) => typeof s === 'string' ? s : (s.name ?? s.description ?? '')).join(', ').slice(0, 200)}`;
+            }
+            if (Array.isArray(weaknesses) && weaknesses.length > 0) {
+              craftLine += ` | Growth: ${weaknesses.slice(0, 3).map((w: any) => typeof w === 'string' ? w : (w.name ?? w.description ?? '')).join(', ').slice(0, 200)}`;
+            }
+            parts.push(craftLine);
+          }
+          break;
+        }
+
+        default:
+          // For any other sections (paragraphDigests, connections, etc.),
+          // include a compact summary only if small enough
+          if (section.tokenEstimate && section.tokenEstimate < 300) {
+            const text = typeof content === 'string' ? content : JSON.stringify(content);
+            parts.push(`[${section.name.toUpperCase()}]\n${text}`);
+          }
+          // Skip large sections — the hand-crafted signals above cover the coaching needs
+          break;
+      }
     }
 
     // NOTE: Cross-module context is NOT in the stable profile (it would distract on
@@ -2168,11 +2861,105 @@ Respond to the student's message. Apply all constraints from your role identity.
       parts.push(`STUDENT THEORY (synthesized understanding — use this to personalize your approach):\n${theoryParts.join('\n')}`);
     }
 
-    // Always include declared context for raw detail access
+    // Pre-theory observations (raw identity signals before first synthesis)
+    if (!theory && sessionMemory?.preTheoryObservations?.length) {
+      parts.push(
+        `EARLY IDENTITY SIGNALS (raw observations — not yet synthesized):\n` +
+        sessionMemory.preTheoryObservations.map(o => `- ${o}`).join('\n'),
+      );
+    }
+
+    // Structured student context — for writing prompt generation
+    const sc = profile.structuredContext;
+    if (sc && (sc.people.length > 0 || sc.places.length > 0 || sc.moments.length > 0)) {
+      const scParts: string[] = ['STUDENT\'S AVAILABLE MATERIAL (use these EXACT names and details in writing prompts):'];
+      if (sc.people.length > 0) {
+        scParts.push(`  People: ${sc.people.map(p => p.relationship ? `${p.name} (${p.relationship})` : p.name).join(', ')}`);
+      }
+      if (sc.places.length > 0) {
+        scParts.push(`  Places: ${sc.places.map(p => p.sensoryDetail ? `${p.place} (${p.sensoryDetail})` : p.place).join(', ')}`);
+      }
+      if (sc.moments.length > 0) {
+        scParts.push(`  Key moments: ${sc.moments.map(m => m.moment).join('; ')}`);
+      }
+      if (sc.concreteDetails.length > 0) {
+        scParts.push(`  Details: ${sc.concreteDetails.map(d => d.detail).join(', ')}`);
+      }
+      parts.push(scParts.join('\n'));
+    }
+
+    // Always include flat declared context for raw detail access
     if (profile.studentDeclaredContext) {
       parts.push(
         `STUDENT'S REAL DETAILS (use these for personalized examples and coaching):\n${profile.studentDeclaredContext}`
       );
+    }
+
+    // ── Progressive Depth Signal ──
+    // As the session accumulates understanding, the coaching should deepen.
+    // Computed ONCE per turn from accumulated signals — not per block.
+    if (sessionMemory) {
+      const depthSignals = {
+        turnsCompleted: sessionMemory.turnCount,
+        eventsAccumulated: sessionMemory.events.length,
+        contextRichness: (profile.studentDeclaredContext?.length ?? 0),
+        theoryPopulated: !!(sessionMemory.studentTheory?.personhood && sessionMemory.studentTheory.personhood.length > 20),
+        findingsAddressed: sessionMemory.revisionChecklist?.filter(r => r.status === 'addressed').length ?? 0,
+        findingsTotal: sessionMemory.revisionChecklist?.length ?? 0,
+        editsProcessed: sessionMemory.events.filter(e => e.kind.startsWith('revision_quality:')).length,
+        patternsObserved: sessionMemory.events.filter(e => e.kind.startsWith('resistance:') || e.kind.startsWith('reinterpretation:')).length,
+      };
+
+      const depthLevel = depthSignals.turnsCompleted <= 2 ? 'surface'
+        : depthSignals.turnsCompleted <= 5 && !depthSignals.theoryPopulated ? 'developing'
+        : depthSignals.theoryPopulated && depthSignals.contextRichness > 200 ? 'deep'
+        : depthSignals.findingsAddressed >= 2 && depthSignals.editsProcessed >= 1 ? 'mastery'
+        : 'developing';
+
+      const depthDirectives: Record<string, string> = {
+        surface: `DEPTH: SURFACE — You're still learning who this student is. Focus on COLLECTING material (scenes, details, moments) and DIAGNOSING the essay's core issue. Don't go deep on craft yet.`,
+        developing: `DEPTH: DEVELOPING — You have some context now. Start connecting observations: "Earlier you mentioned X, and now I see Y in your essay — that tension is interesting." Push beyond surface diagnosis into WHY patterns exist.`,
+        deep: `DEPTH: DEEP — You have a real theory of this student. Use it. Reference their protected values when they deflect. Name tensions between what they say and what the essay shows. Your coaching should feel like it comes from someone who KNOWS them, not someone reading their essay for the first time.`,
+        mastery: `DEPTH: MASTERY — The student has been working. They've addressed findings, made edits, revealed context. Stop teaching principles — they know the principles. Coach at the sentence level. "This verb is doing nothing. Try: [specific alternative]." Every suggestion should be surgical, not structural.`,
+      };
+
+      parts.push(depthDirectives[depthLevel]);
+
+      // At deep/mastery depth, inject a summary of what the system has accumulated
+      if (depthLevel === 'deep' || depthLevel === 'mastery') {
+        const contextSummary: string[] = [];
+        if (profile.studentDeclaredContext) contextSummary.push(`Student context: ${profile.studentDeclaredContext.slice(0, 200)}...`);
+        if (depthSignals.findingsAddressed > 0) contextSummary.push(`${depthSignals.findingsAddressed}/${depthSignals.findingsTotal} findings addressed`);
+        if (depthSignals.editsProcessed > 0) contextSummary.push(`${depthSignals.editsProcessed} revisions processed`);
+        if (depthSignals.patternsObserved > 0) contextSummary.push(`${depthSignals.patternsObserved} behavioral patterns observed`);
+        if (contextSummary.length > 0) {
+          parts.push(`\nACCUMULATED INTELLIGENCE: ${contextSummary.join(' | ')}`);
+        }
+      }
+    }
+
+    // ── GAP-1 FIX: Cognitive Assessment Feed-Forward ──
+    // Inject the coach's prior inner voice and cognitive assessment so the coach
+    // builds on its own prior read rather than rediscovering from scratch each turn.
+    if (sessionMemory && sessionMemory.events.length > 0) {
+      const lastInnerVoice = sessionMemory.events
+        .filter(e =>
+          e.kind.startsWith('new_context:') ||
+          e.kind.startsWith('reinterpretation:') ||
+          e.kind.startsWith('resistance:') ||
+          e.kind === 'journal',
+        )
+        .slice(-2)
+        .map(e => e.summary)
+        .join(' ');
+
+      if (lastInnerVoice) {
+        parts.push(
+          `\n=== YOUR PRIOR ASSESSMENT (from last turn) ===\n` +
+          `${lastInnerVoice}\n` +
+          `BUILD on this assessment. Don't rediscover what you already know. If your read has changed, name what changed and why.`,
+        );
+      }
     }
 
     return parts.length > 0 ? parts.join('\n\n') : '';
@@ -2777,165 +3564,6 @@ Output JSON:
   }
 
   // --------------------------------------------------------------------------
-  // PATTERN DETECTION (LLM-based — Improvement 6)
-  // --------------------------------------------------------------------------
-
-  /**
-   * Detect coaching patterns via Haiku assessment.
-   * Replaces keyword-based pattern matching with semantic understanding.
-   *
-   * Called every 3 turns. Also updates session arc, next focus suggestion,
-   * learning style observations, and quality signals.
-   *
-   * Cost: ~$0.002-0.004 per call (negligible).
-   */
-  private async detectPatternsLLM(
-    conversationHistory: ConversationTurn[],
-    currentMessage: string,
-    profile: EssayProfile,
-    sessionMemory: CoachingSessionMemory,
-  ): Promise<{
-    patterns: PatternInsight[];
-    sessionArcUpdate: string;
-    nextFocusSuggestion: string;
-    learningStyleUpdate: string | null;
-    qualitySignals: CoachingQualitySignals;
-    sessionJournalEntry: string | null;
-    cost: LayerCost;
-  }> {
-    const callStart = Date.now();
-    const now = new Date().toISOString();
-
-    const systemPrompt = `You are analyzing a coaching conversation for patterns. You detect:
-1. BEHAVIORAL PATTERNS: What the student keeps returning to, avoiding, or struggling with
-2. LEARNING STYLE signals: How the student responds to different coaching approaches
-3. SESSION ARC: Where this conversation is in its natural arc (opening/middle/closing)
-4. NEXT FOCUS: What the conversation should prioritize next
-5. QUALITY SIGNALS: Is coaching landing? (vocabulary evolution, question quality, revision sophistication)
-
-Be honest about what you see. "Student is avoiding P3 despite it being the weakest paragraph" is useful. "Student is engaged" is not.
-
-Output JSON:
-{
-  "patterns": [
-    {
-      "pattern": "<what you observe>",
-      "evidence": ["<specific things the student said>"],
-      "implication": "<what this means for coaching strategy>",
-      "instanceCount": <number>
-    }
-  ],
-  "sessionArcUpdate": "<2-3 sentences: where is this conversation and where should it go?>",
-  "nextFocusSuggestion": "<1 sentence: what should the next turn focus on?>",
-  "learningStyleUpdate": "<1 sentence observation about how this student learns, or null if no new signal>",
-  "qualitySignals": {
-    "vocabularyEvolution": "<adopting_architectural_language|stable|not_yet>",
-    "questionQualityTrend": "<improving|stable|declining>",
-    "revisionSophistication": "<architectural|surface|not_yet_discussed>",
-    "studentInitiation": "<high|moderate|low>",
-    "breakthroughMoments": <number>
-  },
-  "sessionJournalEntry": "<1-2 sentences capturing what HAPPENED between coach and student in the last 3 turns. Write as a coaching log, not a summary. Focus on: what the coach showed/asked, how the student responded, what shifted. Example: '[T7-9] Coach compared P3S1 to P5S2 register; student recognized the difference and proposed starting P3 revision from the authentic voice in P5.' Bad example (too generic): 'Student discussed P3 transition and understood the feedback.'>"
-}`;
-
-    const historyText = conversationHistory
-      .map(t => `${t.role.toUpperCase()}: ${t.content}`)
-      .join('\n\n');
-
-    const userPrompt = `FULL CONVERSATION (${conversationHistory.length} turns):
-${historyText}
-
-CURRENT MESSAGE:
-"${currentMessage}"
-
-SESSION EVENTS (${sessionMemory.events.length} total):
-${this.serializeEventsForPrompt(
-  this.retrieveRelevantEvents(sessionMemory.events, [], [])
-)}
-
-ESSAY PHASE: ${profile.index.improvementPhase.level}
-
-Detect patterns. Be specific. Reference actual student quotes.
-Output only JSON.`;
-
-    const response = await callClaude<string>({
-      model: HAIKU,
-      systemPrompt,
-      userPrompt,
-      maxTokens: 600,
-      temperature: 0.3,
-      useJsonMode: false,
-      cacheSystemPrompt: true,
-    });
-
-    const timingMs = Date.now() - callStart;
-    const rawCost = calculateCost(response.usage, HAIKU);
-    console.log(`[EssayIntelligence] L6 pattern detection: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${rawCost.toFixed(4)}`);
-    const tokenUsage: TokenUsage = {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
-    };
-    const cost: LayerCost = { layer: 'L6_pattern_detection', cost: rawCost, tokenUsage, timingMs };
-
-    // Parse with defensive fallback
-    const parsed = this.parseStage4Output<{
-      patterns: Array<{ pattern: string; evidence: string[]; implication: string; instanceCount: number }>;
-      sessionArcUpdate: string;
-      nextFocusSuggestion: string;
-      learningStyleUpdate: string | null;
-      qualitySignals: CoachingQualitySignals;
-      sessionJournalEntry: string | null;
-    }>(response.content as string);
-
-    if (!parsed) {
-      return {
-        patterns: [],
-        sessionArcUpdate: sessionMemory.sessionArcSummary || 'Session in progress',
-        nextFocusSuggestion: sessionMemory.nextFocus || 'Continue current topic',
-        learningStyleUpdate: null,
-        qualitySignals: {
-          vocabularyEvolution: 'not_yet',
-          questionQualityTrend: 'stable',
-          revisionSophistication: 'not_yet_discussed',
-          studentInitiation: 'moderate',
-          breakthroughMoments: 0,
-        },
-        sessionJournalEntry: null,
-        cost,
-      };
-    }
-
-    // Convert to PatternInsight[]
-    const patterns: PatternInsight[] = (parsed.patterns ?? []).map(p => ({
-      id: `pattern_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      pattern: p.pattern,
-      evidence: p.evidence ?? [],
-      implication: p.implication ?? '',
-      firstObservedAt: now,
-      lastObservedAt: now,
-      instanceCount: p.instanceCount ?? 1,
-    }));
-
-    return {
-      patterns,
-      sessionArcUpdate: parsed.sessionArcUpdate ?? 'Session in progress',
-      nextFocusSuggestion: parsed.nextFocusSuggestion ?? 'Continue current topic',
-      learningStyleUpdate: parsed.learningStyleUpdate ?? null,
-      qualitySignals: parsed.qualitySignals ?? {
-        vocabularyEvolution: 'not_yet',
-        questionQualityTrend: 'stable',
-        revisionSophistication: 'not_yet_discussed',
-        studentInitiation: 'moderate',
-        breakthroughMoments: 0,
-      },
-      sessionJournalEntry: parsed.sessionJournalEntry ?? null,
-      cost,
-    };
-  }
-
-  // --------------------------------------------------------------------------
   // STAGE 1.5: COGNITIVE ASSESSMENT (Improvement 6 — Haiku LLM-assessed state)
   // --------------------------------------------------------------------------
 
@@ -3202,7 +3830,16 @@ Output ONLY a JSON object matching this exact schema:
   "crossLayerPatterns": [{"analysisObservation":"<from essay analysis>","conversationEvidence":"<from chat>","coachingImplication":"<what to do with it>"}],
   "synthesizedAtTurn": ${memory.turnCount},
   "pendingObservations": []
-}`;
+}
+
+STAGED EXPECTATIONS BY TURN:
+- Turn 2 (NASCENT): Only 1 student response of evidence. Hedge aggressively — use "possibly", "seems to be", "early signal suggests". "personhood" should be 1-2 sentences of tentative read. blindSpotHypotheses should have readyToSurface=FALSE until you see repetition. 1-2 pending observations is fine. Do NOT over-commit — a wrong theory at T2 poisons T3-T5.
+- Turn 3 (HYPOTHESIS): 2 student responses. Still provisional — confirm whether T2 hedges are holding up. If a T2 signal repeats, upgrade it from "possibly" to "appears to". If contradicted, name the contradiction.
+- Turn 4 (GROWING): Patterns should be repeating. tensions and protectedValues start to surface. blindSpotHypotheses readyToSurface=TRUE only if confirmed twice.
+- Turn 5 (CONFIRMED): "personhood" and "essayRelationship" are PRIMARY — you have 4 turns of conversation, enough to see personality patterns. protectedValues and tensions may be sparse if insufficient evidence. That's fine.
+- Turn 10+: ALL fields should be populated. You have enough conversation history to hypothesize about blind spots, tensions, and protected values.
+- NEVER return empty strings for any field. If you lack evidence, write: "Insufficient signal — would need to see [specific thing you'd need]"
+- 1 evidence-backed hypothesis is better than 0 populated fields. Take the inference.`;
 
     const userPrompt = `=== CONVERSATION (last ${recentHistory.length} turns) ===
 ${historyText}
@@ -3215,15 +3852,16 @@ Blind Spots (from analysis): ${blindSpots.join('; ') || 'none detected'}
 Red Flags (from admissions positioning): ${redFlags.join('; ') || 'none'}
 Student Declared Context: ${profile.studentDeclaredContext || 'none yet'}
 
+${writerPortrait.length < 50 ? 'NOTE: Analysis portrait is preliminary. Prioritize conversation dynamics — what the student asks about, avoids, how they respond to feedback, what they deflect from.\n' : ''}${pendingObservations.length === 0 ? 'NOTE: No explicit portrait observations yet. Infer from conversation patterns — question types, resistance patterns, what topics they return to.\n' : ''}
 Synthesize an updated theory. Be specific and evidence-grounded. Output only JSON.`;
 
     const response = await callClaude<string>({
       model: SONNET,
       systemPrompt,
       userPrompt,
-      maxTokens: 1000,
+      maxTokens: 2000,
       temperature: 0.3,
-      useJsonMode: false,
+      useJsonMode: true,
       cacheSystemPrompt: true,
     });
 
@@ -3238,27 +3876,67 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
     };
     const cost: LayerCost = { layer: 'L6_student_theory_synthesis', cost: rawCost, tokenUsage, timingMs };
 
-    // Parse the theory JSON
-    const rawText = typeof response.content === 'string' ? response.content : String(response.content);
-    let parsed: Record<string, unknown>;
-    try {
-      // Try direct parse, then strip markdown fences, then regex extract
-      try { parsed = JSON.parse(rawText); }
-      catch {
+    // Parse the theory JSON (5-level defensive: object → direct → strip fences → regex → jsonrepair)
+    // With useJsonMode: true, callClaude returns an already-parsed object (not a string).
+    let parsed: Record<string, unknown> = {};
+    let parseSucceeded = false;
+    let parseLevel = 0;
+
+    // Level 0: Already-parsed object (useJsonMode returns parsed content)
+    if (response.content && typeof response.content === 'object' && !Array.isArray(response.content)) {
+      parsed = response.content as Record<string, unknown>;
+      parseSucceeded = true;
+      parseLevel = 0;
+    }
+
+    // Level 1-4: String parsing fallbacks (belt-and-suspenders)
+    const rawText = parseSucceeded ? '' : (typeof response.content === 'string' ? response.content : JSON.stringify(response.content));
+
+    // Level 1: Direct parse
+    if (!parseSucceeded) {
+      try { parsed = JSON.parse(rawText); parseSucceeded = true; parseLevel = 1; } catch { /* fall through */ }
+    }
+
+    // Level 2: Strip markdown fences
+    if (!parseSucceeded) {
+      try {
         const stripped = rawText.replace(/```(?:json)?\s*/g, '').replace(/```\s*$/g, '').trim();
-        try { parsed = JSON.parse(stripped); }
-        catch {
-          const match = rawText.match(/\{[\s\S]*\}/);
-          parsed = match ? JSON.parse(match[0]) : {};
+        parsed = JSON.parse(stripped);
+        parseSucceeded = true;
+        parseLevel = 2;
+      } catch { /* fall through */ }
+    }
+
+    // Level 3: Regex extract JSON object
+    if (!parseSucceeded) {
+      try {
+        const match = rawText.match(/\{[\s\S]*\}/);
+        if (match) { parsed = JSON.parse(match[0]); parseSucceeded = true; parseLevel = 3; }
+      } catch { /* fall through */ }
+    }
+
+    // Level 4: jsonrepair (handles truncated JSON from maxTokens cutoff)
+    if (!parseSucceeded) {
+      try {
+        const match = rawText.match(/\{[\s\S]*$/);
+        if (match) {
+          parsed = JSON.parse(jsonrepair(match[0]));
+          parseSucceeded = true;
+          parseLevel = 4;
+          console.log('[CoachingService] StudentTheory recovered via jsonrepair');
         }
-      }
-    } catch {
-      console.warn('[CoachingService] StudentTheory parse failed — using minimal theory');
-      parsed = {};
+      } catch { /* fall through */ }
+    }
+
+    if (parseSucceeded) {
+      console.log(`[CoachingService] StudentTheory parsed OK — level=${parseLevel}, rawLength=${rawText.length}`);
+    } else {
+      console.warn(`[CoachingService] StudentTheory parse FAILED all 4 levels — rawLength=${rawText.length}, first 500 chars: "${rawText.slice(0, 500)}"`);
     }
 
     const theory: StudentTheory = {
-      personhood: typeof parsed.personhood === 'string' ? parsed.personhood : 'Theory synthesis incomplete.',
+      personhood: typeof parsed.personhood === 'string' && parsed.personhood.length > 20
+        ? parsed.personhood : 'Theory synthesis incomplete.',
       protectedValues: Array.isArray(parsed.protectedValues)
         ? (parsed.protectedValues as Array<Record<string, unknown>>)
             .filter(v => typeof v?.value === 'string')
@@ -3283,7 +3961,8 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
               coachingOpportunity: String(t.coachingOpportunity ?? ''),
             }))
         : [],
-      essayRelationship: typeof parsed.essayRelationship === 'string' ? parsed.essayRelationship : '',
+      essayRelationship: typeof parsed.essayRelationship === 'string' && parsed.essayRelationship.length > 10
+        ? parsed.essayRelationship : '',
       crossLayerPatterns: Array.isArray(parsed.crossLayerPatterns)
         ? (parsed.crossLayerPatterns as Array<Record<string, unknown>>)
             .filter(p => typeof p?.analysisObservation === 'string')
@@ -3310,14 +3989,14 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
   private initializeSessionMemory(): CoachingSessionMemory {
     return {
       turnCount: 0,
-      topicsDiscussed: [],
-      approachesUsed: [],
-      studentStances: [],
       events: [],
       sessionArcSummary: '',
       nextFocus: '',
       strategicQuestion: '',
       questionStaleness: 0,
+      priorTurnStrategicQuestion: null,
+      priorTurnCognitiveAssessment: null,
+      mirrorSurfacedAtTurn: undefined,
     };
   }
 
@@ -3361,8 +4040,7 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
 
   /**
    * Update session memory after a coaching turn completes.
-   * Creates a SessionEvent for the unified event log, then maintains backward-compat
-   * arrays (approachesUsed, studentStances) during the transition period.
+   * Creates a SessionEvent for the unified event log — the authoritative record.
    */
   private updateSessionMemory(
     sessionMemory: CoachingSessionMemory,
@@ -3372,12 +4050,14 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
   ): CoachingSessionMemory {
     const turnNumber = sessionMemory.turnCount + 1;
 
-    // Extract paragraph refs from Stage 1 focus
+    // Extract paragraph refs from Stage 1 focus. focusProbabilities keys are
+    // 1-indexed P-labels ("P1", "P2", …) — see runStage1InsightExtraction's
+    // quickFocus/routingStage1 construction. Normalize to 0-indexed internal.
     const paragraphRefs: number[] = [];
     for (const [label, prob] of Object.entries(stage1.focusProbabilities)) {
       if (prob > 0.3) {
-        const match = label.match(/P(\d+)/);
-        if (match) paragraphRefs.push(parseInt(match[1], 10) - 1);
+        const n = normalizeParagraphRef(label, 'coach_text');
+        if (Number.isFinite(n)) paragraphRefs.push(n);
       }
     }
 
@@ -3407,19 +4087,6 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
     };
 
     sessionMemory.events.push(event);
-
-    // Backward-compat arrays (deprecated, maintained during transition)
-    sessionMemory.approachesUsed.push({
-      turnNumber,
-      approach: cognitiveAssessment.recommendedApproach,
-      outcome: 'pending',
-    });
-    if (stage1.category === 'resistance' || stage1.category === 'preference') {
-      sessionMemory.studentStances.push({
-        stance: studentMessage.substring(0, 200),
-        turnNumber,
-      });
-    }
 
     sessionMemory.turnCount = turnNumber;
     return sessionMemory;
@@ -3559,6 +4226,126 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
 
   /**
    * W6.2: Build escalation context for injection into Stage 3 prompt.
+   * Build the improvement queue section from the analysis system's ImprovementManifest.
+   * The conversator's job is to workshop these improvements with the student.
+   * Every observation maps to an action. Understanding is fuel, improvements are output.
+   */
+  private buildImprovementQueueSection(
+    profile: EssayProfile,
+    memory: CoachingSessionMemory,
+  ): string {
+    const manifest = profile.improvementManifest;
+    if (!manifest || manifest.items.length === 0) return '';
+
+    // Initialize progress tracking on first access
+    if (!memory.improvementProgress) {
+      memory.improvementProgress = {};
+      for (const item of manifest.items) {
+        memory.improvementProgress[item.id] = 'queued';
+      }
+    }
+
+    const progress = memory.improvementProgress;
+    const active = manifest.items.filter(item => {
+      const status = progress[item.id] ?? 'queued';
+      return status !== 'addressed';
+    });
+
+    if (active.length === 0) {
+      return '\n\n=== IMPROVEMENT QUEUE (all addressed) ===\nAll improvements have been addressed. Focus on consolidation and revision plan.';
+    }
+
+    const addressedCount = manifest.items.length - active.length;
+
+    // ── Phase 2: pedagogical-payload diversity ──
+    // Replace the pre-Phase-2 "current = active[0]" with a planner-driven
+    // selection that rotates across principle categories. The planner
+    // falls back to first-unaddressed when the ledger is empty (turn 1) so
+    // behavior is unchanged for fresh sessions. From turn 2 onward, it
+    // avoids re-deploying a just-taught category, which is the regression
+    // vector the blind-spot hunter flagged (5 turns of show-don't-tell
+    // against a 0.0% wordform-overlap score). Side-effects deferred to
+    // recordCoachingTurnDeployment() after the LLM response returns.
+    const planSelection = coachingPlanner.selectNextDeployment(manifest, memory);
+    const current = planSelection?.item ?? active[0];
+    const taughtLedgerKeys = Object.keys(memory.taughtLedger ?? {});
+    const alreadyTaughtBlock = taughtLedgerKeys.length > 0
+      ? `\n\nALREADY TAUGHT THIS SESSION (do NOT re-teach):\n` +
+        taughtLedgerKeys
+          .map((id) => {
+            const t = memory.taughtLedger![id];
+            const paragraph = manifest.items.find((it) => it.id === id)?.paragraph ?? -1;
+            const paraLabel = paragraph === -1 ? 'ESSAY' : `P${paragraph + 1}`;
+            return `  - T${t.turn} ${paraLabel}: ${t.technique ?? 'guidance'} (${t.principleCategory})`;
+          })
+          .join('\n')
+      : '';
+
+    const enrichments = current.conversatorEnrichments.length > 0
+      ? `\n  ENRICHED WITH: ${current.conversatorEnrichments.join('; ')}`
+      : '';
+    const demo = current.demonstration
+      ? `\n  DEMONSTRATION: ${current.demonstration}`
+      : '';
+    const cut = current.wordEconomyCut
+      ? `\n  WORD ECONOMY: ${current.wordEconomyCut}`
+      : '';
+
+    // Scope 3 Phase 7: research-backed principle + college-specific tailoring
+    // note. Both fields are populated (when available) by
+    // enrichWithResearchDatabase() at coaching session init. Each is absent
+    // for items with no IssueType mapping or no collegeId — the empty string
+    // contributes zero tokens in miss cases.
+    const principleLine = current.researchBacking?.principle
+      ? `\n  PRINCIPLE: ${current.researchBacking.principle}`
+      : '';
+    const collegeNoteLine = current.collegeNote
+      ? `\n  COLLEGE NOTE: ${current.collegeNote}`
+      : '';
+
+    const nextItems = active.slice(1, 4).map((item, i) => {
+      const techNote = item.technique ? ` (${item.technique})` : '';
+      const enrichNote = item.conversatorEnrichments.length > 0
+        ? ` [deepened: ${item.conversatorEnrichments[0].slice(0, 80)}]`
+        : '';
+      const paraLabel = item.paragraph === -1 ? 'ESSAY' : `P${item.paragraph + 1}`;
+      return `  ${i + 2}. ${paraLabel}: ${item.action.slice(0, 120)}${techNote}${enrichNote}`;
+    }).join('\n');
+
+    const currentParaLabel = current.paragraph === -1 ? 'ESSAY-LEVEL' : `P${current.paragraph + 1}`;
+    // Planner rationale is logged to console telemetry (see recordDeployment
+    // log line) rather than injected into the prompt — the LLM doesn't need
+    // to know WHY this priority was selected, just what to deploy. Keeps the
+    // prompt leaner by ~20 tokens/turn.
+    return `\n\n=== IMPROVEMENT QUEUE (${addressedCount}/${manifest.items.length} addressed) ===` +
+      `\nWORD BUDGET: ${manifest.wordCount}/${manifest.wordLimit}` +
+      alreadyTaughtBlock +
+      `\n\nCURRENT PRIORITY [${current.impact.toUpperCase()}]:` +
+      `\n  ${currentParaLabel}: ${current.observation}` +
+      `\n  ACTION: ${current.action}` +
+      (current.stakes ? `\n  STAKES: ${current.stakes}` : '') +
+      (current.technique ? `\n  TECHNIQUE: ${current.technique}` : '') +
+      enrichments + demo + cut + principleLine + collegeNoteLine +
+      (nextItems ? `\n\nNEXT IN QUEUE:\n${nextItems}` : '') +
+      `\n\nRULE: Help the student understand and execute the CURRENT PRIORITY.` +
+      `\nIf they're stuck, DEMONSTRATE it using their details.` +
+      `\nIf they share new context, enrich the improvement with their specifics.` +
+      `\nWhen they've addressed it, advance to the next item.` +
+      // Scope 3 Phase 7: force verbatim technique emission when present.
+      // Without this, Sonnet paraphrases technique names ("try writing in
+      // scene mode" instead of "SUMMARY-TO-SCENE") — the student loses the
+      // transferable vocabulary handle. The mandate mirrors the ACTION-mode
+      // rewriteExample requirement so the coaching layer preserves craft
+      // vocabulary the same way it preserves concrete rewrites.
+      (current.technique
+        ? `\n\nVOCABULARY RULE: When offering a rewrite or teaching moment for this priority, ` +
+          `name the technique in ALL-CAPS verbatim (e.g., "This is a ${current.technique} move"). ` +
+          `Say it exactly once per response. This gives the student a transferable ` +
+          `vocabulary handle they can carry to future essays.`
+        : '');
+  }
+
+  /**
    * Produces content based on PERSISTENT tracker state (not current turn's cognitive state),
    * for any topic with escalation level >= 2.
    */
@@ -3740,6 +4527,33 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
       escalationInstructions.join('\n\n');
   }
 
+  /**
+   * Detect convergence-prone language in the essay and return relevant
+   * anti-convergence context for injection into the coaching prompt.
+   * Only fires for the first 2 matched patterns (to avoid prompt bloat).
+   */
+  private buildAntiConvergenceContext(profile: EssayProfile): string {
+    const essayText = profile.paragraphs.map(p => p.text).join(' ').toLowerCase();
+    const matched: string[] = [];
+
+    for (const pattern of ANTI_CONVERGENCE_PATTERNS) {
+      if (matched.length >= 2) break;
+      const signals = pattern.signal.split('|');
+      if (signals.some(s => essayText.includes(s))) {
+        matched.push(
+          `[${pattern.pattern.toUpperCase()}]: ${pattern.example}`
+        );
+      }
+    }
+
+    if (matched.length === 0) return '';
+
+    return `\n\n=== CONVERGENCE ALERT (this essay contains language that makes it sound like thousands of others) ===\n` +
+      `When coaching on these areas, help the student replace convergence-prone language with authentic specifics:\n` +
+      matched.join('\n') +
+      `\nThe student's authentic voice — even with rough edges — is more valuable than polished generic prose.`;
+  }
+
   // --------------------------------------------------------------------------
   // DEMONSTRATION TRIGGER + TECHNIQUE ROUTER (Writing Craft Engine)
   // --------------------------------------------------------------------------
@@ -3781,7 +4595,22 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
       };
     }
 
-    // Condition 3: Turn 5+ and no demonstration detected in conversation history
+    // Condition 3: Turn 3+ with student-declared context — the student has shared
+    // SOMETHING and the coach should demonstrate with whatever is available.
+    // The essay text itself is always available for demonstration.
+    if (turnCount >= 3 && (profile.studentDeclaredContext || '').length > 30) {
+      const coachTurns = conversationHistory.filter(t => t.role === 'coach');
+      const hasDemonstrated = coachTurns.some(t => {
+        return /[''""][^''""\n]{20,}[''""]/.test(t.content) ||
+               /technique|summary.to.scene|cold open|sensory timestamp|somatic|bookend|ritual detail/i.test(t.content) ||
+               /here'?s what|could (sound|look|feel) like|what it looks like|imagine this/i.test(t.content);
+      });
+      if (!hasDemonstrated) {
+        return { trigger: true, reason: 'Turn 3+ with student material available. Show with what you have — one detail is enough for a 2-sentence demonstration.' };
+      }
+    }
+
+    // Condition 4: Turn 5+ staleness guard — if still no demonstration by turn 5
     if (turnCount >= 5) {
       const coachTurns = conversationHistory.filter(t => t.role === 'coach');
       const hasDemonstrated = coachTurns.some(t => {
@@ -3831,27 +4660,81 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
   }
 
   /**
-   * Route a finding to a matching craft technique directive.
-   * Returns the matched technique + directive, or null if no match.
+   * Sync technique route matching — returns technique name + directive for a finding.
+   * Used by the revision checklist builder (sync context) and as the base for
+   * the enriched async version below.
    */
-  private routeFindingToTechnique(finding: Finding): { technique: string; directive: string } | null {
+  private matchFindingToTechnique(finding: Finding): { technique: string; directive: string } | null {
     const claimLower = finding.claim.toLowerCase();
-
     for (const route of TECHNIQUE_ROUTES) {
-      // All claim keywords must be present
       const keywordsMatch = route.claimKeywords.every(kw => claimLower.includes(kw));
       if (!keywordsMatch) continue;
-
-      // If dimension filter exists, at least one must match
       if (route.dimensions && route.dimensions.length > 0) {
         const dimMatch = route.dimensions.some(d => finding.dimensions.includes(d));
         if (!dimMatch) continue;
       }
-
       return { technique: route.technique, directive: route.directive };
     }
-
     return null;
+  }
+
+  /**
+   * Route a finding to a matching craft technique with enriched pedagogical content.
+   * Returns the technique directive + WHY it works + a matched before/after example.
+   * Async because getTechniqueTeaching lazy-loads bundles (cached after first call).
+   */
+  private async routeFindingToEnrichedTechnique(finding: Finding): Promise<{
+    technique: string;
+    directive: string;
+    enrichment: string | null;
+  } | null> {
+    const baseMatch = this.matchFindingToTechnique(finding);
+    if (!baseMatch) return null;
+
+    const { technique, directive } = baseMatch;
+
+    // Build enrichment: WHY + HOW + EXAMPLES (full content — we paid for it, use it)
+    let enrichment: string | null = null;
+
+    // WHY from technique bundles (lazy-loaded, cached after first call)
+    const categoryId = TECHNIQUE_TO_CATEGORY[technique];
+    if (categoryId) {
+      const { getTechniqueTeaching } = await import('./techniqueLibrary');
+      const teaching = await getTechniqueTeaching(categoryId);
+      if (teaching) {
+        enrichment = `WHY: ${teaching.why}`;
+        if (teaching.examples && teaching.examples !== 'No transformation examples available.') {
+          // Include top 2 examples (untruncated — richer context for the coach)
+          const examples = teaching.examples.split('\n\n').slice(0, 2);
+          for (const ex of examples) {
+            if (ex) enrichment += `\n  ${ex}`;
+          }
+        }
+      }
+    }
+
+    // TRANSFORMATION EXAMPLES from research database (matching by craft move)
+    // Include up to 2 full before→after pairs for richer coaching demonstrations
+    const craftMove = TECHNIQUE_TO_CRAFT_MOVE[technique];
+    if (craftMove) {
+      try {
+        const { getExamplesByCraftMove } = await import(
+          '../../commonAppWorkshop/data/transformationExamples'
+        );
+        const examples = (getExamplesByCraftMove(craftMove) || []).slice(0, 2);
+        for (const example of examples) {
+          const transformBlock =
+            `TRANSFORMATION: "${example.before.text}" → "${example.after.text}"` +
+            `\n  PROBLEM: ${example.before.problem}` +
+            `\n  STRENGTH: ${example.after.strength}`;
+          enrichment = enrichment ? `${enrichment}\n  ${transformBlock}` : transformBlock;
+        }
+      } catch {
+        // Non-fatal — transformation examples are optional enrichment
+      }
+    }
+
+    return { technique, directive, enrichment };
   }
 
   /**
@@ -3869,14 +4752,40 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
    *
    * Returns empty string if no findings are available.
    */
-  private buildFindingCoachingContext(
+  private async buildFindingCoachingContext(
     coordinator: EssayProfileCoordinator,
     stage1: Stage1Output,
     profile: EssayProfile,
-  ): string {
+    sessionMemory?: CoachingSessionMemory,
+  ): Promise<string> {
     const findingStore = coordinator.getFindingStore();
     const active = findingStore.getActiveSortedByCoachingValue();
     if (active.length === 0) return '';
+
+    // ── Finding lifecycle tracking ──
+    // Build a set of finding IDs that have been discussed in prior turns
+    // so we can split findings into FRESH vs PENDING vs ADDRESSED
+    const discussedFindingIds = new Set<string>();
+    const addressedFindingIds = new Set<string>();
+    const findingDiscussedAtTurn = new Map<string, number>();
+
+    if (sessionMemory?.events) {
+      for (const event of sessionMemory.events) {
+        if (event.findingRefs) {
+          for (const fId of event.findingRefs) {
+            discussedFindingIds.add(fId);
+            findingDiscussedAtTurn.set(fId, event.turn);
+          }
+        }
+      }
+    }
+    if (sessionMemory?.revisionChecklist) {
+      for (const task of sessionMemory.revisionChecklist) {
+        if (task.status === 'addressed' && task.findingRef) {
+          addressedFindingIds.add(task.findingRef);
+        }
+      }
+    }
 
     // Determine focus paragraph indices from Stage 1
     const focusParagraphs: number[] = [];
@@ -3936,8 +4845,13 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
     );
     selectedFindings = selectedFindings.slice(0, 8);
 
-    // Serialize findings with technique routing
-    const findingLines = selectedFindings.map(f => {
+    // Split findings by lifecycle status for differentiated injection
+    const freshFindings = selectedFindings.filter(f => !discussedFindingIds.has(f.id) && !addressedFindingIds.has(f.id));
+    const pendingFindings = selectedFindings.filter(f => discussedFindingIds.has(f.id) && !addressedFindingIds.has(f.id));
+    // Addressed findings are dropped — don't re-inject solved problems
+
+    // Serialize findings with enriched technique routing (WHY + examples)
+    const findingLines = await Promise.all(selectedFindings.filter(f => !addressedFindingIds.has(f.id)).map(async f => {
       const scopeStr = f.scope.type === 'essay_level'
         ? 'essay-level'
         : f.scope.type === 'cross_paragraph'
@@ -3947,13 +4861,31 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
       const evidence = f.evidence.length > 0
         ? ` Evidence: "${f.evidence[0].text.slice(0, 100)}${f.evidence[0].text.length > 100 ? '...' : ''}"`
         : '';
-      // Route finding to a craft technique directive
-      const techniqueMatch = this.routeFindingToTechnique(f);
-      const techniqueDirective = techniqueMatch
-        ? `\n  → TECHNIQUE: ${techniqueMatch.technique} — ${techniqueMatch.directive}`
-        : '';
-      return `[${f.id}] [${f.maturity}/${f.coachingValue}] ${scopeStr} [${dims}]\n  ${f.claim}${evidence}${techniqueDirective}`;
-    });
+      // Route finding to enriched technique with pedagogical content
+      const techniqueMatch = await this.routeFindingToEnrichedTechnique(f);
+      let techniqueDirective = '';
+      if (techniqueMatch) {
+        techniqueDirective = `\n  → TECHNIQUE: ${techniqueMatch.technique} — ${techniqueMatch.directive}`;
+        if (techniqueMatch.enrichment) {
+          techniqueDirective += `\n  → TEACHING: ${techniqueMatch.enrichment}`;
+        }
+      }
+      // Lifecycle label: FRESH (new to this session) or PENDING (discussed but not addressed)
+      const isPending = discussedFindingIds.has(f.id);
+      const discussedTurn = findingDiscussedAtTurn.get(f.id);
+      const lifecycleLabel = isPending
+        ? ` [PENDING — discussed Turn ${discussedTurn}, student hasn't addressed it yet]`
+        : ' [FRESH — not yet discussed]';
+      return `[${f.id}] [${f.maturity}/${f.coachingValue}] ${scopeStr} [${dims}]${lifecycleLabel}\n  ${f.claim}${evidence}${techniqueDirective}`;
+    }));
+
+    // Lifecycle summary: give the coach a sense of progress
+    const lifecycleSummary = addressedFindingIds.size > 0 || pendingFindings.length > 0
+      ? `\nFINDING PROGRESS: ${addressedFindingIds.size} addressed (dropped from context), ` +
+        `${pendingFindings.length} discussed but pending, ${freshFindings.length} fresh.` +
+        (pendingFindings.length > 0 ? ` For PENDING findings, don't re-diagnose — reference your prior discussion and push for action.` : '') +
+        (freshFindings.length > 0 ? ` For FRESH findings, give the full diagnosis treatment.` : '')
+      : '';
 
     // Supplementary profile context for focus paragraphs
     const profileSnippets: string[] = [];
@@ -3997,10 +4929,48 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
       ? `\nPROFILE CONTEXT FOR FOCUS:\n${profileSnippets.join('\n')}`
       : '';
 
+    // Teaching content from workshop systems (PIQ examples + telling phrase detection)
+    // Zero LLM cost — pure content routing from curated sources
+    // SCOPED to focus paragraphs (±1 context) — don't detect patterns in paragraphs the student isn't working on
+    const focusWithContext = new Set<number>();
+    for (const pi of focusParagraphs) {
+      focusWithContext.add(Math.max(0, pi - 1));
+      focusWithContext.add(pi);
+      focusWithContext.add(Math.min(profile.paragraphs.length - 1, pi + 1));
+    }
+    const scopedEssayText = hasFocusParagraphs
+      ? [...focusWithContext].sort((a, b) => a - b)
+          .map(i => profile.paragraphs[i]?.text ?? '')
+          .join('\n')
+      : profile.paragraphs.map(p => p.text).join('\n'); // essay overview → full text
+
+    // Filter out findings that already have technique enrichment (prevent triple-stacking)
+    const findingsNeedingTeaching = selectedFindings.filter(f => {
+      const lineForFinding = findingLines.find(l => l.startsWith(`[${f.id}]`));
+      return !lineForFinding?.includes('→ TECHNIQUE:');
+    });
+
+    const teachingMatches = await getTeachingContentForContext(
+      findingsNeedingTeaching,
+      scopedEssayText,
+      800, // tighter budget — quality over quantity, 2-3 targeted examples max
+    );
+    const teachingSection = teachingMatches.length > 0
+      ? `\n\n=== CURATED TEACHING CONTENT ===\n` +
+        `Use at most ONE of these examples per response. Pick the one most relevant to\n` +
+        `what the student is working on RIGHT NOW. Use it to DEMONSTRATE the craft move,\n` +
+        `then immediately hand the pen back: "That's one way. Now write yours."\n` +
+        `Do NOT use these when the student asks a direct question — answer the question first.\n\n` +
+        teachingMatches.map(m => m.content).join('\n\n')
+      : '';
+
     return `\n\n=== KEY FINDINGS (reference by [F] label when discussing relevant topics) ===\n` +
       `${hasFocusParagraphs ? `Focus: P${focusParagraphs.map(p => p + 1).join(', P')}` : 'Focus: essay overview'}\n` +
-      findingLines.join('\n\n') +
-      profileSection;
+      lifecycleSummary +
+      '\n' + findingLines.join('\n\n') +
+      profileSection +
+      teachingSection +
+      `\nSYNTHESIS: Do NOT report findings back as a list. Synthesize the 2-3 most important into a SINGLE observation that names what the essay is doing, why it matters for the reader, and what craft move addresses it.`;
   }
 
   // --------------------------------------------------------------------------
@@ -4055,13 +5025,116 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
 
     if (priorCoachPoints.length === 0) return '';
 
+    // Detect repeated directives (writing tasks, action requests) across recent coach turns
+    const recentCoachTurns = history
+      .filter(t => t.role === 'coach')
+      .slice(-3);
+    const directivePatterns = /\b(write me|rewrite|your task|go\.|try it|paste|show me)\b/i;
+    const repeatedDirectives: string[] = [];
+    for (const turn of recentCoachTurns) {
+      const lines = turn.content.split('\n');
+      for (const line of lines) {
+        if (directivePatterns.test(line) && line.length > 20 && line.length < 200) {
+          repeatedDirectives.push(line.trim());
+        }
+      }
+    }
+
+    let directiveWarning = '';
+    if (repeatedDirectives.length >= 2) {
+      directiveWarning = `\n\nDIRECTIVE REPETITION WARNING: You have given similar action requests in your last ${recentCoachTurns.length} responses. DO NOT repeat the same writing task. The student heard you. Either respond to what they're actually saying, or offer a DIFFERENT entry point if the original task isn't working.`;
+    }
+
     return `\n\n=== ANTI-REPETITION: YOU ALREADY SAID THIS ===\n` +
       `The student is returning to a topic you've discussed before. Here are the KEY POINTS you already made:\n` +
       priorCoachPoints.map((p, i) => `  ${i + 1}. ${p}`).join('\n') +
       `\n\nDO NOT rephrase these points. Either:\n` +
       `- Go DEEPER: cover specific sentences/dimensions you haven't touched yet\n` +
       `- Go WIDER: connect this topic to something discussed in later turns\n` +
-      `- Redirect: if you've covered it thoroughly, say so and suggest implementation`;
+      `- Redirect: if you've covered it thoroughly, say so and suggest implementation` +
+      directiveWarning;
+  }
+
+  /**
+   * Build a compact summary of revision priorities from the profile.
+   * Used by buildStableProfileContext to inject what the student already saw.
+   */
+  private buildRevisionPrioritySummary(profile: EssayProfile): string | null {
+    // Try coaching map priorities first
+    const priorities = profile.scoreMatrix?.coachingMap?.priorities;
+    if (priorities && priorities.length > 0) {
+      const lines = priorities.slice(0, 5).map((p, i) => {
+        const paras = p.paragraphs?.map((pi: number) => `P${pi + 1}`).join(', ') ?? '';
+        return `  #${i + 1}: ${p.action ?? p.architecturalReason ?? 'Revision needed'} (${paras})`;
+      });
+      return `- Revision priorities:\n${lines.join('\n')}`;
+    }
+
+    // Fallback: build from active findings
+    const activeFindings = profile.findings
+      .filter(f => f.status === 'active' && (f.coachingValue === 'critical' || f.coachingValue === 'high'))
+      .slice(0, 5);
+    if (activeFindings.length > 0) {
+      const lines = activeFindings.map((f, i) => {
+        const scope = f.scope.type === 'paragraph' ? `P${(f.scope.paragraph ?? 0) + 1}` : 'essay-wide';
+        return `  #${i + 1}: ${f.claim.slice(0, 80)} (${scope})`;
+      });
+      return `- Revision priorities (from findings):\n${lines.join('\n')}`;
+    }
+
+    return null;
+  }
+
+  /**
+   * Parse raw context accumulation text into structured student context.
+   * Uses pattern matching to extract names, places, moments, and details
+   * from the Sonnet-curated contextAccumulation string.
+   */
+  private parseIntoStructuredContext(
+    rawContext: string,
+    turnNumber: number,
+    profile: EssayProfile,
+  ): void {
+    if (!profile.structuredContext) {
+      profile.structuredContext = { people: [], places: [], moments: [], concreteDetails: [] };
+    }
+    const ctx = profile.structuredContext;
+
+    // Extract proper nouns as potential people (Title Case words not at sentence start)
+    const namePattern = /(?:Mrs?\.|Ms\.|Dr\.|Professor|Coach|Teacher)\s+[A-Z][a-z]+|[A-Z][a-z]{2,}\s+[A-Z][a-z]{2,}/g;
+    const names = rawContext.match(namePattern) || [];
+    for (const name of names) {
+      if (!ctx.people.some(p => p.name === name.trim())) {
+        ctx.people.push({ name: name.trim(), relationship: '', firstMentionedTurn: turnNumber });
+      }
+    }
+
+    // Extract places (common physical location words)
+    const placePattern = /(?:practice room|classroom|lab|stage|kitchen|bedroom|garage|library|hackathon|studio|auditorium|gymnasium)/gi;
+    const places = rawContext.match(placePattern) || [];
+    for (const place of places) {
+      if (!ctx.places.some(p => p.place.toLowerCase() === place.toLowerCase())) {
+        ctx.places.push({ place: place.toLowerCase(), firstMentionedTurn: turnNumber });
+      }
+    }
+
+    // Extract temporal/specific moments
+    const momentPattern = /(?:when|the moment|the first time|the night|that day|hour \d+|at \d+(?:am|pm))[^.!?]{10,}[.!?]/gi;
+    const moments = rawContext.match(momentPattern) || [];
+    for (const moment of moments) {
+      if (!ctx.moments.some(m => m.moment === moment.trim())) {
+        ctx.moments.push({ moment: moment.trim(), firstMentionedTurn: turnNumber });
+      }
+    }
+
+    // Extract concrete details (numbers, specific nouns, quoted phrases)
+    const detailPattern = /(?:second place|first place|third|won|built|created|scored \d|valence|algorithm|Chopin|Nocturne|jazz|hackathon team)/gi;
+    const details = rawContext.match(detailPattern) || [];
+    for (const detail of details) {
+      if (!ctx.concreteDetails.some(d => d.detail.toLowerCase() === detail.toLowerCase())) {
+        ctx.concreteDetails.push({ detail: detail.toLowerCase(), firstMentionedTurn: turnNumber });
+      }
+    }
   }
 
   /**

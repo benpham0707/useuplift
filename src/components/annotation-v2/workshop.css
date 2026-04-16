@@ -1,0 +1,133 @@
+/* ============================================
+   Annotation Workshop — Premium Visual Effects
+   ============================================ */
+
+/* Shimmer sweep — used on strength highlights and panels */
+@keyframes workshop-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* Strength glow pulse — emerald */
+@keyframes glow-strength {
+  0%, 100% {
+    box-shadow:
+      0 0 4px hsla(160, 70%, 55%, 0.15),
+      0 0 12px hsla(160, 70%, 55%, 0.05);
+  }
+  50% {
+    box-shadow:
+      0 0 8px hsla(160, 70%, 55%, 0.3),
+      0 0 20px hsla(160, 70%, 55%, 0.1);
+  }
+}
+
+/* Critical glow pulse — rose */
+@keyframes glow-critical {
+  0%, 100% {
+    box-shadow:
+      0 0 4px hsla(350, 75%, 65%, 0.15),
+      0 0 12px hsla(350, 75%, 65%, 0.05);
+  }
+  50% {
+    box-shadow:
+      0 0 8px hsla(350, 75%, 65%, 0.3),
+      0 0 20px hsla(350, 75%, 65%, 0.1);
+  }
+}
+
+/* Phase pulse — for improvement phase badges */
+@keyframes phase-pulse {
+  0%, 100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+}
+
+/* Gentle float for atmospheric orbs */
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0) translateX(0);
+  }
+  33% {
+    transform: translateY(-20px) translateX(10px);
+  }
+  66% {
+    transform: translateY(10px) translateX(-8px);
+  }
+}
+
+/* Card enter animation */
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Connection pulse for line indicators */
+@keyframes connection-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Section reveal — staggered paragraph entrance */
+@keyframes section-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tooltip enter — for insight hover cards */
+@keyframes tooltip-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Severity border glow — subtle ambient glow on selected highlights */
+@keyframes border-glow {
+  0%, 100% {
+    box-shadow: 0 1px 3px hsla(0, 0%, 0%, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 1px 8px var(--glow-color, hsla(250, 70%, 60%, 0.15));
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .workshop-shimmer-layer,
+  .workshop-float-orb,
+  .workshop-glow-strength,
+  .workshop-glow-critical {
+    animation: none !important;
+  }
+}

@@ -1545,18 +1545,11 @@ export default function ActivityWorkshop() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* HERO SECTION — hidden for now, preserved for recall
       <div className="hero-gradient hero-gradient-fade absolute top-0 left-0 right-0 h-[120vh] pointer-events-none -z-10" />
-
-      {/* ================================================================== */}
-      {/* SCORE DASHBOARD + TABBED OVERVIEW                                  */}
-      {/* ================================================================== */}
       <div className="hero-gradient text-white relative flex-shrink-0">
         <div className="max-w-7xl mx-auto px-4 py-6 space-y-3">
-
-          {/* Score Dashboard — extracted memoized component */}
           {pipelineData && <ScoreDashboard data={pipelineData} />}
-
-          {/* Portfolio Overview — collapsible below score cards */}
           <Collapsible open={isOverviewOpen} onOpenChange={setIsOverviewOpen}>
             <CollapsibleTrigger asChild>
               <button className="w-full flex items-center justify-between py-2 px-1 text-white/80 hover:text-white transition-colors">
@@ -1570,9 +1563,9 @@ export default function ActivityWorkshop() {
               </div>
             </CollapsibleContent>
           </Collapsible>
-
         </div>
       </div>
+      END HERO SECTION */}
 
       {/* ================================================================== */}
       {/* RESIZABLE TWO-PANEL WORKSPACE                                      */}

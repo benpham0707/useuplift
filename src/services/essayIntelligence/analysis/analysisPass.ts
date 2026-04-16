@@ -36,6 +36,13 @@ import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import type { FindingStore } from '../findings/findingStore';
 import { buildAnnotationFindingContext } from '../findings/findingContextBuilder';
+import {
+  TECHNIQUE_VOCABULARY_PROMPT_BLOCK,
+  normalizeTechnique,
+} from './techniqueVocabulary';
+import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import type { ImprovementCandidate } from '../profileTypes';
+import { PipelineError } from '../errors';
 
 // ============================================================================
 // CONSTANTS
@@ -190,6 +197,37 @@ function selectAnchorParagraph(
  * Extracts the anchor's calibration reflection, strongest/weakest sentences, and scores.
  * Appended to Block 3 for all non-anchor paragraphs.
  */
+/**
+ * Extract the first complete sentence from a reasoning string.
+ *
+ * Scope 1 Phase 2 (GAP-3): `buildAnchorContext()` previously truncated
+ * `effectivenessReasoning` at 120/150 characters, cutting mid-word and
+ * losing the end of the first sentence. R4 flagged this as load-bearing:
+ * `effectivenessReasoning` is consumed full-length downstream by coaching
+ * (`coachingService.ts:2355` via `profile.activeConcerns`), so the
+ * GENERATION must stay uncapped — only the RE-INJECTION into anchor
+ * context needs a tighter budget.
+ *
+ * This helper extracts the first complete sentence (up to the first `.`,
+ * `?`, or `!` followed by whitespace or end-of-string) and returns it as-is.
+ * If the reasoning has no sentence boundary, returns the full string.
+ * This preserves readable context while bounding size to ~120-250 chars
+ * (the natural length of a first sentence) instead of mid-word truncation.
+ *
+ * Exported for testability — tests/test-scope1-phase2-runtime.ts exercises
+ * the regex edge cases directly.
+ */
+export function extractFirstSentence(text: string): string {
+  if (!text) return '';
+  // Match text up to the first sentence-ending punctuation followed by
+  // whitespace or end-of-string. Handles common abbreviations by requiring
+  // whitespace after the punctuation (so "P1S2." inside a reference doesn't
+  // end the sentence early — but "first claim." followed by " second claim"
+  // does).
+  const match = text.match(/^[^.?!]*[.?!](?=\s|$)/);
+  return match ? match[0].trim() : text.trim();
+}
+
 function buildAnchorContext(anchorResult: AnalysisPassOutput): string {
   const lines: string[] = [];
 
@@ -205,12 +243,13 @@ function buildAnchorContext(anchorResult: AnalysisPassOutput): string {
     lines.push('');
   }
 
-  // Anchor scores
+  // Anchor scores — extract first complete sentence from each reasoning
+  // rather than char-slicing. See extractFirstSentence() doc above.
   lines.push(`ANCHOR SCORES (P${anchorResult.paragraphIndex}):`);
   for (const sa of anchorResult.sentenceAnalyses) {
     const confLevel = sa.confidence?.level ?? 'not assessed';
-    const reasoning = sa.effectivenessReasoning.slice(0, 120);
-    lines.push(`  S${sa.sentenceIndex}: effectiveness=${sa.effectiveness} — "${reasoning}${sa.effectivenessReasoning.length > 120 ? '...' : ''}"`);
+    const firstSentence = extractFirstSentence(sa.effectivenessReasoning);
+    lines.push(`  S${sa.sentenceIndex}: effectiveness=${sa.effectiveness} — "${firstSentence}"`);
     lines.push(`  Confidence: ${confLevel}`);
   }
   lines.push(`Paragraph effectiveness: ${anchorResult.paragraphEffectiveness}`);
@@ -224,9 +263,9 @@ function buildAnchorContext(anchorResult: AnalysisPassOutput): string {
   if (strongest && weakest) {
     lines.push('ESSAY-SPECIFIC EXAMPLES (from anchor scoring):');
     lines.push(`  STRONGEST in anchor: P${anchorResult.paragraphIndex}S${strongest.sentenceIndex} scored ${strongest.effectiveness}`);
-    lines.push(`    "${strongest.effectivenessReasoning.slice(0, 150)}${strongest.effectivenessReasoning.length > 150 ? '...' : ''}"`);
+    lines.push(`    "${extractFirstSentence(strongest.effectivenessReasoning)}"`);
     lines.push(`  WEAKEST in anchor: P${anchorResult.paragraphIndex}S${weakest.sentenceIndex} scored ${weakest.effectiveness}`);
-    lines.push(`    "${weakest.effectivenessReasoning.slice(0, 150)}${weakest.effectivenessReasoning.length > 150 ? '...' : ''}"`);
+    lines.push(`    "${extractFirstSentence(weakest.effectivenessReasoning)}"`);
     lines.push('');
   }
 
@@ -305,6 +344,8 @@ function computeStdev(values: number[]): number {
  */
 function buildSystemPrompt(): string {
   return `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
+
+${TECHNIQUE_VOCABULARY_PROMPT_BLOCK}
 
 ## YOUR ROLE
 
@@ -455,6 +496,29 @@ CALIBRATION FOR CONFIDENCE LEVELS:
 
 IMPORTANT: "low" confidence is NOT a failure. It is diagnostic information. An ambiguous sentence that could be intentional craft or accidental error SHOULD have low confidence — that ambiguity IS the teaching moment.
 
+## IMPROVEMENT CANDIDATE EMISSION (Scope 2 Phase 5)
+
+For every sentence whose analysis surfaces a CONCRETE, LOCALIZED improvement opportunity, emit an "improvementCandidate" alongside the analysis. This is where your evaluation becomes actionable for downstream consolidation and coaching.
+
+Emit a candidate ONLY when:
+- You can articulate a specific change to this sentence (or its immediate neighborhood), not a general area of improvement.
+- The suggestedChange is something a student could act on in one edit pass — not an abstract goal like "develop voice more."
+- The observation is tied to specific text you cite in effectivenessReasoning, strengths, or weaknesses.
+
+DO NOT emit a candidate when:
+- The sentence works well enough that no localized change is worth suggesting (skip — do not force one).
+- The needed change is paragraph-wide or essay-wide (that belongs to L3.75, not L3.5).
+- You would have to invent fabricated details to describe the change.
+
+Fields (omit the field entirely when not emitting):
+- "observation": 1-2 sentences. What's not working, in specific terms. Cite text. Must be grounded in your strengths/weaknesses analysis.
+- "suggestedChange": 1-2 sentences. The concrete change. Imperative voice ("Replace 'very difficult' with the specific physical sensation you felt"). No generic advice.
+- "technique": one of the technique vocabulary names above, or null. Pick at most one; pick null if none cleanly apply. Case-sensitive.
+- "demonstrationSketch": OPTIONAL. A 1-sentence rewrite sketch (leave null — L5 writes the polished rewrite). Emit only if a minimal sketch clarifies the suggestion.
+- "coachingValue": one of "critical" | "high" | "medium" | "diagnostic". Critical = load-bearing sentence with a clear flaw. High = significant local improvement. Medium = genuine polish opportunity. Diagnostic = interesting observation, low action urgency.
+
+The orchestrator harvests these into the ImprovementCandidateStore after L3.5 completes. Duplicate IDs are handled automatically — do not worry about collisions with L3 candidates on the same sentence; the store's lifecycle model handles them.
+
 ## OUTPUT FORMAT
 
 Respond with a single JSON object matching this schema EXACTLY:
@@ -465,13 +529,13 @@ Respond with a single JSON object matching this schema EXACTLY:
   "sentenceAnalyses": [
     {
       "sentenceIndex": 0,
-      "effectivenessReasoning": "string — WHY this score, referencing understanding",
+      "effectivenessReasoning": "string — WHY this score, referencing understanding (uncapped: this IS your reasoning chain and is consumed by downstream coaching)",
       "effectiveness": 65,
       "strengths": [
-        { "observation": "string — what works", "evidence": "string — specific text cited", "confidence": 0.9 }
+        { "observation": "string — what works", "evidence": "string — specific text cited, MAX 10 WORDS", "confidence": 0.9 }
       ],
       "weaknesses": [
-        { "observation": "string — what doesn't work", "evidence": "string — specific text cited", "confidence": 0.85 }
+        { "observation": "string — what doesn't work", "evidence": "string — specific text cited, MAX 10 WORDS", "confidence": 0.85 }
       ],
       "isStrength": false,
       "isProblem": false,
@@ -480,6 +544,13 @@ Respond with a single JSON object matching this schema EXACTLY:
         "reasoning": "string — cite specific text features making you certain or uncertain",
         "level": "high",
         "sensitivityNote": null
+      },
+      "improvementCandidate": {
+        "observation": "string — cites specific text, 1-2 sentences",
+        "suggestedChange": "string — concrete imperative change, 1-2 sentences",
+        "technique": "SUMMARY-TO-SCENE | ... | null",
+        "demonstrationSketch": "string | null",
+        "coachingValue": "critical | high | medium | diagnostic"
       }
     }
   ],
@@ -487,11 +558,17 @@ Respond with a single JSON object matching this schema EXACTLY:
   "paragraphVerdict": "string — one-sentence assessment of how well this paragraph fulfills its role",
   "comparativeNotes": "string | null — how this paragraph compares to the anchor. Null for the anchor itself.",
   "holisticAnalysisEvolution": {
-    "strengthSignatures": [{ "quality": "string", "evidence": "string", "paragraphs": [0] }],
+    "strengthSignatures": [{ "quality": "string", "evidence": "string (MAX 10 WORDS)", "paragraphs": [0] }],
     "growthEdges": [{ "quality": "string", "description": "string", "paragraphs": [0] }],
     "aoTakeaway": "string — what an AO would think after reading this paragraph in context"
   }
-}`;
+}
+
+SCHEMA BREVITY CAPS (Scope 1 Phase 2):
+- strengths[].evidence: MAX 10 words — a specific text quote, not commentary
+- weaknesses[].evidence: MAX 10 words — same
+- strengthSignatures[].evidence: MAX 10 words — same
+- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.`;
 }
 
 // ============================================================================
@@ -631,7 +708,7 @@ Respond with a single JSON object:
   "essayStrengths": [
     {
       "quality": "string — what works at the essay level",
-      "evidence": "string — specific text cited",
+      "evidence": "string — specific text cited, MAX 10 WORDS",
       "paragraphs": [0, 2]
     }
   ],
@@ -1053,6 +1130,68 @@ function buildParagraphPrompt(
 // ============================================================================
 
 /**
+ * Scope 2 Phase 5: Parse a raw improvementCandidate blob emitted by the
+ * L3.5 analysis prompt into a typed ImprovementCandidate.
+ *
+ * Returns null when the field is absent, malformed, or missing required
+ * string fields. A null return is normal — L3.5 emits candidates only on
+ * sentences with actionable localized improvement opportunities.
+ *
+ * ID is built via `ImprovementCandidateStore.buildId` using paragraph +
+ * sentence + observation, so re-runs produce stable IDs and dedupe
+ * naturally against any L3 candidate that already exists for the same
+ * observation.
+ */
+function parseImprovementCandidate(
+  raw: unknown,
+  paragraphIndex: number,
+  sentenceIndex: number,
+): ImprovementCandidate | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const observation = typeof r.observation === 'string' ? r.observation.trim() : '';
+  const suggestedChange = typeof r.suggestedChange === 'string' ? r.suggestedChange.trim() : '';
+  if (observation.length === 0 || suggestedChange.length === 0) return null;
+
+  // technique: null OR exact/normalized match to the vocabulary enum
+  const rawTechnique =
+    typeof r.technique === 'string' ? r.technique : r.technique === null ? null : undefined;
+  const technique = rawTechnique === undefined ? null : normalizeTechnique(rawTechnique);
+
+  const demonstrationSketch =
+    typeof r.demonstrationSketch === 'string' && r.demonstrationSketch.trim().length > 0
+      ? r.demonstrationSketch.trim()
+      : null;
+
+  const rawCoachingValue = typeof r.coachingValue === 'string' ? r.coachingValue : 'medium';
+  const coachingValue: ImprovementCandidate['coachingValue'] =
+    rawCoachingValue === 'critical' || rawCoachingValue === 'high' ||
+    rawCoachingValue === 'medium' || rawCoachingValue === 'diagnostic'
+      ? rawCoachingValue
+      : 'medium';
+
+  const id = ImprovementCandidateStore.buildId('L3.5', paragraphIndex, sentenceIndex, observation);
+
+  return {
+    id,
+    sourceLayer: 'L3.5',
+    paragraph: paragraphIndex,
+    sentence: sentenceIndex,
+    sourceFindingId: null,
+    observation,
+    suggestedChange,
+    technique,
+    demonstrationSketch,
+    coachingValue,
+    lifecycleState: 'candidate',
+    supersededBy: null,
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Validate and transform a raw LLM response into a typed AnalysisPassOutput.
  * Defensive: fills in defaults for missing fields rather than crashing.
  */
@@ -1088,6 +1227,13 @@ function validateAndTransform(
         };
       }
 
+      // Scope 2 Phase 5: parse inline improvement candidate (may be null)
+      const improvementCandidate = parseImprovementCandidate(
+        rawSA.improvementCandidate,
+        paragraphIndex,
+        i,
+      );
+
       sentenceAnalyses.push({
         sentenceIndex: i,
         effectiveness,
@@ -1098,6 +1244,7 @@ function validateAndTransform(
         isProblem: typeof rawSA.isProblem === 'boolean' ? rawSA.isProblem : effectiveness < 50,
         priorityForImprovement: clampPriority(Number(rawSA.priorityForImprovement) || 0),
         confidence,
+        improvementCandidate,
       });
     } else {
       // Missing sentence — fill with a conservative default
@@ -1281,45 +1428,21 @@ export class AnalysisPassService {
       console.log(
         `[AnalysisPass] Mode: essay_level (early phase), 1 Sonnet call for ${analyzableParagraphs.length} paragraphs`,
       );
+      // Scope 2 Phase 5 fail-fast: essay-level analysis is a single Sonnet
+      // call. Previously a catch here returned a "degraded result" with empty
+      // paragraphAnalyses + a faked foundation-phase guess. That silently
+      // produced a profile that looked successful to coaching but had no
+      // scores and no candidates. Doctrine forbids this — rethrow as a
+      // PipelineError so the orchestrator surfaces the failure and no downstream
+      // layer sees an analysis result that wasn't actually produced.
       try {
         return await this.analyzeEssayLevel(profile, staleAreaHints, findingStore, essayType, startTime);
       } catch (error) {
-        // DO NOT fall back to expensive per-paragraph mode — that would cost 7-10x more.
-        // Return a minimal degraded result with phase assessment only. The coaching system
-        // can still function with paragraph understanding from L3 even without L3.5 scores.
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const inner = error instanceof Error ? error : new Error(String(error));
         console.error(
-          `[AnalysisPass] Essay-level analysis failed: ${errorMsg}. Returning degraded result (NOT falling back to per-paragraph — would waste budget).`,
+          `[AnalysisPass] Essay-level analysis failed: ${inner.message}. Fail-fast — rethrowing as PipelineError.`,
         );
-
-        // Still run phase assessment — it can work from holistic profile data even without L3.5 scores
-        let degradedPhase: ImprovementPhase;
-        try {
-          const phaseResult = await assessPhase({ analyses: [], profile, essayType });
-          degradedPhase = phaseResult.phase;
-        } catch {
-          degradedPhase = {
-            level: 'foundation',
-            reasoning: 'L3.5 analysis failed — defaulting to foundation phase',
-            focusAreas: ['Essay structure and clarity'],
-            deferredAreas: [],
-            readinessAssessment: 'Analysis incomplete — coaching available but scoring data unavailable',
-            legacyReadiness: { essayLevel: 20, paragraphLevel: 25, sentenceLevel: 20, wordLevel: 0 },
-            dimensionPhases: [],
-            coachingLens: 'Focus on structural guidance. Per-paragraph scoring is not yet available.',
-            transition: null,
-          };
-        }
-
-        return {
-          paragraphAnalyses: [],
-          improvementPhase: degradedPhase,
-          cost: 0,
-          tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-          timingMs: Date.now() - startTime,
-          analysisMode: 'essay_level' as const,
-          failedParagraphs: [], // Empty — essay-level failure is not a per-paragraph failure
-        };
+        throw PipelineError.essayLevelAnalysisFailed(inner, analyzableParagraphs.length);
       }
     } else {
       console.log(
@@ -1329,7 +1452,11 @@ export class AnalysisPassService {
 
     // Build cached context blocks (shared across all parallel calls)
     const systemPrompt = buildSystemPrompt();
-    const profileContext = buildProfileContext(profile);
+    // Smart context: compact shared digest (replaces full profile dump)
+    // + pre-computed paragraph relevance for per-call filtering
+    const { analysisContextBuilder } = await import('./analysisContextBuilder');
+    const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
+    const profileContext = analysisContextBuilder.buildSharedDigest(profile, 'l3_5');
 
     // ── Anchor-then-parallel scoring (anti-clustering) ──
     // Step 1: Select and score the anchor paragraph first (sequential)
@@ -1356,6 +1483,10 @@ export class AnalysisPassService {
         : undefined;
 
       try {
+        const anchorRelevance = relevanceIndex.get(anchorPara.index);
+        const anchorRelevantContext = anchorRelevance
+          ? analysisContextBuilder.buildParagraphContext(profile, anchorPara.index, anchorRelevance, 'l3_5')
+          : '';
         const anchorResult = await this.analyzeSingleParagraph(
           anchorPara,
           profile.paragraphs.length,
@@ -1364,6 +1495,7 @@ export class AnalysisPassService {
           staleAreaHints,
           anchorFindingContext || undefined,
           { isAnchor: true, anchorReason: anchor.reason },
+          anchorRelevantContext,
         );
         results.push(anchorResult.analysis);
         totalCost += anchorResult.cost;
@@ -1408,6 +1540,10 @@ export class AnalysisPassService {
         ? buildAnnotationFindingContext(findingStore, para.index)
         : undefined;
 
+      const paraRelevance = relevanceIndex.get(para.index);
+      const paraRelevantContext = paraRelevance
+        ? analysisContextBuilder.buildParagraphContext(profile, para.index, paraRelevance, 'l3_5')
+        : '';
       const task = this.analyzeSingleParagraph(
         para,
         profile.paragraphs.length,
@@ -1416,6 +1552,7 @@ export class AnalysisPassService {
         staleAreaHints,
         paraFindingContext || undefined,
         anchorContextStr ? { isAnchor: false, context: anchorContextStr } : undefined,
+        paraRelevantContext,
       )
         .then((result) => {
           results.push(result.analysis);
@@ -1762,6 +1899,7 @@ export class AnalysisPassService {
     staleAreaHints?: string[],
     findingContext?: string,
     anchorConfig?: { isAnchor: boolean; anchorReason?: string; context?: string },
+    paragraphRelevantContext?: string,
   ): Promise<{
     analysis: AnalysisPassOutput;
     cost: number;
@@ -1771,12 +1909,16 @@ export class AnalysisPassService {
 
     // 3-block prompt caching pattern:
     // Block 1: System prompt (static, cached forever via cacheSystemPrompt)
-    // Block 2: Profile context (essay-specific, cached across parallel calls via user message cache_control)
-    // Block 3: Paragraph-specific prompt (not cached)
+    // Block 2: Shared digest (essay text + holistic digest + paragraph roles — cached across parallel calls)
+    // Block 3: Paragraph-relevant context + paragraph-specific prompt (NOT cached)
     //
-    // We combine Block 2 + Block 3 into the user message, but Block 2 is the
-    // same across all calls so Anthropic's automatic prompt prefix caching kicks in.
-    const userPrompt = `${profileContext}\n\n---\n\n${paragraphPrompt}`;
+    // Block 2 is the COMPACT shared digest (~1200 tokens) instead of the full profile dump (~4000 tokens).
+    // Paragraph-relevant holistic data is in Block 3 alongside the paragraph prompt,
+    // filtered by the AnalysisContextBuilder to only include dimensions relevant to THIS paragraph.
+    const relevantSection = paragraphRelevantContext
+      ? `${paragraphRelevantContext}\n\n`
+      : '';
+    const userPrompt = `${profileContext}\n\n---\n\n${relevantSection}${paragraphPrompt}`;
 
     const response = await callClaude<string>(
       {
@@ -1830,7 +1972,14 @@ export class AnalysisPassService {
     }
 
     const systemPrompt = buildSystemPrompt();
-    const profileContext = buildProfileContext(profile);
+    // Smart context for reanalysis too
+    const { analysisContextBuilder } = await import('./analysisContextBuilder');
+    const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
+    const profileContext = analysisContextBuilder.buildSharedDigest(profile, 'l3_5');
+    const paraRelevance = relevanceIndex.get(paragraphIndex);
+    const paraRelevantContext = paraRelevance
+      ? analysisContextBuilder.buildParagraphContext(profile, paragraphIndex, paraRelevance, 'l3_5')
+      : '';
 
     // Use prior anchor context for calibration if available and this isn't the anchor itself
     let anchorConfig: { isAnchor: boolean; context?: string } | undefined;
@@ -1840,7 +1989,7 @@ export class AnalysisPassService {
 
     return this.analyzeSingleParagraph(
       para, profile.paragraphs.length, systemPrompt, profileContext,
-      undefined, undefined, anchorConfig,
+      undefined, undefined, anchorConfig, paraRelevantContext,
     );
   }
 }

@@ -11,17 +11,18 @@
  *             word-level diff, reorder detection.
  *   Step 1 — Haiku triviality pre-filter (~$0.001): binary TRIVIAL vs REAL gate.
  *             Biased toward REAL to prevent lost understanding.
- *   Step 2-4 — Sonnet understanding (~$0.02-0.05): four-step sequential reasoning
- *              through significance anchors → profile impact mapping → scope
- *              recommendation. Produces EditUnderstandingOutput with StalenessEffect[].
+ *   Step 2-4 — Sonnet understanding (~$0.02-0.05): JSON-mode structured output with
+ *              inline reasoning through significance anchors → profile impact mapping →
+ *              scope recommendation. Produces EditUnderstandingOutput with StalenessEffect[].
  *
  * Key quality controls:
- *   - Sonnet prompt forces 4 explicit reasoning steps before scope recommendation
+ *   - useJsonMode: true forces valid JSON output; reasoning embedded in JSON fields
+ *     (significanceReasoning, profileImpact.directImpact, scopeRecommendation.reasoning)
  *   - Calibrated significance anchors (TRANSFORMATIVE/SIGNIFICANT/MODERATE/MINOR/TRIVIAL)
  *     with concrete essay examples
  *   - Anti-fabrication instruction: "if contained to one sentence with no ripple, SAY SO"
  *   - Unaffected areas list (3-5 entries) prevents lazy "everything might be affected" responses
- *   - 4-level defensive JSON parsing (try parse → jsonrepair → regex extract → return error)
+ *   - Haiku repair fallback if primary JSON parse fails
  *
  * Consumed by: focused analysis pipeline, EssayProfileCoordinator.applyEditUnderstanding()
  * Spec: PLAN.md (focused analysis mode, impact classification)
@@ -550,55 +551,38 @@ Classify this edit: TRIVIAL or REAL?`;
 
 const UNDERSTANDING_SYSTEM_PROMPT = `You are an edit impact analyst. Your job is not to re-analyze this essay — the deep profile already did that. Your job is to reason about what THIS SPECIFIC CHANGE does to the existing understanding.
 
-You will follow FOUR explicit steps before producing any output. Do not skip steps. Do not compress reasoning.
+You MUST output ONLY valid JSON — no text before or after. Do all reasoning INSIDE the JSON fields (significanceReasoning, profileImpact.directImpact, scopeRecommendation.reasoning).
 
 ---
 
-STEP 1 — UNDERSTAND THE CHANGE:
-What physically changed? State: the old text, the new text, where in the essay (paragraph/sentence), and the most precise description of change type(s). A single edit CAN be multiple types simultaneously — e.g., "scared" → "hands shaking" is BOTH meaning_evolution (assertion → observation) AND tonal_voice_shift (authenticity increased). List ALL applicable types, ordered by dominance.
+REASONING GUIDANCE (apply inside the JSON fields):
 
----
+UNDERSTAND THE CHANGE: In your changeTypes and significanceReasoning fields, state what physically changed and the most precise description of change type(s). A single edit CAN be multiple types simultaneously — e.g., "scared" → "hands shaking" is BOTH meaning_evolution AND tonal_voice_shift. List ALL applicable types in changeTypes, ordered by dominance.
 
-STEP 2 — ASSESS SIGNIFICANCE:
-Rate significance using these calibrated anchors:
+ASSESS SIGNIFICANCE using these calibrated anchors (put your reasoning in significanceReasoning):
 
 TRANSFORMATIVE: Changes thesis, central metaphor, voice identity, or the function of a load-bearing paragraph. Multiple profile sections become stale. North Star may need re-crystallization.
 Example: "decided" → "couldn't" in a fulcrum sentence shifts the essay's theory of agency. Profile impact: narrative strategy, character revelation, thematic architecture, and through-line all become stale.
-Example: Rewriting the opening paragraph's hook from a specific scene to an abstract reflection — voice identity changes, emotional topography changes, structural role of P1 changes.
 
 SIGNIFICANT: Alters a paragraph's structural role, breaks or transforms a key connection, or shifts voice register in a way that affects the voice map.
-Example: Rewriting the concluding callback to reference a different moment — connection graph changes, structural role shifts, through-line may need updating.
-Example: Adding two sentences that introduce a new subtheme — thematic architecture gains complexity, earnedness map may need a new branch.
+Example: Rewriting the concluding callback to reference a different moment — connection graph changes, structural role shifts.
 
 MODERATE: Changes meaning within a sentence without structural ripple. The sentence's understanding needs updating but paragraph role and connections remain intact.
-Example: "I was nervous" → "My voice kept catching on consonants" — emotional authenticity deepens, sentence understanding updates, but the paragraph still plays its existing structural role.
-Example: Adding specificity that deepens a moment without changing its function.
+Example: "I was nervous" → "My voice kept catching on consonants" — emotional authenticity deepens, sentence understanding updates.
 
-MINOR: Improves execution without changing meaning. Sentence understanding stays valid; only surface-level analysis (word choice quality) may shift.
-Example: "walked" → "drifted" when dreamlike quality was already established. Voice map unchanged, function unchanged.
-Example: Tightening a run-on sentence into two clean sentences while preserving all meaning.
+MINOR: Improves execution without changing meaning. Sentence understanding stays valid; only surface-level analysis may shift.
+Example: "walked" → "drifted" when dreamlike quality was already established.
 
-TRIVIAL: Mechanical fix. No profile impact whatsoever. (Should have been caught by the pre-filter; if you see this, confirm and short-circuit.)
+TRIVIAL: Mechanical fix. No profile impact whatsoever. (Should have been caught by the pre-filter.)
 
----
-
-STEP 3 — MAP PROFILE IMPACT:
-Cite specific profile paths. Be surgical.
+MAP PROFILE IMPACT (put your reasoning in profileImpact.directImpact). Cite specific profile paths. Be surgical.
 
 BAD: "This affects voice."
 GOOD: "P2S4's register shifts from contemplative to urgent; voiceMap.shifts may need a new entry or update to shift[1] where the shift was previously marked at P3."
 
-BAD: "The thematic architecture may change."
-GOOD: "The central metaphor of 'light through blinds' introduced in P2S1 now appears earlier; thematicArchitecture.threads[0].appearances needs P1S3 added."
+REQUIRED: List 3-5 profile areas that are DEFINITELY UNAFFECTED in the unaffectedAreas array, with brief reasoning per entry. This prevents lazy "everything might be affected" responses.
 
-REQUIRED: Also list 3-5 profile areas that are DEFINITELY UNAFFECTED, with brief reasoning. This prevents lazy "everything might be affected" responses.
-
-Example unaffected areas: "CharacterRevelation — the edit changes how a moment is described, not what it reveals about the writer's values. NorthStar throughLine — the paragraph's macro-level function is unchanged. VoiceIdentity dominant register — one word refinement cannot shift the essay's overall voice signature."
-
----
-
-STEP 4 — RECOMMEND SCOPE:
-Your scope MUST follow directly from your Step 3 mapping:
+RECOMMEND SCOPE (put your reasoning in scopeRecommendation.reasoning). Scope MUST follow directly from your impact mapping:
 - If mapped impact is ONLY on specific sentences with no structural ripple → scope: sentence_update
 - If a paragraph's structural role, earnedness function, or connection points change → scope: paragraph_reanalysis
 - If thematic architecture, narrative strategy, voice map, or multiple paragraphs affected → scope: targeted_holistic_refresh
@@ -608,21 +592,19 @@ ANTI-FABRICATION: If the change is genuinely contained to one sentence with no s
 
 ---
 
-NEGATIVE EXAMPLES (what NOT to do):
+QUALITY EXAMPLES:
 
-BAD significance assessment:
-"The word change is significant because it affects the overall tone of the essay and may have implications for how the admissions officer perceives the applicant's character arc."
-PROBLEM: No specific profile sections cited. "Overall tone" is not a profile path. This is vague pattern-matching.
-
-GOOD significance assessment:
+GOOD significanceReasoning:
 "MODERATE. 'scared' → 'hands shaking' changes this sentence from emotional assertion to physical grounding. The sentence's understanding must update (observedFunctions: was 'establishes emotional stakes', becomes 'grounds the emotional moment in physical specificity'). The paragraph's structural role (P3: transitional scene-setting) remains unchanged. No connections pass through this sentence in the connection graph."
 
-BAD scope recommendation:
-"I recommend paragraph_reanalysis because the change may affect how the reader experiences the essay."
-PROBLEM: 'May affect how the reader experiences' is not a profile path. This is not mapped impact — it's speculation.
+BAD significanceReasoning:
+"The word change is significant because it affects the overall tone." — No specific profile sections cited.
 
-GOOD scope recommendation:
-"sentence_update. Impact is precisely bounded: P3S2's observedFunctions array needs replacement. The paragraph's structural role, the voiceMap, the connection graph (no connections involve P3S2), and all holistic sections are unchanged. Three unaffected areas: NorthStar — P3's macro function unchanged. ThematicArchitecture — no thread references this sentence specifically. EmotionalTopography — the paragraph's emotional peak is P3S4, not this sentence."`;
+GOOD scopeRecommendation.reasoning:
+"sentence_update. Impact is precisely bounded: P3S2's observedFunctions array needs replacement. The paragraph's structural role, the voiceMap, the connection graph (no connections involve P3S2), and all holistic sections are unchanged."
+
+BAD scopeRecommendation.reasoning:
+"paragraph_reanalysis because the change may affect how the reader experiences the essay." — Not a profile path, just speculation.`;
 
 /**
  * Build the user prompt for Sonnet understanding, including diff + profile context.
@@ -695,7 +677,7 @@ ${conversationSection}
 
 ## REQUIRED OUTPUT FORMAT
 
-Follow all four steps in your reasoning, then output ONLY this JSON:
+Output ONLY this JSON object. Put all reasoning inside the designated fields (significanceReasoning, profileImpact.directImpact, scopeRecommendation.reasoning). No text outside the JSON.
 
 {
   "significance": "minor|moderate|significant|transformative",
@@ -1264,15 +1246,15 @@ export class EditUnderstandingService {
     );
 
     const sonnetStart = Date.now();
-    let rawSonnetResponse: ClaudeResponse<string>;
+    let rawSonnetResponse: ClaudeResponse<SonnetUnderstandingRaw>;
 
     try {
-      rawSonnetResponse = await callClaude<string>(userPrompt, {
+      rawSonnetResponse = await callClaude<SonnetUnderstandingRaw>(userPrompt, {
         model: SONNET,
         systemPrompt: UNDERSTANDING_SYSTEM_PROMPT,
         maxTokens: UNDERSTANDING_MAX_TOKENS,
         temperature: UNDERSTANDING_TEMPERATURE,
-        useJsonMode: false,
+        useJsonMode: true,
         cacheSystemPrompt: true,
         timeoutMs: UNDERSTANDING_TIMEOUT_MS,
       });
@@ -1290,28 +1272,76 @@ export class EditUnderstandingService {
 
     console.log(`[EditUnderstanding] Step 2-4 Sonnet: ${sonnetMs}ms, $${sonnetCost.toFixed(5)}`);
 
-    // Parse Sonnet output
-    const rawContent = typeof rawSonnetResponse.content === 'string'
-      ? rawSonnetResponse.content
-      : JSON.stringify(rawSonnetResponse.content);
+    // Parse Sonnet output — with useJsonMode: true, callClaude returns an already-parsed object.
+    // Keep parseJsonDefensive as fallback for edge cases where content might still be a string.
+    let sonnetParsed: SonnetUnderstandingRaw | null =
+      (typeof rawSonnetResponse.content === 'object' && rawSonnetResponse.content !== null)
+        ? rawSonnetResponse.content as SonnetUnderstandingRaw
+        : null;
 
-    const sonnetParsed = parseJsonDefensive<SonnetUnderstandingRaw>(rawContent);
+    // Fallback: if content came back as a string (edge case), try defensive parsing
+    if (!sonnetParsed && typeof rawSonnetResponse.content === 'string') {
+      sonnetParsed = parseJsonDefensive<SonnetUnderstandingRaw>(rawSonnetResponse.content);
+    }
+
+    // Last resort: Haiku repair — a different model extracting JSON from the raw output
+    if (!sonnetParsed) {
+      console.warn('[EditUnderstanding] Primary parse failed — attempting Haiku repair');
+      try {
+        const rawContent = typeof rawSonnetResponse.content === 'string'
+          ? rawSonnetResponse.content
+          : JSON.stringify(rawSonnetResponse.content);
+
+        const repairResponse = await callClaude<SonnetUnderstandingRaw>({
+          model: HAIKU,
+          systemPrompt: 'Extract the JSON object from the following text. Output ONLY valid JSON matching the schema described.',
+          userPrompt: `Extract the JSON from this LLM output:\n\n${rawContent}\n\nExpected fields: significance, significanceReasoning, changeTypes, apparentPurpose, purposeConfidence, profileImpact, scopeRecommendation, unaffectedAreas`,
+          maxTokens: 2048,
+          temperature: 0,
+          useJsonMode: true,
+        });
+
+        if (typeof repairResponse.content === 'object' && repairResponse.content !== null) {
+          sonnetParsed = repairResponse.content as SonnetUnderstandingRaw;
+          console.log('[EditUnderstanding] Recovered via Haiku repair');
+          addTokenUsage(tokenUsage, repairResponse);
+          const repairCost = calculateCost(repairResponse.usage, HAIKU);
+          totalCost += repairCost;
+        }
+      } catch (repairErr) {
+        console.error('[EditUnderstanding] Haiku repair also failed:', repairErr);
+      }
+    }
 
     if (!sonnetParsed) {
       // All parse levels failed — cannot return fake understanding
-      console.error('[EditUnderstanding] Failed to parse Sonnet response:', rawContent.substring(0, 500));
+      const rawContent = typeof rawSonnetResponse.content === 'string'
+        ? rawSonnetResponse.content
+        : JSON.stringify(rawSonnetResponse.content);
+      console.error('[EditUnderstanding] Failed to parse Sonnet response:', String(rawContent).substring(0, 500));
       throw new Error('[EditUnderstanding] All JSON parse attempts failed for Sonnet understanding output');
     }
 
     // Validate required fields — accept either changeType or changeTypes (array preferred)
+    // scopeRecommendation handled separately with safe default (LLM occasionally omits it)
     const requiredFields: string[] = [
       'significance', 'significanceReasoning', 'apparentPurpose',
-      'purposeConfidence', 'profileImpact', 'scopeRecommendation',
+      'purposeConfidence', 'profileImpact',
     ];
     for (const field of requiredFields) {
       if (!(field in sonnetParsed)) {
         throw new Error(`[EditUnderstanding] Sonnet output missing required field: ${field}`);
       }
+    }
+    // Safe default for scopeRecommendation — Sonnet occasionally omits this field.
+    // Default to paragraph_reanalysis (moderate scope) rather than crashing the edit pipeline.
+    if (!('scopeRecommendation' in sonnetParsed) || !sonnetParsed.scopeRecommendation) {
+      console.warn('[EditUnderstanding] scopeRecommendation missing from Sonnet output — defaulting to paragraph_reanalysis');
+      sonnetParsed.scopeRecommendation = {
+        scope: 'paragraph_reanalysis',
+        reasoning: 'Field missing from LLM output — defaulting to paragraph-level reanalysis for safety',
+        targets: diff.paragraphChanges.map(pc => `P${pc.paragraphIndex + 1}`),
+      };
     }
     // changeType OR changeTypes must be present
     if (!('changeType' in sonnetParsed) && !('changeTypes' in sonnetParsed)) {

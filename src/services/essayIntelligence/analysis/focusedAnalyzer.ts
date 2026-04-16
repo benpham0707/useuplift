@@ -1335,7 +1335,7 @@ export class FocusedAnalyzer {
                 narrativeContributions: [],
                 rhetoricalFunctions: [],
                 paragraphContribution: '',
-                craft: { rhythm: '', voiceAlignment: '', techniques: [] },
+                craft: { rhythm: '', techniques: [] },
                 significantChoices: [],
                 connectionRefs: [],
                 findingRefs: [],

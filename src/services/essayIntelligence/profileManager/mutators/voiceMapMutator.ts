@@ -199,6 +199,13 @@ export class VoiceMapMutator {
       return [];
     }
 
+    // Scope 1 Phase 2: codeSwitching is optional — initialize if missing.
+    // Mutator still supports writes for backward compat with any external
+    // caller (deprecated but not removed).
+    if (!profile.voiceMap.codeSwitching) {
+      profile.voiceMap.codeSwitching = [];
+    }
+
     // Check for existing code-switch at the same location — replace if found
     const existingIdx = profile.voiceMap.codeSwitching.findIndex(
       (cs) =>
@@ -357,9 +364,13 @@ export class VoiceMapMutator {
       }
     }
 
-    // Validate code-switching locations
-    for (let i = 0; i < profile.voiceMap.codeSwitching.length; i++) {
-      const cs = profile.voiceMap.codeSwitching[i];
+    // Validate code-switching locations.
+    // Scope 1 Phase 2: codeSwitching is optional on VoiceMap — iterate the
+    // empty array fallback if the field is undefined (new profiles don't
+    // emit it; legacy profiles still carry entries that must be validated).
+    const codeSwitchingEvents = profile.voiceMap.codeSwitching ?? [];
+    for (let i = 0; i < codeSwitchingEvents.length; i++) {
+      const cs = codeSwitchingEvents[i];
       const p = cs.location.paragraph;
       const s = cs.location.sentence;
       if (p < 0 || p >= paragraphCount) {

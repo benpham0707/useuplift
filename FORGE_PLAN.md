@@ -1,1403 +1,957 @@
-# FORGE_PLAN.md -- Final Implementation Blueprint (13 Gaps)
+# Implementation Blueprint: ChatHeader Redesign
 
-> **Version**: v1 (Reality-Checked)
-> **Date**: 2026-03-18
-> **Status**: FINAL -- passes the "start coding" test
-> **Verification**: Every code path, type, and prompt traced against real codebase
+The ChatHeader component currently displays Luna's avatar, name, an essay type label, and icon-only action buttons -- but lacks session status, coaching mode indication, and labeled controls. This blueprint redesigns the header to surface all 7 required elements in a single-row layout that fits within the 448px (`max-w-md`) panel constraint without increasing vertical height. The approach absorbs session status and coaching mode into the existing subtitle line, replaces icon-only buttons with compact labeled buttons, and types all props as optional to maintain backward compatibility with both existing consumers.
 
 ---
 
-## DEPENDENCY CHAIN & IMPLEMENTATION ORDER
-
-```
-Phase 0 — CRITICAL BUGS + quick wins (parallel, ~4 hrs):
-  GAP-14  (Activity Major Alignment)  -- CRITICAL bug: Robotics ≠ irrelevant to ME
-  GAP-15  (Coaching Length Directive)  -- complement GAP-1 with prompt-level word limits
-  GAP-20  (Resistance → Brief)        -- map resistance states to brief intensity
-  GAP-9   (False Precision)           -- effectiveness bands utility
-  GAP-7   (Emotional Cues)            -- activity workshop, isolated
-  GAP-11  (School Context)            -- activity workshop, isolated
-
-Phase 1 — Essay Intelligence foundation (parallel, ~6 hrs):
-  GAP-18  (Observation Quality Filter) -- L3 walk: 129→30-45 observations
-  GAP-19  (Voice Intentionality)       -- quality-level-aware calibration in L3.75
-  GAP-21  (Scope Inflation + Red Flags) -- add 3 structural red flag patterns to L3.75
-  GAP-4   (AO First Read)             -- new file + orchestrator wiring
-  GAP-5   (Person Portrait)           -- L3.75 prompt: lunch framing
-  GAP-10  (Archetype)                 -- L3.75 type + prompt, feeds GAP-8
-
-Phase 2 — Scoring & Phase (depends on Phase 1, ~2 hrs):
-  GAP-17  (Scoring Calibration)       -- widen effective scoring range (implement FIRST)
-  GAP-3   (Phase Detector)            -- phaseAssessment.ts narrative calibration
-  GAP-8   (Scoring Bias)              -- analysisPass.ts admissions criteria (implement AFTER 17)
-
-Phase 3 — Coaching layer (depends on Phase 2, ~3 hrs):
-  GAP-1   (Response Intensity)        -- coachingService.ts maxTokens wiring
-  GAP-2   (Learning Style)            -- coachingService.ts sidecar + accumulation
-  GAP-6   (Strategic Thread)          -- coachingService.ts strategic question + staleness
-
-Phase 4 — Cross-cutting (depends on modules existing, ~3 hrs):
-  GAP-16  (PIQ Ceiling Recognition)   -- reduce suggestions for 85+ PIQs
-  GAP-12  (PIQ Portfolio)             -- embedded portfolio context
-  GAP-13  (Cross-Module Bridge)       -- new bridge file, all modules
-```
+## Items
 
 ---
 
-## GAP-9: False Precision (Score Presentation)
+### 1. Props Interface: Zero-prop signature -> Fully typed optional props
+**Before**: `export function ChatHeader()` -- no props, hardcoded `essayType = 'Common App'`
+**After**: `export function ChatHeader(props: ChatHeaderProps)` -- all 7 elements configurable via optional typed props
 
-**Decision**: Agent A -- effectiveness bands
-**Files**: New utility (suggest `src/services/essayIntelligence/analysis/effectivenessBands.ts`)
-**Risk**: Low
-**Effort**: ~30 min
-
-### What to Build
-
-A `toEffectivenessBand()` utility function that maps 0-100 scores to named bands for user-facing display. Internal scoring remains 0-100.
-
-### Type Definition
-
+**Implementation**:
 ```typescript
-// src/services/essayIntelligence/analysis/effectivenessBands.ts
+// At top of ChatHeader.tsx, after imports:
+import type { EssayType } from '@/services/essayIntelligence/profileTypes';
+import type { CoachingMode } from '@/services/essayIntelligence/profileTypes';
 
-export type EffectivenessBand =
-  | 'masterful'     // 96-100
-  | 'exceptional'   // 86-95
-  | 'strong'        // 76-85
-  | 'functional'    // 55-75
-  | 'developing'    // 40-54
-  | 'problematic';  // 0-39
+/** Display labels for essay types */
+const ESSAY_TYPE_LABELS: Record<EssayType, string> = {
+  common_app: 'Common App',
+  supplement: 'Supplement',
+  piq: 'PIQ',
+};
 
-export interface EffectivenessBandResult {
-  band: EffectivenessBand;
-  label: string;          // "Strong" (title case for display)
-  description: string;    // "Does its job with distinction"
-  range: [number, number]; // [76, 85]
-}
+/** Display config for coaching modes */
+const COACHING_MODE_CONFIG: Record<CoachingMode, { label: string; color: string }> = {
+  first_encounter: { label: 'essay coach', color: 'text-slate-400' },
+  revision_response: { label: 'Reviewing Edit', color: 'text-emerald-500' },
+  iteration_deep: { label: 'Deep Iteration', color: 'text-amber-500' },
+  architecture: { label: 'Restructuring', color: 'text-blue-500' },
+  polish: { label: 'Final Polish', color: 'text-violet-500' },
+};
 
-export function toEffectivenessBand(score: number): EffectivenessBandResult;
-```
-
-### Implementation
-
-Map ranges from the existing calibration table in `analysisPass.ts` lines 315-322:
-
-| Score | Band | Label | Description |
-|-------|------|-------|-------------|
-| 96-100 | masterful | Masterful | Would make an AO pause and re-read |
-| 86-95 | exceptional | Exceptional | Memorable after reading 50 essays |
-| 76-85 | strong | Strong | Does its job with distinction |
-| 55-75 | functional | Functional | Competent but not memorable |
-| 40-54 | developing | Developing | Gets the point across with issues |
-| 0-39 | problematic | Problematic | Actively harms the essay |
-
-### Consumer Sites
-- Frontend components displaying sentence/paragraph scores
-- Any coaching response that references scores to students
-- The utility is a pure function -- no LLM calls, no side effects
-
-### Test
-Unit test: input scores at boundaries (0, 39, 40, 54, 55, 75, 76, 85, 86, 95, 96, 100) map to correct bands. Edge cases: NaN -> problematic, negative -> problematic, >100 -> masterful.
-
----
-
-## GAP-7: Emotional Cues (Activity Workshop)
-
-**Decision**: Hybrid (A's softened ban + B's translation table)
-**Files**: `src/services/portfolioStrategy/services/activityWorkshop/chat/dynamicConversationEngine.ts`, `src/services/portfolioStrategy/services/activityWorkshop/chat/questionGenerator.ts`
-**Risk**: Low
-**Effort**: ~45 min
-
-### Change 1: Soften the ban in dynamicConversationEngine.ts
-
-**File**: `dynamicConversationEngine.ts`
-**Location**: Lines 574-578 (the "DON'T ASK ABOUT" section in `buildSystemPrompt()`)
-
-**Current**:
-```
-DON'T ASK ABOUT:
-- "What was hardest/most challenging?" (struggles don't make impressive descriptions)
-- "What obstacles/barriers did you face?" (same problem - focuses on difficulty, not achievement)
-- "How did you feel?" (vague, doesn't translate to concrete descriptions)
-- Generic struggles, difficulties, or challenges
-```
-
-**Replace with**:
-```
-DON'T INITIATE QUESTIONS ABOUT:
-- "What was hardest/most challenging?" (struggles don't make impressive descriptions)
-- "What obstacles/barriers did you face?" (same problem - focuses on difficulty, not achievement)
-- "How did you feel?" (vague, doesn't translate to concrete descriptions)
-- Generic struggles, difficulties, or challenges
-
-WHEN A STUDENT VOLUNTEERS EMOTIONAL CONTEXT (they bring it up, you don't ask):
-Emotion is EVIDENCE OF STAKES. Translate it into description-worthy content:
-- "terrified/nervous" -> the stakes were high enough to feel personal risk -> ask about WHAT was at risk
-- "proud/excited" -> the outcome mattered to them personally -> ask about the specific outcome
-- "frustrated/angry" -> they cared enough to push through -> ask about what they DID about it
-- "passionate/obsessed" -> sustained deep engagement -> ask about hours, duration, depth
-- "overwhelmed" -> the scope was significant -> ask about scale and what they managed
-
-Example: Student says "I was so nervous presenting to the board"
-BAD follow-up: "How did you handle that nervousness?"
-GOOD follow-up: "Presenting to a board — how many people were you presenting to, and what were you asking them to approve?"
-The emotion tells you the stakes were real. Now get the FACTS that prove it.
-```
-
-### Change 2: Add follow-up template in questionGenerator.ts
-
-**File**: `questionGenerator.ts`
-**Location**: After line 305 (after `short_response` in `FOLLOW_UP_TEMPLATES`)
-
-**Add**:
-```typescript
-mentioned_emotion: [
-  "That sounds like the stakes were real. What specifically was on the line?",
-  "When you felt that way, what were you in the middle of? Walk me through the specifics.",
-  "That emotion tells me you cared deeply about this. What was the concrete outcome?",
-],
-```
-
-### Test
-Manual: provide an activity description, then in conversation say "I was really nervous about presenting." Verify the response probes for FACTS (who, how many, what outcome) rather than FEELINGS.
-
----
-
-## GAP-11: School/Competition Context (Activity Workshop)
-
-**Decision**: Hybrid (A's templates + B's advocacy framing)
-**Files**: `src/services/portfolioStrategy/services/activityWorkshop/chat/questionGenerator.ts`
-**Risk**: Low
-**Effort**: ~30 min
-
-### What to Add
-
-New question templates in `QUESTION_TEMPLATES` after the existing `connections.characterTraits` block (line ~274). These are framed as advocacy (building the student's case), not data collection.
-
-```typescript
-// CONTEXT - Competitive Environment (builds the case for impressiveness)
-'facts.context.schoolSize': {
-  questions: [
-    "How big is your school? That helps me understand the scale of what you did.",
-    "How many students are at your school — roughly?",
-  ],
-  category: 'numeric_ask',
-  phase: 'fact_gathering',
-  priority: 'medium',
-},
-'facts.context.competitionLevel': {
-  questions: [
-    "Was there a selection process to get this role, or did you create it yourself?",
-    "How many people applied or tried out? That selectivity makes your role more impressive.",
-    "Were you chosen for this — and if so, from how many candidates?",
-  ],
-  category: 'specific_probe',
-  phase: 'fact_gathering',
-  priority: 'high',
-},
-'facts.context.fieldSelectivity': {
-  questions: [
-    "In your field, how competitive is this level of achievement?",
-    "How does what you accomplished compare to others at your level?",
-    "Is this the kind of thing most students can do, or is it rare?",
-  ],
-  category: 'specific_probe',
-  phase: 'fact_gathering',
-  priority: 'medium',
-},
-```
-
-### Test
-Run the question generator with an activity profile that has leadership signals but no context fields populated. Verify the context templates appear as candidates.
-
----
-
-## GAP-4: AO First Read Simulation
-
-**Decision**: Agent A -- new Haiku call, parallel with L1
-**Files**: New file `src/services/essayIntelligence/analysis/aoFirstRead.ts`, modify `src/services/essayIntelligence/analysis/analysisOrchestrator.ts`, add type to `profileTypes.ts`
-**Risk**: Medium (new pipeline stage)
-**Effort**: ~2 hours
-
-### Type Definition
-
-Add to `profileTypes.ts`:
-
-```typescript
-/**
- * AOFirstRead -- the naive gut reaction of an admissions officer
- * reading this essay for the first time under attention fatigue.
- *
- * Produced by a Haiku call PARALLEL with L1. The value is the naive
- * reaction BEFORE deep understanding -- something L3.75's admissionsPositioning
- * cannot replicate because it knows too much.
- */
-export interface AOFirstRead {
-  /** Where in the first paragraph (if anywhere) the AO's attention locks in */
-  hookMoment: string | null;
-  /** One sentence the AO would say to a colleague: "This is the essay about..." */
-  committeeOneLiner: string;
-  /** What makes this essay NOT just another [topic] essay -- or null if it IS just another one */
-  distinctivenessSignal: string | null;
-  /** Risk of being put down after paragraph 1: high / moderate / low */
-  putDownRisk: 'high' | 'moderate' | 'low';
-  /** Gut reaction reasoning: 2-3 sentences of honest AO internal monologue */
-  gutReaction: string;
+export interface ChatHeaderProps {
+  /** Which essay type is active. Default: 'common_app' */
+  essayType?: EssayType;
+  /** Live coaching session vs viewing archived session. Default: 'live' */
+  sessionStatus?: 'live' | 'archived';
+  /** Current coaching mode from the pipeline. Default: undefined (shows 'essay coach') */
+  coachingMode?: CoachingMode;
+  /** Callback when user clicks the essay switcher */
+  onEssaySwitch?: () => void;
+  /** Callback when user clicks History button */
+  onHistoryClick?: () => void;
+  /** Callback when user clicks Settings button */
+  onSettingsClick?: () => void;
 }
 ```
 
-### New File: aoFirstRead.ts
+**Integration points**:
+- `ChatPanel.tsx` line 105: continues to work as `<ChatHeader />` (all defaults)
+- `ChatWidget.tsx` line 31: continues to work as `<ChatHeader />` (all defaults)
+- Future callers can pass: `<ChatHeader essayType="supplement" coachingMode="iteration_deep" sessionStatus="live" />`
 
+**Source**: direct (refined) -- Agent A's all-optional approach, but with `CoachingMode` from profileTypes.ts
+
+---
+
+### 2. Subtitle Line: Static "essay coach" -> Dynamic status + coaching mode
+**Before**: Hardcoded `<span>essay coach</span>` at 8.5px uppercase
+**After**: Dynamic text driven by `sessionStatus` and `coachingMode`, with AnimatePresence for smooth transitions
+
+**Implementation**:
+
+The subtitle derivation function:
 ```typescript
-// src/services/essayIntelligence/analysis/aoFirstRead.ts
-
-const HAIKU = 'claude-haiku-4-5-20251001';
-
-const SYSTEM_PROMPT = `You are an admissions officer at a selective university. It's 4:15pm. You've read 29 essays today. You have a stack of 14 more. You're experienced, fair, but TIRED.
-
-You are about to read essay #30. Give your HONEST gut reaction.
-
-You are NOT analyzing this essay deeply. You are reading it ONCE, the way a real AO reads -- scanning for a hook, forming a quick impression, deciding whether to lean forward or start skimming.
-
-Output JSON:
-{
-  "hookMoment": "<quote the specific phrase/image in paragraph 1 that made you keep reading, or null if nothing grabbed you>",
-  "committeeOneLiner": "<one sentence you'd say to your colleague: 'This is the essay about...' -- what sticks?>",
-  "distinctivenessSignal": "<what makes this NOT just another [topic] essay, or null if you've read this essay 50 times before>",
-  "putDownRisk": "<high|moderate|low> -- how likely are you to start skimming by paragraph 2?",
-  "gutReaction": "<2-3 sentences of honest internal monologue as you read. Be real. 'Another sports injury essay...' or 'Okay the pawnshop detail is specific, I'm paying attention...'>"
-}`;
-
-export interface AOFirstReadResult {
-  firstRead: AOFirstRead;
-  cost: number;
-  tokenUsage: { inputTokens: number; outputTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
-  timingMs: number;
+function getSubtitleConfig(
+  sessionStatus: 'live' | 'archived',
+  coachingMode?: CoachingMode
+): { text: string; colorClass: string; showDot: boolean; dotColor?: string } {
+  if (sessionStatus === 'archived') {
+    return { text: 'Archived Session', colorClass: 'text-slate-400', showDot: false };
+  }
+  // Live session
+  if (!coachingMode || coachingMode === 'first_encounter') {
+    return { text: 'essay coach', colorClass: 'text-slate-400', showDot: true, dotColor: 'hsl(162,72%,46%)' };
+  }
+  const config = COACHING_MODE_CONFIG[coachingMode];
+  return { text: config.label, colorClass: config.color, showDot: true, dotColor: 'hsl(162,72%,46%)' };
 }
-
-export async function runAOFirstRead(essayText: string): Promise<AOFirstReadResult>;
 ```
 
-### Implementation Notes
-- Single Haiku call, `maxTokens: 400`, `temperature: 0.5` (slightly higher for authentic voice)
-- `cacheSystemPrompt: true` (system prompt is static)
-- User prompt is just the essay text: `"Read this essay:\n\n${essayText}"`
-- Validate output: coerce `putDownRisk` to valid enum, default `hookMoment`/`distinctivenessSignal` to null
-- On failure: return a degraded result with `putDownRisk: 'moderate'` and generic `gutReaction`
-
-### Orchestrator Wiring
-
-**File**: `analysisOrchestrator.ts`
-**Location**: After L1 call starts (line ~273), add AOFirstRead in parallel
-
-```typescript
-// PHASE 1: Foundation (L1 + AOFirstRead parallel → L2 + L2.5 parallel)
-const [l1Result, aoFirstReadResult] = await Promise.allSettled([
-  firstImpressionsService.analyze(input.essayText),
-  runAOFirstRead(input.essayText),
-]);
+The subtitle JSX (replaces the current static `<span>essay coach</span>`):
+```tsx
+{/* Subtitle: dynamic status + coaching mode */}
+<AnimatePresence mode="wait">
+  <motion.span
+    key={subtitle.text}
+    initial={{ opacity: 0, y: 2 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -2 }}
+    transition={{ duration: 0.15 }}
+    className={cn(
+      'flex items-center gap-1 text-[8.5px] font-bold uppercase tracking-[0.12em] leading-none',
+      subtitle.colorClass
+    )}
+  >
+    {subtitle.showDot && (
+      <span
+        className="inline-block w-[5px] h-[5px] rounded-full flex-shrink-0"
+        style={{ background: subtitle.dotColor }}
+      />
+    )}
+    {subtitle.text}
+  </motion.span>
+</AnimatePresence>
 ```
 
-Store the `AOFirstRead` result on the profile (add `aoFirstRead?: AOFirstRead` to `EssayProfile`). Available to:
-- L3.75 holistic synthesis (as input context -- "the naive AO reaction was...")
-- L6 coaching (the coach can reference "an AO reading this would...")
-- L3.5 scoring (as calibration context for the anchor paragraph)
+**Before JSX**:
+```tsx
+<span className="text-[8.5px] font-bold uppercase tracking-[0.12em] text-slate-400 leading-none">
+  essay coach
+</span>
+```
 
-### Cost
-~$0.003 per essay. Zero additional latency (parallel with L1).
+**After JSX**: The AnimatePresence block above.
 
-### Test
-Run against a strong essay and a weak essay. Verify:
-- Strong: low putDownRisk, non-null hookMoment and distinctivenessSignal
-- Weak: high putDownRisk, generic committeeOneLiner
+**Integration points**: None -- internal to ChatHeader. The CoachAvatar's online status dot (lines 170-184) remains unchanged for avatar-level status. The subtitle dot is a SEPARATE, smaller indicator in the text line.
+
+**Source**: rethink -- Agent B's subtitle absorption, refined with `first_encounter` preserving "essay coach" for identity
 
 ---
 
-## GAP-5: Person Portrait (Human Behind the Essay)
+### 3. Essay Switcher: Untyped string -> Typed EssayType with lucide icon
+**Before**: `function EssaySwitcher({ type }: { type: string })` with custom 10x10 SVG document glyph
+**After**: `function EssaySwitcher({ type, onClick }: { type: EssayType; onClick?: () => void })` with lucide FileText icon
 
-**Decision**: Agent B -- lunch framing with examples
-**Files**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
-**Risk**: Low
-**Effort**: ~20 min
+**Implementation**:
 
-### Prompt Change
+Replace the custom SVG document glyph (lines 228-249) with:
+```tsx
+import { History, Settings, FileText, ChevronDown, Archive } from 'lucide-react';
 
-**File**: `holisticSynthesis.ts`
-**Location**: Line 487 (the `writerPortrait` field in the L3.75 JSON schema)
-
-**Current**:
-```
-"writerPortrait": "<who is this writer -- the person behind the words, not the essay>"
-```
-
-**Replace with**:
-```
-"writerPortrait": "<who would you want to have lunch with after reading this? Describe the PERSON — their energy, what they'd talk about, how they see the world. NOT their essay topics or writing ability.
-
-WRONG: 'A thoughtful writer who uses vivid imagery to explore themes of identity and belonging.'
-WRONG: 'The author demonstrates strong emotional intelligence through their narrative choices.'
-RIGHT: 'Someone who notices small things others miss — the kind of person who'd stop mid-sentence because they saw something out the window that reminded them of their grandmother's kitchen. Probably argues with their friends about whether something counts as art. Almost certainly has strong opinions about food.'
-RIGHT: 'The person who stays late not because they have to but because they got curious about something adjacent. Laughs at their own failures with genuine amusement, not performance. Would probably talk your ear off about water quality data if you let them.'>"
+// Inside EssaySwitcher, replace the SVG glyph div with:
+<div
+  className="flex items-center justify-center flex-shrink-0 rounded-md"
+  style={{
+    width: 20,
+    height: 20,
+    background: 'linear-gradient(135deg, hsl(260,70%,60%) 0%, hsl(280,70%,58%) 100%)',
+    boxShadow: '0 1px 2px hsla(260,60%,40%,0.3), inset 0 1px 0 hsla(0,0%,100%,0.2)',
+  }}
+>
+  <FileText size={10} strokeWidth={1.5} className="text-white" />
+</div>
 ```
 
-### Why This Works
-The "lunch" framing forces the LLM to describe a PERSON, not a writer. The WRONG/RIGHT examples explicitly prohibit essay analysis language. The result feeds into `characterRevelation.writerPortrait` which is used by coaching and admissions positioning.
+Replace the label text (line 254) with:
+```tsx
+<span className="text-[12px] font-bold leading-none text-slate-800 tracking-tight whitespace-nowrap truncate">
+  {ESSAY_TYPE_LABELS[type]}
+</span>
+```
 
-### Test
-Run L3.75 against an essay. Verify the writerPortrait describes a person you could picture having lunch with, not an abstract analysis of writing technique.
+Replace the custom chevron SVG (lines 259-274) with:
+```tsx
+<ChevronDown size={10} className="flex-shrink-0 ml-auto text-slate-500 group-hover:text-slate-700 transition-colors" />
+```
+
+Update the function signature:
+```tsx
+function EssaySwitcher({ type, onClick }: { type: EssayType; onClick?: () => void }) {
+```
+
+Add `onClick` to the button's click handler. Keep the existing hover styles (onMouseEnter/onMouseLeave) -- they work correctly with plain CSS.
+
+**Integration points**: Called from the main ChatHeader render with `<EssaySwitcher type={essayType} onClick={onEssaySwitch} />`.
+
+**Source**: hybrid -- Agent B's lucide icons + Agent A's typed props, keeping the existing crafted visual styling
 
 ---
 
-## GAP-10: Essay Archetype Classification
+### 4. Action Buttons: Icon-only 28px -> Labeled compact buttons
+**Before**: 4 icon-only `ActionButton` components (New, History, More, Close) at 28x28px with custom SVGs
+**After**: 2 labeled buttons (History, Settings) using lucide-react icons. Close button removed — panel visibility controlled by parent layout (slide/dock from left edge).
 
-**Decision**: Hybrid (A's profile field + B's scoring calibration)
-**Files**: `profileTypes.ts`, `holisticSynthesis.ts`, `analysisPass.ts`
-**Risk**: Medium
-**Effort**: ~1.5 hours
+**Implementation**:
 
-### Type Addition
+New `HeaderAction` component (replaces `ActionButton` for labeled buttons):
+```tsx
+function HeaderAction({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  label: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1 px-2 h-[26px] rounded-md text-[11px] font-medium text-slate-500 transition-colors duration-150 hover:text-slate-700 hover:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/50 focus-visible:ring-offset-1"
+    >
+      <Icon size={13} strokeWidth={1.8} className="flex-shrink-0" />
+      <span className="leading-none">{label}</span>
+    </button>
+  );
+}
+```
 
-**File**: `profileTypes.ts`
-**Location**: After `aoTakeaway` field on `AdmissionsPositioning` (line 904)
+Width budget for each HeaderAction:
+- `px-2` (8px each side) + icon(13px) + gap(4px) + text = History(~60px), Settings(~65px)
+- Total action cluster: ~125px + gap = ~129px
 
-**Add**:
+**Buttons removed**: "Start new conversation" (PlusIcon), "More options" (MenuIcon), and "Close panel" (CloseIcon) are all removed. New conversation belongs in the History drawer; overflow menu had no defined options; Close is handled by the parent layout (panel slides/docks from the left edge).
+
+**Integration points**: Action cluster in the main render:
+```tsx
+<div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+  <HeaderAction icon={History} label="History" onClick={onHistoryClick} />
+  <HeaderAction icon={Settings} label="Settings" onClick={onSettingsClick} />
+</div>
+```
+
+**Source**: rethink (refined) -- Agent B's labeled buttons, Close removed per user direction (parent layout controls panel visibility)
+
+---
+
+### 5. Main Layout Assembly: Current single-row -> Refined single-row with all 7 elements
+**Before**: Avatar + Name + Divider + EssaySwitcher + ActionCluster (icon-only)
+**After**: Avatar + Name(+dynamic subtitle) + Divider + EssaySwitcher + ActionCluster (labeled)
+
+**Implementation** -- the complete content row JSX:
+```tsx
+export function ChatHeader({
+  essayType = 'common_app',
+  sessionStatus = 'live',
+  coachingMode,
+  onEssaySwitch,
+  onHistoryClick,
+  onSettingsClick,
+}: ChatHeaderProps = {}) {
+  const subtitle = getSubtitleConfig(sessionStatus, coachingMode);
+
+  return (
+    <header className="relative z-20 flex-shrink-0 overflow-hidden">
+      {/* Frosted glass base -- UNCHANGED */}
+      <div aria-hidden className="absolute inset-0 bg-white/60 backdrop-blur-xl" />
+
+      {/* Aurora drift -- UNCHANGED */}
+      <motion.div
+        aria-hidden
+        className="absolute inset-y-0 pointer-events-none"
+        style={{
+          width: '160%', left: '-30%',
+          background: 'linear-gradient(90deg, transparent 0%, hsla(260,75%,75%,0.07) 40%, hsla(200,75%,75%,0.05) 60%, transparent 100%)',
+        }}
+        animate={{ x: ['-8%', '8%', '-8%'] }}
+        transition={{ duration: 30, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      {/* Bottom separator -- UNCHANGED */}
+      <div aria-hidden className="absolute bottom-0 left-0 right-0 h-px pointer-events-none" style={{
+        background: 'linear-gradient(90deg, transparent 0%, hsla(250,45%,55%,0.2) 22%, hsla(250,45%,55%,0.3) 50%, hsla(250,45%,55%,0.2) 78%, transparent 100%)',
+      }} />
+
+      {/* Content row */}
+      <div className="relative flex items-center gap-2 px-3 py-2.5">
+        {/* 1. Luna avatar (hologram orb + online indicator) */}
+        <CoachAvatar />
+
+        {/* 2. Luna name + 4. Session status + 5. Coaching mode (in subtitle) */}
+        <div className="flex flex-col justify-center gap-[2px] flex-shrink-0">
+          <span className="text-[13px] font-bold text-slate-800 leading-none tracking-tight">
+            Luna
+          </span>
+          {/* Dynamic subtitle: status + mode */}
+          <AnimatePresence mode="wait">
+            <motion.span
+              key={subtitle.text}
+              initial={{ opacity: 0, y: 2 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -2 }}
+              transition={{ duration: 0.15 }}
+              className={cn(
+                'flex items-center gap-1 text-[8.5px] font-bold uppercase tracking-[0.12em] leading-none',
+                subtitle.colorClass
+              )}
+            >
+              {subtitle.showDot && (
+                <span
+                  className="inline-block w-[5px] h-[5px] rounded-full flex-shrink-0"
+                  style={{ background: subtitle.dotColor }}
+                />
+              )}
+              {subtitle.text}
+            </motion.span>
+          </AnimatePresence>
+        </div>
+
+        {/* Divider */}
+        <VerticalDivider />
+
+        {/* 3. Essay context switcher */}
+        <EssaySwitcher type={essayType} onClick={onEssaySwitch} />
+
+        {/* 6. History button (labeled) + 7. Settings button (labeled) */}
+        <div className="flex items-center gap-1 flex-shrink-0 ml-auto">
+          <HeaderAction icon={History} label="History" onClick={onHistoryClick} />
+          <HeaderAction icon={Settings} label="Settings" onClick={onSettingsClick} />
+        </div>
+      </div>
+    </header>
+  );
+}
+```
+
+**Width budget verification** (424px usable after px-3 padding = 24px):
+- CoachAvatar: 34px
+- gap: 8px
+- Name block: ~46px (Luna text + subtitle)
+- gap: 8px
+- VerticalDivider: 1px + mx margins ~9px total
+- gap: 8px
+- EssaySwitcher: flex-1 (gets remaining ~182px)
+- gap: 8px
+- HeaderAction History: ~60px
+- HeaderAction Settings: ~65px
+- gap between actions: 4px
+- **Total fixed**: ~242px. **EssaySwitcher gets**: ~182px (generous room for "Common App" + icon + chevron)
+
+**Estimated header height**: ~54px (unchanged from current: py-2.5 = 20px padding + 34px avatar height = 54px)
+
+**Source**: hybrid -- Agent B's single-row structure with Agent A's divider retention
+
+---
+
+### 6. Deleted Code Cleanup
+**Before**: 4 custom SVG icon components (PlusIcon, HistoryIcon, MenuIcon, CloseIcon) + ActionButton component
+**After**: 2 custom components removed (PlusIcon, MenuIcon), HistoryIcon removed (replaced by lucide History), ActionButton replaced by HeaderAction. CloseIcon kept inside CloseButton. Close SVG is retained as inline because it matches the crafted style precisely.
+
+**Files deleted/modified**:
+- `PlusIcon` function: DELETE (lines 338-349)
+- `HistoryIcon` function: DELETE (lines 351-376)
+- `MenuIcon` function: DELETE (lines 378-386)
+- `CloseIcon` function: DELETE (lines 388-399)
+- `ActionButton` function: DELETE (lines 283-332) -- replaced by `HeaderAction`
+
+**Source**: refined -- natural cleanup from replacing custom SVGs with lucide icons
+
+---
+
+## Execution Order
+
+1. **Add imports and types** (Item 1): Add `EssayType`, `CoachingMode` imports, lookup maps, `ChatHeaderProps` interface, `getSubtitleConfig` function. Zero visual change at this step.
+
+2. **Replace EssaySwitcher internals** (Item 3): Swap custom SVG for lucide FileText, add typed props. Test: essay label still shows "Common App".
+
+3. **Add HeaderAction and CloseButton** (Item 4): Create new button components. Test: verify focus ring and hover states.
+
+4. **Rewrite main render** (Item 5): Replace the content row JSX with the new layout including dynamic subtitle and labeled actions. Test: header renders at ~54px height, all 7 elements visible.
+
+5. **Delete dead code** (Item 6): Remove PlusIcon, HistoryIcon, MenuIcon, CloseIcon, ActionButton. Test: `npx tsc --noEmit` passes.
+
+6. **Verify consumers** (Item 1 integration): Confirm `ChatPanel.tsx` and `ChatWidget.tsx` still compile and render correctly with zero-prop `<ChatHeader />`.
+
+---
+
+## Existing Infrastructure Leveraged
+
+| Component/Module | Location | Usage |
+|---|---|---|
+| `EssayType` type | `src/services/essayIntelligence/profileTypes.ts:66` | Props typing |
+| `CoachingMode` type | `src/services/essayIntelligence/profileTypes.ts:99` | Props typing + subtitle derivation |
+| `motion`, `AnimatePresence` | `motion/react` (installed, used in 10+ components) | Subtitle transitions |
+| `History`, `Settings`, `FileText`, `ChevronDown` icons | `lucide-react` (installed, used in 25+ components) | Action buttons + essay switcher |
+| `cn()` utility | `@/lib/utils` | Conditional class merging for subtitle |
+| `CoachAvatar` | Same file (lines 98-187) | UNCHANGED -- hologram orb with online dot |
+| `VerticalDivider` | Same file (lines 401-412) | UNCHANGED -- gradient divider |
+| shadcn Badge | `src/components/ui/badge.tsx` | NOT used (see Rejected Approaches) |
+| shadcn Button | `src/components/ui/button.tsx` | NOT used (ClickSpark wrapping is unwanted) |
+| shadcn Tooltip | `src/components/ui/tooltip.tsx` | NOT used (labeled buttons don't need tooltips) |
+| shadcn Popover | `src/components/ui/popover.tsx` | NOT used yet (premature without essay list data) |
+
+---
+
+## Open Questions
+
+1. **"New conversation" button**: Removed from header. Should live in the History drawer/panel as a top action.
+
+2. **Essay switcher dropdown**: When should the Popover with essay selection be implemented? The current design preserves the button shape but clicking it only fires `onEssaySwitch`. The actual dropdown needs an essay list from session state.
+
+3. **Archived session visual**: Should archived sessions have additional visual treatment beyond the subtitle text? Options: dimmed header opacity, different aurora color, or an Archive icon prefix in the subtitle.
+
+---
+
+## Rejected Approaches
+
+1. **Two-row layout** (Agent A): +40px vertical cost for a chat panel is too expensive. Single row fits all 7 elements.
+
+2. **Icon-only action buttons with tooltips** (Agent A): Does not meet the "labeled" requirement. Tooltips are invisible on mobile and require hover delay.
+
+3. **shadcn Button for header actions**: The ClickSpark wrapper adds purple spark effects on every click -- inappropriate for utility buttons like History and Settings.
+
+4. **Popover on EssaySwitcher now**: No essay list data exists. The switching feature needs session state infrastructure first.
+
+5. **Required props on ChatHeaderProps**: Would break both existing consumers (`ChatPanel.tsx`, `ChatWidget.tsx`) that call `<ChatHeader />` with zero props.
+
+6. **Separate SessionBadge and CoachingModeBadge components** (Agent A): Two badges consume 112-132px (25-30% of row). The subtitle line absorbs both for 0px additional cost.
+
+7. **Removing the vertical divider** (Agent B): 9px cost is trivial; the visual separation between identity and navigation is valuable.
+
+8. **shadcn Badge for session status**: Display-only badges add CVA variant overhead for what is a simple colored text span. The dynamic subtitle is lighter and more flexible.
+
+---
+---
+
+# Implementation Blueprint: Progress Pulse + Cloud Avatar
+
+The ChatHeader currently uses a purple holographic orb as Luna's avatar and displays no essay progress information. This blueprint adds two capabilities: (1) a **Progress Pulse** that shows explicit, visible essay progress -- score, college tier, and momentum -- and (2) a **Cloud Avatar** replacing the orb with an expressive, phase-aware cloud character. Both fit within the existing 448px `max-w-md` panel and the ~54px header height.
+
+---
+
+## Part 1: Reality Verification
+
+### Finding TYPES-1: ImprovementPhaseLevel EXISTS
+**Severity**: verified
+**Detail**: `ImprovementPhaseLevel` at `profileTypes.ts:87` = `'foundation' | 'architecture' | 'craft' | 'polish' | 'distinction'`. Both designs reference this correctly.
+
+### Finding TYPES-2: EffectivenessBand EXISTS + maps to college tiers
+**Severity**: verified
+**Detail**: `effectivenessBands.ts` exports `EffectivenessBand` with 6 bands: masterful(96-100), exceptional(86-95), strong(76-85), functional(55-75), developing(40-54), problematic(0-39). The `toEffectivenessBand()` function converts a 0-100 score. Agent A's `BAND_TO_TIER` mapping is a NEW invention -- it does NOT exist in the codebase. However, the Deep Academic Report module (`tierCalibration.ts`) maps GPA to college tiers using the SAME 6-tier hierarchy (Ivy/Elite, Highly Selective, Very Selective, Selective, Competitive, Accessible). Reusing these tier names for essay effectiveness is conceptually sound but it is a NOVEL mapping -- no existing code connects essay effectiveness bands to college admission tiers.
+
+### Finding TYPES-3: ParagraphScoreMatrix EXISTS
+**Severity**: verified
+**Detail**: `ParagraphScoreMatrix` at `profileTypes.ts:1822` contains `paragraphs: ParagraphScoreEntry[]` where each entry has `scores.effectiveness` (0-100). An "average effectiveness" must be COMPUTED by averaging `paragraphs[i].scores.effectiveness` across all paragraphs. No pre-computed `avgEffectiveness` field exists on the profile.
+
+### Finding TYPES-4: Edit Statistics EXIST in VersionTracker
+**Severity**: verified
+**Detail**: `StalenessAccumulator` in `versionTracker.ts:70-78` tracks `transformativeCount`, `significantCount`, `moderateCount`, `totalEdits`. These are also serialized in `ProfileIndex.accumulatedStaleness` (`profileTypes.ts:1400-1408`). Agent A's `editStats` prop is valid IF derived from the version tracker's accumulator.
+
+### Finding TYPES-5: ImprovementPhase has rich data
+**Severity**: verified
+**Detail**: `ImprovementPhase` (`profileTypes.ts:1428-1477`) contains `level`, `reasoning`, `focusAreas`, `deferredAreas`, `readinessAssessment`, `dimensionPhases[]`, `coachingLens`, `transition`, `nearBoundary`. This is MUCH richer than either design assumed. The `transition` field tracks phase shifts. The `readinessAssessment` is LLM prose describing how close the essay is to the next level.
+
+### Finding AVATAR-1: CoachAvatar is 85 lines of JSX
+**Severity**: verified
+**Detail**: CoachAvatar (`ChatHeader.tsx:98-187`) = 90 lines. Contains outer pulse halo, HUD conic ring, core orb, highlight spark, and online status dot. All framer-motion animated. Agent A's claim of "fewer than 85 lines" for the SVG cloud and Agent B's CSS cloud approach are both plausible replacements.
+
+### Finding AVATAR-2: No face/eyes at 34px is a risk
+**Severity**: concern
+**Detail**: At 34x34px, both designs push the limits of recognizable detail. Agent A's dot-eyes (2px circles) may read as noise. Agent B's faceless physics-only approach may read as a generic blob. Neither has been visually tested. At 34px, SIMPLICITY is key -- fewer elements, higher contrast.
+
+### Finding POPOVER-1: shadcn Popover EXISTS and works
+**Severity**: verified
+**Detail**: `src/components/ui/popover.tsx` wraps `@radix-ui/react-popover` with Portal rendering. It is usable for Agent A's expanded progress view. The Popover renders via Portal (no layout impact on header), has enter/exit animations, and accepts `sideOffset` for positioning.
+
+### Finding LAYOUT-1: Width budget is TIGHT
+**Severity**: concern
+**Detail**: With the Items 1-6 header redesign, the layout is: Avatar(34) + gap(8) + Name(46) + gap(8) + Divider(9) + gap(8) + EssaySwitcher(flex-1, ~182px) + gap(8) + History(60) + Settings(65) + gap(4) = ~424px usable. Adding a 68px Progress Pill (Agent A) would steal from EssaySwitcher, reducing it to ~114px. "Common App" + icon + chevron = ~95px minimum. Tight but viable. An INLINE approach (Agent B) avoids this entirely.
+
+### Finding DATA-FLOW-1: No essay profile data currently flows to ChatHeader
+**Severity**: critical
+**Detail**: ChatHeader receives ZERO props today. The essay profile data (ImprovementPhase, ParagraphScoreMatrix, edit stats) lives in backend services. To show progress, we need: (1) backend endpoint or WebSocket to surface vitals, (2) parent component (ChatPanel/ChatWidget) to hold state, (3) new props on ChatHeader. This is infrastructure work that BOTH designs require equally.
+
+---
+
+## Part 2: Forced-Choice Synthesis
+
+### Decision 1: Score Display -- HYBRID (Agent A pill + Agent B ambient color)
+
+**Winner**: Agent A's explicit progress, refined.
+
+The user said: "intuitive like from 72 -> 78", "suggested score improvement", "where their college is at right now." This is an unambiguous request for EXPLICIT, VISIBLE numbers. Agent B's ambient-only approach (color shifts, energy, wisps) fails this requirement -- students will not decode that "slightly more saturated lavender" means "your score improved 6 points."
+
+**Design**: A compact progress element between the divider and essay switcher. NOT a separate 68px pill (too wide) -- instead, a compact **score badge** (~48px) that shows the current average effectiveness as a number with a small delta arrow when the score has changed.
+
+Display: `78` with a small up-arrow and `+6` in green, or just `72` with no arrow on first analysis. The number IS the effectiveness band midpoint, not the raw 0-100 (to avoid false precision per `effectivenessBands.ts` design philosophy). Show the BAND LABEL on hover/tap.
+
+Pre-analysis state: Pulsing `--` placeholder.
+
+**Additionally**: The cloud avatar's color shifts with phase (Agent B's ambient approach) as a SECONDARY signal. The number is primary; the cloud vibe is reinforcement.
+
+### Decision 2: College Tier -- POPOVER detail, not inline
+
+**Winner**: Agent A's popover, refined.
+
+The user said "where their college is at right now like around T20 colleges level." This needs text, not a border tint. But it does NOT need to be always-visible -- it is a detail you check, not a constant reference.
+
+**Design**: Click/tap the score badge to open a Popover (using existing shadcn Popover). The popover shows:
+- Current effectiveness band label + score range (e.g., "Strong (76-85)")
+- College tier mapping: "Essays in this range are competitive at **Highly Selective** schools (Northwestern, UCLA, UC Berkeley)"
+- Momentum: edit velocity label (stalled/steady/surging) based on edit stats
+- Phase: current improvement phase with one-line description
+- If `nearBoundary` on the phase: "Close to advancing to Architecture phase"
+
+Size: 260px wide, auto-height. This is richer than Agent A's 240x180 SVG arc and more informative than Agent B's 28px expansion.
+
+**BAND_TO_TIER mapping** (new, lives in the component file):
 ```typescript
-/** Archetype classification -- what essay "type" this falls into from an AO's pattern-matching perspective */
-archetypeContext?: {
-  /** The archetype name: "sports injury comeback", "immigrant identity", "service trip revelation", etc. */
-  archetype: string;
-  /** How common this archetype is in the applicant pool */
-  poolDensity: 'saturated' | 'common' | 'moderate' | 'uncommon' | 'rare';
-  /** What (if anything) makes THIS essay's execution non-generic within the archetype */
-  differentiator: string | null;
+const BAND_TO_TIER: Record<EffectivenessBand, { tier: string; examples: string }> = {
+  masterful:   { tier: 'Ivy/Elite',          examples: 'Harvard, Stanford, MIT' },
+  exceptional: { tier: 'Highly Selective',   examples: 'Northwestern, UCLA, UC Berkeley' },
+  strong:      { tier: 'Very Selective',     examples: 'NYU, Boston College, UW-Madison' },
+  functional:  { tier: 'Selective',          examples: 'Boston University, UT Austin, Purdue' },
+  developing:  { tier: 'Competitive',        examples: 'Arizona State, Iowa State, Temple' },
+  problematic: { tier: 'Needs Work',         examples: 'Focus on fundamentals first' },
 };
 ```
+This reuses the tier names from `tierCalibration.ts` (Finding TYPES-2) for consistency across the product.
 
-### L3.75 Prompt Addition
+### Decision 3: Cloud Shape -- CSS overlapping divs (Agent B), refined
 
-**File**: `holisticSynthesis.ts`
-**Location**: After `aoTakeaway` in the admissionsPositioning JSON schema (line ~522)
+**Winner**: Agent B's CSS approach, with adjustments.
 
-**Add to schema**:
-```
-"archetypeContext": {
-  "archetype": "<name the essay archetype an AO would mentally file this under — e.g., 'sports injury comeback', 'immigrant identity', 'service trip revelation', 'music as metaphor', 'death of a grandparent', 'leadership through adversity'. Be honest about the archetype even if the essay is good.>",
-  "poolDensity": "<saturated|common|moderate|uncommon|rare> — how many essays in a typical applicant pool of 500 match this archetype?",
-  "differentiator": "<what makes THIS essay's execution non-generic within the archetype, or null if the execution is also generic>"
-}
-```
+At 34px, an SVG path cloud requires sub-pixel precision and a `filter: blur()` that may alias poorly on non-retina screens. CSS `rounded-full` divs with radial gradients are the SAME technique used for the cloud valley in `ChatPanel.tsx` (lines 127-173) -- proven pattern in this codebase. Consistency matters.
 
-### L3.5 Scoring Calibration
+**Design**: 3 overlapping `rounded-full` divs (main lobe 18x16, left lobe 13x12, right lobe 14x11) with `blur(0.5px)` edge softening. Radial gradient fill matching the current orb's purple palette as the default, shifting hue per phase.
 
-**File**: `analysisPass.ts`
-**Location**: After the calibration examples (around line 337), add a new calibration note
+### Decision 4: Cloud Personality -- Minimal face (refined from Agent A)
 
-**Add**:
-```
-ARCHETYPE CALIBRATION:
-If the holistic context identifies a saturated or common archetype with a null differentiator,
-the essay must earn its scores through EXECUTION, not topic. A "sports injury comeback" essay
-with generic execution ("I learned perseverance") should score 10-15 points lower on sentences
-that rely on the archetype's expected beats rather than earning moments through specific detail.
-A saturated archetype with brilliant execution can still score 85+, but generic sentences within
-a saturated archetype rarely deserve above 55.
-```
+**Winner**: Hybrid -- two dots + phase-driven color, no blush.
 
-### Orchestrator Wiring
-The archetype is produced by L3.75 and stored on the profile. L3.5 receives the full profile (including archetype) as part of its understanding context. No explicit wiring needed beyond the prompt addition -- the existing context assembly already passes the holistic profile to L3.5.
+Agent B's faceless physics-only cloud is elegant in theory but at 34px, "personality through physics" means students see a colored blob. The chat panel already has clouds (the valley) -- another faceless cloud blends in rather than standing out as a CHARACTER.
 
-### Test
-Run against a "sports injury" essay with generic execution. Verify:
-- L3.75 outputs `archetype: "sports injury comeback"`, `poolDensity: "saturated"`
-- L3.5 scores generic "I learned perseverance" sentences lower (~50-55) than specific detail sentences (~70+)
+Agent A's dot-eyes give the cloud identity. At 34px, two 2.5px dots placed at ~35% from top are legible. Happy blush (Agent A) is too much detail at this scale -- cut it. Mood states simplified to 2: default (neutral dots) and thinking (dots shift to .. squint via slight Y offset during analysis).
+
+The phase-driven color shifts (Agent B) apply to the cloud body, not the eyes. Eyes stay dark (slate-700) for contrast.
+
+### Decision 5: Expansion -- POPOVER (Agent A), not row expansion
+
+**Winner**: Agent A's popover approach.
+
+Agent B's 28px row expansion pushes all messages down on every click -- disruptive in a chat context. A Popover (Portal-rendered, no layout shift) is the standard pattern in this codebase (shadcn Popover used in multiple components). It appears ON TOP of content, shows detail, and dismisses cleanly.
+
+### Decision 6: Subtitle -- DYNAMIC phase name (Agent B), refined
+
+**Winner**: Agent B's approach, already adopted in Items 1-6.
+
+The subtitle already shows coaching mode from the Item 2 implementation. For Progress Pulse, the subtitle absorbs the improvement phase when no coaching mode is active: "foundation phase" / "architecture phase" / "craft phase" / "polishing" / "distinction". When coaching mode IS active (revision_response, iteration_deep, etc.), coaching mode takes priority (it is more immediately relevant). Phase is always visible in the popover.
+
+Priority chain: `archived > coaching_mode > improvement_phase > "essay coach"`.
 
 ---
 
-## GAP-3: Phase Detector (Narrative Essay Calibration)
-
-**Decision**: Hybrid (A's data surfacing + B's reframe)
-**Files**: `src/services/essayIntelligence/analysis/phaseAssessment.ts`
-**Risk**: Low
-**Effort**: ~30 min
-
-### Change 1: Surface narrative data in buildHolisticDigest()
-
-**File**: `phaseAssessment.ts`
-**Location**: Lines 215-222 (the `narrativeStrategy` section of `buildHolisticDigest()`)
-
-**Current**:
-```typescript
-if (profile.narrativeStrategy) {
-  const ns = profile.narrativeStrategy;
-  if (ns.arcMomentum) lines.push(`  Arc momentum: ${ns.arcMomentum}`);
-  if (Array.isArray(ns.pivotPoints)) {
-    lines.push(`  Pivot points: ${ns.pivotPoints.length}`);
-  }
-  if (ns.turningPoint != null) lines.push(`  Turning point: present`);
-}
-```
-
-**Replace with**:
-```typescript
-if (profile.narrativeStrategy) {
-  const ns = profile.narrativeStrategy;
-  if (ns.arcType) lines.push(`  Narrative arc: ${ns.arcType}`);
-  if (ns.primaryStrategy) lines.push(`  Strategy: ${ns.primaryStrategy}`);
-  if (ns.arcMomentum) lines.push(`  Arc momentum: ${ns.arcMomentum}`);
-  if (Array.isArray(ns.pivotPoints)) {
-    lines.push(`  Pivot points: ${ns.pivotPoints.length}`);
-  }
-  if (ns.turningPoint != null) lines.push(`  Turning point: present`);
-}
-```
-
-### Change 2: Add narrative calibration to phase system prompt
-
-**File**: `phaseAssessment.ts`
-**Location**: After line 116 (the dimension divergence check), before "COACHING LENS:"
-
-**Add**:
-```
-NARRATIVE ESSAY CALIBRATION:
-For narrative essays (reflective, montage, bracket, lyrical arcs), "thesis" manifests as an emergent theme or revelation, not an explicit statement. A narrative essay at ARCHITECTURE phase may have a powerful through-line but no stated thesis -- this is intentional, not a weakness. Judge narrative essays by their arc coherence, earned moments, and thematic resonance rather than thesis clarity. When the holistic context shows a narrative arc type, recalibrate your thesis expectations accordingly.
-```
-
-### Why Both Changes Together
-The data surfacing ensures the LLM sees the narrative arc type. The calibration note tells it what to do with that information. Without both, the LLM either lacks the data (change 1 alone) or lacks the instruction (change 2 alone).
-
-### Test
-Run phase assessment on a narrative essay with strong arc but no explicit thesis. Verify it does NOT default to foundation/architecture solely due to low thesis confidence.
+## Items
 
 ---
 
-## GAP-8: Scoring Bias (Admissions Relevance in Craft Scores)
+### 7. Progress Score Badge: New compact element between divider and essay switcher
 
-**Decision**: Agent A -- integrated admissions criteria
-**Files**: `src/services/essayIntelligence/analysis/analysisPass.ts`
-**Risk**: Medium (changes scoring behavior)
-**Effort**: ~45 min
+**Before**: Divider flows directly into EssaySwitcher
+**After**: Divider -> ProgressBadge (~48px) -> EssaySwitcher (flex-1, now ~134px)
 
-### Change 1: Add admissions criteria to evaluation method
+**Implementation**:
 
-**File**: `analysisPass.ts`
-**Location**: Lines 358-364 (the evaluation criteria list)
-
-**Current**:
-```
-3. **Reason about effectiveness** -- HOW WELL does this sentence achieve its stated purpose? Consider:
-   - Specificity vs. vagueness
-   - Show vs. tell
-   - Voice authenticity vs. performed voice
-   - Structural contribution vs. filler
-   - Earned emotional moments vs. asserted emotions
-   - Memorable craft vs. generic competence
-```
-
-**Replace with**:
-```
-3. **Reason about effectiveness** -- HOW WELL does this sentence achieve its stated purpose? Consider:
-   - Specificity vs. vagueness
-   - Show vs. tell
-   - Voice authenticity vs. performed voice
-   - Structural contribution vs. filler
-   - Earned emotional moments vs. asserted emotions
-   - Memorable craft vs. generic competence
-   - Admissions resonance: does this sentence reveal something about the student that would matter to an AO? A sentence can be well-crafted but reveal nothing, or plainly written but deeply revealing
-   - Revelation density: how much of the student's character, values, or thinking does this sentence surface per word?
-
-ADMISSIONS-CRAFT INTEGRATION:
-This is a college admissions essay, not a literary exercise. When craft quality and admissions value conflict, admissions value carries MORE weight. A plainly-written sentence that reveals a genuine, specific moment of the student's character ("My GPA dropped from 3.9 to 2.1 the semester my parents divorced") is MORE effective than a beautifully crafted sentence that reveals nothing new about the student. Score accordingly.
-```
-
-### Change 2: Add admissions calibration example
-
-**File**: `analysisPass.ts`
-**Location**: After the score 88 example (around line 337), add:
-
-```
-SCORE 78: "My GPA dropped from 3.9 to 2.1 the semester my parents divorced."
-WHY 78: No craft technique — the sentence is plain. But the specificity is devastating: exact numbers (3.9 to 2.1), exact trigger (parents' divorce), exact timeframe (one semester). An AO reads this and UNDERSTANDS something irreplaceable about this student's trajectory. The admissions revelation density is very high despite modest craft. Not 86+ because the sentence could be more architecturally integrated into the essay's structure.
-```
-
-### What NOT to Change
-- Do NOT add new fields to `SentenceAnalysis`. The LLM already has `effectivenessReasoning` which is free-form. Admissions considerations will naturally appear there.
-- Do NOT add post-hoc scoring adjustments. The LLM integrates admissions natively during its reasoning process.
-
-### Test
-Run L3.5 on an essay with a plain but deeply revealing sentence. Verify it scores higher (~75-85) than a beautifully crafted but generic sentence (~55-65).
-
----
-
-## GAP-1: Response Intensity (Coaching Length Control)
-
-**Decision**: Hybrid (A's memory + Stage 1.5 signal)
-**Files**: `src/services/essayIntelligence/profileTypes.ts`, `src/services/essayIntelligence/coaching/coachingService.ts`
-**Risk**: Low
-**Effort**: ~1 hour
-
-### Type Change
-
-**File**: `profileTypes.ts`
-**Location**: After `nextFocus` in `CoachingSessionMemory` (line 2146)
-
-**Add**:
+New types (add to ChatHeaderProps from Item 1):
 ```typescript
-/**
- * The response intensity from the PREVIOUS turn's sidecar output.
- * Used as a consistency signal alongside Stage 1.5's intensity assessment.
- * null on first turn.
- */
-lastResponseIntensity?: 'full' | 'brief' | 'minimal' | null;
-```
-
-### Wiring: Use Stage 1.5 intensity for maxTokens
-
-**File**: `coachingService.ts`
-**Location**: After the Stage 1.5 call returns (around line 2450+) and before the Stage 3 Sonnet call (line 1482-1492)
-
-The Stage 1.5 call at line 2357 already returns `responseIntensity` in its output. The implementation should:
-
-1. Extract `intensity` from the Stage 1.5 result (already parsed)
-2. Map intensity to maxTokens:
-   - `full` -> 2200 (current default)
-   - `brief` -> 1200
-   - `minimal` -> 600
-3. Pass the dynamic maxTokens to the Stage 3 `callClaude()` call at line 1487
-
-**Current** (line 1487):
-```typescript
-maxTokens: 2200,
-```
-
-**Replace with** (pseudocode -- actual variable name depends on where 1.5 result is accessible):
-```typescript
-maxTokens: intensityToMaxTokens(stage1_5Intensity),
-```
-
-Where:
-```typescript
-function intensityToMaxTokens(intensity: 'full' | 'brief' | 'minimal'): number {
-  switch (intensity) {
-    case 'full': return 2200;
-    case 'brief': return 1200;
-    case 'minimal': return 600;
-  }
-}
-```
-
-### Wiring: Store sidecar intensity in session memory
-
-After parsing the sidecar from Stage 3's response (where `responseIntensity` is extracted), store it:
-
-```typescript
-memory.lastResponseIntensity = sidecar.responseIntensity;
-```
-
-This is available on the next turn for consistency checking but is NOT the primary signal (Stage 1.5 is).
-
-### Important Implementation Detail
-The Stage 1.5 call currently runs INSIDE `processCoachingTurn`. Its result needs to be accessible at the point where `maxTokens` is set for Stage 3. Trace the call flow:
-- Stage 1.5 runs at line ~2357 (private method)
-- Stage 3 Sonnet call at line ~1482 (inside the main flow)
-- The `stage1_5Intensity` must flow from the Stage 1.5 result to the Stage 3 call site
-
-### Test
-Send a short confirmation message ("Yeah, I see what you mean"). Verify:
-- Stage 1.5 returns `minimal` intensity
-- Stage 3 maxTokens is set to 600
-- Coach response is short (acknowledgment, not lecture)
-
----
-
-## GAP-2: Learning Style Accumulation
-
-**Decision**: Refined (complete existing wiring)
-**Files**: `src/services/essayIntelligence/coaching/coachingService.ts`
-**Risk**: Low
-**Effort**: ~45 min
-
-### Change 1: Add learningStyleUpdate to sidecar
-
-**File**: `coachingService.ts`
-**Location**: Line 167 (the `SIDECAR_INSTRUCTIONS` constant, sidecar JSON schema)
-
-**Current sidecar JSON** (line 167):
-```
-{"category":"...","cognitiveState":"...","focusParagraphs":[...],"dimensionFocus":[...],"responseIntensity":"...","sessionJournalEntry":"...","contextAccumulation":"...","needsDeepening":...,"deepeningReason":"..."}
-```
-
-**Add field**:
-```
-"learningStyleUpdate":"<1-sentence observation about how this student learns based on THIS turn's interaction, or null. Examples: 'Responds better to specific text comparisons than abstract descriptions', 'Needs to see the problem demonstrated before accepting the fix', 'Engages deeply when connecting essay craft to their personal experience'>"
-```
-
-### Change 2: Accumulate from sidecar on every turn
-
-After parsing the sidecar (in the sidecar extraction logic), when `sidecar.learningStyleUpdate` is non-null:
-
-```typescript
-if (sidecar.learningStyleUpdate) {
-  // Cap at 8 observations, evict oldest tentative first
-  if (style.observations.length >= 8) {
-    const tentativeIdx = style.observations.findIndex(o => o.confidence === 'tentative');
-    if (tentativeIdx >= 0) {
-      style.observations.splice(tentativeIdx, 1);
-    } else {
-      style.observations.shift(); // evict oldest
-    }
-  }
-  style.observations.push({
-    observation: sidecar.learningStyleUpdate,
-    confidence: 'tentative',
-    turnObserved: memory.turnCount + 1,
-  });
-}
-```
-
-### Change 3: Promote confidence over time
-
-In the existing pattern detection (every 3+ turns, line ~2195), when `learningStyleUpdate` is non-null from pattern detection, check if it confirms an existing tentative observation. If so, promote to 'growing'. If a 'growing' observation is confirmed again, promote to 'confident'.
-
-This logic already partially exists -- the pattern detection `learningStyleUpdate` field was designed for this. The gap is that the sidecar provides turn-by-turn signal to ACCUMULATE, while pattern detection provides periodic CONFIRMATION.
-
-### Test
-Run a 5-turn coaching session. Verify:
-- Turn 1: sidecar produces learningStyleUpdate -> added as tentative
-- Turn 3: pattern detection confirms -> promoted to growing
-- Turn 6: further confirmation -> promoted to confident
-- Never exceeds 8 observations
-
----
-
-## GAP-6: Strategic Thread (Persistent Coaching Direction)
-
-**Decision**: Agent B -- strategic question + staleness
-**Files**: `src/services/essayIntelligence/profileTypes.ts`, `src/services/essayIntelligence/coaching/coachingService.ts`
-**Risk**: Low-Medium
-**Effort**: ~1 hour
-
-### Type Changes
-
-**File**: `profileTypes.ts`
-**Location**: `CoachingSessionMemory` (line 2108)
-
-**Replace** `nextFocus` (line 2142-2146):
-```typescript
-/**
- * What the session should focus on next -- LLM-assessed after each turn.
- * Not a fixed curriculum -- emerges from the conversation.
- */
-nextFocus: string;
-```
-
-**With**:
-```typescript
-/**
- * Strategic question driving the session -- a curiosity, not a topic label.
- * Example: "Does the student hear the voice shift between P2 and P3?"
- * LLM-assessed after each turn. Naturally infiltrates coaching responses.
- * @deprecated nextFocus still populated for backward compat; strategicQuestion is preferred.
- */
-nextFocus: string;
-
-/**
- * The strategic question that should guide the next coaching response.
- * A QUESTION, not a topic. Example: "Can the student explain why P4 matters
- * to their overall argument?" Questions naturally infiltrate responses better
- * than topic directives like "focus on voice."
- */
-strategicQuestion: string;
-
-/**
- * How many consecutive turns the strategicQuestion has remained unchanged.
- * Reset to 0 when strategicQuestion is updated by pattern detection.
- * At 4+, pattern detection includes a gentle escalation note.
- */
-questionStaleness: number;
-```
-
-### Session Memory Initialization
-
-**File**: `coachingService.ts`
-**Location**: `initializeSessionMemory()` (line 2565)
-
-Add:
-```typescript
-strategicQuestion: '',
-questionStaleness: 0,
-```
-
-### Injection into Stage 3 prompt
-
-**File**: `coachingService.ts`
-**Location**: Session arc section (line 1434-1450)
-
-In the MIDDLE SESSION and LATE SESSION blocks, replace:
-```
-${sessionMemory.nextFocus ? `SUGGESTED NEXT FOCUS: ${sessionMemory.nextFocus}` : ''}
-```
-
-With:
-```
-${sessionMemory.strategicQuestion ? `STRATEGIC QUESTION (let this guide your response): ${sessionMemory.strategicQuestion}` : (sessionMemory.nextFocus ? `SUGGESTED NEXT FOCUS: ${sessionMemory.nextFocus}` : '')}
-${sessionMemory.questionStaleness >= 4 ? `NOTE: This question has been the strategic thread for ${sessionMemory.questionStaleness} turns without the student engaging it directly. Consider weaving it in more gently, or assessing whether it's still the right question.` : ''}
-```
-
-### Pattern Detection Update
-
-**File**: `coachingService.ts`
-**Location**: Pattern detection output schema (line ~2220)
-
-Add to the JSON schema:
-```
-"strategicQuestionUpdate": "<a QUESTION (not a topic) that should drive the next coaching response. Must be specific to this essay and this student's current position. Example: 'Can the student feel the difference between P2's authentic voice and P3's performed voice?' Set to null if the current strategic question is still the right one.>"
-```
-
-After pattern detection parses, if `strategicQuestionUpdate` is non-null:
-```typescript
-memory.strategicQuestion = parsed.strategicQuestionUpdate;
-memory.questionStaleness = 0;
-```
-Else:
-```typescript
-memory.questionStaleness += 1;
-```
-
-### Test
-Run a 6-turn session. Verify:
-- Turn 2: pattern detection sets a specific question ("Does the student...")
-- Turns 3-5: question remains, staleness increments
-- Turn 6: if student engages the question, pattern detection updates it. If not, staleness note appears in prompt.
-
----
-
-## GAP-12: PIQ Portfolio Synthesis
-
-**Decision**: Agent B -- embedded portfolio context
-**Files**: PIQ analysis service (the main prompt builder for PIQ analysis)
-**Risk**: Low
-**Effort**: ~1 hour
-
-### Design
-
-When analyzing the Nth PIQ (N >= 2), inject a portfolio context section into the analysis prompt. The section contains `quickSummary` and key dimension highlights from prior PIQ results.
-
-### What to Build
-
-1. A function `buildPIQPortfolioContext(priorResults: PIQWorkshopResult[]): string` that assembles a prompt section:
-
-```typescript
-function buildPIQPortfolioContext(priorResults: PIQWorkshopResult[]): string {
-  if (priorResults.length === 0) return '';
-
-  const lines: string[] = [
-    '=== PIQ PORTFOLIO CONTEXT ===',
-    `This student has already written ${priorResults.length} other PIQ(s).`,
-    '',
-  ];
-
-  for (let i = 0; i < priorResults.length; i++) {
-    const r = priorResults[i];
-    lines.push(`PIQ ${i + 1}: ${r.quickSummary}`);
-
-    // Extract top dimensions that scored well
-    const strongDims = r.dimensions
-      .filter(d => d.status === 'good' || d.status === 'excellent')
-      .map(d => d.name)
-      .slice(0, 3);
-    if (strongDims.length > 0) {
-      lines.push(`  Strong dimensions: ${strongDims.join(', ')}`);
-    }
-
-    // Extract main issues
-    const topIssueNames = r.topIssues.slice(0, 2).map(i => i.title);
-    if (topIssueNames.length > 0) {
-      lines.push(`  Key issues: ${topIssueNames.join(', ')}`);
-    }
-    lines.push('');
-  }
-
-  lines.push('PORTFOLIO DIRECTIVE: This PIQ should reveal DIFFERENT dimensions of this student than their other PIQs. If their prior PIQs already demonstrate leadership and initiative, this one should show a different facet -- creativity, vulnerability, intellectual curiosity, community connection, etc. Evaluate this PIQ in the context of what the PORTFOLIO needs, not just what this individual PIQ achieves.');
-
-  return lines.join('\n');
-}
-```
-
-2. Inject this into the PIQ analysis prompt when `priorResults` is provided as an optional parameter.
-
-### Caller Responsibility
-The HTTP route handler or PIQ orchestrator must pass prior `PIQWorkshopResult[]` when available. This requires the caller to store/retrieve prior results -- likely from the database or session state. The bridge function itself is pure (string in, string out).
-
-### Test
-Analyze a 2nd PIQ with prior result showing strong leadership. Verify the analysis flags when the 2nd PIQ also focuses on leadership ("portfolio overlap -- consider showing a different dimension").
-
----
-
-## GAP-13: Cross-Module Bridge
-
-**Decision**: Agent B -- prose narrative bridge
-**Files**: New file `src/services/studentNarrativeBridge.ts`
-**Risk**: Low
-**Effort**: ~1 hour
-
-### What to Build
-
-A pure function that assembles available cross-module context into a prose string. No LLM calls. Decoupled -- modules don't know about each other's types.
-
-```typescript
-// src/services/studentNarrativeBridge.ts
-
-/**
- * Assembles available cross-module context into a prose string
- * for injection into any module's prompts.
- *
- * Pure function. No LLM calls. Each input is optional.
- * Modules produce strings; this bridge consumes them.
- */
-
-export interface StudentModuleOutputs {
-  /** From essay intelligence: quickSummary or coaching lens */
-  essayIntelligence?: {
-    coachingLens?: string;      // from ImprovementPhase
-    writerPortrait?: string;    // from CharacterRevelation
-    revealedQualities?: string[]; // from CharacterRevelation
+import type { ImprovementPhaseLevel } from '@/services/essayIntelligence/profileTypes';
+import type { EffectivenessBand } from '@/services/essayIntelligence/analysis/effectivenessBands';
+
+/** Vitals passed from parent — derived from EssayProfile + VersionTracker */
+export interface EssayVitals {
+  /** Average paragraph effectiveness (0-100), computed from ParagraphScoreMatrix */
+  avgEffectiveness: number | null;
+  /** Previous avg effectiveness (for delta display) */
+  prevAvgEffectiveness: number | null;
+  /** Current improvement phase level */
+  phase: ImprovementPhaseLevel;
+  /** Phase readiness assessment (LLM prose, from ImprovementPhase) */
+  readinessAssessment: string | null;
+  /** Whether phase is near a boundary */
+  nearBoundary: boolean;
+  /** Edit statistics from VersionTracker */
+  editStats: {
+    totalEdits: number;
+    transformativeCount: number;
+    significantCount: number;
+    moderateCount: number;
   };
-  /** From activity workshop: profile summary */
-  activityProfiles?: Array<{
-    title: string;
-    tier: number;
-    keyStrengths: string[];
-  }>;
-  /** From PIQ workshop: prior PIQ summaries */
-  piqSummaries?: string[];
-  /** From academic advisor: academic context */
-  academicContext?: {
-    gpaContext?: string;
-    courseLoadSummary?: string;
-    majorDirection?: string;
+  /** Whether analysis has completed at least once */
+  hasAnalysis: boolean;
+  /** Whether analysis is currently running */
+  isAnalyzing: boolean;
+}
+
+// Add to ChatHeaderProps:
+export interface ChatHeaderProps {
+  // ... existing props from Item 1 ...
+  /** Essay progress vitals. Undefined = pre-analysis state. */
+  vitals?: EssayVitals;
+}
+```
+
+The ProgressBadge component:
+```tsx
+function ProgressBadge({ vitals, onClick }: { vitals?: EssayVitals; onClick?: () => void }) {
+  if (!vitals) {
+    // Pre-analysis: show nothing (avoid confusing empty state)
+    return null;
+  }
+
+  if (!vitals.hasAnalysis) {
+    // Analysis running but not complete
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex items-center gap-1 px-1.5 h-[24px] rounded-md text-[11px] font-semibold text-slate-400"
+        style={{
+          background: 'hsla(255,50%,90%,0.4)',
+          border: '1px solid hsla(260,40%,70%,0.2)',
+        }}
+      >
+        <motion.span
+          className="w-[5px] h-[5px] rounded-full bg-violet-400"
+          animate={{ opacity: [0.3, 1, 0.3] }}
+          transition={{ duration: 1.5, repeat: Infinity }}
+        />
+        <span>--</span>
+      </button>
+    );
+  }
+
+  const score = vitals.avgEffectiveness ?? 0;
+  const prevScore = vitals.prevAvgEffectiveness;
+  const delta = prevScore !== null ? score - prevScore : null;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="group flex items-center gap-0.5 px-1.5 h-[24px] rounded-md text-[12px] font-bold tabular-nums transition-all duration-150 hover:ring-1 hover:ring-violet-300/40"
+          style={{
+            background: 'linear-gradient(180deg, hsla(255,60%,92%,0.5) 0%, hsla(255,55%,95%,0.3) 100%)',
+            border: '1px solid hsla(260,50%,65%,0.22)',
+            color: 'hsl(260,50%,40%)',
+          }}
+        >
+          <span>{Math.round(score)}</span>
+          {delta !== null && delta !== 0 && (
+            <span className={cn(
+              'text-[9px] font-semibold leading-none',
+              delta > 0 ? 'text-emerald-500' : 'text-rose-400'
+            )}>
+              {delta > 0 ? '+' : ''}{Math.round(delta)}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="bottom" align="start" sideOffset={8} className="w-[260px] p-3">
+        <ProgressDetail vitals={vitals} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+```
+
+Width budget impact: The badge is ~48px when showing "78 +6". EssaySwitcher shrinks from ~182px to ~134px. "Common App" label (~75px) + icon(20px) + chevron(14px) + padding(16px) = ~125px needed. 134px available -- fits with 9px margin.
+
+**Integration points**: Rendered in the content row between VerticalDivider and EssaySwitcher.
+
+**Source**: hybrid -- Agent A's explicit display concept, Agent B's 0-new-width philosophy trimmed to 48px compromise
+
+---
+
+### 8. Progress Detail Popover: Expanded view with college tier, momentum, phase
+
+**Before**: No progress detail view
+**After**: Click score badge opens popover with band, tier, momentum, phase detail
+
+**Implementation**:
+
+```tsx
+/** Maps effectiveness bands to college admission tiers */
+const BAND_TO_TIER: Record<EffectivenessBand, { tier: string; examples: string }> = {
+  masterful:   { tier: 'Ivy/Elite',          examples: 'Harvard, Stanford, MIT' },
+  exceptional: { tier: 'Highly Selective',   examples: 'Northwestern, UCLA, UC Berkeley' },
+  strong:      { tier: 'Very Selective',     examples: 'NYU, Boston College, UW-Madison' },
+  functional:  { tier: 'Selective',          examples: 'Boston University, UT Austin, Purdue' },
+  developing:  { tier: 'Competitive',        examples: 'Arizona State, Iowa State, Temple' },
+  problematic: { tier: 'Needs Work',         examples: 'Focus on fundamentals first' },
+};
+
+/** Compute momentum label from edit stats */
+function getMomentum(editStats: EssayVitals['editStats']): {
+  label: string;
+  color: string;
+} {
+  const { totalEdits, transformativeCount, significantCount, moderateCount } = editStats;
+  if (totalEdits === 0) return { label: 'Not started', color: 'text-slate-400' };
+  // Weighted velocity: transformative edits carry most signal
+  const velocity = (transformativeCount * 10 + significantCount * 5 + moderateCount * 2) / Math.max(totalEdits, 1);
+  if (velocity >= 5) return { label: 'Surging', color: 'text-emerald-500' };
+  if (velocity >= 2) return { label: 'Steady', color: 'text-amber-500' };
+  return { label: 'Warming up', color: 'text-slate-400' };
+}
+
+/** Phase display labels */
+const PHASE_LABELS: Record<ImprovementPhaseLevel, { label: string; description: string }> = {
+  foundation:    { label: 'Foundation',    description: 'Building core narrative and meaning' },
+  architecture:  { label: 'Architecture',  description: 'Strengthening structure and flow' },
+  craft:         { label: 'Craft',         description: 'Refining voice, detail, and technique' },
+  polish:        { label: 'Polish',        description: 'Fine-tuning word choice and rhythm' },
+  distinction:   { label: 'Distinction',   description: 'Elevating to memorable and singular' },
+};
+
+function ProgressDetail({ vitals }: { vitals: EssayVitals }) {
+  const score = vitals.avgEffectiveness ?? 0;
+  const band = toEffectivenessBand(score);
+  const tier = BAND_TO_TIER[band.band];
+  const momentum = getMomentum(vitals.editStats);
+  const phaseInfo = PHASE_LABELS[vitals.phase];
+
+  return (
+    <div className="space-y-3">
+      {/* Band + Score */}
+      <div>
+        <div className="flex items-baseline justify-between">
+          <span className="text-[13px] font-bold text-slate-800">{band.label}</span>
+          <span className="text-[11px] text-slate-400">{band.range[0]}-{band.range[1]} band</span>
+        </div>
+        <p className="text-[11px] text-slate-500 mt-0.5">{band.description}</p>
+      </div>
+
+      {/* College Tier */}
+      <div className="rounded-md px-2.5 py-2" style={{ background: 'hsla(255,50%,95%,0.6)' }}>
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">
+          Essay competitiveness
+        </p>
+        <p className="text-[12px] font-bold text-slate-700">{tier.tier}</p>
+        <p className="text-[10px] text-slate-500 mt-0.5">{tier.examples}</p>
+      </div>
+
+      {/* Phase + Momentum row */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Phase</p>
+          <p className="text-[12px] font-medium text-slate-700">{phaseInfo.label}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Momentum</p>
+          <p className={cn('text-[12px] font-medium', momentum.color)}>{momentum.label}</p>
+        </div>
+      </div>
+
+      {/* Near boundary hint */}
+      {vitals.nearBoundary && vitals.readinessAssessment && (
+        <p className="text-[10px] text-violet-500 italic leading-relaxed">
+          {vitals.readinessAssessment}
+        </p>
+      )}
+
+      {/* Edit stats summary */}
+      <div className="flex gap-3 pt-1 border-t border-slate-100">
+        <span className="text-[10px] text-slate-400">
+          {vitals.editStats.totalEdits} edits
+        </span>
+        {vitals.editStats.transformativeCount > 0 && (
+          <span className="text-[10px] text-emerald-500 font-medium">
+            {vitals.editStats.transformativeCount} transformative
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+**Integration points**: Rendered inside the Popover from Item 7. Uses `toEffectivenessBand` from `@/services/essayIntelligence/analysis/effectivenessBands`.
+
+**Source**: hybrid -- Agent A's popover concept with Agent B's EssayVitals interface, college tiers from `tierCalibration.ts` naming convention
+
+---
+
+### 9. ~~Cloud Avatar~~ — DEFERRED (Placeholder Only)
+
+**Status**: Avatar redesign handled separately via nano banana animated mascot workflow. Keep current CoachAvatar as-is for now. When the animated mascot asset is ready, it will replace CoachAvatar.
+
+**Placeholder approach**: Keep `CoachAvatar` function unchanged. No deletion, no CSS cloud. The avatar slot remains 34x34px and will accept the mascot asset when ready.
+
+**Implementation**: Keep existing `CoachAvatar` unchanged. The 34x34px container slot and online status dot pattern will be preserved for the future mascot drop-in.
+
+**When the mascot is ready**: Replace the `CoachAvatar` function body with an `<img>` or animated component from the nano banana output. The container dimensions, status dot, and `flex-shrink-0` layout role remain the same.
+
+**Source**: deferred — avatar handled via separate nano banana animated mascot workflow
+
+---
+
+### 10. Subtitle Phase Integration: Priority chain for subtitle text
+
+**Before** (from Item 2): subtitle shows coaching mode or "essay coach"
+**After**: subtitle also shows improvement phase when no coaching mode is active
+
+**Implementation**:
+
+Update `getSubtitleConfig` from Item 2:
+```typescript
+function getSubtitleConfig(
+  sessionStatus: 'live' | 'archived',
+  coachingMode?: CoachingMode,
+  phase?: ImprovementPhaseLevel,
+): { text: string; colorClass: string; showDot: boolean; dotColor?: string } {
+  if (sessionStatus === 'archived') {
+    return { text: 'Archived Session', colorClass: 'text-slate-400', showDot: false };
+  }
+
+  // Live session: coaching mode takes priority over phase
+  if (coachingMode && coachingMode !== 'first_encounter') {
+    const config = COACHING_MODE_CONFIG[coachingMode];
+    return { text: config.label, colorClass: config.color, showDot: true, dotColor: 'hsl(162,72%,46%)' };
+  }
+
+  // Show improvement phase if analysis has run
+  if (phase && phase !== 'foundation') {
+    const phaseLabels: Record<ImprovementPhaseLevel, string> = {
+      foundation: 'essay coach',
+      architecture: 'architecture phase',
+      craft: 'craft phase',
+      polish: 'polishing',
+      distinction: 'distinction',
+    };
+    return {
+      text: phaseLabels[phase],
+      colorClass: 'text-violet-400',
+      showDot: true,
+      dotColor: 'hsl(162,72%,46%)',
+    };
+  }
+
+  // Default: essay coach
+  return { text: 'essay coach', colorClass: 'text-slate-400', showDot: true, dotColor: 'hsl(162,72%,46%)' };
+}
+```
+
+**Logic**: archived > active coaching mode > improvement phase > "essay coach". Foundation phase shows "essay coach" because foundation IS the default starting state -- calling it out adds no information.
+
+**Source**: rethink (refined) -- Agent B's phase-in-subtitle approach, with priority chain from Item 2
+
+---
+
+### 11. Data Flow: EssayVitals derivation from EssayProfile
+
+**Before**: No essay data flows to ChatHeader
+**After**: Parent component derives EssayVitals from EssayProfile + VersionTracker and passes as optional prop
+
+**Implementation**:
+
+This is a FUTURE integration item (requires backend wiring). The computation logic:
+```typescript
+import type { EssayProfile } from '@/services/essayIntelligence/profileTypes';
+import type { EssayVitals } from './ChatHeader';
+
+/**
+ * Derive display vitals from the full essay profile.
+ * Called by the parent component (ChatPanel or equivalent) when profile updates.
+ */
+export function deriveEssayVitals(
+  profile: EssayProfile | null,
+  prevAvgEffectiveness: number | null,
+  isAnalyzing: boolean,
+): EssayVitals | undefined {
+  if (!profile) return undefined;
+
+  const scoreMatrix = profile.crystallization?.scoreMatrix;
+  const phase = profile.index.improvementPhase;
+
+  // Compute average effectiveness from paragraph scores
+  let avgEffectiveness: number | null = null;
+  if (scoreMatrix && scoreMatrix.paragraphs.length > 0) {
+    const sum = scoreMatrix.paragraphs.reduce((acc, p) => acc + p.scores.effectiveness, 0);
+    avgEffectiveness = sum / scoreMatrix.paragraphs.length;
+  }
+
+  return {
+    avgEffectiveness,
+    prevAvgEffectiveness,
+    phase: phase.level,
+    readinessAssessment: phase.readinessAssessment,
+    nearBoundary: phase.nearBoundary ?? false,
+    editStats: {
+      totalEdits: profile.index.stalenessSnapshot
+        ? (profile.index as any).accumulatedStaleness?.totalEdits ?? 0
+        : 0,
+      transformativeCount: (profile.index as any).accumulatedStaleness?.transformativeCount ?? 0,
+      significantCount: (profile.index as any).accumulatedStaleness?.significantCount ?? 0,
+      moderateCount: (profile.index as any).accumulatedStaleness?.moderateCount ?? 0,
+    },
+    hasAnalysis: avgEffectiveness !== null,
+    isAnalyzing,
   };
 }
-
-export function assembleStudentContext(outputs: StudentModuleOutputs): string {
-  const sections: string[] = [];
-
-  if (outputs.essayIntelligence) {
-    const ei = outputs.essayIntelligence;
-    const parts: string[] = [];
-    if (ei.writerPortrait) parts.push(`This student: ${ei.writerPortrait}`);
-    if (ei.revealedQualities?.length) parts.push(`Qualities shown in writing: ${ei.revealedQualities.join(', ')}`);
-    if (ei.coachingLens) parts.push(`Current coaching approach: ${ei.coachingLens}`);
-    if (parts.length > 0) sections.push(parts.join('. '));
-  }
-
-  if (outputs.activityProfiles?.length) {
-    const summary = outputs.activityProfiles
-      .map(a => `${a.title} (Tier ${a.tier}): ${a.keyStrengths.slice(0, 2).join(', ')}`)
-      .join('; ');
-    sections.push(`Activities: ${summary}`);
-  }
-
-  if (outputs.piqSummaries?.length) {
-    sections.push(`PIQ insights: ${outputs.piqSummaries.join('. ')}`);
-  }
-
-  if (outputs.academicContext) {
-    const ac = outputs.academicContext;
-    const parts: string[] = [];
-    if (ac.majorDirection) parts.push(`Intended direction: ${ac.majorDirection}`);
-    if (ac.gpaContext) parts.push(ac.gpaContext);
-    if (ac.courseLoadSummary) parts.push(ac.courseLoadSummary);
-    if (parts.length > 0) sections.push(parts.join('. '));
-  }
-
-  if (sections.length === 0) return '';
-
-  return `=== STUDENT CONTEXT (from other modules) ===\n${sections.join('\n')}\n===`;
-}
 ```
 
-### Consumer Pattern
-Each module that wants cross-module context adds an optional `studentContext?: string` parameter to its prompt builder. The caller assembles the context via `assembleStudentContext()` and passes it if available.
+**Note**: The `(profile.index as any).accumulatedStaleness` cast is needed because `accumulatedStaleness` is on `VersionEntry` (`profileTypes.ts:1400`), not directly on `ProfileIndex`. The integration layer will need to bridge this from the VersionTracker's current state. This is documented as a type gap to resolve during backend wiring.
 
-### Test
-Call `assembleStudentContext()` with partial data (only activity profiles). Verify it produces a clean string with no undefined/null artifacts. Call with empty object -- verify it returns empty string.
+**Source**: refined -- addresses Finding DATA-FLOW-1
 
 ---
 
-## GAP-14: Activity Major Alignment Bug (CRITICAL)
+## Execution Order (Items 7-11)
 
-**Decision**: Diagnostic + fix
-**Files**: Activity scoring pipeline (where activity is classified into a domain before `majorAlignmentMatrix.ts` lookup)
-**Risk**: Low (bug fix)
-**Effort**: ~2-4 hours (diagnosis + fix)
+These items DEPEND on Items 1-6 being implemented first (they extend ChatHeaderProps and modify the content row).
 
-### The Problem
+1. **Add EssayVitals type + extend ChatHeaderProps** (Item 7 types): Add the interface and optional `vitals` prop. Zero visual change.
 
-The audit found that a Robotics Club President applying for Mechanical Engineering was classified as `relevantToMajor: false`. The `majorAlignmentMatrix.ts` correctly maps STEM_COMPETITION and CODING_ENGINEERING domains to Engineering as "critical" relevance (boostFactor 0.85-0.95). The bug is UPSTREAM: the activity is being classified into the wrong domain (or domain classification is failing entirely).
+2. **Add ProgressBadge + ProgressDetail** (Items 7-8): Add the score badge and popover detail. Insert between VerticalDivider and EssaySwitcher. Visual change: score appears in header.
 
-### Diagnostic Steps
+3. **Update subtitle priority chain** (Item 10): Modify `getSubtitleConfig` to include phase. Visual change: subtitle shows phase when no coaching mode active.
 
-1. Trace the scoring pipeline for Robotics Club President:
-   - Where does domain classification happen? (likely in `activityScoringService.ts` or the LLM scoring prompt)
-   - What domain does "Robotics Club" get mapped to?
-   - Is it falling through to a default/generic domain?
+4. **Add deriveEssayVitals utility** (Item 11): Export the derivation function. No visual change -- consumed by parent components during backend integration.
 
-2. Check `majorAlignmentMatrix.ts`'s `getMajorAlignment()` (line 1470-1494):
-   - What happens when the domain is not in the matrix?
-   - Does the fallback return `unrelated` (0.0)?
-
-3. Check the `connections.majorAlignment` field on ActivityProfile:
-   - Is the LLM-populated `relevantToMajor` boolean being set by conversation extraction or by the scoring pipeline?
-   - If by conversation extraction: the LLM might be making a bad judgment call
-   - If by scoring pipeline: the domain→major lookup is failing
-
-### Fix Approach
-
-The fix depends on the diagnostic. Most likely scenarios:
-
-**Scenario A**: Activity classified into wrong domain (e.g., "GENERAL_LEADERSHIP" instead of "STEM_COMPETITION"). Fix: improve domain classification prompt or add keyword boosting for STEM terms.
-
-**Scenario B**: Domain lookup fallback returns `unrelated`. Fix: change fallback from `{relevance: 'unrelated', boostFactor: 0}` to `{relevance: 'supporting', boostFactor: 0.2}` with a flag that it's a default.
-
-**Scenario C**: The `relevantToMajor` boolean is set by conversation extraction LLM, not the matrix. Fix: wire the matrix lookup result INTO the profile's `connections.majorAlignment` field, overriding the conversational LLM's judgment with the structured lookup.
-
-### Test
-Score a Robotics Club activity for a Mechanical Engineering applicant. Verify `relevantToMajor: true` and `boostFactor >= 0.85`.
+5. **Avatar** (Item 9): DEFERRED. Keep existing CoachAvatar as placeholder. Mascot asset will be created via nano banana and dropped in later.
 
 ---
 
-## GAP-15: Coaching Response Length Prompt Directive
+## Existing Infrastructure Leveraged (Items 7-11)
 
-**Decision**: Complement GAP-1's maxTokens with explicit prompt instruction
-**Files**: `src/services/essayIntelligence/coaching/coachingService.ts`
-**Risk**: Low
-**Effort**: ~15 min
-
-### The Problem
-
-GAP-1 reduces maxTokens based on Stage 1.5 intensity (600/1200/2200). But maxTokens is a ceiling, not an instruction. The model will still produce 500 tokens of coaching within a 600-token window. The prompt itself needs to say "write 1-3 sentences."
-
-### Implementation
-
-In `coachingService.ts`, where the user prompt is assembled (around line 1465-1478), append an intensity directive BEFORE the "Respond to the student's message" instruction:
-
-```
-// Build this based on the Stage 1.5 intensity result:
-const intensityDirective = {
-  full: '', // no additional constraint — existing "shorter is better" guidance applies
-  brief: `\n\nRESPONSE LENGTH: BRIEF. 3-6 sentences maximum. Acknowledge their point, add ONE new observation or connection, suggest next step. Do NOT elaborate beyond what is needed.`,
-  minimal: `\n\nRESPONSE LENGTH: MINIMAL. 1-3 sentences maximum. Acknowledge what they said. Advance the conversation with a question or a redirect. Nothing more.`,
-}[stage1_5Intensity];
-```
-
-This works WITH GAP-1's maxTokens reduction. Both signals together: the prompt says "1-3 sentences" AND the window caps at 600 tokens.
-
-### Test
-Send "ok that makes sense" → verify response is 1-3 sentences (not a paragraph that acknowledges then re-explains).
+| Component/Module | Location | Usage |
+|---|---|---|
+| `ImprovementPhaseLevel` type | `profileTypes.ts:87` | Phase display, cloud color |
+| `EffectivenessBand` type + `toEffectivenessBand()` | `effectivenessBands.ts` | Score-to-band conversion |
+| `ParagraphScoreMatrix` type | `profileTypes.ts:1822` | Average effectiveness computation |
+| `StalenessAccumulator` shape | `versionTracker.ts:70-78` | Edit statistics |
+| `COLLEGE_TIER_BENCHMARKS` naming | `tierCalibration.ts:32-39` | Tier name consistency |
+| `Popover`, `PopoverTrigger`, `PopoverContent` | `components/ui/popover.tsx` | Progress detail expansion |
+| `motion`, `AnimatePresence` | `motion/react` | Cloud animation, badge transitions |
+| `cn()` utility | `@/lib/utils` | Conditional class composition |
+| Cloud valley CSS technique | `ChatPanel.tsx:127-173` | Proven `rounded-full` + blur pattern |
 
 ---
 
-## GAP-16: PIQ Ceiling Recognition ("Leave It Alone" Mode)
+## Open Questions (Items 7-11)
 
-**Decision**: Reduce suggestion volume for high-scoring PIQs
-**Files**: PIQ analysis service (wherever the teaching/suggestion generation happens)
-**Risk**: Low
-**Effort**: ~1 hour
+1. **Score display philosophy**: The effectiveness band system was designed to AVOID showing raw numbers ("a score of 71 vs 73 carries zero signal" -- effectivenessBands.ts comment). Showing `78` in the badge arguably contradicts this. Alternative: show the BAND LABEL ("Strong") instead of the number. Counter-argument: the user explicitly asked for "72 -> 78" style display. **Decision**: Show the number. The popover provides band context. The number is what drives emotional engagement ("I went from 72 to 78!") even if the precision is technically illusory.
 
-### The Problem
+2. **BAND_TO_TIER accuracy**: Mapping essay effectiveness to college admission tiers is an APPROXIMATION. A "strong" essay alone does not guarantee "Very Selective" admission. The tier mapping should include a disclaimer in the popover. Suggestion: "Based on essay quality alone" footnote.
 
-The audit found: "The system risks over-coaching excellent work and making it worse." A PIQ scoring 90+ needs 1-2 micro-polish suggestions, not a full 13-dimension improvement plan. Over-coaching strong work is the fastest way to lose credibility with good writers.
+3. **Backend data pipeline**: Items 7-11 define the frontend components. The actual data flow (WebSocket, polling, or prop drilling from route-level state) is a separate implementation concern. The `deriveEssayVitals` utility in Item 11 documents the computation, but the TRANSPORT mechanism is TBD.
 
-### Implementation
-
-Add a ceiling-recognition gate to the PIQ analysis pipeline. After Phase 17 (initial scoring) but before Phase 19 (teaching layer):
-
-```typescript
-// In the PIQ analysis orchestration, after initial scoring:
-const overallScore = phase17Result.overallScore;
-
-if (overallScore >= 85) {
-  // Ceiling mode: dramatically reduce suggestion volume
-  const ceilingConfig = {
-    maxWorkshopItems: overallScore >= 92 ? 1 : 2,
-    maxSeverity: 'minor' as const,  // no "critical" or "major" suggestions for strong PIQs
-    ceilingNote: overallScore >= 92
-      ? 'This PIQ is exceptional. The suggestions below are micro-polish only — the essay works as-is.'
-      : 'This PIQ is strong. Focus on the 1-2 suggestions that would make it memorable, not just good.',
-  };
-
-  // Filter workshop items to only minor suggestions
-  phase17Result.workshopItems = phase17Result.workshopItems
-    .filter(item => item.severity === 'minor' || item.severity === 'suggestion')
-    .slice(0, ceilingConfig.maxWorkshopItems);
-
-  // Add ceiling note to the result
-  phase17Result.ceilingNote = ceilingConfig.ceilingNote;
-}
-```
-
-### Test
-Run PIQ analysis on the "elite translator" PIQ (golden dataset). Verify:
-- Score 85+ → max 2 suggestions, all minor severity
-- Score 92+ → max 1 suggestion with "exceptional" ceiling note
+4. **Cloud avatar visual testing**: The CSS cloud at 34px has not been visually tested. The dot-eyes at 2.5px may need size adjustment after rendering. Recommend: implement Item 9 first and test in the browser before proceeding to Items 7-8.
 
 ---
 
-## GAP-17: Scoring Calibration Widening
+## Rejected Approaches (Items 7-11)
 
-**Decision**: Add inter-essay calibration to L3.5 prompt
-**Files**: `src/services/essayIntelligence/analysis/analysisPass.ts`
-**Risk**: Medium (shifts score distributions)
-**Effort**: ~30 min
+1. **Ambient-only progress** (Agent B's cloud-as-data-viz): The user explicitly requested explicit numbers, scores, and college tier labels. Ambient color shifts are invisible to most users. Ambient is a SECONDARY reinforcement, not the primary signal.
 
-### The Problem
+2. **68px progress pill** (Agent A): Too wide. Squeezes EssaySwitcher below comfortable minimum. The 48px score badge is a better compromise.
 
-The audit found an 11.4-point mean gap between a mediocre essay (59.1) and a strong essay (70.5). LLM variance is 8-15 points. The distributions overlap. The anti-clustering rules enforce INTRA-essay spread (20pt min between best/worst in a paragraph) but not INTER-essay spread.
+3. **SVG path cloud** (Agent A): No precedent in codebase. CSS `rounded-full` divs match the proven cloud valley technique in ChatPanel.tsx. More maintainable.
 
-### Implementation
+4. **Header row expansion on click** (Agent B): Layout shift in a chat panel is disruptive. Popover via Portal has zero layout impact.
 
-In `buildSystemPrompt()` (analysisPass.ts), add to the pre-scoring calibration section (after line 414):
+5. **Full progress arc SVG** (Agent A): A 240x180 arc visualization is impressive but over-engineered for a popover that shows 5 data points. Simple text layout is more informative and easier to maintain.
 
-```
-INTER-ESSAY CALIBRATION (prevents score compression):
-The FULL 0-100 range must be used meaningfully:
-- A WEAK essay (cliche-heavy, no specificity, no voice) should AVERAGE 40-50
-- A MEDIOCRE essay (some specificity, some voice, structural issues) should AVERAGE 50-60
-- A COMPETENT essay (solid structure, some distinction) should AVERAGE 60-70
-- A STRONG essay (specific, voiced, architecturally sound) should AVERAGE 70-80
-- An EXCEPTIONAL essay (unforgettable, every sentence earns its place) should AVERAGE 80-90
+6. **Faceless cloud** (Agent B): At 34px without a face, the cloud is indistinguishable from the decorative clouds in the chat panel's valley. Two dot-eyes are the minimum viable personality.
 
-If you find yourself scoring most sentences in the 55-75 range, you are COMPRESSING.
-Step back and ask: "Is this essay mediocre, competent, or strong?" Then ensure your
-paragraph average lands in the corresponding band above.
-```
+7. **Wisp particles** (Agent B): At 34px viewport, 1-4 floating wisps add visual noise without readable meaning. Cut for clarity.
 
-### Test
-Run L3.5 on the piano essay (mediocre) and health clinic essay (strong). Verify:
-- Piano essay mean drops from ~59 to ~50-55
-- Health clinic essay mean rises from ~70 to ~75-80
-- Gap widens from 11.4 to 20+ points
-
----
-
-## GAP-18: L3 Observation Quality Filter (Signal-to-Noise)
-
-**Decision**: Add utility filter + prompt-level quality instruction
-**Files**: `src/services/essayIntelligence/analysis/sequentialDeepWalk.ts`
-**Risk**: Medium (reduces output volume)
-**Effort**: ~2-3 hours
-
-### The Problem
-
-The L3 walk produces 129 observations for a 7-paragraph essay. ~70% are obvious or redundant (parallel syntax noted for the 15th time, the same cross-paragraph connection flagged from both endpoints). Elite counselor's notes would fit half a page. The system should produce only observations that contribute to deep understanding.
-
-### Root Cause
-
-The observation count is EMERGENT from:
-1. Mandatory 1-5 findings per paragraph (correct — keep)
-2. Three observation fields per sentence (observedFunctions, inferredIntents, narrativeContributions) each accepting multiple entries
-3. Rich evidence arrays on each finding
-4. Back-propagations creating additional entries
-
-The prompt asks for quality but the schema allows unlimited quantity per field.
-
-### Implementation: Two-Part Fix
-
-**Part 1: Prompt-level quality filter** (in sequentialDeepWalk.ts system prompt, after the novelty-driven growth section):
-
-```
-OBSERVATION ECONOMY:
-Every observation must pass this test: "Would a competent English teacher already know this?"
-If YES — do NOT produce the observation. It wastes the student's and coach's attention.
-If NO — produce it with evidence.
-
-Examples of observations to SKIP:
-- "Uses parallel syntax" (obvious structural observation)
-- "Transitions from one topic to another" (descriptive of any essay)
-- "The sentence functions as a topic sentence" (basic compositional observation)
-
-Examples of observations to PRODUCE:
-- "The parallel syntax between P1S2 and P5S1 creates an echo that the reader might not consciously notice but that gives the essay structural coherence" (non-obvious architectural connection)
-- "The narrator's voice shifts from received philosophical language to physical specificity exactly once — in P4S3 — and that moment is the essay's emotional pivot" (cross-paragraph insight a teacher would miss)
-
-QUANTITY GUIDANCE:
-- A transitional paragraph needs 1-2 observations (its function + one insight)
-- A contributing paragraph needs 3-5 observations (what it does + how it serves the arc)
-- A pivotal paragraph needs 5-8 observations (architectural significance + specific craft)
-- An entire 7-paragraph essay should produce 25-40 total observations, not 100+
-```
-
-**Part 2: Post-processing deduplication** (in the walk output validation):
-
-```typescript
-// After all paragraphs are walked, deduplicate cross-paragraph observations:
-function deduplicateObservations(paragraphs: ParagraphUnderstanding[]): ParagraphUnderstanding[] {
-  const seenObservations = new Set<string>();
-
-  for (const para of paragraphs) {
-    for (const sentence of para.sentences) {
-      // For each observation field, filter to unique observations
-      for (const field of ['observedFunctions', 'inferredIntents', 'narrativeContributions'] as const) {
-        if (sentence[field]) {
-          sentence[field] = sentence[field].filter(obs => {
-            // Normalize: lowercase, remove quotes, trim
-            const normalized = obs.observation.toLowerCase().replace(/['"]/g, '').trim();
-            // Check for near-duplicate (first 50 chars match)
-            const key = normalized.substring(0, 50);
-            if (seenObservations.has(key)) return false;
-            seenObservations.add(key);
-            return true;
-          });
-        }
-      }
-    }
-  }
-
-  return paragraphs;
-}
-```
-
-### Expected Impact
-- Current: ~129 observations for 7-paragraph essay
-- Target: ~30-45 observations (25-40 from prompt + dedup removes remaining overlaps)
-- Each surviving observation should be non-obvious and architecturally significant
-
-### Test
-Run L3 on the piano essay. Count observations. Verify:
-- Total < 50
-- Zero observations that a competent English teacher would already know
-- All architectural observations (cross-paragraph connections, fulfilled/unfulfilled promises) survive
-- Obvious observations (parallel syntax, topic sentences, tense shifts) are absent
-
----
-
-## GAP-19: Voice Shift Intentionality Over-Attribution
-
-**Decision**: Quality-level-aware calibration in L3.75 voice map prompt
-**Files**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
-**Risk**: Low
-**Effort**: ~30 min
-
-### The Problem
-
-The audit found that 4/5 voice shifts were marked "intentional" for a mediocre piano essay. The L3.75 prompt already says "assessment should follow FROM the reasoning" and "below 0.6 confidence, present as question" — but the LLM defaults to "intentional" because it attributes craft sophistication to all writers by default. A 17-year-old who shifts from lyrical to analytical register mid-paragraph is almost certainly losing control of their voice, not deploying a deliberate rhetorical strategy.
-
-### Root Cause
-
-The prompt has no quality-level calibration. It treats a mediocre essay the same as a polished one. An elite writing professor would say: "In a strong essay, most voice shifts are intentional. In a mediocre essay, most are accidental."
-
-### Implementation
-
-**File**: `holisticSynthesis.ts`
-**Location**: After the existing voice map quality standards (lines 416-424), add:
-
-```
-INTENTIONALITY CALIBRATION BY ESSAY QUALITY:
-
-CRITICAL: Your default assessment should be calibrated to the essay's overall quality level.
-- In a STRONG essay (most sentences are specific, voiced, architecturally sound): voice shifts are more likely intentional. The writer has demonstrated craft control elsewhere.
-- In a FUNCTIONAL essay (competent but generic): voice shifts are more likely UNINTENTIONAL or AMBIGUOUS. The writer may not have the craft awareness to deploy register shifts deliberately. Default to "ambiguous" unless you have STRONG textual evidence of intentional deployment (e.g., a structural marker like an em-dash, a paragraph break aligned with a thematic pivot, or explicit setup language).
-- In a DEVELOPING essay (vague, telling-heavy): voice shifts are almost certainly unintentional. Default to "unintentional" unless the evidence is overwhelming.
-
-The essay's quality level is visible in the understanding context you received. Use the paragraph verdicts and overall arc assessment to calibrate your prior.
-
-Example of WRONG intentionality assessment for a mediocre essay:
-"intentional (0.75) — The shift from sensory to abstract vocabulary enacts the paragraph's epistemological argument."
-WHY WRONG: A 17-year-old writing a mediocre essay is not "enacting an epistemological argument." They shifted registers because they ran out of sensory vocabulary and defaulted to abstract language. The shift IS observable, but attributing intent to it flatters the writer and misleads the coaching.
-
-Example of RIGHT intentionality assessment for the same essay:
-"ambiguous (0.45) — The register shifts from sensory ('fingers danced') to abstract ('analytical thinking') at the em-dash. The em-dash suggests structural awareness, but the abstract vocabulary reads more like the writer defaulting to a formal register they associate with 'smart writing' than deliberately deploying conceptual language. The shift may be unintentional — the writer may not hear the register change."
-```
-
-### Why This Matters for Coaching
-
-The coaching system uses voice shift intentionality to decide whether to praise a craft choice or flag a loss of control. If a shift is "intentional," the coach says "nice — that register change works." If it's "unintentional," the coach says "do you hear how your voice changes here? Is that what you want?" Getting this wrong means the coach validates accidental craft choices, reinforcing bad habits.
-
-### Test
-Run L3.75 on the piano essay (mediocre). Verify:
-- At least 2/5 shifts are "ambiguous" or "unintentional" (currently 4/5 are "intentional")
-- Confidence scores for "intentional" assessments are backed by specific textual evidence, not inferred sophistication
-- The P5 shift (to pure abstraction) should be "ambiguous" or "unintentional" (currently "ambiguous" — should stay)
-
----
-
-## GAP-20: Coaching Resistance → Shorter Responses
-
-**Decision**: Map resistance cognitive states to brief intensity
-**Files**: `src/services/essayIntelligence/coaching/coachingService.ts`
-**Risk**: Low
-**Effort**: ~30 min
-
-### The Problem
-
-The audit found: "The coach escalates directness (good) but also escalates response length (bad). T6 is 418 words. T7 is 512 words. T8 is 607 words. Each time the student deflects, the coach lectures MORE. An elite human coach would do the opposite."
-
-When a student is resistant, they need a SHORT, direct question — not a longer lecture. The current system detects resistance correctly (cognitive state: resistant_to_specific, resistant_to_general) but responds with MORE words because nothing maps resistance to brief/minimal intensity.
-
-### Implementation
-
-This is a wiring fix that connects to GAP-1 (response intensity) and GAP-15 (length directive).
-
-**File**: `coachingService.ts`
-**Location**: Where Stage 1.5 intensity is extracted and passed to Stage 3
-
-After extracting `responseIntensity` from Stage 1.5, add an override for resistance states:
-
-```typescript
-// After Stage 1.5 returns cognitiveAssessment:
-let effectiveIntensity = cognitiveAssessment.responseIntensity;
-
-// Override: resistance should produce BRIEF responses, not full lectures
-if (
-  cognitiveAssessment.cognitiveState === 'resistant_to_specific' ||
-  cognitiveAssessment.cognitiveState === 'resistant_to_general'
-) {
-  effectiveIntensity = 'brief';
-}
-
-// Override: overwhelmed should produce MINIMAL responses
-if (cognitiveAssessment.cognitiveState === 'overwhelmed') {
-  effectiveIntensity = 'minimal';
-}
-```
-
-This feeds into GAP-1's maxTokens mapping (brief=1200) and GAP-15's prompt directive ("3-6 sentences maximum").
-
-### Why This Works
-
-When a student is resistant, the elite coach move is: name the pattern in 1-2 sentences, ask a direct question, then STOP. "I notice you've asked about the rewrite three times without sharing it. What's holding you back?" (25 words). The 1200-token window + "3-6 sentences" directive + the existing resistance-specific coaching philosophy should produce this naturally.
-
-### Test
-Send a message that triggers resistant_to_specific (e.g., "just tell me if the opening is good enough"). Verify:
-- maxTokens = 1200
-- Prompt says "3-6 sentences maximum"
-- Response is short and direct, not a lecture
-
----
-
-## GAP-21: Scope Inflation Pattern Detection
-
-**Decision**: Add to L3.75 admissionsPositioning as a red flag
-**Files**: `src/services/essayIntelligence/analysis/holisticSynthesis.ts`
-**Risk**: Low
-**Effort**: ~20 min
-
-### The Problem
-
-The audit found: "'Create worlds through sound' (P0) → 'create projects' (P3) → 'make a meaningful difference' (P6). Claims get bigger, evidence gets thinner. The system notes individual gaps but never identifies this as a structural pattern."
-
-Scope inflation is a common pattern in mediocre essays: the language gets grander as the essay progresses, but the supporting detail gets vaguer. AOs notice this — it signals a student who is reaching for significance rather than earning it.
-
-### Implementation
-
-**File**: `holisticSynthesis.ts`
-**Location**: In the Phase B system prompt, the `admissionsPositioning.redFlags` field description (around line 520)
-
-**Current**:
-```
-"redFlags": ["<anything an admissions reader would notice or question — describe WHAT it is, not whether it is a problem>"],
-```
-
-**Add to the quality standards section** (after line 425, in the section that guides redFlags):
-
-```
-RED FLAG PATTERNS TO CHECK:
-- SCOPE INFLATION: Do claims get bigger while evidence gets thinner? "I changed my community" in the conclusion when the essay shows a single tutoring session. If the scale of claimed impact GROWS across paragraphs while the specificity of evidence SHRINKS, flag this as: "Scope inflation: language escalates from [specific early claim] to [broad late claim] without proportional evidence."
-- PEOPLE ABSENCE: Does the essay mention zero named individuals? An essay about growth with no teachers, mentors, teammates, or family members is a red flag — it suggests the student either lacks meaningful relationships or doesn't know how to write about them. Flag as: "No named individuals appear in the essay."
-- SOLO CREDIT for TEAM WORK: Does the essay use "I" exclusively for something that likely involved collaboration? "I developed an AI DJ" for what was probably a team project. Flag as: "Solo credit language for likely collaborative work — [specific claim]."
-```
-
-### Why This Matters
-
-These three red flag patterns (scope inflation, people absence, solo credit) were the top 3 things the audit said an elite counselor catches in the first 30 seconds but the system never flags. Adding them to the L3.75 red flag detection costs zero — it's prompt guidance for a field that already exists.
-
-### Test
-Run L3.75 on the piano essay. Verify redFlags includes:
-- Scope inflation (P0 "create worlds" → P7 "meaningful difference")
-- No named individuals (zero people appear)
-- Solo credit ("I developed an AI DJ" when it was a team hackathon entry — though L3.75 may not know this without coaching context)
-
----
-
-## IMPLEMENTATION COST SUMMARY
-
-| Gap | New Files | New LLM Calls | Prompt Token Impact | Type Changes | Effort |
-|-----|-----------|---------------|---------------------|--------------|--------|
-| 14 | 0 | 0 | 0 | 0 (bug fix) | 2-4 hr |
-| 15 | 0 | 0 | +30 tokens (user prompt) | 0 | 15 min |
-| 9 | 1 utility | 0 | 0 | 1 type + function | 30 min |
-| 7 | 0 | 0 | +200 tokens (system) | 0 | 45 min |
-| 11 | 0 | 0 | 0 (templates) | 0 | 30 min |
-| 18 | 0 | 0 | +150 tokens (walk prompt) | 0 | 2-3 hr |
-| 4 | 1 service | 1 Haiku ($0.003) | 0 | 1 interface | 2 hr |
-| 5 | 0 | 0 | +80 tokens (L3.75) | 0 | 20 min |
-| 10 | 0 | 0 | +100 tokens (L3.75) + +80 (L3.5) | 1 field | 1.5 hr |
-| 17 | 0 | 0 | +100 tokens (system) | 0 | 30 min |
-| 3 | 0 | 0 | +80 tokens (system) | 0 | 30 min |
-| 8 | 0 | 0 | +200 tokens (system) | 0 | 45 min |
-| 16 | 0 | 0 | 0 | 0 | 1 hr |
-| 1 | 0 | 0 | 0 | 1 field | 1 hr |
-| 2 | 0 | 0 | +30 tokens (sidecar) | 0 | 45 min |
-| 6 | 0 | 0 | +50 tokens (session arc) | 2 fields | 1 hr |
-| 12 | 0 | 0 | +100-200 tokens (per PIQ) | 0 | 1 hr |
-| 13 | 1 bridge | 0 | 0 | 1 interface | 1 hr |
-| 19 | 0 | 0 | +200 tokens (L3.75) | 0 | 30 min |
-| 20 | 0 | 0 | 0 | 0 | 30 min |
-| 21 | 0 | 0 | +100 tokens (L3.75) | 0 | 20 min |
-| **TOTAL** | **3 files** | **1 Haiku** | **~+1500 tokens** | **~8 additions** | **~19.5 hr** |
-
-### Per-Essay Cost Impact
-- New: 1 Haiku call at ~$0.003
-- Prompt inflation: ~1200 tokens across all prompts = ~$0.004 additional input cost (Sonnet pricing)
-- L3 observation reduction: saves ~$0.05-0.10 in output tokens (fewer observations = fewer output tokens)
-- **Net incremental cost per essay: ~$0.00** (observation savings offset prompt inflation + new call)
-- Quality improvement is essentially FREE in cost terms
-
----
-
-## RISK REGISTER
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| GAP-18 observation reduction too aggressive — loses genuine insights | High | Run L3 before/after on 3 essays, manually compare. Keep architectural cross-paragraph insights. |
-| GAP-17 calibration widening + GAP-8 admissions criteria together shift scores unpredictably | High | Implement GAP-17 first, validate distributions, THEN add GAP-8. Never both at once. |
-| GAP-14 major alignment fix has deeper root cause than expected | Medium | Diagnostic steps in plan. If domain classification is LLM-based, fix may require prompt change + test suite. |
-| GAP-10 archetype penalty too aggressive | Medium | Start with "10-15 points lower" as guidance, not hard rule; LLM calibrates |
-| GAP-4 AOFirstRead Haiku fails | Low | Graceful degradation: skip and continue pipeline, log warning |
-| GAP-1 maxTokens=600 too short for some minimal turns | Low | Floor at 600, sidecar still fits; if Sonnet needs more it won't hit 600 for minimal |
-| GAP-6 strategicQuestion stale forever | Low | Staleness counter + pattern detection re-evaluation provides escalation path |
-| GAP-16 ceiling recognition too aggressive — misses real issues in strong PIQs | Low | Only filter to minor severity, don't eliminate all suggestions. Ceiling note frames as polish, not critique. |
-
----
-
-## QUALITY GATES
-
-Before considering any gap "done":
-
-1. **Type check passes**: `npx tsc --noEmit` with zero errors
-2. **Prompt spec complete**: every prompt change has before/after text in this doc
-3. **Test exists**: at least one test scenario per gap
-4. **No regression**: existing tests still pass
-5. **Cost verified**: run 1 end-to-end and verify cost is within +$0.01 of baseline
-
----
-
-## NOTES FOR IMPLEMENTER
-
-1. **GAP-14 (major alignment) is the most urgent fix.** A student seeing their primary activity classified as "irrelevant to major" will lose trust in the entire system. Diagnose first: trace the activity through domain classification → major lookup. The matrix data is correct; the bug is upstream.
-
-2. **GAP-15 + GAP-1 work together.** GAP-15 (prompt directive) tells the model "write 1-3 sentences." GAP-1 (maxTokens) constrains the ceiling. Implement GAP-15 first (15 min), then GAP-1 (1 hr). Both together are much more effective than either alone.
-
-3. **GAP-18 (observation compression) is the highest-risk change.** Reducing L3 output from 129 to 30-45 observations could lose genuine insights if the quality filter is too aggressive. Run before/after on 3 essays and manually verify that cross-paragraph architectural insights survive while obvious syntax observations are eliminated. Iterate the prompt until the balance is right.
-
-4. **GAP-17 (scoring calibration) and GAP-8 (admissions criteria) must be sequenced.** Implement GAP-17 first and validate the new score distributions. THEN add GAP-8. Doing both simultaneously makes it impossible to diagnose which change caused any distribution shift.
-
-5. **GAP-6 has a backward compat concern.** Existing sessions have `nextFocus` populated. The `strategicQuestion` field is new and will be empty for existing sessions. The prompt injection uses a fallback: if `strategicQuestion` is empty, use `nextFocus`. Pattern detection will populate `strategicQuestion` on the next cycle.
-
-6. **GAP-10's archetype feeds into GAP-8.** Implement GAP-10 first so that L3.5 has archetype context available when the scoring calibration from GAP-8 references it.
-
-7. **GAP-4 is the only new file that touches the analysis pipeline.** Wire into `analysisOrchestrator.ts` with `Promise.allSettled` (not `Promise.all`) so a Haiku failure doesn't crash the pipeline.
-
-8. **GAP-13 is standalone.** The bridge file can be implemented and tested in isolation. Wiring it into each module's prompt builder is a separate step that can happen incrementally.
-
-9. **GAP-16 (PIQ ceiling) should be validated against the golden dataset.** The "elite translator" PIQ should score 85+ and trigger ceiling mode. Verify it gets max 2 suggestions, all minor severity.
+8. **Phase abbreviations (FND/ARC/CRT)** (Agent A): Not intuitive. Students must learn a new abbreviation system. Full phase names in the subtitle and popover are clearer.

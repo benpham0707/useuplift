@@ -1481,6 +1481,12 @@ export const harvardSocraticQuestions: CollegeSocraticQuestionBank = {
 // HARVARD ELITE EXAMPLES (Placeholder - to be populated)
 // ============================================================================
 
+// TODO(scope3-content): Populate with 3-4 elite Harvard essay patterns
+// following the shape in brown.ts:1181 — each entry needs `exampleId`,
+// `pattern`, `anonymizedDescription`, and `whatMakesItEffective[]`.
+// Scope 3 Phase 7 already wires these through `getCollegeCoachingOverlay()`
+// (collegeOverlay.ts) so Harvard students automatically see elite teaching
+// patterns once populated.
 export const harvardEliteExamples: CollegeEliteExample[] = [];
 
 // ============================================================================

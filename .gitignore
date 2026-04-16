@@ -43,3 +43,12 @@ yarn-error.log*
 # Secret checklists (contain actual API keys)
 *_ENV_CHECKLIST.md
 *-env-setup.sh
+
+# Agent scratch — Claude Code + Cursor worktrees
+.claude/worktrees/
+
+# Browser-testing artifacts — use Chrome DevTools MCP, not Playwright
+.playwright-mcp/
+
+# Supabase CLI temp state
+supabase/.temp/

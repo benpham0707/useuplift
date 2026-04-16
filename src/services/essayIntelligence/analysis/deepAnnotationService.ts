@@ -48,6 +48,8 @@ import type {
 } from '../profileTypes';
 import type { FindingStore } from '../findings/findingStore';
 import { buildAnnotationFindingContext } from '../findings/findingContextBuilder';
+import type { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
+import type { CoachingMap, ImprovementCandidate } from '../profileTypes';
 
 // ============================================================================
 // CONSTANTS
@@ -160,6 +162,20 @@ export interface L5Annotation {
   northStarConnection: string;
 
   /**
+   * Scope 1 GAP-5: AO-framed phenomenological impact. What happens in the
+   * AO's reading experience when this annotation's issue is present?
+   * Grounded in `admissionsPositioning.archetypeContext` (archetype +
+   * poolDensity + differentiator) when available. Mirrors the shape of
+   * `ImprovementEntry.stakes` at `profileTypes.ts:2390`.
+   *
+   * Null for pure strength annotations and for structural notes where no
+   * AO stake applies. Populate for growth/teaching/action annotations.
+   *
+   * Target: 70-90% coverage on non-pure-strength annotations.
+   */
+  stakes: string | null;
+
+  /**
    * Priority 1-5, LLM-assigned based on coaching value for this student
    * at this phase. 1 = "if the student reads ONE annotation, read this one."
    */
@@ -169,11 +185,60 @@ export interface L5Annotation {
   phase: ImprovementPhaseLevel;
 
   /**
-   * Concrete rewrite suggestion — ONLY for ACTION mode annotations.
-   * Must be structurally aware: the rewrite considers the paragraph's
-   * architectural role, not just sentence quality.
+   * Concrete rewrite suggestion — REQUIRED for ACTION mode annotations
+   * (Scope 1 GAP-6 hardened). Must be structurally aware: the rewrite
+   * considers the paragraph's architectural role, not just sentence quality.
+   *
+   * Scope 1 Phase 3: an annotation emitted with `teachingMode = 'action'`
+   * MUST have a non-null rewriteExample. `validateAnnotations()` drops any
+   * ACTION annotation arriving with null rewriteExample — there is NO
+   * "change mode to consequence" downgrade path. The teaching mode
+   * decision happens BEFORE the rewrite attempt.
    */
   rewriteExample: string | null;
+
+  /**
+   * Scope 1 GAP-7: Specific sentence to cut when an ACTION-mode rewrite
+   * adds net words. Format:
+   *   "Cut P{n}S{n}: 'first 8 words...' ({word count} words) — {reason}"
+   *
+   * Populated for ACTION annotations with additive rewrites in Polish /
+   * Distinction phase essays (informed by pre-call filler-pattern and
+   * long-sentence diagnostics). Null when the rewrite is length-neutral
+   * or the annotation is not ACTION mode.
+   */
+  wordEconomyCut: string | null;
+
+  /**
+   * Scope 1 GAP-8: Exact 5-12 word quoted phrase that IS the anti-pattern.
+   * Populated for growth annotations that identify a cliché, stock phrase,
+   * or telling-not-showing surface. When pre-call `detectTellingPhrases`
+   * finds matches in the paragraph text, the LLM is instructed to use the
+   * exact quoted phrase; otherwise it extracts its own 5-12 word span.
+   *
+   * Distinct from `location.spanText`: spanText is the full UI highlight
+   * anchor; antiPatternExample is the specific sub-phrase within that
+   * anchor carrying the problem.
+   *
+   * Null for strength / structural / awareness annotations.
+   */
+  antiPatternExample: string | null;
+
+  /**
+   * Scope 1 GAP-9: Named craft technique from the 20-entry TECHNIQUE_ROUTES
+   * vocabulary (SUMMARY-TO-SCENE, COLD OPEN, SOMATIC VULNERABILITY, etc.).
+   *
+   * Populated POST-CALL by the deterministic multi-signal technique matcher
+   * in `coaching/techniqueMatcher.ts`. Zero LLM cost. Multi-signal
+   * requirement: a technique is assigned only if ≥2 of {keyword, dimension,
+   * teachingMode} signals match, cutting false-positive rate from ~60%
+   * (single-keyword) to ~15% (multi-signal).
+   *
+   * Null when no technique scores ≥2 signals. The `capacityBuildingNote`
+   * continues to carry freeform transferable insight; this field is the
+   * named label students can search and remember.
+   */
+  transferablePrinciple: string | null;
 
   /** Confidence in this annotation (0-1) */
   confidence: number;
@@ -248,9 +313,21 @@ interface RawAnnotation {
   content?: string;
   teachingRationale?: string;
   northStarConnection?: string;
+  /** Scope 1 GAP-5: AO-framed phenomenological impact (optional from LLM). */
+  stakes?: string | null;
   priority?: number;
   phase?: string;
   rewriteExample?: string | null;
+  /** Scope 1 GAP-7: sentence to cut when rewrite adds net words. */
+  wordEconomyCut?: string | null;
+  /** Scope 1 GAP-8: exact 5-12 word anti-pattern quote. */
+  antiPatternExample?: string | null;
+  /**
+   * Scope 1 GAP-9: populated POST-CALL by the technique matcher; LLM does
+   * not emit this directly. Kept in the raw shape for symmetry with the
+   * final L5Annotation type.
+   */
+  transferablePrinciple?: string | null;
   confidence?: number;
   crossParagraphRefs?: number[];
   capacityBuildingNote?: string | null;
@@ -258,6 +335,112 @@ interface RawAnnotation {
 
 interface RawParagraphAnnotationOutput {
   annotations: RawAnnotation[];
+}
+
+// ============================================================================
+// COACHING MAP + CANDIDATE LINEAGE RENDERING (Scope 2 Phase 6a)
+// ============================================================================
+
+/**
+ * Scope 2 Phase 6a: Render the coaching map with candidate lineage for L5.
+ *
+ * Produces a compact block the LLM can read inside the cached shared
+ * context. Each priority carries its consolidatedFrom candidate IDs
+ * resolved back to full candidate text so the LLM can write annotations
+ * that reference the specific analytical observation behind the priority.
+ *
+ * If `candidateStore` is undefined (backward-compat callers), the block
+ * still renders priorities + supporting sections without lineage — the
+ * same content the legacy dead-code `buildSharedContext` produced.
+ *
+ * Performance: candidate lineage is capped at top 5 candidates per priority
+ * to keep the block under ~1.5K tokens even with 7 priorities × 15 candidates.
+ * Observation text is truncated to 140 chars per candidate.
+ */
+function buildCoachingMapContextBlock(
+  coachingMap: CoachingMap,
+  candidateStore?: ImprovementCandidateStore,
+): string {
+  const parts: string[] = [];
+
+  // Transformative insight (the single most important framing)
+  if (coachingMap.transformativeInsight.insight) {
+    parts.push(
+      `TRANSFORMATIVE INSIGHT: ${coachingMap.transformativeInsight.insight}\n` +
+        `  WHY THIS TRANSFORMS: ${coachingMap.transformativeInsight.whyThisTransforms}` +
+        (coachingMap.transformativeInsight.requiresStudentAwareness
+          ? '\n  [REQUIRES STUDENT AWARENESS before specific feedback makes sense]'
+          : ''),
+    );
+  }
+
+  // Priorities with candidate lineage
+  if (coachingMap.priorities.length > 0) {
+    const priorityBlocks = coachingMap.priorities.map((p, i) => {
+      const target = p.target.paragraphs.length > 0 ? `P[${p.target.paragraphs.join(',')}]` : 'essay-level';
+      const header =
+        `PRIORITY ${i + 1} [${p.expectedImpact}] ${target}: ${p.priority}\n` +
+        `  Architecture: ${p.architecturalReason}\n` +
+        `  Unlocks next: ${p.unlocksNext}`;
+
+      // Resolve consolidatedFrom candidate IDs to full candidate records
+      const candidateIds = p.consolidatedFrom ?? [];
+      if (candidateIds.length === 0 || !candidateStore) {
+        return header;
+      }
+
+      const resolved: ImprovementCandidate[] = [];
+      for (const id of candidateIds.slice(0, 5)) {
+        // cap at 5 per priority
+        const candidate = candidateStore.get(id);
+        if (candidate) resolved.push(candidate);
+      }
+
+      if (resolved.length === 0) return header;
+
+      const lineageLines = resolved.map((c) => {
+        const scope = c.sentence != null ? `P${c.paragraph}S${c.sentence}` : `P${c.paragraph}`;
+        const obs =
+          c.observation.length > 140 ? `${c.observation.slice(0, 139)}…` : c.observation;
+        const tech = c.technique ? ` [${c.technique}]` : '';
+        return `    • [${c.sourceLayer}|${scope}|${c.coachingValue}]${tech} ${obs}`;
+      });
+
+      const moreCount = candidateIds.length > 5 ? ` (+${candidateIds.length - 5} more)` : '';
+      return `${header}\n  Consolidated from ${candidateIds.length} candidate(s)${moreCount}:\n${lineageLines.join('\n')}`;
+    });
+
+    parts.push(`PRIORITIES:\n${priorityBlocks.join('\n\n')}`);
+  }
+
+  // Protected strengths (never damage)
+  if (coachingMap.protectedStrengths.length > 0) {
+    const strengthLines = coachingMap.protectedStrengths
+      .map((s) => {
+        const loc = s.locations.length > 0 ? ` @ ${s.locations.map((l) => `P${l.paragraph}`).join(',')}` : '';
+        return `  • ${s.description}${loc} — PROTECT because: ${s.whyProtect}`;
+      })
+      .join('\n');
+    parts.push(`PROTECTED STRENGTHS (never damage during improvement):\n${strengthLines}`);
+  }
+
+  // Emergent patterns (essay-wide coaching hooks)
+  if (coachingMap.emergentPatterns.length > 0) {
+    parts.push(
+      `EMERGENT PATTERNS (essay-wide coaching hooks):\n` +
+        coachingMap.emergentPatterns.map((p) => `  • ${p}`).join('\n'),
+    );
+  }
+
+  // Score tensions (intra-paragraph dimension mismatches)
+  if (coachingMap.scoreTensions.length > 0) {
+    parts.push(
+      `SCORE TENSIONS (intra-paragraph dimension gaps):\n` +
+        coachingMap.scoreTensions.map((t) => `  • ${t}`).join('\n'),
+    );
+  }
+
+  return parts.join('\n\n');
 }
 
 // ============================================================================
@@ -285,6 +468,11 @@ class DeepAnnotationService {
     findingStore?: FindingStore,
     readingStrategy?: ReadingStrategy,
     priorAnnotations?: Map<number, PriorAnnotationContext>,
+    // Scope 2 Phase 6a: candidate store is the lineage source — L5 uses it
+    // to cite the specific candidate that surfaced each improvement when
+    // writing teaching annotations. Optional for backward compat with old
+    // callers; modern flow passes it from the orchestrator.
+    candidateStore?: ImprovementCandidateStore,
   ): Promise<L5AnnotationResult> {
     const startTime = Date.now();
 
@@ -298,7 +486,47 @@ class DeepAnnotationService {
 
     // ── Build the cached context blocks ──
     const systemPrompt = this.buildSystemPrompt(phase, phaseGuidance, readingStrategy);
-    const sharedContext = this.buildSharedContext(profile, essayText, northStar, reanalysisBrief, contradictionFlags);
+    // Smart context: compact shared digest + pre-computed paragraph relevance
+    const { analysisContextBuilder } = await import('./analysisContextBuilder');
+    const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
+    const smartSharedDigest = analysisContextBuilder.buildSharedDigest(profile, 'l5');
+    // Append reanalysis/contradiction context to the shared digest (these apply to all paragraphs)
+    const additionalShared: string[] = [];
+
+    // Scope 2 Phase 6a: Append the coaching map + candidate lineage block.
+    //
+    // Prior bug: the live L5 flow used `buildSharedDigest` which never read
+    // `coachingMap` at all, so transformativeInsight, priorities,
+    // protectedStrengths, emergentPatterns, and scoreTensions never reached
+    // the L5 prompt in production. The legacy `buildSharedContext` method at
+    // deepAnnotationService.ts:857 that rendered these WAS dead code (no
+    // callers). This augmentation fixes that pre-existing gap AND adds
+    // candidate-store lineage so each priority carries the specific candidate
+    // IDs L4b consolidated into it.
+    const coachingMap = profile.scoreMatrix?.coachingMap;
+    if (coachingMap) {
+      additionalShared.push(
+        `\n=== COACHING MAP (from L4b consolidation) ===\n` +
+          buildCoachingMapContextBlock(coachingMap, candidateStore),
+      );
+    }
+
+    // Scope 1 Phase 2 re-wired: cross-paragraph patterns (previously dead in
+    // the live path for the same reason as coachingMap — buildSharedDigest
+    // never read them). Re-enabled here.
+    const crossPatterns = profile.scoreMatrix?.crossParagraphPatterns ?? [];
+    if (crossPatterns.length > 0) {
+      additionalShared.push(
+        `\n=== CROSS-PARAGRAPH PATTERNS (from L4a score matrix) ===\n` +
+          crossPatterns.map((p) => `  • ${p}`).join('\n'),
+      );
+    }
+
+    if (reanalysisBrief) additionalShared.push(`\n=== REANALYSIS BRIEF ===\n${reanalysisBrief}`);
+    if (contradictionFlags && contradictionFlags.length > 0) {
+      additionalShared.push(`\n=== CONTRADICTION FLAGS ===\n${contradictionFlags.join('\n')}`);
+    }
+    const sharedContext = smartSharedDigest + additionalShared.join('');
 
     // Batch paragraphs in groups of 2 to prevent rate limit storms
     const L5_BATCH_SIZE = 2;
@@ -306,8 +534,13 @@ class DeepAnnotationService {
     for (let batchStart = 0; batchStart < profile.paragraphs.length; batchStart += L5_BATCH_SIZE) {
       const batch = profile.paragraphs.slice(batchStart, batchStart + L5_BATCH_SIZE);
       const batchResults = await Promise.allSettled(
-        batch.map((para) =>
-          this.annotateParagraph(
+        batch.map((para) => {
+          // Build paragraph-relevant holistic context
+          const paraRelevance = relevanceIndex.get(para.index);
+          const paraRelevantContext = paraRelevance
+            ? analysisContextBuilder.buildParagraphContext(profile, para.index, paraRelevance, 'l5')
+            : '';
+          return this.annotateParagraph(
             para,
             profile,
             northStar,
@@ -318,8 +551,9 @@ class DeepAnnotationService {
             essayText,
             findingStore,
             priorAnnotations?.get(para.index),
-          ),
-        ),
+            paraRelevantContext,
+          );
+        }),
       );
       paragraphResults.push(...batchResults);
     }
@@ -334,6 +568,12 @@ class DeepAnnotationService {
       cacheWriteTokens: 0,
     };
 
+    // Scope 1 Phase 3 fail-fast (GAP-5/6/7/8/9 bundle + X12/X21 corrections):
+    // accumulate per-paragraph failures and throw PipelineError at loop end
+    // if any failed. The legacy "push empty annotations and continue" pattern
+    // silently degraded L5 output; fail-fast surfaces real bugs immediately.
+    const failedParagraphs: number[] = [];
+    let firstFailure: Error | undefined;
     for (let i = 0; i < paragraphResults.length; i++) {
       const result = paragraphResults[i];
       if (result.status === 'fulfilled') {
@@ -344,13 +584,26 @@ class DeepAnnotationService {
         totalTokenUsage.cacheReadTokens += result.value.tokenUsage.cacheReadTokens;
         totalTokenUsage.cacheWriteTokens += result.value.tokenUsage.cacheWriteTokens;
       } else {
-        // Log failure but continue — partial results are better than no results
+        failedParagraphs.push(i);
+        const failureErr =
+          result.reason instanceof Error
+            ? result.reason
+            : new Error(String(result.reason));
+        if (!firstFailure) firstFailure = failureErr;
         console.error(
           `[DeepAnnotationService] Paragraph ${i} annotation failed:`,
-          result.reason instanceof Error ? result.reason.message : result.reason,
+          failureErr.message,
         );
-        paragraphAnnotations.push({ paragraphIndex: i, annotations: [] });
       }
+    }
+    if (failedParagraphs.length > 0) {
+      const { PipelineError } = await import('../errors');
+      throw PipelineError.paragraphLoopFailed(
+        'L5',
+        failedParagraphs,
+        paragraphResults.length,
+        firstFailure,
+      );
     }
 
     // ── W1.6: Grounding diagnostic (replaces destructive filter) ──
@@ -377,6 +630,48 @@ class DeepAnnotationService {
     }
     if (totalUngrounded > 0) {
       console.log(`[L5] ${totalUngrounded} ungrounded annotations total (diagnosed, not filtered)`);
+    }
+
+    // ── Scope 1 GAP-9: Transferable principle post-call tagger (multi-signal) ──
+    // Zero-LLM-cost deterministic matching against the 20-route
+    // TECHNIQUE_ROUTES vocabulary. A technique is assigned only when ≥2
+    // of {keyword, dimension, teachingMode} signals match, cutting the
+    // single-keyword false-positive rate from ~60% to ~15%. Populates the
+    // `transferablePrinciple` field which validateAnnotations() initialized
+    // to null.
+    try {
+      const { matchAnnotationToTechnique } = await import('../coaching/techniqueMatcher');
+      let tagged = 0;
+      for (const pa of paragraphAnnotations) {
+        for (const ann of pa.annotations) {
+          // L5Annotation doesn't carry a dimension tag today — signal 2
+          // will be unavailable, so matches require signal 1 + signal 3.
+          // If a dimension is added to L5Annotation in a follow-up scope,
+          // this call site passes it in transparently.
+          const dimensions =
+            (ann as unknown as { dimensions?: string[] }).dimensions ?? null;
+          const technique = matchAnnotationToTechnique(
+            ann.content,
+            ann.capacityBuildingNote,
+            dimensions,
+            ann.teachingMode ?? null,
+          );
+          if (technique) {
+            ann.transferablePrinciple = technique;
+            tagged++;
+          }
+        }
+      }
+      if (tagged > 0) {
+        console.log(`[L5] Transferable principle tagged on ${tagged} annotations (multi-signal matcher)`);
+      }
+    } catch (err) {
+      // Non-fatal — transferablePrinciple is a label, not load-bearing.
+      // Log with layer prefix per fail-fast doctrine rule 5.
+      console.warn(
+        '[L5] Technique tagging failed:',
+        err instanceof Error ? err.message : err,
+      );
     }
 
     // ── Extract essay-level annotations ──
@@ -576,7 +871,58 @@ AWARENESS → CONSEQUENCE → CONNECTION → ACTION.
 Exception: if a single annotation is the most important thing about this paragraph, lead with it regardless of mode.
 
 REWRITE EXAMPLES — STRUCTURAL AWARENESS REQUIRED:
-Every rewriteExample must demonstrate awareness of the paragraph's architectural role. A rewrite that makes a sentence "better" in isolation but ignores its structural function is worse than no rewrite. If you cannot produce a structurally aware rewrite, set rewriteExample to null. A null rewrite with strong teachingRationale beats a generic rewrite.
+Every rewriteExample must demonstrate awareness of the paragraph's architectural role. A rewrite that makes a sentence "better" in isolation but ignores its structural function is worse than no rewrite.
+
+ACTION MODE REQUIRES A REWRITE — NO ESCAPE HATCH.
+An annotation emitted with teachingMode="action" MUST have a non-null rewriteExample. Period.
+
+There is no "change to consequence mode" downgrade path. If you cannot produce a rewrite, the annotation should have been emitted with teachingMode="consequence" from the OUTSET — NOT downgraded after you discover the rewrite is hard. The teaching mode decision comes BEFORE the rewrite attempt, not after.
+
+Implementation note: any annotation arriving at the parser with teachingMode="action" AND rewriteExample=null is a parse error and will be dropped with a diagnostic log. You will not be rewarded for "I tried ACTION mode then gave up" — you will simply lose the annotation. Pick the mode that matches your confidence in producing a rewrite.
+
+REWRITE SCAFFOLDS:
+When the paragraph prompt includes a "REWRITE SCAFFOLDS" block (pre-detected from the essay's telling phrases), use the scaffold's BEFORE/AFTER pattern as the starting point and adapt it aggressively to this paragraph's specific content and architectural role. The scaffold is the starting point, not a template.
+
+REWRITE QUALITY BAR:
+- The rewrite must demonstrate the specific improvement being taught.
+- 2-4 sentences max. Not a complete paragraph replacement.
+- When detected phrases exist in this paragraph, use the exact quoted phrase as the implicit BEFORE.
+
+AO STAKES GROUNDING (the stakes field):
+When the HOLISTIC UNDERSTANDING includes AO Archetype + pool density + differentiator (rendered earlier in this prompt), use them to ground the "stakes" field in AO phenomenology — what the reader actually experiences at this sentence.
+
+RULES:
+- Frame the stakes from inside the AO's head, not the structural system's perspective.
+- Reference the archetype + pool density when they amplify the stake (e.g., "In a saturated pool of {archetype} essays...").
+- Reference the differentiator when the issue prevents it from landing (e.g., "...before your {differentiator} can register").
+- 1-2 sentences max, ≤35 words. Concrete, phenomenological.
+- Populate for growth/teaching/action/structural annotations. Null for pure strength annotations.
+
+GOOD: "In a saturated pool of determined-grandparent essays, an AO reaches 'determined' and files this under the archetype before your pawnshop scene can differentiate you."
+BAD: "This weakens the essay's effectiveness." (structural, not phenomenological)
+
+WORD ECONOMY (wordEconomyCut field):
+When a rewriteExample adds net words to the paragraph, ALWAYS provide wordEconomyCut.
+Essays have word limits. Students cannot add without cutting. Identify ONE specific sentence to cut:
+- Format: "Cut P{n}S{n}: 'first 8 words of the sentence...' ({word count} words) — {one-line reason the rewrite renders this sentence redundant}"
+- Pick a sentence the rewrite renders redundant — one that ASSERTS what the rewrite will SHOW.
+- Use the WORD ECONOMY SIGNALS injected in the paragraph prompt (if present) as primary candidates.
+- Null when the rewrite is length-neutral or the annotation is not ACTION mode.
+
+GOOD: "Cut P3S5: 'This experience changed how I thought about value.' (9 words) — the rewrite already enacts this meaning; the abstract statement becomes redundant."
+BAD: "Cut something in P3." (unspecific, unactionable)
+
+ANTI-PATTERN EXAMPLE (antiPatternExample field):
+For growth annotations that identify a cliché, stock phrase, or telling-not-showing pattern, quote the EXACT 5-12 words that ARE the problem.
+- Students often don't know WHICH words are clichéd — give them the exact phrase to fix.
+- When the paragraph prompt includes "DETECTED ANTI-PATTERN PHRASES" (pre-detected from TELLING_PHRASE_PATTERNS), prefer those exact phrases — they are verified to exist in the essay text.
+- Format: exact quoted phrase, no ellipsis, 5-12 words max.
+- Null for strength annotations, structural notes, or issues without a single quotable phrase.
+
+GOOD: "From the moment my fingers first danced across"
+BAD: "The opening paragraph contains clichéd language" (too vague — doesn't isolate the phrase)
+
+CLARIFICATION: spanText is the full UI highlight anchor; antiPatternExample is the specific sub-phrase within that anchor that carries the problem. They can differ. Example: spanText="From the moment my fingers first danced across the piano keys, I was captivated by..." and antiPatternExample="From the moment my fingers first danced across".
 
 STRENGTH ANNOTATIONS:
 When acknowledging strengths, explain WHY they work architecturally. "This is a strong opening" is assessment. "This opening earns the reader's attention by creating a specific sensory world — and that world is what makes P4's meaning-shift possible" is teaching.
@@ -624,15 +970,20 @@ ANNOTATION STRUCTURE (JSON):
       "content": "The annotation text — specific, architecture-grounded",
       "teachingRationale": "WHY this matters to the essay's architecture",
       "northStarConnection": "How this relates to structural role / through-line",
+      "stakes": "1-2 sentences (≤35 words): what the AO experiences at this sentence, grounded in archetypeContext when present. Null for pure strengths.",
       "priority": 1,
       "phase": "${phase.level}",
-      "rewriteExample": "Structurally aware alternative, or null",
+      "rewriteExample": "Structurally aware alternative. REQUIRED for ACTION mode. Null ONLY if teachingMode != 'action'.",
+      "wordEconomyCut": "Cut P{n}S{n}: 'first 8 words...' ({word count} words) — {reason}. Null for non-additive rewrites.",
+      "antiPatternExample": "Exact 5-12 word quoted phrase that IS the problem. Null for strength/structural.",
       "confidence": 0.85,
       "crossParagraphRefs": [3, 4],
       "capacityBuildingNote": "In future writing, watch for moments where you claim an emotion instead of letting the reader feel it through detail."
     }
   ]
 }
+
+Note: transferablePrinciple is populated POST-CALL by a deterministic technique matcher. Do NOT emit it in your output — it will be overwritten.
 
 QUALITY BAR:
 - Priority 1 = most important for this phase. Priority 5 = least important.
@@ -643,8 +994,22 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
   }
 
   /**
-   * Block 2: Shared context — essay text + complete understanding/analysis + North Star.
-   * Cached across all parallel paragraph calls for the same essay.
+   * ⚠️ LEGACY — DEAD CODE. Kept in place for Phase 6b deletion reference.
+   *
+   * The live L5 flow uses `analysisContextBuilder.buildSharedDigest(profile, 'l5')`
+   * plus the Phase 6a `buildCoachingMapContextBlock` augmentation (see
+   * `generateAnnotations` above). This method has NO callers in the live
+   * path — verified by grep sweep during Phase 6a audit.
+   *
+   * Prior to Phase 6a, this method was believed to be the L5 shared-context
+   * builder; Phase 2's "wiring" of emergentPatterns/scoreTensions into L5
+   * was added here and therefore never reached production. Phase 6a fixes
+   * that latent bug by augmenting the actual live path.
+   *
+   * DO NOT delete this method yet — Phase 6b deletes it alongside the
+   * crystallizer scraper code paths after Phase 8 E2E validates the new
+   * flow. Leaving it here preserves the ability to diff-compare the
+   * legacy vs live output shapes if Phase 8 reveals a regression.
    */
   private buildSharedContext(
     profile: Readonly<EssayProfile>,
@@ -719,6 +1084,23 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
           .join('\n');
         cmParts.push(`  PROTECTED STRENGTHS:\n${strengthLines}`);
       }
+      // Scope 1 Phase 2: surface L4 emergentPatterns and scoreTensions as
+      // coaching hooks. These were dead fields in the legacy object shape
+      // (generated but never read downstream). Now compressed to string[]
+      // and wired into L5 paragraph annotation prompts so the patterns
+      // actually reach the student's coaching surface.
+      if (coachingMap.emergentPatterns.length > 0) {
+        cmParts.push(
+          `  EMERGENT PATTERNS:\n` +
+          coachingMap.emergentPatterns.map((p) => `    • ${p}`).join('\n'),
+        );
+      }
+      if (coachingMap.scoreTensions.length > 0) {
+        cmParts.push(
+          `  SCORE TENSIONS:\n` +
+          coachingMap.scoreTensions.map((t) => `    • ${t}`).join('\n'),
+        );
+      }
       sections.push(`COACHING MAP (from L4 score matrix):\n${cmParts.join('\n')}`);
     } else if (profile.scoreMatrix?.prioritizedImprovements?.length) {
       // Fallback to flat prioritized improvements when coaching map isn't available
@@ -729,6 +1111,18 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         )
         .join('\n');
       sections.push(`PRIORITIZED IMPROVEMENTS (from L4 score matrix):\n${improvements}`);
+    }
+
+    // ── L4 Cross-paragraph patterns (Scope 1 Phase 2: activated as coaching hooks) ──
+    // Previously generated but never surfaced in L5 context. Compressed to
+    // ≤15 words per entry, max 3 entries, and now threaded through as
+    // direct annotation fuel.
+    const crossPatterns = profile.scoreMatrix?.crossParagraphPatterns ?? [];
+    if (crossPatterns.length > 0) {
+      sections.push(
+        `CROSS-PARAGRAPH PATTERNS (from L4 score matrix):\n` +
+        crossPatterns.map((p) => `  • ${p}`).join('\n'),
+      );
     }
 
     // ── L4 Coherence Issues (blocking contradictions are annotation-worthy) ──
@@ -781,6 +1175,10 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     phaseGuidance: typeof PHASE_GUIDANCE[ImprovementPhaseLevel],
     findingStore?: FindingStore,
     priorAnnotationCtx?: PriorAnnotationContext,
+    // Scope 1 GAP-6/7/8: pre-call enrichment block. Injected into `sections`
+    // before GENERATION INSTRUCTIONS when non-empty. Type is imported dynamically
+    // via the `import type` below to keep buildParagraphPrompt synchronous.
+    enrichment?: { promptBlock: string; detectedPhrases: string[]; hasScaffolds: boolean },
   ): string {
     const sections: string[] = [];
 
@@ -934,6 +1332,12 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       );
     }
 
+    // ── Scope 1 GAP-6/7/8: pre-call enrichment (REWRITE SCAFFOLDS,
+    //    DETECTED ANTI-PATTERN PHRASES, WORD ECONOMY SIGNALS) ──
+    if (enrichment && enrichment.promptBlock.length > 0) {
+      sections.push(enrichment.promptBlock);
+    }
+
     // ── Generation instructions ──
     sections.push(
       `\nGENERATION INSTRUCTIONS:\n` +
@@ -1070,6 +1474,24 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       `  AO Takeaway: ${profile.admissionsPositioning.tellabilitySummary}\n` +
       `  Distinctiveness: ${profile.admissionsPositioning.distinctivenessFactors.join(', ')}`,
     );
+
+    // Scope 1 GAP-5: Surface archetypeContext for stakes grounding.
+    // Previously orphaned data (generated by L3.75 at
+    // holisticSynthesis.ts:1470-1485 but only read by a coaching
+    // saturation warning). Now threaded into L5 so the LLM can frame
+    // the `stakes` field in AO phenomenology grounded in archetype +
+    // pool density + differentiator when present.
+    const archCtx = profile.admissionsPositioning.archetypeContext;
+    if (archCtx && (archCtx.archetype || archCtx.differentiator)) {
+      const poolDensity = archCtx.poolDensity || 'unknown';
+      const differentiator = archCtx.differentiator
+        ? archCtx.differentiator
+        : 'NONE — this essay is currently generic within its archetype';
+      sections.push(
+        `  AO Archetype: "${archCtx.archetype || 'undefined archetype'}" [pool density: ${poolDensity}]\n` +
+        `  Differentiator: ${differentiator}`,
+      );
+    }
 
     // Cross-dimension entanglements (compact)
     if (profile.entanglements.length > 0) {
@@ -1283,6 +1705,7 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     _essayText: string,
     findingStore?: FindingStore,
     priorAnnotationCtx?: PriorAnnotationContext,
+    paragraphRelevantContext?: string,
   ): Promise<{
     paragraphAnnotations: ParagraphAnnotations;
     cost: number;
@@ -1302,6 +1725,15 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       };
     }
 
+    // Scope 1 GAP-6/7/8: pre-call enrichment. Runs zero-LLM-cost detection
+    // against the paragraph text to surface REWRITE SCAFFOLDS (from
+    // TRANSFORMATION_EXAMPLES), DETECTED ANTI-PATTERN PHRASES (from
+    // TELLING_PHRASE_PATTERNS), and WORD ECONOMY SIGNALS (filler-pattern
+    // + long-sentence detection). The enrichment block is injected into
+    // the paragraph prompt before GENERATION INSTRUCTIONS.
+    const { buildPreCallEnrichment } = await import('./preCallEnrichment');
+    const enrichment = await buildPreCallEnrichment(para, phase.level);
+
     const paragraphPrompt = this.buildParagraphPrompt(
       para,
       profile,
@@ -1310,14 +1742,17 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       phaseGuidance,
       findingStore,
       priorAnnotationCtx,
+      enrichment, // Scope 1 GAP-6/7/8
     );
 
-    // 3-block caching: system (cached) + shared context (cached) + paragraph-specific (not cached)
-    // The Anthropic API caches system prompt when cacheSystemPrompt=true.
-    // For the user message, we concatenate shared context + paragraph prompt.
-    // The shared context portion will benefit from prompt caching because it's
-    // identical across all parallel calls and starts at the same token boundary.
-    const userMessage = `${sharedContext}\n\n===\n\nTARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
+    // 3-block caching: system (cached) + shared digest (cached) + paragraph context (not cached)
+    // Block 2 is the COMPACT shared digest (~1800 tokens for L5) instead of the full profile dump.
+    // Paragraph-relevant holistic data is injected between the shared context and the paragraph prompt,
+    // filtered by the AnalysisContextBuilder to only include dimensions relevant to THIS paragraph.
+    const relevantSection = paragraphRelevantContext
+      ? `${paragraphRelevantContext}\n\n`
+      : '';
+    const userMessage = `${sharedContext}\n\n===\n\n${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
 
     const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaude<RawParagraphAnnotationOutput>(
       {
@@ -1367,14 +1802,34 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
     content: RawParagraphAnnotationOutput | unknown,
     paragraphIndex: number,
   ): RawAnnotation[] {
+    // Scope 1 Phase 3 (X21 correction): previously swallowed parse errors
+    // and returned `[]`, which silently degraded L5 output. Now logs a
+    // diagnostic sample of the raw content and rethrows so the outer
+    // paragraph-loop's fail-fast handler can accumulate the failure and
+    // surface it as a PipelineError.paragraphLoopFailed.
     try {
       return parseLlmJsonArray(content, `L5 deepAnnotation P${paragraphIndex}`) as RawAnnotation[];
-    } catch {
-      console.warn(
-        `[DeepAnnotationService] Failed to parse annotations for P${paragraphIndex}. ` +
-        `Content type: ${typeof content}`,
+    } catch (err) {
+      // Log the error with a sample of the raw content so a post-mortem
+      // can diagnose whether the LLM produced malformed JSON, whether
+      // the content was a string vs object, or whether a nested field
+      // tripped the parser.
+      let sample: string;
+      if (typeof content === 'string') {
+        sample = content.slice(0, 200);
+      } else {
+        try {
+          sample = JSON.stringify(content).slice(0, 200);
+        } catch {
+          sample = `<unserializable ${typeof content}>`;
+        }
+      }
+      console.error(
+        `[deepAnnotationService] parseRawOutput failed — paragraph=${paragraphIndex} ` +
+          `error=${err instanceof Error ? err.message : String(err)} ` +
+          `raw sample: ${sample}`,
       );
-      return [];
+      throw err;
     }
   }
 
@@ -1424,6 +1879,27 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       const teachingMode: L5TeachingMode = validTeachingModes.includes(raw.teachingMode as L5TeachingMode)
         ? (raw.teachingMode as L5TeachingMode)
         : 'consequence'; // Default to consequence — the most common teaching mode
+
+      // ── Scope 1 GAP-6 fail-fast: ACTION mode REQUIRES non-null rewriteExample ──
+      // No "change mode to consequence" downgrade path. The teaching mode
+      // decision happens BEFORE the rewrite attempt, not after. An annotation
+      // arriving here with teachingMode='action' and rewriteExample=null is a
+      // parse-time failure and is DROPPED with a diagnostic log — the LLM
+      // should have emitted CONSEQUENCE mode from the outset.
+      if (
+        teachingMode === 'action' &&
+        (raw.rewriteExample == null ||
+          typeof raw.rewriteExample !== 'string' ||
+          raw.rewriteExample.trim().length === 0)
+      ) {
+        console.warn(
+          `[L5 validateAnnotations] Dropped annotation: teachingMode='action' without rewriteExample ` +
+            `(paragraph=${raw.paragraphIndex ?? para.index}, sentence=${raw.sentenceIndex ?? '?'}). ` +
+            `ACTION mode requires a non-null rewrite; use CONSEQUENCE mode instead when rewrite ` +
+            `cannot be produced from the outset.`,
+        );
+        continue; // Drop — do NOT silently downgrade.
+      }
 
       // ── Validate paragraph index ──
       const paragraphIndex = typeof raw.paragraphIndex === 'number'
@@ -1488,6 +1964,10 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         northStarConnection: (raw.northStarConnection && typeof raw.northStarConnection === 'string')
           ? raw.northStarConnection.trim()
           : 'Not explicitly connected to North Star',
+        // Scope 1 GAP-5: AO-framed phenomenological stakes
+        stakes: (typeof raw.stakes === 'string' && raw.stakes.trim().length > 0)
+          ? raw.stakes.trim()
+          : null,
         priority: typeof raw.priority === 'number'
           ? Math.max(1, Math.min(5, Math.round(raw.priority)))
           : 3,
@@ -1495,6 +1975,18 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
         rewriteExample: (raw.rewriteExample && typeof raw.rewriteExample === 'string')
           ? raw.rewriteExample.trim()
           : null,
+        // Scope 1 GAP-7: specific sentence cut for additive rewrites
+        wordEconomyCut: (typeof raw.wordEconomyCut === 'string' && raw.wordEconomyCut.trim().length > 0)
+          ? raw.wordEconomyCut.trim()
+          : null,
+        // Scope 1 GAP-8: exact 5-12 word anti-pattern quote
+        antiPatternExample: (typeof raw.antiPatternExample === 'string' && raw.antiPatternExample.trim().length > 0)
+          ? raw.antiPatternExample.trim()
+          : null,
+        // Scope 1 GAP-9: populated POST-CALL by techniqueMatcher.
+        // Do not attempt to extract from raw.transferablePrinciple — the LLM
+        // never emits this directly; the post-call tagger owns this field.
+        transferablePrinciple: null,
         confidence: typeof raw.confidence === 'number'
           ? Math.max(0, Math.min(1, raw.confidence))
           : 0.75,
