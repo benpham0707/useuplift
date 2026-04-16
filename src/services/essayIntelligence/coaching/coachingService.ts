@@ -42,7 +42,6 @@ import type {
   CoachingSessionMemory,
   SessionEvent,
   LearningStyleObservations,
-  CoachingQualitySignals,
   Finding,
 } from '../profileTypes';
 
@@ -57,8 +56,26 @@ import { COACHING_VALUE_ORDER } from '../findings/findingStore';
 
 import type { CoachingMode } from '../profileTypes';
 import type { BlockContext } from './types';
-import { buildCoachingPrompt } from './promptBlocks';
+import {
+  buildCoachingPrompt,
+  strategicQuestionFromPriorTurnSection,
+  innerVoiceMirrorCandidateSection,
+  learningStyleCalibrationSection,
+  strategicQuestionFromPriorTurnData,
+  innerVoiceMirrorCandidateData,
+  learningStyleCalibrationData,
+  round3DirectivesBlock,
+  historicalIntelligenceSection,
+} from './promptBlocks';
+import { normalizeParagraphRef, assertRefInRange } from './paragraphRef';
 import { getTeachingContentForContext } from './teachingContentRouter';
+import * as coachingPlanner from './coachingPlanner';
+import * as edgeProtocol from './edgeProtocol';
+import * as lengthCalibrator from './lengthCalibrator';
+import {
+  FORBIDDEN_PATTERNS_BLOCK,
+  SECTION_WORD_BUDGETS_BLOCK,
+} from './forbiddenPatterns';
 import { CoachingBlockedError } from '../errors';
 
 // ============================================================================
@@ -367,10 +384,6 @@ export interface CoachingResult {
    * Improvement 6: Updated learning style observations — pass back on next turn.
    */
   learningStyle: LearningStyleObservations;
-  /**
-   * Improvement 6: Quality signals extracted every 3 turns.
-   */
-  qualitySignals?: CoachingQualitySignals;
   /**
    * Improvement 6: LLM-assessed cognitive state for this turn.
    */
@@ -860,17 +873,50 @@ export class CoachingService {
     // Fills demonstration, researchBacking, stakes (when thin), and collegeNote
     // fields that buildImprovementManifest() leaves empty. Zero LLM calls.
     // Idempotent via manifest._enriched — subsequent turns are instant no-ops.
-    // Dynamic import keeps the coldpath free for sessions without a manifest.
-    // Fail-open on unexpected errors so enrichment issues don't break coaching.
+    //
+    // classified: mixed (systemic + recoverable)
+    //   - PipelineError.enrichmentSystemicMiss: SYSTEMIC — table drift. Log at
+    //     ERROR level with structured diagnostic; mark _enriched=true so we
+    //     don't retry every turn; continue coaching with best-effort manifest.
+    //     This is the "fail-loud but don't block" pattern per CLAUDE.md.
+    //   - Other errors (import failure, runtime): RECOVERABLE — warn+continue.
     if (profile.improvementManifest && !profile.improvementManifest._enriched) {
       try {
         const { enrichWithResearchDatabase } = await import('../analysis/researchEnrichment');
-        enrichWithResearchDatabase(profile.improvementManifest, collegeId);
+        // Resolve collegeId in priority order:
+        //   1. Explicit param from the orchestrator (this turn's caller)
+        //   2. profile.collegeId (persisted at session init for supplement/PIQ)
+        // This keeps common_app flows working (both undefined) while
+        // guaranteeing supplement flows enrich even after server restarts
+        // (where the in-memory sessionStore forgets collegeId but the
+        // persisted profile remembers it).
+        const effectiveCollegeId = collegeId ?? profile.collegeId;
+        enrichWithResearchDatabase(profile.improvementManifest, effectiveCollegeId);
       } catch (err) {
-        console.warn(
-          '[CoachingService] Research enrichment failed (non-fatal):',
-          err instanceof Error ? err.message : err,
-        );
+        const { isPipelineError } = await import('../errors');
+        if (isPipelineError(err) && err.layer === 'research_enrichment') {
+          // Systemic miss — table drift between TECHNIQUE_VOCABULARY_LIST and
+          // ROUTE_TO_ISSUE_TYPE. Surface loudly for observability/alerts, but
+          // don't block the coaching turn. Mark enriched=true to prevent
+          // per-turn retry of a known-broken lookup.
+          console.error(
+            '[CoachingService] Research enrichment SYSTEMIC failure — ' +
+              'ROUTE_TO_ISSUE_TYPE / OBSERVATION_KEYWORD_TO_ISSUE needs audit:',
+            err.toDiagnostic(),
+          );
+          profile.improvementManifest._enriched = true;
+          profile.improvementManifest._enrichmentError = {
+            type: 'systemic_miss',
+            layer: err.layer,
+            message: err.message,
+            at: new Date().toISOString(),
+          };
+        } else {
+          console.warn(
+            '[CoachingService] Research enrichment failed (non-fatal, recoverable):',
+            err instanceof Error ? err.message : err,
+          );
+        }
       }
     }
 
@@ -937,19 +983,19 @@ export class CoachingService {
     // ── Learning Style Context for Stage 3 prompt injection ──
     // style.observations accumulate across turns but were never passed to the coaching LLM.
     // Build a prompt section from non-tentative observations (or all if <=3 total).
+    // The adaptation-rule directives live authoritatively in
+    // `learningStyleCalibrationDirective` (cached system prompt via
+    // round3DirectivesBlock). Emit only the raw observations here — Sonnet maps
+    // them to the appropriate directive itself. Dedup: removed an inline
+    // ADAPTATION RULES bullet list that restated the same guidance the
+    // directive block already carries.
     const learningStyleSection = style.observations.length > 0
       ? `\n\n=== LEARNING STYLE OBSERVATIONS ===\n` +
         style.observations
           .filter(o => o.confidence !== 'tentative' || style.observations.length <= 3)
           .map(o => `- ${o.observation} (${o.confidence})`)
           .join('\n') +
-        `\nADAPTATION RULES (apply these based on what you've observed):` +
-        `\n- If student prefers concrete examples: demonstrate with THEIR actual text, not generic samples` +
-        `\n- If student learns by writing first: ask them to write BEFORE giving detailed feedback` +
-        `\n- If student responds to questions: lead with questions, not directives` +
-        `\n- If student needs explicit structure: give numbered steps, not open-ended prompts` +
-        `\n- If student gets overwhelmed: narrow to ONE thing per turn, not three` +
-        `\n- If student thrives on positive feedback: lead with what's working, then the gap`
+        `\nApply the matching shorthand directives from LEARNING_STYLE_CALIBRATION (system prompt).`
       : undefined;
 
     // ── Cross-module context gating ──
@@ -1041,6 +1087,72 @@ export class CoachingService {
     // GAP-1: Store responseIntensity in session memory for next-turn consistency
     memory.lastResponseIntensity = sidecar.responseIntensity;
 
+    // ── Phase 3: record edge-protocol deployments ──
+    // Heuristic: if the pushback directive was emitted THIS turn (i.e., the
+    // coach was allowed to push back at prompt-assembly time), mark it as
+    // deployed. We intentionally record the ALLOWANCE, not the ACTUAL prose
+    // move — the sidecar doesn't surface "did-I-push-back", and false-
+    // positives here just mean pushback won't fire again, which is
+    // the desired cap. Same logic for blindSpot.
+    const wasAllowedPushback = edgeProtocol.shouldAllowPushback(memory);
+    if (wasAllowedPushback) {
+      edgeProtocol.recordPushback(memory);
+      console.log('[EdgeProtocol] Pushback marked as deployed this turn');
+    }
+    const wasAllowedBlindSpot = edgeProtocol.shouldSurfaceBlindSpot(
+      memory,
+      memory.studentTheory,
+      studentMessage,
+    );
+    if (wasAllowedBlindSpot) {
+      edgeProtocol.recordBlindSpotDeployed(memory);
+      console.log('[EdgeProtocol] BlindSpot marked as surfaced this turn');
+    }
+
+    // Post-turn forbidden-vocabulary audit (classified: recoverable)
+    // Surfaces coercive escalation patterns without blocking the turn. The
+    // audit scorecard can consume these to gate releases.
+    const forbidden = edgeProtocol.detectForbiddenVocabulary(response);
+    if (forbidden.length > 0) {
+      console.warn(
+        `[EdgeProtocol] Forbidden vocabulary detected (${forbidden.length} occurrences): ` +
+          forbidden.map((f) => `"${f.phrase}"`).join(', '),
+      );
+    }
+
+    // ── Phase 2: record planner deployment ──
+    // Re-run the planner with the PRE-turn memory state (ledger hasn't been
+    // written yet) to recover which improvement was deployed this turn, then
+    // record it. The planner is pure — cheap to invoke twice. Without this,
+    // the ledger never grows and future turns would not rotate away from
+    // previously-deployed categories.
+    if (profile.improvementManifest && profile.improvementManifest.items.length > 0) {
+      try {
+        const selection = coachingPlanner.selectNextDeployment(profile.improvementManifest, memory);
+        if (selection) {
+          coachingPlanner.recordDeployment(memory, {
+            selection,
+            turn: memory.turnCount + 1,
+            responseText: response,
+          });
+          console.log(
+            `[CoachingPlanner] Recorded deployment: imp=${selection.item.id} ` +
+              `category=${selection.principleCategory} ` +
+              `technique=${selection.item.technique ?? '(none)'} ` +
+              `mode=${memory.taughtLedger?.[selection.item.id]?.deploymentMode ?? 'unknown'}`,
+          );
+        }
+      } catch (err) {
+        // classified: recoverable
+        // Planner is pedagogical-layer enhancement; a failure here should
+        // not block the coaching turn. Log loudly for observability.
+        console.warn(
+          '[CoachingPlanner] recordDeployment failed (non-fatal):',
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
+
     // GAP-2: Accumulate learning style observations from sidecar
     if (sidecar.learningStyleUpdate) {
       if (style.observations.length >= 8) {
@@ -1105,8 +1217,9 @@ export class CoachingService {
       // Extract ALL-CAPS technique names (e.g., SUMMARY-TO-SCENE, SENSORY TIMESTAMP)
       const techniqueMatches = resp.match(/\b[A-Z]{2,}(?:[-\s][A-Z]{2,}){1,3}\b/g) ?? [];
       const techniques = [...new Set(techniqueMatches)].slice(0, 2);
-      // Extract paragraph targets (P1, P2, etc.)
-      const paraMatches = resp.match(/\bP\d\b/g) ?? [];
+      // Extract paragraph targets. Widened to multi-digit P10..P99 — the old
+      // /\bP\d\b/ regex silently dropped anything past P9.
+      const paraMatches = resp.match(/\bP\d{1,2}\b/g) ?? [];
       const paragraphs = [...new Set(paraMatches)].slice(0, 3);
 
       if (techniques.length > 0 || paragraphs.length > 0) {
@@ -1115,12 +1228,23 @@ export class CoachingService {
           paragraphs.length > 0 ? `Target: ${paragraphs.join(', ')}` : '',
         ].filter(Boolean).join(' | ');
 
+        // Round-3 Coaching Integration: centralize paragraph-ref conversion.
+        // Coach prose is 1-indexed ("P1" == first paragraph); events on session
+        // memory must be 0-indexed to match the manifest convention used by
+        // per-paragraph delta telemetry and the finding store.
+        const refs0Indexed = paragraphs
+          .map((p) => normalizeParagraphRef(p, 'coach_text'))
+          .filter((n) => Number.isFinite(n));
+        for (const ref of refs0Indexed) {
+          assertRefInRange(ref, profile.paragraphs.length, 'coach_suggestion');
+        }
+
         memory.events.push({
           turn: memory.turnCount + 1,
           kind: 'coach_suggestion',
           summary: suggestionSummary,
           significance: 0.7,
-          paragraphRefs: paraMatches ? paraMatches.map(p => parseInt(p.slice(1), 10) - 1) : [],
+          paragraphRefs: refs0Indexed,
           findingRefs: [],
         });
       }
@@ -1277,14 +1401,29 @@ export class CoachingService {
       memory.events[memory.events.length - 1].findingRefs = supersededFindingIds;
     }
 
-    // ── StudentTheory Periodic Synthesis (every 5 turns, starting at turn 5) ──
-    // Require minimum signal: at least 2 portrait observations OR turn >= 5
+    // ── StudentTheory Progressive Synthesis (T2 nascent → T5 confirmed, then every 5) ──
+    // Round-3 Coaching Integration: theory must be available BEFORE the turn
+    // that should be shaped by it — the old T5-only schedule produced a synthesis
+    // that could never shape the session that generated it. Firing at T2 gives
+    // the coach `blindSpotHypotheses` and `personhood` context from T3 onward.
+    //
+    // Maturity ladder:
+    //   T2 → 'nascent'     (2 turns of evidence — hedge aggressively)
+    //   T3 → 'hypothesis'  (still provisional)
+    //   T4 → 'growing'     (patterns repeating)
+    //   T5 → 'confirmed'   (broadly stable)
+    //   T10, T15, … → re-synthesize, maturity stays 'confirmed'
     const pendingObs = [
       ...(memory.preTheoryObservations ?? []),
       ...(memory.studentTheory?.pendingObservations ?? []),
     ];
-    const hasMinimumSignal = pendingObs.length >= 2 || memory.turnCount >= 5;
-    if (memory.turnCount > 0 && hasMinimumSignal && (memory.turnCount >= 5 && memory.turnCount % 5 === 0)) {
+    const hasMinimumSignal = pendingObs.length >= 1 || memory.turnCount >= 2;
+    const shouldSynthesize =
+      memory.turnCount >= 2 &&
+      memory.turnCount <= 5
+        ? true // fire every turn from T2..T5
+        : memory.turnCount > 5 && memory.turnCount % 5 === 0; // then every 5 turns
+    if (shouldSynthesize && hasMinimumSignal) {
       try {
         const synthStart = Date.now();
         const { theory, cost: synthCost } = await this.synthesizeStudentTheory(
@@ -1298,6 +1437,13 @@ export class CoachingService {
           theory.pendingObservations = [...preObs];
           memory.preTheoryObservations = [];
         }
+        // Assign maturity based on turn number at synthesis time.
+        const maturityByTurn: Record<number, NonNullable<StudentTheory['maturity']>> = {
+          2: 'nascent',
+          3: 'hypothesis',
+          4: 'growing',
+        };
+        theory.maturity = maturityByTurn[memory.turnCount] ?? 'confirmed';
         memory.studentTheory = theory;
         costs.push(synthCost);
         console.log(
@@ -1360,6 +1506,19 @@ export class CoachingService {
         }
       }
     }
+
+    // ── Round-3 Coaching Integration: roll prior-turn handoff state ──
+    // Capture this turn's strategicQuestion + innerVoice so the NEXT turn's
+    // prompt can surface them literally (see strategicQuestionFromPriorTurnSection
+    // and innerVoiceMirrorCandidateSection in promptBlocks.ts).
+    //
+    // Note: memory.strategicQuestion is the live session thread and may have
+    // been updated this turn from sidecar.strategicQuestionUpdate. It's the
+    // correct value to propagate — an unchanged strategicQuestion simply
+    // re-appears on the next turn's prompt, which is the desired behavior
+    // (unresolved → re-anchor).
+    memory.priorTurnStrategicQuestion = memory.strategicQuestion || null;
+    memory.priorTurnCognitiveAssessment = sidecar.innerVoice ?? null;
 
     const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
     console.log(
@@ -1850,8 +2009,13 @@ Output only the JSON object. No preamble or explanation.`;
     // ── BLOCK 2: Stable profile context + essay text + findings (CACHED in system prompt) ──
     const stableProfileContext = this.buildStableProfileContext(profile, assembledContext);
 
-    // Scope essay text to focus paragraphs +/-1 context window
-    const essayText = this.scopeEssayText(profile.paragraphs, quickFocus.focusParagraphs);
+    // CACHE FIX: Send the FULL essay text in the system prompt (stable across turns
+    // within a session). Per-turn focus is a small hint emitted in the user prompt
+    // (FOCUS_PARAGRAPHS payload) — keeping the system prefix byte-identical between
+    // turns is what unlocks Anthropic's prompt cache. Previously, we scoped essay
+    // text to focusParagraphs+/-1 each turn, which mutated the cached prefix and
+    // forced a cache write on nearly every turn (audit T1/T2/T4/T5 cache_read=0).
+    const essayText = profile.paragraphs.map((p, i) => `P${i + 1}: ${p.text}`).join('\n\n');
 
     // Build a minimal Stage1Output adapter for finding context, anti-repetition, and escalation
     // Declared early so it's available for buildFindingCoachingContext below.
@@ -1893,10 +2057,32 @@ READINESS: ${phase.readinessAssessment}`;
     const antiConvergenceSection = this.buildAntiConvergenceContext(profile);
 
     // System prompt = coaching philosophy + profile + essay + phase + anti-convergence
-    // STABLE across turns → enables Anthropic prompt caching ($0.30/M read vs $3.75/M write).
+    //                 + round-3 directive blocks (HOW to handle prior-turn payloads)
+    // STABLE across turns within a session → enables Anthropic prompt caching
+    // ($0.30/M read vs $3.75/M write — ~10x discount on the cached portion).
+    //
+    // Round-3 split: directive TEXT (how to interpret payloads) lives here; only
+    // the per-turn payload VALUES (the specific quoted question / hypothesis /
+    // observation list) go in the user prompt. This pushes ~600-900 tokens of
+    // stable directive text into the cache and keeps the user-prompt delta small.
+    //
     // findingSection (findings + teaching content) goes in USER prompt — it changes per turn
     // based on focus paragraphs, so putting it here would break the cache prefix every turn.
+    // Round 7 — Historical intelligence section. Pulls pre-computed
+    // cross-session signals (revision intelligence + voice evolution) off
+    // the profile. Coordinator recomputes these after every L3.5 analysis
+    // pass; this call is a pure string assemble. Empty string on session
+    // one (both inputs null) = zero prompt bloat.
+    const historicalSection = historicalIntelligenceSection(
+      profile.revisionIntelligence ?? null,
+      profile.voiceEvolution ?? null,
+    );
+
     const systemPrompt = coachingPhilosophy +
+      FORBIDDEN_PATTERNS_BLOCK +
+      SECTION_WORD_BUDGETS_BLOCK +
+      round3DirectivesBlock() +
+      historicalSection +
       `\n\n===ESSAY PROFILE CONTEXT===\n${stableProfileContext}` +
       `\n\n===ESSAY TEXT (current version — quote directly when referencing specific moments)===\n${essayText}` +
       phaseSection +
@@ -2145,6 +2331,42 @@ ${stalenessNote}`;
     // ── Improvement Queue (from analysis manifest) ──
     const improvementQueueSection = this.buildImprovementQueueSection(profile, sessionMemory);
 
+    // ── Phase 3: edge-protocol directives ──
+    // Three bounded edge behaviors, each conditionally emits a prompt
+    // directive. All guards are pure and unit-tested in
+    // tests/unit/test-edge-protocol.ts — the regression surface is small.
+    //   3.1 killer diagnostic — turn 1 only, uses AO first-read data
+    //   3.2 calibrated pushback — first deflection, max once per session
+    //   3.3 blindSpot surfacing — emotional opening + ready hypothesis, max once
+    let edgeProtocolSection = '';
+    const turnNumberForEdge = (sessionMemory.turnCount ?? 0) + 1;
+    edgeProtocolSection += edgeProtocol.killerDiagnosticDirective(
+      turnNumberForEdge,
+      profile.aoFirstRead,
+    );
+    if (edgeProtocol.shouldAllowPushback(sessionMemory)) {
+      edgeProtocolSection += edgeProtocol.pushbackDirective();
+    }
+    if (edgeProtocol.shouldSurfaceBlindSpot(sessionMemory, sessionMemory.studentTheory, studentMessage)) {
+      edgeProtocolSection += edgeProtocol.blindSpotDirective(sessionMemory.studentTheory!);
+    }
+
+    // ── Phase 4.3: length calibration hint ──
+    // V2 T5 was 490 words (overload). Giving the LLM a numeric target it can
+    // follow keeps response density tuned to turn position + session state.
+    // Pass the pre-estimated intensity so the calibrator's wordBudget aligns
+    // with the maxTokens we send to Anthropic (no more 1500-token ceilings on
+    // a turn we already classified as 'minimal').
+    const lengthBudget = lengthCalibrator.calibrateLengthBudget(
+      {
+        turnNumber: turnNumberForEdge,
+        estimatedIntensity,
+        isInSessionDraftFeedback: isInSessionDraft,
+      },
+      sessionMemory,
+    );
+    const lengthHintSection = lengthCalibrator.budgetHintForPrompt(lengthBudget);
+
     // ── W6.2: Escalation context for confused students ──
     const escalationSection = this.buildEscalationContext(sessionMemory);
 
@@ -2155,15 +2377,22 @@ ${stalenessNote}`;
     // First_encounter mode always allows demonstrations. Other modes allow demos
     // when the student is deflecting (deflectionCounter >= 2) — if the current
     // approach isn't working, demonstrating the next improvement breaks the deadlock.
-    const deflCount = sessionMemory.deflectionCounter ?? 0;
-    const demoTrigger = (coachingMode === 'first_encounter' || deflCount >= 2)
+    const demoDeflCount = sessionMemory.deflectionCounter ?? 0;
+    const demoTrigger = (coachingMode === 'first_encounter' || demoDeflCount >= 2)
       ? this.shouldTriggerDemonstration(
           sessionMemory, profile, quickFocus, studentMessage, conversationHistory,
         )
       : null;
     const sessionTheory = sessionMemory.studentTheory;
+    // Round-3 Coaching Integration: expose theory maturity so the coach
+    // calibrates trust in the personhood read. At 'nascent' (T2), the theory
+    // is a hypothesis — coach should not stake coaching moves on it. At
+    // 'confirmed' (T5+), it can drive framing.
+    const theoryMaturityNote = sessionTheory?.maturity
+      ? ` [maturity=${sessionTheory.maturity}${sessionTheory.maturity === 'nascent' ? ' — hypothesis only, do NOT stake major coaching moves on this' : ''}]`
+      : '';
     const theoryContext = sessionTheory
-      ? `\nSTUDENT THEORY: ${sessionTheory.personhood}\nTENSIONS: ${sessionTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\nYour demonstration should illuminate a tension, not just fix a craft issue.`
+      ? `\nSTUDENT THEORY${theoryMaturityNote}: ${sessionTheory.personhood}\nTENSIONS: ${sessionTheory.tensions.map(t => `${t.studentSays} vs ${t.essayShows}`).join('; ')}\nYour demonstration should illuminate a tension, not just fix a craft issue.`
       : '';
     const priorDemoCount = sessionMemory.demonstrationCount ?? 0;
     // Demo budget is improvement-driven, not count-driven. Always allow demonstrations.
@@ -2189,8 +2418,8 @@ ${stalenessNote}`;
       if (shouldCoachWrite) {
         sessionMemory.demonstrationCount = priorDemoCount + 1;
       }
-      const deflCount = sessionMemory.deflectionCounter ?? 0;
-      if (deflCount >= 2) {
+      const postDemoDeflCount = sessionMemory.deflectionCounter ?? 0;
+      if (postDemoDeflCount >= 2) {
         // Deflection-triggered: keep counter at 1 for quick re-trigger
         sessionMemory.deflectionCounter = 1;
       } else {
@@ -2223,6 +2452,34 @@ ${stalenessNote}`;
     // Use caller-provided context if available, otherwise fall back to built context
     const effectiveLearningStyle = learningStyleContext ?? builtLearningStyleContext;
 
+    // ── Round-3 Coaching Integration: prior-turn session-memory surfacing ──
+    // CACHE-OPTIMIZED SPLIT: directive text (how to handle each payload) is in
+    // the system prompt via round3DirectivesBlock(). Here we emit ONLY the
+    // per-turn variable values — the quoted question, hypothesis, observation
+    // list — keeping the user-prompt delta as small as possible.
+    // Each *Data() call emits '' when its triggering condition is not met;
+    // safe to concat unconditionally.
+    const priorStrategicSection = strategicQuestionFromPriorTurnData(
+      sessionMemory.priorTurnStrategicQuestion,
+    );
+    const mirrorSection = innerVoiceMirrorCandidateData(
+      sessionMemory.priorTurnCognitiveAssessment,
+      turnCount,
+      sessionMemory.mirrorSurfacedAtTurn,
+    );
+    // If the mirror opportunity was surfaced to the coach this turn, record it
+    // so the 3-turn cooldown kicks in. We intentionally record on OPPORTUNITY,
+    // not on confirmed-use, because we can't observe whether the coach actually
+    // mirrored (same logic as edgeProtocol.pushback). Under-firing is preferred
+    // to over-firing for this section — it controls a psychological-register
+    // move that degrades quickly under repetition.
+    if (mirrorSection.length > 0) {
+      sessionMemory.mirrorSurfacedAtTurn = turnCount;
+    }
+    const learningStyleCalibration = learningStyleCalibrationData(
+      memWithStyle.learningStyleObservations?.observations,
+    );
+
     // User message = dynamic per-turn content + findings + teaching content
     // Findings are here (not in system prompt) because they change per turn based on focus paragraphs.
     // This keeps the system prompt stable for Anthropic prompt caching.
@@ -2233,7 +2490,7 @@ STUDENT (current message):
 "${studentMessage}"
 ${editContextSection}
 ${stage1Section}
-${sessionArcSection}${journalSection}${momentumSignal}${checklistSection}${improvementQueueSection}${effectiveLearningStyle ?? ''}${crossModuleContext ? `\n\n=== PORTFOLIO CONTEXT (from other modules — reference ONLY if relevant to the student's question) ===\n${crossModuleContext}` : ''}
+${sessionArcSection}${journalSection}${momentumSignal}${checklistSection}${improvementQueueSection}${edgeProtocolSection}${priorStrategicSection}${mirrorSection}${learningStyleCalibration}${lengthHintSection}${effectiveLearningStyle ?? ''}${crossModuleContext ? `\n\n=== PORTFOLIO CONTEXT (from other modules — reference ONLY if relevant to the student's question) ===\n${crossModuleContext}` : ''}
 ${escalationSection}${resistanceEscalationSection}${demonstrationSection}${isInSessionDraft ? `
 
 === IN-SESSION DRAFT DETECTED ===
@@ -2274,11 +2531,14 @@ Respond to the student's message. Apply all constraints from your role identity.
         : '' // 'full' — existing "shorter is better" guidance in the philosophy block applies
     }`;
 
-    // GAP-1: Dynamic maxTokens based on pre-estimated intensity
-    // full=1500 (trimmed from 2200 — actual Turn 1 uses ~1000), brief=1000, minimal=500
-    // All values include ~150 tokens for sidecar metadata
-    const maxTokensByIntensity = { full: 1500, brief: 1000, minimal: 500 } as const;
-    const dynamicMaxTokens = maxTokensByIntensity[estimatedIntensity];
+    // Cost-cut: bind maxTokens to lengthCalibrator.wordBudget (≈1.6 tokens/word
+    // + 200 cushion for the sidecar). The previous fixed ladder
+    // (full=1500, brief=1000, minimal=500) let Sonnet write 600w when its
+    // word budget was 240w, blowing through both the cap and the cost target.
+    // Using lengthBudget.maxTokens keeps the API ceiling honest:
+    //   full(240w) → 584 tokens   brief(110w) → 376 tokens   minimal(45w) → 350 tokens
+    // Add a ~200-token sidecar cushion above the budget for safety on full/brief.
+    const dynamicMaxTokens = lengthBudget.maxTokens;
 
     // temperature 0.4 (lower reduces constraint violations)
     const response = await callClaude<string>(
@@ -3304,165 +3564,6 @@ Output JSON:
   }
 
   // --------------------------------------------------------------------------
-  // PATTERN DETECTION (LLM-based — Improvement 6)
-  // --------------------------------------------------------------------------
-
-  /**
-   * Detect coaching patterns via Haiku assessment.
-   * Replaces keyword-based pattern matching with semantic understanding.
-   *
-   * Called every 3 turns. Also updates session arc, next focus suggestion,
-   * learning style observations, and quality signals.
-   *
-   * Cost: ~$0.002-0.004 per call (negligible).
-   */
-  private async detectPatternsLLM(
-    conversationHistory: ConversationTurn[],
-    currentMessage: string,
-    profile: EssayProfile,
-    sessionMemory: CoachingSessionMemory,
-  ): Promise<{
-    patterns: PatternInsight[];
-    sessionArcUpdate: string;
-    nextFocusSuggestion: string;
-    learningStyleUpdate: string | null;
-    qualitySignals: CoachingQualitySignals;
-    sessionJournalEntry: string | null;
-    cost: LayerCost;
-  }> {
-    const callStart = Date.now();
-    const now = new Date().toISOString();
-
-    const systemPrompt = `You are analyzing a coaching conversation for patterns. You detect:
-1. BEHAVIORAL PATTERNS: What the student keeps returning to, avoiding, or struggling with
-2. LEARNING STYLE signals: How the student responds to different coaching approaches
-3. SESSION ARC: Where this conversation is in its natural arc (opening/middle/closing)
-4. NEXT FOCUS: What the conversation should prioritize next
-5. QUALITY SIGNALS: Is coaching landing? (vocabulary evolution, question quality, revision sophistication)
-
-Be honest about what you see. "Student is avoiding P3 despite it being the weakest paragraph" is useful. "Student is engaged" is not.
-
-Output JSON:
-{
-  "patterns": [
-    {
-      "pattern": "<what you observe>",
-      "evidence": ["<specific things the student said>"],
-      "implication": "<what this means for coaching strategy>",
-      "instanceCount": <number>
-    }
-  ],
-  "sessionArcUpdate": "<2-3 sentences: where is this conversation and where should it go?>",
-  "nextFocusSuggestion": "<1 sentence: what should the next turn focus on?>",
-  "learningStyleUpdate": "<1 sentence observation about how this student learns, or null if no new signal>",
-  "qualitySignals": {
-    "vocabularyEvolution": "<adopting_architectural_language|stable|not_yet>",
-    "questionQualityTrend": "<improving|stable|declining>",
-    "revisionSophistication": "<architectural|surface|not_yet_discussed>",
-    "studentInitiation": "<high|moderate|low>",
-    "breakthroughMoments": <number>
-  },
-  "sessionJournalEntry": "<1-2 sentences capturing what HAPPENED between coach and student in the last 3 turns. Write as a coaching log, not a summary. Focus on: what the coach showed/asked, how the student responded, what shifted. Example: '[T7-9] Coach compared P3S1 to P5S2 register; student recognized the difference and proposed starting P3 revision from the authentic voice in P5.' Bad example (too generic): 'Student discussed P3 transition and understood the feedback.'>"
-}`;
-
-    const historyText = conversationHistory
-      .map(t => `${t.role.toUpperCase()}: ${t.content}`)
-      .join('\n\n');
-
-    const userPrompt = `FULL CONVERSATION (${conversationHistory.length} turns):
-${historyText}
-
-CURRENT MESSAGE:
-"${currentMessage}"
-
-SESSION EVENTS (${sessionMemory.events.length} total):
-${this.serializeEventsForPrompt(
-  this.retrieveRelevantEvents(sessionMemory.events, [], [])
-)}
-
-ESSAY PHASE: ${profile.index.improvementPhase.level}
-
-Detect patterns. Be specific. Reference actual student quotes.
-Output only JSON.`;
-
-    const response = await callClaude<string>({
-      model: HAIKU,
-      systemPrompt,
-      userPrompt,
-      maxTokens: 600,
-      temperature: 0.3,
-      useJsonMode: false,
-      cacheSystemPrompt: true,
-    });
-
-    const timingMs = Date.now() - callStart;
-    const rawCost = calculateCost(response.usage, HAIKU);
-    console.log(`[EssayIntelligence] L6 pattern detection: ${response.usage.input_tokens.toLocaleString()} input + ${response.usage.output_tokens.toLocaleString()} output = $${rawCost.toFixed(4)}`);
-    const tokenUsage: TokenUsage = {
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
-    };
-    const cost: LayerCost = { layer: 'L6_pattern_detection', cost: rawCost, tokenUsage, timingMs };
-
-    // Parse with defensive fallback
-    const parsed = this.parseStage4Output<{
-      patterns: Array<{ pattern: string; evidence: string[]; implication: string; instanceCount: number }>;
-      sessionArcUpdate: string;
-      nextFocusSuggestion: string;
-      learningStyleUpdate: string | null;
-      qualitySignals: CoachingQualitySignals;
-      sessionJournalEntry: string | null;
-    }>(response.content as string);
-
-    if (!parsed) {
-      return {
-        patterns: [],
-        sessionArcUpdate: sessionMemory.sessionArcSummary || 'Session in progress',
-        nextFocusSuggestion: sessionMemory.nextFocus || 'Continue current topic',
-        learningStyleUpdate: null,
-        qualitySignals: {
-          vocabularyEvolution: 'not_yet',
-          questionQualityTrend: 'stable',
-          revisionSophistication: 'not_yet_discussed',
-          studentInitiation: 'moderate',
-          breakthroughMoments: 0,
-        },
-        sessionJournalEntry: null,
-        cost,
-      };
-    }
-
-    // Convert to PatternInsight[]
-    const patterns: PatternInsight[] = (parsed.patterns ?? []).map(p => ({
-      id: `pattern_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      pattern: p.pattern,
-      evidence: p.evidence ?? [],
-      implication: p.implication ?? '',
-      firstObservedAt: now,
-      lastObservedAt: now,
-      instanceCount: p.instanceCount ?? 1,
-    }));
-
-    return {
-      patterns,
-      sessionArcUpdate: parsed.sessionArcUpdate ?? 'Session in progress',
-      nextFocusSuggestion: parsed.nextFocusSuggestion ?? 'Continue current topic',
-      learningStyleUpdate: parsed.learningStyleUpdate ?? null,
-      qualitySignals: parsed.qualitySignals ?? {
-        vocabularyEvolution: 'not_yet',
-        questionQualityTrend: 'stable',
-        revisionSophistication: 'not_yet_discussed',
-        studentInitiation: 'moderate',
-        breakthroughMoments: 0,
-      },
-      sessionJournalEntry: parsed.sessionJournalEntry ?? null,
-      cost,
-    };
-  }
-
-  // --------------------------------------------------------------------------
   // STAGE 1.5: COGNITIVE ASSESSMENT (Improvement 6 — Haiku LLM-assessed state)
   // --------------------------------------------------------------------------
 
@@ -3732,7 +3833,10 @@ Output ONLY a JSON object matching this exact schema:
 }
 
 STAGED EXPECTATIONS BY TURN:
-- Turn 5: "personhood" and "essayRelationship" are PRIMARY — you have 4 turns of conversation, enough to see personality patterns. protectedValues and tensions may be sparse if insufficient evidence. That's fine.
+- Turn 2 (NASCENT): Only 1 student response of evidence. Hedge aggressively — use "possibly", "seems to be", "early signal suggests". "personhood" should be 1-2 sentences of tentative read. blindSpotHypotheses should have readyToSurface=FALSE until you see repetition. 1-2 pending observations is fine. Do NOT over-commit — a wrong theory at T2 poisons T3-T5.
+- Turn 3 (HYPOTHESIS): 2 student responses. Still provisional — confirm whether T2 hedges are holding up. If a T2 signal repeats, upgrade it from "possibly" to "appears to". If contradicted, name the contradiction.
+- Turn 4 (GROWING): Patterns should be repeating. tensions and protectedValues start to surface. blindSpotHypotheses readyToSurface=TRUE only if confirmed twice.
+- Turn 5 (CONFIRMED): "personhood" and "essayRelationship" are PRIMARY — you have 4 turns of conversation, enough to see personality patterns. protectedValues and tensions may be sparse if insufficient evidence. That's fine.
 - Turn 10+: ALL fields should be populated. You have enough conversation history to hypothesize about blind spots, tensions, and protected values.
 - NEVER return empty strings for any field. If you lack evidence, write: "Insufficient signal — would need to see [specific thing you'd need]"
 - 1 evidence-backed hypothesis is better than 0 populated fields. Take the inference.`;
@@ -3885,14 +3989,14 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
   private initializeSessionMemory(): CoachingSessionMemory {
     return {
       turnCount: 0,
-      topicsDiscussed: [],
-      approachesUsed: [],
-      studentStances: [],
       events: [],
       sessionArcSummary: '',
       nextFocus: '',
       strategicQuestion: '',
       questionStaleness: 0,
+      priorTurnStrategicQuestion: null,
+      priorTurnCognitiveAssessment: null,
+      mirrorSurfacedAtTurn: undefined,
     };
   }
 
@@ -3936,8 +4040,7 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
 
   /**
    * Update session memory after a coaching turn completes.
-   * Creates a SessionEvent for the unified event log, then maintains backward-compat
-   * arrays (approachesUsed, studentStances) during the transition period.
+   * Creates a SessionEvent for the unified event log — the authoritative record.
    */
   private updateSessionMemory(
     sessionMemory: CoachingSessionMemory,
@@ -3947,12 +4050,14 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
   ): CoachingSessionMemory {
     const turnNumber = sessionMemory.turnCount + 1;
 
-    // Extract paragraph refs from Stage 1 focus
+    // Extract paragraph refs from Stage 1 focus. focusProbabilities keys are
+    // 1-indexed P-labels ("P1", "P2", …) — see runStage1InsightExtraction's
+    // quickFocus/routingStage1 construction. Normalize to 0-indexed internal.
     const paragraphRefs: number[] = [];
     for (const [label, prob] of Object.entries(stage1.focusProbabilities)) {
       if (prob > 0.3) {
-        const match = label.match(/P(\d+)/);
-        if (match) paragraphRefs.push(parseInt(match[1], 10) - 1);
+        const n = normalizeParagraphRef(label, 'coach_text');
+        if (Number.isFinite(n)) paragraphRefs.push(n);
       }
     }
 
@@ -3982,19 +4087,6 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
     };
 
     sessionMemory.events.push(event);
-
-    // Backward-compat arrays (deprecated, maintained during transition)
-    sessionMemory.approachesUsed.push({
-      turnNumber,
-      approach: cognitiveAssessment.recommendedApproach,
-      outcome: 'pending',
-    });
-    if (stage1.category === 'resistance' || stage1.category === 'preference') {
-      sessionMemory.studentStances.push({
-        stance: studentMessage.substring(0, 200),
-        turnNumber,
-      });
-    }
 
     sessionMemory.turnCount = turnNumber;
     return sessionMemory;
@@ -4164,7 +4256,31 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
     }
 
     const addressedCount = manifest.items.length - active.length;
-    const current = active[0];
+
+    // ── Phase 2: pedagogical-payload diversity ──
+    // Replace the pre-Phase-2 "current = active[0]" with a planner-driven
+    // selection that rotates across principle categories. The planner
+    // falls back to first-unaddressed when the ledger is empty (turn 1) so
+    // behavior is unchanged for fresh sessions. From turn 2 onward, it
+    // avoids re-deploying a just-taught category, which is the regression
+    // vector the blind-spot hunter flagged (5 turns of show-don't-tell
+    // against a 0.0% wordform-overlap score). Side-effects deferred to
+    // recordCoachingTurnDeployment() after the LLM response returns.
+    const planSelection = coachingPlanner.selectNextDeployment(manifest, memory);
+    const current = planSelection?.item ?? active[0];
+    const taughtLedgerKeys = Object.keys(memory.taughtLedger ?? {});
+    const alreadyTaughtBlock = taughtLedgerKeys.length > 0
+      ? `\n\nALREADY TAUGHT THIS SESSION (do NOT re-teach):\n` +
+        taughtLedgerKeys
+          .map((id) => {
+            const t = memory.taughtLedger![id];
+            const paragraph = manifest.items.find((it) => it.id === id)?.paragraph ?? -1;
+            const paraLabel = paragraph === -1 ? 'ESSAY' : `P${paragraph + 1}`;
+            return `  - T${t.turn} ${paraLabel}: ${t.technique ?? 'guidance'} (${t.principleCategory})`;
+          })
+          .join('\n')
+      : '';
+
     const enrichments = current.conversatorEnrichments.length > 0
       ? `\n  ENRICHED WITH: ${current.conversatorEnrichments.join('; ')}`
       : '';
@@ -4197,8 +4313,13 @@ Synthesize an updated theory. Be specific and evidence-grounded. Output only JSO
     }).join('\n');
 
     const currentParaLabel = current.paragraph === -1 ? 'ESSAY-LEVEL' : `P${current.paragraph + 1}`;
+    // Planner rationale is logged to console telemetry (see recordDeployment
+    // log line) rather than injected into the prompt — the LLM doesn't need
+    // to know WHY this priority was selected, just what to deploy. Keeps the
+    // prompt leaner by ~20 tokens/turn.
     return `\n\n=== IMPROVEMENT QUEUE (${addressedCount}/${manifest.items.length} addressed) ===` +
       `\nWORD BUDGET: ${manifest.wordCount}/${manifest.wordLimit}` +
+      alreadyTaughtBlock +
       `\n\nCURRENT PRIORITY [${current.impact.toUpperCase()}]:` +
       `\n  ${currentParaLabel}: ${current.observation}` +
       `\n  ACTION: ${current.action}` +

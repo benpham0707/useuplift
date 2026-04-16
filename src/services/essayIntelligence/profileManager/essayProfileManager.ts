@@ -83,8 +83,14 @@ import type {
 
 import { FindingStore } from '../findings/findingStore';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
-import type { ImprovementCandidate } from '../profileTypes';
+import type {
+  ImprovementCandidate,
+  ImprovementCandidateStoreSnapshot,
+} from '../profileTypes';
 import { isPipelineError } from '../errors';
+import { writeSnapshot } from '../history/snapshotStore';
+import { computeRevisionIntelligence } from '../history/revisionIntelligence';
+import { computeVoiceEvolution } from '../history/voiceEvolution';
 
 /**
  * Minimal StructuralCartography shape needed by the coordinator for dispatch.
@@ -649,8 +655,15 @@ export function createInitialProfile(input: {
     wordCount: number;
     promptText?: string;
   };
+  /**
+   * Target college identifier for supplement / PIQ essays. Normalized
+   * lowercase (e.g. "stanford"). Leave undefined for common_app essays.
+   * Threaded through to `EssayProfile.collegeId` so research enrichment
+   * can look up college-specific guidance on every coaching turn.
+   */
+  collegeId?: string;
 }): EssayProfile {
-  const { paragraphTexts, sentenceTexts, metadata } = input;
+  const { paragraphTexts, sentenceTexts, metadata, collegeId } = input;
 
   const now = new Date().toISOString();
 
@@ -887,6 +900,10 @@ export function createInitialProfile(input: {
     patternInsights: [],
     studentDeclaredContext: '',
 
+    // College target (supplement/PIQ only; undefined for common_app) — consumed
+    // by researchEnrichment for college-specific coachingNote lookups.
+    collegeId,
+
     // Metadata
     metadata: {
       confidenceLevel: 'initial',
@@ -926,6 +943,21 @@ export class EssayProfileCoordinator {
   // (ImprovementCandidate + ImprovementCandidateStoreSnapshot) so this class
   // slots in without disturbing the existing profileMigration backfill path.
   private candidateStore: ImprovementCandidateStore;
+
+  // ── Revision History (Phase 1 — cross-session snapshot chain) ──
+  // Stable per-coordinator session identifier. The current profile layer
+  // lacks an explicit session-id field, so we synthesize one deterministically
+  // at coordinator construction: createdAt + a construction-time epoch. The
+  // id is stable for the coordinator's lifetime, which matches how the
+  // coordinator maps to a single session in the current layering. Re-hydrated
+  // coordinators (fromCheckpoint) get a fresh id — that's the correct
+  // boundary behavior (a new server-side session).
+  private readonly revisionSessionId: string;
+  // Cached essay text captured at the last writeSnapshot call, kept in
+  // memory so detectResetCondition can compute token-overlap against a
+  // known-prior essay text (we intentionally don't persist full text on
+  // snapshots — only the hash — to keep snapshot size minimal).
+  private priorSnapshotEssayText: string | null = null;
 
   // ── Domain mutators ──
   private sentenceMutator: ISentenceMutator;
@@ -971,6 +1003,16 @@ export class EssayProfileCoordinator {
       defaultThreshold: 3,
       isFirstSession: true,
     };
+
+    // Synthesize a stable session id for revision-history snapshots.
+    // Combines profile createdAt (stable for profile lifetime) with
+    // construction epoch — uniqueness across coordinator instances,
+    // stability across writes within one coordinator.
+    const createdAtStamp =
+      profile.metadata && typeof profile.metadata.createdAt === 'string'
+        ? profile.metadata.createdAt
+        : new Date().toISOString();
+    this.revisionSessionId = `${createdAtStamp}-${Date.now()}`;
 
     // W1.2: Initialize FindingStore from persisted findings (or empty)
     if (profile.findings.length > 0) {
@@ -1037,6 +1079,8 @@ export class EssayProfileCoordinator {
       wordCount: number;
       promptText?: string;
     };
+    /** Target college (supplement/PIQ only). Normalized lowercase. */
+    collegeId?: string;
     checkpointStore: CheckpointStore;
     mutators?: Partial<{
       sentence: ISentenceMutator;
@@ -1054,6 +1098,7 @@ export class EssayProfileCoordinator {
       paragraphTexts: input.paragraphTexts,
       sentenceTexts: input.sentenceTexts,
       metadata: input.metadata,
+      collegeId: input.collegeId,
     });
     return new EssayProfileCoordinator(profile, input.checkpointStore, input.mutators);
   }
@@ -1690,6 +1735,78 @@ export class EssayProfileCoordinator {
     // generates the authoritative essay-level AO impression.
 
     this.afterMutation(allMutations, { paragraphIndex: result.paragraphIndex });
+
+    // Phase 1 revision-history hook. Snapshot failures MUST NOT break the
+    // analysis cycle — wrap in try/catch, log, and return. Idempotent when
+    // writeSnapshot is called multiple times within one session (same
+    // revisionSessionId replaces in place).
+    this.captureRevisionSnapshot();
+  }
+
+  /**
+   * Capture a cross-session revision snapshot of the current profile.
+   *
+   * Called at the end of each L3.5 analysis pass. Uses the stable
+   * `revisionSessionId` for idempotency — multiple writes within one
+   * coordinator lifetime REPLACE a single stored entry rather than
+   * stacking duplicates. The revision-history cap (10) and reset
+   * semantics (substantial_rewrite / topic_change / manual_reset) are
+   * enforced by `writeSnapshot`.
+   *
+   * Failure policy: any extraction / write failure is caught and logged.
+   * The analysis cycle never fails because of a snapshot.
+   */
+  private captureRevisionSnapshot(): void {
+    try {
+      const currentEssayText = (this.profile.paragraphs ?? [])
+        .map((p) => (typeof p.text === 'string' ? p.text : ''))
+        .join('\n\n');
+
+      const result = writeSnapshot({
+        history: this.profile.revisionHistory,
+        profile: this.profile,
+        sessionId: this.revisionSessionId,
+        version: this.writeVersion,
+        priorEssayText: this.priorSnapshotEssayText,
+      });
+
+      this.profile.revisionHistory = result.history;
+      // Cache this snapshot's essay text so the NEXT write can honestly
+      // compute token overlap against the prior snapshot's content.
+      this.priorSnapshotEssayText = currentEssayText;
+
+      if (result.resetSignal.triggered) {
+        console.log(
+          `[EssayProfileCoordinator] revision reset fired: ` +
+            `reason=${result.resetSignal.reason}` +
+            (typeof result.resetSignal.tokenOverlap === 'number'
+              ? ` overlap=${result.resetSignal.tokenOverlap.toFixed(3)}`
+              : ''),
+        );
+      }
+
+      // Phase 2 — Derive cross-session intelligence from the snapshot chain
+      // PLUS the live profile. Both computes tolerate history.length < 2 by
+      // returning null (session one, or post-reset). The intelligence is
+      // attached to the profile so the coaching prompt can read it. Wrap in
+      // try/catch at the outer layer (this try) — compute failures are
+      // non-fatal, identical to snapshot write failures.
+      //
+      // Ordering note: these run AFTER the snapshot write so
+      // `result.history` contains the current-session snapshot at its tail.
+      // computeRevisionIntelligence / computeVoiceEvolution strip the
+      // current-session entry by essayTextHash match before comparing.
+      const snapshotsForCompute = result.history.snapshots;
+      const revIntel = computeRevisionIntelligence(this.profile, snapshotsForCompute);
+      const voiceEvo = computeVoiceEvolution(this.profile, snapshotsForCompute);
+      this.profile.revisionIntelligence = revIntel;
+      this.profile.voiceEvolution = voiceEvo;
+    } catch (err) {
+      console.error(
+        '[EssayProfileCoordinator] revision snapshot write failed (non-fatal):',
+        err instanceof Error ? err.message : err,
+      );
+    }
   }
 
   /**
@@ -2246,6 +2363,23 @@ export class EssayProfileCoordinator {
    */
   getFindingStore(): FindingStore {
     return this.findingStore;
+  }
+
+  /**
+   * Return a fresh serialization of the candidate store. Used by the
+   * orchestrator immediately before `buildImprovementManifest()` so that
+   * L4 priority → candidate technique resolution (via `consolidatedFrom`
+   * IDs) has a guaranteed-non-stale view of the store — without waiting
+   * for the next full checkpoint.
+   *
+   * Root cause of the S3/V14/S6/partial-S5 audit failures: the manifest
+   * builder reads `profile.improvementCandidateSnapshot`, which is only
+   * synced inside `checkpoint()`. When the checkpoint cadence and the
+   * manifest-build timing drift, manifest items end up with
+   * `technique: null` despite every candidate in the store carrying one.
+   */
+  snapshotCandidateStore(): ImprovementCandidateStoreSnapshot {
+    return this.candidateStore.serialize();
   }
 
   // ══════════════════════════════════════════════════════════════════════

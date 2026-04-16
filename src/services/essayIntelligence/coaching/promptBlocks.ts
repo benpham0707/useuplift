@@ -16,7 +16,11 @@
  */
 
 import type { BlockContext } from './types';
-import type { ImprovementPhaseLevel } from '../profileTypes';
+import type {
+  ImprovementPhaseLevel,
+  RevisionIntelligenceSignals,
+  VoiceEvolutionSignals,
+} from '../profileTypes';
 import { getCollegeCoachingOverlay } from './collegeOverlay';
 import { assembleKnowledgeBlock } from './coachingKnowledgeBase';
 
@@ -121,12 +125,10 @@ SHAPE 1 — DEEP DIAGNOSIS (first encounter, student asks for feedback):
      naturally: "That's SUMMARY-TO-SCENE — your P2 narrates from 30,000 feet
      when the reader needs ground-level." or "This is a SENSORY TIMESTAMP move."
      Naming the technique gives the student craft vocabulary they can reuse.
-     WORD ECONOMY: The essay's live word count is in your profile context.
-     When suggesting additions, ALWAYS name the specific cut: "This needs
-     ~80 words. Cut the summary sentence in P3 (47 words of redundant
-     restatement) to make room." The student must know what LEAVES when
-     something ARRIVES. If the essay is over 90% of its limit, lead with
-     the cut before the addition.
+     Respect the WORD ECONOMY rule (additions require a named subtraction)
+     given in FIRST-ENCOUNTER COACHING PRIORITIES — the cut/add pattern and
+     WORD COUNT reference format live there authoritatively. If the essay is
+     over 90% of its limit, lead with the cut before the addition.
   4. THE UNLOCKING QUESTION — forces a specific creative act. "Write the
      first three sentences of P1 using the hackathon. Go."
 
@@ -894,8 +896,8 @@ Assess the REORGANIZATION, not the sentences:
    emerged? Through-lines include: callbacks, echoes, transitional
    phrases, thematic threads, tonal arcs. Name them specifically.
 
-Do NOT assess sentence-level quality during architecture review. The
-student is thinking at paragraph level. Meet them there.` +
+(Stay at paragraph level — the "no sentence-level comments" rule is
+enforced in ARCHITECTURE COACHING PRIORITIES below.)` +
       // Mode × Phase interaction: architecture at foundation may be premature
       (ctx.phase === 'foundation'
         ? `\n\nPHASE WARNING (FOUNDATION): The student is reorganizing structure, but the essay is still at FOUNDATION — the fundamental "who is this person?" question may be unanswered. Structure won't help if the content doesn't yet reveal identity. Assess the reorganization, but also ask: "Does the new sequence help the reader understand who you are? Or is the real issue what the essay SAYS, not how it's ordered?"`
@@ -1012,8 +1014,7 @@ REQUIRED in every revision response:
 - One specific next move with paragraph target and length constraint
 - WORD ECONOMY: if the revision added words, name what can be cut. Reference
   the WORD COUNT from your context — the student needs the number.
-- TECHNIQUE NAMING: When your context includes a "→ TECHNIQUE:" directive,
-  name that technique by its ALL-CAPS name naturally in your response.`;
+  (TECHNIQUE NAMING rule already given in RESPONSE STRUCTURE above — apply it here too.)`;
 
     case 'iteration_deep':
       return `ITERATION COACHING PRIORITIES:
@@ -1151,11 +1152,9 @@ function voiceBlock(ctx: BlockContext): string {
 
     case 'architecture':
       return base + `
-- STRATEGIC. Speak at structural level. Your observations are about
-  paragraph sequence, reader journey, and structural logic — not about
-  individual sentences or word choices.
-- RESTRAINED — resist sentence-level comments. Even when you see
-  sentence-level issues, hold them. The student is thinking about bones.
+- STRATEGIC. Speak at structural level — paragraph sequence, reader
+  journey, structural logic. (The "no sentence-level comments" rule is
+  given in ARCHITECTURE COACHING PRIORITIES.)
 - AFFIRMING OF BOLDNESS — restructuring is the hardest revision. The
   student just rearranged the entire architecture of their essay. That
   takes courage. Meet that courage with structural-level engagement.`;
@@ -1589,29 +1588,17 @@ DEMONSTRATION ANTI-PATTERNS (never write these in sample prose):
 CRITICAL PRINCIPLE: Every detail in a rewrite must carry its weight.
 In 650 words, there's no room for scenery that doesn't serve the story.
 
-READING BETWEEN THE LINES — THE STATED VS REVEALED GAP:
-The most valuable coaching insight often lives in the gap between what the
-student SAYS their essay is about and what their WRITING reveals it's about.
-
-How to detect the gap:
+STATED VS REVEALED — DETECTION SIGNALS (the rule and example live in ASSESSMENT APPROACH above; these are the craft-level signals you read from):
 - Where does the student write with the most energy, specificity, and physical
   detail? That's where their real investment is, regardless of their stated topic.
 - Where does the voice flatten into generic language? That's where they're
   performing rather than revealing. Generic language signals: the student is
   writing what they think the AO wants, not what they actually experienced.
-- When the student says "my essay is about X" but the writing's strongest
-  moments are about Y, the essay is about Y. Name this gently: "You say
-  this essay is about resilience, but your writing comes alive in the
-  paragraph about Mrs. Chen's hands on the keys. What if the essay isn't
-  about resilience? What if it's about inheritance — receiving something
-  from a teacher that you can't name yet?"
-
-Why this matters: The AO reads the WRITING, not the student's intention.
-If the strongest writing reveals something the student hasn't consciously
-articulated, that revelation is more compelling than the stated theme.
-Students who discover their own essay's real subject during coaching
-produce dramatically better revisions than students who optimize their
-stated subject.
+The AO reads the WRITING, not the student's intention. A revelation the
+student hasn't consciously articulated is more compelling than the stated
+theme — and students who discover their essay's real subject during
+coaching produce dramatically better revisions than students who optimize
+their stated subject.
 
 EMOTIONAL ARCHITECTURE — HOW ESSAYS BUILD READER INVESTMENT:
 
@@ -2121,4 +2108,413 @@ export async function buildCoachingPrompt(ctx: BlockContext): Promise<string> {
     pedagogicalCalibrationBlock(ctx),
     sidecarBlock(ctx),
   ].filter(Boolean).join('\n\n');
+}
+
+// ============================================================================
+// ROUND-3 COACHING INTEGRATION — session-memory-aware dynamic sections
+// ============================================================================
+//
+// These live at the bottom of the file because they consume runtime session
+// memory, not the mode/phase blockCtx. They're invoked at the userPrompt
+// assembly site in coachingService.runStage3CoachingResponse where
+// sessionMemory and learningStyleObservations are in scope.
+//
+// Each function returns the empty string when the triggering condition is
+// not met — keeps the caller simple (string concat, no filter needed).
+// ============================================================================
+
+/**
+ * Round-3 Section: STRATEGIC_QUESTION_FROM_PRIOR_TURN
+ *
+ * Surfaces the prior turn's strategicQuestion verbatim in the next coach
+ * prompt so the coach must explicitly satisfy it OR explicitly choose to
+ * abandon it. Eliminates the silent-drop regression where each turn's sidecar
+ * produces a sharp question and the next turn's coach regenerates a dumber
+ * version from journals.
+ *
+ * Invariant: only fires when `sessionMemory.priorTurnStrategicQuestion` is a
+ * non-empty string. Safe to call on the first turn (returns '').
+ */
+export function strategicQuestionFromPriorTurnSection(
+  priorTurnStrategicQuestion: string | null | undefined,
+): string {
+  if (!priorTurnStrategicQuestion || priorTurnStrategicQuestion.trim().length === 0) {
+    return '';
+  }
+  const q = priorTurnStrategicQuestion.trim();
+  return `\n\n=== STRATEGIC QUESTION FROM PRIOR TURN ===
+The ask you handed the student LAST TURN was: \`${q}\`
+- If they addressed it, acknowledge that briefly and move forward to new territory.
+- If they did NOT address it, re-anchor to it before opening new territory — do not silently drop it.
+- If you are deliberately choosing to abandon it, say so in prose with one sentence of reasoning ("I'm setting that aside because…").
+ASK-SECTION RULE: When the student has not yet answered this prior-turn question, favor re-issuing it (or a sharper variant) as the current turn's ASK instead of inventing a new question. New questions when the old one is unresolved fragment the session thread.`;
+}
+
+/**
+ * Round-3 Section: INNER_VOICE_MIRROR_CANDIDATE
+ *
+ * Offers the coach the chance to mirror back a testable hypothesis the
+ * coach's inner voice formed LAST turn. Only fires when:
+ *   - A non-empty priorTurnCognitiveAssessment exists
+ *   - The assessment contains a testable-hypothesis marker
+ *     ("suggests", "either…or", "might be", "I'm betting", "could be")
+ *   - The last mirror was >= 3 turns ago (or never) — rate limit
+ *
+ * The prompt does NOT force the coach to mirror; it surfaces the opportunity
+ * and lets the coach judge relevance. That preserves LLM-first design — we
+ * track, the LLM decides.
+ */
+const MIRROR_MARKERS = [
+  'suggests',
+  'either',
+  'might be',
+  "i'm betting",
+  'could be',
+  'seems like',
+  'looks like',
+];
+
+const MIRROR_COOLDOWN_TURNS = 3;
+
+export function innerVoiceMirrorCandidateSection(
+  priorTurnCognitiveAssessment: string | null | undefined,
+  currentTurnNumber: number,
+  mirrorSurfacedAtTurn: number | null | undefined,
+): string {
+  if (!priorTurnCognitiveAssessment || priorTurnCognitiveAssessment.trim().length === 0) {
+    return '';
+  }
+  const hypo = priorTurnCognitiveAssessment.trim();
+  const lower = hypo.toLowerCase();
+  const hasMarker = MIRROR_MARKERS.some((m) => lower.includes(m));
+  if (!hasMarker) return '';
+
+  // Rate limit: at most 1 mirror per 3 turns.
+  if (
+    typeof mirrorSurfacedAtTurn === 'number' &&
+    currentTurnNumber - mirrorSurfacedAtTurn < MIRROR_COOLDOWN_TURNS
+  ) {
+    return '';
+  }
+
+  return `\n\n=== MIRROR OPPORTUNITY (from prior turn's inner voice) ===
+Last turn you diagnosed the student's pattern as: \`${hypo}\`
+If this hypothesis is RELEVANT to what they just said, reflect it back as a QUESTION rather than a pronouncement — give them the chance to confirm or push back.
+Example framing: "Here's what I'm noticing: you asked about X right after I gave you Y — is that you processing X first, or are you deferring Y? I'm asking because…"
+RULES:
+- Mirror at most once per 3 turns (don't become a therapy session).
+- Do NOT mirror if a LATER turn has already validated or refuted this hypothesis.
+- Do NOT mirror if the student's current message has moved to entirely different territory — forcing the mirror would derail.
+- When you do mirror, own it as YOUR observation, not a verdict.`;
+}
+
+/**
+ * Round-3 Section: LEARNING_STYLE_CALIBRATION
+ *
+ * Converts the last 2-3 learning-style observations into terse one-line
+ * coach directives. Replaces the longer descriptive `learningStyleSection`
+ * with something the coach can actually act on in real time.
+ *
+ * Hard-coded directive table is intentional: these are simple operational
+ * transforms ("student names their own problems → go deeper"), not
+ * pedagogical judgments. Keeps the coach prompt short and specific.
+ */
+interface MinimalLearningObservation {
+  observation: string;
+  confidence: 'tentative' | 'growing' | 'confident';
+  turnObserved: number;
+}
+
+export function learningStyleCalibrationSection(
+  observations: ReadonlyArray<MinimalLearningObservation> | undefined,
+): string {
+  const obs = observations ?? [];
+  const confident = obs.filter((o) => o.confidence !== 'tentative');
+  const useList = confident.length > 0 ? confident.slice(-3) : [];
+
+  if (useList.length === 0) {
+    // Tentative-only or empty — pattern unknown.
+    return `\n\n=== LEARNING STYLE CALIBRATION ===
+Student pattern unknown (no confirmed observations yet). Default to standard coach behavior; watch how they respond to your first prompt to calibrate. Treat their first reply as calibration data, not as a missed opportunity.`;
+  }
+
+  const directives: string[] = [];
+  for (const o of useList) {
+    const t = o.observation.toLowerCase();
+    if (t.includes('self-diagnos')) {
+      directives.push(
+        '- SELF-DIAGNOSES ACCURATELY: This student names their own problems. Validate their diagnosis tersely, then go ONE LEVEL DEEPER than they did. Do not repeat their observation back as coaching.',
+      );
+    } else if (
+      t.includes('volunteer') &&
+      (t.includes('context') || t.includes('detail') || t.includes('relevant'))
+    ) {
+      directives.push(
+        '- VOLUNTEERS CONTEXT WHEN RELEVANT: This student is sequential. Do NOT front-load context demands. Let them surface details when they become relevant. Wait for the pull; do not prompt for backstory you do not yet need.',
+      );
+    } else if (t.includes('revision') && (t.includes('strong') || t.includes('instinct'))) {
+      directives.push(
+        '- STRONG REVISION INSTINCTS: This student revises well. Assume capability. Push at ARCHITECTURE, not basics. Skip foundation-phase coaching ("be specific", "cut filler") unless they ask.',
+      );
+    } else if (t.includes('concrete') || t.includes('example') || t.includes('demonstration')) {
+      directives.push(
+        '- RESPONDS TO CONCRETE EXAMPLES: Demonstrate using THEIR actual text, not generic samples. Skip abstract principles; show-not-tell about show-not-tell.',
+      );
+    } else if (t.includes('question') && t.includes('lead')) {
+      directives.push(
+        '- RESPONDS TO QUESTIONS: Lead with questions, not directives. Socratic calibration beats instruction for this student.',
+      );
+    } else if (t.includes('overwhelm') || t.includes('overload')) {
+      directives.push(
+        '- GETS OVERWHELMED: Narrow to ONE thing per turn, not three. Compress the ask, expand the rationale.',
+      );
+    } else {
+      // Unmatched observation — pass through as a guiding note the coach can interpret.
+      directives.push(`- OBSERVED (${o.confidence}): ${o.observation}`);
+    }
+  }
+
+  return `\n\n=== LEARNING STYLE CALIBRATION ===\n${directives.join('\n')}\nApply these calibrations in how you phrase the ask and the feedback — not as content you mention to the student.`;
+}
+
+// ============================================================================
+// ROUND-3 CACHE-OPTIMIZED SPLIT — directive (system, cached) / data (user, uncached)
+// ============================================================================
+//
+// The combined functions above bake DIRECTIVE TEXT and VARIABLE DATA into one
+// string, which forced the whole block into the per-turn user prompt and broke
+// prompt caching. The split below gives the coaching service two halves:
+//   - *Directive()  — stable across turns; safe to put in the cached system prompt
+//   - *Data()       — pure variable payload; sits in the uncached user prompt
+//
+// The directive blocks reference the data block by section name so the LLM
+// knows where to look for the value when it appears in the user prompt.
+// ============================================================================
+
+/**
+ * Stable directive describing how to handle STRATEGIC_QUESTION_FROM_PRIOR_TURN
+ * payloads when they appear in the user prompt. Goes in the system prompt.
+ */
+export function strategicQuestionFromPriorTurnDirective(): string {
+  return `\n\n=== HANDLING STRATEGIC_QUESTION_FROM_PRIOR_TURN ===
+When the user prompt contains a \`STRATEGIC_QUESTION_FROM_PRIOR_TURN: "..."\` line, that quoted question is the ask you handed the student LAST TURN.
+- If they addressed it, acknowledge that briefly and move forward to new territory.
+- If they did NOT address it, re-anchor to it before opening new territory — do not silently drop it.
+- If you are deliberately choosing to abandon it, say so in prose with one sentence of reasoning ("I'm setting that aside because…").
+ASK-SECTION RULE: When the student has not yet answered this prior-turn question, favor re-issuing it (or a sharper variant) as the current turn's ASK instead of inventing a new question. New questions when the old one is unresolved fragment the session thread.`;
+}
+
+/** Per-turn payload for STRATEGIC_QUESTION_FROM_PRIOR_TURN. Goes in user prompt. */
+export function strategicQuestionFromPriorTurnData(
+  priorTurnStrategicQuestion: string | null | undefined,
+): string {
+  if (!priorTurnStrategicQuestion || priorTurnStrategicQuestion.trim().length === 0) {
+    return '';
+  }
+  return `\nSTRATEGIC_QUESTION_FROM_PRIOR_TURN: "${priorTurnStrategicQuestion.trim()}"`;
+}
+
+/**
+ * Stable directive describing how to handle MIRROR_OPPORTUNITY payloads when
+ * they appear in the user prompt. Goes in the system prompt.
+ */
+export function innerVoiceMirrorCandidateDirective(): string {
+  return `\n\n=== HANDLING MIRROR_OPPORTUNITY (inner voice mirror) ===
+When the user prompt contains a \`MIRROR_OPPORTUNITY: "..."\` line, that quoted text is a hypothesis you formed last turn about the student's pattern.
+If this hypothesis is RELEVANT to what they just said, reflect it back as a QUESTION rather than a pronouncement — give them the chance to confirm or push back.
+Example framing: "Here's what I'm noticing: you asked about X right after I gave you Y — is that you processing X first, or are you deferring Y? I'm asking because…"
+RULES:
+- Mirror at most once per 3 turns (don't become a therapy session).
+- Do NOT mirror if a LATER turn has already validated or refuted this hypothesis.
+- Do NOT mirror if the student's current message has moved to entirely different territory — forcing the mirror would derail.
+- When you do mirror, own it as YOUR observation, not a verdict.
+- The MIRROR_OPPORTUNITY line is only emitted when conditions are met (rate-limit, marker present); its absence means do not mirror this turn.`;
+}
+
+/** Per-turn payload for MIRROR_OPPORTUNITY. Goes in user prompt. */
+export function innerVoiceMirrorCandidateData(
+  priorTurnCognitiveAssessment: string | null | undefined,
+  currentTurnNumber: number,
+  mirrorSurfacedAtTurn: number | null | undefined,
+): string {
+  if (!priorTurnCognitiveAssessment || priorTurnCognitiveAssessment.trim().length === 0) {
+    return '';
+  }
+  const hypo = priorTurnCognitiveAssessment.trim();
+  const lower = hypo.toLowerCase();
+  const hasMarker = MIRROR_MARKERS.some((m) => lower.includes(m));
+  if (!hasMarker) return '';
+  if (
+    typeof mirrorSurfacedAtTurn === 'number' &&
+    currentTurnNumber - mirrorSurfacedAtTurn < MIRROR_COOLDOWN_TURNS
+  ) {
+    return '';
+  }
+  return `\nMIRROR_OPPORTUNITY: "${hypo}"`;
+}
+
+/**
+ * Stable directive describing how to apply LEARNING_STYLE_CALIBRATION values
+ * when they appear in the user prompt. Goes in the system prompt.
+ */
+export function learningStyleCalibrationDirective(): string {
+  return `\n\n=== HANDLING LEARNING_STYLE_CALIBRATION ===
+When the user prompt contains a \`LEARNING_STYLE_CALIBRATION:\` block, each line is one observed pattern. Common shorthand directives you may see:
+- SELF-DIAGNOSES ACCURATELY → validate tersely, go ONE LEVEL DEEPER than they did, do not parrot their observation back.
+- VOLUNTEERS CONTEXT WHEN RELEVANT → student is sequential; do NOT front-load context demands; wait for the pull.
+- STRONG REVISION INSTINCTS → assume capability; push at ARCHITECTURE not basics; skip foundation-phase coaching unless asked.
+- RESPONDS TO CONCRETE EXAMPLES → demonstrate using THEIR actual text, not generic samples; show-not-tell about show-not-tell.
+- RESPONDS TO QUESTIONS → lead with questions, not directives; Socratic calibration beats instruction.
+- GETS OVERWHELMED → narrow to ONE thing per turn, not three; compress the ask, expand the rationale.
+- Pattern unknown → default to standard coach behavior; treat their first reply as calibration data, not a missed opportunity.
+- OBSERVED (...) → an unmatched observation; interpret in context.
+Apply these calibrations in HOW you phrase the ask and the feedback — not as content you mention to the student.`;
+}
+
+/** Per-turn payload for LEARNING_STYLE_CALIBRATION. Goes in user prompt. */
+export function learningStyleCalibrationData(
+  observations: ReadonlyArray<MinimalLearningObservation> | undefined,
+): string {
+  const obs = observations ?? [];
+  const confident = obs.filter((o) => o.confidence !== 'tentative');
+  const useList = confident.length > 0 ? confident.slice(-3) : [];
+
+  if (useList.length === 0) {
+    return `\nLEARNING_STYLE_CALIBRATION: pattern unknown (no confirmed observations yet)`;
+  }
+
+  const directives: string[] = [];
+  for (const o of useList) {
+    const t = o.observation.toLowerCase();
+    if (t.includes('self-diagnos')) {
+      directives.push('- SELF-DIAGNOSES ACCURATELY');
+    } else if (
+      t.includes('volunteer') &&
+      (t.includes('context') || t.includes('detail') || t.includes('relevant'))
+    ) {
+      directives.push('- VOLUNTEERS CONTEXT WHEN RELEVANT');
+    } else if (t.includes('revision') && (t.includes('strong') || t.includes('instinct'))) {
+      directives.push('- STRONG REVISION INSTINCTS');
+    } else if (t.includes('concrete') || t.includes('example') || t.includes('demonstration')) {
+      directives.push('- RESPONDS TO CONCRETE EXAMPLES');
+    } else if (t.includes('question') && t.includes('lead')) {
+      directives.push('- RESPONDS TO QUESTIONS');
+    } else if (t.includes('overwhelm') || t.includes('overload')) {
+      directives.push('- GETS OVERWHELMED');
+    } else {
+      directives.push(`- OBSERVED (${o.confidence}): ${o.observation}`);
+    }
+  }
+
+  return `\nLEARNING_STYLE_CALIBRATION:\n${directives.join('\n')}`;
+}
+
+/**
+ * Aggregate of all Round-3 directive blocks. Stable across turns within a
+ * session — safe to embed in the cached system prompt. The coaching service
+ * concatenates this once per system-prompt build.
+ */
+export function round3DirectivesBlock(): string {
+  return (
+    strategicQuestionFromPriorTurnDirective() +
+    innerVoiceMirrorCandidateDirective() +
+    learningStyleCalibrationDirective()
+  );
+}
+
+// ============================================================================
+// ROUND 7 — HISTORICAL INTELLIGENCE SECTION
+// ============================================================================
+//
+// Phase 2 derived signals (revisionIntelligence + voiceEvolution) surfaced
+// as an optional, additive section in the cached system prompt. The section
+// sits BETWEEN the forbidden-patterns block and the profile-context block so
+// the coach sees cross-session trends before diving into this-session state.
+//
+// Session-one guarantees: when both inputs are null OR both summaryForCoach
+// fields are empty, this returns '' — zero prompt bloat on the first
+// session. The coachingService concatenation treats '' as "skip."
+//
+// Style: every pre-composed framing surfaced here contains '?' so the coach
+// relays them as questions, not verdicts. Upstream compute enforces this.
+// ============================================================================
+
+/**
+ * Build the historical-intelligence prompt section.
+ *
+ * @param revisionIntel Output of `computeRevisionIntelligence` on the profile.
+ *                      Null when history < 2 snapshots or compute skipped.
+ * @param voiceEvo      Output of `computeVoiceEvolution` on the profile.
+ *                      Null when history < 2 snapshots or compute skipped.
+ * @returns             A non-empty formatted block when there is signal to
+ *                      surface. Empty string otherwise (zero bloat).
+ */
+export function historicalIntelligenceSection(
+  revisionIntel: RevisionIntelligenceSignals | null | undefined,
+  voiceEvo: VoiceEvolutionSignals | null | undefined,
+): string {
+  // Normalize — both-null AND both-empty-summary collapse to empty section.
+  const revSummary = (revisionIntel?.summaryForCoach ?? '').trim();
+  const voiceSummary = (voiceEvo?.summaryForCoach ?? '').trim();
+  const hasRevSummary = revSummary.length > 0;
+  const hasVoiceSummary = voiceSummary.length > 0;
+  const hasPatterns = (revisionIntel?.patternLevelIssues?.length ?? 0) > 0;
+  const hasRegressions = (revisionIntel?.regressionEvents?.length ?? 0) > 0;
+  const hasOverRevision = voiceEvo?.overRevisionWarning?.triggered === true;
+
+  if (
+    !hasRevSummary &&
+    !hasVoiceSummary &&
+    !hasPatterns &&
+    !hasRegressions &&
+    !hasOverRevision
+  ) {
+    return '';
+  }
+
+  const lines: string[] = [];
+  lines.push('\n\n=== ACCUMULATED SIGNAL FROM REVISION HISTORY ===');
+
+  if (hasRevSummary || hasPatterns || hasRegressions) {
+    lines.push('');
+    lines.push('Revision intelligence:');
+    if (hasRevSummary) lines.push(revSummary);
+
+    if (hasPatterns) {
+      lines.push('');
+      lines.push('Pattern-level issues worth surfacing:');
+      for (const issue of revisionIntel!.patternLevelIssues) {
+        lines.push(`- ${issue.humanFraming}`);
+      }
+    }
+
+    if (hasRegressions) {
+      lines.push('');
+      lines.push('Regressions to flag:');
+      for (const r of revisionIntel!.regressionEvents) {
+        lines.push(
+          `- ${r.craftCategory} returned at P${r.paragraph} after being addressed in session ${r.previouslyAddressedAtSession}`,
+        );
+      }
+    }
+  }
+
+  if (hasVoiceSummary || hasOverRevision) {
+    lines.push('');
+    lines.push('Voice evolution:');
+    if (hasVoiceSummary) lines.push(voiceSummary);
+
+    if (hasOverRevision && voiceEvo!.overRevisionWarning.framingForCoach) {
+      lines.push('');
+      lines.push('OVER-REVISION WARNING:');
+      lines.push(voiceEvo!.overRevisionWarning.framingForCoach);
+    }
+  }
+
+  lines.push('');
+  lines.push(
+    'Use these signals when genuinely relevant to the current turn. When they are, reference them as questions rather than verdicts. When they are not relevant to what the student is asking about or what the essay currently needs, do not force them in.',
+  );
+
+  return lines.join('\n');
 }
