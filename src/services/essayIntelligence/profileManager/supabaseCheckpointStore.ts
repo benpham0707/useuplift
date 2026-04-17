@@ -45,48 +45,67 @@ export class SupabaseCheckpointStore implements CheckpointStore {
   }
 
   async save(profile: EssayProfile, metadata: CheckpointMetadata): Promise<void> {
-    try {
-      const supabase = await getSupabaseAdmin();
+    // Round 7 P0 (D4-H1): validate essayId up-front — the Supabase column is
+    // `essay_id UUID NOT NULL REFERENCES essays(id)`, so an empty string or
+    // malformed UUID causes an insert error that the old catch-and-log
+    // wrapper hid. Fail-fast so the coordinator can surface telemetry.
+    if (!metadata.essayId || metadata.essayId.trim() === '') {
+      throw new Error(
+        `[SupabaseCheckpointStore] Cannot save checkpoint: essayId is empty. ` +
+        `This indicates a regression of D4-H1 — every caller of ` +
+        `EssayProfileCoordinator.createNew / fromCheckpoint MUST provide a ` +
+        `valid UUID.`,
+      );
+    }
 
-      // Compute text hash from paragraph texts
-      const baselineText = profile.paragraphs.map(p => p.text).join('\n\n');
-      const textHash = hashEssayText(baselineText);
+    const supabase = await getSupabaseAdmin();
 
-      // Scope 3 Phase 7: strip transient Scope 3 fields before persisting.
-      // `improvementManifest._enriched` is the session-local idempotency
-      // flag for research enrichment — persisting it would permanently
-      // short-circuit enrichment when the student switches collegeId
-      // mid-thread or the research DB is updated. The JSON-replacer
-      // pattern scales if more keys need to be stripped later.
-      const sanitizedProfile = JSON.parse(
-        JSON.stringify(profile, (key, value) => {
-          if (key === '_enriched') return undefined;
-          return value;
-        }),
+    // Compute text hash from paragraph texts
+    const baselineText = profile.paragraphs.map(p => p.text).join('\n\n');
+    const textHash = hashEssayText(baselineText);
+
+    // Scope 3 Phase 7: strip transient Scope 3 fields before persisting.
+    // `improvementManifest._enriched` is the session-local idempotency
+    // flag for research enrichment — persisting it would permanently
+    // short-circuit enrichment when the student switches collegeId
+    // mid-thread or the research DB is updated. The JSON-replacer
+    // pattern scales if more keys need to be stripped later.
+    const sanitizedProfile = JSON.parse(
+      JSON.stringify(profile, (key, value) => {
+        if (key === '_enriched') return undefined;
+        return value;
+      }),
+    );
+
+    // Round 7 P0 (D4-L3): essay_type threaded from metadata — previously
+    // hardcoded to 'common_app', which flipped PIQ / supplement rows to
+    // common_app on every save (even when the upsert succeeded).
+    const { error } = await supabase
+      .from('essay_understanding')
+      .upsert(
+        {
+          essay_id: metadata.essayId,
+          user_id: this.userId,
+          essay_type: metadata.essayType,
+          text_hash: textHash,
+          profile_cache: sanitizedProfile as Record<string, unknown>,
+          total_cost_usd: metadata.costSoFar,
+          version: metadata.writeVersion,
+          last_analysis_at: new Date().toISOString(),
+        },
+        { onConflict: 'essay_id,user_id' },
       );
 
-      const { error } = await supabase
-        .from('essay_understanding')
-        .upsert(
-          {
-            essay_id: metadata.essayId,
-            user_id: this.userId,
-            essay_type: 'common_app', // Default; overwritten if row exists
-            text_hash: textHash,
-            profile_cache: sanitizedProfile as Record<string, unknown>,
-            total_cost_usd: metadata.costSoFar,
-            version: metadata.writeVersion,
-            last_analysis_at: new Date().toISOString(),
-          },
-          { onConflict: 'essay_id,user_id' },
-        );
-
-      if (error) {
-        console.error('[SupabaseCheckpointStore] Save failed:', error.message);
-      }
-    } catch (err) {
-      // Fire-and-forget: log but don't throw (don't break the pipeline)
-      console.error('[SupabaseCheckpointStore] Save error:', err);
+    if (error) {
+      // Round 7 P0 (Plan §2.5): THROW on persistence failure instead of
+      // silently logging. The coordinator's `checkpoint()` catches + logs
+      // + rethrows so telemetry surfaces it. Previously, FK / constraint
+      // violations (notably D4-H1 empty-string essayId) were swallowed
+      // here and no Round-7 signal ever reached the DB.
+      const msg = `[SupabaseCheckpointStore] Upsert failed: ${error.message} ` +
+        `(essayId=${metadata.essayId}, userId=${this.userId}, reason=${metadata.reason})`;
+      console.error(msg);
+      throw new Error(msg);
     }
   }
 

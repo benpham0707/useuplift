@@ -238,7 +238,15 @@ async function main(): Promise<void> {
 
   console.log('\nPHASE 3: Coaching turn 1...');
   const checkpointStore = new InMemoryCheckpointStore();
-  const orchestrator = new ReanalysisOrchestrator(profile, essayText, checkpointStore);
+  // Round 7 P0 (D4-H1): ReanalysisOrchestrator signature is
+  // (profile, checkpointStore, essayId). Previous call passed essayText as
+  // the second arg — pre-existing bug, now fixed to satisfy the stricter
+  // signature.
+  const orchestrator = new ReanalysisOrchestrator(
+    profile,
+    checkpointStore,
+    '00000000-0000-4000-8000-0000000fa571',
+  );
   const conversationHistory: ConversationTurn[] = [];
   let sessionMemory: CoachingSessionMemory | undefined;
   let learningStyle: LearningStyleObservations | undefined;

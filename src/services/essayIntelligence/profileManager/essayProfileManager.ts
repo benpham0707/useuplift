@@ -969,8 +969,26 @@ export class EssayProfileCoordinator {
   private northStarMutator: INorthStarMutator;
   private insightMutator: IInsightMutator;
 
+  /**
+   * Round 7 P0 (D4-H1): Stable essay UUID used on every checkpoint write.
+   * Previously the coordinator produced `CheckpointMetadata.essayId = ''`
+   * with a comment "Will be set by the orchestrator" — but no orchestrator
+   * ever set it, and `SupabaseCheckpointStore.save()` swallowed the FK
+   * violation, so no Round-7 signal ever persisted. Now required at
+   * construction; assertion below guards against empty-string regressions.
+   */
+  private readonly essayId: string;
+
+  /**
+   * Round 7 P0 (D4-L3): Essay type threaded through to the checkpoint
+   * store so supplement/PIQ rows stop flipping to 'common_app' on save.
+   */
+  private readonly essayType: EssayType;
+
   private constructor(
     profile: EssayProfile,
+    essayId: string,
+    essayType: EssayType,
     checkpointStore: CheckpointStore,
     mutators?: Partial<{
       sentence: ISentenceMutator;
@@ -983,6 +1001,16 @@ export class EssayProfileCoordinator {
       insight: IInsightMutator;
     }>,
   ) {
+    if (!essayId || essayId.trim() === '') {
+      throw new Error(
+        'EssayProfileCoordinator requires a non-empty essayId. Got: ' +
+        JSON.stringify(essayId) +
+        '. This previously defaulted to the empty string and caused every ' +
+        'checkpoint write to silently fail (Round 7 P0, D4-H1).',
+      );
+    }
+    this.essayId = essayId;
+    this.essayType = essayType;
     this.profile = profile;
     this.writeVersion = 0;
     this.stalenessTracker = new StalenessTrackerImpl();
@@ -1071,6 +1099,13 @@ export class EssayProfileCoordinator {
    * Wraps createInitialProfile() to produce a properly shaped empty EssayProfile.
    */
   static createNew(input: {
+    /**
+     * Round 7 P0 (D4-H1): Stable UUID for the essay this coordinator
+     * manages. Threaded through to every `CheckpointMetadata.essayId`
+     * so Supabase upserts target the right row. Required — previously
+     * defaulted silently to '' and caused all persistence to no-op.
+     */
+    essayId: string;
     essayText: string;
     paragraphTexts: string[];
     sentenceTexts: string[][];
@@ -1100,7 +1135,13 @@ export class EssayProfileCoordinator {
       metadata: input.metadata,
       collegeId: input.collegeId,
     });
-    return new EssayProfileCoordinator(profile, input.checkpointStore, input.mutators);
+    return new EssayProfileCoordinator(
+      profile,
+      input.essayId,
+      input.metadata.essayType,
+      input.checkpointStore,
+      input.mutators,
+    );
   }
 
   /**
@@ -1124,6 +1165,7 @@ export class EssayProfileCoordinator {
    */
   static fromCheckpoint(
     profile: EssayProfile,
+    essayId: string,
     checkpointStore: CheckpointStore,
     mutators?: Partial<{
       sentence: ISentenceMutator;
@@ -1186,7 +1228,17 @@ export class EssayProfileCoordinator {
       }
     }
 
-    return new EssayProfileCoordinator(profile, checkpointStore, mutators);
+    // Round 7 P0 (D4-L3): Recover essayType from the persisted North Star
+    // scale — it's the single source of truth persisted on the profile.
+    // Mirrors the mapping in ReanalysisOrchestrator.triggerReanalysis().
+    const essayType: EssayType =
+      profile.northStar?.activeScale === 'piq'
+        ? 'piq'
+        : profile.northStar?.activeScale === 'supplement'
+          ? 'supplement'
+          : 'common_app';
+
+    return new EssayProfileCoordinator(profile, essayId, essayType, checkpointStore, mutators);
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2570,7 +2622,14 @@ export class EssayProfileCoordinator {
     const validationResult = reason === 'circuit_breaker' ? this.validateQuick() : this.validateFull();
 
     const metadata: CheckpointMetadata = {
-      essayId: '', // Will be set by the orchestrator
+      // Round 7 P0 (D4-H1): essayId threaded from construction — no longer
+      // empty-string placeholder. Required for the Supabase upsert's UUID
+      // NOT NULL `essay_id` column and for the (essay_id, user_id) unique
+      // index used on conflict.
+      essayId: this.essayId,
+      // Round 7 P0 (D4-L3): essayType threaded from construction so
+      // supplement / PIQ rows stop being flipped to 'common_app' on save.
+      essayType: this.essayType,
       reason,
       completedLayer: reason.replace('after_', ''),
       writeVersion: this.writeVersion,
@@ -2579,7 +2638,19 @@ export class EssayProfileCoordinator {
       costSoFar: this.profile.metadata.totalAnalysisCost,
     };
 
-    await this.checkpointStore.save(this.profile, metadata);
+    // Round 7 P0: `save()` now throws on Supabase error (see
+    // supabaseCheckpointStore.save — silent-catch removed). Surface the
+    // failure so orchestrators can log / retry / alert telemetry; the P1
+    // coach-reliability PR will wrap this in a richer error envelope.
+    try {
+      await this.checkpointStore.save(this.profile, metadata);
+    } catch (err) {
+      console.error(
+        `[EssayProfileCoordinator] Checkpoint persistence FAILED (essayId=${this.essayId}, reason=${reason}):`,
+        err instanceof Error ? err.message : err,
+      );
+      throw err;
+    }
   }
 
   /**

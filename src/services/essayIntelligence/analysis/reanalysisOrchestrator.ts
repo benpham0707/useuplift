@@ -206,11 +206,22 @@ export class ReanalysisOrchestrator {
 
   // ── Construction ──────────────────────────────────────────────────────────
 
-  constructor(profile: EssayProfile, checkpointStore: CheckpointStore, essayId?: string) {
+  constructor(profile: EssayProfile, checkpointStore: CheckpointStore, essayId: string) {
+    // Round 7 P0 (D4-H1): essayId is now REQUIRED. The previous synthetic
+    // `essay_${Date.now()}` fallback produced non-UUID strings that could
+    // never satisfy the `essay_understanding.essay_id UUID` FK — another
+    // path by which persistence silently no-op'd. Production caller
+    // (`src/http/essayCoachingRoutes.ts`) already provides it.
+    if (!essayId || essayId.trim() === '') {
+      throw new Error(
+        'ReanalysisOrchestrator requires a stable essayId; got undefined/empty. ' +
+        'Upstream must pass the essay UUID at construction time (Round 7 P0, D4-H1).',
+      );
+    }
     this.checkpointStore = checkpointStore;
-    this.coordinator = EssayProfileCoordinator.fromCheckpoint(profile, checkpointStore);
+    this.essayId = essayId;
+    this.coordinator = EssayProfileCoordinator.fromCheckpoint(profile, essayId, checkpointStore);
     this.router = new ProfileRouter();
-    this.essayId = essayId ?? `essay_${Date.now()}`;
 
     // FIX 1.2: createVersionTracker takes baselineText string, not (essayLength, profile)
     const baselineText = profile.paragraphs.map(p => p.text).join('\n\n');
@@ -670,6 +681,7 @@ export class ReanalysisOrchestrator {
       const freshProfile = pipelineResult.profile as EssayProfile;
       this.coordinator = EssayProfileCoordinator.fromCheckpoint(
         freshProfile,
+        this.essayId,
         this.checkpointStore,
       );
       console.log('[ReanalysisOrchestrator] Coordinator updated with fresh post-reanalysis profile (checkpoint store preserved)');
@@ -1193,12 +1205,13 @@ export class ReanalysisOrchestrator {
  *
  * @param profile         The current EssayProfile snapshot
  * @param checkpointStore Store for saving profile checkpoints
- * @param essayId         Optional essay ID — used in re-analysis pipeline inputs
+ * @param essayId         REQUIRED essay UUID — threaded into checkpoint
+ *                        metadata (Round 7 P0, D4-H1)
  */
 export function createReanalysisOrchestrator(
   profile: EssayProfile,
   checkpointStore: CheckpointStore,
-  essayId?: string,
+  essayId: string,
 ): ReanalysisOrchestrator {
   return new ReanalysisOrchestrator(profile, checkpointStore, essayId);
 }

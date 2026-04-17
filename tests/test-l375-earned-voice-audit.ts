@@ -360,6 +360,9 @@ async function main(): Promise<void> {
   // Create coordinator
   const checkpointStore = new InMemoryCheckpointStore();
   const coordinator = EssayProfileCoordinator.createNew({
+    // Round 7 P0 (D4-H1): essayId now required. Any valid UUID works for
+    // this in-memory audit — the InMemoryCheckpointStore doesn't validate.
+    essayId: '00000000-0000-4000-8000-000000000375',
     essayText,
     paragraphTexts,
     sentenceTexts,
