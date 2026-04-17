@@ -11,7 +11,10 @@
     "preview": "vite preview",
     "server": "PORT=8789 tsx src/http/server.ts",
     "dev:full": "run-p server dev",
-    "setup:local": "bash scripts/setup-local-dev.sh"
+    "setup:local": "bash scripts/setup-local-dev.sh",
+    "test": "tsx tests/unit/run-all.ts",
+    "test:integration": "tsx tests/integration/run-all.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",
