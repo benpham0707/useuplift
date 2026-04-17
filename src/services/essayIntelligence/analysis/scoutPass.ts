@@ -19,7 +19,7 @@
  * Consumed by: L3 understanding walk (as investigation leads)
  */
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import type {
   ConnectionScoutOutput,
@@ -368,7 +368,7 @@ export class ScoutPassService {
 
     const userPrompt = buildUserPrompt(essayText, impressions);
 
-    const response: ClaudeResponse<Record<string, unknown>> = await callClaude<Record<string, unknown>>(
+    const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
       {
         model: HAIKU_MODEL,
         systemPrompt: SYSTEM_PROMPT,

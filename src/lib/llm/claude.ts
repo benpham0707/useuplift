@@ -627,11 +627,16 @@ export async function callClaude<T = any>(
  *
  * Uses exponential backoff with jitter to prevent thundering herd.
  * Accepts the same input types as callClaude (string, ClaudeMessageInput, ClaudeSimpleInput).
+ *
+ * @param maxRetries  Total attempts (initial + retries). Default: 3 — i.e.,
+ *                    one initial call plus up to two retry attempts before
+ *                    throwing the last error. Non-retryable errors (e.g. 4xx
+ *                    other than 429) throw immediately.
  */
 export async function callClaudeWithRetry<T = any>(
   promptOrInput: string | ClaudeMessageInput | ClaudeSimpleInput,
   options: ClaudeCallOptions = {},
-  maxRetries = 0
+  maxRetries = 3
 ): Promise<ClaudeResponse<T>> {
   let lastError: Error | null = null;
 

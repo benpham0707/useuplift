@@ -18,7 +18,7 @@
  * Types: src/services/essayIntelligence/profileTypes.ts (HolisticSynthesisOutput)
  */
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import type {
@@ -1877,7 +1877,7 @@ export class HolisticSynthesisService {
 
     // Run Phase A and Phase B in parallel
     const [responseA, responseB] = await Promise.all([
-      callClaude<unknown>(
+      callClaudeWithRetry<unknown>(
         {
           model: SONNET,
           systemPrompt: SYSTEM_PROMPT_PHASE_A,
@@ -1897,7 +1897,7 @@ export class HolisticSynthesisService {
         );
         return r;
       }),
-      callClaude<unknown>(
+      callClaudeWithRetry<unknown>(
         {
           model: SONNET,
           systemPrompt: SYSTEM_PROMPT_PHASE_B,
@@ -2073,7 +2073,7 @@ export class HolisticSynthesisService {
 
     // ── Step 1: Phase A + Phase B (parallel) — 10 holistic sections ──
     const [responseA, responseB] = await Promise.all([
-      callClaude<unknown>({
+      callClaudeWithRetry<unknown>({
         model: SONNET,
         systemPrompt: SYSTEM_PROMPT_PHASE_A,
         userPrompt,
@@ -2083,7 +2083,7 @@ export class HolisticSynthesisService {
         useJsonMode: true,
         cacheSystemPrompt: true,
       }),
-      callClaude<unknown>({
+      callClaudeWithRetry<unknown>({
         model: SONNET,
         systemPrompt: SYSTEM_PROMPT_PHASE_B,
         userPrompt,
@@ -2111,7 +2111,7 @@ export class HolisticSynthesisService {
       understandingContext,
     );
 
-    const metaResponse = await callClaude<unknown>({
+    const metaResponse = await callClaudeWithRetry<unknown>({
       model: SONNET,
       systemPrompt: SYSTEM_PROMPT_META,
       userPrompt: metaUserPrompt,
@@ -2138,7 +2138,7 @@ export class HolisticSynthesisService {
       metaOutput.readingStrategy,
     );
 
-    const curationResponse = await callClaude<unknown>({
+    const curationResponse = await callClaudeWithRetry<unknown>({
       model: SONNET,
       systemPrompt: SYSTEM_PROMPT_CURATION,
       userPrompt: curationUserPrompt,
@@ -2533,7 +2533,7 @@ export class HolisticSynthesisService {
 
     let response: ClaudeResponse<unknown>;
     try {
-      response = await callClaude<unknown>({
+      response = await callClaudeWithRetry<unknown>({
         model: SONNET,
         systemPrompt,
         userPrompt,
@@ -2867,7 +2867,7 @@ ${findingsContext}${previousContext}
 
 Produce the understanding synthesis as JSON.`;
 
-  const response: ClaudeResponse = await callClaude({
+  const response: ClaudeResponse = await callClaudeWithRetry({
     model: SONNET,
     system: systemPrompt,
     messages: [{ role: 'user', content: userPrompt }],

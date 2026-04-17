@@ -31,7 +31,7 @@ import type {
 import type { ProfileRouter, AssembledProfileContext } from '../profileManager/profileRouter';
 import type { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { jsonrepair } from 'jsonrepair';
 
@@ -857,7 +857,7 @@ export class FocusedAnalyzer {
 
       console.log(`[FocusedAnalyzer] Step 1: Calling Sonnet for understanding delta (~${Math.round(understandingPrompt.length / 4)} estimated input tokens)`);
 
-      const step1Response: ClaudeResponse<string> = await callClaude<string>(
+      const step1Response: ClaudeResponse<string> = await callClaudeWithRetry<string>(
         {
           model: SONNET,
           systemPrompt: FOCUSED_UNDERSTANDING_SYSTEM_PROMPT,
@@ -1050,7 +1050,7 @@ export class FocusedAnalyzer {
 
         console.log(`[FocusedAnalyzer] Step 2: Calling Sonnet for analysis delta (~${Math.round(analysisPrompt.length / 4)} estimated input tokens)`);
 
-        const step2Response: ClaudeResponse<string> = await callClaude<string>(
+        const step2Response: ClaudeResponse<string> = await callClaudeWithRetry<string>(
           {
             model: SONNET,
             systemPrompt: FOCUSED_ANALYSIS_SYSTEM_PROMPT,

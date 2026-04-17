@@ -22,7 +22,7 @@ import type {
   ImprovementPhase,
   ImprovementPhaseLevel,
 } from '../profileTypes';
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 
 // ============================================================================
@@ -450,7 +450,7 @@ export async function assessPhase(input: PhaseAssessmentInput): Promise<PhaseAss
   const userPrompt = buildPhaseUserPrompt(input);
 
   try {
-    const response = await callClaude<string>({
+    const response = await callClaudeWithRetry<string>({
       model: SONNET,
       systemPrompt,
       userPrompt,

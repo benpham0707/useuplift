@@ -15,7 +15,7 @@
  * Output type: ParagraphFirstImpression[] (from profileTypes.ts)
  */
 
-import { callClaude, calculateCost, classifyError } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost, classifyError } from '../../../lib/llm/claude';
 import type { ClaudeResponse, LayerError } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import type {
@@ -540,7 +540,7 @@ export class FirstImpressionsService {
 
     const userPrompt = buildUserPrompt(paragraphText, paragraphIndex, totalParagraphs, allParagraphs);
 
-    const response: ClaudeResponse<Record<string, unknown>> = await callClaude<Record<string, unknown>>(
+    const response: ClaudeResponse<Record<string, unknown>> = await callClaudeWithRetry<Record<string, unknown>>(
       {
         model: HAIKU_MODEL,
         systemPrompt: SYSTEM_PROMPT,

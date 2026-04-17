@@ -49,7 +49,7 @@ import type { ProfileRouter, RoutingRule } from '../profileManager/profileRouter
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
 import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import { jsonrepair } from 'jsonrepair';
 import type { LayerCost, TokenUsage } from '../analysis/analysisOrchestrator';
 import { COACHING_VALUE_ORDER } from '../findings/findingStore';
@@ -1702,7 +1702,7 @@ STUDENT MESSAGE TO CLASSIFY:
 Output only the JSON object. No preamble or explanation.`;
 
     // FIX 2.8: cacheSystemPrompt=true — Stage 1 system prompt is static, benefits from caching
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: HAIKU,
         systemPrompt,
@@ -2541,7 +2541,7 @@ Respond to the student's message. Apply all constraints from your role identity.
     const dynamicMaxTokens = lengthBudget.maxTokens;
 
     // temperature 0.4 (lower reduces constraint violations)
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: SONNET,
         systemPrompt,
@@ -3253,7 +3253,7 @@ Output JSON:
   "newUnderstanding": "<revised understanding that incorporates the student's reinterpretation>"
 }`;
 
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: SONNET,
         systemPrompt,
@@ -3451,7 +3451,7 @@ Output JSON:
   "contextAccumulation": "<1-2 sentence addition to the student's context narrative. Write as if continuing a portrait: connect to what's already known when possible. Focus on NEW facts, relationships, and stated intent — not analysis. Include specific names, places, and events. If the student contradicts earlier context, note the correction (e.g., 'Student clarified the watch was grandmother's, not grandfather's'). If nothing genuinely new was revealed, return empty string.>"
 }`;
 
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: SONNET,
         systemPrompt,
@@ -3654,7 +3654,7 @@ ${sessionContext}${learningContext}
 Assess this student's cognitive-emotional state. Be honest. Be specific.
 Output only JSON.`;
 
-    const response = await callClaude<string>({
+    const response = await callClaudeWithRetry<string>({
       model: HAIKU,
       systemPrompt,
       userPrompt,
@@ -3757,7 +3757,7 @@ WHAT THEY NEED: ${assessment.whatTheyNeed}
 
 Respond briefly. 1-3 sentences max.`;
 
-    const response = await callClaude<string>({
+    const response = await callClaudeWithRetry<string>({
       model: HAIKU,
       systemPrompt,
       userPrompt,
@@ -3855,7 +3855,7 @@ Student Declared Context: ${profile.studentDeclaredContext || 'none yet'}
 ${writerPortrait.length < 50 ? 'NOTE: Analysis portrait is preliminary. Prioritize conversation dynamics — what the student asks about, avoids, how they respond to feedback, what they deflect from.\n' : ''}${pendingObservations.length === 0 ? 'NOTE: No explicit portrait observations yet. Infer from conversation patterns — question types, resistance patterns, what topics they return to.\n' : ''}
 Synthesize an updated theory. Be specific and evidence-grounded. Output only JSON.`;
 
-    const response = await callClaude<string>({
+    const response = await callClaudeWithRetry<string>({
       model: SONNET,
       systemPrompt,
       userPrompt,

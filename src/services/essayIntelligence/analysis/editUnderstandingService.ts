@@ -42,7 +42,7 @@ import type {
 } from '../profileTypes';
 
 import { ProfileRouter } from '../profileManager/profileRouter';
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import type { LayerCost, TokenUsage } from './analysisOrchestrator';
 
@@ -498,7 +498,7 @@ Paragraphs added: ${diff.structural.paragraphsAdded.length}, Paragraphs removed:
 
 Classify this edit: TRIVIAL or REAL?`;
 
-  const response = await callClaude<string>(userPrompt, {
+  const response = await callClaudeWithRetry<string>(userPrompt, {
     model: HAIKU,
     systemPrompt: FILTER_SYSTEM_PROMPT,
     maxTokens: FILTER_MAX_TOKENS,
@@ -1249,7 +1249,7 @@ export class EditUnderstandingService {
     let rawSonnetResponse: ClaudeResponse<SonnetUnderstandingRaw>;
 
     try {
-      rawSonnetResponse = await callClaude<SonnetUnderstandingRaw>(userPrompt, {
+      rawSonnetResponse = await callClaudeWithRetry<SonnetUnderstandingRaw>(userPrompt, {
         model: SONNET,
         systemPrompt: UNDERSTANDING_SYSTEM_PROMPT,
         maxTokens: UNDERSTANDING_MAX_TOKENS,
@@ -1292,7 +1292,7 @@ export class EditUnderstandingService {
           ? rawSonnetResponse.content
           : JSON.stringify(rawSonnetResponse.content);
 
-        const repairResponse = await callClaude<SonnetUnderstandingRaw>({
+        const repairResponse = await callClaudeWithRetry<SonnetUnderstandingRaw>({
           model: HAIKU,
           systemPrompt: 'Extract the JSON object from the following text. Output ONLY valid JSON matching the schema described.',
           userPrompt: `Extract the JSON from this LLM output:\n\n${rawContent}\n\nExpected fields: significance, significanceReasoning, changeTypes, apparentPurpose, purposeConfidence, profileImpact, scopeRecommendation, unaffectedAreas`,
