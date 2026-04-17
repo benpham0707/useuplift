@@ -738,8 +738,23 @@ export class FocusedAnalyzer {
       return 'comprehensive';
     }
 
-    // Rule 5: Transformative change
+    // Rule 5: Transformative change, guarded by structural scope.
+    // LLM sometimes over-labels a small same-paragraph rewrite as
+    // transformative (piano-essay: P1 replaced with a new scene; 7→7
+    // paragraphs; role unchanged). Rules 3-4 already caught reorder /
+    // add / remove, so we know structural shape is preserved here. When
+    // ≤2 paragraphs actually changed, trust the diff over the LLM label
+    // and route to focused — the Level 3 escalation ladder handles the
+    // rare case where a small transformative edit genuinely needs a
+    // comprehensive rebuild.
     if (understanding.significance === 'transformative') {
+      const changedCount = diff.paragraphChanges.length;
+      if (changedCount > 0 && changedCount <= 2) {
+        console.log(
+          `[FocusedAnalyzer] Mode: focused — significance=transformative but only ${changedCount} paragraph(s) changed (guardrail)`,
+        );
+        return 'focused';
+      }
       console.log('[FocusedAnalyzer] Mode: comprehensive — significance=transformative');
       return 'comprehensive';
     }
