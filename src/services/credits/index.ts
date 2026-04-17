@@ -5,14 +5,14 @@
 export {
   // Constants
   CREDIT_COSTS,
-  
+
   // Types
   type CreditTransactionType,
   type CreditBalance,
   type CreditDeductionResult,
   type CreditCheckResult,
-  
-  // Functions
+
+  // Client-side (Clerk-JWT authenticated) functions
   getCredits,
   hasEnoughCredits,
   canAnalyzeEssay,
@@ -21,4 +21,14 @@ export {
   deductForEssayAnalysis,
   deductForChatMessage,
   formatCreditCost,
+
+  // Server-side (service-role) atomic debit path — for HTTP routes.
+  // See creditsService.ts §"SERVER-SIDE ATOMIC DEBIT PATH".
+  type AtomicDebitResult,
+  type AtomicDebitErrorReason,
+  type AtomicDebitOptions,
+  getCreditsServer,
+  hasEnoughCreditsServer,
+  atomicDebit,
+  refundCredits,
 } from './creditsService';

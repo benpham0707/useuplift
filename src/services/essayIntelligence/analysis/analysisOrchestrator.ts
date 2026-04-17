@@ -333,7 +333,12 @@ export class AnalysisOrchestrator {
     const wordCount = input.essayText.split(/\s+/).filter(Boolean).length;
 
     // ── Create the coordinator with an empty profile ──
+    // Round 7 P0 (D4-H1): thread essayId through so checkpoint writes
+    // target the right `essay_understanding` row. Previously the
+    // coordinator defaulted essayId to '' and Supabase upserts silently
+    // failed — no Round-7 signal ever reached the DB.
     const coordinator = EssayProfileCoordinator.createNew({
+      essayId: input.essayId,
       essayText: input.essayText,
       paragraphTexts,
       sentenceTexts,

@@ -23,7 +23,7 @@
  * Types: src/services/essayIntelligence/profileTypes.ts (DeepDiveRequest, DeepDiveResult)
  */
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import type {
@@ -121,7 +121,7 @@ export async function runDeepDive(
       `~${Math.round(userPrompt.length / 4)} estimated input tokens`
     );
 
-    response = await callClaude<unknown>({
+    response = await callClaudeWithRetry<unknown>({
       model: SONNET,
       systemPrompt: template.systemPrompt,
       userPrompt,

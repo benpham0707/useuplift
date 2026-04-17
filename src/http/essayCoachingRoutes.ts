@@ -25,6 +25,58 @@ import type {
   LearningStyleObservations,
   StudentTheory,
 } from '@/services/essayIntelligence/profileTypes';
+import {
+  CREDIT_COSTS,
+  atomicDebit,
+  hasEnoughCreditsServer,
+} from '@/services/credits';
+
+// ============================================================================
+// ERROR CLASSIFICATION (Round 7 P0 — D6-H2)
+// ============================================================================
+//
+// Maps thrown errors from the coaching pipeline (and related services) to
+// an appropriate HTTP status. Keeps the response envelope `{ success, error,
+// code }` consistent. Partial/minimal — full reliability pass lives in the
+// `fix/coach-reliability` P1 PR.
+
+interface ClassifiedError {
+  status: number;
+  code: string;
+  message: string;
+}
+
+function classifyError(err: unknown): ClassifiedError {
+  const msg = err instanceof Error ? err.message : String(err);
+  const lower = msg.toLowerCase();
+
+  // Upstream LLM rate-limit / overload — propagate for retry-aware clients.
+  if (
+    lower.includes('rate limit') ||
+    lower.includes('rate_limit') ||
+    lower.includes('429') ||
+    lower.includes('overloaded')
+  ) {
+    return { status: 429, code: 'upstream_rate_limit', message: msg };
+  }
+
+  // Invalid input — validation errors thrown downstream.
+  if (
+    lower.includes('invalid input') ||
+    lower.includes('validation') ||
+    lower.startsWith('invalid ')
+  ) {
+    return { status: 400, code: 'invalid_input', message: msg };
+  }
+
+  // Credit-related runtime errors (belt-and-suspenders — the primary
+  // credit-check path returns 402 directly).
+  if (lower.includes('insufficient credits') || lower.includes('insufficient_balance')) {
+    return { status: 402, code: 'insufficient_credits', message: msg };
+  }
+
+  return { status: 500, code: 'internal_error', message: msg };
+}
 
 const essayCoachingRouter = Router();
 
@@ -433,15 +485,39 @@ essayCoachingRouter.post('/essay-coaching/respond', requireAuth, async (req: Req
     const userId = getAuthUserId(req, res);
     if (!userId) return;
     const { essayId, studentMessage, conversationHistory = [], sessionMemory, learningStyle } = req.body;
-    if (!essayId || !studentMessage) return res.status(400).json({ success: false, error: 'essayId and studentMessage are required' });
+    if (!essayId || !studentMessage) {
+      return res.status(400).json({ success: false, code: 'invalid_input', error: 'essayId and studentMessage are required' });
+    }
 
     const profileId = await resolveProfileId(userId);
-    if (!profileId) return res.status(404).json({ success: false, error: 'User profile not found' });
+    if (!profileId) return res.status(404).json({ success: false, code: 'profile_not_found', error: 'User profile not found' });
 
     const sessionKey = `${profileId}:${essayId}`;
     const session = sessionStore.get(sessionKey);
-    if (!session) return res.status(404).json({ success: false, error: 'No active coaching session. Call /essay-coaching/start first.' });
+    if (!session) {
+      return res.status(404).json({ success: false, code: 'no_active_session', error: 'No active coaching session. Call /essay-coaching/start first.' });
+    }
     session.lastAccessed = Date.now();
+
+    // ── Round 7 P0 (D6-H2): credit gate ─────────────────────────────────────
+    // Pre-call balance check. Short-circuits zero-balance users BEFORE we
+    // burn LLM tokens. Not strictly atomic (another turn could drain the
+    // balance in the interim), but atomic debit AFTER the call is the
+    // authoritative guard.
+    const COST = CREDIT_COSTS.CHAT_MESSAGE;
+    const preCheck = await hasEnoughCreditsServer(userId, COST);
+    if (!preCheck.hasEnough) {
+      return res.status(402).json({
+        success: false,
+        code: 'insufficient_credits',
+        error: `Insufficient credits. Current: ${preCheck.currentBalance}, Required: ${preCheck.required}`,
+        data: {
+          currentBalance: preCheck.currentBalance,
+          required: preCheck.required,
+          shortfall: preCheck.shortfall,
+        },
+      });
+    }
 
     const crossModuleContext = await assembleCrossModuleContext(profileId);
     const result = await session.orchestrator.processCoachingTurn(
@@ -456,17 +532,47 @@ essayCoachingRouter.post('/essay-coaching/respond', requireAuth, async (req: Req
       });
     }
 
+    // ── Post-call atomic debit ──────────────────────────────────────────────
+    // The coaching turn succeeded. Now atomically debit the credit. If this
+    // fails (e.g. a concurrent turn won the race and drained the balance),
+    // we log for telemetry but do NOT fail the response — the user already
+    // got their answer. The warning surfaces in the response envelope so
+    // clients can refresh the balance indicator.
+    const warnings: string[] = [];
+    const debit = await atomicDebit(userId, COST, {
+      transaction: { type: 'usage', description: 'AI Coach chat message' },
+    });
+    if (!debit.success) {
+      console.warn(
+        `[essay-coaching/respond] Atomic debit failed for user ${userId} reason=${debit.reason}: ${debit.error}`,
+      );
+      if (debit.reason === 'insufficient_balance') {
+        warnings.push('credit_debit_race_lost');
+      } else {
+        warnings.push('credit_debit_failed');
+      }
+      // TODO (P1): emit structured metric for SRE dashboards.
+    }
+
     return res.json({
       success: true,
       data: {
         response: result.response, cost: result.totalCost, profileDeepened: result.profileDeepened,
         sessionMemory: result.sessionMemory, learningStyle: result.learningStyle,
         cognitiveAssessment: result.cognitiveAssessment,
+        creditBalance: debit.success ? debit.newBalance : debit.newBalance,
+        creditDebited: debit.success ? COST : 0,
       },
+      warnings: warnings.length > 0 ? warnings : undefined,
     });
   } catch (error: unknown) {
-    console.error('[essay-coaching/respond] Error:', error);
-    return res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Failed to process coaching turn' });
+    const classified = classifyError(error);
+    console.error(`[essay-coaching/respond] Error (${classified.code}):`, error);
+    return res.status(classified.status).json({
+      success: false,
+      code: classified.code,
+      error: classified.message,
+    });
   }
 });
 

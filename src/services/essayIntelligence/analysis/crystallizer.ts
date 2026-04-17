@@ -30,7 +30,7 @@
  *       docs/plan-sections/01-essay-profile-types.md (North Star types)
  */
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import { ProfileRouter } from '../profileManager/profileRouter';
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
 import { FindingStore, buildFindingContext } from '../findings';
@@ -1856,7 +1856,7 @@ Output JSON:
   const userPrompt = contextParts.join('\n');
 
   try {
-    const response = await callClaude<AdversarialContradictionOutput>({
+    const response = await callClaudeWithRetry<AdversarialContradictionOutput>({
       model: HAIKU,
       systemPrompt,
       userPrompt,
@@ -2076,7 +2076,7 @@ export class CrystallizerService {
     const northStarSystemPrompt = buildSystemPromptL4aNorthStar(scale, essayType);
     const northStarCallInstruction = buildCallInstructionL4aNorthStar(profile, scale, priorNorthStar);
 
-    const northStarResponse = await callClaude<RawNorthStarOutput>({
+    const northStarResponse = await callClaudeWithRetry<RawNorthStarOutput>({
       model: SONNET,
       systemPrompt: northStarSystemPrompt,
       userPrompt: profileContext + '\n\n' + northStarCallInstruction,
@@ -2109,7 +2109,7 @@ export class CrystallizerService {
     const scoreMatrixSystemPrompt = buildSystemPromptL4aScoreMatrix(scale, essayType);
     const scoreMatrixCallInstruction = buildCallInstructionL4aScoreMatrix(northStar, profile, scale);
 
-    const scoreMatrixResponse = await callClaude<RawScoreMatrixOutput>({
+    const scoreMatrixResponse = await callClaudeWithRetry<RawScoreMatrixOutput>({
       model: SONNET,
       systemPrompt: scoreMatrixSystemPrompt,
       userPrompt: profileContext + '\n\n' + scoreMatrixCallInstruction,
@@ -2198,7 +2198,7 @@ export class CrystallizerService {
         candidateStore,
       );
 
-      const l4bResponse = await callClaude<RawL4bOutput>({
+      const l4bResponse = await callClaudeWithRetry<RawL4bOutput>({
         model: SONNET,
         systemPrompt: l4bSystemPrompt,
         userPrompt: profileContext + '\n\n' + l4bCallInstruction,

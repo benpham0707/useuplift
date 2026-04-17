@@ -25,7 +25,7 @@
  */
 
 import crypto from 'crypto';
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonArray } from './llmJsonParser';
 import type {
@@ -1754,7 +1754,7 @@ OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanati
       : '';
     const userMessage = `${sharedContext}\n\n===\n\n${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
 
-    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaude<RawParagraphAnnotationOutput>(
+    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaudeWithRetry<RawParagraphAnnotationOutput>(
       {
         model: SONNET,
         systemPrompt,
@@ -2192,7 +2192,7 @@ annotations that don't add value.
 
 Output JSON: { "annotations": [...] }`;
 
-    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaude<RawParagraphAnnotationOutput>(
+    const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaudeWithRetry<RawParagraphAnnotationOutput>(
       {
         model: SONNET,
         systemPrompt,

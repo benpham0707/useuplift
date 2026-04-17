@@ -48,7 +48,7 @@ import type {
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { ProfileRouter } from '../profileManager/profileRouter';
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
@@ -618,7 +618,7 @@ export class SequentialDeepWalkService {
         // 3. Call Sonnet — dynamically scale output tokens by sentence count
         const sentenceCount = this.splitIntoSentences(paragraphs[pIdx]).length;
         const walkMaxTokens = computeWalkMaxTokens(sentenceCount);
-        const response = await callClaude<Record<string, unknown>>({
+        const response = await callClaudeWithRetry<Record<string, unknown>>({
           model: SONNET,
           // Scope 2 Phase 5: buildSystemPrompt() substitutes the technique
           // vocabulary block into the template. Still cached across calls

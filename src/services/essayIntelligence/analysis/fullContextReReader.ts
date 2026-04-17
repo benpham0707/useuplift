@@ -18,7 +18,7 @@
  * Types: src/services/essayIntelligence/profileTypes.ts (ReReadResult)
  */
 
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import { normalizeRhythmTag } from './rhythmTag';
@@ -369,7 +369,7 @@ export async function runTargetedReRead(
   );
 
   try {
-    const response: ClaudeResponse<string> = await callClaude<string>({
+    const response: ClaudeResponse<string> = await callClaudeWithRetry<string>({
       model: SONNET,
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,

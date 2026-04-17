@@ -3864,9 +3864,26 @@ export interface CheckpointStore {
 
 /**
  * CheckpointMetadata — metadata saved alongside each checkpoint.
+ *
+ * Round 7 P0 (D4-H1 / D4-L3): `essayId` and `essayType` MUST be threaded
+ * through from the coordinator. Persistence silently no-op'd for months
+ * because `essayId` was hardcoded to `''` and `essay_type` was hardcoded
+ * to `'common_app'` in `SupabaseCheckpointStore.save()`.
  */
 export interface CheckpointMetadata {
+  /**
+   * Stable essay UUID. MUST match the `essays(id)` row this checkpoint
+   * belongs to — the `essay_understanding.essay_id` column is a UUID NOT
+   * NULL FK to `essays.id`, so an empty string causes an insert error
+   * that used to be swallowed silently.
+   */
   essayId: string;
+  /**
+   * Essay type. Required so `SupabaseCheckpointStore.save()` writes the
+   * correct row type (previously hardcoded to `'common_app'`, which
+   * flipped PIQ/supplement rows to common_app on every save).
+   */
+  essayType: EssayType;
   reason: CheckpointReason;
   completedLayer: string;
   writeVersion: number;

@@ -18,7 +18,7 @@ import type {
   SnapshotUnderstanding,
   FindingMaturity,
 } from '../profileTypes';
-import { callClaude } from '../../../lib/llm/claude';
+import { callClaudeWithRetry } from '../../../lib/llm/claude';
 import { SnapshotManager } from './snapshotManager';
 
 // ============================================================================
@@ -249,7 +249,7 @@ export async function compareToSnapshot(
 
   // Single Sonnet call — comparison is a judgment call.
   // Using simple input format with useJsonMode for automatic JSON parsing.
-  const response = await callClaude<Record<string, unknown>>({
+  const response = await callClaudeWithRetry<Record<string, unknown>>({
     model: 'claude-sonnet-4-5-20250929',
     systemPrompt: COMPARISON_SYSTEM_PROMPT,
     userPrompt,

@@ -31,7 +31,7 @@ import type {
   SentenceAnalysisConfidence,
 } from '../profileTypes';
 import { assessPhase } from './phaseAssessment';
-import { callClaude, calculateCost } from '../../../lib/llm/claude';
+import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import type { FindingStore } from '../findings/findingStore';
@@ -1723,7 +1723,7 @@ export class AnalysisPassService {
     const systemPrompt = buildEssayLevelSystemPrompt();
     const userPrompt = buildEssayLevelUserPrompt(profile, staleAreaHints, combinedFindingContext);
 
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: SONNET,
         systemPrompt,
@@ -1920,7 +1920,7 @@ export class AnalysisPassService {
       : '';
     const userPrompt = `${profileContext}\n\n---\n\n${relevantSection}${paragraphPrompt}`;
 
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: SONNET,
         systemPrompt,

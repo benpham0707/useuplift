@@ -14,7 +14,7 @@
  * - L6 coaching (the coach can reference "an AO reading this would...")
  */
 
-import { callClaude } from '../../../lib/llm/claude';
+import { callClaudeWithRetry } from '../../../lib/llm/claude';
 
 const HAIKU = 'claude-haiku-4-5-20251001';
 
@@ -77,7 +77,7 @@ export async function runAOFirstRead(essayText: string): Promise<AOFirstReadResu
   const callStart = Date.now();
 
   try {
-    const response = await callClaude<string>(
+    const response = await callClaudeWithRetry<string>(
       {
         model: HAIKU,
         systemPrompt: SYSTEM_PROMPT,
