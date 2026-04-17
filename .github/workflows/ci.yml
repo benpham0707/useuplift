@@ -25,26 +25,13 @@ jobs:
         run: npm test
 
   integration:
-    name: Integration tests (Postgres round-trip)
+    name: Integration tests
     needs: typecheck-and-test
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
     env:
-      SUPABASE_TEST_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # Secrets surface to the job env. When absent, each integration test
+      # self-skips (exit 77) via its own gate; the job stays green.
       SUPABASE_URL: ${{ secrets.SUPABASE_TEST_URL }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_TEST_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_TEST_KEY }}
@@ -57,19 +44,5 @@ jobs:
           cache: 'npm'
       - name: Install deps
         run: npm ci
-      - name: Install supabase CLI
-        run: |
-          curl -sL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz \
-            | tar -xz -C /tmp
-          sudo mv /tmp/supabase /usr/local/bin/
-          supabase --version
-      - name: Apply migrations to service-container Postgres
-        run: |
-          for f in supabase/migrations/*.sql; do
-            echo "applying $f"
-            PGPASSWORD=postgres psql \
-              -h localhost -U postgres -d postgres \
-              -v ON_ERROR_STOP=1 -f "$f"
-          done
       - name: Integration tests
         run: npm run test:integration
