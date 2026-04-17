@@ -677,6 +677,58 @@ export class CoachingService {
   }
 
   /**
+   * Round-7 Hardening P0 (C6): Minimal-path classifier.
+   *
+   * Decides whether a coaching turn qualifies for the cheap Haiku-only path
+   * (runStage1InsightExtraction → generateMinimalResponse) instead of the
+   * full Sonnet coaching call. Purpose: short acknowledgements like
+   * "ok thanks" cost ~$0.002 here vs ~$0.01-0.02 if routed through Sonnet.
+   *
+   * All four criteria must agree. Conservative default is `false`.
+   *
+   * Criteria (per forge plan §2.7):
+   *   1. Raw student message is ≤ 30 characters.
+   *   2. Stage-1 category is `confirmation` or `clarification`
+   *      (both imply no reinterpretation / no new context to integrate).
+   *   3. No prior-turn pushback is active — if a pushback has been deployed
+   *      this session, the next turn may carry unresolved resistance that
+   *      needs Sonnet's judgment, not a Haiku ack.
+   *   4. `improvementPhase !== 'foundation'` — foundation-phase students
+   *      need scaffolding even for short messages, so a "minimal" ack would
+   *      strand them. All other phases (architecture/craft/polish/distinction)
+   *      can handle a terse acknowledgement.
+   *
+   * Not checked here (handled at call-site via env flag):
+   *   - `ENABLE_HAIKU_MINIMAL_PATH` kill-switch.
+   */
+  private classifyAsMinimal(
+    studentMessage: string,
+    stage1: Stage1Output,
+    sessionMemory: CoachingSessionMemory,
+    improvementPhase: ImprovementPhaseLevel,
+  ): boolean {
+    // 1. Length gate — raw character count, unstripped.
+    if (studentMessage.length > 30) return false;
+
+    // 2. Category gate — only confirmation / clarification route minimal.
+    //    Explicitly reject reinterpretation even if short: semantically heavy.
+    const minimalCategories: InsightCategory[] = ['confirmation', 'clarification'];
+    if (!minimalCategories.includes(stage1.category)) return false;
+    if (stage1.category === 'reinterpretation') return false; // defensive redundancy
+
+    // 3. Pushback gate — unresolved pushback means the next turn may carry
+    //    resistance that needs full coaching. The edge-protocol cap allows
+    //    only one pushback per session, so pushbackCount > 0 means it's
+    //    been deployed and we're still in the "post-pushback" session state.
+    if ((sessionMemory.pushbackCount ?? 0) > 0) return false;
+
+    // 4. Phase gate — foundation students need scaffolding always.
+    if (improvementPhase === 'foundation') return false;
+
+    return true;
+  }
+
+  /**
    * Scope essay text to focus paragraphs +/-1 context window.
    * Non-focus paragraphs get a one-line summary with word count.
    * Returns full essay if no focus paragraphs.
@@ -1018,6 +1070,88 @@ export class CoachingService {
 
     // ── Attach learning style to session memory for Stage 3 fallback access ──
     (memory as SessionMemoryWithStyle).learningStyleObservations = style;
+
+    // ── Round-7 Hardening P0 (C6): Pre-Sonnet Haiku classification ──
+    // Every turn — even "ok thanks" one-liners — previously hit Sonnet. We now
+    // classify first with Haiku (~$0.001), and for messages that satisfy the
+    // minimal-path criteria (see classifyAsMinimal), we answer with Haiku
+    // (~$0.001) instead of Sonnet (~$0.01-0.02). Kill-switch:
+    // ENABLE_HAIKU_MINIMAL_PATH='false' forces every turn through Sonnet.
+    //
+    // Stage1Output is reused downstream: when the minimal branch fires we
+    // return after a lean state update. When the Sonnet branch fires, the
+    // existing sidecar-derived stage1 (post-Sonnet) still drives downstream
+    // bookkeeping — we do NOT replace the sidecar version. The pre-call
+    // stage1 is only used for routing here.
+    const { stage1: preStage1, s1Cost: preStage1Cost } = await this.runStage1InsightExtraction(
+      studentMessage,
+      conversationHistory,
+      profile,
+      recentEditContext,
+    );
+    costs.push(preStage1Cost);
+
+    const minimalPathEnabled = process.env.ENABLE_HAIKU_MINIMAL_PATH !== 'false';
+    const isMinimal = minimalPathEnabled && this.classifyAsMinimal(
+      studentMessage,
+      preStage1,
+      memory,
+      phase.level,
+    );
+
+    if (isMinimal) {
+      console.log(
+        `[CoachingService] Minimal path — category=${preStage1.category}, ` +
+        `msgLen=${studentMessage.length}, phase=${phase.level}`,
+      );
+
+      // Build a lightweight CognitiveAssessment for generateMinimalResponse.
+      // This is NOT the Stage-1.5 LLM assessment — we skip that call on the
+      // minimal path to preserve the cost win. The ack prompt only uses
+      // assessment + whatTheyNeed, so a derived stub is sufficient.
+      const minimalAssessment: CognitiveAssessment = {
+        assessment: `Student message is brief (${studentMessage.length} chars) and ` +
+          `classified as ${preStage1.category}. No substantive coaching required this turn.`,
+        whatTheyNeed: 'A brief, specific acknowledgement — no teaching, no elaboration.',
+        recommendedApproach: 'Acknowledge and advance. 1-3 sentences.',
+        responseIntensity: 'minimal',
+      };
+
+      const { response: minimalResponse, cost: minimalCost } = await this.generateMinimalResponse(
+        studentMessage,
+        minimalAssessment,
+        conversationHistory,
+        profile,
+      );
+      costs.push(minimalCost);
+
+      // Minimal state updates — the turn still happened, so we must:
+      //  - bump turnCount
+      //  - append a session event (so retrieval sees it)
+      //  - record lastResponseIntensity
+      // Skipping these would desync turn indexing across the suite.
+      memory.lastResponseIntensity = 'minimal';
+      memory = this.updateSessionMemory(memory, studentMessage, preStage1, minimalAssessment);
+
+      const totalCost = costs.reduce((sum, c) => sum + c.cost, 0);
+      console.log(
+        `[CoachingService] Minimal turn complete — totalCost=$${totalCost.toFixed(5)}, ` +
+        `totalTime=${Date.now() - turnStart}ms, sessionTurn=${memory.turnCount}`,
+      );
+
+      return {
+        response: minimalResponse,
+        insightExtracted: null,
+        profileDeepened: false,
+        routingRuleUsed: routingRule,
+        cost: costs,
+        totalCost,
+        stage4Verdict: 'none',
+        sessionMemory: memory,
+        learningStyle: style,
+        cognitiveAssessment: minimalAssessment,
+      };
+    }
 
     // ── Single Sonnet Call: Coaching Response + Metadata Sidecar ──
     const s3Start = Date.now();
