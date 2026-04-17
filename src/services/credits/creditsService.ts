@@ -14,8 +14,19 @@ import { supabase } from '@/integrations/supabase/safeClient';
 const FALLBACK_URL = 'https://wrppjajhxiftzddeeqsk.supabase.co';
 const FALLBACK_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndycHBqYWpoeGlmdHpkZGVlcXNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzExMTI2NTcsImV4cCI6MjA4NjY4ODY1N30.cFgyAcfDn6e15KYr_xpiLwfgyUJyOSlE9PoHD3aXhhs';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || FALLBACK_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || FALLBACK_KEY;
+// Guard `import.meta.env` access for server-side (tsx/node) imports where
+// Vite is not the loader. Client builds still resolve these at compile time.
+const VITE_ENV: Record<string, string | undefined> =
+  (typeof import.meta !== 'undefined' && (import.meta as unknown as { env?: Record<string, string | undefined> }).env) ||
+  {};
+const SUPABASE_URL =
+  VITE_ENV.VITE_SUPABASE_URL ||
+  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_URL : undefined) ||
+  FALLBACK_URL;
+const SUPABASE_PUBLISHABLE_KEY =
+  VITE_ENV.VITE_SUPABASE_ANON_KEY ||
+  (typeof process !== 'undefined' ? process.env?.VITE_SUPABASE_ANON_KEY : undefined) ||
+  FALLBACK_KEY;
 
 /**
  * Create an authenticated Supabase client using Clerk JWT token
@@ -284,4 +295,335 @@ export async function deductForChatMessage(
  */
 export function formatCreditCost(amount: number): string {
   return amount === 1 ? '1 credit' : `${amount} credits`;
+}
+
+// ============================================================================
+// SERVER-SIDE ATOMIC DEBIT PATH
+// ============================================================================
+//
+// The client-side path above (`deductCredits`, etc.) uses `import.meta.env`
+// and a Clerk-JWT-authenticated client. It is not safe to call from Node
+// server routes (`import.meta.env` is undefined under tsx/esbuild server
+// builds, and there is no Clerk JWT available in a server-internal flow).
+//
+// These server-side helpers use `supabaseAdmin` (service-role) and perform
+// an ATOMIC debit via a single SQL UPDATE with a `credits >= $amount` guard.
+// Under concurrent access, at most one caller observes `success: true`;
+// all others see `insufficient_balance`. No advisory lock required — the
+// row-level UPDATE is atomic by Postgres MVCC semantics.
+//
+// Usage: HTTP routes that burn LLM tokens (e.g. `/essay-coaching/respond`)
+// should: (1) pre-check balance to short-circuit zero-balance users;
+// (2) run the expensive call; (3) atomically debit post-call; (4) on
+// atomic-debit failure, surface a warning in the response envelope — do
+// NOT double-charge, do NOT block a successful response. Audit finding
+// D6-H2 (Round 7 P0 hardening).
+
+/** Reason tags returned by `atomicDebit` when `success: false`. */
+export type AtomicDebitErrorReason =
+  | 'insufficient_balance'
+  | 'db_error'
+  | 'unexpected_error';
+
+export interface AtomicDebitResult {
+  success: boolean;
+  newBalance: number;
+  /** Balance observed immediately before the debit attempt (if known). */
+  priorBalance?: number;
+  /** Machine-readable reason. Use for HTTP status mapping. */
+  reason?: AtomicDebitErrorReason;
+  error?: string;
+}
+
+export interface AtomicDebitOptions {
+  /**
+   * If provided, a row is inserted into `credit_transactions` after the
+   * debit succeeds. Failures here are logged but do NOT fail the debit.
+   */
+  transaction?: {
+    type: CreditTransactionType;
+    description: string;
+  };
+}
+
+/**
+ * Server-side: read the current credit balance for a user via
+ * `supabaseAdmin`. Returns 0 on any error or missing row.
+ */
+export async function getCreditsServer(userId: string): Promise<number> {
+  try {
+    const { supabaseAdmin } = await import('@/supabase/admin');
+    const { data, error } = await supabaseAdmin
+      .from('profiles')
+      .select('credits')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) {
+      console.warn('[credits/server] getCreditsServer error:', error.message);
+      return 0;
+    }
+    const credits = Number((data as { credits?: number } | null)?.credits ?? 0);
+    return Number.isFinite(credits) ? credits : 0;
+  } catch (err) {
+    console.warn('[credits/server] getCreditsServer threw:', err);
+    return 0;
+  }
+}
+
+/**
+ * Server-side: check whether a user has at least `required` credits,
+ * without performing any mutation.
+ */
+export async function hasEnoughCreditsServer(
+  userId: string,
+  required: number,
+): Promise<CreditCheckResult> {
+  const currentBalance = await getCreditsServer(userId);
+  const hasEnough = currentBalance >= required;
+  return {
+    hasEnough,
+    currentBalance,
+    required,
+    shortfall: hasEnough ? 0 : required - currentBalance,
+  };
+}
+
+/** Max compare-and-swap retries before giving up. Bounded to keep tail
+ * latency predictable under heavy contention. */
+const ATOMIC_DEBIT_MAX_ATTEMPTS = 8;
+
+/**
+ * Server-side ATOMIC debit via compare-and-swap (optimistic concurrency).
+ *
+ * Algorithm per attempt:
+ *   1. Read current balance (`priorBalance`).
+ *   2. If `priorBalance < amount` → return insufficient_balance.
+ *   3. UPDATE profiles SET credits = priorBalance - amount
+ *      WHERE user_id = $u AND credits = priorBalance
+ *      RETURNING credits.
+ *   4. If 1 row updated → success. If 0 rows updated → another writer
+ *      raced us; retry (bounded by ATOMIC_DEBIT_MAX_ATTEMPTS).
+ *
+ * This is the standard CAS pattern. It is correct without an RPC or
+ * advisory lock because the `credits = priorBalance` predicate acts as
+ * the version stamp — two concurrent callers cannot both match it, since
+ * whichever commits first changes the value.
+ *
+ * NOTE: `amount` must be a positive integer. Fractional amounts are
+ * rejected (`profiles.credits` is `integer NOT NULL`).
+ */
+export async function atomicDebit(
+  userId: string,
+  amount: number,
+  options: AtomicDebitOptions = {},
+): Promise<AtomicDebitResult> {
+  if (!userId || typeof userId !== 'string') {
+    return { success: false, newBalance: 0, reason: 'unexpected_error', error: 'userId is required' };
+  }
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return {
+      success: false,
+      newBalance: 0,
+      reason: 'unexpected_error',
+      error: `amount must be a positive integer (got ${amount})`,
+    };
+  }
+
+  try {
+    const { supabaseAdmin } = await import('@/supabase/admin');
+
+    let priorBalance = 0;
+    for (let attempt = 1; attempt <= ATOMIC_DEBIT_MAX_ATTEMPTS; attempt++) {
+      // (1) Read current balance.
+      const { data: priorRow, error: priorErr } = await supabaseAdmin
+        .from('profiles')
+        .select('credits')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (priorErr) {
+        return {
+          success: false,
+          newBalance: 0,
+          reason: 'db_error',
+          error: `Failed to read balance: ${priorErr.message}`,
+        };
+      }
+      if (!priorRow) {
+        return {
+          success: false,
+          newBalance: 0,
+          reason: 'insufficient_balance',
+          error: `No profile row for user ${userId}`,
+        };
+      }
+      priorBalance = Number((priorRow as { credits?: number }).credits ?? 0);
+
+      // (2) Insufficient balance — deterministic failure, no retry.
+      if (priorBalance < amount) {
+        return {
+          success: false,
+          newBalance: priorBalance,
+          priorBalance,
+          reason: 'insufficient_balance',
+          error: `Insufficient credits. Current: ${priorBalance}, Required: ${amount}`,
+        };
+      }
+
+      // (3) Compare-and-swap: UPDATE ... WHERE credits = priorBalance.
+      const newBalance = priorBalance - amount;
+      const { data: updatedRows, error: updateErr } = await supabaseAdmin
+        .from('profiles')
+        .update({ credits: newBalance })
+        .eq('user_id', userId)
+        .eq('credits', priorBalance) // version-stamp guard
+        .select('credits');
+
+      if (updateErr) {
+        return {
+          success: false,
+          newBalance: priorBalance,
+          priorBalance,
+          reason: 'db_error',
+          error: `Failed to debit credits: ${updateErr.message}`,
+        };
+      }
+
+      const updatedCount = Array.isArray(updatedRows) ? updatedRows.length : 0;
+      if (updatedCount === 1) {
+        const observedNewBalance = Number(
+          (updatedRows![0] as { credits?: number }).credits ?? newBalance,
+        );
+
+        // (4a) Best-effort transaction log — failure is non-fatal.
+        if (options.transaction) {
+          try {
+            const { error: txErr } = await supabaseAdmin
+              .from('credit_transactions')
+              .insert({
+                user_id: userId,
+                amount: -amount,
+                type: options.transaction.type,
+                description: options.transaction.description,
+              });
+            if (txErr) {
+              console.warn('[credits/server] Transaction log insert failed (non-fatal):', txErr.message);
+            }
+          } catch (txCatch) {
+            console.warn('[credits/server] Transaction log insert threw (non-fatal):', txCatch);
+          }
+        }
+
+        return {
+          success: true,
+          newBalance: observedNewBalance,
+          priorBalance,
+        };
+      }
+
+      // (4b) CAS failed — another writer changed `credits`. Retry.
+      // Small exponential backoff to avoid thundering-herd on hot rows.
+      if (attempt < ATOMIC_DEBIT_MAX_ATTEMPTS) {
+        const delayMs = Math.min(50, 2 ** attempt); // 2, 4, 8, 16, 32, 50, 50 ms
+        await new Promise((r) => setTimeout(r, delayMs));
+      }
+    }
+
+    // Exhausted retries — treat as a transient DB-contention failure.
+    const currentBalance = await getCreditsServer(userId);
+    return {
+      success: false,
+      newBalance: currentBalance,
+      priorBalance,
+      reason: 'db_error',
+      error: `Atomic debit contention: exhausted ${ATOMIC_DEBIT_MAX_ATTEMPTS} CAS attempts`,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      newBalance: 0,
+      reason: 'unexpected_error',
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
+}
+
+/**
+ * Server-side compensating credit. Used when an LLM call succeeds but the
+ * downstream `atomicDebit` failed (e.g. the user won a concurrent race).
+ * Also available for refund/bonus flows. Always succeeds unless the DB
+ * write fails; no atomicity guard is needed (adding credits cannot go
+ * negative).
+ */
+export async function refundCredits(
+  userId: string,
+  amount: number,
+  options: { type?: CreditTransactionType; description?: string } = {},
+): Promise<AtomicDebitResult> {
+  if (!userId || typeof userId !== 'string') {
+    return { success: false, newBalance: 0, reason: 'unexpected_error', error: 'userId is required' };
+  }
+  if (!Number.isInteger(amount) || amount <= 0) {
+    return {
+      success: false,
+      newBalance: 0,
+      reason: 'unexpected_error',
+      error: `amount must be a positive integer (got ${amount})`,
+    };
+  }
+  try {
+    const { supabaseAdmin } = await import('@/supabase/admin');
+    const { data: priorRow, error: priorErr } = await supabaseAdmin
+      .from('profiles')
+      .select('credits')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (priorErr || !priorRow) {
+      return {
+        success: false,
+        newBalance: 0,
+        reason: priorErr ? 'db_error' : 'insufficient_balance',
+        error: priorErr ? priorErr.message : `No profile row for user ${userId}`,
+      };
+    }
+    const priorBalance = Number((priorRow as { credits?: number }).credits ?? 0);
+    const newBalance = priorBalance + amount;
+    const { error: updateErr } = await supabaseAdmin
+      .from('profiles')
+      .update({ credits: newBalance })
+      .eq('user_id', userId);
+    if (updateErr) {
+      return {
+        success: false,
+        newBalance: priorBalance,
+        priorBalance,
+        reason: 'db_error',
+        error: updateErr.message,
+      };
+    }
+
+    try {
+      const { error: txErr } = await supabaseAdmin
+        .from('credit_transactions')
+        .insert({
+          user_id: userId,
+          amount,
+          type: options.type ?? 'bonus',
+          description: options.description ?? 'Refund / compensating credit',
+        });
+      if (txErr) {
+        console.warn('[credits/server] Refund log insert failed (non-fatal):', txErr.message);
+      }
+    } catch (txCatch) {
+      console.warn('[credits/server] Refund log insert threw (non-fatal):', txCatch);
+    }
+
+    return { success: true, newBalance, priorBalance };
+  } catch (err) {
+    return {
+      success: false,
+      newBalance: 0,
+      reason: 'unexpected_error',
+      error: err instanceof Error ? err.message : 'Unknown error',
+    };
+  }
 }
