@@ -27,6 +27,7 @@
 import crypto from 'crypto';
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
+import { buildFabricationGuardBlock } from '../../../lib/llm/fabricationGuard';
 import { parseLlmJsonArray } from './llmJsonParser';
 import type {
   EssayProfile,
@@ -990,7 +991,9 @@ QUALITY BAR:
 - Every annotation must pass the teaching test.
 - At least 25% of annotations should be strength type.
 
-OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanation text.`;
+OUTPUT: JSON object with "annotations" array. No markdown wrapping, no explanation text.
+
+${buildFabricationGuardBlock()}`;
   }
 
   /**

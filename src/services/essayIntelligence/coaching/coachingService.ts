@@ -50,6 +50,7 @@ import type { AssembledProfileContext } from '../profileManager/profileRouter';
 import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
 
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
+import { buildFabricationGuardBlock } from '../../../lib/llm/fabricationGuard';
 import { jsonrepair } from 'jsonrepair';
 import type { LayerCost, TokenUsage } from '../analysis/analysisOrchestrator';
 import { COACHING_VALUE_ORDER } from '../findings/findingStore';
@@ -2220,7 +2221,8 @@ READINESS: ${phase.readinessAssessment}`;
       `\n\n===ESSAY PROFILE CONTEXT===\n${stableProfileContext}` +
       `\n\n===ESSAY TEXT (current version — quote directly when referencing specific moments)===\n${essayText}` +
       phaseSection +
-      antiConvergenceSection;
+      antiConvergenceSection +
+      `\n\n${buildFabricationGuardBlock()}`;
 
     // ── BLOCK 3: Dynamic per-turn context (NOT cached — changes every turn) ──
     const dynamicProfileContext = this.buildDynamicProfileContext(profile, sessionMemory);
@@ -3882,7 +3884,9 @@ Do NOT:
 DO:
 - Acknowledge what they said specifically
 - If appropriate, briefly advance to what's next
-- Sound like a real person, not a chatbot`;
+- Sound like a real person, not a chatbot
+
+${buildFabricationGuardBlock()}`;
 
     const userPrompt = `${historyText ? `RECENT CONVERSATION:\n${historyText}\n\n` : ''}STUDENT: "${studentMessage}"
 
