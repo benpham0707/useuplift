@@ -2317,6 +2317,40 @@ export class EssayProfileCoordinator {
   }
 
   /**
+   * Port F2 (Wave-1b): write the essay-level AI-authoring risk signal into
+   * the profile index. Called once per analysis (gated on
+   * ENABLE_AI_RISK_SIGNAL) by the orchestrator after the aiRiskScorer has
+   * computed it. The signal is read by L3.75 as a diagnostic prior inside
+   * the INTENTIONALITY CALIBRATION block — L3.75 never mutates it.
+   *
+   * Passing null explicitly clears the signal (e.g., on a re-analysis where
+   * the orchestrator decides the prior signal is stale).
+   */
+  updateAiRiskSignal(
+    signal: { score: number; notes: string; confidence: number; open: string | null } | null,
+  ): void {
+    this.checkSessionBoundary();
+    this.profile.index.aiRiskSignal = signal;
+    if (signal) {
+      console.log(
+        `[EssayProfileCoordinator] aiRiskSignal written: ` +
+        `score=${signal.score.toFixed(2)}, confidence=${signal.confidence.toFixed(2)}`,
+      );
+    } else {
+      console.log('[EssayProfileCoordinator] aiRiskSignal cleared');
+    }
+
+    // Same bookkeeping as updateImprovementPhase: bump writeVersion, touch
+    // lastMutatedAt, refresh session boundary, recompute the index. The
+    // signal has no downstream staleness dependencies — it is a read-only
+    // input to L3.75 (never a gate), so no staleness propagation is needed.
+    this.writeVersion++;
+    this.profile.metadata.lastMutatedAt = new Date().toISOString();
+    this.sessionBoundary.lastMutationAt = Date.now();
+    this.recomputeIndex();
+  }
+
+  /**
    * Add a detected pattern insight to the profile.
    * Called after coaching turn detectPatterns().
    */

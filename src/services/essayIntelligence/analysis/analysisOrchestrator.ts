@@ -414,6 +414,15 @@ export class AnalysisOrchestrator {
     // ── Checkpoint after Phase 1 ──
     await this.safeCheckpoint(coordinator, 'after_l1_l2');
 
+    // ── Port F2 (Wave-1b): compute aiRiskSignal once per essay ──
+    // Gated on ENABLE_AI_RISK_SIGNAL (opt-in until the ESL A/B confirms
+    // FP ≤ 10% per Verdict §6 Q6). Runs between L1/L2 and L3 so the signal
+    // is in place before L3.75's Phase A reads profile.index.aiRiskSignal
+    // as a diagnostic prior inside its INTENTIONALITY CALIBRATION block.
+    // NON-BLOCKING: a scorer throw is caught and logged inside the helper;
+    // the pipeline continues with the signal absent (pre-port-identical).
+    await this.computeAndWriteAiRiskSignal(coordinator, input.essayText);
+
     // ═══════════════════════════════════════════════════════════════════════
     // PHASE 2: Sequential Deep Walk (L3 — FAIL-FAST)
     // ═══════════════════════════════════════════════════════════════════════
@@ -2294,6 +2303,106 @@ export class AnalysisOrchestrator {
         );
       }
     })();
+  }
+
+  // ==========================================================================
+  // PORT F2 (Wave-1b): aiRiskScorer → ProfileIndex.aiRiskSignal
+  // ==========================================================================
+  // Runs the heuristic AI-authoring risk scorer once per essay, writes the
+  // result into ProfileIndex.aiRiskSignal, and lets L3.75 read it as a
+  // diagnostic prior inside the INTENTIONALITY CALIBRATION block. GATED on
+  // ENABLE_AI_RISK_SIGNAL because the scorer has elevated false-positive
+  // rates on non-native English speakers (per Verdict §6 Q6). The gate
+  // stays opt-in until a 2-week ESL A/B confirms FP ≤ 10%.
+  //
+  // NEVER FATAL: a scorer throw does not stop analysis. L3.75 simply runs
+  // without the prior (pre-port-identical behavior).
+  //
+  // RUN ORDER: after L1/L2 complete, before L3 (and therefore before L3.75).
+  // The scorer is a pure text function — L3's walk does not read the signal,
+  // so running before or after L3 is functionally equivalent; running before
+  // keeps the signal visible for the entire `after_l3` checkpoint.
+
+  private async computeAndWriteAiRiskSignal(
+    coordinator: import('../profileManager/essayProfileManager').EssayProfileCoordinator,
+    essayText: string,
+  ): Promise<void> {
+    if (process.env.ENABLE_AI_RISK_SIGNAL !== 'true') return;
+
+    try {
+      const { aiRiskScorer } = await import('../../authenticity/aiRiskScorer');
+      const assessment = aiRiskScorer.assessRisk(essayText);
+
+      // Normalize the scorer's 0-100 overallRisk to 0..1 for the seam, and
+      // derive a confidence from the essay length (the scorer short-circuits
+      // on < 10 words / < 2 sentences to a minimal zero-risk assessment;
+      // treat those as low-confidence). The `open` slot carries the flagged-
+      // passage count + dominant-signal hint so downstream consumers have
+      // freeform metadata without schema change.
+      const wordCount = essayText.split(/\s+/).filter(w => w.length > 0).length;
+      const confidence = wordCount >= 200 ? 0.85 : wordCount >= 50 ? 0.55 : 0.2;
+
+      const topSignal = this.dominantAiRiskSignal(assessment.metrics);
+      const flaggedCount = assessment.flaggedPassages.length;
+      const open = JSON.stringify({
+        topSignal,
+        flaggedCount,
+        riskLevel: assessment.riskLevel,
+        wordCount,
+      });
+
+      // Build a descriptive notes string (lint scans the block body, not
+      // this notes string directly — but we still author it observationally
+      // to avoid contaminating any future block that interpolates it).
+      const notesParts: string[] = [];
+      notesParts.push(`heuristic overallRisk: ${assessment.overallRisk}/100`);
+      if (topSignal) notesParts.push(`top signal: ${topSignal.name} (${topSignal.score}/100)`);
+      if (flaggedCount > 0) notesParts.push(`${flaggedCount} flagged passage(s)`);
+      notesParts.push(`word count: ${wordCount}`);
+      const notes = notesParts.join('; ');
+
+      coordinator.updateAiRiskSignal({
+        score: assessment.overallRisk / 100,
+        notes,
+        confidence,
+        open,
+      });
+
+      console.log(
+        `[Orchestrator] Port F2 — aiRiskSignal written to ProfileIndex: ` +
+        `score=${(assessment.overallRisk / 100).toFixed(2)}, ` +
+        `confidence=${confidence.toFixed(2)}, ` +
+        `flagged=${flaggedCount}, ` +
+        `riskLevel=${assessment.riskLevel}`,
+      );
+    } catch (error) {
+      console.error(
+        `[Orchestrator] Port F2 — aiRiskScorer compute failed (non-fatal):`,
+        error instanceof Error ? error.message : String(error),
+      );
+      // Intentionally do NOT write a null signal on failure. The seam stays
+      // absent (pre-port-identical prompt) rather than being populated with
+      // degraded data.
+    }
+  }
+
+  /**
+   * Pick the single highest-weighted aiRiskScorer signal for the `open`
+   * metadata slot. Returns null when no signal crossed a reporting threshold.
+   */
+  private dominantAiRiskSignal(
+    metrics: Record<string, number>,
+  ): { name: string; score: number } | null {
+    let bestName: string | null = null;
+    let bestScore = 0;
+    for (const [name, score] of Object.entries(metrics)) {
+      if (typeof score === 'number' && score > bestScore) {
+        bestScore = score;
+        bestName = name;
+      }
+    }
+    if (bestName === null || bestScore < 20) return null;
+    return { name: bestName, score: bestScore };
   }
 }
 

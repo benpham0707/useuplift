@@ -2033,16 +2033,37 @@ export interface ProfileIndex {
    * produced by the `aiRiskScorer` runtime utility. Lives on ProfileIndex
    * (not on L1 output) because it is an essay-level property, not a per-
    * paragraph observation. Null until Port F2 enables the scorer; populated
-   * at analysis start and re-computed on substantive edits.
+   * at analysis start (gated on ENABLE_AI_RISK_SIGNAL) and re-computed on
+   * substantive edits.
    *
-   * Consumed by: coaching (surface AI-authoring concerns), UI (authenticity
-   *   panel), L3.5 calibration (elevated risk tightens the anti-fabrication
-   *   guard from Port G1).
+   * Consumed by: L3.75 INTENTIONALITY CALIBRATION as a DIAGNOSTIC PRIOR (not
+   *   ground truth). L3.75 reads this signal; it does NOT mutate it. The
+   *   authentic-vs-performed assessment remains evidence-based — the prior
+   *   is only context. L3.5 may also factor it into anti-fabrication guard
+   *   (Port G1) calibration.
+   *
+   * KNOWN LIMITATION: The underlying `aiRiskScorer` uses 7 heuristic text
+   * signals (vocabulary uniformity, sentence-length variance, banned-term
+   * density, cliché density, hedging, adverb density, generic reflections).
+   * These signals show elevated false-positive rates on non-native English
+   * speakers (ESL cohort). Per Verdict §6 Q6, default-on is gated on a
+   * 2-week ESL A/B with a ≤10% FP threshold. Until that gate passes,
+   * ENABLE_AI_RISK_SIGNAL stays opt-in only.
+   *
+   * The `open` string|null escape hatch follows LLM-first Rule 3: even for
+   * a numeric signal, downstream consumers (coaching, UI, L3.5) can carry
+   * freeform metadata (e.g., which heuristic dominated, whether the essay
+   * was too short for certain signals) without a schema change.
    */
   aiRiskSignal?: {
+    /** 0..1 AI-authoring risk score (normalized from the 0-100 scorer output). */
     score: number;
+    /** Free-text rationale — summary of which signals contributed. */
     notes: string;
+    /** 0..1 confidence the signal is reliable given text length + heuristic coverage. */
     confidence: number;
+    /** OpenEnum escape hatch per Rule 3: freeform metadata from the scorer. */
+    open: string | null;
   } | null;
 
   /**
