@@ -11,10 +11,19 @@
 -- production and local environments see a no-op CREATE and then apply the
 -- new columns; preview environments that don't have the table get both
 -- the table and the columns in one step.
+--
+-- IMPORTANT: The FK `REFERENCES essays(id)` is intentionally OMITTED here
+-- (matches the sibling bootstrap at 20260402000000). On preview environments
+-- the essays table may also be missing — including the FK causes the entire
+-- CREATE to silently roll back via FK-target resolution failure, which
+-- leaves essay_understanding uncreated and the ALTER below still fails with
+-- "relation does not exist". Production and local already have the full
+-- table (with FK, indexes, RLS, triggers) from 20260304000002; the
+-- CREATE TABLE IF NOT EXISTS below is a no-op there, preserving the FK.
 
 CREATE TABLE IF NOT EXISTS essay_understanding (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  essay_id UUID NOT NULL REFERENCES essays(id) ON DELETE CASCADE,
+  essay_id UUID NOT NULL,
   user_id TEXT NOT NULL,
   version INTEGER NOT NULL DEFAULT 1,
   essay_type TEXT NOT NULL,
