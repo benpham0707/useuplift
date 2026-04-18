@@ -120,6 +120,44 @@ export class ImprovementCandidateStore {
   }
 
   /**
+   * Port G2 (Focus Mode) — rank active candidates by ROI and mark all but the
+   * top-N with `visible=false`. Does NOT remove candidates from the store
+   * (Rule 2 — never discard paid LLM output). Idempotent: re-running with
+   * the same input produces identical `visible` assignments.
+   *
+   * ROI = priorityScore × phaseAlignmentScore, where:
+   *   - priorityScore: coachingValue → number
+   *     { critical: 4, high: 3, medium: 2, contextual: 1.5, diagnostic: 1 }
+   *   - phaseAlignmentScore: 1.0 when the candidate's implied phase matches
+   *     `currentPhase`, else 0.6.
+   *
+   * Implied-phase heuristic (documented inline — simple, not load-bearing):
+   *   foundation   ← coachingValue=critical OR technique ∈ {show_dont_tell, specificity, concrete_detail, narrative_clarity}
+   *   architecture ← coachingValue=high OR technique ∈ {structural_role, through_line, fulcrum, earned_moment}
+   *   craft        ← technique ∈ {anaphora, juxtaposition, sensory_detail, vocabulary_domain, rhythm, cadence}
+   *   polish       ← coachingValue=medium without craft technique
+   *   distinction  ← coachingValue=contextual or diagnostic
+   *
+   * `maxVisible` is clamped to a minimum of 2 — the research supports 2-3,
+   * not 1 (Sommers 1982; Kluger & DeNisi 1996).
+   *
+   * Ref: docs/V1_KNOWLEDGE_ABSORPTION_VERDICT.md §3 Port G2.
+   */
+  rankAndApplyFocusMode(
+    currentPhase: string | null,
+    maxVisible: number = 3,
+  ): void {
+    const cap = Math.max(2, maxVisible);
+    const active = this.getActive();
+    const scored = active
+      .map((c) => ({ c, roi: computeFocusRoi(c, currentPhase) }))
+      .sort((a, b) => b.roi - a.roi);
+    for (let i = 0; i < scored.length; i++) {
+      scored[i].c.visible = i < cap;
+    }
+  }
+
+  /**
    * Mark candidates as consolidated (L4 absorbed them into a CoachingMap
    * priority). Does NOT un-supersede already-superseded candidates — the
    * lifecycle transitions are strict forward moves.
@@ -216,4 +254,54 @@ export class ImprovementCandidateStore {
     store.nextId = snapshot.nextId;
     return store;
   }
+}
+
+// ============================================================================
+// Port G2 — Focus Mode ROI helpers
+// ============================================================================
+
+const G2_PRIORITY_SCORE: Record<ImprovementCandidate['coachingValue'], number> = {
+  critical: 4,
+  high: 3,
+  medium: 2,
+  contextual: 1.5,
+  diagnostic: 1,
+};
+
+const G2_FOUNDATION_TECHNIQUES = new Set([
+  'show_dont_tell', 'specificity', 'concrete_detail', 'narrative_clarity',
+]);
+const G2_ARCHITECTURE_TECHNIQUES = new Set([
+  'structural_role', 'through_line', 'fulcrum', 'earned_moment',
+]);
+const G2_CRAFT_TECHNIQUES = new Set([
+  'anaphora', 'juxtaposition', 'sensory_detail', 'vocabulary_domain',
+  'rhythm', 'cadence',
+]);
+
+function impliedPhaseFor(c: ImprovementCandidate): string {
+  const tech = c.technique?.toLowerCase() ?? '';
+  if (c.coachingValue === 'critical' || G2_FOUNDATION_TECHNIQUES.has(tech)) {
+    return 'foundation';
+  }
+  if (c.coachingValue === 'high' || G2_ARCHITECTURE_TECHNIQUES.has(tech)) {
+    return 'architecture';
+  }
+  if (G2_CRAFT_TECHNIQUES.has(tech)) {
+    return 'craft';
+  }
+  if (c.coachingValue === 'medium') {
+    return 'polish';
+  }
+  // contextual + diagnostic
+  return 'distinction';
+}
+
+export function computeFocusRoi(
+  c: ImprovementCandidate,
+  currentPhase: string | null,
+): number {
+  const priority = G2_PRIORITY_SCORE[c.coachingValue] ?? 0;
+  const alignment = currentPhase && impliedPhaseFor(c) === currentPhase ? 1.0 : 0.6;
+  return priority * alignment;
 }
