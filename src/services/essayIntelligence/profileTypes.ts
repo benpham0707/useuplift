@@ -31,6 +31,11 @@
 // surface is re-exported at the bottom of this file for consumer convenience.
 import type { RevisionHistory } from './history/profileSnapshot';
 
+// PIQPromptType is imported for ProfileIndex.piqPromptType (Wave-1b pre-req 6).
+// Re-exported at the bottom of this file so essayIntelligence consumers can
+// import it directly from profileTypes without reaching into the piq service.
+import type { PIQPromptType } from '../piq/types';
+
 // ============================================================================
 // PHASE 2 — HISTORICAL INTELLIGENCE SIGNALS
 // ============================================================================
@@ -469,6 +474,54 @@ export type CheckpointReason =
 // ============================================================================
 
 /**
+ * OpenEnum — closed-taxonomy escape hatch (LLM-first doctrine Rule 3).
+ *
+ * Any field that constrains LLM output to an enumerated set MUST expose a
+ * sibling `open: string | null` field so the model can emit a free-text
+ * classification when its perception does not fit the enum. This prevents
+ * the system from silently hitting the closed-taxonomy ceiling.
+ *
+ * Usage pattern:
+ *   {
+ *     symptomType: 'manufactured_vulnerability' | 'generic_insight' | null,
+ *     symptomTypeOpen: string | null,  // populated when none of the enum values fit
+ *   }
+ *
+ * The companion `...Open` field is null when the enum classification is confident;
+ * populated (and the enum null) when the LLM chooses free-text instead.
+ *
+ * Enforced by: tests/test-open-escape-hatch.ts (schema validator)
+ * Ref: V1_KNOWLEDGE_ABSORPTION_VERDICT.md Section 4 Pre-req 5
+ */
+
+/**
+ * KnowledgePatternMatch — a structured cross-reference to an R&D-workshop
+ * pattern ID (e.g., from `piq/issuePatterns.ts` or the Common App issue
+ * library). Emitted by L3.5 when the analysis recognizes a pattern documented
+ * in the knowledge base. The pattern ID + source gives coaching and UI a
+ * stable identifier for cross-essay aggregation; `open` is the LLM-first
+ * escape hatch for novel patterns the library doesn't name.
+ *
+ * Populated by: analysisPass.ts (L3.5) after Port B1 lands
+ * Consumed by: coachingService (patternId → fix strategy lookup), UI
+ * Ref: V1_KNOWLEDGE_ABSORPTION_VERDICT.md Section 4 Pre-req 1, Port B1
+ */
+export interface KnowledgePatternMatch {
+  /** Pattern library source — expand as new libraries are wired in. */
+  source: 'piq' | 'commonApp' | 'narrative' | 'activity' | 'piqAntiPattern';
+  /** Stable pattern identifier from the source library (e.g., 'hook_generic_opener'). */
+  patternId: string | null;
+  /** Free-text classification when the LLM recognizes a pattern the library doesn't name. */
+  patternOpen: string | null;
+  /** LLM confidence in this match (0-1). */
+  confidence: number;
+  /** Essay text that triggered the match (cognitive forcing function — cite evidence). */
+  evidence: string;
+  /** Severity of the instance as read in context (library-level severity can be looked up separately). */
+  severity: 'minor' | 'major' | 'critical' | null;
+}
+
+/**
  * ObservationEntry — the multi-observation unit used everywhere for fields
  * where a single sentence/element can have multiple distinct observations.
  *
@@ -648,6 +701,26 @@ export interface SentenceAnalysis {
    * LLM chose not to produce a concrete suggestedChange.
    */
   improvementCandidate?: ImprovementCandidate | null;
+
+  /**
+   * Wave-1b pre-req (Port B1 seam): structured references to R&D-workshop
+   * pattern libraries (PIQ 41-pattern, Common App issue library, etc.) that
+   * this sentence triggers. Populated by L3.5 after Port B1 injects the
+   * pattern library into the analysis prompt. Sentence-local scope only —
+   * architectural-scope matches live on `AnalysisPassOutput.paragraphPatternMatches`.
+   * Optional for backward compat; empty array when no library matches.
+   */
+  patternMatches?: KnowledgePatternMatch[];
+
+  /**
+   * Wave-1b pre-req (Port B2 seam): SymptomDiagnoser 29-type classification
+   * for structural weaknesses (e.g., 'generic_opener', 'imposed_epiphany').
+   * `symptomType` is the enum slot; `symptomTypeOpen` is the LLM-first escape
+   * hatch when no enum value fits. See OpenEnum convention above.
+   * Both null when the sentence is not a symptom carrier.
+   */
+  symptomType?: string | null;
+  symptomTypeOpen?: string | null;
 }
 
 /**
@@ -1918,6 +1991,35 @@ export interface ProfileIndex {
       coachingValue: FindingCoachingValue;
     }>;
   };
+
+  /**
+   * Wave-1b pre-req 2 (Port F2 seam): essay-level AI-authoring risk signal
+   * produced by the `aiRiskScorer` runtime utility. Lives on ProfileIndex
+   * (not on L1 output) because it is an essay-level property, not a per-
+   * paragraph observation. Null until Port F2 enables the scorer; populated
+   * at analysis start and re-computed on substantive edits.
+   *
+   * Consumed by: coaching (surface AI-authoring concerns), UI (authenticity
+   *   panel), L3.5 calibration (elevated risk tightens the anti-fabrication
+   *   guard from Port G1).
+   */
+  aiRiskSignal?: {
+    score: number;
+    notes: string;
+    confidence: number;
+  } | null;
+
+  /**
+   * Wave-1b pre-req 6 (Port A3 dependency): UC PIQ prompt discriminator.
+   * Populated at analysis start via `detectPIQType()` in
+   * `src/services/piq/prompts/promptMetadata.ts` when the essay is a PIQ.
+   * Null for Common App, supplemental, and other non-PIQ essays.
+   *
+   * Downstream ports (A3, Port 11) route PIQ-specific rubric weights and
+   * teaching examples based on this field. Without it, those ports would
+   * inject the wrong weights for 7 of 8 PIQs.
+   */
+  piqPromptType?: PIQPromptType | null;
 }
 
 // ============================================================================
@@ -3638,11 +3740,25 @@ export interface AnalysisPassOutput {
      * See SentenceAnalysis.improvementCandidate for the fuller contract.
      */
     improvementCandidate?: ImprovementCandidate | null;
+    /** Wave-1b pre-req seam (Port B1): sentence-scope pattern-library matches. */
+    patternMatches?: KnowledgePatternMatch[];
+    /** Wave-1b pre-req seam (Port B2): SymptomDiagnoser classification + escape hatch. */
+    symptomType?: string | null;
+    symptomTypeOpen?: string | null;
   }>;
 
   /** Paragraph-level analysis */
   paragraphEffectiveness: number;
   paragraphVerdict: string;
+
+  /**
+   * Wave-1b pre-req (Port B1 architectural-scope channel): paragraph-scope
+   * pattern matches — hook/arc/structural issues that span sentences. Kept
+   * separate from sentence-level `patternMatches` so scope is preserved and
+   * coaching can decide whether a fix lands at sentence edit or architectural
+   * revision granularity.
+   */
+  paragraphPatternMatches?: KnowledgePatternMatch[];
 
   /** Essay-specific calibration reflection produced BEFORE scoring (anti-clustering). Optional for backward compat. */
   calibrationReflection?: string;
@@ -4678,3 +4794,6 @@ export type {
   RevisionResetSignal,
   RevisionHistory,
 } from './history/profileSnapshot';
+
+// PIQPromptType re-exported for ProfileIndex.piqPromptType consumers.
+export type { PIQPromptType } from '../piq/types';
