@@ -511,7 +511,19 @@ export interface KnowledgePatternMatch {
   source: 'piq' | 'commonApp' | 'narrative' | 'activity' | 'piqAntiPattern';
   /** Stable pattern identifier from the source library (e.g., 'hook_generic_opener'). */
   patternId: string | null;
-  /** Free-text classification when the LLM recognizes a pattern the library doesn't name. */
+  /**
+   * OpenEnum escape hatch (Wave-1b Pre-req 5). When the LLM recognizes a
+   * failure pattern that none of the library entries name, it emits a
+   * free-text description in `open` and leaves `patternId` null. Either
+   * `patternId` (known) or `open` (novel) must be non-null when the match
+   * is emitted; validateAndTransform enforces this.
+   */
+  open: string | null;
+  /**
+   * Alias for `open` — retained for backward compat with the Wave-1b seam
+   * draft where the field was named `patternOpen`. New callers should prefer
+   * `open`. Kept in sync with `open` by validateAndTransform.
+   */
   patternOpen: string | null;
   /** LLM confidence in this match (0-1). */
   confidence: number;
