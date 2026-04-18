@@ -12,6 +12,7 @@
 
 import type { BuiltInEditingCommand } from './types';
 import type { CommandManifest } from '../../workshop/shared/types';
+import { buildFabricationGuardBlock } from '../../lib/llm/fabricationGuard';
 
 // ============================================================================
 // TYPES
@@ -166,7 +167,9 @@ RULES:
 
 ${BANNED_TERMS}
 
-${OUTPUT_FORMAT}`;
+${OUTPUT_FORMAT}
+
+${buildFabricationGuardBlock()}`;
 }
 
 // ============================================================================
