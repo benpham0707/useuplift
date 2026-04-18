@@ -2351,6 +2351,35 @@ export class EssayProfileCoordinator {
   }
 
   /**
+   * Port A3 (Wave-1a gap-fix): write the detected PIQ prompt type into the
+   * profile index. Called by the orchestrator at analysis start when
+   * `essayType === 'piq'`. Without this, `profile.index.piqPromptType` stays
+   * null, A3's PIQ_MODE block at L3.5 never activates, and A3 is a silent
+   * no-op for every PIQ essay.
+   *
+   * Passing null explicitly clears the field (e.g., on a re-analysis where
+   * the orchestrator decides the detection is stale).
+   */
+  updatePiqPromptType(
+    promptType: import('../../piq/types').PIQPromptType | null,
+  ): void {
+    this.checkSessionBoundary();
+    this.profile.index.piqPromptType = promptType;
+    console.log(
+      `[EssayProfileCoordinator] piqPromptType ${promptType ? `set to ${promptType}` : 'cleared'}`,
+    );
+
+    // Same bookkeeping as updateAiRiskSignal: bump writeVersion, touch
+    // lastMutatedAt, refresh session boundary, recompute the index. No
+    // downstream staleness propagation — piqPromptType is a read-only
+    // routing signal consumed by L3.5 PIQ_MODE.
+    this.writeVersion++;
+    this.profile.metadata.lastMutatedAt = new Date().toISOString();
+    this.sessionBoundary.lastMutationAt = Date.now();
+    this.recomputeIndex();
+  }
+
+  /**
    * Add a detected pattern insight to the profile.
    * Called after coaching turn detectPatterns().
    */
