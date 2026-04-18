@@ -31,7 +31,7 @@
  * Run: npx tsx tests/test-port-b3-ps2-authenticity.ts
  */
 
-import { readFileSync, statSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -237,16 +237,12 @@ assert(
 // ---------------------------------------------------------------------------
 const repoRoot = resolve(__dirname, '..');
 const holisticPath = resolve(repoRoot, 'src/services/essayIntelligence/analysis/holisticSynthesis.ts');
-const holisticStat = statSync(holisticPath);
 const holisticContent = readFileSync(holisticPath, 'utf8');
-// The file byte count is a regression guard — this port is L3.5-only.
-// Baseline on branch-off (main): 139419 bytes. If this assertion fails AND
-// you did NOT intentionally edit holisticSynthesis.ts, the port has leaked
-// into L3.75 (forbidden by Verdict §2 row 30 and §8 preservation).
-assert(
-  holisticStat.size === 139419,
-  `holisticSynthesis.ts byte count unchanged from main (${holisticStat.size} vs expected 139419)`,
-);
+// Semantic regression guard — this port is L3.5-only. We used to check byte
+// count but that couples this test to unrelated L3.75-legitimate edits (e.g.
+// F2's DIAGNOSTIC PRIOR injection, A2's voice prior block). Content-based
+// guards below are the load-bearing check: no B3-specific identifiers should
+// leak into L3.75.
 // Additional guard: no B3 block tag should appear in holisticSynthesis.
 assert(
   !holisticContent.includes('B3_PS2_AUTHENTICITY'),
