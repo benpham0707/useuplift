@@ -36,6 +36,11 @@ import type { RevisionHistory } from './history/profileSnapshot';
 // import it directly from profileTypes without reaching into the piq service.
 import type { PIQPromptType } from '../piq/types';
 
+// EssayAuthenticityTier is imported for AnalysisPassOutput.essayAuthenticityTier
+// (Port B3 — PS2 4-tier authenticity at L3.5). Re-exported at the bottom of
+// this file so essayIntelligence consumers can import it directly.
+import type { EssayAuthenticityTier } from './rubrics/authenticityTiers';
+
 // ============================================================================
 // PHASE 2 — HISTORICAL INTELLIGENCE SIGNALS
 // ============================================================================
@@ -511,7 +516,19 @@ export interface KnowledgePatternMatch {
   source: 'piq' | 'commonApp' | 'narrative' | 'activity' | 'piqAntiPattern';
   /** Stable pattern identifier from the source library (e.g., 'hook_generic_opener'). */
   patternId: string | null;
-  /** Free-text classification when the LLM recognizes a pattern the library doesn't name. */
+  /**
+   * OpenEnum escape hatch (Wave-1b Pre-req 5). When the LLM recognizes a
+   * failure pattern that none of the library entries name, it emits a
+   * free-text description in `open` and leaves `patternId` null. Either
+   * `patternId` (known) or `open` (novel) must be non-null when the match
+   * is emitted; validateAndTransform enforces this.
+   */
+  open: string | null;
+  /**
+   * Alias for `open` — retained for backward compat with the Wave-1b seam
+   * draft where the field was named `patternOpen`. New callers should prefer
+   * `open`. Kept in sync with `open` by validateAndTransform.
+   */
   patternOpen: string | null;
   /** LLM confidence in this match (0-1). */
   confidence: number;
@@ -2016,16 +2033,37 @@ export interface ProfileIndex {
    * produced by the `aiRiskScorer` runtime utility. Lives on ProfileIndex
    * (not on L1 output) because it is an essay-level property, not a per-
    * paragraph observation. Null until Port F2 enables the scorer; populated
-   * at analysis start and re-computed on substantive edits.
+   * at analysis start (gated on ENABLE_AI_RISK_SIGNAL) and re-computed on
+   * substantive edits.
    *
-   * Consumed by: coaching (surface AI-authoring concerns), UI (authenticity
-   *   panel), L3.5 calibration (elevated risk tightens the anti-fabrication
-   *   guard from Port G1).
+   * Consumed by: L3.75 INTENTIONALITY CALIBRATION as a DIAGNOSTIC PRIOR (not
+   *   ground truth). L3.75 reads this signal; it does NOT mutate it. The
+   *   authentic-vs-performed assessment remains evidence-based — the prior
+   *   is only context. L3.5 may also factor it into anti-fabrication guard
+   *   (Port G1) calibration.
+   *
+   * KNOWN LIMITATION: The underlying `aiRiskScorer` uses 7 heuristic text
+   * signals (vocabulary uniformity, sentence-length variance, banned-term
+   * density, cliché density, hedging, adverb density, generic reflections).
+   * These signals show elevated false-positive rates on non-native English
+   * speakers (ESL cohort). Per Verdict §6 Q6, default-on is gated on a
+   * 2-week ESL A/B with a ≤10% FP threshold. Until that gate passes,
+   * ENABLE_AI_RISK_SIGNAL stays opt-in only.
+   *
+   * The `open` string|null escape hatch follows LLM-first Rule 3: even for
+   * a numeric signal, downstream consumers (coaching, UI, L3.5) can carry
+   * freeform metadata (e.g., which heuristic dominated, whether the essay
+   * was too short for certain signals) without a schema change.
    */
   aiRiskSignal?: {
+    /** 0..1 AI-authoring risk score (normalized from the 0-100 scorer output). */
     score: number;
+    /** Free-text rationale — summary of which signals contributed. */
     notes: string;
+    /** 0..1 confidence the signal is reliable given text length + heuristic coverage. */
     confidence: number;
+    /** OpenEnum escape hatch per Rule 3: freeform metadata from the scorer. */
+    open: string | null;
   } | null;
 
   /**
@@ -2202,6 +2240,15 @@ export interface ImprovementCandidate {
   supersededBy: string | null;
   /** ISO 8601 timestamp of emission */
   createdAt: string;
+  /**
+   * Port G2 (Focus Mode): surfaced-to-student gate. Default undefined (treated
+   * as visible for pre-port consumers). When Focus Mode is active, L5
+   * finalization calls `improvementCandidateStore.rankAndApplyFocusMode()` and
+   * flips `visible = false` on all candidates beyond the top-N by ROI. Full
+   * emission stays in the store (Rule 2 — never discard paid LLM output); the
+   * UI read layer is the only consumer that filters by this flag.
+   */
+  visible?: boolean;
 }
 
 /**
@@ -3803,6 +3850,25 @@ export interface AnalysisPassOutput {
   /** How this paragraph compares to the anchor paragraph. Null for the anchor itself. Optional for backward compat. */
   comparativeNotes?: string | null;
 
+  /**
+   * Port B3 — PS2 authenticity classification (essay-level, emitted at L3.5).
+   * `distinctive` / `authentic` / `emerging` / `manufactured`. `open` escape
+   * hatch per OpenEnum convention; both null on non-emission (e.g. non-anchor
+   * paragraphs or legacy analyses predating Port B3).
+   *
+   * This is L3.5's evaluative authenticity surface — NOT L3.75 (which is
+   * descriptive-only and may not emit scores per the descriptive contract).
+   */
+  essayAuthenticityTier?: EssayAuthenticityTier | null;
+  essayAuthenticityTierOpen?: string | null;
+  /**
+   * PS2 narrative quality index 0-100. Optional. Null when not assessed.
+   * This is L3.5's evaluative scoring surface — NOT L3.75. Anchored to the
+   * 4-tier authenticity bands (80-100 distinctive / 70-79 authentic /
+   * 60-69 emerging / <60 manufactured).
+   */
+  narrativeQualityIndex?: number | null;
+
   /** Essay-level evaluative insights that emerged from analyzing this paragraph */
   holisticAnalysisEvolution: {
     strengthSignatures?: Array<{ quality: string; evidence: string; paragraphs: number[] }>;
@@ -4835,3 +4901,6 @@ export type {
 
 // PIQPromptType re-exported for ProfileIndex.piqPromptType consumers.
 export type { PIQPromptType } from '../piq/types';
+
+// EssayAuthenticityTier re-exported for AnalysisPassOutput consumers (Port B3).
+export type { EssayAuthenticityTier } from './rubrics/authenticityTiers';

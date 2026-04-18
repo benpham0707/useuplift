@@ -77,6 +77,7 @@ import {
 } from './techniqueVocabulary';
 import type { StudentVoiceProfile } from '../../voiceProfile/types';
 import { buildPriorVoiceBlock } from './priorVoiceBlock';
+import { buildAiRiskSignalBlock } from './aiRiskSignalBlock';
 
 // ============================================================================
 // CONSTANTS
@@ -1881,8 +1882,17 @@ export class HolisticSynthesisService {
     const priorVoiceBlock = buildPriorVoiceBlock(input.priorVoiceProfile);
     const priorVoicePreamble = priorVoiceBlock ? priorVoiceBlock + '\n\n' : '';
 
+    // Port F2 (Wave-1b): prepend aiRiskScorer diagnostic prior when the
+    // orchestrator has populated profile.index.aiRiskSignal (gated on
+    // ENABLE_AI_RISK_SIGNAL). Empty string when the signal is null/
+    // undefined, producing pre-port-identical user prompt. The prior is
+    // DIAGNOSTIC — L3.75 reads, never mutates. See aiRiskSignalBlock.ts.
+    const aiRiskSignalBlock = buildAiRiskSignalBlock(input.profile.index.aiRiskSignal ?? null);
+    const aiRiskPreamble = aiRiskSignalBlock ? aiRiskSignalBlock + '\n\n' : '';
+
     const userPrompt = [
       priorVoicePreamble,
+      aiRiskPreamble,
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',
@@ -2088,8 +2098,16 @@ export class HolisticSynthesisService {
     const priorVoiceBlock = buildPriorVoiceBlock(input.priorVoiceProfile);
     const priorVoicePreamble = priorVoiceBlock ? priorVoiceBlock + '\n\n' : '';
 
+    // Port F2 (Wave-1b): prepend aiRiskScorer diagnostic prior. Same
+    // invariant as synthesize() — empty when the signal is null, wrapped
+    // with F2_AI_RISK_SIGNAL version markers when present. Read-only from
+    // profile.index; this iteration loop never mutates the signal.
+    const aiRiskSignalBlock = buildAiRiskSignalBlock(input.profile.index.aiRiskSignal ?? null);
+    const aiRiskPreamble = aiRiskSignalBlock ? aiRiskSignalBlock + '\n\n' : '';
+
     const userPrompt = [
       priorVoicePreamble,
+      aiRiskPreamble,
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',

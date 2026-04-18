@@ -37,6 +37,7 @@ import { FindingStore, buildFindingContext } from '../findings';
 import { ConnectionGraph, buildHolisticConnectionContext } from '../connections';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { PipelineError } from '../errors';
+import { buildScoreMatrixAnchorsBlock } from './scoreMatrixAnchors';
 import type {
   EssayProfile,
   EssayType,
@@ -494,6 +495,8 @@ Before assigning scores, you MUST:
    - 30-49: Weak — significant room for improvement
    - Below 30: Actively problematic for this dimension
    If all paragraphs cluster in the 70-85 range for any dimension, you have FAILED to differentiate.
+
+${buildScoreMatrixAnchorsBlock()}
 
 verdict: A single sentence capturing the paragraph's architectural assessment.
 BAD: "Good paragraph with strong writing."

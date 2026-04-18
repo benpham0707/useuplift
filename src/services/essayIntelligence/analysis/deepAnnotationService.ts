@@ -752,6 +752,20 @@ class DeepAnnotationService {
       0,
     ) + allAnnotations.essayLevelAnnotations.length + crossParagraphAnnotations.length;
 
+    // Port G2 — Focus Mode. When ENABLE_FOCUS_MODE is set, rank active
+    // candidates by ROI and mark all but the top-N with `visible = false`.
+    // Full emission stays in the store (Rule 2 — nothing discarded); only
+    // the UI read layer filters by this flag. Off by default so UX
+    // instrumentation can A/B measure implementation-rate delta before
+    // default-on.
+    if (process.env.ENABLE_FOCUS_MODE === 'true' && candidateStore) {
+      try {
+        candidateStore.rankAndApplyFocusMode(phase.level, 3);
+      } catch (err) {
+        console.error('[L5] G2 rankAndApplyFocusMode failed (non-blocking):', err);
+      }
+    }
+
     return {
       paragraphAnnotations: allAnnotations.paragraphAnnotations,
       essayLevelAnnotations: allAnnotations.essayLevelAnnotations,
