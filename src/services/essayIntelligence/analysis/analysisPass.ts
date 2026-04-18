@@ -61,6 +61,7 @@ import {
   isEssayAuthenticityTier,
   type EssayAuthenticityTier,
 } from '../rubrics/authenticityTiers';
+import { withPromptBlockVersion } from '../../../lib/llm/promptBlockVersions';
 
 // ============================================================================
 // CONSTANTS
@@ -92,6 +93,39 @@ const CONCURRENCY_LIMIT = 2;
  * Large context + detailed output = needs breathing room.
  */
 const PER_PARAGRAPH_TIMEOUT_MS = 90_000;
+
+/**
+ * Port F1 — Cliché Anchor Extension for L3.5 SCORE 38 / SCORE 52 bands.
+ *
+ * Extends the existing anchored-score calibration examples in
+ * `buildSystemPrompt()` with 3 SCORE-38 + 2 SCORE-52 cliché-pattern anchors.
+ * The anchors calibrate the model toward R&D-library-style cliché recognition
+ * via SEMANTIC MATCHING, NOT regex. The 500-phrase reference library itself
+ * stays server-side only (see taxonomies/clicheLibrary.ts).
+ *
+ * Block slot: F1_CLICHE_ANCHORS @ v1.0.0 (declared `evaluative` — L3.5
+ * territory, forbidden-vocab lint does NOT scan this body).
+ *
+ * Ref: docs/V1_KNOWLEDGE_ABSORPTION_VERDICT.md §3 Port F1 + §5 Row 2 + §8.
+ */
+// @prompt-block F1_CLICHE_ANCHORS
+const F1_CLICHE_ANCHOR_EXTENSION_BODY = `ADDITIONAL CLICHÉ ANCHORS — use these as calibration examples for the SCORE 38 and SCORE 52 bands when the student's essay contains language that SEMANTICALLY matches these patterns (not literal string matches — match the underlying move: stock passion-discovery phrasing, unearned tapestry/journey abstraction, manufactured epiphany, oversimplified transformation).
+
+SCORE 38: "In high school, I decided to delve deeper into my passion for computer science."
+WHY 38: 'Delve deeper into my passion for' is among the most-used stock phrases in college essays — it names an activity without a single concrete detail. 'Passion for computer science' is an abstract declaration, not a scene. Any applicant in any field could swap the noun and the sentence would still work, which is the definition of interchangeable language. Zero sensory grounding, zero specific memory.
+
+SCORE 38: "This tapestry of experiences has shaped who I am today."
+WHY 38: 'Tapestry of experiences' is an AI-convergence metaphor — an abstract container word ('tapestry') paired with an abstract collective ('experiences') paired with a closing abstraction ('who I am today'). The sentence has no noun an admissions officer could picture and no verb describing an action that happened. It is structurally an essay ending template, not a sentence about this particular writer.
+
+SCORE 38: "That summer sparked my passion for medicine and ignited my curiosity about the human body."
+WHY 38: 'Sparked my passion' and 'ignited my curiosity' are the two most over-used metaphors in the medical-essay genre — paired here they produce double-cliché density. The sentence asserts the emotional transformation ('sparked', 'ignited') rather than showing what specifically happened that summer. Replace both verbs with any other activating verb and the sentence says the same empty thing.
+
+SCORE 52: "Volunteering at the hospital had a profound impact on me and forever changed my perspective on medicine."
+WHY 52: 'Profound impact' and 'forever changed my perspective' are stock transformation phrases — the sentence gestures at real experience (volunteering at a hospital is concrete and specific to the writer) but reaches for the laziest available closing abstractions. The ACTIVITY is grounded; the REFLECTION is borrowed. That gap between concrete setup and generic payoff is why it sits at 52, not 38: the reader learns the writer was there, but learns nothing about what the writer saw or understood.
+
+SCORE 52: "That conversation with my grandmother was a defining moment in my life that taught me the value of perseverance."
+WHY 52: A real memory is gestured at ('conversation with my grandmother') but instantly flattened by the two laziest available wrappers: 'defining moment in my life' + 'taught me the value of X'. The writer had a specific exchange, probably with specific words and a specific room; instead of the exchange we get the summary-of-the-summary. The grounding detail keeps it above 38; the double-cliché reflection keeps it below the 55-75 functional band.
+`;
 
 // ============================================================================
 // RESULT TYPE
@@ -401,6 +435,14 @@ function buildSystemPrompt(
   // block marker; non-B3 deployments see the block absent and land on the
   // original cache entry.
   const ps2AuthenticityBlock = buildPs2AuthenticityBlock();
+  // Port F1 — cliché anchor extension. Block-versioned so content edits
+  // bump F1_CLICHE_ANCHORS and invalidate only this slice of the cached
+  // system prompt. Level: evaluative (L3.5 territory — forbidden-vocab
+  // lint exempts the body).
+  const clicheAnchorsBlock = withPromptBlockVersion(
+    F1_CLICHE_ANCHOR_EXTENSION_BODY,
+    'F1_CLICHE_ANCHORS',
+  );
 
   const basePrompt = `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
 
@@ -439,6 +481,8 @@ WHY 88: 'Wanted to disappear' is emotionally honest without melodrama. 'Three we
 
 SCORE 78 (admissions resonance): "That semester my GPA dropped from a 3.8 to a 2.4, and I told no one."
 WHY 78: Craft is PLAIN — no imagery, no metaphor, no rhythm. But admissions resonance is exceptional: the specific numbers (3.8 → 2.4) prove this is real, not performed. 'I told no one' reveals isolation, shame, and the gap between public persona and private struggle — an AO learns more about this applicant from this one sentence than from three paragraphs of polished prose. High revelation density compensates for modest craft. This is what it looks like when admissions resonance outweighs pure craft in scoring.
+
+${clicheAnchorsBlock}
 
 ## REFERENCING FINDINGS (PRIMARY CONTEXT)
 

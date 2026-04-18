@@ -174,7 +174,7 @@ export interface ClicheAnalyzerOptions {
 // COMMON ESSAY CLICHÉS (Reference for AI, not for pattern matching)
 // ============================================================================
 
-const CLICHE_REFERENCE = {
+export const CLICHE_REFERENCE = {
   // Common topics that need fresh framing
   common_topics: [
     'immigration/cultural adjustment',
