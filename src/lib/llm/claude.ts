@@ -261,6 +261,51 @@ const DEFAULT_MODEL = 'claude-sonnet-4-5-20250929'; // Sonnet 4.5
 const DEFAULT_MAX_TOKENS = 4096;
 
 // ============================================================================
+// SYSTEM PROMPT VERSIONING (Wave-1b Pre-req 3)
+// ============================================================================
+
+/**
+ * Current system-prompt schema version.
+ *
+ * Anthropic's prompt cache is keyed by the literal text of the cached block
+ * (plus model + the ordered block prefix). We cannot inject a version into
+ * a separate "cache key" field — there is no such field. Instead we prepend
+ * a short, semantically inert marker to the TOP of every cached system
+ * prompt. Two deploys with the same prompt text but different versions
+ * therefore produce different cache entries, and a deploy that edits a
+ * cached prompt gets a clean cache cut instead of partial/silent drift.
+ *
+ * BUMP THIS on any edit to a cached system prompt. Wave-1b knowledge-
+ * absorption ports (B1, B2, B3, F1, G3) will bump it as they land. Leave
+ * it at v1.3.0 until a port actually changes a prompt.
+ *
+ * Ref: docs/V1_KNOWLEDGE_ABSORPTION_VERDICT.md Section 4 Pre-req 3
+ */
+export const SYSTEM_PROMPT_VERSION = 'v1.3.0';
+
+/**
+ * Prefix a system-prompt string with the current version marker so the
+ * Anthropic prompt cache keys it by (prompt_text + version).
+ *
+ * The marker is intentionally compact and visibly meta so the LLM treats
+ * it as a no-op header. Idempotent: if the prompt already starts with a
+ * `[SYS_V:...]` marker, it is replaced rather than doubled.
+ *
+ * Exported so services that build `cache_control` blocks manually (not via
+ * the `cacheSystemPrompt: true` option) can still opt into versioning.
+ */
+export function withSystemPromptVersion(
+  systemPrompt: string,
+  version: string = SYSTEM_PROMPT_VERSION,
+): string {
+  const marker = `[SYS_V:${version}]\n`;
+  // Replace any existing marker at the top so callers can't accidentally
+  // double-tag a prompt when chaining helpers.
+  const stripped = systemPrompt.replace(/^\[SYS_V:[^\]]+\]\n?/, '');
+  return marker + stripped;
+}
+
+// ============================================================================
 // TIMEOUT UTILITIES
 // ============================================================================
 
@@ -482,10 +527,17 @@ export async function callClaude<T = any>(
   }
 
   try {
-    // Build system parameter — use cache_control when caching requested
+    // Build system parameter — use cache_control when caching requested.
+    // Wave-1b Pre-req 3: when caching, prepend SYSTEM_PROMPT_VERSION marker so
+    // prompt edits across deploys get a clean cache cut rather than silent
+    // drift. See `withSystemPromptVersion` for rationale.
     const systemForRequest = systemParam
       ? cacheSystemPrompt
-        ? [{ type: 'text' as const, text: systemParam, cache_control: { type: 'ephemeral' as const } }]
+        ? [{
+            type: 'text' as const,
+            text: withSystemPromptVersion(systemParam),
+            cache_control: { type: 'ephemeral' as const },
+          }]
         : systemParam
       : undefined;
 
