@@ -414,6 +414,16 @@ export class AnalysisOrchestrator {
     // ── Checkpoint after Phase 1 ──
     await this.safeCheckpoint(coordinator, 'after_l1_l2');
 
+    // ── Port A3 (Wave-1a gap-fix): detect PIQ prompt type once per essay ──
+    // Runs when essayType==='piq' so profile.index.piqPromptType is populated
+    // before L3.5 reads it to activate PIQ_MODE. Without this the PIQ_MODE
+    // block + 13-dim rubric + G3 PIQ dimension anchors are all dormant for
+    // every PIQ essay (silent no-op). NON-BLOCKING: detectPIQType is a pure
+    // keyword-match over the essay text, but wrapped in try/catch for safety.
+    if (input.essayType === 'piq') {
+      await this.computeAndWritePiqPromptType(coordinator, input.essayText);
+    }
+
     // ── Port F2 (Wave-1b): compute aiRiskSignal once per essay ──
     // Gated on ENABLE_AI_RISK_SIGNAL (opt-in until the ESL A/B confirms
     // FP ≤ 10% per Verdict §6 Q6). Runs between L1/L2 and L3 so the signal
@@ -2322,6 +2332,42 @@ export class AnalysisOrchestrator {
   // The scorer is a pure text function — L3's walk does not read the signal,
   // so running before or after L3 is functionally equivalent; running before
   // keeps the signal visible for the entire `after_l3` checkpoint.
+
+  /**
+   * Port A3 (Wave-1a gap-fix): detect the UC PIQ prompt type from essay text
+   * and write it into ProfileIndex.piqPromptType so L3.5's PIQ_MODE branch
+   * can activate. Without this call, piqPromptType stays null for every PIQ
+   * essay and A3 is a silent no-op — the PIQ 13-dimension rubric, the
+   * prompt-specific primary-dimensions guidance, and G3's PIQ dimension
+   * anchors all sit dormant in the cached system prompt.
+   *
+   * Only called when input.essayType === 'piq'. Non-PIQ paths never hit this
+   * method and piqPromptType stays null (which is the correct state for
+   * non-PIQ essays — A3's block is essayType-gated).
+   *
+   * NON-BLOCKING: detectPIQType is a pure keyword-match over essay text, but
+   * the try/catch protects against future refactors that make it async or
+   * network-bound. A failure leaves piqPromptType null (same as non-PIQ),
+   * producing pre-A3-identical behavior at L3.5.
+   */
+  private async computeAndWritePiqPromptType(
+    coordinator: import('../profileManager/essayProfileManager').EssayProfileCoordinator,
+    essayText: string,
+  ): Promise<void> {
+    try {
+      const { detectPIQType } = await import('../../piq/prompts/promptMetadata');
+      const promptType = detectPIQType(essayText);
+      coordinator.updatePiqPromptType(promptType);
+      console.log(
+        `[Orchestrator] Port A3 — piqPromptType detected and written to ProfileIndex: ${promptType}`,
+      );
+    } catch (error) {
+      console.error(
+        `[Orchestrator] Port A3 — detectPIQType failed (non-fatal, A3 will be a no-op on this essay):`,
+        error instanceof Error ? error.message : String(error),
+      );
+    }
+  }
 
   private async computeAndWriteAiRiskSignal(
     coordinator: import('../profileManager/essayProfileManager').EssayProfileCoordinator,
