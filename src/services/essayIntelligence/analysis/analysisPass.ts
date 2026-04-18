@@ -28,6 +28,7 @@ import type {
   AnalysisPassOutput,
   ObservationEntry,
   ImprovementPhase,
+  KnowledgePatternMatch,
   SentenceAnalysisConfidence,
 } from '../profileTypes';
 import { assessPhase } from './phaseAssessment';
@@ -50,6 +51,10 @@ import {
 } from '../rubrics/piqRubric';
 import { buildSymptomTaxonomyBlock } from '../taxonomies/symptomTaxonomyBlock';
 import { isKnownSymptomType } from '../taxonomies/symptomTypeIndex';
+import {
+  buildPatternCatalogBlock,
+  PATTERN_INDEX,
+} from './patternCatalogBlock';
 
 // ============================================================================
 // CONSTANTS
@@ -355,8 +360,18 @@ function computeStdev(values: number[]): number {
  * marker differentiates the cached prompt for PIQ essays from the baseline
  * prompt for non-PIQ essays. Non-PIQ callers pass null/undefined and get the
  * unchanged baseline prompt (original cache preserved).
+ *
+ * Port B1: when `essayType` is provided, the KNOWN PATTERN CATALOG block
+ * (~900 tokens, top-15 filtered by essayType) is appended. The block is
+ * wrapped by `withPromptBlockVersion(..., 'B1_PATTERN_LIBRARY')` so its
+ * version marker re-keys the cached slice independently of the base prompt
+ * and the A3 block. essayType=null/undefined → block omitted (baseline
+ * cache preserved for pre-B1 call-sites).
  */
-function buildSystemPrompt(piqPromptType?: PIQPromptType | null): string {
+function buildSystemPrompt(
+  piqPromptType?: PIQPromptType | null,
+  essayType?: EssayType | null,
+): string {
   const piqModeBlock = piqPromptType ? buildPiqModeBlock(piqPromptType) : '';
   const piqAntiClusteringLine = piqPromptType
     ? `\n${piqModeAntiClusteringClause()}\n`
@@ -367,6 +382,11 @@ function buildSystemPrompt(piqPromptType?: PIQPromptType | null): string {
   // bumps without touching the surrounding prompt. Deterministic content
   // (no per-request variables) → full cacheability.
   const symptomTaxonomyBlock = buildSymptomTaxonomyBlock();
+  // Port B1 — Known-pattern catalog (PIQ 41-pattern + Common App 28-pattern).
+  // Filters by essayType so PIQ essays see PIQ patterns, Common App essays
+  // see Common App patterns, supplement sees both. Block is cached via
+  // B1_PATTERN_LIBRARY slot — bump the slot when the catalog content shifts.
+  const patternCatalogBlock = essayType ? buildPatternCatalogBlock(essayType) : '';
 
   const basePrompt = `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
 
@@ -599,10 +619,38 @@ SCHEMA BREVITY CAPS (Scope 1 Phase 2):
 - strengthSignatures[].evidence: MAX 10 words — same
 - effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.${piqAntiClusteringLine}`;
 
-  if (!piqPromptType) {
-    // Non-PIQ path: baseline prompt unchanged — original Anthropic cache
-    // entry is preserved across deploys that didn't touch this function.
+  // Port B1: schema-extension appendix for pattern catalog emission. Kept
+  // separate from the base prompt (and gated on essayType) so non-B1 call-
+  // sites preserve the original Anthropic cache key.
+  const patternSchemaExtension = patternCatalogBlock
+    ? `\n\n## PATTERN CATALOG SCHEMA EXTENSION (this essay only)
+
+Each sentenceAnalyses[] entry gains an optional \`patternMatches\` array:
+
+    "patternMatches": [
+      {
+        "patternId": "piq:hook-weak-generic" | null,
+        "open": "string | null — free-text when no listed pattern fits",
+        "evidence": "string — quoted span, MAX 15 words",
+        "confidence": 0.0 to 1.0,
+        "severity": "critical" | "major" | "minor" | null
+      }
+    ]
+
+The paragraph-level output gains an optional \`paragraphPatternMatches\` array with the same entry shape — use this (not per-sentence entries) for architectural-scope matches (hook, arc, coherence, ending) that span sentences.
+
+Both arrays default to [] or may be omitted. At least one of \`patternId\` or \`open\` must be non-null per entry; entries with both null are discarded by the pipeline. Unknown patternIds (not present in the KNOWN PATTERN CATALOG above) are also discarded unless \`open\` is non-null.`
+    : '';
+
+  if (!piqPromptType && !patternCatalogBlock) {
+    // Non-PIQ + non-B1 path: baseline prompt unchanged — original Anthropic
+    // cache entry is preserved across deploys that didn't touch this function.
     return basePrompt;
+  }
+
+  if (!piqPromptType) {
+    // B1-only path: append pattern catalog + schema extension, skip A3.
+    return `${basePrompt}${patternSchemaExtension}\n\n${patternCatalogBlock}`;
   }
 
   // PIQ path: append PIQ_MODE block + the PIQ-specific sentenceAnalyses
@@ -619,7 +667,15 @@ Emit \`piqDimensions\` with integer 0-10 scores for the subset of the 13 PIQ dim
 
 Use \`piqDimensionsOpen\` ONLY when the sentence's contribution is real but does not fit any of the 13 enumerated dimensions — this is the LLM-first escape hatch (OpenEnum convention). If all contributions fit within the 13-dim taxonomy, leave \`piqDimensionsOpen\` null.`;
 
-  return `${basePrompt}${piqSchemaExtension}\n\n${piqModeBlock}`;
+  // PIQ + B1 path: both schema extensions + both prompt blocks. Order:
+  // base prompt → PIQ schema ext → (optional) B1 schema ext → PIQ_MODE block
+  // → (optional) pattern catalog block. B1 section is appended only when
+  // essayType triggered catalog emission.
+  const piqBody = `${basePrompt}${piqSchemaExtension}${patternSchemaExtension}\n\n${piqModeBlock}`;
+  if (patternCatalogBlock) {
+    return `${piqBody}\n\n${patternCatalogBlock}`;
+  }
+  return piqBody;
 }
 
 // ============================================================================
@@ -1305,6 +1361,10 @@ function validateAndTransform(
         paragraphIndex,
         i,
       );
+      // Port B1: parse per-sentence pattern matches. LLM emits these only
+      // when B1_PATTERN_LIBRARY block is active; on non-B1 paths rawSA.patternMatches
+      // is undefined and the output field is omitted. Scope is 'sentence'.
+      const patternMatches = extractPatternMatches(rawSA.patternMatches, 'sentence');
 
       sentenceAnalyses.push({
         sentenceIndex: i,
@@ -1321,6 +1381,7 @@ function validateAndTransform(
         piqDimensionsOpen,
         symptomType,
         symptomTypeOpen,
+        ...(patternMatches.length > 0 ? { patternMatches } : {}),
       });
     } else {
       // Missing sentence — fill with a conservative default
@@ -1378,6 +1439,15 @@ function validateAndTransform(
     ? raw.comparativeNotes
     : null;
 
+  // Port B1: parse architectural-scope pattern matches (hook, arc, coherence,
+  // ending — patterns that span multiple sentences). Kept separate from
+  // sentence-local patternMatches so downstream consumers can decide
+  // sentence-edit vs architectural-revision granularity.
+  const paragraphPatternMatches = extractPatternMatches(
+    raw.paragraphPatternMatches,
+    'paragraph',
+  );
+
   return {
     paragraphIndex,
     sentenceAnalyses,
@@ -1386,7 +1456,103 @@ function validateAndTransform(
     calibrationReflection,
     comparativeNotes: comparativeNotes ?? undefined,
     holisticAnalysisEvolution,
+    ...(paragraphPatternMatches.length > 0 ? { paragraphPatternMatches } : {}),
   };
+}
+
+/**
+ * Port B1: parse `patternMatches[]` from raw LLM output into typed
+ * KnowledgePatternMatch[]. Defensive contract:
+ *
+ *   - Entry with both `patternId` and `open` null → discarded.
+ *   - Entry with `patternId` non-null AND patternId not in PATTERN_INDEX → discarded
+ *     UNLESS `open` is also non-null (in which case the `open` free-text
+ *     survives, patternId is coerced to null). The rationale is LLM-first
+ *     Rule 3: closed taxonomies must not block novel observations. Unknown-
+ *     patternId + no-open is the fail-fast case (LLM hallucinated an ID).
+ *   - `confidence` clamped to 0..1.
+ *   - `severity` coerced to enum or null.
+ *   - `evidence` required; empty → discarded.
+ *
+ * `scope` parameter only affects downstream source-classification (the
+ * pipeline routes sentence-scope matches to `SentenceAnalysis.patternMatches`
+ * and paragraph-scope matches to `AnalysisPassOutput.paragraphPatternMatches`
+ * via the separate call-sites above). The field itself is not emitted on
+ * the KnowledgePatternMatch type per Wave-1b seam.
+ */
+function extractPatternMatches(
+  raw: unknown,
+  _scope: 'sentence' | 'paragraph',
+): KnowledgePatternMatch[] {
+  if (!Array.isArray(raw)) return [];
+
+  const out: KnowledgePatternMatch[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const obj = item as Record<string, unknown>;
+
+    // Resolve patternId / open with OpenEnum semantics.
+    const rawPatternId =
+      typeof obj.patternId === 'string' && obj.patternId.length > 0 ? obj.patternId : null;
+    const rawOpen =
+      typeof obj.open === 'string' && obj.open.length > 0
+        ? obj.open
+        : typeof obj.patternOpen === 'string' && obj.patternOpen.length > 0
+        ? obj.patternOpen
+        : null;
+
+    // Enforce patternId membership unless `open` carries the novel description.
+    let patternId = rawPatternId;
+    if (patternId !== null && !PATTERN_INDEX.has(patternId)) {
+      if (rawOpen === null) {
+        // Unknown patternId with no open escape hatch — discard (LLM hallucinated).
+        continue;
+      }
+      // Unknown patternId but open is populated — keep the free-text, null the ID.
+      patternId = null;
+    }
+
+    // At least one of patternId / open must survive.
+    if (patternId === null && rawOpen === null) continue;
+
+    // Required evidence.
+    const evidence = typeof obj.evidence === 'string' ? obj.evidence : '';
+    if (evidence.length === 0) continue;
+
+    // Confidence clamped 0..1.
+    const rawConf = Number(obj.confidence);
+    const confidence = Number.isFinite(rawConf)
+      ? Math.max(0, Math.min(1, rawConf))
+      : 0.5;
+
+    // Severity enum coercion.
+    const rawSev = typeof obj.severity === 'string' ? obj.severity : null;
+    const severity: 'minor' | 'major' | 'critical' | null =
+      rawSev === 'minor' || rawSev === 'major' || rawSev === 'critical' ? rawSev : null;
+
+    // Infer source namespace from patternId prefix. When only `open` is set
+    // (novel pattern not in library), resolve via the PATTERN_INDEX lookup if
+    // possible, else fall back to 'commonApp' as the broader default pool
+    // (L5 lookup uses patternId; source is a routing hint only).
+    const source: KnowledgePatternMatch['source'] =
+      patternId?.startsWith('piq:')
+        ? 'piq'
+        : patternId?.startsWith('common_app:')
+        ? 'commonApp'
+        : 'commonApp';
+
+    out.push({
+      source,
+      patternId,
+      open: rawOpen,
+      patternOpen: rawOpen, // keep alias in sync per OpenEnum backward-compat
+      confidence,
+      evidence,
+      severity,
+    });
+  }
+
+  return out;
 }
 
 /**
@@ -1619,9 +1785,11 @@ export class AnalysisPassService {
     // Port A3: activate PIQ_MODE in the system prompt when the essay is a
     // PIQ with a detected prompt type. Non-PIQ essays hit the unchanged
     // baseline prompt (original Anthropic cache preserved).
+    // Port B1: pass essayType so the pattern-catalog block can be gated to
+    // PIQ / Common App / supplement pools. essayType=undefined → no block.
     const activePiqPromptType =
       essayType === 'piq' ? (profile.index.piqPromptType ?? null) : null;
-    const systemPrompt = buildSystemPrompt(activePiqPromptType);
+    const systemPrompt = buildSystemPrompt(activePiqPromptType, essayType ?? null);
     // Smart context: compact shared digest (replaces full profile dump)
     // + pre-computed paragraph relevance for per-call filtering
     const { analysisContextBuilder } = await import('./analysisContextBuilder');
@@ -2144,8 +2312,14 @@ export class AnalysisPassService {
     // Port A3: reanalysis-path PIQ_MODE activation. `essayType` isn't a param
     // to reanalyzeParagraph; we infer PIQ status from ProfileIndex.piqPromptType
     // (populated only for PIQ essays via detectPIQType at orchestrator start).
+    // Port B1: when piqPromptType is set we know essayType is 'piq'. Common App
+    // / supplement reanalysis paths can't infer essayType from the profile yet
+    // (ProfileIndex doesn't carry it), so those paths skip the pattern catalog
+    // block — baseline cache preserved. Adding an essayType field to
+    // ProfileIndex is a separate Wave-1b follow-up.
     const reanalysisPiqPromptType = profile.index.piqPromptType ?? null;
-    const systemPrompt = buildSystemPrompt(reanalysisPiqPromptType);
+    const reanalysisEssayType: EssayType | null = reanalysisPiqPromptType ? 'piq' : null;
+    const systemPrompt = buildSystemPrompt(reanalysisPiqPromptType, reanalysisEssayType);
     // Smart context for reanalysis too
     const { analysisContextBuilder } = await import('./analysisContextBuilder');
     const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);
