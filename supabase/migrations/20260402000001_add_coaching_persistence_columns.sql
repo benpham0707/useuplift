@@ -1,4 +1,6 @@
 -- Cross-Session Coaching Persistence
+-- CANARY-2026-04-18-post-8ddf45c: if this line does not appear in CI failure
+-- output, Supabase Preview is reading a stale version of this file.
 -- Adds coaching_state and profile_cache columns to essay_understanding.
 -- coaching_state: persists CoachingSessionMemory between sessions.
 -- profile_cache: caches EssayProfile to skip re-analysis on unchanged text.
