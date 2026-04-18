@@ -2202,6 +2202,15 @@ export interface ImprovementCandidate {
   supersededBy: string | null;
   /** ISO 8601 timestamp of emission */
   createdAt: string;
+  /**
+   * Port G2 (Focus Mode): surfaced-to-student gate. Default undefined (treated
+   * as visible for pre-port consumers). When Focus Mode is active, L5
+   * finalization calls `improvementCandidateStore.rankAndApplyFocusMode()` and
+   * flips `visible = false` on all candidates beyond the top-N by ROI. Full
+   * emission stays in the store (Rule 2 — never discard paid LLM output); the
+   * UI read layer is the only consumer that filters by this flag.
+   */
+  visible?: boolean;
 }
 
 /**
