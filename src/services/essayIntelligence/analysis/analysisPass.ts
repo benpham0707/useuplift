@@ -51,6 +51,7 @@ import {
 } from '../rubrics/piqRubric';
 import { buildSymptomTaxonomyBlock } from '../taxonomies/symptomTaxonomyBlock';
 import { isKnownSymptomType } from '../taxonomies/symptomTypeIndex';
+import { buildPiqDimensionAnchorsBlock } from './piqDimensionAnchors';
 import {
   buildPatternCatalogBlock,
   PATTERN_INDEX,
@@ -732,9 +733,10 @@ Use \`piqDimensionsOpen\` ONLY when the sentence's contribution is real but does
 
   // PIQ + B1 path: both schema extensions + both prompt blocks. Order:
   // base prompt → PIQ schema ext → (optional) B1 schema ext → PIQ_MODE block
-  // → (optional) pattern catalog block. B1 section is appended only when
-  // essayType triggered catalog emission.
-  const piqBody = `${basePrompt}${piqSchemaExtension}${patternSchemaExtension}\n\n${piqModeBlock}`;
+  // → G3 PIQ dimension anchors (concrete 0-10 examples — calibrates against
+  // compression into 5-7 band across all 13 dims) → (optional) pattern catalog.
+  const piqDimensionAnchorsBlock = buildPiqDimensionAnchorsBlock();
+  const piqBody = `${basePrompt}${piqSchemaExtension}${patternSchemaExtension}\n\n${piqModeBlock}\n\n${piqDimensionAnchorsBlock}`;
   if (patternCatalogBlock) {
     return `${piqBody}\n\n${patternCatalogBlock}`;
   }
