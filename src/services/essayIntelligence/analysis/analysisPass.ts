@@ -43,6 +43,11 @@ import {
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import type { ImprovementCandidate } from '../profileTypes';
 import { PipelineError } from '../errors';
+import type { PIQPromptType } from '../../piq/types';
+import {
+  buildPiqModeBlock,
+  piqModeAntiClusteringClause,
+} from '../rubrics/piqRubric';
 
 // ============================================================================
 // CONSTANTS
@@ -341,9 +346,21 @@ function computeStdev(values: number[]): number {
 /**
  * Block 1: Static system prompt with scoring calibration.
  * Cached across ALL paragraph calls via cache_control.
+ *
+ * Port A3: when the essay is a PIQ (piqPromptType non-null), the PIQ_MODE
+ * block is appended before the OUTPUT FORMAT section. The block itself is
+ * wrapped by `withPromptBlockVersion(..., 'A3_PIQ_RUBRIC')` so its version
+ * marker differentiates the cached prompt for PIQ essays from the baseline
+ * prompt for non-PIQ essays. Non-PIQ callers pass null/undefined and get the
+ * unchanged baseline prompt (original cache preserved).
  */
-function buildSystemPrompt(): string {
-  return `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
+function buildSystemPrompt(piqPromptType?: PIQPromptType | null): string {
+  const piqModeBlock = piqPromptType ? buildPiqModeBlock(piqPromptType) : '';
+  const piqAntiClusteringLine = piqPromptType
+    ? `\n${piqModeAntiClusteringClause()}\n`
+    : '';
+
+  const basePrompt = `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
 
 ${TECHNIQUE_VOCABULARY_PROMPT_BLOCK}
 
@@ -568,7 +585,29 @@ SCHEMA BREVITY CAPS (Scope 1 Phase 2):
 - strengths[].evidence: MAX 10 words — a specific text quote, not commentary
 - weaknesses[].evidence: MAX 10 words — same
 - strengthSignatures[].evidence: MAX 10 words — same
-- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.`;
+- effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.${piqAntiClusteringLine}`;
+
+  if (!piqPromptType) {
+    // Non-PIQ path: baseline prompt unchanged — original Anthropic cache
+    // entry is preserved across deploys that didn't touch this function.
+    return basePrompt;
+  }
+
+  // PIQ path: append PIQ_MODE block + the PIQ-specific sentenceAnalyses
+  // schema extension. The block is wrapped by withPromptBlockVersion() so
+  // its version marker seeds a distinct cache entry keyed per PIQ prompt.
+  const piqSchemaExtension = `\n\n## PIQ_MODE SCHEMA EXTENSION (this essay only)
+
+Each sentenceAnalyses[] entry in the OUTPUT FORMAT above gains two additional optional fields when PIQ_MODE is active:
+
+    "piqDimensions": { "<dimension_key>": <score_0_to_10>, ... } | null,
+    "piqDimensionsOpen": "string | null — free-text contribution description if the 13-dim taxonomy doesn't fit"
+
+Emit \`piqDimensions\` with integer 0-10 scores for the subset of the 13 PIQ dimensions this sentence meaningfully contributes to. Omit keys the sentence does not touch (rather than emitting 0 for every unused dimension). Null or empty object if the sentence is purely transitional and contributes to no PIQ dimension.
+
+Use \`piqDimensionsOpen\` ONLY when the sentence's contribution is real but does not fit any of the 13 enumerated dimensions — this is the LLM-first escape hatch (OpenEnum convention). If all contributions fit within the 13-dim taxonomy, leave \`piqDimensionsOpen\` null.`;
+
+  return `${basePrompt}${piqSchemaExtension}\n\n${piqModeBlock}`;
 }
 
 // ============================================================================
@@ -1234,6 +1273,15 @@ function validateAndTransform(
         i,
       );
 
+      // Port A3: carry through PIQ rubric scores when present. LLM emits
+      // these only in PIQ_MODE; on non-PIQ paths rawSA.piqDimensions will
+      // be undefined so both fields land as null on the output.
+      const piqDimensions = extractPiqDimensions(rawSA.piqDimensions);
+      const piqDimensionsOpen =
+        typeof rawSA.piqDimensionsOpen === 'string' && rawSA.piqDimensionsOpen.length > 0
+          ? rawSA.piqDimensionsOpen
+          : null;
+
       sentenceAnalyses.push({
         sentenceIndex: i,
         effectiveness,
@@ -1245,6 +1293,8 @@ function validateAndTransform(
         priorityForImprovement: clampPriority(Number(rawSA.priorityForImprovement) || 0),
         confidence,
         improvementCandidate,
+        piqDimensions,
+        piqDimensionsOpen,
       });
     } else {
       // Missing sentence — fill with a conservative default
@@ -1344,6 +1394,28 @@ function clampScore(n: number): number {
 /** Clamp priority to 0-5 */
 function clampPriority(n: number): number {
   return Math.max(0, Math.min(5, Math.round(n)));
+}
+
+/**
+ * Port A3: extract per-sentence PIQ rubric dimension scores. LLM emits a
+ * `piqDimensions: Record<string, number>` object only in PIQ_MODE. Integer
+ * keys (dimension names) map to 0-10 integer scores. Defensive: unknown
+ * keys are kept verbatim (they land on SentenceAnalysis.piqDimensions
+ * typed as Record<string, number>, which intentionally doesn't constrain
+ * the key set — the OpenEnum escape hatch absorbs novelty). Returns null
+ * when absent / malformed so non-PIQ and partial-emission paths are
+ * indistinguishable downstream.
+ */
+function extractPiqDimensions(raw: unknown): Record<string, number> | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (typeof k !== 'string' || k.length === 0) continue;
+    const n = Number(v);
+    if (!Number.isFinite(n)) continue;
+    out[k] = Math.max(0, Math.min(10, Math.round(n)));
+  }
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /**
@@ -1450,8 +1522,13 @@ export class AnalysisPassService {
       );
     }
 
-    // Build cached context blocks (shared across all parallel calls)
-    const systemPrompt = buildSystemPrompt();
+    // Build cached context blocks (shared across all parallel calls).
+    // Port A3: activate PIQ_MODE in the system prompt when the essay is a
+    // PIQ with a detected prompt type. Non-PIQ essays hit the unchanged
+    // baseline prompt (original Anthropic cache preserved).
+    const activePiqPromptType =
+      essayType === 'piq' ? (profile.index.piqPromptType ?? null) : null;
+    const systemPrompt = buildSystemPrompt(activePiqPromptType);
     // Smart context: compact shared digest (replaces full profile dump)
     // + pre-computed paragraph relevance for per-call filtering
     const { analysisContextBuilder } = await import('./analysisContextBuilder');
@@ -1971,7 +2048,11 @@ export class AnalysisPassService {
       throw new Error(`Paragraph ${paragraphIndex} has no understanding — L3 walk must complete first`);
     }
 
-    const systemPrompt = buildSystemPrompt();
+    // Port A3: reanalysis-path PIQ_MODE activation. `essayType` isn't a param
+    // to reanalyzeParagraph; we infer PIQ status from ProfileIndex.piqPromptType
+    // (populated only for PIQ essays via detectPIQType at orchestrator start).
+    const reanalysisPiqPromptType = profile.index.piqPromptType ?? null;
+    const systemPrompt = buildSystemPrompt(reanalysisPiqPromptType);
     // Smart context for reanalysis too
     const { analysisContextBuilder } = await import('./analysisContextBuilder');
     const relevanceIndex = analysisContextBuilder.buildRelevanceIndex(profile);

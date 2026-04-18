@@ -721,6 +721,25 @@ export interface SentenceAnalysis {
    */
   symptomType?: string | null;
   symptomTypeOpen?: string | null;
+
+  /**
+   * Port A3 — PIQ 13-dimension rubric scores for this sentence. Populated
+   * ONLY when `EssayProfile.index.essayType === 'piq'` (non-PIQ path never
+   * emits this field). Keys are `PIQRubricDimension` enum values; values are
+   * integer 0-10 per-dimension scores. Only emit for dimensions the sentence
+   * meaningfully contributes to — a sentence that doesn't touch a dimension
+   * should omit its key rather than emit 0.
+   *
+   * `piqDimensionsOpen` is the OpenEnum escape hatch per Wave-1b pre-req 5 /
+   * LLM-first Rule 3: free-text contribution description for sentences that
+   * don't fit the 13-dimension taxonomy cleanly. Both fields are null on
+   * non-PIQ paths and for sentences that don't warrant PIQ-scoped scoring.
+   *
+   * Consumers: L4 crystallizer (ParagraphScoreEntry.piqDimensions aggregate);
+   * L5 deepAnnotationService (coaching routes by dimension).
+   */
+  piqDimensions?: Record<string, number> | null;
+  piqDimensionsOpen?: string | null;
 }
 
 /**
@@ -2409,6 +2428,18 @@ export interface ParagraphScoreEntry {
   verdict: string;
   /** 1-5: improvement priority informed by structural role significance */
   priorityForImprovement: number;
+  /**
+   * Port A3 — paragraph-level aggregate of PIQ 13-dimension rubric scores.
+   * Populated ONLY when `EssayProfile.index.essayType === 'piq'`. Keys are
+   * `PIQRubricDimension` enum values; values are integer 0-10 aggregates
+   * (typically max or weighted-mean of the paragraph's sentence-level
+   * `piqDimensions`). Non-PIQ paths leave this undefined.
+   *
+   * Ports downstream of A3 (B1 pattern library, B2 symptom router, F1
+   * cliché anchors) will populate this field; the A3 port itself only
+   * carries the shape so schema can be consumed early.
+   */
+  piqDimensions?: Record<string, number> | null;
 }
 
 /**
@@ -3745,6 +3776,13 @@ export interface AnalysisPassOutput {
     /** Wave-1b pre-req seam (Port B2): SymptomDiagnoser classification + escape hatch. */
     symptomType?: string | null;
     symptomTypeOpen?: string | null;
+    /**
+     * Port A3 — PIQ 13-dimension rubric scores. Populated only when the
+     * essay is a PIQ (`EssayProfile.index.essayType === 'piq'`). See
+     * `SentenceAnalysis.piqDimensions` for the fuller contract.
+     */
+    piqDimensions?: Record<string, number> | null;
+    piqDimensionsOpen?: string | null;
   }>;
 
   /** Paragraph-level analysis */
