@@ -181,6 +181,16 @@ export interface PipelineInput {
    * Without this, the walk creates findings from scratch with no prior context.
    */
   priorFindings?: Finding[];
+  /**
+   * Port A2 (Wave-1a): Clerk user ID. When supplied AND the
+   * ENABLE_VOICE_PROFILE_IMPORT env flag is 'true', the orchestrator loads
+   * the persisted StudentVoiceProfile (if any) before L3.75 runs and
+   * threads it as a prior observation into Phase A's user prompt. After
+   * L3.75 completes, the orchestrator fire-and-forgets an enrichProfile
+   * write so the next essay sees updated voice context. Unsupplied →
+   * pre-port-identical behavior.
+   */
+  userId?: string;
 }
 
 /** Complete pipeline result */
@@ -477,6 +487,13 @@ export class AnalysisOrchestrator {
     // L3.75 judges convergence. System enforces budget + iteration caps only.
     // ═══════════════════════════════════════════════════════════════════════
 
+    // ── Port A2 (Wave-1a): load prior StudentVoiceProfile ──
+    // Feature-flagged and gated on a userId being supplied by the caller.
+    // Failure to load is NON-FATAL — the pipeline proceeds with no prior,
+    // producing pre-port-identical output. Only successful loads are threaded
+    // into the growth cycle below.
+    const priorVoiceProfile = await this.loadPriorVoiceProfile(input.userId);
+
     let growthReadingStrategy: ReadingStrategy | undefined;
 
     try {
@@ -488,11 +505,17 @@ export class AnalysisOrchestrator {
         coordinator.getFindingStore(),
         undefined, // priorPhase
         coordinator,
+        priorVoiceProfile,
       );
 
       // Apply the final synthesis to the profile
       coordinator.applyHolisticSynthesis(growthResult.finalSynthesis);
       growthReadingStrategy = growthResult.readingStrategy;
+
+      // ── Port A2 (Wave-1a): persist derived voice back to voice_profiles ──
+      // Fire-and-forget. If persistence fails, the analysis result still stands
+      // — we never throw from this path. Catch + log only.
+      this.persistDerivedVoice(input.userId, input.essayId, input.essayText);
 
       // Scope 2 Phase 5: Harvest L3.75 improvement candidates from the
       // craftAssessment.growthEdges[].pairedImprovement slots. L3.75 is the
@@ -1029,6 +1052,7 @@ export class AnalysisOrchestrator {
     findingStore?: import('../findings/findingStore').FindingStore,
     priorPhase?: ImprovementPhase,
     coordinator?: EssayProfileCoordinator,
+    priorVoiceProfile?: import('../../voiceProfile/types').StudentVoiceProfile | null,
   ): Promise<{
     finalSynthesis: HolisticSynthesisOutput;
     readingStrategy: ReadingStrategy;
@@ -1066,6 +1090,7 @@ export class AnalysisOrchestrator {
         budgetCeiling: state.budgetCeiling,
         budgetRemaining: state.budgetRemaining,
         findingStore,
+        priorVoiceProfile,
       });
 
       state.budgetRemaining -= iterResult.cost;
@@ -2192,6 +2217,83 @@ export class AnalysisOrchestrator {
       }
     }
     return null;
+  }
+
+  // ==========================================================================
+  // PORT A2 (Wave-1a): VOICE-PROFILE IMPORT + PERSISTENCE
+  // ==========================================================================
+  // These two helpers wrap the voiceProfileService calls so the pipeline can
+  // (a) read a prior StudentVoiceProfile before L3.75 runs and (b) write the
+  // derived voice back after L3.75 completes. Both are gated on a feature
+  // flag + a supplied userId. Failures are NON-FATAL by design — analysis
+  // must never break because cross-essay voice persistence had a hiccup.
+
+  /**
+   * Load the persisted StudentVoiceProfile for this user when the feature is
+   * enabled AND a userId is supplied. Returns null otherwise, or when the
+   * load fails (we log and continue — never throw).
+   */
+  private async loadPriorVoiceProfile(
+    userId: string | undefined,
+  ): Promise<import('../../voiceProfile/types').StudentVoiceProfile | null> {
+    if (!userId) return null;
+    if (process.env.ENABLE_VOICE_PROFILE_IMPORT !== 'true') return null;
+
+    try {
+      const { voiceProfileService } = await import('../../voiceProfile/voiceProfileService');
+      const profile = await voiceProfileService.load(userId);
+      if (profile) {
+        console.log(
+          `[Orchestrator] Port A2 — loaded prior voice profile for user ${userId} ` +
+          `(version=${profile.version}, samples=${profile.sampleCount}, ` +
+          `confidence=${profile.confidence.toFixed(2)})`,
+        );
+      } else {
+        console.log(`[Orchestrator] Port A2 — no prior voice profile for user ${userId} (first-time analysis)`);
+      }
+      return profile;
+    } catch (error) {
+      console.error(
+        `[Orchestrator] Port A2 — voice profile load failed (non-fatal):`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Fire-and-forget persistence of the derived voice after L3.75 completes.
+   * Uses voiceProfileService.enrichProfile when a prior exists, otherwise
+   * buildFromSample. Never throws — we intentionally do NOT await this from
+   * the caller so a slow Supabase write cannot delay analysis return.
+   */
+  private persistDerivedVoice(
+    userId: string | undefined,
+    essayId: string,
+    essayText: string,
+  ): void {
+    if (!userId) return;
+    if (process.env.ENABLE_VOICE_PROFILE_IMPORT !== 'true') return;
+
+    void (async () => {
+      try {
+        const { voiceProfileService } = await import('../../voiceProfile/voiceProfileService');
+        const existing = await voiceProfileService.load(userId);
+        const next = existing
+          ? await voiceProfileService.enrichProfile(userId, essayText, 'essay')
+          : await voiceProfileService.buildFromSample(userId, essayText, 'essay');
+        await voiceProfileService.save(next);
+        console.log(
+          `[Orchestrator] Port A2 — persisted voice profile for user ${userId} ` +
+          `after essay ${essayId} (version=${next.version}, samples=${next.sampleCount})`,
+        );
+      } catch (error) {
+        console.error(
+          `[Orchestrator] Port A2 — voice profile persistence failed (non-fatal):`,
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    })();
   }
 }
 
