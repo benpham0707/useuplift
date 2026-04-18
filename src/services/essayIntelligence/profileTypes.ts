@@ -36,6 +36,11 @@ import type { RevisionHistory } from './history/profileSnapshot';
 // import it directly from profileTypes without reaching into the piq service.
 import type { PIQPromptType } from '../piq/types';
 
+// EssayAuthenticityTier is imported for AnalysisPassOutput.essayAuthenticityTier
+// (Port B3 — PS2 4-tier authenticity at L3.5). Re-exported at the bottom of
+// this file so essayIntelligence consumers can import it directly.
+import type { EssayAuthenticityTier } from './rubrics/authenticityTiers';
+
 // ============================================================================
 // PHASE 2 — HISTORICAL INTELLIGENCE SIGNALS
 // ============================================================================
@@ -3815,6 +3820,25 @@ export interface AnalysisPassOutput {
   /** How this paragraph compares to the anchor paragraph. Null for the anchor itself. Optional for backward compat. */
   comparativeNotes?: string | null;
 
+  /**
+   * Port B3 — PS2 authenticity classification (essay-level, emitted at L3.5).
+   * `distinctive` / `authentic` / `emerging` / `manufactured`. `open` escape
+   * hatch per OpenEnum convention; both null on non-emission (e.g. non-anchor
+   * paragraphs or legacy analyses predating Port B3).
+   *
+   * This is L3.5's evaluative authenticity surface — NOT L3.75 (which is
+   * descriptive-only and may not emit scores per the descriptive contract).
+   */
+  essayAuthenticityTier?: EssayAuthenticityTier | null;
+  essayAuthenticityTierOpen?: string | null;
+  /**
+   * PS2 narrative quality index 0-100. Optional. Null when not assessed.
+   * This is L3.5's evaluative scoring surface — NOT L3.75. Anchored to the
+   * 4-tier authenticity bands (80-100 distinctive / 70-79 authentic /
+   * 60-69 emerging / <60 manufactured).
+   */
+  narrativeQualityIndex?: number | null;
+
   /** Essay-level evaluative insights that emerged from analyzing this paragraph */
   holisticAnalysisEvolution: {
     strengthSignatures?: Array<{ quality: string; evidence: string; paragraphs: number[] }>;
@@ -4847,3 +4871,6 @@ export type {
 
 // PIQPromptType re-exported for ProfileIndex.piqPromptType consumers.
 export type { PIQPromptType } from '../piq/types';
+
+// EssayAuthenticityTier re-exported for AnalysisPassOutput consumers (Port B3).
+export type { EssayAuthenticityTier } from './rubrics/authenticityTiers';
