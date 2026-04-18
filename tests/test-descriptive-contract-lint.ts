@@ -51,9 +51,15 @@
  * Run:   npx tsx tests/test-descriptive-contract-lint.ts
  */
 
-import { readFileSync } from 'fs';
-import { resolve, dirname } from 'path';
+import { readFileSync, readdirSync } from 'fs';
+import { resolve, dirname, relative, sep } from 'path';
 import { fileURLToPath } from 'url';
+
+import {
+  PROMPT_BLOCK_DECLARATIONS,
+  isKnownBlockId,
+  type PromptBlockId,
+} from '../src/lib/llm/promptBlockVersions';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -360,6 +366,286 @@ function scanFile(absPath: string, relPath: string): Violation[] {
 }
 
 // ---------------------------------------------------------------------------
+// Block-tagged region scanner (Wave-1b.5)
+// ---------------------------------------------------------------------------
+// Complements the file-level scan. Authors tag a prompt-body constant with
+//
+//     // @prompt-block <BLOCK_ID>
+//     const bodyTemplate = `...multi-line prompt content...`;
+//
+// The PROMPT_BLOCK_DECLARATIONS registry declares the contract level for
+// each blockId (descriptive / evaluative / prescriptive). If the level is
+// 'descriptive', the template literal below the tag is scanned with the
+// same forbidden-vocabulary rules as the L1/L3/L3.75 file-level scan — even
+// when the block lives in a file outside TARGET_FILES.
+//
+// Unknown block IDs are lint failures (the author forgot to claim a slot
+// in PROMPT_BLOCK_VERSIONS).
+
+// Anchored to start-of-line (tolerating leading whitespace) so that jsdoc
+// lines like " *     // @prompt-block ..." do NOT match — those are doc
+// examples, not real authored blocks.
+const BLOCK_TAG_RE = /^\s*\/\/\s*@prompt-block\s+([A-Z][A-Z0-9_]*)/;
+
+/** Directories (relative to repo root) to walk for @prompt-block tags. */
+const BLOCK_SCAN_ROOTS = ['src'];
+
+/** Skip these path segments entirely. */
+const SCAN_SKIP_SEGMENTS = new Set([
+  'node_modules', '.git', 'dist', 'build', 'coverage', '.next', '.turbo',
+]);
+
+function walkTsFiles(root: string): string[] {
+  const out: string[] = [];
+  function recur(dir: string): void {
+    let entries: ReturnType<typeof readdirSync>;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (SCAN_SKIP_SEGMENTS.has(entry.name)) continue;
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) {
+        recur(full);
+      } else if (entry.isFile() && (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx'))) {
+        if (entry.name.endsWith('.d.ts')) continue;
+        out.push(full);
+      }
+    }
+  }
+  recur(root);
+  return out;
+}
+
+interface TaggedBlock {
+  /** 1-based line of the @prompt-block comment. */
+  tagLine: number;
+  blockId: string;
+  /** 1-based line where the bound template literal opens. */
+  startLine: number;
+  /** 1-based line where the bound template literal closes. */
+  endLine: number;
+}
+
+/**
+ * For each `// @prompt-block ID` tag, find the next template literal in
+ * source and bind it to the tag. Scans both top-level assignments and
+ * expressions (e.g., literal passed as an argument).
+ */
+function extractTaggedBlocks(source: string): TaggedBlock[] {
+  const lines = source.split('\n');
+  const blocks: TaggedBlock[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(BLOCK_TAG_RE);
+    if (!match) continue;
+
+    const blockId = match[1];
+    const tagLine = i + 1;
+
+    // Scan forward up to 5 lines for the opening backtick of a template
+    // literal. This tolerates multi-line signatures / comments between the
+    // tag and the literal.
+    const LOOKAHEAD = 5;
+    let openRow = -1;
+    let openCol = -1;
+    outer: for (let r = i + 1; r <= Math.min(i + LOOKAHEAD, lines.length - 1); r++) {
+      const col = lines[r].indexOf('`');
+      if (col !== -1) {
+        openRow = r;
+        openCol = col;
+        break outer;
+      }
+    }
+
+    if (openRow === -1) {
+      // Author forgot to put a template literal after the tag. Record
+      // with startLine=endLine=tagLine so the caller reports a violation.
+      blocks.push({ tagLine, blockId, startLine: tagLine, endLine: tagLine });
+      continue;
+    }
+
+    // Walk to the closing backtick, respecting ${...} nesting.
+    let endRow = -1;
+    let col = openCol + 1;
+    let depth = 0;
+    walk: for (let r = openRow; r < lines.length; r++) {
+      const ln = lines[r];
+      while (col < ln.length) {
+        const ch = ln[col];
+        const prev = col > 0 ? ln[col - 1] : '';
+        if (ch === '{' && prev === '$') {
+          depth++;
+          col++;
+          continue;
+        }
+        if (ch === '}' && depth > 0) {
+          depth--;
+          col++;
+          continue;
+        }
+        if (ch === '`' && depth === 0 && prev !== '\\') {
+          endRow = r;
+          break walk;
+        }
+        col++;
+      }
+      col = 0;
+    }
+
+    if (endRow === -1) {
+      blocks.push({ tagLine, blockId, startLine: openRow + 1, endLine: openRow + 1 });
+      continue;
+    }
+
+    blocks.push({
+      tagLine,
+      blockId,
+      startLine: openRow + 1,
+      endLine: endRow + 1,
+    });
+    i = endRow; // skip past the literal we just consumed
+  }
+
+  return blocks;
+}
+
+function scanTaggedBlock(
+  lines: string[],
+  block: TaggedBlock,
+  relPath: string,
+): { violations: Violation[]; unknownId: boolean; missingLiteral: boolean } {
+  if (!isKnownBlockId(block.blockId)) {
+    return {
+      violations: [{
+        file: relPath,
+        line: block.tagLine,
+        word: block.blockId,
+        snippet: `unknown blockId '${block.blockId}' — claim a slot in PROMPT_BLOCK_VERSIONS first`,
+      }],
+      unknownId: true,
+      missingLiteral: false,
+    };
+  }
+
+  if (block.startLine === block.tagLine) {
+    return {
+      violations: [{
+        file: relPath,
+        line: block.tagLine,
+        word: block.blockId,
+        snippet: `@prompt-block ${block.blockId} is not followed by a template literal within 5 lines`,
+      }],
+      unknownId: false,
+      missingLiteral: true,
+    };
+  }
+
+  const level = PROMPT_BLOCK_DECLARATIONS[block.blockId as PromptBlockId].level;
+  if (level !== 'descriptive') {
+    // Evaluative / prescriptive blocks are exempt from forbidden-vocabulary
+    // scanning — that's what those contract levels mean.
+    return { violations: [], unknownId: false, missingLiteral: false };
+  }
+
+  const patterns = FORBIDDEN_WORDS.map(w => ({ word: w, re: buildWordPattern(w) }));
+  const violations: Violation[] = [];
+
+  // Reuse the same exclusion heuristics the file-level scan uses, but in
+  // micro-scope (the single template literal). We build a fake PromptBlock
+  // for computeRegionExclusions.
+  const fakeBlock: PromptBlock = {
+    startLine: block.startLine,
+    endLine: block.endLine,
+    identifier: `@prompt-block:${block.blockId}`,
+  };
+  const regionExcluded = computeRegionExclusions(lines, fakeBlock);
+
+  // Pre-compute meta flags (negative-example / taxonomy-label lines).
+  const metaFlags: boolean[] = new Array(lines.length).fill(false);
+  for (let n = block.startLine; n <= block.endLine; n++) {
+    metaFlags[n - 1] = isMetaLine(lines[n - 1]);
+  }
+  const GLOSS_LOOKBACK = 6;
+  for (let n = block.startLine; n <= block.endLine; n++) {
+    if (!GLOSS_RE.test(lines[n - 1])) continue;
+    for (let p = n - 2; p >= Math.max(block.startLine - 1, n - 2 - GLOSS_LOOKBACK); p--) {
+      if (metaFlags[p]) {
+        metaFlags[n - 1] = true;
+        break;
+      }
+    }
+  }
+
+  for (let n = block.startLine; n <= block.endLine; n++) {
+    const line = lines[n - 1];
+    if (ESCAPE_MARKER_RE.test(line)) continue;
+    if (regionExcluded.has(n)) continue;
+    if (isQuotedEnumerationLine(line)) continue;
+    if (metaFlags[n - 1]) continue;
+
+    for (const { word, re } of patterns) {
+      const idx = line.search(re);
+      if (idx < 0) continue;
+      const start = Math.max(0, idx - 20);
+      const end = Math.min(line.length, idx + word.length + 60);
+      const snippet = line.slice(start, end).trim();
+      violations.push({ file: relPath, line: n, word, snippet });
+    }
+  }
+
+  return { violations, unknownId: false, missingLiteral: false };
+}
+
+interface TaggedScanResult {
+  violations: Violation[];
+  filesWithTags: number;
+  taggedBlocks: number;
+  unknownIds: number;
+  missingLiterals: number;
+}
+
+function scanAllTaggedBlocks(repoRoot: string): TaggedScanResult {
+  const result: TaggedScanResult = {
+    violations: [],
+    filesWithTags: 0,
+    taggedBlocks: 0,
+    unknownIds: 0,
+    missingLiterals: 0,
+  };
+
+  for (const rel of BLOCK_SCAN_ROOTS) {
+    const abs = resolve(repoRoot, rel);
+    const files = walkTsFiles(abs);
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      // Cheap pre-filter: only parse files that contain the tag substring.
+      // The real per-line anchored match happens inside extractTaggedBlocks.
+      if (!source.includes('@prompt-block')) continue;
+
+      const lines = source.split('\n');
+      const blocks = extractTaggedBlocks(source);
+      if (blocks.length === 0) continue;
+
+      const relPath = relative(repoRoot, file).split(sep).join('/');
+      result.filesWithTags++;
+      result.taggedBlocks += blocks.length;
+
+      for (const block of blocks) {
+        const scan = scanTaggedBlock(lines, block, relPath);
+        result.violations.push(...scan.violations);
+        if (scan.unknownId) result.unknownIds++;
+        if (scan.missingLiteral) result.missingLiterals++;
+      }
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -377,10 +663,14 @@ function main(): void {
     allViolations.push(...viols);
   }
 
+  const taggedResult = scanAllTaggedBlocks(repoRoot);
+  allViolations.push(...taggedResult.violations);
+
   if (allViolations.length === 0) {
     console.log('[descriptive-contract-lint] PASS');
     console.log(`  Files scanned:   ${TARGET_FILES.length}`);
     console.log(`  Prompt blocks:   ${blocksScanned}`);
+    console.log(`  Tagged blocks:   ${taggedResult.taggedBlocks} in ${taggedResult.filesWithTags} file(s)`);
     console.log(`  Violations:      0`);
     process.exit(0);
   }
@@ -388,15 +678,22 @@ function main(): void {
   console.error('[descriptive-contract-lint] FAIL');
   console.error(`  Files scanned:   ${TARGET_FILES.length}`);
   console.error(`  Prompt blocks:   ${blocksScanned}`);
+  console.error(`  Tagged blocks:   ${taggedResult.taggedBlocks} in ${taggedResult.filesWithTags} file(s)`);
+  if (taggedResult.unknownIds > 0) {
+    console.error(`  Unknown IDs:     ${taggedResult.unknownIds} (claim a slot in src/lib/llm/promptBlockVersions.ts)`);
+  }
+  if (taggedResult.missingLiterals > 0) {
+    console.error(`  Missing literals: ${taggedResult.missingLiterals} (@prompt-block tag not followed by a template literal)`);
+  }
   console.error(`  Violations:      ${allViolations.length}`);
   console.error('');
   for (const v of allViolations) {
     console.error(`  ${v.file}:${v.line}: "${v.word}"  —  ${v.snippet}`);
   }
   console.error('');
-  console.error('L1 / L3 / L3.75 prompts are DESCRIPTIVE ONLY. To allow a specific');
-  console.error('line that legitimately references forbidden vocabulary (e.g. a');
-  console.error('surgical carve-out), add this inline marker on the offending line:');
+  console.error('L1 / L3 / L3.75 prompts and descriptive-level tagged blocks are');
+  console.error('DESCRIPTIVE ONLY. To allow a specific line that legitimately');
+  console.error('references forbidden vocabulary, add this inline marker:');
   console.error('  // @descriptive-contract-ok: <short reason>');
   console.error('See docs/V1_KNOWLEDGE_ABSORPTION_VERDICT.md Section 4 Pre-req 4.');
   process.exit(1);
