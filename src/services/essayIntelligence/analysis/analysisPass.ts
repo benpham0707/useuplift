@@ -50,6 +50,12 @@ import {
 } from '../rubrics/piqRubric';
 import { buildSymptomTaxonomyBlock } from '../taxonomies/symptomTaxonomyBlock';
 import { isKnownSymptomType } from '../taxonomies/symptomTypeIndex';
+import {
+  buildPs2AuthenticityBlock,
+  clampNarrativeQualityIndex,
+  isEssayAuthenticityTier,
+  type EssayAuthenticityTier,
+} from '../rubrics/authenticityTiers';
 
 // ============================================================================
 // CONSTANTS
@@ -367,6 +373,14 @@ function buildSystemPrompt(piqPromptType?: PIQPromptType | null): string {
   // bumps without touching the surrounding prompt. Deterministic content
   // (no per-request variables) → full cacheability.
   const symptomTaxonomyBlock = buildSymptomTaxonomyBlock();
+  // Port B3 — PS2 4-tier authenticity block is always active on L3.5 (non-PIQ
+  // and PIQ paths both benefit from the authenticity axis). The block body
+  // explicitly documents orthogonality to the 5-tier WEAK/MEDIOCRE/COMPETENT/
+  // STRONG/EXCEPTIONAL quality scale so the two taxonomies co-exist rather
+  // than compete. Cache-key divergence is seeded by the B3_PS2_AUTHENTICITY
+  // block marker; non-B3 deployments see the block absent and land on the
+  // original cache entry.
+  const ps2AuthenticityBlock = buildPs2AuthenticityBlock();
 
   const basePrompt = `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
 
@@ -492,6 +506,8 @@ Think about WHERE this essay sits among all the college essays you've read. Diff
 
 Before scoring, explicitly classify this essay into one of these tiers and let that classification anchor your scoring range. State your tier classification in the calibrationReflection.
 
+${ps2AuthenticityBlock}
+
 **Essay-specific ceiling/floor reflection** — complete BEFORE scoring:
 
 1. CEILING: Identify the single moment (in any paragraph) where this writer's craft is strongest. What makes it strong? What score does it deserve?
@@ -551,7 +567,10 @@ ${symptomTaxonomyBlock}
 Respond with a single JSON object matching this schema EXACTLY:
 
 {
-  "calibrationReflection": "string — essay-specific, not generic. References actual text. Must identify ceiling moment + score, floor moment + score, this paragraph's expected range.",
+  "calibrationReflection": "string — essay-specific, not generic. References actual text. Must identify (a) ceiling moment + score, (b) floor moment + score, (c) this paragraph's expected range, (d) the 5-tier QUALITY classification (WEAK/MEDIOCRE/COMPETENT/STRONG/EXCEPTIONAL), and (e) the 4-tier AUTHENTICITY classification (distinctive/authentic/emerging/manufactured) + NQI 0-100 + one anchoring text citation for the authenticity judgment. Quality and authenticity are orthogonal axes — both must be stated.",
+  "essayAuthenticityTier": "'distinctive' | 'authentic' | 'emerging' | 'manufactured' | null — Port B3. Essay-level authenticity classification. Emit on the anchor paragraph; null on later paragraphs unless later context materially changes the assessment.",
+  "essayAuthenticityTierOpen": "string | null — OpenEnum escape hatch. Use when the 4-tier taxonomy does not fit; then set essayAuthenticityTier to null.",
+  "narrativeQualityIndex": "integer 0-100 | null — Port B3. Essay-level narrative-quality/authenticity score. Anchored: 80-100 distinctive, 70-79 authentic, 60-69 emerging, <60 manufactured. Null on later paragraphs.",
   "sentenceRanking": ["brief justification for ranking order — strongest to weakest"],
   "sentenceAnalyses": [
     {
@@ -1378,6 +1397,32 @@ function validateAndTransform(
     ? raw.comparativeNotes
     : null;
 
+  // Port B3 — PS2 authenticity tier + NQI parsing with OpenEnum promotion.
+  // The LLM emits these on the anchor paragraph; later paragraphs typically
+  // emit null. When the LLM returns an unknown tier string, we promote it to
+  // `essayAuthenticityTierOpen` (OpenEnum convention) and set the enum field
+  // to null — preserving the LLM's observation without corrupting the typed
+  // enum.
+  let essayAuthenticityTier: EssayAuthenticityTier | null = null;
+  let essayAuthenticityTierOpen: string | null = null;
+  const rawTier = (raw as { essayAuthenticityTier?: unknown }).essayAuthenticityTier;
+  const rawTierOpen = (raw as { essayAuthenticityTierOpen?: unknown }).essayAuthenticityTierOpen;
+  if (isEssayAuthenticityTier(rawTier)) {
+    essayAuthenticityTier = rawTier;
+  } else if (typeof rawTier === 'string' && rawTier.length > 0) {
+    // Unknown enum value — promote to the open escape hatch rather than
+    // silently dropping the LLM's observation.
+    essayAuthenticityTierOpen = rawTier;
+  }
+  if (typeof rawTierOpen === 'string' && rawTierOpen.length > 0) {
+    // If the LLM also emitted an explicit open-text field, prefer that over
+    // the promotion above (the LLM was explicit about using the escape hatch).
+    essayAuthenticityTierOpen = rawTierOpen;
+  }
+  const narrativeQualityIndex = clampNarrativeQualityIndex(
+    (raw as { narrativeQualityIndex?: unknown }).narrativeQualityIndex,
+  );
+
   return {
     paragraphIndex,
     sentenceAnalyses,
@@ -1385,6 +1430,9 @@ function validateAndTransform(
     paragraphVerdict,
     calibrationReflection,
     comparativeNotes: comparativeNotes ?? undefined,
+    essayAuthenticityTier,
+    essayAuthenticityTierOpen,
+    narrativeQualityIndex,
     holisticAnalysisEvolution,
   };
 }
