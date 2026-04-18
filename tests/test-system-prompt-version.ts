@@ -38,8 +38,8 @@ assert(
   `got: ${SYSTEM_PROMPT_VERSION}`,
 );
 assert(
-  'SYSTEM_PROMPT_VERSION is currently v1.3.0 (bump only on prompt edits)',
-  SYSTEM_PROMPT_VERSION === 'v1.3.0',
+  'SYSTEM_PROMPT_VERSION is currently v1.4.0 (Wave-1b.5 block-versioned prompts)',
+  SYSTEM_PROMPT_VERSION === 'v1.4.0',
   `got: ${SYSTEM_PROMPT_VERSION}`,
 );
 
@@ -47,8 +47,8 @@ assert(
 const base = 'You are an expert admissions essay analyst.';
 const tagged = withSystemPromptVersion(base);
 assert(
-  'withSystemPromptVersion prepends [SYS_V:v1.3.0]',
-  tagged.startsWith('[SYS_V:v1.3.0]\n'),
+  'withSystemPromptVersion prepends [SYS_V:v1.4.0]',
+  tagged.startsWith('[SYS_V:v1.4.0]\n'),
   `got head: ${JSON.stringify(tagged.slice(0, 40))}`,
 );
 assert(
@@ -59,15 +59,15 @@ assert(
 
 // 3. Different versions produce different cache-key inputs for the same prompt.
 const vA = withSystemPromptVersion(base, 'v1.3.0');
-const vB = withSystemPromptVersion(base, 'v1.4.0');
+const vB = withSystemPromptVersion(base, 'v1.5.0');
 assert(
   'Different versions produce different marked prompts (cache-key divergence)',
   vA !== vB,
   'versions collapsed to same output',
 );
 assert(
-  'v1.4.0 output starts with [SYS_V:v1.4.0]',
-  vB.startsWith('[SYS_V:v1.4.0]\n'),
+  'v1.5.0 output starts with [SYS_V:v1.5.0]',
+  vB.startsWith('[SYS_V:v1.5.0]\n'),
   `got head: ${JSON.stringify(vB.slice(0, 40))}`,
 );
 

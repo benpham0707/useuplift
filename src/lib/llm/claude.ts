@@ -276,12 +276,16 @@ const DEFAULT_MAX_TOKENS = 4096;
  * cached prompt gets a clean cache cut instead of partial/silent drift.
  *
  * BUMP THIS on any edit to a cached system prompt. Wave-1b knowledge-
- * absorption ports (B1, B2, B3, F1, G3) will bump it as they land. Leave
- * it at v1.3.0 until a port actually changes a prompt.
+ * absorption ports (B1, B2, B3, F1, G3) will bump it as they land.
  *
- * Ref: docs/V1_KNOWLEDGE_ABSORPTION_VERDICT.md Section 4 Pre-req 3
+ * History:
+ *   v1.3.0 — Wave-1b prereqs land.
+ *   v1.4.0 — Wave-1b.5 block-versioned composable prompts (new cache-key
+ *            surface area via withPromptBlockVersion in promptBlockVersions.ts).
+ *
+ * Ref: docs/V1_KNOWLEDGE_ABSORPTION_VERDICT.md Section 4 Pre-req 3 + Wave-1b.5
  */
-export const SYSTEM_PROMPT_VERSION = 'v1.3.0';
+export const SYSTEM_PROMPT_VERSION = 'v1.4.0';
 
 /**
  * Prefix a system-prompt string with the current version marker so the
