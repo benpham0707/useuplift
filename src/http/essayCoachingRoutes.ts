@@ -408,6 +408,7 @@ essayCoachingRouter.post('/essay-coaching/start', requireAuth, async (req: Reque
       const result = await analysisOrchestrator.analyzeEssay({
         essayId, essayText, essayType: essayType as 'common_app' | 'supplement' | 'piq',
         includeAnnotations: false, checkpointStore,
+        userId, // Port A2 (Wave-1a): enables cross-essay voice prior + persistence when env-flagged
       });
       profile = result.profile as EssayProfile;
       pipelineCost = result.costSummary.totalCost;

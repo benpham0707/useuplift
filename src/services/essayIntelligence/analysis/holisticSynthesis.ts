@@ -75,6 +75,8 @@ import {
   TECHNIQUE_VOCABULARY_PROMPT_BLOCK,
   normalizeTechnique,
 } from './techniqueVocabulary';
+import type { StudentVoiceProfile } from '../../voiceProfile/types';
+import { buildPriorVoiceBlock } from './priorVoiceBlock';
 
 // ============================================================================
 // CONSTANTS
@@ -133,6 +135,15 @@ export interface HolisticSynthesisInput {
    * When provided, synthesis can evolve existing findings and produce new essay-level ones.
    */
   findingStore?: FindingStore;
+  /**
+   * Port A2 (Wave-1a): Prior StudentVoiceProfile carried forward from earlier
+   * essays by this user. When non-null, L3.75 Phase A receives an
+   * A2_VOICE_PRIOR block in its user prompt so the current essay's voice is
+   * described with cross-essay context. When null/undefined, the block is
+   * omitted entirely (pre-port-identical behavior — no "no prior" framing).
+   * Gated by ENABLE_VOICE_PROFILE_IMPORT in the orchestrator.
+   */
+  priorVoiceProfile?: StudentVoiceProfile | null;
 }
 
 // ============================================================================
@@ -217,6 +228,12 @@ export interface SynthesisIterationInput {
   budgetRemaining?: number;
   /** FindingStore for finding context injection */
   findingStore?: FindingStore;
+  /**
+   * Port A2 (Wave-1a): Prior StudentVoiceProfile for this user. Threaded from
+   * orchestrator so every growth-cycle iteration carries the same prior
+   * context. See HolisticSynthesisInput.priorVoiceProfile for semantics.
+   */
+  priorVoiceProfile?: StudentVoiceProfile | null;
 }
 
 /**
@@ -1858,7 +1875,14 @@ export class HolisticSynthesisService {
       }
     }
 
+    // Port A2 (Wave-1a): prepend prior-voice block when available.
+    // Empty string when input.priorVoiceProfile is null/undefined, producing
+    // pre-port-identical user prompt. See priorVoiceBlock.ts for contract.
+    const priorVoiceBlock = buildPriorVoiceBlock(input.priorVoiceProfile);
+    const priorVoicePreamble = priorVoiceBlock ? priorVoiceBlock + '\n\n' : '';
+
     const userPrompt = [
+      priorVoicePreamble,
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',
@@ -2058,7 +2082,14 @@ export class HolisticSynthesisService {
       ? this.buildPhaseContext(input.priorPhase)
       : '';
 
+    // Port A2 (Wave-1a): prepend prior-voice block. Same invariant as
+    // synthesize() — empty when no prior profile, block wrapped with
+    // A2_VOICE_PRIOR version markers when present.
+    const priorVoiceBlock = buildPriorVoiceBlock(input.priorVoiceProfile);
+    const priorVoicePreamble = priorVoiceBlock ? priorVoiceBlock + '\n\n' : '';
+
     const userPrompt = [
+      priorVoicePreamble,
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',
