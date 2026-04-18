@@ -48,6 +48,8 @@ import {
   buildPiqModeBlock,
   piqModeAntiClusteringClause,
 } from '../rubrics/piqRubric';
+import { buildSymptomTaxonomyBlock } from '../taxonomies/symptomTaxonomyBlock';
+import { isKnownSymptomType } from '../taxonomies/symptomTypeIndex';
 
 // ============================================================================
 // CONSTANTS
@@ -359,6 +361,12 @@ function buildSystemPrompt(piqPromptType?: PIQPromptType | null): string {
   const piqAntiClusteringLine = piqPromptType
     ? `\n${piqModeAntiClusteringClause()}\n`
     : '';
+  // Port B2a — SymptomDiagnoser 29-type taxonomy. Appended before OUTPUT
+  // FORMAT. The block is wrapped by withPromptBlockVersion() so its
+  // B2_SYMPTOM_TAXONOMY slot version seeds cache-key divergence on catalog
+  // bumps without touching the surrounding prompt. Deterministic content
+  // (no per-request variables) → full cacheability.
+  const symptomTaxonomyBlock = buildSymptomTaxonomyBlock();
 
   const basePrompt = `You are an expert admissions essay analyst. Your task is to EVALUATE how effectively each sentence and paragraph work — not to describe what they do (understanding is already complete), but to JUDGE how well they do it.
 
@@ -536,6 +544,8 @@ Fields (omit the field entirely when not emitting):
 
 The orchestrator harvests these into the ImprovementCandidateStore after L3.5 completes. Duplicate IDs are handled automatically — do not worry about collisions with L3 candidates on the same sentence; the store's lifecycle model handles them.
 
+${symptomTaxonomyBlock}
+
 ## OUTPUT FORMAT
 
 Respond with a single JSON object matching this schema EXACTLY:
@@ -568,7 +578,9 @@ Respond with a single JSON object matching this schema EXACTLY:
         "technique": "SUMMARY-TO-SCENE | ... | null",
         "demonstrationSketch": "string | null",
         "coachingValue": "critical | high | medium | diagnostic"
-      }
+      },
+      "symptomType": "string | null — one of the 29 snake_case archetype names from the SYMPTOM TAXONOMY block above, or null when no archetype fits this sentence",
+      "symptomTypeOpen": "string | null — free-text failure-mode description when the sentence carries a real structural symptom that doesn't fit any of the 29 archetypes; null when symptomType is set OR when the sentence has no structural symptom"
     }
   ],
   "paragraphEffectiveness": 62,
@@ -1282,6 +1294,18 @@ function validateAndTransform(
           ? rawSA.piqDimensionsOpen
           : null;
 
+      // Port B2a: carry through SymptomDiagnoser classification. Coercion
+      // policy — if `symptomType` is an unknown value AND `symptomTypeOpen`
+      // is null, we promote the raw value to `symptomTypeOpen` (preserving
+      // LLM intent) and null out `symptomType` so downstream consumers see
+      // a clean enum slot. If both are null, leave both null.
+      const { symptomType, symptomTypeOpen } = extractSymptomFields(
+        rawSA.symptomType,
+        rawSA.symptomTypeOpen,
+        paragraphIndex,
+        i,
+      );
+
       sentenceAnalyses.push({
         sentenceIndex: i,
         effectiveness,
@@ -1295,6 +1319,8 @@ function validateAndTransform(
         improvementCandidate,
         piqDimensions,
         piqDimensionsOpen,
+        symptomType,
+        symptomTypeOpen,
       });
     } else {
       // Missing sentence — fill with a conservative default
@@ -1416,6 +1442,73 @@ function extractPiqDimensions(raw: unknown): Record<string, number> | null {
     out[k] = Math.max(0, Math.min(10, Math.round(n)));
   }
   return Object.keys(out).length > 0 ? out : null;
+}
+
+/**
+ * Port B2a — parse + validate `symptomType` / `symptomTypeOpen` from raw
+ * LLM output with OpenEnum coercion.
+ *
+ * Coercion policy (verdict §3 Port B2):
+ *   1. Both null / missing / empty   → return { null, null } (no symptom).
+ *   2. symptomType known enum        → keep as-is; keep symptomTypeOpen if
+ *                                       a string was also provided, else null.
+ *   3. symptomType unknown string    → coerce symptomType → null; promote
+ *                                       the raw value to symptomTypeOpen if
+ *                                       symptomTypeOpen was null; log warning.
+ *                                       (The LLM named a real failure mode
+ *                                       that doesn't fit the 29-type catalog —
+ *                                       preserve intent rather than discard.)
+ *   4. symptomType non-string value  → coerce to null; warn; preserve any
+ *                                       symptomTypeOpen that was provided.
+ *
+ * Rationale: the closed enum is the stable contract for L5 rewrite routing,
+ * but the OpenEnum field absorbs genuine novelty rather than forcing a bad
+ * fit. Unknown values landing on `symptomType` would break the contract;
+ * unknowns landing on `symptomTypeOpen` are expected and documented.
+ */
+function extractSymptomFields(
+  rawType: unknown,
+  rawOpen: unknown,
+  paragraphIndex: number,
+  sentenceIndex: number,
+): { symptomType: string | null; symptomTypeOpen: string | null } {
+  const openStr = typeof rawOpen === 'string' && rawOpen.length > 0 ? rawOpen : null;
+
+  // No symptom emitted — both null.
+  if (rawType == null || rawType === '') {
+    return { symptomType: null, symptomTypeOpen: openStr };
+  }
+
+  // Non-string emission is a schema violation — coerce to null, try to
+  // preserve as open-enum text if stringification is meaningful.
+  if (typeof rawType !== 'string') {
+    console.warn(
+      `[AnalysisPass] P${paragraphIndex}S${sentenceIndex}: symptomType is non-string (${typeof rawType}), coercing to null`,
+    );
+    return { symptomType: null, symptomTypeOpen: openStr };
+  }
+
+  // Empty-after-trim → treat as absent.
+  const trimmed = rawType.trim();
+  if (trimmed.length === 0) {
+    return { symptomType: null, symptomTypeOpen: openStr };
+  }
+
+  // Known enum value — the happy path.
+  if (isKnownSymptomType(trimmed)) {
+    return { symptomType: trimmed, symptomTypeOpen: openStr };
+  }
+
+  // Unknown value — OpenEnum coercion. Promote to symptomTypeOpen if the
+  // LLM didn't already provide one, so downstream consumers still see the
+  // LLM's intent expressed in free-text form.
+  console.warn(
+    `[AnalysisPass] P${paragraphIndex}S${sentenceIndex}: symptomType "${trimmed}" is not a known archetype — coercing to symptomTypeOpen`,
+  );
+  return {
+    symptomType: null,
+    symptomTypeOpen: openStr ?? trimmed,
+  };
 }
 
 /**
