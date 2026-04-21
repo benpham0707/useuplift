@@ -51,6 +51,16 @@ import type { FindingStore } from '../findings/findingStore';
 import { buildAnnotationFindingContext } from '../findings/findingContextBuilder';
 import type { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import type { CoachingMap, ImprovementCandidate } from '../profileTypes';
+import {
+  isCorpusRetrievalEnabledForL5,
+  createTelemetry,
+  retrieveAnchorMoves,
+  buildCorpusMovesBlock,
+  estimateBlockTokens,
+  detectFabricatedReferences,
+  type CorpusRetrievalTelemetry,
+} from './corpusRetrievalBlocks';
+import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
 
 // ============================================================================
 // CONSTANTS
@@ -474,6 +484,7 @@ class DeepAnnotationService {
     // writing teaching annotations. Optional for backward compat with old
     // callers; modern flow passes it from the orchestrator.
     candidateStore?: ImprovementCandidateStore,
+    essayId?: string,
   ): Promise<L5AnnotationResult> {
     const startTime = Date.now();
 
@@ -527,6 +538,29 @@ class DeepAnnotationService {
     if (contradictionFlags && contradictionFlags.length > 0) {
       additionalShared.push(`\n=== CONTRADICTION FLAGS ===\n${contradictionFlags.join('\n')}`);
     }
+
+    // Wave-3a Phase 3C: corpus-anchored craft moves — injected once into the
+    // shared-context block so each paragraph's annotation call inherits the
+    // same growth-target vocabulary. Retrieval keyed on the full essay text
+    // surfaces moves most topically relevant to this essay. Stage tag
+    // 'feedback'. Feature-flag-gated per-layer, silent-degrade on retrieval
+    // error.
+    const l5CorpusTel: CorpusRetrievalTelemetry | null = isCorpusRetrievalEnabledForL5()
+      ? createTelemetry()
+      : null;
+    let injectedL5MoveCount = 0;
+    if (l5CorpusTel) {
+      const corpusRunStart = Date.now();
+      const moves = await retrieveAnchorMoves(essayText, profile, l5CorpusTel, 'feedback');
+      injectedL5MoveCount = moves.length;
+      const movesBlock = buildCorpusMovesBlock(moves);
+      if (movesBlock.length > 0) {
+        additionalShared.push(`\n${movesBlock}`);
+        l5CorpusTel.corpusBlockTokens += estimateBlockTokens(movesBlock);
+      }
+      l5CorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
+    }
+
     const sharedContext = smartSharedDigest + additionalShared.join('');
 
     // Batch paragraphs in groups of 2 to prevent rate limit storms
@@ -764,6 +798,38 @@ class DeepAnnotationService {
       } catch (err) {
         console.error('[L5] G2 rankAndApplyFocusMode failed (non-blocking):', err);
       }
+    }
+
+    // Wave-3a Phase 3C/3B: attribution detection — scan all L5 annotation
+    // output (paragraph + essay-level + cross-paragraph) for [MOVE-#]
+    // references. Annotations are short free-text strings, so serializing
+    // the full structure captures everything the LLM wrote.
+    if (l5CorpusTel && injectedL5MoveCount > 0) {
+      const outputBlob =
+        JSON.stringify(allAnnotations.paragraphAnnotations) +
+        JSON.stringify(allAnnotations.essayLevelAnnotations) +
+        JSON.stringify(crossParagraphAnnotations);
+      const { referenced, fabricated } = detectFabricatedReferences(
+        outputBlob,
+        injectedL5MoveCount,
+        0,
+      );
+      const moveRefs = referenced.filter((r) => r.startsWith('[MOVE-'));
+      l5CorpusTel.attribution.movesReferenced += moveRefs.length;
+      l5CorpusTel.attribution.fabricatedReferences.push(...fabricated);
+      if (fabricated.length > 0) {
+        console.warn(`[L5/corpus] Fabricated corpus references detected: ${fabricated.join(', ')}`);
+      }
+    }
+
+    // Wave-3a Phase 3C/3B: persist corpus telemetry for this L5 run.
+    if (l5CorpusTel) {
+      const record = buildCorpusTelemetryRecord({
+        essayId: essayId ?? 'unknown',
+        layer: 'L5',
+        telemetry: l5CorpusTel,
+      });
+      void persistCorpusTelemetry(record);
     }
 
     return {

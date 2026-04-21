@@ -78,6 +78,19 @@ import {
   SECTION_WORD_BUDGETS_BLOCK,
 } from './forbiddenPatterns';
 import { CoachingBlockedError } from '../errors';
+import {
+  isCorpusRetrievalEnabledForL6,
+  createTelemetry,
+  retrieveAnchorMoves,
+  buildCorpusMovesBlock,
+  estimateBlockTokens,
+  detectFabricatedReferences,
+  type CorpusRetrievalTelemetry,
+} from '../analysis/corpusRetrievalBlocks';
+import {
+  buildCorpusTelemetryRecord,
+  persistCorpusTelemetry,
+} from '../analysis/corpusTelemetryPersistence';
 
 // ============================================================================
 // CONSTANTS
@@ -2616,10 +2629,35 @@ ${stalenessNote}`;
       memWithStyle.learningStyleObservations?.observations,
     );
 
+    // Wave-3a Phase 3C: corpus-anchored craft moves, keyed on the student's
+    // current message. Per-turn only — lives in the non-cached user prompt,
+    // so retrieval results don't invalidate the cached system prefix.
+    //
+    // L6 is opt-in only: `ENABLE_CORPUS_RETRIEVAL_L6=true` must be set
+    // EXPLICITLY. The master `ENABLE_CORPUS_RETRIEVAL_L35` flag does NOT
+    // cascade here because retrieval adds ~1.8s per coaching turn, which is
+    // a meaningful latency hit on interactive UX. Keep L6 off unless A/B
+    // data shows the added context improves coaching quality enough to
+    // justify the latency.
+    let l6CorpusMovesBlock = '';
+    let injectedL6MoveCount = 0;
+    const l6CorpusTel: CorpusRetrievalTelemetry | null = isCorpusRetrievalEnabledForL6()
+      ? createTelemetry()
+      : null;
+    if (l6CorpusTel) {
+      const corpusRunStart = Date.now();
+      const moves = await retrieveAnchorMoves(studentMessage, profile, l6CorpusTel, 'coaching');
+      injectedL6MoveCount = moves.length;
+      l6CorpusMovesBlock = buildCorpusMovesBlock(moves);
+      l6CorpusTel.corpusBlockTokens += estimateBlockTokens(l6CorpusMovesBlock);
+      l6CorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
+    }
+    const l6CorpusSection = l6CorpusMovesBlock ? `\n\n${l6CorpusMovesBlock}\n` : '';
+
     // User message = dynamic per-turn content + findings + teaching content
     // Findings are here (not in system prompt) because they change per turn based on focus paragraphs.
     // This keeps the system prompt stable for Anthropic prompt caching.
-    const userPrompt = `${findingSection ? `${findingSection}\n\n` : ''}${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
+    const userPrompt = `${findingSection ? `${findingSection}\n\n` : ''}${l6CorpusSection}${dynamicProfileContext ? `===STUDENT CONTEXT (this session)===\n${dynamicProfileContext}\n\n` : ''}===CONVERSATION===
 ${conversationText}
 
 STUDENT (current message):
@@ -2701,6 +2739,37 @@ Respond to the student's message. Apply all constraints from your role identity.
     const s3Cost: LayerCost = { layer: 'L6_S3_coaching_response', cost: rawCost, tokenUsage, timingMs };
 
     const rawText = typeof response.content === 'string' ? response.content : String(response.content);
+
+    // Wave-3a Phase 3C/3B: attribution detection for L6 — scan the coach's
+    // response text for [MOVE-#] references and flag fabrications. The
+    // coaching response is free-text, so we scan the raw string directly.
+    if (l6CorpusTel && injectedL6MoveCount > 0) {
+      const { referenced, fabricated } = detectFabricatedReferences(
+        rawText,
+        injectedL6MoveCount,
+        0,
+      );
+      const moveRefs = referenced.filter((r) => r.startsWith('[MOVE-'));
+      l6CorpusTel.attribution.movesReferenced += moveRefs.length;
+      l6CorpusTel.attribution.fabricatedReferences.push(...fabricated);
+      if (fabricated.length > 0) {
+        console.warn(`[L6/corpus] Fabricated corpus references detected: ${fabricated.join(', ')}`);
+      }
+    }
+
+    // Wave-3a Phase 3C/3B: persist corpus telemetry for this L6 Stage 3 call.
+    // Uses `unknown` essayId — profile.index doesn't carry it; the orchestrator
+    // thread currently doesn't thread essayId down to coaching. Telemetry
+    // still slices by `layer='L6'` for aggregation.
+    if (l6CorpusTel) {
+      const record = buildCorpusTelemetryRecord({
+        essayId: profile.collegeId ?? 'unknown',
+        layer: 'L6',
+        telemetry: l6CorpusTel,
+      });
+      void persistCorpusTelemetry(record);
+    }
+
     const { response: coachingResponse, sidecar } = this.parseSidecarResponse(rawText);
     return { response: coachingResponse, sidecar, s3Cost };
   }

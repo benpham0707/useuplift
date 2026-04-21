@@ -461,6 +461,7 @@ export class AnalysisOrchestrator {
         {
           reanalysisContext: l3ReanalysisContext,
           findingStore: walkFindingStore.size > 0 ? walkFindingStore : undefined,
+          essayId: input.essayId,
         },
       );
 
@@ -525,6 +526,7 @@ export class AnalysisOrchestrator {
         undefined, // priorPhase
         coordinator,
         priorVoiceProfile,
+        input.essayId,
       );
 
       // Apply the final synthesis to the profile
@@ -584,6 +586,7 @@ export class AnalysisOrchestrator {
         input.reanalysisBrief?.staleAreas,
         findingStoreForAnalysis.size > 0 ? findingStoreForAnalysis : undefined,
         input.essayType,
+        input.essayId,
       );
 
       // If any individual paragraphs failed within the layer, treat as failure
@@ -652,6 +655,7 @@ export class AnalysisOrchestrator {
         priorNorthStar,
         findingStoreForL4.size > 0 ? findingStoreForL4 : undefined,
         connectionGraphForL4.totalCount > 0 ? connectionGraphForL4 : undefined,
+        input.essayId,
       );
 
       // applyNorthStar triggers checkpoint('after_l4') internally
@@ -845,6 +849,7 @@ export class AnalysisOrchestrator {
           growthReadingStrategy,
           undefined, // priorAnnotations
           candidateStoreForL5,
+          input.essayId,
         );
 
         costTracker.record('L5', l5Result.cost, l5Result.tokenUsage, l5Result.timingMs);
@@ -1072,6 +1077,7 @@ export class AnalysisOrchestrator {
     priorPhase?: ImprovementPhase,
     coordinator?: EssayProfileCoordinator,
     priorVoiceProfile?: import('../../voiceProfile/types').StudentVoiceProfile | null,
+    essayId?: string,
   ): Promise<{
     finalSynthesis: HolisticSynthesisOutput;
     readingStrategy: ReadingStrategy;
@@ -1110,6 +1116,7 @@ export class AnalysisOrchestrator {
         budgetRemaining: state.budgetRemaining,
         findingStore,
         priorVoiceProfile,
+        essayId,
       });
 
       state.budgetRemaining -= iterResult.cost;
