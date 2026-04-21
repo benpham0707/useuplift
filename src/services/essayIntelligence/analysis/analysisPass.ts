@@ -63,6 +63,17 @@ import {
   type EssayAuthenticityTier,
 } from '../rubrics/authenticityTiers';
 import { withPromptBlockVersion } from '../../../lib/llm/promptBlockVersions';
+import {
+  isCorpusRetrievalEnabled,
+  createTelemetry,
+  retrieveAnchorMoves,
+  retrieveParagraphAntiPatterns,
+  buildCorpusMovesBlock,
+  buildAntiPatternsBlock,
+  detectFabricatedReferences,
+  estimateBlockTokens,
+} from './corpusRetrievalBlocks';
+import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
 
 // ============================================================================
 // CONSTANTS
@@ -1214,6 +1225,7 @@ function buildParagraphPrompt(
   staleAreaHints?: string[],
   findingContext?: string,
   anchorConfig?: { isAnchor: boolean; anchorReason?: string; context?: string },
+  corpusContext?: string,
 ): string {
   const lines: string[] = [];
 
@@ -1283,6 +1295,14 @@ function buildParagraphPrompt(
   // Non-anchor: inject cross-paragraph calibration context
   if (anchorConfig?.context) {
     lines.push(anchorConfig.context);
+    lines.push('');
+  }
+
+  // Wave-3a Phase 3A: inject corpus retrieval block (anchor moves on anchor
+  // paragraph, anti-patterns on per-paragraph). Skipped silently when the
+  // feature flag is off or retrieval returned no results.
+  if (corpusContext && corpusContext.length > 0) {
+    lines.push(corpusContext);
     lines.push('');
   }
 
@@ -1814,6 +1834,7 @@ export class AnalysisPassService {
     staleAreaHints?: string[],
     findingStore?: FindingStore,
     essayType?: EssayType,
+    essayId?: string,
   ): Promise<L35AnalysisResult> {
     const startTime = Date.now();
     const totalUsage = {
@@ -1832,7 +1853,7 @@ export class AnalysisPassService {
 
     if (analyzableParagraphs.length === 0) {
       console.warn('[AnalysisPass] No analyzable paragraphs found — all skipped or missing understanding');
-      const emptyPhaseResult = await assessPhase({ analyses: [], profile, essayType });
+      const emptyPhaseResult = await assessPhase({ analyses: [], profile, essayType, essayId });
       return {
         paragraphAnalyses: [],
         improvementPhase: emptyPhaseResult.phase,
@@ -1861,7 +1882,7 @@ export class AnalysisPassService {
       // PipelineError so the orchestrator surfaces the failure and no downstream
       // layer sees an analysis result that wasn't actually produced.
       try {
-        return await this.analyzeEssayLevel(profile, staleAreaHints, findingStore, essayType, startTime);
+        return await this.analyzeEssayLevel(profile, staleAreaHints, findingStore, essayType, startTime, essayId);
       } catch (error) {
         const inner = error instanceof Error ? error : new Error(String(error));
         console.error(
@@ -1900,6 +1921,16 @@ export class AnalysisPassService {
       `Anchor: P${anchor.index} (${anchor.reason}). Concurrency: ${CONCURRENCY_LIMIT}`,
     );
 
+    // Wave-3a Phase 3A: corpus retrieval telemetry. Populated through the run
+    // even when the feature flag is off (then `featureFlagEnabled: false`).
+    const corpusTelemetry = createTelemetry();
+    const corpusEnabled = isCorpusRetrievalEnabled();
+    if (corpusEnabled) {
+      console.log('[AnalysisPass] Corpus retrieval ENABLED (L3.5 × Wave-3a corpus)');
+    }
+    let injectedAnchorMoveCount = 0;
+    const corpusRunStart = Date.now();
+
     const results: AnalysisPassOutput[] = [];
 
     // ── Step 1: Score anchor paragraph (sequential) ──
@@ -1919,6 +1950,14 @@ export class AnalysisPassService {
         const anchorRelevantContext = anchorRelevance
           ? analysisContextBuilder.buildParagraphContext(profile, anchorPara.index, anchorRelevance, 'l3_5')
           : '';
+        // Wave-3a Phase 3A: retrieve corpus-anchored craft moves for the anchor
+        // paragraph, filtered by voice. Degrades silently to empty string when
+        // the feature flag is off or retrieval errors out.
+        const anchorText = anchorPara.sentences.map((s) => s.text).join(' ');
+        const anchorMoves = await retrieveAnchorMoves(anchorText, profile, corpusTelemetry);
+        const anchorCorpusBlock = buildCorpusMovesBlock(anchorMoves);
+        injectedAnchorMoveCount = anchorMoves.length;
+        corpusTelemetry.corpusBlockTokens += estimateBlockTokens(anchorCorpusBlock);
         const anchorResult = await this.analyzeSingleParagraph(
           anchorPara,
           profile.paragraphs.length,
@@ -1928,8 +1967,22 @@ export class AnalysisPassService {
           anchorFindingContext || undefined,
           { isAnchor: true, anchorReason: anchor.reason },
           anchorRelevantContext,
+          anchorCorpusBlock || undefined,
         );
         results.push(anchorResult.analysis);
+        // Attribution test: detect fabricated [MOVE-#] references in anchor output
+        if (injectedAnchorMoveCount > 0) {
+          const outputBlob = JSON.stringify(anchorResult.analysis);
+          const { referenced, fabricated } = detectFabricatedReferences(outputBlob, injectedAnchorMoveCount, 0);
+          const moveRefs = referenced.filter((r) => r.startsWith('[MOVE-'));
+          corpusTelemetry.attribution.movesReferenced += moveRefs.length;
+          corpusTelemetry.attribution.fabricatedReferences.push(...fabricated);
+          if (fabricated.length > 0) {
+            console.warn(
+              `[L3.5/corpus] Anchor P${anchorPara.index}: fabricated corpus references detected: ${fabricated.join(', ')}`,
+            );
+          }
+        }
         totalCost += anchorResult.cost;
         totalUsage.inputTokens += anchorResult.usage.input_tokens;
         totalUsage.outputTokens += anchorResult.usage.output_tokens;
@@ -1976,23 +2029,51 @@ export class AnalysisPassService {
       const paraRelevantContext = paraRelevance
         ? analysisContextBuilder.buildParagraphContext(profile, para.index, paraRelevance, 'l3_5')
         : '';
-      const task = this.analyzeSingleParagraph(
-        para,
-        profile.paragraphs.length,
-        systemPrompt,
-        profileContext,
-        staleAreaHints,
-        paraFindingContext || undefined,
-        anchorContextStr ? { isAnchor: false, context: anchorContextStr } : undefined,
-        paraRelevantContext,
-      )
-        .then((result) => {
+      // Wave-3a Phase 3A: retrieve anti-patterns for this paragraph in parallel
+      // with the analysis call. Similarity-gated; strong paragraphs naturally
+      // surface nothing. Feature-flag OFF → resolves immediately to empty.
+      const paraTextForRetrieval = para.sentences.map((s) => s.text).join(' ');
+      const antiPatternPromise = retrieveParagraphAntiPatterns(
+        paraTextForRetrieval,
+        para.index,
+        corpusTelemetry,
+      );
+      const task = antiPatternPromise
+        .then((antiPatterns) => {
+          const corpusBlock = buildAntiPatternsBlock(antiPatterns);
+          corpusTelemetry.corpusBlockTokens += estimateBlockTokens(corpusBlock);
+          return this.analyzeSingleParagraph(
+            para,
+            profile.paragraphs.length,
+            systemPrompt,
+            profileContext,
+            staleAreaHints,
+            paraFindingContext || undefined,
+            anchorContextStr ? { isAnchor: false, context: anchorContextStr } : undefined,
+            paraRelevantContext,
+            corpusBlock || undefined,
+          ).then((result) => ({ result, antiPatternCount: antiPatterns.length }));
+        })
+        .then(({ result, antiPatternCount }) => {
           results.push(result.analysis);
           totalCost += result.cost;
           totalUsage.inputTokens += result.usage.input_tokens;
           totalUsage.outputTokens += result.usage.output_tokens;
           totalUsage.cacheReadTokens += result.usage.cache_read_input_tokens ?? 0;
           totalUsage.cacheWriteTokens += result.usage.cache_creation_input_tokens ?? 0;
+          // Attribution test: detect fabricated [AP-#] references
+          if (antiPatternCount > 0) {
+            const outputBlob = JSON.stringify(result.analysis);
+            const { referenced, fabricated } = detectFabricatedReferences(outputBlob, 0, antiPatternCount);
+            const apRefs = referenced.filter((r) => r.startsWith('[AP-'));
+            corpusTelemetry.attribution.antiPatternsReferenced += apRefs.length;
+            corpusTelemetry.attribution.fabricatedReferences.push(...fabricated);
+            if (fabricated.length > 0) {
+              console.warn(
+                `[L3.5/corpus] P${para.index}: fabricated anti-pattern references: ${fabricated.join(', ')}`,
+              );
+            }
+          }
         })
         .catch((error) => {
           const errorMsg = error instanceof Error ? error.message : String(error);
@@ -2074,6 +2155,7 @@ export class AnalysisPassService {
       analyses: results,
       profile,
       essayType,
+      essayId,
       priorPhase: priorPhase.level !== 'foundation' || priorPhase.reasoning !== 'Initial profile — no analysis has been performed yet'
         ? priorPhase
         : null,
@@ -2110,6 +2192,34 @@ export class AnalysisPassService {
       `cost=$${totalCost.toFixed(4)}, time=${timingMs}ms`,
     );
 
+    // Wave-3a Phase 3B: emit + persist corpus retrieval telemetry summary.
+    // Persistence is silent-fail and feature-flag-gated — safe to always call.
+    if (corpusEnabled) {
+      corpusTelemetry.totalLatencyMs = Date.now() - corpusRunStart;
+      const injections = corpusTelemetry.attempts.filter((a) => a.injected).length;
+      const errors = corpusTelemetry.attempts.filter((a) => a.error !== null).length;
+      const referenced =
+        corpusTelemetry.attribution.movesReferenced +
+        corpusTelemetry.attribution.antiPatternsReferenced;
+      const fabricated = corpusTelemetry.attribution.fabricatedReferences.length;
+      const hallucinationRate = referenced > 0 ? fabricated / referenced : 0;
+      console.log(
+        `[L3.5/corpus] Retrieval telemetry: attempts=${corpusTelemetry.attempts.length}, ` +
+        `injections=${injections}, errors=${errors}, fallbacks=${corpusTelemetry.fallbacksTriggered.length}, ` +
+        `referenced=${referenced}, fabricated=${fabricated} ` +
+        `(hallucination rate: ${(hallucinationRate * 100).toFixed(1)}%), ` +
+        `blockTokens=${corpusTelemetry.corpusBlockTokens}`,
+      );
+
+      const record = buildCorpusTelemetryRecord({
+        essayId: essayId ?? 'unknown',
+        layer: 'L3.5',
+        telemetry: corpusTelemetry,
+      });
+      // Fire-and-forget — persistence never blocks the response path.
+      void persistCorpusTelemetry(record);
+    }
+
     return {
       paragraphAnalyses: results,
       improvementPhase,
@@ -2136,6 +2246,7 @@ export class AnalysisPassService {
     findingStore?: FindingStore,
     essayType?: EssayType,
     startTime?: number,
+    essayId?: string,
   ): Promise<L35AnalysisResult> {
     const start = startTime ?? Date.now();
 
@@ -2189,6 +2300,7 @@ export class AnalysisPassService {
       analyses: results,
       profile,
       essayType,
+      essayId,
       priorPhase: priorPhase.level !== 'foundation' || priorPhase.reasoning !== 'Initial profile — no analysis has been performed yet'
         ? priorPhase
         : null,
@@ -2332,12 +2444,13 @@ export class AnalysisPassService {
     findingContext?: string,
     anchorConfig?: { isAnchor: boolean; anchorReason?: string; context?: string },
     paragraphRelevantContext?: string,
+    corpusContext?: string,
   ): Promise<{
     analysis: AnalysisPassOutput;
     cost: number;
     usage: ClaudeResponse['usage'];
   }> {
-    const paragraphPrompt = buildParagraphPrompt(para, paragraphCount, staleAreaHints, findingContext, anchorConfig);
+    const paragraphPrompt = buildParagraphPrompt(para, paragraphCount, staleAreaHints, findingContext, anchorConfig, corpusContext);
 
     // 3-block prompt caching pattern:
     // Block 1: System prompt (static, cached forever via cacheSystemPrompt)

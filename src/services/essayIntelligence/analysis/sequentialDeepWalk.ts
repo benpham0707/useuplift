@@ -65,6 +65,15 @@ import {
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import type { ImprovementCandidate } from '../profileTypes';
 import { PipelineError } from '../errors';
+import {
+  isCorpusRetrievalEnabledForL3,
+  createTelemetry,
+  retrievePhaseArchetypes,
+  buildDescriptiveArchetypesBlock,
+  estimateBlockTokens,
+  type CorpusRetrievalTelemetry,
+} from './corpusRetrievalBlocks';
+import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
 
 // ============================================================================
 // CONSTANTS
@@ -534,6 +543,8 @@ export class SequentialDeepWalkService {
       reanalysisContext?: string;
       /** W1.3: FindingStore for injecting finding context into walk prompts */
       findingStore?: FindingStore;
+      /** Wave-3a Phase 3C: essay UUID for corpus telemetry persistence. */
+      essayId?: string;
     },
   ): Promise<L3WalkResult> {
     const startTime = Date.now();
@@ -545,6 +556,24 @@ export class SequentialDeepWalkService {
 
     const startIndex = options?.startFromParagraph ?? 0;
     const markedEssay = this.buildMarkedEssayText(paragraphs);
+
+    // Wave-3a Phase 3C: retrieve corpus archetypes ONCE at start of walk.
+    // Uses the DESCRIPTIVE block builder (no calibration language) to preserve
+    // L3's Understanding-only framing — we want context, not evaluation. Stage
+    // tag 'walk' so telemetry aggregates independently of phase assessment.
+    // Feature-flag-gated per-layer (`ENABLE_CORPUS_RETRIEVAL_L3`), falls back
+    // to the master `ENABLE_CORPUS_RETRIEVAL_L35` when unset.
+    let walkCorpusArchetypeBlock = '';
+    const walkCorpusTel: CorpusRetrievalTelemetry | null = isCorpusRetrievalEnabledForL3()
+      ? createTelemetry()
+      : null;
+    if (walkCorpusTel) {
+      const corpusRunStart = Date.now();
+      const archetypes = await retrievePhaseArchetypes(profile, walkCorpusTel, 'walk');
+      walkCorpusArchetypeBlock = buildDescriptiveArchetypesBlock(archetypes);
+      walkCorpusTel.corpusBlockTokens += estimateBlockTokens(walkCorpusArchetypeBlock);
+      walkCorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
+    }
 
     // Accumulation state
     const walkOutputs: UnderstandingWalkOutput[] = [];
@@ -613,6 +642,7 @@ export class SequentialDeepWalkService {
           holisticEvolution,
           reanalysisContextForPara,
           options?.findingStore,
+          walkCorpusArchetypeBlock,
         );
 
         // 3. Call Sonnet — dynamically scale output tokens by sentence count
@@ -682,6 +712,16 @@ export class SequentialDeepWalkService {
         paragraphs.length,
         firstWalkError,
       );
+    }
+
+    // Wave-3a Phase 3C/3B: persist corpus telemetry for this walk.
+    if (walkCorpusTel) {
+      const record = buildCorpusTelemetryRecord({
+        essayId: options?.essayId ?? 'unknown',
+        layer: 'L3',
+        telemetry: walkCorpusTel,
+      });
+      void persistCorpusTelemetry(record);
     }
 
     return {
@@ -820,6 +860,7 @@ export class SequentialDeepWalkService {
     currentHolisticEvolution: L3WalkResult['holisticEvolution'],
     reanalysisContext?: string,
     findingStore?: FindingStore,
+    corpusArchetypeBlock?: string,
   ): string {
     const sections: string[] = [];
 
@@ -827,6 +868,13 @@ export class SequentialDeepWalkService {
     if (reanalysisContext) {
       sections.push('=== RE-ANALYSIS CONTEXT (these areas changed — prioritize them) ===');
       sections.push(reanalysisContext);
+    }
+
+    // Wave-3a Phase 3C: corpus archetypes (descriptive context only). Same
+    // string for every paragraph in the walk — cached by Anthropic once the
+    // preceding block prefix stabilizes.
+    if (corpusArchetypeBlock && corpusArchetypeBlock.length > 0) {
+      sections.push(corpusArchetypeBlock);
     }
 
     // ── BLOCK 2: ESSAY TEXT (cached across calls) ──

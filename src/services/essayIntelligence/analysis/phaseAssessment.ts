@@ -24,6 +24,14 @@ import type {
 } from '../profileTypes';
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
+import {
+  isCorpusRetrievalEnabled,
+  createTelemetry,
+  retrievePhaseArchetypes,
+  buildPhaseArchetypesBlock,
+  estimateBlockTokens,
+} from './corpusRetrievalBlocks';
+import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
 
 // ============================================================================
 // CONSTANTS
@@ -40,6 +48,8 @@ export interface PhaseAssessmentInput {
   profile: Readonly<EssayProfile>;
   essayType?: EssayType;
   priorPhase?: ImprovementPhase | null;
+  /** Optional essayId — used only for Phase 3B telemetry persistence. */
+  essayId?: string;
 }
 
 export interface PhaseAssessmentResult {
@@ -280,7 +290,10 @@ function buildHolisticDigest(profile: Readonly<EssayProfile>): string {
   return lines.join('\n');
 }
 
-function buildPhaseUserPrompt(input: PhaseAssessmentInput): string {
+function buildPhaseUserPrompt(
+  input: PhaseAssessmentInput,
+  corpusArchetypeBlock?: string,
+): string {
   const { analyses, profile, essayType, priorPhase } = input;
 
   const lines: string[] = [];
@@ -303,6 +316,14 @@ function buildPhaseUserPrompt(input: PhaseAssessmentInput): string {
   // Holistic digest
   lines.push(buildHolisticDigest(profile));
   lines.push('');
+
+  // Wave-3a Phase 3A: corpus archetype anchors (injected after holistic digest,
+  // before prior-phase context). Skipped silently when the feature flag is off
+  // or retrieval returned nothing.
+  if (corpusArchetypeBlock && corpusArchetypeBlock.length > 0) {
+    lines.push(corpusArchetypeBlock);
+    lines.push('');
+  }
 
   // Prior phase for transition detection
   if (priorPhase) {
@@ -447,7 +468,37 @@ export async function assessPhase(input: PhaseAssessmentInput): Promise<PhaseAss
   }
 
   const systemPrompt = buildPhaseSystemPrompt();
-  const userPrompt = buildPhaseUserPrompt(input);
+
+  // Wave-3a Phase 3A: retrieve corpus archetype anchors for this essay's
+  // thematic+narrative signature. Feature-flag-gated; degrades to empty string
+  // silently when disabled or on retrieval error.
+  // Wave-3a Phase 3B: persist phase-level telemetry separately from L3.5's
+  // record so downstream aggregation can slice by layer.
+  let corpusArchetypeBlock: string | undefined;
+  if (isCorpusRetrievalEnabled()) {
+    const phaseRunStart = Date.now();
+    const phaseTelemetry = createTelemetry();
+    const archetypes = await retrievePhaseArchetypes(input.profile, phaseTelemetry);
+    corpusArchetypeBlock = buildPhaseArchetypesBlock(archetypes) || undefined;
+    phaseTelemetry.corpusBlockTokens += estimateBlockTokens(corpusArchetypeBlock ?? '');
+    phaseTelemetry.totalLatencyMs = Date.now() - phaseRunStart;
+    const attempt = phaseTelemetry.attempts[0];
+    if (attempt) {
+      console.log(
+        `[PhaseAssessment/corpus] archetypes=${attempt.resultCount}, ` +
+        `latency=${attempt.latencyMs}ms, injected=${attempt.injected}` +
+        (attempt.error ? `, error=${attempt.error}` : ''),
+      );
+    }
+    const phaseRecord = buildCorpusTelemetryRecord({
+      essayId: input.essayId ?? 'unknown',
+      layer: 'phase-assessment',
+      telemetry: phaseTelemetry,
+    });
+    void persistCorpusTelemetry(phaseRecord);
+  }
+
+  const userPrompt = buildPhaseUserPrompt(input, corpusArchetypeBlock);
 
   try {
     const response = await callClaudeWithRetry<string>({

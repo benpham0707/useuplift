@@ -78,6 +78,15 @@ import {
 import type { StudentVoiceProfile } from '../../voiceProfile/types';
 import { buildPriorVoiceBlock } from './priorVoiceBlock';
 import { buildAiRiskSignalBlock } from './aiRiskSignalBlock';
+import {
+  isCorpusRetrievalEnabledForL375,
+  createTelemetry,
+  retrievePhaseArchetypes,
+  buildDescriptiveArchetypesBlock,
+  estimateBlockTokens,
+  type CorpusRetrievalTelemetry,
+} from './corpusRetrievalBlocks';
+import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
 
 // ============================================================================
 // CONSTANTS
@@ -121,6 +130,11 @@ export interface HolisticSynthesisInput {
   essayText: string;
   /** Complete profile after L3 walk (all paragraph/sentence understanding populated) */
   profile: EssayProfile;
+  /**
+   * Wave-3a Phase 3C: essay UUID threaded for corpus telemetry persistence.
+   * Optional — 'unknown' is recorded if caller doesn't supply one.
+   */
+  essayId?: string;
   /**
    * L3's holistic evolution accumulator — starting scaffold.
    * Only 4 fields: centralThesis, thesisConfidence, voiceSignature, arcMomentum.
@@ -235,6 +249,10 @@ export interface SynthesisIterationInput {
    * context. See HolisticSynthesisInput.priorVoiceProfile for semantics.
    */
   priorVoiceProfile?: StudentVoiceProfile | null;
+  /**
+   * Wave-3a Phase 3C: essay UUID threaded for corpus telemetry persistence.
+   */
+  essayId?: string;
 }
 
 /**
@@ -1890,9 +1908,27 @@ export class HolisticSynthesisService {
     const aiRiskSignalBlock = buildAiRiskSignalBlock(input.profile.index.aiRiskSignal ?? null);
     const aiRiskPreamble = aiRiskSignalBlock ? aiRiskSignalBlock + '\n\n' : '';
 
+    // Wave-3a Phase 3C: inject corpus archetype anchors. Uses the DESCRIPTIVE
+    // block (no calibration language) — L3.75 synthesizes what IS, it does
+    // not judge. Stage tag 'synthesis' so telemetry aggregates independently
+    // of phase assessment. Feature-flag-gated per-layer, silent-degrade.
+    let corpusArchetypeBlock = '';
+    const synthesisCorpusTel: CorpusRetrievalTelemetry | null = isCorpusRetrievalEnabledForL375()
+      ? createTelemetry()
+      : null;
+    if (synthesisCorpusTel) {
+      const corpusRunStart = Date.now();
+      const archetypes = await retrievePhaseArchetypes(input.profile, synthesisCorpusTel, 'synthesis');
+      corpusArchetypeBlock = buildDescriptiveArchetypesBlock(archetypes);
+      synthesisCorpusTel.corpusBlockTokens += estimateBlockTokens(corpusArchetypeBlock);
+      synthesisCorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
+    }
+    const corpusPreamble = corpusArchetypeBlock ? corpusArchetypeBlock + '\n\n' : '';
+
     const userPrompt = [
       priorVoicePreamble,
       aiRiskPreamble,
+      corpusPreamble,
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',
@@ -2021,6 +2057,16 @@ export class HolisticSynthesisService {
       `entanglements: ${synthesis.entanglements.length}`,
     );
 
+    // Wave-3a Phase 3C/3B: persist corpus telemetry for this synthesis call.
+    if (synthesisCorpusTel) {
+      const record = buildCorpusTelemetryRecord({
+        essayId: input.essayId ?? 'unknown',
+        layer: 'L3.75',
+        telemetry: synthesisCorpusTel,
+      });
+      void persistCorpusTelemetry(record);
+    }
+
     return {
       synthesis,
       isComplete,
@@ -2105,9 +2151,26 @@ export class HolisticSynthesisService {
     const aiRiskSignalBlock = buildAiRiskSignalBlock(input.profile.index.aiRiskSignal ?? null);
     const aiRiskPreamble = aiRiskSignalBlock ? aiRiskSignalBlock + '\n\n' : '';
 
+    // Wave-3a Phase 3C: same descriptive archetype block as synthesize(). Only
+    // injected on the first iteration — subsequent iterations refine rather
+    // than re-contextualize, so re-injecting wastes tokens. Feature-flag-gated,
+    // silent-degrade.
+    let iterCorpusArchetypeBlock = '';
+    const iterCorpusTel: CorpusRetrievalTelemetry | null =
+      isFirstIteration && isCorpusRetrievalEnabledForL375() ? createTelemetry() : null;
+    if (iterCorpusTel) {
+      const corpusRunStart = Date.now();
+      const archetypes = await retrievePhaseArchetypes(input.profile, iterCorpusTel, 'synthesis');
+      iterCorpusArchetypeBlock = buildDescriptiveArchetypesBlock(archetypes);
+      iterCorpusTel.corpusBlockTokens += estimateBlockTokens(iterCorpusArchetypeBlock);
+      iterCorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
+    }
+    const iterCorpusPreamble = iterCorpusArchetypeBlock ? iterCorpusArchetypeBlock + '\n\n' : '';
+
     const userPrompt = [
       priorVoicePreamble,
       aiRiskPreamble,
+      iterCorpusPreamble,
       '=== FULL ESSAY TEXT ===\n',
       input.essayText,
       '\n\n',
@@ -2238,6 +2301,17 @@ export class HolisticSynthesisService {
       `Meta=$${costMeta.toFixed(3)}, Curation=$${costCuration.toFixed(3)}), ` +
       `${timingMs}ms`,
     );
+
+    // Wave-3a Phase 3C/3B: persist corpus telemetry (first-iteration only —
+    // later iterations didn't retrieve, so no record to write).
+    if (iterCorpusTel) {
+      const record = buildCorpusTelemetryRecord({
+        essayId: input.essayId ?? 'unknown',
+        layer: 'L3.75-iter',
+        telemetry: iterCorpusTel,
+      });
+      void persistCorpusTelemetry(record);
+    }
 
     return {
       output: {

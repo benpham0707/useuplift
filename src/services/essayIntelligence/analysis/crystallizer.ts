@@ -38,6 +38,18 @@ import { ConnectionGraph, buildHolisticConnectionContext } from '../connections'
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { PipelineError } from '../errors';
 import { buildScoreMatrixAnchorsBlock } from './scoreMatrixAnchors';
+import {
+  isCorpusRetrievalEnabledForL4,
+  createTelemetry,
+  retrievePhaseArchetypes,
+  retrieveAnchorMoves,
+  buildPhaseArchetypesBlock,
+  buildCorpusMovesBlock,
+  estimateBlockTokens,
+  detectFabricatedReferences,
+  type CorpusRetrievalTelemetry,
+} from './corpusRetrievalBlocks';
+import { buildCorpusTelemetryRecord, persistCorpusTelemetry } from './corpusTelemetryPersistence';
 import type {
   EssayProfile,
   EssayType,
@@ -2052,6 +2064,7 @@ export class CrystallizerService {
     priorNorthStar?: EssayNorthStar,
     findingStore?: FindingStore,
     connectionGraph?: ConnectionGraph,
+    essayId?: string,
   ): Promise<L4CrystallizationResult> {
     const startTime = Date.now();
     const scale = essayTypeToScale(essayType);
@@ -2072,6 +2085,32 @@ export class CrystallizerService {
     // Profile context is shared between L4a and L4b calls
     const profileContext = buildProfileContext(profile, essayText, assembledContext);
 
+    // Wave-3a Phase 3C: corpus retrieval — craft moves + archetypes. L4
+    // produces the ScoreMatrix (evaluative layer), so calibration-framed
+    // archetype block is appropriate here. Retrieval runs once per
+    // crystallization; block reused across all 3 L4 calls (NorthStar /
+    // ScoreMatrix / L4b). Stage tag 'crystallizer'. Feature-flag-gated
+    // per-layer, silent-degrade.
+    let corpusBlock = '';
+    let injectedCrystalMoveCount = 0;
+    const crystallizerCorpusTel: CorpusRetrievalTelemetry | null = isCorpusRetrievalEnabledForL4()
+      ? createTelemetry()
+      : null;
+    if (crystallizerCorpusTel) {
+      const corpusRunStart = Date.now();
+      const [archetypes, moves] = await Promise.all([
+        retrievePhaseArchetypes(profile, crystallizerCorpusTel, 'crystallizer'),
+        retrieveAnchorMoves(essayText, profile, crystallizerCorpusTel, 'crystallizer'),
+      ]);
+      injectedCrystalMoveCount = moves.length;
+      const archetypeBlock = buildPhaseArchetypesBlock(archetypes);
+      const movesBlock = buildCorpusMovesBlock(moves);
+      corpusBlock = [archetypeBlock, movesBlock].filter((s) => s.length > 0).join('\n\n');
+      crystallizerCorpusTel.corpusBlockTokens += estimateBlockTokens(corpusBlock);
+      crystallizerCorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
+    }
+    const corpusPrepend = corpusBlock ? corpusBlock + '\n\n' : '';
+
     // ── Phase 2: L4a split calls (CRITICAL PATH — North Star then Score Matrix) ──
     const l4aStartTime = Date.now();
 
@@ -2082,7 +2121,7 @@ export class CrystallizerService {
     const northStarResponse = await callClaudeWithRetry<RawNorthStarOutput>({
       model: SONNET,
       systemPrompt: northStarSystemPrompt,
-      userPrompt: profileContext + '\n\n' + northStarCallInstruction,
+      userPrompt: profileContext + '\n\n' + corpusPrepend + northStarCallInstruction,
       maxTokens: L4A_NORTH_STAR_MAX_TOKENS,
       temperature: TEMPERATURE,
       useJsonMode: true,
@@ -2115,7 +2154,7 @@ export class CrystallizerService {
     const scoreMatrixResponse = await callClaudeWithRetry<RawScoreMatrixOutput>({
       model: SONNET,
       systemPrompt: scoreMatrixSystemPrompt,
-      userPrompt: profileContext + '\n\n' + scoreMatrixCallInstruction,
+      userPrompt: profileContext + '\n\n' + corpusPrepend + scoreMatrixCallInstruction,
       maxTokens: L4A_SCORE_MATRIX_MAX_TOKENS,
       temperature: TEMPERATURE,
       useJsonMode: true,
@@ -2204,7 +2243,7 @@ export class CrystallizerService {
       const l4bResponse = await callClaudeWithRetry<RawL4bOutput>({
         model: SONNET,
         systemPrompt: l4bSystemPrompt,
-        userPrompt: profileContext + '\n\n' + l4bCallInstruction,
+        userPrompt: profileContext + '\n\n' + corpusPrepend + l4bCallInstruction,
         maxTokens: L4B_MAX_OUTPUT_TOKENS,
         temperature: TEMPERATURE,
         useJsonMode: true,
@@ -2333,6 +2372,40 @@ export class CrystallizerService {
     // ── Phase 5: Return ──
     const totalTimingMs = Date.now() - startTime;
     const totalCost = l4aCost + l4bCost + (adversarialCost ?? 0);
+
+    // Wave-3a Phase 3C/3B: attribution detection — scan L4 outputs for
+    // [MOVE-#] references and flag fabrications. Archetypes don't carry
+    // numbered labels (buildPhaseArchetypesBlock uses displayName, not
+    // [ARCH-#]), so we only check move labels here.
+    if (crystallizerCorpusTel && injectedCrystalMoveCount > 0) {
+      const outputBlob =
+        JSON.stringify(northStarResponse.content) +
+        JSON.stringify(scoreMatrixResponse.content) +
+        (l4bCost > 0 ? JSON.stringify({ coherenceReport: finalCoherenceReport }) : '');
+      const { referenced, fabricated } = detectFabricatedReferences(
+        outputBlob,
+        injectedCrystalMoveCount,
+        0,
+      );
+      const moveRefs = referenced.filter((r) => r.startsWith('[MOVE-'));
+      crystallizerCorpusTel.attribution.movesReferenced += moveRefs.length;
+      crystallizerCorpusTel.attribution.fabricatedReferences.push(...fabricated);
+      if (fabricated.length > 0) {
+        console.warn(
+          `[L4/corpus] Fabricated corpus references detected: ${fabricated.join(', ')}`,
+        );
+      }
+    }
+
+    // Wave-3a Phase 3C/3B: persist corpus telemetry for this L4 run.
+    if (crystallizerCorpusTel) {
+      const record = buildCorpusTelemetryRecord({
+        essayId: essayId ?? 'unknown',
+        layer: 'L4',
+        telemetry: crystallizerCorpusTel,
+      });
+      void persistCorpusTelemetry(record);
+    }
 
     return {
       northStar,

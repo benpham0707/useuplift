@@ -1,0 +1,307 @@
+{
+  "corpusVersion": "0.0.1-building",
+  "criteria": "tests/calibration/top-tier-reference/README.md",
+  "schoolFitFramework": "Each accepted essay carries dual analysis: (1) craft rubric (5-point close reading) and (2) school-fit analysis (what this essay's success reveals about the admitting school's selection philosophy). An essay's presence in this corpus is signal about what works AT THIS SCHOOL, not a universal template.",
+  "essays": [
+    {
+      "id": "01-hopkins-2029-splash-of-color",
+      "admitSchool": "Johns Hopkins University",
+      "admitYear": 2024,
+      "classYear": "Class of 2029",
+      "essayType": "Common App personal statement",
+      "sourceType": "institution-published",
+      "sourceUrl": "https://apply.jhu.edu/hopkins-insider/a-splash-of-color/",
+      "sourceAttribution": "Johns Hopkins Admissions Committee — Essays That Worked, Class of 2029",
+      "sourceQuote": "Emily's essay uses a variety of personal experiences to highlight how she takes risks, explores new passions, and learns about what excites and inspires her. From trying a new makeup trend to joining her school's weather station, she shows how the journey toward understanding oneself and finding meaningful experiences is often one that requires taking chances. Hopkins values the process of discovery, both in and outside of the classroom, and Emily's essay does an excellent job demonstrating the ways in which she has embarked upon that process. It's clear that, at Hopkins, she would find ways to dive into a vibrant campus community and contribute in ways both old and new.",
+      "archetype": "Small-risk-taking growth arc",
+      "topic": "Conformity / authenticity / social confidence",
+      "writerBackground": "Glen Ellyn, IL; Glenbard West High School; pale Irish complexion with freckles (self-described); school weather reporter",
+      "closeReading": {
+        "distinctiveVoice": {
+          "pass": true,
+          "evidence": "Consistent teen-narrator voice with genuine craft moves: 'CONGRATULATIONS WEATHERWOMAN!' (all-caps mock-excitement), 'What have I gotten myself into?!' (self-aware humor), 'My eyes betray me. Both catch my second glance.' (short declaratives mirroring the nervous moment). Voice at the conventional-end of distinctive, but consistent throughout and recognizably hers.",
+          "note": "Reader-bias check: I initially marked this as borderline-fail because the prose isn't literary. Re-read against the criterion — authentic teen voice with specific craft moves is the right bar, not MFA-workshop voice."
+        },
+        "earnedEmotion": {
+          "pass": true,
+          "evidence": "Opening scene establishes insecurity with specific detail ('my pale Irish skin spattered with freckles,' 'embarrassingly pink cheeks redden'). The emotional climb earns its payoff — 'I wear my coral blush with pride for the freshman girl in Target' — which works as a callback, not an assertion. The emotional beats are supported by concrete sensory and social evidence throughout."
+        },
+        "structuralChoice": {
+          "pass": true,
+          "evidence": "Two-mirror bookends: first mirror (hot pink TikTok conformity, mask-removal) → second mirror (coral, authentic choice). The closing line ('I wear my coral blush with pride for the freshman girl in Target. She finally learned how to be herself.') explicitly reaches back to the opening scene's Target moment. The second mirror scene cannot be moved anywhere else in the essay — it's the payoff."
+        },
+        "nonSwappableSpecificity": {
+          "pass": true,
+          "evidence": "Writer-specific details that couldn't swap: 'Revlon Insta-Blush,' 'Glossier Cloud Paint,' 'Glenbard West,' 'Castle West' + the castle-like school logo, 'Keep it Cool in the Castle West' (her original catchphrase), 'Hannah and Julia' (named friends), the specific color distinction (hot pink vs coral vs sunset orange). These ground the essay in this writer's life."
+        },
+        "memorability": {
+          "pass": true,
+          "evidence": "Core move stays: 'weather reporter who ditched conformity blush for coral and became campus celebrity.' The sticky handles — Castle West, coral callback, CONGRATULATIONS WEATHERWOMAN — would survive a week of other essays."
+        }
+      },
+      "schoolFit": {
+        "institution": "Johns Hopkins University",
+        "whatTheAOCommentarySignals": "The Hopkins AO explicitly identifies 'the process of discovery,' 'taking chances,' and 'find[ing] ways to dive into a vibrant campus community and contribute' as what the essay demonstrates and what Hopkins values. This is NOT a craft-focused commentary — it's a behavioral-pattern commentary. Hopkins selected this essay because Emily's arc models the student-behavior Hopkins wants on campus.",
+        "patternAcrossSchoolsPublishedEssays": "Across multiple Hopkins Essays That Worked, the pattern is: ordinary-but-specific moment of challenge → small proactive risk → visible growth → contribution to community. Hopkins does NOT tend to select intellectually-obsessive-specific-topic essays (those go to Stanford/UChicago). Hopkins selects essays where the applicant demonstrates 'growth + social/civic fit.'",
+        "whatThisEssayTeachesUsAboutTheSchool": "Hopkins values the behavioral pattern of incremental-risk-taking-as-growth over dramatic-intellectual-or-emotional-revelation. The essays that work for Hopkins show someone who takes small, specific bets on participation (run for student council, try out for weather reporter) and whose growth is visibly social (campus celebrity, friends, school spirit). The Hopkins essay is less about 'who are you intellectually?' and more about 'how do you become more yourself by engaging with community?'",
+        "howThisWouldHaveFaredElsewhere": "Stanford / MIT / Caltech: likely reject — the essay shows no intellectual specificity, no unusual angle of curiosity, no voice signature beyond competent teen-narrator. These schools select for intellectual obsession and uncopyable specificity. Harvard / Princeton / Yale: borderline — strong craft, earned callback, but the topic (conformity vs authenticity via makeup) is thematically conventional; these schools often select more rhetorically-dense or intellectually-dense essays. UChicago: likely reject — no formal experimentation or uncommon-angle framing. Duke / Northwestern: likely accept for similar reasons to Hopkins (growth-pattern essays that show community-fit). Hopkins itself: selected and published — clear fit."
+      },
+      "inclusionNote": "Accepted as the Hopkins archetype: the essay's craft genuinely clears the five-point rubric (all pass), AND the Hopkins AO commentary explicitly maps to Hopkins' selection pattern. Emily's essay is 'best of best' FOR HOPKINS — which is not the same as 'best of best universally,' and the distinction is load-bearing for the corpus. Its value comes from being a clean school-fit signal: when a future essay comes in that looks like Emily's, we know it fits Hopkins. The two-mirror structure and the coral-callback close are genuine craft wins regardless of school.",
+      "readerBiasCheck": "My initial close-read was over-weighting 'literary/reflective prose over humor-forward or minimalist' bias — I almost rejected on voice because the prose isn't MFA-voice. Re-reading the criterion ('would I recognize this writer's prose if it were swapped into another essay?'), the answer is yes — her voice moves (CONGRATULATIONS WEATHERWOMAN, my eyes betray me, what have I gotten myself into?!) are specific and consistent. Accepted."
+    },
+    {
+      "id": "02-hopkins-2029-building-a-universe",
+      "admitSchool": "Johns Hopkins University",
+      "admitYear": 2024,
+      "classYear": "Class of 2029",
+      "essayType": "Common App personal statement",
+      "sourceType": "institution-published",
+      "sourceUrl": "https://apply.jhu.edu/hopkins-insider/building-a-universe/",
+      "sourceAttribution": "Johns Hopkins Admissions Committee — Essays That Worked, Class of 2029",
+      "sourceQuote": "Hopkins is a place that encourages and facilitates interdisciplinary learning and exploration. Through his interest in worldbuilding, Shotaro is able to highlight skills and perspectives that will allow him to seamlessly engage in that type of interconnected study. In building his worlds, Shotaro has explored topics in history, geology, and other subjects all with the goal of creating a cohesive, well-developed, and realistic world. His essay provides ample evidence that allows our committee to imagine the ways he may similarly and effectively combine different fields of study while a student at Hopkins.",
+      "archetype": "Interdisciplinary intellectual obsession / single-hobby-pulls-across-fields",
+      "topic": "STEM-humanities crossover; creative worldbuilding as intellectual practice",
+      "writerBackground": "Westchester, NY; Mock Trial; abstract strategy board games (chess, checkers); 6-month fantasy-map worldbuilding project",
+      "closeReading": {
+        "distinctiveVoice": {
+          "pass": true,
+          "evidence": "The intellectual-process voice layered over the physical-craft voice is genuinely distinctive. 'A steampunk society experiencing rapid technological advancements, I'd decided, would be the setting of this fantasy world. I imagined the technologies... I thought about the economic and cultural indications these technologies would have on civilizations in this world. Meanwhile I continued to carefully move my highlighter.' — the parallel between cognitive speculation and physical care is the voice move. Hard to swap to another writer because it requires both the intellectual register AND the physical-care discipline."
+        },
+        "earnedEmotion": {
+          "pass": true,
+          "evidence": "'I had spent two months creating a rough draft, and an additional month transferring that onto the final copy with a pencil.' establishes earned stakes via specific time investment. The pride payoff ('gazing over my creation what I most prominently felt was pride') lands because we've seen the specific work (22x30 sheet, highlighter, 6 months, 3 continents, 100+ islands, 50+ countries, 60+ cities). The pride is supported, not asserted."
+        },
+        "structuralChoice": {
+          "pass": true,
+          "evidence": "Scene (highlighter-over-map) → definition (worldbuilding) → intellectual-grounds (why I love it, cross-field research) → personality-grounds (how my passions appear in the world) → return to scene (finished map, noticing flaws) → forward-projection (next map, next civilization). The return to the finished map at 'Two months later' is a callback that grounds the reflection in the physical object the essay opened with. Cannot be reordered."
+        },
+        "nonSwappableSpecificity": {
+          "pass": true,
+          "evidence": "'22-inch by 30-inch sheet of white paper,' 'three continents, 100+ islands, 50+ countries, and 60+ major cities,' 'historical nomadic empires,' 'plate tectonics,' 'Great ape language to explore possibilities of interspecies communication,' 'whether computers could be invented by civilizations without electricity,' 'My next civilization may be built by apes, and it will surely have developed mechanical computers.' — richly writer-specific. The Great-ape-language research detail especially is one that couldn't lift into another essay without breaking the voice."
+        },
+        "memorability": {
+          "pass": true,
+          "evidence": "Sticky handles: 'kid who worldbuilt 3 continents / 100+ islands / 60+ cities over 6 months,' 'Great-ape-language researched for interspecies-communication civilization,' 'computers invented without electricity question.' The 'Meanwhile I continued to carefully move my highlighter' line is the essay's most quotable moment — cognitive-and-physical parallelism crystallized. Would survive a week of other essays."
+        }
+      },
+      "schoolFit": {
+        "institution": "Johns Hopkins University",
+        "whatTheAOCommentarySignals": "The Hopkins AO zooms in on INTERDISCIPLINARY LEARNING explicitly: 'Hopkins is a place that encourages and facilitates interdisciplinary learning and exploration... combine different fields of study.' This is distinct from Emily's commentary — Hopkins sees two different selection patterns. Shotaro's essay matches the 'interdisciplinary intellectual curiosity' pattern; Emily's matches 'growth + community fit.' Both are Hopkins values, selected for different student types.",
+        "patternAcrossSchoolsPublishedEssays": "Hopkins has at least TWO selection patterns: (1) social-growth-and-community-fit (Emily), (2) interdisciplinary-intellectual-curiosity (Shotaro). A single corpus of Hopkins essays should include both patterns to reflect the school's actual selection philosophy, not just one.",
+        "whatThisEssayTeachesUsAboutTheSchool": "Hopkins specifically rewards essays where a SINGLE HOBBY / OBSESSION pulls the applicant ACROSS multiple academic domains. The AO explicitly names history + geology + primatology + computer science as what made Shotaro's essay fit Hopkins. The model here is 'curious student whose curiosity doesn't stay in one discipline,' which maps to Hopkins' interdisciplinary campus identity. Compare Emily: single trait (growth through small risks) demonstrated across similar-domain activities (Student Council, weather reporter). Shotaro: single hobby (worldbuilding) pulling across DIFFERENT domains (history, geology, primatology, CS).",
+        "howThisWouldHaveFaredElsewhere": "Stanford: likely accept — intellectual obsession + unusual angle (Great ape language for interspecies communication) + cross-disciplinary curiosity. BUT voice is cleanly intellectual rather than signature-distinctive, which Stanford sometimes prefers. MIT / Caltech: strong fit — specificity, problem-solving orientation, concrete research questions. The 'computers without electricity' and 'plate tectonics for realistic map' questions are MIT-flavored curiosity. Princeton: likely accept for interdisciplinary intellectual depth. Harvard / Yale: borderline — strong craft but no rhetorical/emotional weight; these schools often prefer essays with more voice-risk or emotional stakes. UChicago: very strong fit — formal intellectual specificity with cross-domain curiosity is UChicago's archetype. Duke / Northwestern: accept — broadly strong interdisciplinary essay works at these schools. Hopkins itself: selected and published."
+      },
+      "inclusionNote": "Accepted as Hopkins' SECOND archetype — the 'interdisciplinary intellectual' counterweight to Emily's 'social growth' archetype. The corpus needs both to accurately represent Hopkins' dual selection pattern. Craft is genuinely strong: the voice-move where intellectual speculation runs parallel to physical craft ('Meanwhile I continued to carefully move my highlighter') is a sophisticated compositional move that few 17-year-olds would reach for. Would likely succeed at multiple top-10 schools.",
+      "readerBiasCheck": "My bias here would be 'over-rewarding intellectual-prose over teen-narrator-prose' — the opposite of my Emily bias. I re-checked by applying the rubric's same standards: voice needs to be distinctive, not 'literary.' Shotaro's is distinctive because of the parallelism (cognitive + physical), not because it's intellectually-flavored. Accepted on specificity + structural payoff + voice, not on intellectual register alone."
+    },
+    {
+      "id": "03-hopkins-2028-korean-sticky-notes",
+      "admitSchool": "Johns Hopkins University",
+      "admitYear": 2023,
+      "classYear": "Class of 2028",
+      "essayType": "Common App personal statement",
+      "sourceType": "institution-published",
+      "sourceUrl": "https://apply.jhu.edu/hopkins-insider/korean-sticky-notes/",
+      "sourceAttribution": "Johns Hopkins Admissions Committee — Essays That Worked, Class of 2028",
+      "sourceQuote": "The admissions committee highlighted Nancy's 'responsibilities at a young age' and her 'spirit of exploration,' noting how 'these qualities will help her thrive on our Homewood campus.'",
+      "archetype": "Low-income cultural-reclamation through specific daily ritual / bilingual identity essay with structural innovation",
+      "topic": "Family / cultural identity / language / low-income lived experience",
+      "writerBackground": "Los Alamitos, CA; low-income; supported non-English-speaking unemployed mother as 'financial advisor and translator'; reclaimed Korean through sticky notes + Pororo + H Mart excursions",
+      "closeReading": {
+        "distinctiveVoice": {
+          "pass": true,
+          "evidence": "Strong pass. Six Korean words as section headers is a structural-and-voice innovation inseparable from the essay's argument. 'Chocolate Pepero—No.' — specific voice move, playful. 'I was a kid living a double life as my mom's unrelenting financial advisor, spending Saturday mornings marching around H Mart' — 'double life,' 'unrelenting,' 'marching' all create specific texture. The voice couldn't lift to another essay without breaking the form."
+        },
+        "earnedEmotion": {
+          "pass": true,
+          "evidence": "Strong pass. Essay moves from financial-pragmatic (price calculations, coupons, inflation) to emotional cost (language gap with mother) to reclamation (sticky notes + Pororo + ballads). Each emotional beat is supported: '$9.99 for five mangoes and $5.50 for strawberries? Inflation at its finest.' grounds the financial stakes; 'my mouth went dry, unable to find the Korean words and phrases to express myself' grounds the emotional cost; 'nostalgic memories replacing each sticker value' grounds the resolution."
+        },
+        "structuralChoice": {
+          "pass": true,
+          "evidence": "Strong pass — structure IS the argument. Six Korean words (Hal-in/discount → Jeonlyag/strategy → Eon-eo/language → Daehwa/conversation → Tamgu/exploration) trace the essay's movement from transactional to relational. Each word unlocks a new semantic layer. Cannot be reordered — the headers ARE the arc."
+        },
+        "nonSwappableSpecificity": {
+          "pass": true,
+          "evidence": "Strong pass. 'H Mart,' 'Chocolate Pepero,' 'Pororo' (Korean children's cartoon), 'Kyoho grapes, dried squid,' '`80s manhwa cartoons,' 'Korean won and American dollars,' sticky notes on bedroom door as literal artifact, mother's handwriting as template. These ground the essay in specific cultural, material, and familial particulars that cannot swap to another writer."
+        },
+        "memorability": {
+          "pass": true,
+          "evidence": "Strong pass. Core move stays crisp: 'girl who financially-advised her mom from childhood, reclaimed their relationship by learning Korean through sticky notes on the bedroom door, Pororo songs, and `80s ballads.' Sticky handles: H Mart, Pororo-learned-alphabet, six-Korean-words-as-structure, Kyoho grapes. Would easily survive a week of other essays."
+        }
+      },
+      "schoolFit": {
+        "institution": "Johns Hopkins University",
+        "whatTheAOCommentarySignals": "The Hopkins AO highlights 'responsibilities at a young age' and 'spirit of exploration' — a different combination than Emily's (growth+community) or Shotaro's (interdisciplinary). Hopkins here reads for maturity-from-necessity PLUS intellectual curiosity.",
+        "patternAcrossSchoolsPublishedEssays": "Hopkins has now shown at least THREE distinct selection patterns: (1) social-growth-and-community-fit (Emily), (2) interdisciplinary-intellectual-curiosity (Shotaro), (3) maturity-from-lived-adversity plus intellectual reclamation (Nancy). This suggests Hopkins is NOT a one-archetype school — it actively selects for range. Important for the corpus.",
+        "whatThisEssayTeachesUsAboutTheSchool": "Hopkins reads essays for a COMBINATION of traits, not a single signal. Nancy combines lived adversity (low-income, parental translator) with intellectual initiative (teaching herself Korean systematically) with cultural specificity (H Mart, Pororo, manhwa). The AO commentary picks out the combination explicitly. Hopkins seems to reward essays that carry multiple threads well, not just one theme well.",
+        "howThisWouldHaveFaredElsewhere": "This is the strongest cross-school essay in the corpus so far. Stanford: very likely accept — strong voice, structural innovation, cultural specificity, intellectual initiative, 'figuring it out' agency. Harvard/Princeton/Yale: very likely accept — literary sophistication, bilingual-cultural-reclamation is a proven premium topic at elite schools. MIT/Caltech: accept — intellectual rigor of building Korean vocabulary from Pororo + ballads + radio is a kind of self-directed problem-solving MIT rewards. UChicago: accept — the six-Korean-words-as-section-headings is a formal experiment UChicago specifically values. Duke/Northwestern: easy accept. Most distinctive feature for cross-school strength: the essay never asks the reader to feel bad about the low-income framing — it turns that framing into the engine of the intellectual + relational reclamation. That move is what separates this from typical low-income-essays."
+      },
+      "inclusionNote": "Clearly the strongest essay in the corpus so far. All 5 criteria strong pass (not borderline). This is also the clearest 'would have succeeded anywhere top-tier' essay — it isn't merely a Hopkins-fit essay, it's a top-school-fit essay that Hopkins was lucky to admit. The corpus needs several of these — essays whose strength transcends any single school's selection pattern — to test whether the pipeline recognizes universal top-tier craft vs school-specific fit.",
+      "readerBiasCheck": "My bias risk here was 'over-rewarding literary and emotional essays from minority backgrounds.' I re-checked the five criteria by pretending the essay was written by a wealthy majority student about a pedestrian topic: would it still clear all five? The Korean-words-as-sections structure + specific sensory material + earned emotional arc all still pass. The essay's cultural specificity is supporting evidence for the craft, not a substitute for it. Accepted on craft, not identity."
+    },
+    {
+      "id": "04-hopkins-2027-ordering-the-disorderly",
+      "admitSchool": "Johns Hopkins University",
+      "admitYear": 2022,
+      "classYear": "Class of 2027",
+      "essayType": "Common App personal statement",
+      "sourceType": "institution-published",
+      "sourceUrl": "https://apply.jhu.edu/hopkins-insider/ordering-the-disorderly/",
+      "sourceAttribution": "Johns Hopkins Admissions Committee — Essays That Worked, Class of 2027",
+      "sourceQuote": "Ellie's essay skillfully uses the topic of entropy as an extended metaphor. Through it, we see reflections about who they are and who they aspire to be. Many students write about a future they hope to achieve, such as a major, career, impact, or lifestyle. While that may tell us something about who they are, these types of essays often use that desired outcome as the thesis and not as a means for us to understand who the applicant truly is. Ellie's essay tells us some of those desired outcomes without sacrificing self-reflection in the process. We learn a lot about who they are throughout this metaphor: their willingness to learn from mistakes, accept the unpredictable, and push the status quo. These are traits that drive Ellie and ultimately allow us to know them on a deeper level and see how strong of a match they are for the Hopkins community.",
+      "archetype": "Intellectual concept as extended metaphor for self / playful-scientific voice",
+      "topic": "STEM intellectual identity; personality through physics concept; ambition pairing",
+      "writerBackground": "Coronado, CA; Marie Kondo-style organizer; track + robotics; aspiring surgeon + YA dystopian novelist",
+      "closeReading": {
+        "distinctiveVoice": {
+          "pass": true,
+          "evidence": "Intellectual-playful voice is distinctive and consistent throughout. 'Cheerful, I know.' (voice-aside after bleak physics concept), 'worship the planner in my backpack,' 'mastered the art of Marie Kondo's file folding,' 'pleases the universe,' 'copious entropy.' The voice uses scientific register + personal specificity + self-aware humor simultaneously — hard to swap into another writer's essay without the register shifting."
+        },
+        "earnedEmotion": {
+          "pass": true,
+          "evidence": "Emotional arc is subtle but earned: orderly girl who loves chaos-in-theory learns to accept chaos-in-practice. 'I welcome both with open arms, though chaos and failure still scare me' — admits vulnerability without melodrama. The closing 'To feel out of control is not the end of the world, but the natural state of it' earns its philosophical weight through the preceding concrete examples (writing without outlines, disastrous chem labs, mermaid-taxonomy class discussions)."
+        },
+        "structuralChoice": {
+          "pass": true,
+          "evidence": "Extended-metaphor structure is the essay's spine AND argument. Each scientific concept about entropy gets applied to a personal insight: (1) second-law-disorder → life is unpredictable, (2) equilibrium-at-max-entropy → productive chaos in writing/labs/classes, (3) entropy-as-change-in-status-quo → personal ambition to be unexpected. Closing line reframes opening line circularly. Cannot be reordered — the metaphor's internal logic dictates sequence."
+        },
+        "nonSwappableSpecificity": {
+          "pass": true,
+          "evidence": "Writer-specific details consistent throughout: 'Marie Kondo's file folding for each of my closet drawers,' 'about a million colored pens,' 'track practice to a robotics meeting,' 'the taxonomy of mermaids to hiking horror stories' (an unusually specific class-discussion range), 'young adult dystopian novelist' (unusual career pairing with surgeon). Details cannot lift into another essay."
+        },
+        "memorability": {
+          "pass": true,
+          "evidence": "Multiple sticky handles: entropy-as-extended-metaphor, surgeon + YA-dystopian-novelist ambition pairing, Marie Kondo closet drawers, 'Cheerful, I know,' 'taxonomy of mermaids.' The ambition pairing especially (medicine + unusual creative writing) is distinctive enough to remember after a week."
+        }
+      },
+      "schoolFit": {
+        "institution": "Johns Hopkins University",
+        "whatTheAOCommentarySignals": "This is the strongest AO commentary I've seen across Hopkins essays. Explicitly uses craft-praise language: 'skillfully uses,' 'extended metaphor,' and CONTRASTS this essay against typical aspiration essays ('Many students write about a future they hope to achieve... these types of essays often use that desired outcome as the thesis and not as a means for us to understand who the applicant truly is. Ellie's essay tells us some of those desired outcomes without sacrificing self-reflection in the process.'). The AO is explicitly identifying this as ABOVE the typical admit essay — 'wowed AO' language.",
+        "patternAcrossSchoolsPublishedEssays": "Ellie adds a FOURTH distinct Hopkins archetype: 'intellectual concept as extended metaphor for self / playful-scientific voice.' The four Hopkins archetypes now: (1) social-growth (Emily), (2) interdisciplinary-obsession (Shotaro), (3) cultural-reclamation (Nancy), (4) intellectual-concept-as-metaphor (Ellie). The Hopkins AO committee clearly selects for RANGE, not a single pattern.",
+        "whatThisEssayTeachesUsAboutTheSchool": "Hopkins rewards essays where the applicant's intellectual framework is THE vehicle for self-revelation, not a separate showcase. Ellie isn't writing about surgery OR about being a novelist OR about organization — she's using a physics concept to simultaneously show all three threads interacting. Hopkins' AO specifically praises this integration. For Hopkins, 'intellectual ambition' and 'self-reflection' should be the same move, not sequential paragraphs.",
+        "howThisWouldHaveFaredElsewhere": "This is a genuine multi-school-strong essay. Stanford: strong accept — intellectual playfulness, unusual career pairing (surgeon + YA dystopian novelist), voice signature, self-aware humor. MIT: accept — scientific concept used rigorously, not as decoration. Caltech: accept — same. Harvard / Princeton / Yale: strong accept — literary sophistication + intellectual depth. UChicago: strong accept — this is exactly UChicago's wheelhouse (formal intellectual experiment + playful voice + uncommon thinking). Duke / Northwestern / Brown: accept. The ambition-pairing (surgeon + YA dystopian novelist) is the kind of specific-unexpected-combination admissions officers genuinely remember."
+      },
+      "inclusionNote": "Strongest essay in the corpus so far on multiple axes: (a) only one where the AO commentary uses explicit craft-praise language rather than 'fit' language, (b) uses an extended metaphor as structural AND argumentative spine simultaneously, (c) has the most distinctive career-ambition pairing I've seen, (d) voice signature is recognizable sentence-to-sentence. This is the archetype of 'essay that would succeed at any top-10 school' — Ellie likely had her pick of admits.",
+      "readerBiasCheck": "My bias risk: 'over-rewarding clever structural conceits.' I re-checked by asking: does the metaphor work AS metaphor, or is it decoration? The entropy concepts genuinely illuminate the personal material — 'equilibrium at maximum entropy' actually describes her learning-to-tolerate-chaos in a non-trivial way, not just as a cute hook. The metaphor earns its weight."
+    },
+    {
+      "id": "05-harvard-2028-i-too-can-dance",
+      "admitSchool": "Harvard University",
+      "admitYear": 2024,
+      "classYear": "Class of 2028",
+      "essayType": "Common App personal statement",
+      "sourceType": "consultant-feature-via-Crimson-sponsored-content",
+      "sourceUrl": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "sourceAttribution": "Harvard Crimson Brand Studio (sponsored feature, Crimson-attested Harvard admit); consultant commentary by Ivy Institute",
+      "provenanceCaveat": "Harvard admit claimed by Crimson-sponsored feature, not independently verified by Harvard admissions. Accepted on strength of craft + reputable-student-newspaper attestation. First-name-only student attribution (Sarika) is weaker than institution-published sources.",
+      "sourceQuote": "In this essay 'I, Too, Can Dance,' Sarika skillfully describes how she went from wanting to dance like the made-up character Angelina Ballerina to discovering deep fulfillment and a way to express herself via writing... Sarika's profound reflection and her mature realization that artistic expression can take numerous forms are what make her essay so moving. [Ivy Institute]",
+      "archetype": "Interior self-transformation via metaphor-possession / disability essay that refuses to be a disability essay",
+      "topic": "Disability + artistic self-discovery + writing-as-dance",
+      "writerBackground": "Sarika; wheelchair user; no biographical hooks beyond disability named in the essay — no family, community, geography, ethnicity, or religion appears",
+      "closeReading": {
+        "distinctiveVoice": {
+          "pass": true,
+          "evidence": "Voice is a dance-writing hybrid register. Dance verbs applied directly to writing nouns: 'my pencil pirouettes perfect O's on paper,' 'my fingers tap dance across the keys,' 'the ink flows gracefully, and for a moment, it leaps off the page.' This is possession-not-comparison — the essay never announces the metaphor, it writes from inside it. Voice is restrained throughout: the word 'wheelchair' appears exactly ONCE in the whole essay, paragraph 3, in service of a rhetorical question. Compare with typical disability essays that name the disability 5-10 times. The restraint IS the voice."
+        },
+        "earnedEmotion": {
+          "pass": true,
+          "evidence": "Emotion is supported by specific consequence-detail, not assertion. The wheelchair's impact on dance is established via 'I even ran over my friends' toes' rather than 'I couldn't dance because I was disabled.' The closing emotional payoff ('I, too, can dance') earns its weight because the preceding paragraph 6 lists three specific writing projects (LDCT-scans cancer article, Spanish poem, autobiographical story) that demonstrate the capacity the opening paragraphs longed for. The resolution isn't asserted — it's enacted in the catalog of what she writes."
+        },
+        "structuralChoice": {
+          "pass": true,
+          "evidence": "Two structural moves working simultaneously: (1) Paragraph 2's triplet of longings ('I longed for... I longed for... I longed for...') is a hidden thesis statement — three desires, one of which (agency over stories) gets fulfilled by displacement into writing. The closing 'I, too, can dance' resolves the opening's longing-syntax into capacity-syntax. (2) The Nutcracker-mice reference in paragraph 5 is the essay's hinge — the moment writing arrives is described using ballet imagery ('ideas scampered through my head like Nutcracker mice awakening a sleeping Clara'), which produces felt continuity rather than explained transition. The dance-vocabulary migrates from her legs to her mind without the reader being told the migration happened."
+        },
+        "nonSwappableSpecificity": {
+          "pass": true,
+          "evidence": "Specific-to-her-life details: 'Angelina Ballerina' (cartoon reference, specific era), 'LDCT scans or aneuploidy-targeted therapy' (cancer-research vocabulary demonstrating actual engagement, not name-dropping), 'Sugar Plum Fairy,' 'Nutcracker mice,' 'grand jeté,' 'arabesque,' 'en pointe' (specific ballet terminology showing reader-expertise that a non-ballet-trained writer couldn't fake), 'Mary Had a Little Lamb' on recorder (specific failure), 'Spanish poem about the beauty of unspoken moments.' Plus the Langston Hughes allusion in the title ('I, Too, Sing America') operating quietly — readers who catch it get extra depth."
+        },
+        "memorability": {
+          "pass": true,
+          "evidence": "Multiple sticky handles: the dance-verbs-for-writing move ('pencil pirouettes,' 'fingers tap dance'), Angelina Ballerina → Nutcracker mice → written dance arc, the wheelchair-reveal-via-running-over-toes, the Langston Hughes title allusion, LDCT-scans specificity. Would summarize a week later: 'girl in a wheelchair who wanted to be a ballerina and became a writer using dance verbs for writing.' Core move stays crisp."
+        }
+      },
+      "editorialAnalysisBeyondCommentary": {
+        "whatTheIvyInstituteCommentaryGotRight": "Named the dance-to-writing arc. Named that Sarika 'describes her writing process using dance-related imagery.' Named the 'profound reflection' and 'mature realization' effects.",
+        "whatTheIvyInstituteCommentaryMissedOrUndersold": "(1) The wheelchair reveal is craft-perfect — disclosed via consequence ('ran over my friends' toes') before being named; named exactly once in the entire essay. The commentary doesn't identify this as deliberate tonal restraint. (2) Paragraph 2's triplet of longings is a hidden thesis statement that foreshadows the essay's turn — only the middle longing ('enchant the world with my own stories') gets fulfilled by displacement to writing. The commentary reads the essay as a chronological narrative, missing the syntactic foreshadowing. (3) The dance-vocabulary applied to writing is possession, not comparison. Commentary says 'effectively drawing comparisons between dance and writing' — but Sarika isn't comparing; she's using dance verbs on writing nouns WITHOUT announcing the metaphor. This is a stronger move than comparison. (4) The Nutcracker-mice reference is the hinge where dance-vocabulary migrates from body to mind. Commentary doesn't notice this structural pivot. (5) The title is a Langston Hughes allusion ('I, Too, Sing America') operating quietly. Commentary doesn't mention it.",
+        "transferableCraftMoves": [
+          {
+            "name": "Reveal-through-consequence",
+            "description": "The wheelchair appears via 'ran over my friends' toes' before being named. Readers infer rather than being told. Inference creates intimacy. Transfers to any essay with a central fact about the writer (disability, loss, family situation): let the fact be felt through its consequences before being named explicitly.",
+            "universalApplication": "Instead of 'My mother died when I was eight,' try a detail whose implication is the death. Instead of 'I'm autistic,' try a sensory failure whose cause is autism."
+          },
+          {
+            "name": "Syntactic foreshadowing",
+            "description": "Paragraph 2's 'I longed for... I longed for... I longed for...' plants the shape of unfulfilled desire. The closing 'I, too, can dance' resolves the triplet by converting longing into capacity. Reader doesn't consciously notice the mirror but feels the resolution because the form of the closing answers the form of the setup.",
+            "universalApplication": "Plant the syntactic shape of your thesis near the opening, in a form that foreshadows your resolution. Let the closing echo that form transformed. Readers feel resolution without being told the essay has resolved."
+          },
+          {
+            "name": "Possession-not-comparison",
+            "description": "Sarika doesn't say 'writing is my new form of dance.' She says 'pencil pirouettes,' 'fingers tap dance,' 'ink leaps off the page.' The dance vocabulary is applied directly to writing tools. The essay never announces the metaphor; it writes from inside it.",
+            "universalApplication": "When an essay is about becoming one thing after trying to be another, don't compare the two. Use the vocabulary of the first identity as the verbs for the second. Possession is stronger than comparison because it requires the reader to feel the continuity rather than being told to."
+          },
+          {
+            "name": "Metaphor-bridge as hinge",
+            "description": "The moment Sarika transitions from trying to dance to writing is bridged by 'ideas scampered through my head like Nutcracker mice.' The metaphor does double work: describes the arrival of ideas AND uses ballet imagery for continuity. Reader feels transformation, not break.",
+            "universalApplication": "Every personal essay with a turn (I was X, then I became Y) needs a bridge. The strongest bridge isn't a sentence that says 'and then everything changed.' It's a metaphor that uses imagery from the old identity to describe the arrival of the new."
+          },
+          {
+            "name": "Name the central fact exactly once",
+            "description": "'Wheelchair' appears in the essay one time. This is a disability essay where the word 'disability' doesn't appear. The restraint does the work — by refusing to make the wheelchair the theme, Sarika makes the essay about the wheelchair in a way no 'wheelchair essay' could be.",
+            "universalApplication": "If your essay is about a thing (loss, identity, illness, family), try naming that thing once and only once. Let the rest of the essay orbit it. Readers trust writers who don't over-label their own material. Trust creates intimacy. Over-labeling creates distance."
+          }
+        ],
+        "weaknessesWorthNoting": [
+          "'Glimmered' in paragraph 2 is a generic-decorative verb in an otherwise-precise context. Compared with 'pirouetted,' 'grand jeté,' and 'scampered' elsewhere, it's a slack word.",
+          "The art-attempt failure in paragraph 4 ('colorful mess') is thin compared to piano ('uncoordinated staccato tap dance') and recorder ('flute-like screeches tumbling through the air'). The triplet isn't evenly weighted.",
+          "'Cathartic cadences of fresh ink, bursting with stories to be told and melting into parched paper' stacks alliteration + genre-cliche + image in one sentence. Overwritten.",
+          "The Sugar Plum Fairy's return in paragraph 6 feels reached-for, in contrast to the Nutcracker-mice return in paragraph 5 which feels organic.",
+          "The final two one-sentence paragraphs feel architecturally designed for quotability. Effective but detectable.",
+          "No biographical range beyond disability (no family, community, geography, ethnicity). This is a choice that works for this essay's architecture but is atypical for top-school admits and worth noting as a data point."
+        ]
+      },
+      "schoolFit": {
+        "institution": "Harvard University",
+        "whatTheConsultantCommentarySignals": "Ivy Institute frames the essay through 'profound reflection,' 'mature realization,' and 'artistic expression can take numerous forms.' This is not Harvard-AO commentary — it's consultant-marketing framing. What it tells us about Harvard selection is indirect: a consultant confident enough to sponsor this essay as 'successful Harvard' must believe Harvard selects for literary maturity and craft sophistication. The commentary's shape (reflective, craft-aware) suggests the consultants reading Harvard admit pools see literary prose as a Harvard-fit signal.",
+        "patternAcrossSchoolsPublishedEssays": "Compared to Hopkins AO commentaries, which tend to frame essays as 'shows Hopkins values' (community, exploration, interdisciplinary range), the Crimson-sponsored Harvard commentaries frame essays as exhibits of prose maturity and literary reflection. This is a different curation axis — Hopkins curates for behavioral fit; Harvard (per its consultant-featured 'successful' essays) curates for craft visibility.",
+        "whatThisEssayTeachesUsAboutTheSchool": "Harvard's 2024 selection of Sarika's essay is informative specifically BECAUSE the essay has no biographical hooks. No family, community, ethnicity, geography. Harvard selected an essay that wins on craft alone. This is distinctive — most top schools prefer essays that carry both craft AND biographical signal. Harvard's willingness to admit on craft-only suggests Harvard's AOs read essays as literary artifacts first and applications second. For the school-fit map: Harvard rewards prose maturity even in the absence of what the Common Data Set would call 'diversity signal.'",
+        "howThisWouldHaveFaredElsewhere": "Stanford: strong accept — voice-signature + unusual-angle + craft. Yale / Princeton: accept — literary sophistication travels; the Langston Hughes allusion signals a reader. MIT / Caltech: borderline — no STEM angle beyond passing LDCT-scans reference. UChicago: strong accept — UChicago loves formal restraint and interior architecture; Sarika's single-wheelchair-mention and metaphor-possession approach are UChicago's wheelhouse. Brown / Penn / Columbia / Cornell / Dartmouth: accept. Johns Hopkins: would accept, but Hopkins AO commentary likely would emphasize growth-from-disability narrative rather than craft — meaning Sarika's essay would outperform its likely Hopkins framing. Tells us: the same essay produces different commentary at different schools, and Harvard's commentary (via its reputable proxy channels) reads craft more directly than Hopkins' does."
+      },
+      "inclusionNote": "Strongest essay in the corpus on 'craft-alone' axis. No biographical hooks, pure interior self-transformation via metaphor-possession. Teaches five high-value transferable craft moves: reveal-through-consequence, syntactic foreshadowing, possession-not-comparison, metaphor-bridge-as-hinge, name-the-central-fact-once. Corpus needs this entry specifically as the exemplar of 'what to do when the essay is the whole case.'",
+      "readerBiasCheck": "My bias risk here: 'over-rewarding literary prose in essays from under-represented voices.' I re-checked by asking whether the essay would pass without the disability angle. Even stripping 'wheelchair' out, the dance-to-writing transformation + syntactic foreshadowing + title allusion + metaphor possession would still clear the bar. The disability context supports but does not carry the craft. Accepted on the craft, which is genuinely exceptional."
+    },
+    {
+      "id": "06-harvard-2028-three-days-before-a-plane",
+      "admitSchool": "Harvard University",
+      "admitYear": 2024,
+      "classYear": "Class of 2028",
+      "essayType": "Common App personal statement",
+      "sourceType": "consultant-feature-via-Crimson-sponsored-content",
+      "sourceUrl": "https://www.thecrimson.com/topic/sponsored-successful-harvard-essays-2024/",
+      "sourceAttribution": "Harvard Crimson Brand Studio (sponsored); consultant commentary by Ivy Institute",
+      "provenanceCaveat": "Harvard admit claimed by Crimson-sponsored feature, not independently verified. First-name-only attribution (Francisco, nickname Cisco). Same caveats as entry #05.",
+      "sourceQuote": "Although Francisco's essay effectively recounts a transformative summer experience, it could be enhanced by the inclusion of additional personal details and background information... Valuable context could be provided by including specifications about his initial interest in engineering and science or his prior experiences with competitiveness. [Ivy Institute]",
+      "archetype": "Peak-scene carries the essay / community-transformation with concentrated emotional core",
+      "topic": "MITES program + minority STEM community + emotional vulnerability + belonging",
+      "writerBackground": "Francisco (nickname Cisco); summer MITES program participant; hormone-imbalance + scoliosis; quit milk before program; minority STEM student",
+      "verdict": "ACCEPT (with substantial caveats)",
+      "fullReviewPath": "tests/calibration/top-tier-reference/reviews/06-francisco-three-days-before-a-plane-review-v2.md",
+      "reviewSummary": {
+        "depthNote": "Full 25,000-word sentence-by-sentence review at v2 depth in the linked markdown file. This JSON entry is a summary; the markdown is authoritative.",
+        "acceptanceRationale": "The Izzy-breakdown paragraph (paragraph 4) operates at high craft-density — ambulance-on-chest metaphor with double connotation, stingy-breaths ethical-inflection adjective, peripheral-vision near-miss framing, fear-triplet-to-resolution-triplet direct mapping. Rest of essay has substantial craft weaknesses (abstract gain-list closing, specificity-oscillation, genre-cliche transitions). Corpus needs this essay as the exemplar of 'peak scene carries essay despite uneven surrounding craft' — a distinct pattern from Sarika's 'craft sustained throughout.'",
+        "closeReadingVerdicts": {
+          "distinctiveVoice": "BORDERLINE-PASS — strong in Izzy scene, generic elsewhere",
+          "earnedEmotion": "PASS — Izzy paragraph earns; closing less earned",
+          "structuralChoice": "PASS — fear-triplet-to-resolution-triplet + opening-to-closing milk bookend",
+          "nonSwappableSpecificity": "BORDERLINE-PASS — specifics exist (MITES, Izzy, Cisco, ambulance) but essay oscillates into abstraction",
+          "memorability": "PASS — Izzy scene + milk bookend + Cisco nickname"
+        },
+        "craftMovesExtracted": 17,
+        "antiMovesExtracted": 8,
+        "patternClustersIdentified": 3,
+        "wave2PortCandidates": 10
+      },
+      "schoolFitSummary": "Francisco's admission tells us that in 2024 Harvard rewarded essays with a specifically-rendered emotional transformation scene even when surrounding craft was weaker. Combined with Sarika's admission (craft alone), suggests Harvard reads for 'is there a peak specific moment?' as a primary selection signal. Francisco's essay is closer to a Hopkins-archetype than a typical Harvard-archetype — would likely have performed better at Hopkins with more enthusiastic commentary.",
+      "readerBiasCheck": "Risk: under-rewarding unconventional structure by over-weighting sustained craft. Counter-checked: accepted on Izzy-paragraph density + structural arc + specific biographical grounding. Counter-bias: am I accepting because Harvard 'admitted' him? Admission is unverified; I shouldn't weight it heavily. Accepted on Izzy scene's in-text craft alone."
+    }
+  ]
+}
