@@ -5185,3 +5185,117 @@ export interface CarryForwardDecision {
    */
   arbitrationMechanism: 'validity_test' | 'llm_judgment' | 'comprehensive_rule';
 }
+
+// ============================================================================
+// CONVERSATOR GROUND TRUTH (Phase 0 D-0.3)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_E2E_INTEGRITY_AUDIT.md
+//   §4.5 (type shapes), §5.2 (consumption by next iteration), §5.3 (carry-forward).
+// Contract (D-0.3): exact types per §4.5 — all three types, full field set.
+// Co-located with EssayProfile types here (rather than in conversator/types.ts)
+// because they are essay-profile-level durable state — D-0.5 adds them to
+// EssayProfile root as `groundTruthFacts: GroundTruthFact[]`,
+// `storyFragments: StoryFragment[]`, `intentSignals: IntentSignal[]`. They
+// survive iterations as first-class durable state (like Findings); iteration
+// N+1's analysis layers read them as input. DigContext (D-0.2) references
+// these types via its `structuredAnswer` field.
+
+/**
+ * One captured factual claim from a student dig answer.
+ *
+ * The factual ground truth substrate for L5 fabrication-guard (Tier 3) and
+ * for analysis-layer prompts that need student-side anchors text alone can't
+ * provide. Example: "5 people on the team, not 50" — the essay's number was
+ * ambiguous; the student answered the dig and we now know the truth.
+ *
+ * Producer: digAnswerExtractor (Phase 3 D-3.7) — Sonnet call extracting
+ *   structured shape from raw chat answer.
+ * Consumers: L1/L3/L3.5/L5 prompt cached blocks (the analysis-side facts
+ *   block); L5 fabrication-guard at Tier 3; future-iteration evidence
+ *   anchoring on Findings.
+ * Carry-forward: durable across iterations; superseded only by explicit
+ *   student correction (per §5.3).
+ */
+export interface GroundTruthFact {
+  /** Stable record ID. */
+  id: string;
+  /** The factual claim, in the student's words or the extractor's faithful paraphrase. */
+  claim: string;
+  /** Raw student statements that grounded the claim. */
+  evidence: string[];
+  /** Extractor's confidence in the claim. */
+  confidence: 'high' | 'medium' | 'low';
+  /** Chat message ID that carried the answer (links into essay_chat_conversations). */
+  sourceTurn?: string;
+  /** Where in the essay this fact applies. */
+  appliesTo?: { paragraph: number; sentence?: number; spanText?: string };
+  /** ISO timestamp of capture. */
+  capturedAt: string;
+  /** Dig question ID that prompted the answer (links into UnderstandingQuestion). */
+  digQuestionId?: string;
+}
+
+/**
+ * One narrative fragment from a student dig answer.
+ *
+ * Story fragments are richer than facts — they carry arc framing, sensory
+ * anchors, emotional thread. Used by L3 Pass 2 Story lens to enrich
+ * `momentEarnednessMap` synthesis and by L5 Move 6 multiplicity paths
+ * (the rewrite layer can offer paths grounded in the student's own
+ * remembered specifics).
+ *
+ * Producer: digAnswerExtractor (Phase 3 D-3.7) when the answer comes back
+ *   in `narrative` shape.
+ * Consumers: L3 Pass 2 Story lens (per F2 R-7 contributor table); L3 Pass 3
+ *   `momentEarnednessMap.moments[].mechanisms` synthesis; L5 Move 6 path
+ *   composition.
+ * Carry-forward: durable across iterations.
+ */
+export interface StoryFragment {
+  /** Stable record ID. */
+  id: string;
+  /** The raw narrative the student shared. */
+  fragment: string;
+  /** Student's own framing of the arc, if they offered one. */
+  arc?: string;
+  /** Sensory details the student named (sights, sounds, textures). */
+  sensoryAnchors?: string[];
+  /** Emotional register of the fragment. */
+  emotionalThread?: string;
+  /** Where this could ground in the essay (LLM-suggested, NOT student-asserted). */
+  potentialAnchorParagraphs: number[];
+  /** ISO timestamp of capture. */
+  capturedAt: string;
+  /** Dig question ID that prompted the answer. */
+  digQuestionId?: string;
+}
+
+/**
+ * One captured intent signal from a student dig answer.
+ *
+ * Intent signals encode "what the student says they're trying to do" —
+ * usable by L4 northStar.intentBridge to align (or surface mismatch with)
+ * the system's inferred intent. The student's stated intent is authoritative
+ * over the system's inferred intent for this layer.
+ *
+ * Producer: digAnswerExtractor (Phase 3 D-3.7) when the answer reveals
+ *   intent (typically `short_phrase` or `narrative` shape).
+ * Consumers: L4 northStar.intentBridge.alignments[] (validates or flags
+ *   mismatch); L5 Tier 1 prompt's framing (don't propose paths that violate
+ *   stated intent); coachingMap.transformativeInsight framing.
+ * Carry-forward: durable across iterations.
+ */
+export interface IntentSignal {
+  /** Stable record ID. */
+  id: string;
+  /** What the student says they're trying to do at this point. */
+  intent: string;
+  /** Where the intent applies — paragraph-level, sentence-level, or essay-level. */
+  appliesTo: { paragraph?: number; sentence?: number; essayLevel?: boolean };
+  /** Whether the system's analysis-side read aligned with the student's stated intent. */
+  alignmentWithSystemRead: 'aligned' | 'partial' | 'mismatch';
+  /** ISO timestamp of capture. */
+  capturedAt: string;
+  /** Dig question ID that prompted the answer. */
+  digQuestionId?: string;
+}
