@@ -4037,11 +4037,32 @@ export interface StalenessReport {
 
 /**
  * StalenessEffect — declares which mutations affect which profile sections.
+ *
+ * `findingIds[]` was added in Phase 0 D-0.14 of the integrated build per
+ * F2 R-12 + F1 audit + ITERATION_LOOP_DESIGN §2.3. Optional so existing
+ * StalenessEffect emitters that don't yet populate it continue to compile.
+ * When present, lets the orchestrator know "this edit invalidates F7"
+ * via explicit linkage — needed by D-1.6 (priorAnnotations builder)
+ * and D-4e.2 (focused_structural mode's Finding-lineage tracking
+ * through reorders).
  */
 export interface StalenessEffect {
   target: StalenessTarget;
   strength: StalenessStrength;
   reason: string;
+  /**
+   * Finding IDs this staleness applies to. When populated, downstream
+   * carry-forward arbitration can decide whether the named Findings need
+   * re-derivation or can carry. Empty / absent means "no Finding linkage
+   * declared" — staleness propagates per `target` alone.
+   *
+   * Producer: editUnderstandingService and any future mutation that
+   *   knows which Findings the staleness invalidates.
+   * Consumer: priorAnnotationsBuilder (Phase 1 D-1.6),
+   *   focusedAnalyzer escalation ladder (per ITERATION_LOOP_DESIGN §6.4),
+   *   focused_structural index-remap (Phase 4 D-4e.2).
+   */
+  findingIds?: string[];
 }
 
 /**
