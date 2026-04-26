@@ -5264,6 +5264,69 @@ export interface IterationRecord {
   startedAt: string;
   /** ISO timestamp when iteration ended (after this record's commit). */
   finishedAt: string;
+  /**
+   * Telemetry events emitted during this iteration.
+   *
+   * Phase 0 D-0.9 amendment: optional addition to the §7.1 type spec.
+   * Telemetry module buffers events keyed by currentIteration in-memory
+   * during the iteration; orchestrator flushes the buffer to
+   * `events[]` at iteration commit (Phase 1 D-1.10).
+   *
+   * The optional shape preserves D-0.1's verbatim §7.1 promise: existing
+   * IterationRecord constructors that don't populate this field still
+   * compile. New code that wants the audit trail populates it.
+   *
+   * Producer: telemetry/iterationTelemetry.ts (D-0.9) buffer flush.
+   * Consumer: post-launch tuning, calibration drift detection, audit
+   *   tooling. Read-only after iteration commit.
+   */
+  events?: IterationTelemetryEvent[];
+}
+
+/**
+ * One telemetry event from a step within an iteration.
+ *
+ * Phase 0 D-0.9 — emit-side type. The telemetry module
+ * (`src/services/essayIntelligence/telemetry/iterationTelemetry.ts`)
+ * produces these from `emitStepStart` / `emitStepSuccess` /
+ * `emitStepFailure`. Pure data — no methods, no class instances —
+ * so events serialize cleanly to JSONB if a future deliverable
+ * persists them outside the in-memory iteration buffer.
+ *
+ * Consumers: IterationRecord.events[] (post-flush) for audit; console
+ *   log with `[IterationTelemetry]` prefix for tail-able local dev.
+ */
+export interface IterationTelemetryEvent {
+  /** Iteration this event belongs to. Matches IterationLedger.currentIteration at emit time. */
+  iteration: number;
+  /**
+   * Step identifier within the iteration. Free-form — examples:
+   * `'l1.firstImpressions'`, `'l3.sweep'`, `'l3.lens.voice'`,
+   * `'l5.tier2'`, `'landing.detector'`. Phase 1+ standardizes step
+   * names as orchestration sites stabilize.
+   */
+  step: string;
+  /** Optional paragraph index for per-paragraph events. */
+  paragraphIndex?: number;
+  /** Lifecycle stage of the event. */
+  status: 'started' | 'succeeded' | 'failed';
+  /** Failure context — populated only on `status: 'failed'`. */
+  error?: { message: string; code?: string; context?: Record<string, unknown> };
+  /** USD cost of the step (LLM-touching steps only). */
+  cost?: number;
+  /** Token usage for the step (LLM-touching steps only). */
+  tokenUsage?: {
+    inputTokens: number;
+    outputTokens: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+  };
+  /** Wall-clock duration in ms (populated on succeeded / failed). */
+  durationMs?: number;
+  /** Model name (LLM-touching steps only). */
+  model?: string;
+  /** ISO timestamp of the event. */
+  timestamp: string;
 }
 
 /**
