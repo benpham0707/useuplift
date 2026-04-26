@@ -3318,6 +3318,40 @@ export interface ImprovementEntry {
    * insight. Null is the correct "not applicable" value — not a failure.
    */
   collegeNote?: string | null;
+
+  /**
+   * Phase 0 D-0.17 — L4b absorption scaffold.
+   *
+   * The `pairedImprovement` payload migrates from
+   * `CraftAssessment.growthEdges[].pairedImprovement` (currently emitted
+   * by L3.75 at profileTypes.ts:1287-1298) to L4b's direct emission on
+   * each ImprovementEntry. Same field shape — single source of truth
+   * once the absorption lands.
+   *
+   * Producer:
+   *   - Today: orchestrator harvests from `CraftAssessment.growthEdges[].pairedImprovement`
+   *     into the ImprovementCandidateStore, then L4b reads via candidateStore.
+   *   - Post-absorption (Phase 4 sub-phase 4c, D-4c.1): L4b prompt extension
+   *     adds TECHNIQUE_VOCABULARY block; L4b emits this field directly per
+   *     priority entry. Output cap raised by ~2-3K tokens (D-4c.3).
+   * Consumers: L5 Tier 1 prompt (Move 7 contribution framing); manifest
+   *   merger (l5ManifestMerger.ts); L6 coaching reads via manifest.
+   * Note: contract calls the field's home "ImprovementManifestEntry" but
+   *   the actual existing type is `ImprovementEntry` (same intent). The
+   *   field lands on the existing type to avoid a churn-only rename.
+   */
+  pairedImprovement?: {
+    /** TECHNIQUE_VOCABULARY entry or null when no standard technique applies. */
+    technique: string | null;
+    /** One-sentence action the student should take. */
+    directive: string;
+    /** Why this matters to the essay's architecture specifically. */
+    architecturalReason: string;
+    /** 1-2 sentence sketch of the improved version, or null. */
+    demonstrationSketch: string | null;
+    /** Magnitude of the impact if applied. */
+    expectedImpact: 'transformative' | 'significant' | 'incremental';
+  } | null;
 }
 
 /**
