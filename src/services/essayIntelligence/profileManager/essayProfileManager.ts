@@ -1243,6 +1243,40 @@ export class EssayProfileCoordinator {
       }
     }
 
+    // ── Phase 0 D-0.8: IterationLedger / Conversator-state hydration ─────
+    // Defensive backfill at load time. The bulk of historical rows are
+    // backfilled by migration 20260426000002, but this guards against
+    // edge cases:
+    //   - profile_cache rows that have not yet had the migration applied
+    //     in this environment (e.g., a developer pulling main without
+    //     running supabase db push).
+    //   - rows where the migration ran but a concurrent writer interleaved
+    //     and left a partial JSONB.
+    //   - in-memory profiles passed to fromCheckpoint() without going
+    //     through the JSONB store at all (test fixtures, etc.).
+    // Only populates fields that are missing — never overwrites existing
+    // ledger or ground-truth state.
+    if (!profile.iterationLedger) {
+      profile.iterationLedger = {
+        currentIteration: 0,
+        iterations: [],
+        taughtMoves: [],
+        recentDecisions: [],
+      };
+    }
+    if (!profile.groundTruthFacts) {
+      profile.groundTruthFacts = [];
+    }
+    if (!profile.storyFragments) {
+      profile.storyFragments = [];
+    }
+    if (!profile.intentSignals) {
+      profile.intentSignals = [];
+    }
+    if (!profile.conversatorSessionLog) {
+      profile.conversatorSessionLog = [];
+    }
+
     // Round 7 P0 (D4-L3): Recover essayType from the persisted North Star
     // scale — it's the single source of truth persisted on the profile.
     // Mirrors the mapping in ReanalysisOrchestrator.triggerReanalysis().
