@@ -4269,12 +4269,27 @@ export interface UnderstandingQuestion {
   anchorParagraph?: number;
   /** What discovering the answer would reveal */
   expectedInsight: string;
-  /** Which layer/step raised this question */
-  source: 'walk' | 'synthesis' | 'deep_dive' | 'coaching' | 'maturity_gap';
-  /** Status tracking */
-  status: 'open' | 'resolved' | 'filtered';
+  /**
+   * Which layer/step raised this question. Type aliased to
+   * `UnderstandingQuestionSource` (D-0.2 extension) so the
+   * `analysis_specifics_gap` value is available alongside legacy values.
+   */
+  source: UnderstandingQuestionSource;
+  /**
+   * Status tracking. Type aliased to `UnderstandingQuestionStatus` (D-0.2
+   * extension) so the dig-pathway statuses (`asked_to_student`,
+   * `student_answered`, `student_declined`) are available alongside legacy.
+   */
+  status: UnderstandingQuestionStatus;
   /** Resolution (if resolved) */
   resolution?: string;
+  /**
+   * Dig context — populated only when `source === 'analysis_specifics_gap'`.
+   * Carries the analysis layer's reasoning, expected answer shape, downstream
+   * consumers, framing seed, and (post-delivery) the chat threading + the
+   * extracted structured answer. See `DigContext` (D-0.2).
+   */
+  dig?: DigContext;
 
   // ── Persistent Queue Fields (Gap 2) ──
 
@@ -5298,4 +5313,121 @@ export interface IntentSignal {
   capturedAt: string;
   /** Dig question ID that prompted the answer. */
   digQuestionId?: string;
+}
+
+// ============================================================================
+// SPECIFICS-NEED / DIG CONTEXT (Phase 0 D-0.2)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_E2E_INTEGRITY_AUDIT.md
+//   §3.1 (type extensions for UnderstandingQuestion + DigContext shape).
+// Contract (D-0.2): extend UnderstandingQuestion with the new
+// `analysis_specifics_gap` source and three new statuses; add the
+// `dig?: DigContext` sub-object populated only when source ===
+// 'analysis_specifics_gap'. The new unions are SUPERSETS of the legacy
+// unions, so existing consumers keep working unchanged.
+//
+// Per Q-B (analysis-driven dig): every analysis layer that produces an
+// output contributes specifics-need entries. The Conversator (Phase 3)
+// reads the queue, composes student-facing framings, captures answers,
+// and routes structured records back into the analysis prompts via
+// GroundTruthFact / StoryFragment / IntentSignal (D-0.3).
+
+/**
+ * The set of layers/steps that can raise an UnderstandingQuestion.
+ *
+ * Legacy values (`walk`, `synthesis`, `deep_dive`, `coaching`,
+ * `maturity_gap`) carry forward unchanged. The NEW value
+ * `analysis_specifics_gap` flags a question whose answer requires
+ * student input — text re-investigation alone won't resolve it.
+ */
+export type UnderstandingQuestionSource =
+  | 'walk'
+  | 'synthesis'
+  | 'deep_dive'
+  | 'coaching'
+  | 'maturity_gap'
+  | 'analysis_specifics_gap';
+
+/**
+ * The lifecycle states of an UnderstandingQuestion.
+ *
+ * Legacy values (`open`, `resolved`, `filtered`) carry forward unchanged.
+ * THREE NEW values cover the dig pathway:
+ *   `asked_to_student` — Conversator surfaced the question; awaiting answer.
+ *   `student_answered` — student answered; structured answer attached on `dig`.
+ *   `student_declined` — student declined to answer (e.g., "skip" / "I don't know"); deferred.
+ */
+export type UnderstandingQuestionStatus =
+  | 'open'
+  | 'resolved'
+  | 'filtered'
+  | 'asked_to_student'
+  | 'student_answered'
+  | 'student_declined';
+
+/**
+ * Sub-object populated on questions where `source === 'analysis_specifics_gap'`.
+ *
+ * Captures the analysis layer's reasoning ("why we need this"), what shape
+ * answer would resolve it, what downstream layers will consume the
+ * structured answer, what fields it populates, the Conversator's
+ * non-leading framing seed, and (after delivery) the chat threading +
+ * extraction state.
+ *
+ * Producers:
+ *   - Analysis layers populate `whyAsked` / `expectedAnswerShape` /
+ *     `consumers` / `populates` / `framingSeed` at emission.
+ *   - Conversator timing policy + composer (Phase 3 D-3.5) populate
+ *     `askedAt` and `conversatorMessageId` when surfacing.
+ *   - Conversator answer extractor (Phase 3 D-3.7) populates
+ *     `studentAnswerRaw` and either `structuredAnswer` (success) or
+ *     `extractionPending` (failure with raw answer + reason for retry).
+ * Consumers:
+ *   - The Conversator timing policy reads `expectedAnswerShape` /
+ *     `framingSeed` to compose the student-facing question.
+ *   - Iteration N+1 analysis-layer prompts read `structuredAnswer` from the
+ *     ground-truth blocks (also persisted to GroundTruthFact[] /
+ *     StoryFragment[] / IntentSignal[]) — the dig sub-object is the
+ *     bookkeeping; the durable records are the consumption substrate.
+ */
+export interface DigContext {
+  /** Why this dig matters — the analysis layer's reasoning. */
+  whyAsked: string;
+  /** What shape of answer would resolve the dig. Drives extractor routing. */
+  expectedAnswerShape: 'scalar' | 'short_phrase' | 'specific_memory' | 'list' | 'narrative';
+  /** Which downstream layer(s) will consume the structured answer. */
+  consumers: Array<'l3' | 'l3_5' | 'l3_75' | 'l4' | 'l5' | 'finding_maturity'>;
+  /**
+   * Field paths on the profile (or store) that the structured answer
+   * populates. e.g., `['groundTruthFacts.factsByLocation', 'finding.evidence']`.
+   * Free-form strings — these are documentation, not enforced.
+   */
+  populates: string[];
+  /**
+   * Conversator-facing seed — a non-leading way to phrase the question.
+   * The composer prompt (Phase 3 D-3.5) revises this seed into the
+   * actual student-facing message; the seed encodes the analytic intent.
+   */
+  framingSeed: string;
+  /** ISO timestamp when the question was asked to the student. */
+  askedAt?: string;
+  /** Conversator chat message ID that surfaced the question (links into essay_chat_conversations). */
+  conversatorMessageId?: string;
+  /** Raw student answer text. Persisted before extraction in case extraction fails. */
+  studentAnswerRaw?: string;
+  /**
+   * Structured answer extracted by the Conversator (D-3.7). One of the
+   * three durable record types — the same record is also persisted to
+   * the corresponding store on EssayProfile root for cross-iteration
+   * carry-forward.
+   */
+  structuredAnswer?: GroundTruthFact | StoryFragment | IntentSignal | null;
+  /**
+   * If extraction failed, the raw answer + reason. Allows retry without
+   * re-asking the student.
+   */
+  extractionPending?: {
+    rawAnswer: string;
+    failureReason: string;
+  };
 }
