@@ -13,6 +13,11 @@ import { jsonrepair } from 'jsonrepair';
 import dotenv from 'dotenv';
 import path from 'path';
 
+// Build cost ledger (Phase 0 D-0.10) — Node-only, gated by isBrowser
+// below. Type-only import keeps `fs` out of browser bundles; the runtime
+// module is loaded via dynamic import in `getBuildCostLedger()`.
+import type * as BuildCostLedger from '../../services/essayIntelligence/telemetry/buildCostLedger';
+
 // Single-key policy: only use ANTHROPIC_API_KEY (paid/subscription credits).
 // CLAUDE_CODE_KEY is no longer considered.
 // Check if we're in browser (Vite) or Node.js environment
@@ -26,6 +31,18 @@ const isBrowser = typeof window !== 'undefined'
   && navigator.userAgent.length > 0
   && !navigator.userAgent.startsWith('Node.js')
   && (navigator.userAgent.includes('Mozilla') || navigator.userAgent.includes('Chrome') || navigator.userAgent.includes('Safari') || navigator.userAgent.includes('AppleWebKit'));
+
+// Build cost ledger lazy-loader. Only loaded in Node (server / test
+// harness / scripts); never bundled into the browser. The build cost
+// cap discipline (D-0.10) applies to build-session API calls, not to
+// browser-side runtime user calls (which have separate accounting).
+let buildCostLedgerCache: typeof BuildCostLedger | null = null;
+async function getBuildCostLedger(): Promise<typeof BuildCostLedger | null> {
+  if (isBrowser) return null;
+  if (buildCostLedgerCache) return buildCostLedgerCache;
+  buildCostLedgerCache = await import('../../services/essayIntelligence/telemetry/buildCostLedger');
+  return buildCostLedgerCache;
+}
 
 // Ensure dotenv is loaded — idempotent, safe to call multiple times.
 // This eliminates import-order bugs where services are loaded before
@@ -314,11 +331,19 @@ export function withSystemPromptVersion(
 // ============================================================================
 
 /**
- * Attempt to repair truncated JSON (common when Claude hits maxTokens).
- * Strategy: find the last complete array element and close the array.
- * Works for both arrays-of-objects `[{...}, {...}]` and standalone objects.
+ * Attempt to repair truncated JSON (common when Claude hits maxTokens, and
+ * occasionally when the model emits a mid-stream syntax glitch).
+ *
+ * Three strategies, tried in order:
+ *   (a) Root array: find the last complete element, close with `]`.
+ *   (b) Root object: find the last complete top-level PROPERTY (ending at a
+ *       `,` at depth 1), truncate there, close outstanding nesting, close
+ *       with `}`. This is what recovers L3.75 Phase B + L3 walk outputs that
+ *       hit max_tokens or sample a bad character mid-generation — previously
+ *       these hit `arrayDepth: -1, element end positions: 0` and threw.
+ *   (c) Give up.
  */
-function repairTruncatedJSON(text: string): unknown {
+export function repairTruncatedJSON(text: string): unknown {
   let s = text.trim();
 
   // Strip markdown code block wrapper if present (common in Claude responses)
@@ -340,13 +365,17 @@ function repairTruncatedJSON(text: string): unknown {
     s = s.substring(firstBrace);
   }
 
-  // Track positions of complete top-level array elements
-  // Walk through the string tracking nesting depth
+  // Single pass: track nesting depth, record (a) complete top-level array
+  // elements, and (b) complete top-level object properties. Each recorded
+  // position carries a `closer` flag — '' if the JSON is already closed at
+  // that position, otherwise ']' or '}' to append.
+  type RepairPosition = { end: number; closer: '' | ']' | '}' };
   let inString = false;
   let escape = false;
   let depth = 0;
-  let arrayDepth = -1;
-  const elementEndPositions: number[] = [];
+  let arrayDepth = -1; // position of root `[` if root is an array, else -1
+  let objectDepth = -1; // position of root `{` if root is an object, else -1
+  const positions: RepairPosition[] = [];
 
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
@@ -360,45 +389,51 @@ function repairTruncatedJSON(text: string): unknown {
       depth++;
     } else if (ch === ']') {
       depth--;
+      // Root array closed cleanly — full JSON intact
+      if (depth === 0 && arrayDepth !== -1) {
+        positions.push({ end: i, closer: '' });
+      }
     } else if (ch === '{') {
+      if (depth === 0) objectDepth = i;
       depth++;
     } else if (ch === '}') {
       depth--;
-      // If we just closed a top-level array element (depth back to 1 = inside outer array)
+      // Closed a top-level array element (needs array closer)
       if (depth === 1 && arrayDepth !== -1) {
-        elementEndPositions.push(i);
+        positions.push({ end: i, closer: ']' });
       }
-      // If we just closed the only top-level object (not in an array)
-      if (depth === 0 && arrayDepth === -1) {
-        elementEndPositions.push(i);
+      // Closed a complete object-valued top-level property (needs object closer)
+      if (depth === 1 && objectDepth !== -1) {
+        positions.push({ end: i, closer: '}' });
       }
+      // Root object closed cleanly — full JSON intact
+      if (depth === 0 && objectDepth !== -1) {
+        positions.push({ end: i, closer: '' });
+      }
+    } else if (ch === ',' && depth === 1 && objectDepth !== -1) {
+      // Comma at depth 1 of root object = end of a top-level property.
+      // Record the char BEFORE the comma so the slice ends at the value.
+      positions.push({ end: i - 1, closer: '}' });
     }
   }
 
-  console.warn(`[JSONRepair] Text length: ${s.length}, element end positions: ${elementEndPositions.length}, arrayDepth: ${arrayDepth}`);
+  const rootKind = arrayDepth !== -1 ? 'array' : objectDepth !== -1 ? 'object' : 'none';
+  console.warn(`[JSONRepair] Text length: ${s.length}, root: ${rootKind}, repair positions: ${positions.length}`);
 
-  // Try the full string first (shouldn't work if we're here, but just in case)
-  // Then try truncating to the last complete element
-  for (let attempt = elementEndPositions.length - 1; attempt >= 0; attempt--) {
-    const endPos = elementEndPositions[attempt];
-    let candidate = s.substring(0, endPos + 1);
-
-    // Close the outer array if needed
-    if (arrayDepth !== -1) {
-      candidate += ']';
-    }
-
-    // Clean trailing commas before closing bracket
+  // Walk positions newest → oldest. Strip orphan trailing commas then append
+  // the position's closer (empty for already-closed JSON).
+  for (let attempt = positions.length - 1; attempt >= 0; attempt--) {
+    const { end, closer } = positions[attempt];
+    let candidate = s.substring(0, end + 1);
+    candidate = candidate.replace(/,(\s*)$/, '$1');
     candidate = candidate.replace(/,(\s*[\]}])/g, '$1');
-
+    candidate += closer;
     try {
       return JSON.parse(candidate);
     } catch (e) {
-      if (attempt === elementEndPositions.length - 1) {
-        console.warn(`[JSONRepair] Last element attempt failed:`, (e as Error).message.substring(0, 100));
-        console.warn(`[JSONRepair] Candidate ends with: ...${candidate.slice(-80)}`);
+      if (attempt === positions.length - 1) {
+        console.warn(`[JSONRepair] ${rootKind}: last-position attempt failed, walking back — ${(e as Error).message.substring(0, 80)}`);
       }
-      // Try next earlier element
     }
   }
 
@@ -530,6 +565,14 @@ export async function callClaude<T = any>(
     ];
   }
 
+  // Build cost cap enforcement (Phase 0 D-0.10). Throws
+  // BuildCostCapExceededError when cumulative >= $9. The orchestrator
+  // / test harness catches and halts cleanly. Browser-side calls
+  // (runtime user flows) skip this — the build cap is for Node build
+  // sessions only.
+  const buildCostLedger = await getBuildCostLedger();
+  buildCostLedger?.checkCapBeforeCall();
+
   try {
     // Build system parameter — use cache_control when caching requested.
     // Wave-1b Pre-req 3: when caching, prepend SYSTEM_PROMPT_VERSION marker so
@@ -638,15 +681,35 @@ export async function callClaude<T = any>(
         throw new Error(`Unexpected content type: ${response.content[0].type}`);
       }
 
+      const usageOut = {
+        input_tokens: response.usage.input_tokens,
+        output_tokens: response.usage.output_tokens,
+        cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
+        cache_read_input_tokens: response.usage.cache_read_input_tokens,
+      };
+
+      // Record to the build cost ledger (Phase 0 D-0.10). Sync
+      // append + cumulative update + telemetry emission. Browser
+      // calls skip this — the build cap is for Node build sessions.
+      // Failure to record HALTS the caller per no-fallback discipline:
+      // a missed cost record on a successful call would make the cap
+      // unreliable.
+      if (buildCostLedger) {
+        const costUsd = calculateCost(usageOut, model);
+        buildCostLedger.recordCost({
+          model,
+          inputTokens: usageOut.input_tokens,
+          outputTokens: usageOut.output_tokens,
+          cacheReadTokens: usageOut.cache_read_input_tokens ?? undefined,
+          cacheWriteTokens: usageOut.cache_creation_input_tokens ?? undefined,
+          costUsd,
+        });
+      }
+
       // Return structured response
       return {
         content,
-        usage: {
-          input_tokens: response.usage.input_tokens,
-          output_tokens: response.usage.output_tokens,
-          cache_creation_input_tokens: response.usage.cache_creation_input_tokens,
-          cache_read_input_tokens: response.usage.cache_read_input_tokens,
-        },
+        usage: usageOut,
         stopReason: response.stop_reason || 'unknown',
       };
     } catch (error) {
