@@ -3950,6 +3950,60 @@ export interface AnalysisPassOutput {
     growthEdges?: Array<{ quality: string; description: string; paragraphs: number[] }>;
     aoTakeaway?: string;
   };
+
+  // ── Phase 0 D-0.16 — L3.5 extension scaffold ─────────────────────────
+  // Spec: docs/pipeline-evolution/04-pipeline-architecture/L3-5/PLAN.md
+  // Both fields are optional during gradual rollout. Phase 4 sub-phase 4b
+  // (D-4b.1, D-4b.2) wires emission and verifies calibration windows.
+  // Existing L3.5 emitters that don't yet populate these fields continue
+  // to compile.
+
+  /**
+   * Cross-lens contradiction flags — emitted when ≥2 lenses make claims
+   * at the same location that cannot both be true.
+   *
+   * Per L3-5/PLAN.md: "do not flag complementary observations or
+   * different perspectives. Examples that qualify: Voice says P5 is
+   * intentional, Meaning says P5 is unearned. Examples that do NOT
+   * qualify: Voice says P5 is reflective, Story says P5 is structural —
+   * those are complementary."
+   *
+   * Producer: L3.5 prompt (extended in Phase 4 D-4b.1).
+   * Consumers: L4 (resolves in score reasoning OR surfaces unresolved
+   *   in coachingMap); L6 coaching (surfaces to student when relevant).
+   * Calibration: emission rate target 5–30% of analyses; outside that
+   *   range = prompt re-tune (D-4b.5 calibration check).
+   */
+  contradictionFlags?: Array<{
+    lens1: 'voice' | 'meaning' | 'story' | 'admissions';
+    lens2: 'voice' | 'meaning' | 'story' | 'admissions';
+    location: ParagraphLocation;
+    claim: string;
+    evidence: string;
+  }>;
+
+  /**
+   * Essay-level strength signatures — distinct craft techniques the essay
+   * demonstrates, with text evidence and paragraph anchors. Migrated
+   * from L3.75 `craftAssessment.strengthSignatures[]` (where the field
+   * was under-disciplined and ballooned to 21 entries on fixture 05).
+   *
+   * Producer: L3.5 prompt (extended in Phase 4 D-4b.2). Cap 5–8;
+   *   each entry must name a DISTINCT craft technique with NEW evidence
+   *   not used by a prior signature in this output.
+   * Consumers: L4 northStar.distinctivenessSignature articulation;
+   *   L5 Tier 2 protectedStrengths input (don't damage these on revision).
+   * Calibration: count distribution outside 4–10 = prompt re-tune.
+   *
+   * Note: shape matches `holisticAnalysisEvolution.strengthSignatures`
+   * above (the legacy nested home). Phase 4 sub-phase 4b moves emission
+   * to this top-level field; the legacy field is dropped post-absorption.
+   */
+  essayStrengthSignatures?: Array<{
+    quality: string;
+    evidence: string;
+    paragraphs: number[];
+  }>;
 }
 
 /**
