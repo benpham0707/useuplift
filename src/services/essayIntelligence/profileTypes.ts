@@ -22,6 +22,9 @@
  * Profile Manager spec: docs/plan-sections/04-profile-manager.md
  */
 
+// Conversator-internal types (D-0.4) — referenced by EssayProfile.conversatorSessionLog (D-0.5).
+import type { ConversatorSessionEntry } from './conversator/types';
+
 // ============================================================================
 // CROSS-FILE TYPE IMPORTS
 // ============================================================================
@@ -2447,6 +2450,78 @@ export interface EssayProfile {
    * next compute — see `computeVoiceEvolution` docs.
    */
   voiceEvolution?: VoiceEvolutionSignals | null;
+
+  // ── INTEGRATED PIPELINE BUILD — Phase 0 D-0.5 root additions ─────────────
+  // The five fields below are required (no `?`) per the D-0.5 contract.
+  // Defaults populated by `createInitialProfile()` in essayProfileManager.ts:
+  //   iterationLedger:        { currentIteration: 0, iterations: [],
+  //                             taughtMoves: [], recentDecisions: [] }
+  //   groundTruthFacts:       []
+  //   storyFragments:         []
+  //   intentSignals:          []
+  //   conversatorSessionLog:  []
+  // D-0.8 backfills these onto existing JSONB profiles loaded from Supabase.
+
+  /**
+   * The iteration loop's substrate — currentIteration counter + append-only
+   * iteration audit + append-only TaughtMove ledger + recent CarryForwardDecision
+   * window. See `IterationLedger` (D-0.1) for the full shape and per-field
+   * producers/consumers.
+   *
+   * Producer: orchestrator (currentIteration increment, iterations[] append,
+   *   recentDecisions[] append/prune); L5 deepAnnotationService (taughtMoves[]
+   *   append at annotation emission); landingDetector (taughtMoves[i].landing
+   *   set on iteration AFTER delivery).
+   * Consumer: priorAnnotationsBuilder (Phase 1 dead-wire fix), focusedAnalyzer
+   *   mode-selection, L5 prompt iteration context, Conversator continuous-chat
+   *   handler, audit / calibration tooling.
+   */
+  iterationLedger: IterationLedger;
+
+  /**
+   * Durable factual claims captured by the Conversator from student dig
+   * answers. See `GroundTruthFact` (D-0.3). Survives iterations as
+   * first-class durable state per L5_E2E_INTEGRITY_AUDIT §5.3.
+   *
+   * Producer: digAnswerExtractor (Phase 3 D-3.7).
+   * Consumer: L1/L3/L3.5/L5 prompt cached blocks; L5 fabrication-guard
+   *   at Tier 3 (conflict detection essay vs ground truth).
+   */
+  groundTruthFacts: GroundTruthFact[];
+
+  /**
+   * Durable narrative fragments captured by the Conversator from student
+   * dig answers. See `StoryFragment` (D-0.3). Survives iterations.
+   *
+   * Producer: digAnswerExtractor when answers come back in `narrative` shape.
+   * Consumer: L3 Pass 2 Story lens (per F2 R-7); L3 Pass 3
+   *   `momentEarnednessMap.moments[].mechanisms` synthesis; L5 Move 6
+   *   multiplicity paths.
+   */
+  storyFragments: StoryFragment[];
+
+  /**
+   * Durable intent signals captured by the Conversator. See `IntentSignal`
+   * (D-0.3). The student's stated intent is authoritative over the system's
+   * inferred intent.
+   *
+   * Producer: digAnswerExtractor.
+   * Consumer: L4 northStar.intentBridge.alignments[] (validates or flags
+   *   mismatch); L5 Tier 1 prompt framing; coachingMap.transformativeInsight.
+   */
+  intentSignals: IntentSignal[];
+
+  /**
+   * Compact recent-session chat log. The full durable log lives in the
+   * `essay_chat_conversations` table (D-0.6). See `ConversatorSessionEntry`
+   * (D-0.4).
+   *
+   * Producer: conversatorPersistence (Phase 3 D-3.2).
+   * Consumer: continuous-chat handler (recent context); dig answer
+   *   extractor (question / answer / clarifying-turn thread); L6 cross-
+   *   iteration coaching ("have we worked on this before?").
+   */
+  conversatorSessionLog: ConversatorSessionEntry[];
 }
 
 // ============================================================================

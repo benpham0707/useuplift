@@ -915,6 +915,21 @@ export function createInitialProfile(input: {
       lastMutatedAt: now,
       legacyProfile: false,
     },
+
+    // ── Integrated pipeline build — Phase 0 D-0.5 root defaults ──────────
+    // Required fields per D-0.5 contract; defaults are empty arrays plus
+    // a fresh IterationLedger with currentIteration=0 (the orchestrator
+    // increments to 1 on first-pass entry).
+    iterationLedger: {
+      currentIteration: 0,
+      iterations: [],
+      taughtMoves: [],
+      recentDecisions: [],
+    },
+    groundTruthFacts: [],
+    storyFragments: [],
+    intentSignals: [],
+    conversatorSessionLog: [],
   };
 
   return profile;
