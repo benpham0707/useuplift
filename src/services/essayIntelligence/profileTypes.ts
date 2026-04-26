@@ -4904,3 +4904,284 @@ export type { PIQPromptType } from '../piq/types';
 
 // EssayAuthenticityTier re-exported for AnalysisPassOutput consumers (Port B3).
 export type { EssayAuthenticityTier } from './rubrics/authenticityTiers';
+
+// ============================================================================
+// ITERATION LEDGER (Phase 0 D-0.1)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_ITERATION_LOOP_DESIGN.md
+//   §7.1 (type shapes), §7.2 (producers), §7.3 (consumers), §7.4 (pruning).
+// Contract (D-0.1): types verbatim from the spec — no field additions, no
+// removals, no semantic changes. Per-field JSDocs name the producer and the
+// consumers so future readers can grep for field meaning without rereading
+// the design doc.
+// Q1 redirection retired per Tue's R-1 Resolution A (2026-04-26):
+// `comprehensiveBaselineCost` and `carryForwardSavings` are audit-only —
+// extra spend is escalation-driven (§6.4 + §9 of iteration design),
+// never scheduled redirection.
+
+/**
+ * Top-level iteration state on EssayProfile root.
+ *
+ * Persists across sessions on EssayProfile JSONB. Holds the per-essay
+ * iteration history: the append-only audit of every iteration's cost and
+ * decisions, the append-only ledger of every L5 annotation ever delivered
+ * (with cross-iteration landing status), and a recent-window of
+ * carry-forward decisions for diagnostic use.
+ *
+ * The substrate the entire iteration loop reads from. Producer and
+ * consumer details are field-level below.
+ *
+ * Added to EssayProfile root by D-0.5; this declaration only defines the
+ * shape (D-0.1).
+ */
+export interface IterationLedger {
+  /**
+   * Monotonically increasing iteration counter. Iteration 1 = first-pass.
+   *
+   * Producer: orchestrator increments at the start of every iteration
+   *   (analysisOrchestrator.ts entry; reanalysisOrchestrator.ts re-analysis entry).
+   * Consumers: priorAnnotationsBuilder (§7.5 dead-wire fix), focusedAnalyzer
+   *   mode-selection (`if iteration > 1, prefer focused`), L5 prompt iteration
+   *   context, UI iteration display.
+   * Pruning: never pruned.
+   */
+  currentIteration: number;
+  /**
+   * Append-only audit record of every iteration's cost and carry-forward
+   * decisions. `iterations[N-1]` is the audit record for iteration N.
+   *
+   * Producer: orchestrator pushes at iteration end after costs are tallied.
+   * Consumers: telemetry, cost-trajectory analysis, post-launch tuning.
+   * Pruning: kept indefinitely (one record ~500 bytes; 50 iterations ~25KB).
+   */
+  iterations: IterationRecord[];
+  /**
+   * Append-only ledger of every L5 annotation ever delivered. Each entry's
+   * `landing` field is `null` (absent) at delivery and populated by the
+   * landing detector on the *next* iteration (since landing is observable
+   * only after the student's response edit).
+   *
+   * Producer: L5 deepAnnotationService appends one entry per emitted
+   *   annotation (Phase 1 D-1.2).
+   * Consumers: priorAnnotationsBuilder groups prior moves by paragraph;
+   *   landingDetector reads as classification input; Conversator
+   *   continuous-chat handler reads for cross-iteration coaching context
+   *   ("have we worked on this before?"); cross-iteration synthesizer.
+   * Pruning: kept indefinitely (~100KB at 5 moves × 20 iterations).
+   */
+  taughtMoves: TaughtMove[];
+  /**
+   * Per-iteration carry-forward decisions for diagnostic / audit.
+   *
+   * Producer: orchestrator appends at every carry-forward decision point
+   *   (per-paragraph, per-Finding, per-lens-emission, etc.).
+   * Consumers: regression detection ("voiceMap was carried 5 iterations
+   *   running but the essay's voice register evolved"), per-iteration
+   *   cost-vs-baseline regression detection.
+   * Pruning: pruned to the last 5 iterations at iteration end (decisions
+   *   are dense and only audit-relevant short-term).
+   */
+  recentDecisions: CarryForwardDecision[];
+}
+
+/**
+ * Per-iteration audit record. Captures what triggered the iteration, the
+ * orchestrator's carry-vs-rederive-vs-refresh decisions, what was actually
+ * spent, what a comprehensive baseline would have spent (audit-only — see
+ * the R-1 retirement note in this section's header), whether escalation
+ * fired, and a free-text rationale for ambiguous calls.
+ *
+ * Producer: orchestrator commits at iteration end after costs tallied.
+ * Consumers: telemetry, audit/calibration tooling, escalation calibration
+ *   drift detection.
+ */
+export interface IterationRecord {
+  /** Iteration number this record describes. Matches `IterationLedger.currentIteration` at the time of commit. */
+  iteration: number;
+  /** What triggered this iteration. */
+  triggeredBy: 'first_pass' | 'edit' | 'student_request';
+  /**
+   * Edit-triggered iterations carry the diff scope. Absent for `first_pass`
+   * and `student_request`.
+   */
+  editScope?: {
+    /** Zero-indexed paragraph indices that changed. */
+    paragraphsChanged: number[];
+    /** Edit significance — drives mode selection and ripple sizing. */
+    significance: 'minor' | 'moderate' | 'significant' | 'transformative';
+    /** LLM-classified change types per editUnderstandingService. */
+    changeTypes: EditChangeType[];
+    /** Structural reordering metadata. */
+    structural: { reordered: boolean; added: number; removed: number };
+  };
+  /**
+   * What the orchestrator decided to re-derive vs carry. Item-keyed for
+   * audit traceability; the `recentDecisions[]` ledger holds the per-decision
+   * detail, this is the rolled-up summary.
+   */
+  carryForwardSummary: {
+    /** Items carried forward unchanged. e.g., `['voiceMap', 'P1.understanding', 'F3', 'F5']`. */
+    carried: string[];
+    /** Items re-derived. e.g., `['P3.understanding', 'P3.analysis', 'thematicArchitecture']`. */
+    rederived: string[];
+    /** Items partially refreshed. e.g., `['L5.P3.annotations', 'F7.maturity']`. */
+    refreshed: string[];
+  };
+  /** Cost actually spent this iteration, per layer. e.g., `{ L1: 0.005, 'L3.sweep': 0.12, L5: 0.30 }`. */
+  costBreakdown: Record<string, number>;
+  /**
+   * Cost a comprehensive baseline would have spent, recomputed from per-layer
+   * baseline costs.
+   *
+   * Audit-only — informs cost-trajectory monitoring, NOT redirection.
+   * Per R-1 Resolution A (Tue 2026-04-26): no mandated redirection fraction;
+   * extra spend is triggered by the escalation ladder per ITERATION_LOOP_DESIGN
+   * §6.4 + §9, never scheduled.
+   */
+  comprehensiveBaselineCost: number;
+  /**
+   * `comprehensiveBaselineCost - sum(costBreakdown)`.
+   *
+   * Genuine savings, not a slush fund. The carry-forward already delivers
+   * the quality booster for free (iteration N's L5 receives priorAnnotations
+   * + matured findings — structurally deeper than iter-1 cold pass at no
+   * extra cost). Savings are not redirected.
+   */
+  carryForwardSavings: number;
+  /**
+   * Whether escalation fired this iteration, and to which level. Levels per
+   * ITERATION_LOOP_DESIGN §6.4:
+   *   0 — no escalation (focused / focused_structural / comprehensive ran clean).
+   *   1 — re-walk affected paragraphs only.
+   *   2 — re-walk + neighbor sentences.
+   *   3 — re-walk + targeted lens re-runs (post-absorption replaces L3.75 refresh).
+   *   4 — comprehensive escalation.
+   * Used by: calibration drift detection (e.g., persistent over-escalation on small edits).
+   */
+  escalationLevel: 0 | 1 | 2 | 3 | 4;
+  /** Free-text rationale for any ambiguous decisions this iteration. LLM-generated. */
+  rationale: string;
+  /** ISO timestamp when iteration started. */
+  startedAt: string;
+  /** ISO timestamp when iteration ended (after this record's commit). */
+  finishedAt: string;
+}
+
+/**
+ * One L5 annotation delivered, with cross-iteration tracking.
+ *
+ * The append-only ledger is the substrate for non-repetition (we know what
+ * was said before so we don't say it again), landing detection (we know
+ * which moves the student addressed), and cross-iteration synthesis
+ * ("you've been working on opening hooks across iterations 1–3").
+ *
+ * Producer: L5 deepAnnotationService appends at annotation emission
+ *   (Phase 1 D-1.2).
+ * Mutator (landing field only): landingDetector on the iteration AFTER
+ *   delivery (Phase 1 D-1.3 + D-1.6).
+ * Consumers: priorAnnotationsBuilder (groups by paragraph), landingDetector
+ *   (input to classification), Conversator continuous-chat handler,
+ *   cross-iteration synthesizer.
+ */
+export interface TaughtMove {
+  /** Stable ID, e.g., `M-{iteration}-{paragraph}-{seq}`. Property-tested for stability per Phase 1 D-1.13. */
+  id: string;
+  /** L5Annotation.id at time of generation. Bridges to the full annotation in the iteration checkpoint. */
+  annotationId: string;
+  /** Optional Finding link — the durable claim this move teaches against. */
+  findingId?: string;
+  /** Where the move was anchored. */
+  location: { paragraphIndex: number; sentenceIndex?: number; spanText?: string };
+  /** Iteration at which this move was delivered. */
+  taughtAtIteration: number;
+  /**
+   * Teaching mode for the move. Aliased to `L5TeachingMode` (defined above
+   * in this file) for single source of truth; the union is identical to
+   * the §7.1 inline literal: `'awareness' | 'consequence' | 'connection' | 'action'`.
+   */
+  teachingMode: L5TeachingMode;
+  /** 1–2 sentence content snapshot. Full annotation lives in the iteration checkpoint. */
+  contentSummary: string;
+  /** Optional stakes summary — what the student loses by not addressing this. */
+  stakesSnapshot?: string;
+  /**
+   * Landing status, populated on the iteration AFTER delivery.
+   *
+   * Set by: landingDetector (Phase 1 D-1.3 — single Haiku call combining
+   *   3 signals: edit-vs-critique, redetection, chat-behavior, with an
+   *   LLM-judged combiner, NOT a formula).
+   * Per Q4 (locked): confidence floor 0.7 to count as `addressed`; below →
+   *   `partially_addressed`. Asymmetric tolerance: prefer-not-to-repeat over
+   *   prefer-to-cover.
+   */
+  landing?: {
+    /**
+     * Landing classification.
+     *   `addressed` — student edit (or Conversator chat) substantively addressed the move.
+     *   `partially_addressed` — addressed weakly OR confidence < 0.7.
+     *   `unaddressed` — not addressed.
+     *   `changed_target` — student edit targets the spot but in a direction
+     *     that makes the original move no longer applicable.
+     *   `pending` — detector explicitly in-flight or partial. Distinct from
+     *     `landing` being absent (which is the default at delivery, per §7.2).
+     */
+    status: 'addressed' | 'partially_addressed' | 'unaddressed' | 'changed_target' | 'pending';
+    /** Iteration at which landing was detected (always `taughtAtIteration + N` for N >= 1). */
+    detectedAtIteration: number;
+    /** Detector confidence (0–1). Floor 0.7 to count as `addressed` per Q4. */
+    confidence: number;
+    /** Detector's free-text reasoning for the classification (LLM-generated). */
+    reasoning: string;
+    /** Which signals fed the LLM-judged combiner. */
+    signalsUsed: Array<'edit_vs_critique' | 'redetection' | 'chat_behavior'>;
+  };
+  /** If this move was deepened in a later iteration, the deepening-chain by TaughtMove ID. */
+  deepenedBy?: string[];
+  /** If this move was superseded by a later move at the same location, the link. */
+  supersededBy?: string;
+}
+
+/**
+ * One carry-forward arbitration decision, recorded for audit / regression
+ * detection. Pruned with `IterationLedger.recentDecisions[]` to the last
+ * 5 iterations.
+ *
+ * Producer: orchestrator at every carry-forward decision point.
+ * Consumer: regression detection, calibration drift detection.
+ */
+export interface CarryForwardDecision {
+  /** Iteration this decision was made in. */
+  iteration: number;
+  /**
+   * Item key naming what was decided. Examples: `'voiceMap.signature'`,
+   * `'F7'` (Finding ID), `'P3.analysis'`, `'L5.P3.annotations'`. Keys
+   * follow per-layer conventions in ITERATION_LOOP_DESIGN §3 carry-forward
+   * inventory.
+   */
+  itemKey: string;
+  /**
+   * What the orchestrator decided.
+   *   `carry` — keep prior iteration's value.
+   *   `rederive` — fully re-compute.
+   *   `partial_refresh` — refresh some sub-fields, carry others.
+   */
+  decision: 'carry' | 'rederive' | 'partial_refresh';
+  /**
+   * Free-text rationale for the decision. LLM-generated for ambiguous calls
+   * (`arbitrationMechanism === 'llm_judgment'`); deterministic-template for
+   * validity-test calls.
+   */
+  rationale: string;
+  /** Baseline re-derive cost the carry would have incurred. 0 if `decision === 'rederive'`. */
+  costSavedIfCarry: number;
+  /** Cost actually spent on re-derive. 0 if `decision === 'carry'`. */
+  costSpentIfRederive: number;
+  /**
+   * Which arbitration mechanism made the call.
+   *   `validity_test` — deterministic per-item rule (e.g., "carry voiceMap
+   *     unless register-shift detector flags drift on changed paragraphs").
+   *   `llm_judgment` — Sonnet/Haiku call resolved ambiguity.
+   *   `comprehensive_rule` — comprehensive mode forced re-derive (no arbitration).
+   */
+  arbitrationMechanism: 'validity_test' | 'llm_judgment' | 'comprehensive_rule';
+}
