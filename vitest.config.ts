@@ -28,6 +28,12 @@ export default defineConfig({
     // Node environment — these are unit tests of business logic, not
     // browser components.
     environment: 'node',
+    // Use the `forks` pool so tests can use process.chdir() for
+    // filesystem isolation. The default `threads` pool runs tests in
+    // worker_threads which block chdir (ERR_WORKER_UNSUPPORTED_OPERATION).
+    // The buildCostLedger and mockLlm tests both use cwd-swap for
+    // isolated fixture / ledger paths.
+    pool: 'forks',
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json'],
