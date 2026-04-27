@@ -21,10 +21,12 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Run only *.test.ts under tests/unit/ (the legacy tsx runner
-    // covers the rest). Path-based include lets the two test runners
-    // coexist without the legacy scripts being picked up by vitest.
-    include: ['tests/unit/**/*.test.ts'],
+    // Run only *.test.ts under tests/unit/ + tests/integration/ (the
+    // legacy tsx runner covers the rest of tests/integration/ that
+    // doesn't end in .test.ts). The path-based include lets the two
+    // test runners coexist without the legacy scripts being picked up
+    // by vitest.
+    include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
     // Node environment — these are unit tests of business logic, not
     // browser components.
     environment: 'node',
