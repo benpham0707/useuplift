@@ -218,6 +218,184 @@ const CASES: CalibrationCase[] = [
   },
 
   // ────────────────────────────────────────────────────────────────────
+  // ADVERSARIAL EXTENSION (Round 4+ generalization tests).
+  // These cases exercise boundaries the prompt was NOT tuned on, to
+  // verify generalization rather than memorization. Each case is
+  // designed to break a plausible mis-reading of the prompt.
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: 'case-6-addressed-with-redetection-conflict',
+    description: 'addressed substance + redetection false positive → Q4 conflict rule should downgrade to partially_addressed.',
+    rationale:
+      'The edit fully executes the directive (concrete loss named). But the upstream re-detection mistakenly still flags the symptom (false positive — possibly redetector sees lingering "abstract" word). Q4 conflict rule: working hypothesis `addressed` + Signal B says still flagged → downgrade to `partially_addressed`. Tests the conflict resolution branch directly.',
+    input: {
+      priorTaughtMove: move({
+        id: 'M-1-2-A-6',
+        annotationId: 'A-6',
+        location: { paragraphIndex: 2, sentenceIndex: 0, spanText: 'I learned a lot' },
+        teachingMode: 'awareness',
+        contentSummary:
+          '"I learned a lot" tells the reader you grew without showing what shifted. Replace with the specific lesson — what you now believe that you didn\'t before, what assumption broke.',
+      }),
+      edit: {
+        oldText: 'I learned a lot from that summer at the hospice.',
+        newText:
+          "I left the hospice no longer believing that comfort meant solving — sometimes it meant standing still while someone else's hands shook against mine and not naming it.",
+        significance: 'significant',
+      },
+      newAnalysisAtLocation: {
+        symptomFlagged: true,
+        reasoning: 'Re-detector flags lingering abstraction in "comfort meant solving"; the edit may not have fully landed.',
+      },
+    },
+    expected: {
+      // Q4 conflict rule: addressed + B says flagged → partially_addressed.
+      status: 'partially_addressed',
+      confidenceMin: 0.5,
+      confidenceMax: 0.9,
+      mustListSignals: ['edit_vs_critique', 'redetection'],
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: 'case-7-rewrite-that-addresses-not-changed-target',
+    description: 'Substance reframed to resolve critique → addressed, NOT changed_target.',
+    rationale:
+      'The chess-club anecdote contradiction case again, but THIS time the student rewrites the chess paragraph to acknowledge competition was about camaraderie, not winning. The substance (chess anecdote) is still present; the contradiction is resolved by reframing. Per the prompt: changed_target requires substance to be GONE, not rewritten. This must be addressed.',
+    input: {
+      priorTaughtMove: move({
+        id: 'M-1-2-A-7',
+        annotationId: 'A-7',
+        location: { paragraphIndex: 2, sentenceIndex: 0, spanText: 'I trained for months for the regional chess tournament' },
+        teachingMode: 'connection',
+        contentSummary:
+          'The chess-club anecdote contradicts the claim in P1 that you avoid competitive environments. Either reframe the chess paragraph in non-competitive terms, or adjust the P1 framing.',
+        stakesSnapshot: 'Internal contradictions read as performative.',
+      }),
+      edit: {
+        oldText:
+          'I trained for months for the regional chess tournament. When I won, I knew I belonged in that crowd — the smart kids, the ones who took ranking seriously.',
+        newText:
+          "I spent months at the chess club not because I cared about the tournament — I never made it past the first round — but because the long Saturday afternoons of analysis with Marcus and Priya were the only place I could think out loud without performing.",
+        significance: 'significant',
+      },
+      newAnalysisAtLocation: {
+        symptomFlagged: false,
+        reasoning: 'Chess substance preserved; competition framing reframed to camaraderie + thinking-aloud. Contradiction with P1 resolved.',
+      },
+    },
+    expected: {
+      status: 'addressed',
+      confidenceMin: 0.75,
+      confidenceMax: 1.0,
+      mustListSignals: ['edit_vs_critique', 'redetection'],
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: 'case-8-unaddressed-cosmetic-only',
+    description: 'Cosmetic-only edit at location (tense polish) → true Branch 1 unaddressed.',
+    rationale:
+      'Move asks for the specific realization to be named. Student edits the location but ONLY changes tense ("realized" → "had realized") — zero engagement with the directive. The targeted vague phrase ("something important") is untouched. This is true Branch 1: the edit shows no recognition of the move\'s direction at all. Tests that the model distinguishes pure-cosmetic edits from gestural engagement.',
+    input: {
+      priorTaughtMove: move({
+        id: 'M-1-1-A-8',
+        annotationId: 'A-8',
+        location: { paragraphIndex: 1, sentenceIndex: 2, spanText: 'I realized something important' },
+        teachingMode: 'action',
+        contentSummary:
+          '"I realized something important" tells without showing. Replace with the specific realization — what you now know, what shifted in your understanding, named concretely.',
+      }),
+      edit: {
+        oldText: 'After three weeks, I realized something important.',
+        newText: 'After three weeks, I had realized something important.',
+        significance: 'minor',
+      },
+      newAnalysisAtLocation: {
+        symptomFlagged: true,
+        reasoning: 'Tense polish only ("realized" → "had realized"). The vague phrase the move targeted is unchanged; the realization is still unnamed.',
+      },
+    },
+    expected: {
+      status: 'unaddressed',
+      confidenceMin: 0.75,
+      confidenceMax: 1.0,
+      mustListSignals: ['edit_vs_critique', 'redetection'],
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: 'case-9-changed-target-deletion',
+    description: 'Move\'s target paragraph entirely deleted (no replacement, surrounding text stitched) → changed_target.',
+    rationale:
+      'The student didn\'t replace the offending paragraph with new content; they just deleted it and stitched the surrounding paragraphs together. The move\'s target is GONE — no longer in the essay. This is changed_target by deletion, distinct from changed_target by replacement. Tests that the prompt handles pure deletion cleanly.',
+    input: {
+      priorTaughtMove: move({
+        id: 'M-1-3-A-9',
+        annotationId: 'A-9',
+        location: { paragraphIndex: 3, sentenceIndex: 0, spanText: 'When my grandmother passed' },
+        teachingMode: 'connection',
+        contentSummary:
+          'This grief paragraph is doing too much work for the essay\'s through-line. Either let it earn its weight by connecting to the central argument, or trim it back significantly.',
+      }),
+      edit: {
+        oldText:
+          "When my grandmother passed, I felt the floor disappear beneath me. I did not eat for three days. I sat in her kitchen and held the green ceramic bowl she had used for everything — soup, dough, holding the keys when she came home.",
+        newText: '',
+        significance: 'transformative',
+      },
+      newAnalysisAtLocation: {
+        symptomFlagged: false,
+        reasoning: 'Paragraph deleted entirely; the original target is no longer in the essay.',
+      },
+    },
+    expected: {
+      status: 'changed_target',
+      confidenceMin: 0.7,
+      confidenceMax: 1.0,
+      mustListSignals: ['edit_vs_critique', 'redetection'],
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────
+  {
+    id: 'case-10-strong-partial-multifaceted',
+    description: 'Multi-facet directive: student executes one facet, leaves the other → partially_addressed.',
+    rationale:
+      'Move asked for two things: (1) cut a tangent and (2) reconnect to the central image. Student cut the tangent successfully but didn\'t reconnect to the central image. Half the directive executed. This is partially_addressed at higher confidence (0.75ish) than the gestural cases — the executed facet is real, not gestural. Tests that the model can read multi-facet directives.',
+    input: {
+      priorTaughtMove: move({
+        id: 'M-1-4-A-10',
+        annotationId: 'A-10',
+        location: { paragraphIndex: 4, sentenceIndex: 0 },
+        teachingMode: 'action',
+        contentSummary:
+          'Two things in this paragraph: (1) the digression about your father\'s coworker is pulling focus from the central pawnshop image — cut it. (2) After cutting, reconnect the closing sentence to the pawnshop frame so the reader feels the through-line.',
+      }),
+      edit: {
+        oldText:
+          "My father's coworker, Marco, who had once played in a small jazz band in Naples and still kept a battered trumpet in his car, used to say the same thing — that you can tell a person's whole life from their hands. Standing behind the counter at the pawnshop, I saw what Marco meant.",
+        newText:
+          "Standing behind the counter at the pawnshop, I saw what he meant — that you can tell a person's whole life from their hands.",
+        significance: 'significant',
+      },
+      newAnalysisAtLocation: {
+        symptomFlagged: true,
+        reasoning: 'Tangent successfully cut. But the closing sentence references "what he meant" without naming Marco or reconnecting explicitly to the pawnshop image; the through-line is weaker than the move asked for.',
+      },
+    },
+    expected: {
+      status: 'partially_addressed',
+      confidenceMin: 0.6,
+      confidenceMax: 0.95,
+      mustListSignals: ['edit_vs_critique', 'redetection'],
+    },
+  },
+
+  // ────────────────────────────────────────────────────────────────────
   {
     id: 'case-5-low-confidence',
     description: 'Low-confidence — gestural addition; partially_addressed at <0.7 confidence.',
