@@ -5,7 +5,9 @@
 //   §5 (the heart of the loop), §5.2 (LLM-judged combiner — NOT a
 //   formula), §5.3 (asymmetric tolerance: prefer-not-to-repeat over
 //   prefer-to-cover).
-// Model: claude-haiku-4-5-20251001 (per landingDetector.ts).
+// Model: claude-sonnet-4-5-20250929 (per landingDetector.ts; signal-
+// weighting judgment warrants Sonnet under Tue's 2026-04-27 model
+// policy for new build sites).
 // Q4 enforcement happens AFTER the LLM call (in landingDetector.ts's
 // applyConfidenceFloor). The prompt instructs the LLM to report
 // confidence honestly; the floor logic is in the caller.
@@ -14,7 +16,7 @@
 // draft so the skeleton is wired and testable end-to-end with mocked
 // LLM. D-1.4 (separate deliverable) revises through 3+ rounds with
 // adversarial-thinking + comparison passes; D-1.5 ($0.50–$1.00 mid-
-// build touchpoint) validates against real Haiku on 5 known cases.
+// build touchpoint) validates against real Sonnet on 5 known cases.
 // LANDING_DETECTOR_PROMPT_VERSION bumps each time the prompt
 // substantively changes — landed in BUILD_COST_LEDGER.md cost-record
 // rows so calibration drift across versions is auditable.

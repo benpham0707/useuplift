@@ -8,17 +8,26 @@
 // Q4 (locked, Tue 2026-04-26): confidence floor 0.7 to count as
 //   `addressed`; below → `partially_addressed`.
 //
-// Single Haiku call per (TaughtMove, iteration). Structured output
+// Single Sonnet call per (TaughtMove, iteration). Structured output
 // enforced via JSON mode + airtight runtime schema validation.
+//
+// Model policy (Tue 2026-04-27): new build-phase sites use Sonnet
+// when single-call cost stays under $0.10 OR when judgment matters.
+// Landing detection weighs three signals (edit-vs-critique,
+// re-detection, chat-behavior) into a 4-way classification — narrow
+// taxonomy but the weighting is judgment, not pattern-matching. Per
+// the policy this is a Sonnet site. Per-call cost on the typical
+// payload (~250 input + 80 output tokens) ≈ $0.0019, well under the
+// $0.10 ceiling.
 //
 // D-1.3 is the SKELETON: API surface + validation + Q4 enforcement +
 // the call wiring. The prompt body lives at
 // `prompts/landingDetector.prompt.ts` (D-1.4) which lands separately
 // after 3+ rounds of revision. The end-to-end calibration check
-// against real Haiku is D-1.5 ($0.50–$1.00 mid-build touchpoint).
+// against real Sonnet is D-1.5 ($0.50–$1.00 mid-build touchpoint).
 //
 // Failure surface (per the no-fallback charter):
-//   - Haiku call failure → throw; caller halts.
+//   - LLM call failure → throw; caller halts.
 //   - JSON parse failure → throw with raw output in error context.
 //   - Schema-validation failure (missing field, wrong type, status
 //     not in enum, confidence outside [0,1], signalsUsed has unknown
@@ -33,8 +42,13 @@ import type { TaughtMove } from '../profileTypes';
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
-/** Haiku 4.5 — fast, structured-output capable, designed for diagnosis. */
-export const LANDING_DETECTOR_MODEL = 'claude-haiku-4-5-20251001';
+/**
+ * Sonnet 4.5 — chosen because signal weighting in landing detection is
+ * judgment, not pattern-matching. Per Tue's 2026-04-27 model policy:
+ * new build-phase sites use Sonnet when single-call cost < $0.10 and/or
+ * when judgment matters. Both apply here.
+ */
+export const LANDING_DETECTOR_MODEL = 'claude-sonnet-4-5-20250929';
 
 /** Q4 (locked): confidence floor for `addressed`. */
 export const ADDRESSED_CONFIDENCE_FLOOR = 0.7;
@@ -152,9 +166,8 @@ export async function detectLanding(
     const parsed = parseAndValidate(response.content, response);
     const output = applyConfidenceFloor(parsed);
 
-    // Compute approximate cost (the build cost ledger captures the
-    // exact cost via claude.ts's own recordCost wiring — this duplicate
-    // is for telemetry visibility, not double-billing).
+    // The build cost ledger captures the exact cost via claude.ts's own
+    // recordCost wiring; we only emit token usage to telemetry here.
     emitStepSuccess(stepId, {
       model: LANDING_DETECTOR_MODEL,
       tokenUsage: {
@@ -257,7 +270,7 @@ function parseAndValidate(content: string, rawResponse: { content: string }): La
     parsed = JSON.parse(content);
   } catch (parseErr) {
     throw new Error(
-      `[landingDetector] failed to parse Haiku JSON output: ${(parseErr as Error).message}. ` +
+      `[landingDetector] failed to parse JSON output: ${(parseErr as Error).message}. ` +
         `Raw output (truncated): ${content.slice(0, 500)}`,
     );
   }

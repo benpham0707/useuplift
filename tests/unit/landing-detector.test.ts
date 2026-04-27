@@ -8,10 +8,11 @@
 //   1. Pure helpers — applyConfidenceFloor (Q4 enforcement) and the
 //      schema validator __parseAndValidateForTesting. No mocks needed.
 //   2. Orchestration — detectLanding() with vi.mock'd callClaude. Verify
-//      the call invokes Haiku with JSON mode + temperature 0, returns
-//      the parsed shape, applies the Q4 floor on weak `addressed`, and
-//      surfaces every failure mode (input validation, JSON parse, schema
-//      mismatch, upstream LLM error) without silent fallback.
+//      the call invokes Sonnet (per Tue's 2026-04-27 model policy) with
+//      JSON mode + temperature 0, returns the parsed shape, applies the
+//      Q4 floor on weak `addressed`, and surfaces every failure mode
+//      (input validation, JSON parse, schema mismatch, upstream LLM
+//      error) without silent fallback.
 //
 // The prompt body itself (D-1.4 round-1 draft) is not validated here —
 // that is the calibration check at D-1.5 ($0.50–$1.00 mid-build API
@@ -164,7 +165,7 @@ describe('D-1.3 — parseAndValidate (output schema enforcement)', () => {
 
   it('throws on non-JSON content', () => {
     expect(() => __parseAndValidateForTesting('not json {{')).toThrow(
-      /failed to parse Haiku JSON output/,
+      /failed to parse JSON output/,
     );
   });
 
@@ -285,7 +286,7 @@ describe('D-1.3 — detectLanding orchestration', () => {
     mockCallClaude.mockReset();
   });
 
-  it('calls Haiku with JSON mode + temperature 0 and returns parsed output', async () => {
+  it('calls Sonnet with JSON mode + temperature 0 and returns parsed output', async () => {
     mockCallClaude.mockResolvedValueOnce(makeClaudeResponse(happyOutput));
 
     const result = await detectLanding(makeInput());
@@ -416,7 +417,7 @@ describe('D-1.3 — detectLanding orchestration', () => {
 
   it('re-throws JSON parse failures with context (no silent fallback)', async () => {
     mockCallClaude.mockResolvedValueOnce(makeClaudeResponse('I cannot answer that question'));
-    await expect(detectLanding(makeInput())).rejects.toThrow(/failed to parse Haiku JSON output/);
+    await expect(detectLanding(makeInput())).rejects.toThrow(/failed to parse JSON output/);
   });
 
   it('re-throws schema validation failures (no silent fallback)', async () => {
@@ -436,7 +437,7 @@ describe('D-1.3 — detectLanding orchestration', () => {
     await expect(detectLanding(makeInput())).rejects.toThrow(/rate limit exceeded/);
   });
 
-  it('does not call Haiku when input validation fails (saves a Haiku call)', async () => {
+  it('does not call the LLM when input validation fails (saves a call)', async () => {
     await expect(
       detectLanding({
         ...makeInput(),
