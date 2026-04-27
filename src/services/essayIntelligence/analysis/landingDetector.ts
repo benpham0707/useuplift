@@ -163,7 +163,10 @@ export async function detectLanding(
       temperature: 0.0,
     });
 
-    const parsed = parseAndValidate(response.content, response);
+    // callClaude with useJsonMode: true returns response.content as the
+    // already-parsed JSON object (claude.ts handles fence stripping +
+    // jsonrepair fallback paths). We validate the shape directly.
+    const parsed = validateOutput(response.content);
     const output = applyConfidenceFloor(parsed);
 
     // The build cost ledger captures the exact cost via claude.ts's own
@@ -257,55 +260,61 @@ function validateInput(input: LandingDetectorInput): void {
 }
 
 /**
- * Parse Haiku's JSON response and validate against the
- * LandingDetectorOutput schema. Airtight: every field checked, every
- * enum value validated, confidence range checked.
+ * Validate the parsed JSON output against the LandingDetectorOutput
+ * schema. Airtight: every field checked, every enum value validated,
+ * confidence range checked.
  *
- * On any deviation, throws with a diagnostic that includes the raw
- * response (truncated to 500 chars) so the operator can debug.
+ * Input is `unknown` because the value comes from callClaude with
+ * useJsonMode: true, which auto-parses the JSON in the LLM client
+ * (including fence-stripping + jsonrepair fallback paths). We accept
+ * whatever it produced and enforce the schema here.
+ *
+ * On any deviation, throws with a diagnostic that JSON-stringifies the
+ * received value (truncated to 500 chars) so the operator can debug.
  */
-function parseAndValidate(content: string, rawResponse: { content: string }): LandingDetectorOutput {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch (parseErr) {
+function validateOutput(content: unknown): LandingDetectorOutput {
+  const rawForError = (() => {
+    try {
+      return JSON.stringify(content).slice(0, 500);
+    } catch {
+      return '<unserializable>';
+    }
+  })();
+
+  if (content === null || typeof content !== 'object' || Array.isArray(content)) {
     throw new Error(
-      `[landingDetector] failed to parse JSON output: ${(parseErr as Error).message}. ` +
-        `Raw output (truncated): ${content.slice(0, 500)}`,
+      `[landingDetector] parsed output is not an object. Raw: ${rawForError}`,
     );
   }
-  if (!parsed || typeof parsed !== 'object') {
-    throw new Error(`[landingDetector] parsed output is not an object. Raw: ${content.slice(0, 500)}`);
-  }
-  const o = parsed as Record<string, unknown>;
+  const o = content as Record<string, unknown>;
 
   const validStatuses = ['addressed', 'partially_addressed', 'unaddressed', 'changed_target'];
   if (typeof o.status !== 'string' || !validStatuses.includes(o.status)) {
     throw new Error(
       `[landingDetector] output.status must be one of ${validStatuses.join(' | ')}; ` +
-        `got ${JSON.stringify(o.status)}. Raw: ${content.slice(0, 500)}`,
+        `got ${JSON.stringify(o.status)}. Raw: ${rawForError}`,
     );
   }
   if (typeof o.confidence !== 'number' || !Number.isFinite(o.confidence)) {
     throw new Error(
       `[landingDetector] output.confidence must be a finite number; got ${typeof o.confidence}. ` +
-        `Raw: ${content.slice(0, 500)}`,
+        `Raw: ${rawForError}`,
     );
   }
   if (o.confidence < 0 || o.confidence > 1) {
     throw new Error(
       `[landingDetector] output.confidence must be in [0, 1]; got ${o.confidence}. ` +
-        `Raw: ${content.slice(0, 500)}`,
+        `Raw: ${rawForError}`,
     );
   }
   if (typeof o.reasoning !== 'string' || o.reasoning.length === 0) {
     throw new Error(
-      `[landingDetector] output.reasoning must be a non-empty string. Raw: ${content.slice(0, 500)}`,
+      `[landingDetector] output.reasoning must be a non-empty string. Raw: ${rawForError}`,
     );
   }
   if (!Array.isArray(o.signalsUsed)) {
     throw new Error(
-      `[landingDetector] output.signalsUsed must be an array. Raw: ${content.slice(0, 500)}`,
+      `[landingDetector] output.signalsUsed must be an array. Raw: ${rawForError}`,
     );
   }
   const validSignals = ['edit_vs_critique', 'redetection', 'chat_behavior'];
@@ -313,21 +322,16 @@ function parseAndValidate(content: string, rawResponse: { content: string }): La
     if (typeof sig !== 'string' || !validSignals.includes(sig)) {
       throw new Error(
         `[landingDetector] output.signalsUsed[*] must be one of ${validSignals.join(' | ')}; ` +
-          `got ${JSON.stringify(sig)}. Raw: ${content.slice(0, 500)}`,
+          `got ${JSON.stringify(sig)}. Raw: ${rawForError}`,
       );
     }
   }
   if (o.signalsUsed.length === 0) {
     throw new Error(
       `[landingDetector] output.signalsUsed must be non-empty — the LLM should report which signal(s) it used. ` +
-        `Raw: ${content.slice(0, 500)}`,
+        `Raw: ${rawForError}`,
     );
   }
-
-  // Touch the rawResponse param to satisfy the unused-arg linter; the
-  // raw response is captured in error contexts above when validation
-  // fails so we keep the parameter for future use.
-  void rawResponse;
 
   return {
     status: o.status as LandingDetectorOutput['status'],
@@ -364,11 +368,24 @@ export function applyConfidenceFloor(output: LandingDetectorOutput): LandingDete
 // ─── Test helpers ──────────────────────────────────────────────────────
 
 /**
- * Test-only: parse + validate a raw JSON string AS IF it came from
- * Haiku. Lets unit tests exercise the validation paths without
+ * Test-only: JSON.parse + validate a raw JSON string AS IF it came from
+ * the LLM client. Lets unit tests exercise the validation paths without
  * spinning up a real call. Exported under the __ convention to signal
  * test-only access.
+ *
+ * For non-JSON or otherwise unparseable input, throws with the same
+ * diagnostic the production path produces when JSON parsing fails
+ * upstream of validation.
  */
 export function __parseAndValidateForTesting(rawJson: string): LandingDetectorOutput {
-  return parseAndValidate(rawJson, { content: rawJson });
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(rawJson);
+  } catch (parseErr) {
+    throw new Error(
+      `[landingDetector] failed to parse JSON output: ${(parseErr as Error).message}. ` +
+        `Raw output (truncated): ${rawJson.slice(0, 500)}`,
+    );
+  }
+  return validateOutput(parsed);
 }

@@ -70,9 +70,12 @@ function makeInput(overrides: Partial<LandingDetectorInput> = {}): LandingDetect
   };
 }
 
-function makeClaudeResponse(jsonContent: object | string): ClaudeResponse<string> {
+// callClaude with useJsonMode: true returns response.content already
+// parsed (object), not a JSON string. Mock fixtures must match the
+// real wire format the production code consumes.
+function makeClaudeResponse(jsonContent: object | string): ClaudeResponse<unknown> {
   return {
-    content: typeof jsonContent === 'string' ? jsonContent : JSON.stringify(jsonContent),
+    content: jsonContent,
     usage: {
       input_tokens: 250,
       output_tokens: 80,
@@ -170,7 +173,7 @@ describe('D-1.3 — parseAndValidate (output schema enforcement)', () => {
   });
 
   it('throws on JSON that is not an object', () => {
-    expect(() => __parseAndValidateForTesting('[1,2,3]')).toThrow(/must be one of/);
+    expect(() => __parseAndValidateForTesting('[1,2,3]')).toThrow(/parsed output is not an object/);
     expect(() => __parseAndValidateForTesting('null')).toThrow(/parsed output is not an object/);
     expect(() => __parseAndValidateForTesting('"a string"')).toThrow(
       /parsed output is not an object/,
@@ -415,9 +418,24 @@ describe('D-1.3 — detectLanding orchestration', () => {
     ).rejects.toThrow(/symptomFlagged must be a boolean/);
   });
 
-  it('re-throws JSON parse failures with context (no silent fallback)', async () => {
-    mockCallClaude.mockResolvedValueOnce(makeClaudeResponse('I cannot answer that question'));
-    await expect(detectLanding(makeInput())).rejects.toThrow(/failed to parse JSON output/);
+  it('re-throws when callClaude returns non-object content (no silent fallback)', async () => {
+    // useJsonMode: true makes callClaude auto-parse and throw upstream
+    // on un-parseable JSON. If somehow a non-object value reaches us
+    // (LLM returned a JSON array, or a primitive), validateOutput
+    // surfaces it explicitly rather than silently coercing.
+    mockCallClaude.mockResolvedValueOnce(makeClaudeResponse(['array', 'not', 'object']));
+    await expect(detectLanding(makeInput())).rejects.toThrow(
+      /parsed output is not an object|output\.status must be one of/,
+    );
+  });
+
+  it('re-throws when callClaude itself throws on un-parseable JSON (no silent fallback)', async () => {
+    // callClaude with useJsonMode: true runs JSON.parse internally and
+    // throws on failure. Our orchestration must surface that error.
+    mockCallClaude.mockRejectedValueOnce(
+      new Error('Failed to parse JSON response: Unexpected token I in JSON at position 0'),
+    );
+    await expect(detectLanding(makeInput())).rejects.toThrow(/Failed to parse JSON response/);
   });
 
   it('re-throws schema validation failures (no silent fallback)', async () => {
