@@ -21,12 +21,17 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
-    // Run only *.test.ts under tests/unit/ + tests/integration/ (the
-    // legacy tsx runner covers the rest of tests/integration/ that
-    // doesn't end in .test.ts). The path-based include lets the two
-    // test runners coexist without the legacy scripts being picked up
-    // by vitest.
-    include: ['tests/unit/**/*.test.ts', 'tests/integration/**/*.test.ts'],
+    // Vitest-compatible tests are explicitly enumerated. The repo has
+    // many legacy *.test.ts files written for the tsx-based runner
+    // (`tests/unit/run-all.ts`) that don't import from 'vitest' — those
+    // shouldn't be loaded here. Phase 1+ test deliverables append to
+    // this list as new vitest-compatible tests land.
+    include: [
+      'tests/unit/build-cost-ledger.test.ts',
+      'tests/unit/mock-llm.test.ts',
+      'tests/unit/no-silent-fallback.test.ts',
+      'tests/integration/phase0-types-migrations.test.ts',
+    ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
     environment: 'node',
