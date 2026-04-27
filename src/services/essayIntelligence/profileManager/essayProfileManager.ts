@@ -79,7 +79,11 @@ import type {
   FindingCoachingValue,
   DeltaSynthesisOutput,
   HolisticSectionType,
+  IterationLedger,
+  IterationRecord,
 } from '../profileTypes';
+
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
 
 import { FindingStore } from '../findings/findingStore';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
@@ -936,6 +940,140 @@ export function createInitialProfile(input: {
 }
 
 // ============================================================================
+// ITERATION LEDGER ACCESSOR / MUTATOR (Phase 1 D-1.1)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_ITERATION_LOOP_DESIGN.md
+//   §7.2 (currentIteration is incremented at the start of every iteration
+//   by the orchestrator).
+// Contract (D-1.1): provide explicit get / increment helpers + a
+// load-time validator that fails fast on corruption. The orchestrator
+// (D-1.8 / D-1.9) calls incrementIteration() at iteration entry.
+//
+// Top-level exports rather than methods on the coordinator class so the
+// orchestrator can call them on a raw profile without coordinator
+// instantiation (the orchestrator owns its own profile reference).
+//
+// Resolves the small contract divergence between D-0.5 ("currentIteration
+// = 0 at create") and D-1.1's prose ("On profile create, currentIteration
+// = 1") — D-0.5's create-time default of 0 is correct; the first
+// incrementIteration() call at orchestrator entry takes it to 1.
+
+/**
+ * Read the current iteration counter.
+ *
+ * Producer: incrementIteration() (mutator below) at orchestrator
+ *   iteration entry.
+ * Consumers: focusedAnalyzer mode-selection (`if iteration > 1, prefer
+ *   focused`), L5 prompt iteration context, priorAnnotationsBuilder.
+ *
+ * Throws if iterationLedger is missing — by Phase 1, every profile
+ * goes through createInitialProfile() (currentIteration=0) or
+ * fromCheckpoint() (hydrates if missing), so a missing ledger here
+ * indicates a profile constructed via a non-canonical path (raw
+ * literal cast, old test fixture, etc.). Fail-fast surfaces the bug.
+ */
+export function getCurrentIteration(profile: EssayProfile): number {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.getCurrentIteration] EssayProfile.iterationLedger is missing. ' +
+        'Profile must go through createInitialProfile() or EssayProfileCoordinator.fromCheckpoint() ' +
+        'before reading the iteration counter.',
+    );
+  }
+  return profile.iterationLedger.currentIteration;
+}
+
+/**
+ * Increment the iteration counter at iteration start. Must be called by
+ * the orchestrator at every iteration entry — analysisOrchestrator
+ * (first_pass on a fresh analysis) or reanalysisOrchestrator (edit /
+ * student_request on a re-analysis).
+ *
+ * Per L5_ITERATION_LOOP_DESIGN §7.2: "incremented at the start of every
+ * iteration." The IterationRecord audit commit happens at iteration end
+ * via D-1.10; this call only updates the live counter.
+ *
+ * Producer: orchestrator entry (D-1.8 / D-1.9).
+ * Consumer: every downstream layer that reads getCurrentIteration().
+ *
+ * Throws if iterationLedger is missing or if triggeredBy is empty —
+ * fail-fast per D-1.1 contract. The triggeredBy enum is structurally
+ * enforced by TypeScript at compile time; the runtime check guards
+ * against any dynamic-string-passing path.
+ */
+export function incrementIteration(
+  profile: EssayProfile,
+  triggeredBy: IterationRecord['triggeredBy'],
+): void {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.incrementIteration] EssayProfile.iterationLedger is missing. ' +
+        'Hydrate via fromCheckpoint() or construct via createInitialProfile() before incrementing.',
+    );
+  }
+  if (
+    triggeredBy !== 'first_pass' &&
+    triggeredBy !== 'edit' &&
+    triggeredBy !== 'student_request'
+  ) {
+    throw new Error(
+      `[essayProfileManager.incrementIteration] triggeredBy is required and must be one of ` +
+        `'first_pass' | 'edit' | 'student_request'; got: ${JSON.stringify(triggeredBy)}.`,
+    );
+  }
+  profile.iterationLedger.currentIteration += 1;
+  // Note: the IterationRecord with full audit fields (carryForwardSummary,
+  // costBreakdown, comprehensiveBaselineCost, carryForwardSavings,
+  // escalationLevel, rationale, finishedAt) is committed at iteration
+  // END via D-1.10. The orchestrator captures `startedAt` locally and
+  // bundles it into the record at commit time. The increment here is the
+  // lifecycle marker; the record is the audit artifact. triggeredBy is
+  // captured so the orchestrator can read it back when commiting.
+  //
+  // We do NOT push a placeholder IterationRecord here because the
+  // append-only invariant (D-1.14) requires that every entry in
+  // iterations[] is the final committed audit — placeholders would
+  // violate the invariant if a crash interrupts before commit.
+}
+
+/**
+ * Validate that an iterationLedger has the required structure. Throws
+ * fail-fast with a diagnostic naming which field is corrupt.
+ *
+ * Exported so D-1.1 unit tests can exercise it directly without
+ * scaffolding a coordinator instance. Used internally by fromCheckpoint()
+ * after the existence-check + hydration block.
+ *
+ * Defensive: legacy stores sometimes serialize empty arrays as null;
+ * coerces those before validating (mutates the ledger in-place).
+ *
+ * Per D-1.1 contract: "Load failure on a corrupt iterationLedger →
+ * fail-fast with diagnostic naming the corrupt field."
+ */
+export function assertIterationLedgerOnLoad(ledger: IterationLedger, essayId: string): void {
+  if (typeof ledger.currentIteration !== 'number' || ledger.currentIteration < 0) {
+    throw new Error(
+      `[essayProfileManager] corrupt iterationLedger.currentIteration on load (essayId=${essayId}): ` +
+        `expected non-negative number, got ${typeof ledger.currentIteration} ${JSON.stringify(ledger.currentIteration)}.`,
+    );
+  }
+  // Legacy null-as-empty coercion. JSONB serializers occasionally write
+  // null for an empty array; we accept this as "empty" rather than
+  // throwing. After coercion, the field MUST be an array.
+  for (const arrayField of ['iterations', 'taughtMoves', 'recentDecisions'] as const) {
+    if ((ledger as Record<string, unknown>)[arrayField] === null) {
+      (ledger as unknown as Record<string, unknown[]>)[arrayField] = [];
+    }
+    if (!Array.isArray(ledger[arrayField])) {
+      throw new Error(
+        `[essayProfileManager] corrupt iterationLedger.${arrayField} on load (essayId=${essayId}): ` +
+          `expected array, got ${typeof ledger[arrayField]} ${JSON.stringify(ledger[arrayField])}.`,
+      );
+    }
+  }
+}
+
+// ============================================================================
 // ESSAY PROFILE COORDINATOR
 // ============================================================================
 
@@ -1243,7 +1381,7 @@ export class EssayProfileCoordinator {
       }
     }
 
-    // ── Phase 0 D-0.8: IterationLedger / Conversator-state hydration ─────
+    // ── Phase 0 D-0.8 + Phase 1 D-1.1: IterationLedger / Conversator-state hydration ─────
     // Defensive backfill at load time. The bulk of historical rows are
     // backfilled by migration 20260426000002, but this guards against
     // edge cases:
@@ -1256,13 +1394,37 @@ export class EssayProfileCoordinator {
     //     through the JSONB store at all (test fixtures, etc.).
     // Only populates fields that are missing — never overwrites existing
     // ledger or ground-truth state.
+    //
+    // D-1.1 refinement: every legacy-hydration occurrence now emits a
+    // structured warning (console.warn + telemetry event with
+    // status='succeeded' + context flag). Substitution is VISIBLE, not
+    // silent — the no-fallback charter requires that the system surface
+    // when it had to substitute defaults so audit can detect drift.
     if (!profile.iterationLedger) {
+      console.warn(
+        `[EssayProfileCoordinator.fromCheckpoint] iterationLedger missing on loaded profile (essayId=${essayId}); hydrating with defaults. ` +
+          `This indicates the JSONB row pre-dates D-0.5/D-0.8 or a migration was incomplete.`,
+      );
+      emitIterationEvent({
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyHydration',
+        status: 'succeeded',
+        timestamp: new Date().toISOString(),
+        error: undefined,
+      });
       profile.iterationLedger = {
         currentIteration: 0,
         iterations: [],
         taughtMoves: [],
         recentDecisions: [],
       };
+    } else {
+      // Validate structure of existing iterationLedger; corrupt fields
+      // throw fail-fast (per D-1.1 contract: "Load failure on a corrupt
+      // iterationLedger → fail-fast with diagnostic naming the corrupt
+      // field"). Defensively coerce arrays-as-null to empty arrays
+      // because some legacy stores serialize null for "empty" arrays.
+      assertIterationLedgerOnLoad(profile.iterationLedger, essayId);
     }
     if (!profile.groundTruthFacts) {
       profile.groundTruthFacts = [];

@@ -30,6 +30,7 @@ export default defineConfig({
       'tests/unit/build-cost-ledger.test.ts',
       'tests/unit/mock-llm.test.ts',
       'tests/unit/no-silent-fallback.test.ts',
+      'tests/unit/iteration-ledger-accessor.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
