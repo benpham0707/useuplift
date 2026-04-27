@@ -148,10 +148,74 @@ follow-up deliverables:
 | Item | Reason | Lands at |
 |---|---|---|
 | package.json `vitest` + `@vitest/coverage-v8` devDependencies + `test:vitest` / `test:coverage` scripts | Pre-existing uncommitted tiptap dep state in package.json (annotation V2 workstream) — staging conflict | Next package.json commit (whoever lands the tiptap deps adds these alongside) |
-| R-2 absorption supersession edits across L4/ESSAY_NORTH_STAR_DESIGN.md, L5/L5_EXPERIENCE_TARGET.md, L5/L5_ITERATION_LOOP_DESIGN.md, L5/L5_E2E_INTEGRITY_AUDIT.md, L5/L5_CONSUMPTION_AUDIT.md, L5/L5_FEEDBACK_REDESIGN.md, L5/L5_IMPLEMENTATION_PLAN.md | Per F7's deferred-edits list — these are textual updates documenting that L3.75 fields' layer-of-origin changed; they don't gate Phase 1 entry but should land before Phase 4 sub-phase 4a executes the absorption | D-0.18 follow-up commit (separate from this audit doc) |
+| R-2 absorption supersession edits across L4/ESSAY_NORTH_STAR_DESIGN.md, L5/L5_EXPERIENCE_TARGET.md, L5/L5_ITERATION_LOOP_DESIGN.md, L5/L5_E2E_INTEGRITY_AUDIT.md, L5/L5_CONSUMPTION_AUDIT.md, L5/L5_FEEDBACK_REDESIGN.md, L5/L5_IMPLEMENTATION_PLAN.md | Per F7's deferred-edits list. **APPLIED to working tree** as of this audit — see §5.1 below. Not committed because the entire `docs/pipeline-evolution/` directory is untracked (foundation-phase artifacts pending a single block commit by Tue); my edits land alongside that commit. | working-tree state; commits with foundation-phase block |
 | RE_ANALYSIS_LIFECYCLE_DESIGN.md absorption + focused_structural integration | Per F7 R-4 — tightly coupled to the actual implementation of focused_structural | D-4e.3 (Phase 4 sub-phase 4e) |
 | §A3 row-by-row consumption audit cross-check | Deferred to round-trip integration test that exercises producer→consumer→persistence in code | D-0.19 |
 | 16-of-26 audit-finding scoping cross-check (per master plan §7) | Findings F1, F2 etc. land at specific Phase 4 sub-phases per the cross-reference table | Per-sub-phase audits in Phase 4 |
+
+---
+
+## §5.1 — R-2 supersession edits applied to working tree
+
+The 7 R-2 supersession edits per F7 have been applied to the on-disk
+files in `docs/pipeline-evolution/04-pipeline-architecture/`. Because
+that directory is entirely untracked at the time of this audit
+(foundation-phase artifacts), the edits exist in the working tree
+alongside Tue's foundation-phase work and will land in the foundation-
+phase block commit. Diffs preserved against working-tree baseline.
+
+Per-file summary of what was applied:
+
+- **`L4/ESSAY_NORTH_STAR_DESIGN.md`** (line 69 area): the "After L3.75
+  (Holistic Synthesis)" milestone reframed to "After L3 (Sweep + 4 lens
+  deep reads + Pass 3)". Pre-absorption framing preserved as historical
+  reference inside a `[NOTE]` block beneath the new framing.
+- **`L5/L5_EXPERIENCE_TARGET.md`** (top of §5): absorption note added
+  noting the layer-of-origin change for fields referenced in surface
+  input lists. The fields themselves (voiceIdentity, voiceMap,
+  thematicArchitecture, narrativeStrategy, admissionsPositioning,
+  characterRevelation, momentEarnednessMap, entanglements,
+  emotionalTopography, craftAssessment.\* sub-fields) still exist;
+  their producer changes.
+- **`L5/L5_FEEDBACK_REDESIGN.md`** (top-of-doc note): absorption applies
+  to §1.2 input contract, §2 signal inventory rows that cite L3.75
+  specifically, and §11.2 failure mode (now "L3 lens or Pass 3 missing"
+  with single-owner-with-visible-failure semantics).
+- **`L5/L5_E2E_INTEGRITY_AUDIT.md`** (front-matter + decisions block):
+  Q1 entry STRUCK (per Tue's R-1 Resolution A) with retirement statement
+  pointing to ITERATION_LOOP_DESIGN §1 + §9. Absorption note added
+  flagging §1.3 step 11 (lens-targeted re-run replaces single-call
+  section masks), §3.2 (per-lens contributor split per F2 R-7), §6.2
+  (no-fallback diff applied to lens references).
+- **`L5/L5_ITERATION_LOOP_DESIGN.md`** (top-of-doc note): five specific
+  re-mappings called out — §3 inventory rows 11-19 (lens-of-origin),
+  §4.5 (per-lens policy replacing per-section), §10 F1 (Voice lens
+  re-run replacing voice-section refresh), §11 Q1 (superseded by R-1
+  Resolution A), §11 Q5 (lens-targeted re-run is the canonical
+  replacement; D-4a.16 is the implementation).
+- **`L5/L5_CONSUMPTION_AUDIT.md`** (top-of-doc note): cost convention
+  table re-mapping (L3.75 ~$0.10 → L3 lens 4× + Pass 3 ~$0.40 total),
+  rows 49–110 layer-of-origin annotation, **row 95** verdict CHANGED
+  from `rewire` to **`cut`** per Decision A (blindSpots[] removed
+  entirely; redFlags is canonical home).
+- **`L5/L5_IMPLEMENTATION_PLAN.md`** (surgical edits at three sites):
+  - **D-4.1** rewritten from "L3.75 targeted-refresh prompt variant +
+    section-mask handling" to "Lens-targeted re-run mechanism" — new
+    file path `src/services/essayIntelligence/analysis/l3/lensTargetedRerun.ts`,
+    new contract (per-lens invalidation flags + selective re-runs +
+    optional Pass 3 re-run; single-call section-mask alternative removed).
+  - **D-4.3** rewritten from "L3.75 targeted-refresh contamination check"
+    to "Lens-mask honoring contamination check" — new validation diffs
+    carried lenses against prior iteration's; flagged Voice lens
+    regenerates cleanly.
+  - **D-4.11** DELETED per Tue's R-1 Resolution A. Replacement contract
+    documented inline: D-4.12 (cost trajectory test) verifies the
+    predicted trajectory holds without redirection; D-1.10 / D-1.11
+    wire IterationRecord telemetry capturing actual escalation pattern.
+
+`RE_ANALYSIS_LIFECYCLE_DESIGN.md` deferred to D-4e.3 per F7 — that
+revision is tightly coupled to the focused_structural mode
+implementation, so the doc edit lands alongside the code.
 
 ---
 
