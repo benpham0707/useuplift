@@ -484,4 +484,424 @@ describe('D-1.6 — input validation', () => {
       }),
     ).rejects.toThrow(/perMoveChatBehavior must be a Map when present/);
   });
+
+  it('rejects paragraphRemap that is not a Map when provided', async () => {
+    await expect(
+      buildPriorAnnotations({
+        ...makeInput(),
+        paragraphRemap: {} as unknown as Map<number, number>,
+      }),
+    ).rejects.toThrow(/paragraphRemap must be a Map when present/);
+  });
+});
+
+// ============================================================================
+// D-1.7 — paragraphRemap support (index remap on structural reorder)
+// ============================================================================
+// Per the D-1.7 contract: "Synthetic fixtures simulating each edit type
+// (reorder, insert, delete, multi-paragraph) — assert the remapped Map for
+// each." These tests pass `paragraphRemap` literals directly so the
+// builder's remap-application logic is exercised without coupling to
+// `paragraphRemapBuilder` (which has its own F1–F18 coverage).
+//
+// Drop-telemetry assertions spy on `console.log` and look for the
+// `[priorAnnotationsBuilder] move-dropped` prefix that the production
+// emitter writes.
+
+import type {
+  ParagraphRemap,
+  ParagraphRemapEntry,
+} from '../../src/services/essayIntelligence/analysis/paragraphRemapBuilder';
+
+function dropEntry(
+  reason: 'paragraph_deleted' | 'ambiguous_remap_no_unique_target',
+): ParagraphRemapEntry {
+  return { dropped: true, reason };
+}
+
+function makeRemap(entries: Array<[number, ParagraphRemapEntry]>): ParagraphRemap {
+  return new Map(entries);
+}
+
+function captureDropLogs(): { spy: ReturnType<typeof vi.spyOn>; payloads: Array<Record<string, unknown>> } {
+  const payloads: Array<Record<string, unknown>> = [];
+  const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+    if (args[0] === '[priorAnnotationsBuilder] move-dropped' && typeof args[1] === 'string') {
+      payloads.push(JSON.parse(args[1]) as Record<string, unknown>);
+    }
+  });
+  return { spy, payloads };
+}
+
+// ─── B1: undefined remap → identity ────────────────────────────────────
+
+describe('D-1.7 — B1: no_remap_identity', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('with paragraphRemap omitted, behaves exactly as D-1.6 (identity)', async () => {
+    const moves = [
+      makeMove({ id: 'M-1', taughtAtIteration: 1, location: { paragraphIndex: 0 } }),
+      makeMove({ id: 'M-2', taughtAtIteration: 1, location: { paragraphIndex: 2 } }),
+    ];
+    seedDetectorByMoveId(
+      new Map([
+        ['M-1', makeLanding()],
+        ['M-2', makeLanding()],
+      ]),
+    );
+
+    const result = await buildPriorAnnotations({
+      iterationLedger: makeLedger(moves),
+      currentIteration: 2,
+      perParagraphEdits: new Map([
+        [0, makeEdit()],
+        [2, makeEdit()],
+      ]),
+    });
+
+    expect(result?.has(0)).toBe(true);
+    expect(result?.has(2)).toBe(true);
+    expect(result?.size).toBe(2);
+  });
+});
+
+// ─── B2: empty remap (no entries) → identity for everything ───────────
+
+describe('D-1.7 — B2: empty_remap_treated_as_identity', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('empty Map remap leaves every move at its old index (identity fallback)', async () => {
+    const moves = [
+      makeMove({ id: 'M-1', taughtAtIteration: 1, location: { paragraphIndex: 0 } }),
+      makeMove({ id: 'M-2', taughtAtIteration: 1, location: { paragraphIndex: 2 } }),
+    ];
+    seedDetectorByMoveId(
+      new Map([
+        ['M-1', makeLanding()],
+        ['M-2', makeLanding()],
+      ]),
+    );
+
+    const result = await buildPriorAnnotations({
+      iterationLedger: makeLedger(moves),
+      currentIteration: 2,
+      perParagraphEdits: new Map([
+        [0, makeEdit()],
+        [2, makeEdit()],
+      ]),
+      paragraphRemap: makeRemap([]),
+    });
+
+    expect(result?.get(0)?.priorAnnotations).toHaveLength(1);
+    expect(result?.get(2)?.priorAnnotations).toHaveLength(1);
+  });
+});
+
+// ─── B3: swap re-keys correctly ────────────────────────────────────────
+
+describe('D-1.7 — B3: swap_keys_correctly', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('OLD P2↔P3 swap puts iter-1 P3 moves under iter-2 NEW P2 slot', async () => {
+    const moves = [
+      makeMove({ id: 'M-2', taughtAtIteration: 1, location: { paragraphIndex: 2 } }),
+      makeMove({ id: 'M-3', taughtAtIteration: 1, location: { paragraphIndex: 3 } }),
+    ];
+    seedDetectorByMoveId(
+      new Map([
+        ['M-2', makeLanding()],
+        ['M-3', makeLanding()],
+      ]),
+    );
+
+    // OLD 2 → NEW 3, OLD 3 → NEW 2 (and 0,1 identity covered by absence)
+    const remap = makeRemap([
+      [0, 0],
+      [1, 1],
+      [2, 3],
+      [3, 2],
+    ]);
+
+    const result = await buildPriorAnnotations({
+      iterationLedger: makeLedger(moves),
+      currentIteration: 2,
+      // Edit signals keyed by OLD index (the orchestrator's contract per D-1.7 plan)
+      perParagraphEdits: new Map([
+        [2, makeEdit()],
+        [3, makeEdit()],
+      ]),
+      paragraphRemap: remap,
+    });
+
+    expect(result?.get(2)?.priorAnnotations).toHaveLength(1); // M-3 lands here
+    expect(result?.get(3)?.priorAnnotations).toHaveLength(1); // M-2 lands here
+    expect(result?.has(0)).toBe(false);
+    expect(result?.has(1)).toBe(false);
+  });
+});
+
+// ─── B4: delete drops move + emits telemetry ───────────────────────────
+
+describe('D-1.7 — B4: delete_drops_move', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('move at deleted paragraph is dropped from Map; telemetry payload has reason + ids', async () => {
+    const { spy, payloads } = captureDropLogs();
+    try {
+      const moves = [
+        makeMove({ id: 'M-deleted', taughtAtIteration: 1, location: { paragraphIndex: 0 }, contentSummary: 'critique that survives only as a Finding' }),
+        makeMove({ id: 'M-kept', taughtAtIteration: 1, location: { paragraphIndex: 1 } }),
+      ];
+      seedDetectorByMoveId(new Map([['M-kept', makeLanding()]]));
+      const remap = makeRemap([
+        [0, dropEntry('paragraph_deleted')],
+        [1, 0],
+      ]);
+
+      const result = await buildPriorAnnotations({
+        iterationLedger: makeLedger(moves),
+        currentIteration: 2,
+        perParagraphEdits: new Map([[1, makeEdit()]]),
+        paragraphRemap: remap,
+      });
+
+      expect(result?.size).toBe(1);
+      expect(result?.get(0)?.priorAnnotations).toHaveLength(1); // M-kept lands at NEW 0
+
+      expect(payloads).toHaveLength(1);
+      expect(payloads[0]).toMatchObject({
+        moveId: 'M-deleted',
+        oldParagraphIndex: 0,
+        reason: 'paragraph_deleted',
+        taughtAtIteration: 1,
+        currentIteration: 2,
+      });
+      expect(payloads[0].contentSummarySnippet).toEqual(expect.stringContaining('critique'));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+// ─── B5: multi-edit with multiple drops ────────────────────────────────
+
+describe('D-1.7 — B5: multi_edit', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('handles compound structural change: 2 drops + 2 remapped survivors', async () => {
+    const { spy, payloads } = captureDropLogs();
+    try {
+      const moves = [
+        makeMove({ id: 'M-A', taughtAtIteration: 1, location: { paragraphIndex: 0 } }),
+        makeMove({ id: 'M-B', taughtAtIteration: 1, location: { paragraphIndex: 1 } }),
+        makeMove({ id: 'M-C', taughtAtIteration: 1, location: { paragraphIndex: 2 } }),
+        makeMove({ id: 'M-D', taughtAtIteration: 1, location: { paragraphIndex: 3 } }),
+      ];
+      seedDetectorByMoveId(
+        new Map([
+          ['M-A', makeLanding()],
+          ['M-D', makeLanding()],
+        ]),
+      );
+      // From F13: {0:2, 1:dropped, 2:dropped, 3:1}
+      const remap = makeRemap([
+        [0, 2],
+        [1, dropEntry('paragraph_deleted')],
+        [2, dropEntry('paragraph_deleted')],
+        [3, 1],
+      ]);
+
+      const result = await buildPriorAnnotations({
+        iterationLedger: makeLedger(moves),
+        currentIteration: 2,
+        perParagraphEdits: new Map([
+          [0, makeEdit()],
+          [3, makeEdit()],
+        ]),
+        paragraphRemap: remap,
+      });
+
+      expect(result?.get(2)?.priorAnnotations).toHaveLength(1); // M-A
+      expect(result?.get(1)?.priorAnnotations).toHaveLength(1); // M-D
+      expect(result?.size).toBe(2);
+      expect(payloads.map((p) => p.moveId).sort()).toEqual(['M-B', 'M-C']);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+// ─── B6: multiple priors at same OLD paragraph, both remapped ──────────
+
+describe('D-1.7 — B6: multiple_priors_same_paragraph_remapped', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('two priors at OLD P2 both group under NEW P5', async () => {
+    const moves = [
+      makeMove({ id: 'M-A', taughtAtIteration: 1, location: { paragraphIndex: 2 } }),
+      makeMove({ id: 'M-B', taughtAtIteration: 1, location: { paragraphIndex: 2 } }),
+    ];
+    seedDetectorByMoveId(
+      new Map([
+        ['M-A', makeLanding()],
+        ['M-B', makeLanding()],
+      ]),
+    );
+    const remap = makeRemap([[2, 5]]);
+
+    const result = await buildPriorAnnotations({
+      iterationLedger: makeLedger(moves),
+      currentIteration: 2,
+      perParagraphEdits: new Map([[2, makeEdit()]]),
+      paragraphRemap: remap,
+    });
+
+    expect(result?.get(5)?.priorAnnotations).toHaveLength(2);
+    expect(result?.size).toBe(1);
+  });
+});
+
+// ─── B7: dropped move never calls detector ─────────────────────────────
+
+describe('D-1.7 — B7: dropped_does_NOT_call_detector', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('dropped move skips landing detector entirely', async () => {
+    const { spy } = captureDropLogs();
+    try {
+      const moves = [makeMove({ id: 'M-dropped', taughtAtIteration: 1, location: { paragraphIndex: 0 } })];
+      const remap = makeRemap([[0, dropEntry('paragraph_deleted')]]);
+
+      const result = await buildPriorAnnotations({
+        iterationLedger: makeLedger(moves),
+        currentIteration: 2,
+        perParagraphEdits: new Map([[0, makeEdit()]]),
+        paragraphRemap: remap,
+      });
+
+      expect(result?.size).toBe(0);
+      expect(mockDetect).toHaveBeenCalledTimes(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+// ─── B8: dropped move does NOT need an edit signal ─────────────────────
+
+describe('D-1.7 — B8: dropped_does_NOT_require_edit_signal', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('drop happens BEFORE edit-signal lookup; missing edit does not throw on dropped paragraph', async () => {
+    const { spy, payloads } = captureDropLogs();
+    try {
+      const moves = [makeMove({ id: 'M-dropped', taughtAtIteration: 1, location: { paragraphIndex: 7 } })];
+      const remap = makeRemap([[7, dropEntry('paragraph_deleted')]]);
+
+      const result = await buildPriorAnnotations({
+        iterationLedger: makeLedger(moves),
+        currentIteration: 2,
+        perParagraphEdits: new Map(), // intentionally empty — would throw if reached
+        paragraphRemap: remap,
+      });
+
+      expect(result?.size).toBe(0);
+      expect(payloads).toHaveLength(1);
+      expect(mockDetect).toHaveBeenCalledTimes(0);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+// ─── B9: non-dropped still requires edit signal (D-1.6 contract preserved) ──
+
+describe('D-1.7 — B9: non_dropped_still_requires_edit_signal', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('remapped (not dropped) move still throws on missing edit signal at OLD index', async () => {
+    const moves = [makeMove({ id: 'M-remapped', taughtAtIteration: 1, location: { paragraphIndex: 0 } })];
+    const remap = makeRemap([[0, 1]]); // OLD 0 → NEW 1, NOT dropped
+
+    await expect(
+      buildPriorAnnotations({
+        iterationLedger: makeLedger(moves),
+        currentIteration: 2,
+        perParagraphEdits: new Map(), // missing entry for OLD 0 → throw
+        paragraphRemap: remap,
+      }),
+    ).rejects.toThrow(/missing edit signal for paragraphIndex=0/);
+  });
+});
+
+// ─── B10: iteration 1 ignores remap ────────────────────────────────────
+
+describe('D-1.7 — B10: iter_1_ignores_remap', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('currentIteration=1 returns undefined regardless of remap presence', async () => {
+    const remap = makeRemap([[0, dropEntry('paragraph_deleted')]]);
+    const result = await buildPriorAnnotations({
+      iterationLedger: makeLedger([makeMove({ id: 'M-x', taughtAtIteration: 0, location: { paragraphIndex: 0 } })]),
+      currentIteration: 1,
+      perParagraphEdits: new Map(),
+      paragraphRemap: remap,
+    });
+    expect(result).toBeUndefined();
+    expect(mockDetect).not.toHaveBeenCalled();
+  });
+});
+
+// ─── B11: addressedByEdit derivation survives remap ───────────────────
+
+describe('D-1.7 — B11: addressedByEdit_after_remap', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('detector status flows into the remapped slot correctly', async () => {
+    const move = makeMove({
+      id: 'M-1',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 2 },
+      contentSummary: 'remapped critique',
+    });
+    seedDetectorByMoveId(new Map([['M-1', makeLanding({ status: 'addressed' })]]));
+    const remap = makeRemap([[2, 5]]);
+
+    const result = await buildPriorAnnotations({
+      iterationLedger: makeLedger([move]),
+      currentIteration: 2,
+      perParagraphEdits: new Map([[2, makeEdit()]]),
+      paragraphRemap: remap,
+    });
+
+    const ann = result?.get(5)?.priorAnnotations[0];
+    expect(ann?.content).toBe('remapped critique');
+    expect(ann?.addressedByEdit).toBe(true);
+  });
+});
+
+// ─── B12: ambiguous_remap_no_unique_target reason flows through telemetry ──
+
+describe('D-1.7 — B12: ambiguous_drop_reason', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('ambiguous drop reason surfaces in telemetry payload distinctly from paragraph_deleted', async () => {
+    const { spy, payloads } = captureDropLogs();
+    try {
+      const moves = [makeMove({ id: 'M-amb', taughtAtIteration: 1, location: { paragraphIndex: 1 } })];
+      const remap = makeRemap([[1, dropEntry('ambiguous_remap_no_unique_target')]]);
+
+      await buildPriorAnnotations({
+        iterationLedger: makeLedger(moves),
+        currentIteration: 2,
+        perParagraphEdits: new Map(),
+        paragraphRemap: remap,
+      });
+
+      expect(payloads).toHaveLength(1);
+      expect(payloads[0].reason).toBe('ambiguous_remap_no_unique_target');
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });

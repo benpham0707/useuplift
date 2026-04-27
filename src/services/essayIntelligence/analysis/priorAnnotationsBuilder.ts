@@ -37,10 +37,21 @@
 //     `addressedByEdit: false` on detector failure, or fabricate landing
 //     statuses. Every failure mode is visible; the iteration halts.
 //
-// Index remap on structural reorder is D-1.7 (next deliverable). This file
-// holds the simple-edit-only baseline.
+// Index remap on structural reorder is D-1.7 (this file's extension). When
+// a `paragraphRemap` is supplied, prior moves' OLD paragraph indices are
+// translated to NEW indices before grouping; moves whose paragraph was
+// deleted (or ambiguously remapped to no unique target) are DROPPED rather
+// than misattributed (the durable Finding carries the claim instead). The
+// drop decision is logged via console (tail-able with the
+// `[priorAnnotationsBuilder]` prefix) but is NOT a failure — only remap-
+// derivation errors throw.
 
 import { detectLanding, type LandingDetectorInput } from './landingDetector';
+import {
+  isDropped,
+  type ParagraphRemap,
+  type ParagraphRemapDropReason,
+} from './paragraphRemapBuilder';
 import type {
   IterationLedger,
   PriorAnnotationContext,
@@ -93,6 +104,24 @@ export interface PriorAnnotationsBuilderInput {
   perParagraphRedetection?: Map<number, RedetectionSignal>;
   /** Optional Signal C per move (keyed by TaughtMove.id). Absent → no C. */
   perMoveChatBehavior?: Map<string, ChatBehaviorSignal>;
+  /**
+   * Optional OLD → NEW paragraph index remap (D-1.7). When supplied:
+   *   - Moves whose `location.paragraphIndex` maps to a `dropped` entry are
+   *     DROPPED from priorAnnotations (not misattributed). A
+   *     `[priorAnnotationsBuilder] move-dropped` console event is emitted
+   *     for the orchestrator's debug surface.
+   *   - Moves whose `location.paragraphIndex` is NOT a key in the remap
+   *     fall through to identity (oldIdx === newIdx) — this preserves the
+   *     D-1.6 baseline for ranges the remap doesn't cover.
+   *   - Moves whose `location.paragraphIndex` maps to a number `n` are
+   *     grouped under NEW key `n` in the result Map. Edit-signal lookup
+   *     (`perParagraphEdits.get(...)`) STILL uses the OLD index; the
+   *     orchestrator builds `perParagraphEdits` keyed by OLD indices.
+   *
+   * Compute via `buildParagraphRemap` (D-1.7 sibling helper). When omitted,
+   * builder behaves exactly as D-1.6 (identity for all priors).
+   */
+  paragraphRemap?: ParagraphRemap;
 }
 
 // ─── Public API ────────────────────────────────────────────────────────
@@ -143,6 +172,31 @@ export async function buildPriorAnnotations(
   // Promise.allSettled. Per-move detector call ~3–5s; small N typical (5–10
   // moves per iteration) so total ~15–50s. Acceptable for off-critical-path.
   for (const move of priors) {
+    const oldParagraphIndex = move.location.paragraphIndex;
+
+    // D-1.7: consult remap BEFORE edit-signal lookup. Dropped moves don't
+    // need an edit signal (the paragraph is gone or ambiguous), so the
+    // missing-edit fail-fast must NOT fire on them. Drop here, log,
+    // continue — orchestrator's debug surface tail picks up the event.
+    const remapEntry = input.paragraphRemap?.get(oldParagraphIndex);
+    if (remapEntry !== undefined && isDropped(remapEntry)) {
+      emitMoveDropped({
+        moveId: move.id,
+        oldParagraphIndex,
+        reason: remapEntry.reason,
+        taughtAtIteration: move.taughtAtIteration,
+        currentIteration: input.currentIteration,
+        findingId: move.findingId,
+        contentSummarySnippet: move.contentSummary.slice(0, 80),
+      });
+      continue;
+    }
+    // newParagraphIndex resolution: explicit number from remap, OR
+    // identity fallback when remap doesn't cover this old index (no
+    // structural change for this paragraph) OR when remap absent entirely.
+    const newParagraphIndex =
+      typeof remapEntry === 'number' ? remapEntry : oldParagraphIndex;
+
     const detectorInput = buildDetectorInput(move, input);
     const landing = await runDetectorWithEnrichedError(detectorInput, move);
 
@@ -159,16 +213,37 @@ export async function buildPriorAnnotations(
       addressedByEdit: landing.status === 'addressed',
     };
 
-    const paragraphIndex = move.location.paragraphIndex;
-    const existing = result.get(paragraphIndex);
+    const existing = result.get(newParagraphIndex);
     if (existing) {
       existing.priorAnnotations.push(annotation);
     } else {
-      result.set(paragraphIndex, { priorAnnotations: [annotation] });
+      result.set(newParagraphIndex, { priorAnnotations: [annotation] });
     }
   }
 
   return result;
+}
+
+/**
+ * Structured drop log for the orchestrator's debug surface (D-1.7). Emits
+ * a single-line JSON record with the `[priorAnnotationsBuilder]` prefix —
+ * tail-able alongside the iterationTelemetry stream. Distinct from the
+ * iteration's event ledger because a drop is neither a "started" nor
+ * "succeeded" / "failed" step; it's a deliberate skip.
+ */
+function emitMoveDropped(payload: {
+  moveId: string;
+  oldParagraphIndex: number;
+  reason: ParagraphRemapDropReason;
+  taughtAtIteration: number;
+  currentIteration: number;
+  findingId?: string;
+  contentSummarySnippet: string;
+}): void {
+  console.log(
+    '[priorAnnotationsBuilder] move-dropped',
+    JSON.stringify({ ...payload, timestamp: new Date().toISOString() }),
+  );
 }
 
 // ─── Internal helpers ──────────────────────────────────────────────────
@@ -271,5 +346,8 @@ function validateInput(input: PriorAnnotationsBuilderInput): void {
     !(input.perMoveChatBehavior instanceof Map)
   ) {
     throw new Error('[priorAnnotationsBuilder] input.perMoveChatBehavior must be a Map when present.');
+  }
+  if (input.paragraphRemap !== undefined && !(input.paragraphRemap instanceof Map)) {
+    throw new Error('[priorAnnotationsBuilder] input.paragraphRemap must be a Map when present.');
   }
 }

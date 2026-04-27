@@ -134,7 +134,13 @@ interface SonnetUnderstandingRaw {
  * Simple string hash for paragraph identity comparison.
  * Fast O(n) hash — not cryptographic, just for change detection.
  */
-function hashString(s: string): number {
+/**
+ * Stable string hash (FNV-style 31× rolling). Exported so
+ * `paragraphRemapBuilder` (D-1.7) can mirror the same hash → identity logic
+ * `computeEditDiff` uses internally; sharing the helper eliminates the drift
+ * hazard that the index-remap problem is uniquely sensitive to.
+ */
+export function hashString(s: string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) {
     h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
@@ -166,16 +172,24 @@ function splitSentences(text: string): string[] {
 /**
  * Split essay text into paragraphs on double newlines.
  * Filters out empty strings resulting from extra whitespace.
+ *
+ * Exported so `paragraphRemapBuilder` (D-1.7) splits on the same boundary
+ * rule the diff was computed under.
  */
-function splitParagraphs(text: string): string[] {
+export function splitParagraphs(text: string): string[] {
   return text.split(/\n\s*\n/).map(p => p.trim()).filter(p => p.length > 0);
 }
 
 /**
  * Compute text overlap ratio between two strings (Jaccard on word sets).
  * Used for sentence alignment within changed paragraphs.
+ *
+ * Exported so `paragraphRemapBuilder` (D-1.7) uses the identical pairing
+ * threshold (0.30) the diff was computed under — the helpers MUST stay
+ * lockstep or the builder and the diff disagree on which paragraph is
+ * "the same one."
  */
-function overlapRatio(a: string, b: string): number {
+export function overlapRatio(a: string, b: string): number {
   const wordsA = new Set(a.toLowerCase().split(/\s+/));
   const wordsB = new Set(b.toLowerCase().split(/\s+/));
   let intersection = 0;
