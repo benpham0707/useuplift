@@ -165,7 +165,8 @@ describe('Phase 0 → Phase 1 integration gate (D-0.19)', () => {
 
     it('emitStepStart + emitStepSuccess populates the iteration buffer with valid events', async () => {
       const tel = await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
-      const { stepId } = tel.emitStepStart(1, 'integration-gate-step', {
+      const ESSAY_ID = 'phase0-test-essay';
+      const { stepId } = tel.emitStepStart(ESSAY_ID, 1, 'integration-gate-step', {
         paragraphIndex: 0,
         model: 'claude-haiku-4-5-20251001',
       });
@@ -174,13 +175,58 @@ describe('Phase 0 → Phase 1 integration gate (D-0.19)', () => {
         tokenUsage: { inputTokens: 100, outputTokens: 50 },
         model: 'claude-haiku-4-5-20251001',
       });
-      const events = tel.flushEventsForIteration(1);
+      const events = tel.flushEventsForIteration(ESSAY_ID, 1);
       expect(events).toHaveLength(2);
       expect(events[0].status).toBe('started');
       expect(events[1].status).toBe('succeeded');
       expect(events[1].durationMs).toBeGreaterThanOrEqual(0);
-      tel.clearEventsForIteration(1);
-      expect(tel.flushEventsForIteration(1)).toEqual([]);
+      tel.clearEventsForIteration(ESSAY_ID, 1);
+      expect(tel.flushEventsForIteration(ESSAY_ID, 1)).toEqual([]);
+    });
+
+    // [D-1.11 Step 15 regression test] Two essays both running iter=1 in
+    // the same process MUST NOT cross-pollinate each other's telemetry
+    // streams. Pre-Step-15 the buffer was keyed by iteration alone;
+    // both essays' events would end up in the same bucket and
+    // flushEventsForIteration(1) would return the merged stream.
+    it('concurrent-essay safety: two essays at iter=1 do not cross-pollinate telemetry', async () => {
+      const tel = await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
+      tel.__resetTelemetryForTesting();
+
+      const ESSAY_A = 'essay-A-uuid';
+      const ESSAY_B = 'essay-B-uuid';
+
+      const a1 = tel.emitStepStart(ESSAY_A, 1, 'A.step1');
+      tel.emitStepSuccess(a1.stepId, { cost: 0.01 });
+      const b1 = tel.emitStepStart(ESSAY_B, 1, 'B.step1');
+      tel.emitStepSuccess(b1.stepId, { cost: 0.02 });
+
+      const aEvents = tel.flushEventsForIteration(ESSAY_A, 1);
+      const bEvents = tel.flushEventsForIteration(ESSAY_B, 1);
+
+      // Each essay sees ONLY its own events
+      expect(aEvents).toHaveLength(2); // started + succeeded
+      expect(aEvents.every((e) => e.step === 'A.step1')).toBe(true);
+
+      expect(bEvents).toHaveLength(2);
+      expect(bEvents.every((e) => e.step === 'B.step1')).toBe(true);
+
+      // Clearing one essay's bucket does not touch the other's
+      tel.clearEventsForIteration(ESSAY_A, 1);
+      expect(tel.flushEventsForIteration(ESSAY_A, 1)).toEqual([]);
+      expect(tel.flushEventsForIteration(ESSAY_B, 1)).toHaveLength(2);
+    });
+
+    it('emitIterationEvent throws on missing or empty essayId (D-1.11 Step 15)', async () => {
+      const tel = await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
+      expect(() =>
+        tel.emitIterationEvent('', {
+          iteration: 1,
+          step: 'should-not-emit',
+          status: 'succeeded',
+          timestamp: new Date().toISOString(),
+        }),
+      ).toThrow(/essayId must be a non-empty string/);
     });
   });
 

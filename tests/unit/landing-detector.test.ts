@@ -60,6 +60,7 @@ function makeTaughtMove(overrides: Partial<TaughtMove> = {}): TaughtMove {
 
 function makeInput(overrides: Partial<LandingDetectorInput> = {}): LandingDetectorInput {
   return {
+    essayId: 'test-essay-landing-detector',
     priorTaughtMove: makeTaughtMove(),
     edit: {
       oldText: 'I felt sad about losing the match.',
@@ -357,10 +358,22 @@ describe('D-1.3 — detectLanding orchestration', () => {
   it('rejects missing priorTaughtMove (input validation)', async () => {
     await expect(
       detectLanding({
+        essayId: 'test-essay',
         priorTaughtMove: undefined as unknown as TaughtMove,
         edit: { oldText: '', newText: '', significance: 'minor' },
       }),
     ).rejects.toThrow(/input\.priorTaughtMove is missing/);
+    expect(mockCallClaude).not.toHaveBeenCalled();
+  });
+
+  it('rejects missing essayId (D-1.11 Step 15)', async () => {
+    await expect(
+      detectLanding({
+        essayId: '' as string,
+        priorTaughtMove: makeTaughtMove(),
+        edit: { oldText: 'x', newText: 'y', significance: 'minor' },
+      }),
+    ).rejects.toThrow(/essayId is missing or empty/);
     expect(mockCallClaude).not.toHaveBeenCalled();
   });
 

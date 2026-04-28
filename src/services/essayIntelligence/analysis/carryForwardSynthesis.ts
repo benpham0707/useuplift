@@ -137,6 +137,7 @@ export function synthesizeCarryForwardSummary(
  * the rule only flags catches that are TRULY silent.
  */
 export function safeAppendCarryForwardDecision(
+  essayId: string,
   profile: EssayProfile,
   decision: CarryForwardDecision,
 ): boolean {
@@ -145,7 +146,7 @@ export function safeAppendCarryForwardDecision(
     return true;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    emitIterationEvent({
+    emitIterationEvent(essayId, {
       iteration: profile.iterationLedger?.currentIteration ?? -1,
       step: 'carryForward.decision_append_failure',
       status: 'failed',

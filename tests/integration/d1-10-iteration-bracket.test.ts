@@ -226,25 +226,26 @@ describe('D-1.10 — Scenario 5: orchestrator-shape lifecycle bracket', () => {
     const coord = makeCoordinator({ essayText });
     const profile = coord.getProfile() as EssayProfile;
 
+    // D-1.11 Step 0/15: buffer + telemetry are keyed by (essayId, iteration).
+    const ESSAY_ID = 'test-essay-id';
+
     // Entry: increment iteration counter
     incrementIteration(profile, 'first_pass');
     const iter = getCurrentIteration(profile);
     expect(iter).toBe(1);
 
     // Mid-iteration: emit some telemetry events (D-0.9)
-    const { stepId } = emitStepStart(iter, 'L1.firstImpressions');
+    const { stepId } = emitStepStart(ESSAY_ID, iter, 'L1.firstImpressions');
     emitStepSuccess(stepId, { cost: 0.005, model: 'claude-haiku-4-5-20251001' });
 
     // After L5: buffer some TaughtMoves
-    // D-1.11 Step 0: buffer is now keyed by (essayId, iteration).
-    const ESSAY_ID = 'test-essay-id';
     bufferTaughtMoves(ESSAY_ID, iter, [
       makeMove({ id: 'M-1', taughtAtIteration: iter }),
       makeMove({ id: 'M-2', taughtAtIteration: iter }),
     ]);
 
     // End: assemble IterationRecord, flush buffers, push, checkpoint
-    const events = flushEventsForIteration(iter);
+    const events = flushEventsForIteration(ESSAY_ID, iter);
     const flushedMoves = flushTaughtMovesForIteration(ESSAY_ID, iter);
 
     const record: IterationRecord = {

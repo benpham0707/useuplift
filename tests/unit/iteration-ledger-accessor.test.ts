@@ -284,7 +284,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         // (c) Telemetry emitted via the real production emitIterationEvent
         //     with step='profile.fromCheckpoint.legacyHydration' AND
         //     status='failed' (post-T1.4 severity flip).
-        const events = flushEventsForIteration(0);
+        const events = flushEventsForIteration('test-essay-legacy', 0);
         const legacyEvent = events.find(
           (e) => e.step === 'profile.fromCheckpoint.legacyHydration',
         );
@@ -338,7 +338,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
           'test-essay-bare-legacy',
           new InMemoryCheckpointStore(),
         );
-        const events = flushEventsForIteration(0);
+        const events = flushEventsForIteration('test-essay-bare-legacy', 0);
 
         // All four backfill steps emitted with status='failed' + code='legacy_backfill'.
         for (const field of ['groundTruthFacts', 'storyFragments', 'intentSignals', 'conversatorSessionLog']) {

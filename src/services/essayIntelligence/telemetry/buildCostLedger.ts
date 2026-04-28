@@ -79,6 +79,14 @@ export interface BuildCostEntry {
   qualityNote?: string;
   /** Optional iteration tag — when present, telemetry event is keyed to this iteration. */
   iteration?: number;
+  /**
+   * D-1.11 Step 15: optional essay ID for telemetry buffer keying. When
+   * absent, the cost-ledger emit lands in a sentinel '<build-cost-ledger>'
+   * bucket (the cost ledger is a process-level audit, not per-essay
+   * scoped — most callers are tooling / probes that don't have an
+   * essayId in scope). Real essay-scoped callers should pass it.
+   */
+  essayId?: string;
 }
 
 /**
@@ -234,7 +242,7 @@ export function recordCost(entry: BuildCostEntry): void {
     model: entry.model,
     timestamp,
   };
-  emitIterationEvent(event);
+  emitIterationEvent(entry.essayId ?? '<build-cost-ledger>', event);
 }
 
 /**

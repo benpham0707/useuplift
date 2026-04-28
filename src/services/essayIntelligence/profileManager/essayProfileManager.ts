@@ -1683,7 +1683,7 @@ export class EssayProfileCoordinator {
         `[EssayProfileCoordinator.fromCheckpoint] iterationLedger missing on loaded profile (essayId=${essayId}); hydrating with defaults. ` +
           `This indicates the JSONB row pre-dates D-0.5/D-0.8 or a migration was incomplete.`,
       );
-      emitIterationEvent({
+      emitIterationEvent(essayId, {
         iteration: 0,
         step: 'profile.fromCheckpoint.legacyHydration',
         status: 'failed',
@@ -1714,7 +1714,7 @@ export class EssayProfileCoordinator {
     // hydrated without these fields (charter §8). Behavior unchanged —
     // the assignment still happens; the emit is the only addition.
     if (!profile.groundTruthFacts) {
-      emitIterationEvent({
+      emitIterationEvent(essayId, {
         iteration: 0,
         step: 'profile.fromCheckpoint.legacyBackfill.groundTruthFacts',
         status: 'failed',
@@ -1724,7 +1724,7 @@ export class EssayProfileCoordinator {
       profile.groundTruthFacts = [];
     }
     if (!profile.storyFragments) {
-      emitIterationEvent({
+      emitIterationEvent(essayId, {
         iteration: 0,
         step: 'profile.fromCheckpoint.legacyBackfill.storyFragments',
         status: 'failed',
@@ -1734,7 +1734,7 @@ export class EssayProfileCoordinator {
       profile.storyFragments = [];
     }
     if (!profile.intentSignals) {
-      emitIterationEvent({
+      emitIterationEvent(essayId, {
         iteration: 0,
         step: 'profile.fromCheckpoint.legacyBackfill.intentSignals',
         status: 'failed',
@@ -1744,7 +1744,7 @@ export class EssayProfileCoordinator {
       profile.intentSignals = [];
     }
     if (!profile.conversatorSessionLog) {
-      emitIterationEvent({
+      emitIterationEvent(essayId, {
         iteration: 0,
         step: 'profile.fromCheckpoint.legacyBackfill.conversatorSessionLog',
         status: 'failed',

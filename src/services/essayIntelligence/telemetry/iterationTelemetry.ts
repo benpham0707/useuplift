@@ -24,48 +24,36 @@
 import type { IterationTelemetryEvent } from '../profileTypes';
 
 /**
- * In-memory event buffer keyed by iteration number.
+ * In-memory event buffer keyed by (essayId, iteration) compound key.
  *
- * Map<iteration, IterationTelemetryEvent[]>. Pure module-level state —
- * the telemetry module is a singleton in process. The orchestrator
- * flushes per iteration; tests reset via `__resetTelemetryForTesting()`.
+ * Pure module-level state — the telemetry module is a singleton in
+ * process. The orchestrator flushes per (essayId, iteration); tests
+ * reset via `__resetTelemetryForTesting()`.
  *
- * ⚠️ [thread-safety / D-1.11 Step 0 deferred fix] This buffer is keyed
- * ONLY by iteration number. Two essays both running iter=N in the same
- * process will write to the same bucket; `flushEventsForIteration(N)`
- * returns the merged event stream of BOTH essays (the flush returns
- * a `.slice()` non-destructive copy, then `clearEventsForIteration`
- * deletes the entire bucket).
+ * [D-1.11 Step 15 closure] Pre-Step-15 the buffer was keyed by
+ * iteration number ALONE — two essays both running iter=N in the same
+ * process would cross-pollinate (`flushEventsForIteration(N)` returned
+ * the merged event stream of BOTH essays). Compound (essayId, iter)
+ * keying makes cross-essay collision impossible at the type level,
+ * matching the taughtMoveBuilder pattern (D-1.11 Step 0).
  *
- * IMPACT: AUDIT-ONLY corruption — events end up in the wrong essay's
- * `IterationRecord.events[]` audit trail. NOT load-bearing for next
- * iteration's analysis (unlike the TaughtMove buffer, which D-1.11
- * Step 0 already keyed by `(essayId, iter)`).
- *
- * RUNTIME ASSUMPTION: today's production model is one
- * `ReanalysisOrchestrator` instance per essay session, single-essay-at-a-
- * time. Two `analyzeEssay` calls don't interleave at the same iteration
- * in this model. The collision is LATENT — one shared-worker /
- * batch-analysis refactor away from corrupting audit trails silently.
- *
- * DEFERRED FIX (tracked): rekey by `(essayId, iter)` — same pattern
- * as `taughtMoveBuilder` (D-1.11 Step 0). Requires threading `essayId`
- * through `emitStepStart`/`emitStepSuccess`/`emitStepFailure` and their
- * callers (`landingDetector.ts`, `essayProfileManager.ts`,
- * `buildCostLedger.ts`). Wider refactor; landing as its own focused
- * commit before D-1.11 Step 14 (integration test) so the test can
- * cover the concurrent-essay path.
+ * Compound key built via `bufferKey(essayId, iteration)` using a
+ * delimiter character unlikely to appear in essayIds (chr 0x1F unit
+ * separator).
  */
-const eventsByIteration: Map<number, IterationTelemetryEvent[]> = new Map();
+function bufferKey(essayId: string, iteration: number): string {
+  return `${essayId}${iteration}`;
+}
+const eventsByEssayAndIteration: Map<string, IterationTelemetryEvent[]> = new Map();
 
 /**
- * Started-step lookup keyed by `stepId`. Holds the start timestamp so
- * `emitStepSuccess` / `emitStepFailure` can compute durationMs without
- * the caller having to track it.
- *
- * Map<stepId, { iteration, step, paragraphIndex?, startedAtMs }>.
+ * Started-step lookup keyed by `stepId`. Holds the start timestamp +
+ * essayId so `emitStepSuccess` / `emitStepFailure` can derive the
+ * buffer key from stepId without the caller threading essayId through
+ * the success/failure call.
  */
 interface InFlightStep {
+  essayId: string;
   iteration: number;
   step: string;
   paragraphIndex?: number;
@@ -92,17 +80,26 @@ let stepIdCounter = 0;
  * unless they re-throw. Per no-fallback discipline: a telemetry
  * failure halts the caller; we do not silently lose events.
  */
-export function emitIterationEvent(event: IterationTelemetryEvent): void {
-  const bucket = eventsByIteration.get(event.iteration);
+export function emitIterationEvent(essayId: string, event: IterationTelemetryEvent): void {
+  if (typeof essayId !== 'string' || essayId.length === 0) {
+    throw new Error(
+      `[IterationTelemetry] emitIterationEvent: essayId must be a non-empty string; got ${JSON.stringify(essayId)}.`,
+    );
+  }
+  const k = bufferKey(essayId, event.iteration);
+  const bucket = eventsByEssayAndIteration.get(k);
   if (bucket) {
     bucket.push(event);
   } else {
-    eventsByIteration.set(event.iteration, [event]);
+    eventsByEssayAndIteration.set(k, [event]);
   }
   // Structured console log for tail-able local dev. Single-line JSON
   // so logs can be piped through jq / grep without multi-line concerns.
-  // The prefix is the agreed contract for log filtering.
-  console.log('[IterationTelemetry]', JSON.stringify(event));
+  // The prefix is the agreed contract for log filtering. Includes
+  // essayId in the log envelope (not in the event itself — the event
+  // shape stays unchanged so existing IterationRecord.events[] audit
+  // consumers don't have to deal with a new field).
+  console.log('[IterationTelemetry]', JSON.stringify({ essayId, ...event }));
 }
 
 /**
@@ -114,13 +111,20 @@ export function emitIterationEvent(event: IterationTelemetryEvent): void {
  * without the caller tracking it.
  */
 export function emitStepStart(
+  essayId: string,
   iteration: number,
   step: string,
   context?: { paragraphIndex?: number; model?: string },
 ): { stepId: string } {
-  const stepId = `step-${iteration}-${step}-${++stepIdCounter}`;
+  if (typeof essayId !== 'string' || essayId.length === 0) {
+    throw new Error(
+      `[IterationTelemetry] emitStepStart: essayId must be a non-empty string; got ${JSON.stringify(essayId)}.`,
+    );
+  }
+  const stepId = `step-${essayId}-${iteration}-${step}-${++stepIdCounter}`;
   const startedAtMs = Date.now();
   inFlightSteps.set(stepId, {
+    essayId,
     iteration,
     step,
     paragraphIndex: context?.paragraphIndex,
@@ -134,7 +138,7 @@ export function emitStepStart(
     model: context?.model,
     timestamp: new Date(startedAtMs).toISOString(),
   };
-  emitIterationEvent(event);
+  emitIterationEvent(essayId, event);
   return { stepId };
 }
 
@@ -174,7 +178,7 @@ export function emitStepSuccess(
     model: output?.model,
     timestamp: new Date(finishedAtMs).toISOString(),
   };
-  emitIterationEvent(event);
+  emitIterationEvent(inFlight.essayId, event);
 }
 
 /**
@@ -195,7 +199,9 @@ export function emitStepFailure(
     // forgot the start, we still want the failure logged. Emit a
     // best-effort event without iteration / step context, but mark
     // the missing-start in the error.context so the audit trail
-    // surfaces it.
+    // surfaces it. essayId is also unknown here, so the event lands
+    // in a sentinel `'<unknown-essay>'` bucket — visible to flush via
+    // explicit query but won't pollute any real essay's events[].
     const fallbackEvent: IterationTelemetryEvent = {
       iteration: -1,
       step: 'unknown',
@@ -210,7 +216,7 @@ export function emitStepFailure(
       },
       timestamp: new Date().toISOString(),
     };
-    emitIterationEvent(fallbackEvent);
+    emitIterationEvent('<unknown-essay>', fallbackEvent);
     return;
   }
   inFlightSteps.delete(stepId);
@@ -229,25 +235,32 @@ export function emitStepFailure(
     model: context?.model,
     timestamp: new Date(finishedAtMs).toISOString(),
   };
-  emitIterationEvent(event);
+  emitIterationEvent(inFlight.essayId, event);
 }
 
 /**
- * Read all events for a given iteration without removing them. Used
- * by the orchestrator when committing IterationRecord (Phase 1 D-1.10)
- * to populate `events[]` from the buffer.
+ * Read all events for a given (essayId, iteration) without removing
+ * them. Used by the orchestrator when committing IterationRecord
+ * (Phase 1 D-1.10) to populate `events[]` from the buffer.
+ *
+ * [D-1.11 Step 15] essayId is now a required parameter — see the
+ * top-of-file thread-safety comment. Concurrent essays at the same
+ * iteration don't cross-pollinate.
  */
-export function flushEventsForIteration(iteration: number): IterationTelemetryEvent[] {
-  return eventsByIteration.get(iteration)?.slice() ?? [];
+export function flushEventsForIteration(
+  essayId: string,
+  iteration: number,
+): IterationTelemetryEvent[] {
+  return eventsByEssayAndIteration.get(bufferKey(essayId, iteration))?.slice() ?? [];
 }
 
 /**
- * Clear the buffer for a given iteration. Called by the orchestrator
- * AFTER a successful flushEventsForIteration + IterationRecord commit
- * so memory doesn't grow unboundedly across long sessions.
+ * Clear the buffer for a given (essayId, iteration). Called by the
+ * orchestrator AFTER a successful flushEventsForIteration + IterationRecord
+ * commit so memory doesn't grow unboundedly across long sessions.
  */
-export function clearEventsForIteration(iteration: number): void {
-  eventsByIteration.delete(iteration);
+export function clearEventsForIteration(essayId: string, iteration: number): void {
+  eventsByEssayAndIteration.delete(bufferKey(essayId, iteration));
 }
 
 /**
@@ -257,7 +270,7 @@ export function clearEventsForIteration(iteration: number): void {
  * import in tests signals "internal access for tests only."
  */
 export function __resetTelemetryForTesting(): void {
-  eventsByIteration.clear();
+  eventsByEssayAndIteration.clear();
   inFlightSteps.clear();
   stepIdCounter = 0;
 }

@@ -93,6 +93,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The move asked the student to name what their growth cost. The edit replaces an abstract claim ("I had grown into someone new") with concrete tradeoffs (no longer calling mother on Sundays without flinching; the easy self gone). This is exactly what the directive asked for; addressed should be unambiguous.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-2-A-1',
         annotationId: 'A-1',
@@ -125,6 +127,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The move flagged "deeply meaningful" as doing no work and asked for the actual meaning. The student swapped synonyms ("profoundly significant") — same hollow claim, different words. Critique was about vacuity, not word choice; the directive was not executed. Anchor Case 2 from the prompt.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-3-A-2',
         annotationId: 'A-2',
@@ -155,6 +159,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The move asked the student to anchor the thesis to the specific decision the essay argues about. The edit acknowledges "choices" but stays abstract ("choices people make"). Direction is right (toward specificity); execution is incomplete (no specific decision named). Should be partially_addressed; redetection still flags lower-severity vagueness.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-0-A-3',
         annotationId: 'A-3',
@@ -185,6 +191,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The move flagged a contradiction between a chess-club anecdote (P3) and a claim in P1 that the student avoids competition. The edit deletes the chess paragraph entirely and replaces it with an unrelated food-bank passage. The original substance the move targeted is GONE — the chess anecdote no longer exists to be reconciled with the P1 claim. This is changed_target, NOT addressed (the contradiction was not resolved; it was removed by deletion). Anchor Case 3 from the prompt.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-2-A-4',
         annotationId: 'A-4',
@@ -229,6 +237,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The edit fully executes the directive (concrete loss named). But the upstream re-detection mistakenly still flags the symptom (false positive — possibly redetector sees lingering "abstract" word). Q4 conflict rule: working hypothesis `addressed` + Signal B says still flagged → downgrade to `partially_addressed`. Tests the conflict resolution branch directly.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-2-A-6',
         annotationId: 'A-6',
@@ -264,6 +274,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The chess-club anecdote contradiction case again, but THIS time the student rewrites the chess paragraph to acknowledge competition was about camaraderie, not winning. The substance (chess anecdote) is still present; the contradiction is resolved by reframing. Per the prompt: changed_target requires substance to be GONE, not rewritten. This must be addressed.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-2-A-7',
         annotationId: 'A-7',
@@ -300,6 +312,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'Move asks for the specific realization to be named. Student edits the location but ONLY changes tense ("realized" → "had realized") — zero engagement with the directive. The targeted vague phrase ("something important") is untouched. This is true Branch 1: the edit shows no recognition of the move\'s direction at all. Tests that the model distinguishes pure-cosmetic edits from gestural engagement.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-1-A-8',
         annotationId: 'A-8',
@@ -333,6 +347,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The student didn\'t replace the offending paragraph with new content; they just deleted it and stitched the surrounding paragraphs together. The move\'s target is GONE — no longer in the essay. This is changed_target by deletion, distinct from changed_target by replacement. Tests that the prompt handles pure deletion cleanly.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-3-A-9',
         annotationId: 'A-9',
@@ -367,6 +383,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'Move asked for two things: (1) cut a tangent and (2) reconnect to the central image. Student cut the tangent successfully but didn\'t reconnect to the central image. Half the directive executed. This is partially_addressed at higher confidence (0.75ish) than the gestural cases — the executed facet is real, not gestural. Tests that the model can read multi-facet directives.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-4-A-10',
         annotationId: 'A-10',
@@ -402,6 +420,8 @@ const CASES: CalibrationCase[] = [
     rationale:
       'The move asked the student to push past summary to a claim they could not have made on page 1. The student left the summary intact ("perseverance, empathy, leadership") and tacked on a vague reflection ("maybe that\'s why I keep coming back to them"). This is gestural — direction is correct but the claim is vague. Expected: partially_addressed at confidence < 0.7. Even if the model returns addressed, the Q4 floor downgrades it; calibration verifies the model reports honest sub-0.7 confidence rather than gaming over the floor.',
     input: {
+      essayId: "calibration-essay",
+
       priorTaughtMove: move({
         id: 'M-1-5-A-5',
         annotationId: 'A-5',

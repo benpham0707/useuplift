@@ -203,6 +203,7 @@ describe('D-1.8 — Scenario 1: iteration 1 first-pass', () => {
       });
 
       const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
         profile,
         currentEssayText: 'P0 first.\n\nP1 second.',
       });
@@ -249,6 +250,7 @@ describe('D-1.8 — Scenario 2: iter 2 with prior + snapshot', () => {
     mockDetect.mockResolvedValue(makeLanding({ status: 'addressed' }));
 
     const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
       profile,
       currentEssayText: newText,
       editSignificance: 'significant',
@@ -290,6 +292,7 @@ describe('D-1.8 — Scenario 3: iter 2 with empty taughtMoves[]', () => {
     });
 
     const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
       profile,
       currentEssayText: newText,
     });
@@ -329,6 +332,7 @@ describe('D-1.8 — Scenario 4: iter 2 with P1↔P2 reorder', () => {
     mockDetect.mockResolvedValue(makeLanding({ status: 'addressed' }));
 
     const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
       profile,
       currentEssayText: newText,
     });
@@ -377,6 +381,7 @@ describe('D-1.8 — Scenario 5: iter 2 with deleted paragraph', () => {
       });
 
       const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
         profile,
         currentEssayText: newText,
       });
@@ -418,6 +423,7 @@ describe('D-1.8 — Scenario 6: iter 2 with missing snapshotText (pre-D-1.10)', 
       });
 
       const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
         profile,
         currentEssayText: 'P0 current.\n\nP1 current.',
       });
@@ -461,6 +467,7 @@ describe('D-1.8 — caller priorEssayText override takes precedence over ledger 
     mockDetect.mockResolvedValue(makeLanding({ status: 'partially_addressed' }));
 
     const result = await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
       profile,
       currentEssayText: newText,
       priorEssayTextOverride: overrideOldText,
@@ -507,6 +514,7 @@ describe('D-1.8 — editSignificance absent → mechanical fallback fires', () =
     mockDetect.mockResolvedValue(makeLanding());
 
     await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
       profile,
       currentEssayText: newText,
       // editSignificance intentionally omitted — exercise mechanical fallback.
@@ -555,6 +563,7 @@ describe('D-1.8 — editSignificance absent → mechanical fallback fires', () =
     mockDetect.mockResolvedValue(makeLanding());
 
     await buildPriorAnnotationsForOrchestrator({
+        essayId: "test-essay-d18",
       profile,
       currentEssayText: newText,
     });

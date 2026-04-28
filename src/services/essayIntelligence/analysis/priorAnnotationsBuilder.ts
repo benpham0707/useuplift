@@ -98,6 +98,14 @@ export interface ChatBehaviorSignal {
 
 /** Builder input. All optional signals default to absent. */
 export interface PriorAnnotationsBuilderInput {
+  /**
+   * D-1.11 Step 15: essay ID for telemetry buffer keying. Threaded
+   * through to detectLanding's LandingDetectorInput so its emitStepStart/
+   * Success/Failure calls land in the correct (essayId, iter) audit
+   * bucket. Without this, concurrent essays would cross-pollinate
+   * each other's landing-detector telemetry streams.
+   */
+  essayId: string;
   /** The full iteration ledger. `taughtMoves[]` is the source of priors. */
   iterationLedger: IterationLedger;
   /**
@@ -192,6 +200,7 @@ export async function buildPriorAnnotations(
     const remapEntry = input.paragraphRemap?.get(oldParagraphIndex);
     if (remapEntry !== undefined && isDropped(remapEntry)) {
       emitMoveDropped({
+        essayId: input.essayId,
         moveId: move.id,
         oldParagraphIndex,
         reason: remapEntry.reason,
@@ -243,6 +252,7 @@ export async function buildPriorAnnotations(
  * "succeeded" / "failed" step; it's a deliberate skip.
  */
 function emitMoveDropped(payload: {
+  essayId: string;
   moveId: string;
   oldParagraphIndex: number;
   reason: ParagraphRemapDropReason;
@@ -257,7 +267,7 @@ function emitMoveDropped(payload: {
   // Drop is `status: 'succeeded'` because it IS the successful
   // execution of the deliberate-skip path; the `error.code` carries
   // the drop reason as structured metadata for audit filtering.
-  emitIterationEvent({
+  emitIterationEvent(payload.essayId, {
     iteration: payload.currentIteration,
     step: 'priorAnnotations.move_dropped',
     paragraphIndex: payload.oldParagraphIndex,
@@ -303,6 +313,7 @@ function buildDetectorInput(
   const chatBehavior = input.perMoveChatBehavior?.get(move.id);
 
   const detectorInput: LandingDetectorInput = {
+    essayId: input.essayId,
     priorTaughtMove: move,
     edit,
   };
@@ -346,6 +357,9 @@ async function runDetectorWithEnrichedError(
 function validateInput(input: PriorAnnotationsBuilderInput): void {
   if (!input || typeof input !== 'object') {
     throw new Error('[priorAnnotationsBuilder] input is missing or not an object.');
+  }
+  if (typeof input.essayId !== 'string' || input.essayId.length === 0) {
+    throw new Error('[priorAnnotationsBuilder] input.essayId is missing or empty (D-1.11 Step 15: required for telemetry buffer keying).');
   }
   if (!input.iterationLedger || typeof input.iterationLedger !== 'object') {
     throw new Error('[priorAnnotationsBuilder] input.iterationLedger is missing or not an object.');
@@ -638,6 +652,13 @@ function validateBuildPerParagraphEditsInput(input: BuildPerParagraphEditsInput)
 //     fallback — the wire-up debug-logs the cause for tail-able audit.
 
 export interface BuildPriorAnnotationsForOrchestratorInput {
+  /**
+   * D-1.11 Step 15: essay ID for telemetry buffer keying. Threaded
+   * through to buildPriorAnnotations → buildDetectorInput → detectLanding
+   * so the landing-detector's telemetry events land in the correct
+   * (essayId, iter) audit bucket.
+   */
+  essayId: string;
   /** The fully-hydrated profile from the coordinator at Phase 6 entry. */
   profile: Readonly<EssayProfile>;
   /** Current essay text (input.essayText at the orchestrator). */
@@ -686,7 +707,7 @@ export async function buildPriorAnnotationsForOrchestrator(
     // first-pass. Emit as 'succeeded' (not 'failed') because the branch
     // is the correct, expected behavior for this iteration count, not
     // a degradation. Console.log retained for tail-able dev visibility.
-    emitIterationEvent({
+    emitIterationEvent(input.essayId, {
       iteration: currentIteration,
       step: 'priorAnnotations.composer.firstPassShortCircuit',
       status: 'succeeded',
@@ -712,7 +733,7 @@ export async function buildPriorAnnotationsForOrchestrator(
     // priorIterationLedger correctly). Emit status:'failed' so audit
     // grep surfaces the degradation. Behavior unchanged: thread
     // undefined gracefully so L5 still runs, just without priors.
-    emitIterationEvent({
+    emitIterationEvent(input.essayId, {
       iteration: currentIteration,
       step: 'priorAnnotations.composer.snapshotUnavailable',
       status: 'failed',
@@ -749,6 +770,7 @@ export async function buildPriorAnnotationsForOrchestrator(
   });
 
   const priorAnnotations = await buildPriorAnnotations({
+    essayId: input.essayId,
     iterationLedger: profile.iterationLedger,
     currentIteration,
     perParagraphEdits,

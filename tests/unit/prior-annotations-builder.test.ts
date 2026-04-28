@@ -127,6 +127,7 @@ function seedDetectorByMoveId(map: Map<string, LandingDetectorOutput>): void {
 
 function makeInput(overrides: Partial<PriorAnnotationsBuilderInput> = {}): PriorAnnotationsBuilderInput {
   return {
+    essayId: 'test-essay-builder',
     iterationLedger: makeLedger(),
     currentIteration: 2,
     perParagraphEdits: new Map(),
@@ -142,6 +143,7 @@ describe('D-1.6 — iteration gating', () => {
   it('returns undefined on iteration 1 (no priors structurally)', async () => {
     const ledger = makeLedger([makeMove({ taughtAtIteration: 0 })]); // even with phantom moves, iter 1 → undefined
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: ledger,
       currentIteration: 1,
       perParagraphEdits: new Map(),
@@ -153,6 +155,7 @@ describe('D-1.6 — iteration gating', () => {
   it('returns empty Map on iteration ≥ 2 with no prior moves at iteration N-1', async () => {
     const ledger = makeLedger([makeMove({ taughtAtIteration: 5 })]); // moves exist but not at iteration 1
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: ledger,
       currentIteration: 2,
       perParagraphEdits: new Map(),
@@ -178,6 +181,7 @@ describe('D-1.6 — iteration filtering', () => {
     seedDetectorByMoveId(new Map([['M-iter2', makeLanding()]]));
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: ledger,
       currentIteration: 3, // priors are at iteration 2
       perParagraphEdits: new Map([[1, makeEdit()]]),
@@ -211,6 +215,7 @@ describe('D-1.6 — paragraph grouping', () => {
     );
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       perParagraphEdits: new Map([
@@ -239,6 +244,7 @@ describe('D-1.6 — addressedByEdit derivation', () => {
     const move = makeMove({ id: 'M-1', taughtAtIteration: 1, location: { paragraphIndex: 0 } });
     seedDetectorByMoveId(new Map([['M-1', makeLanding({ status })]]));
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger([move]),
       currentIteration: 2,
       perParagraphEdits: new Map([[0, makeEdit()]]),
@@ -262,6 +268,7 @@ describe('D-1.6 — annotation field population', () => {
     });
     seedDetectorByMoveId(new Map([['M-1', makeLanding({ status: 'partially_addressed' })]]));
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger([move]),
       currentIteration: 2,
       perParagraphEdits: new Map([[3, makeEdit()]]),
@@ -284,6 +291,7 @@ describe('D-1.6 — signal pass-through', () => {
     const edit = makeEdit({ oldText: 'OLD', newText: 'NEW', significance: 'significant' });
     seedDetectorByMoveId(new Map([['M-1', makeLanding()]]));
     await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger([move]),
       currentIteration: 2,
       perParagraphEdits: new Map([[0, edit]]),
@@ -303,6 +311,7 @@ describe('D-1.6 — signal pass-through', () => {
       ]),
     );
     await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       perParagraphEdits: new Map([
@@ -333,6 +342,7 @@ describe('D-1.6 — signal pass-through', () => {
       ]),
     );
     await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       perParagraphEdits: new Map([
@@ -363,7 +373,8 @@ describe('D-1.6 — missing edit failure surface', () => {
     const move = makeMove({ id: 'M-orphan', taughtAtIteration: 1, location: { paragraphIndex: 7 } });
     await expect(
       buildPriorAnnotations({
-        iterationLedger: makeLedger([move]),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger([move]),
         currentIteration: 2,
         perParagraphEdits: new Map(), // no entry for paragraph 7
       }),
@@ -384,7 +395,8 @@ describe('D-1.6 — detector error failure surface', () => {
     let caught: Error | undefined;
     try {
       await buildPriorAnnotations({
-        iterationLedger: makeLedger([move]),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger([move]),
         currentIteration: 2,
         perParagraphEdits: new Map([[0, makeEdit()]]),
       });
@@ -406,7 +418,8 @@ describe('D-1.6 — detector error failure surface', () => {
     mockDetect.mockRejectedValueOnce(new Error('first fails'));
     await expect(
       buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map([
           [0, makeEdit()],
@@ -618,6 +631,7 @@ describe('D-1.7 — B1: no_remap_identity', () => {
     );
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       perParagraphEdits: new Map([
@@ -650,6 +664,7 @@ describe('D-1.7 — B2: empty_remap_treated_as_identity', () => {
     );
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       perParagraphEdits: new Map([
@@ -690,6 +705,7 @@ describe('D-1.7 — B3: swap_keys_correctly', () => {
     ]);
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       // Edit signals keyed by OLD index (the orchestrator's contract per D-1.7 plan)
@@ -726,7 +742,8 @@ describe('D-1.7 — B4: delete_drops_move', () => {
       ]);
 
       const result = await buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map([[1, makeEdit()]]),
         paragraphRemap: remap,
@@ -779,7 +796,8 @@ describe('D-1.7 — B5: multi_edit', () => {
       ]);
 
       const result = await buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map([
           [0, makeEdit()],
@@ -817,6 +835,7 @@ describe('D-1.7 — B6: multiple_priors_same_paragraph_remapped', () => {
     const remap = makeRemap([[2, 5]]);
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger(moves),
       currentIteration: 2,
       perParagraphEdits: new Map([[2, makeEdit()]]),
@@ -840,7 +859,8 @@ describe('D-1.7 — B7: dropped_does_NOT_call_detector', () => {
       const remap = makeRemap([[0, dropEntry('paragraph_deleted')]]);
 
       const result = await buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map([[0, makeEdit()]]),
         paragraphRemap: remap,
@@ -866,7 +886,8 @@ describe('D-1.7 — B8: dropped_does_NOT_require_edit_signal', () => {
       const remap = makeRemap([[7, dropEntry('paragraph_deleted')]]);
 
       const result = await buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map(), // intentionally empty — would throw if reached
         paragraphRemap: remap,
@@ -892,7 +913,8 @@ describe('D-1.7 — B9: non_dropped_still_requires_edit_signal', () => {
 
     await expect(
       buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map(), // missing entry for OLD 0 → throw
         paragraphRemap: remap,
@@ -909,6 +931,7 @@ describe('D-1.7 — B10: iter_1_ignores_remap', () => {
   it('currentIteration=1 returns undefined regardless of remap presence', async () => {
     const remap = makeRemap([[0, dropEntry('paragraph_deleted')]]);
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger([makeMove({ id: 'M-x', taughtAtIteration: 0, location: { paragraphIndex: 0 } })]),
       currentIteration: 1,
       perParagraphEdits: new Map(),
@@ -935,6 +958,7 @@ describe('D-1.7 — B11: addressedByEdit_after_remap', () => {
     const remap = makeRemap([[2, 5]]);
 
     const result = await buildPriorAnnotations({
+      essayId: "test-essay-builder",
       iterationLedger: makeLedger([move]),
       currentIteration: 2,
       perParagraphEdits: new Map([[2, makeEdit()]]),
@@ -959,7 +983,8 @@ describe('D-1.7 — B12: ambiguous_drop_reason', () => {
       const remap = makeRemap([[1, dropEntry('ambiguous_remap_no_unique_target')]]);
 
       await buildPriorAnnotations({
-        iterationLedger: makeLedger(moves),
+        essayId: "test-essay-builder",
+      iterationLedger: makeLedger(moves),
         currentIteration: 2,
         perParagraphEdits: new Map(),
         paragraphRemap: remap,

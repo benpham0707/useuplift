@@ -207,7 +207,7 @@ describe('D-1.11 — Scenario E: append-time validation throw is caught + emits 
     incrementIteration(profile, 'first_pass'); // currentIteration = 1
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const ok = safeAppendCarryForwardDecision(profile, decision({
+      const ok = safeAppendCarryForwardDecision('test-essay-d111', profile, decision({
         iteration: 99, // mismatch — currentIteration is 1
         itemKey: 'should-not-be-recorded',
       }));
@@ -219,7 +219,7 @@ describe('D-1.11 — Scenario E: append-time validation throw is caught + emits 
       const { flushEventsForIteration } = await import(
         '../../src/services/essayIntelligence/telemetry/iterationTelemetry'
       );
-      const events = flushEventsForIteration(1);
+      const events = flushEventsForIteration('test-essay-d111', 1);
       const failure = events.find(
         (e) => e.step === 'carryForward.decision_append_failure',
       );

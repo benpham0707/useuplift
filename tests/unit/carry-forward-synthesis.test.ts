@@ -273,7 +273,7 @@ describe('safeAppendCarryForwardDecision — happy path', () => {
 
   it('returns true and appends the decision on the happy path', () => {
     const profile = makeProfile();
-    const ok = safeAppendCarryForwardDecision(profile, makeDecision());
+    const ok = safeAppendCarryForwardDecision('test-essay-cfs', profile, makeDecision());
     expect(ok).toBe(true);
     expect(profile.iterationLedger.recentDecisions).toHaveLength(1);
   });
@@ -296,7 +296,7 @@ describe('safeAppendCarryForwardDecision — failure swallow', () => {
     const profile = makeProfile(); // currentIteration=1
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const ok = safeAppendCarryForwardDecision(profile, {
+      const ok = safeAppendCarryForwardDecision('test-essay-cfs', profile, {
         iteration: 99, // mismatch — currentIteration is 1
         itemKey: 'mode_selection',
         decision: 'partial_refresh',
@@ -316,7 +316,7 @@ describe('safeAppendCarryForwardDecision — failure swallow', () => {
       const { flushEventsForIteration } = await import(
         '../../src/services/essayIntelligence/telemetry/iterationTelemetry'
       );
-      const events = flushEventsForIteration(1);
+      const events = flushEventsForIteration('test-essay-cfs', 1);
       const failureEvent = events.find(
         (e) => e.step === 'carryForward.decision_append_failure',
       );
@@ -333,7 +333,7 @@ describe('safeAppendCarryForwardDecision — failure swallow', () => {
     const profile = makeProfile();
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const ok = safeAppendCarryForwardDecision(profile, {
+      const ok = safeAppendCarryForwardDecision('test-essay-cfs', profile, {
         iteration: 1,
         itemKey: 'mode_selection',
         decision: 'bogus' as CarryForwardDecision['decision'], // invalid enum

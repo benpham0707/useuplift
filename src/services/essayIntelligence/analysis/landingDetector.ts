@@ -68,6 +68,14 @@ const MAX_OUTPUT_TOKENS = 800;
  * optional (some iterations have only the edit).
  */
 export interface LandingDetectorInput {
+  /**
+   * D-1.11 Step 15: essay ID for telemetry buffer keying. The detector's
+   * emitStepStart/Success/Failure calls require essayId so events land
+   * in the right (essayId, iteration) audit bucket — without it,
+   * concurrent essays would cross-pollinate each other's telemetry
+   * streams. Threaded from the orchestrator through priorAnnotationsBuilder.
+   */
+  essayId: string;
   /** The move whose landing is being detected. */
   priorTaughtMove: TaughtMove;
   /**
@@ -149,7 +157,7 @@ export async function detectLanding(
   validateInput(input);
 
   const detectingAtIteration = input.priorTaughtMove.taughtAtIteration + 1;
-  const { stepId } = emitStepStart(detectingAtIteration, 'landingDetector', {
+  const { stepId } = emitStepStart(input.essayId, detectingAtIteration, 'landingDetector', {
     model: LANDING_DETECTOR_MODEL,
   });
 
@@ -208,6 +216,9 @@ export async function detectLanding(
 function validateInput(input: LandingDetectorInput): void {
   if (!input || typeof input !== 'object') {
     throw new Error('[landingDetector] input is missing or not an object.');
+  }
+  if (typeof input.essayId !== 'string' || input.essayId.length === 0) {
+    throw new Error('[landingDetector] input.essayId is missing or empty (D-1.11 Step 15: required for telemetry buffer keying).');
   }
   if (!input.priorTaughtMove || typeof input.priorTaughtMove !== 'object') {
     throw new Error('[landingDetector] input.priorTaughtMove is missing or not an object.');

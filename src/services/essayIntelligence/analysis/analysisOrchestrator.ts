@@ -532,7 +532,7 @@ export class AnalysisOrchestrator {
     // focused-mode iteration commit deliverable).
     if (input.modeSelectionDecision) {
       const currentIter = getCurrentIteration(coordinator.getProfile());
-      safeAppendCarryForwardDecision(coordinator.getProfile(), {
+      safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
         ...input.modeSelectionDecision,
         iteration: currentIter,
       });
@@ -662,7 +662,7 @@ export class AnalysisOrchestrator {
           const decisionType: CarryForwardDecision['decision'] =
             evo.newMaturity === 'superseded' ? 'rederive' : 'partial_refresh';
           const supersedesNote = evo.supersedes ? ` (supersedes ${evo.supersedes})` : '';
-          safeAppendCarryForwardDecision(coordinator.getProfile(), {
+          safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
             iteration: dp3aIter,
             itemKey: evo.findingId,
             decision: decisionType,
@@ -748,7 +748,7 @@ export class AnalysisOrchestrator {
         const decisionType: CarryForwardDecision['decision'] =
           evo.newMaturity === 'superseded' ? 'rederive' : 'partial_refresh';
         const supersedesNote = evo.supersedes ? ` (supersedes ${evo.supersedes})` : '';
-        safeAppendCarryForwardDecision(coordinator.getProfile(), {
+        safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
           iteration: dp3bIter,
           itemKey: evo.findingId,
           decision: decisionType,
@@ -1055,7 +1055,7 @@ export class AnalysisOrchestrator {
               : 'partial_refresh';
             const dp4PerSectionCost = deltaResult.cost / Math.max(1, affectedSections.length);
             for (const section of affectedSections) {
-              safeAppendCarryForwardDecision(coordinator.getProfile(), {
+              safeAppendCarryForwardDecision(input.essayId, coordinator.getProfile(), {
                 iteration: dp4Iter,
                 itemKey: section,
                 decision: dp4DecisionType,
@@ -1104,6 +1104,7 @@ export class AnalysisOrchestrator {
         // existing catch → buildPartialResult per the no-fallback charter.
         const { buildPriorAnnotationsForOrchestrator } = await import('./priorAnnotationsBuilder');
         const priorAnnotationsForL5 = await buildPriorAnnotationsForOrchestrator({
+          essayId: input.essayId,
           profile: profileForAnnotations,
           currentEssayText: input.essayText,
           priorEssayTextOverride: input.priorEssayText,
@@ -1124,7 +1125,7 @@ export class AnalysisOrchestrator {
           for (const [paragraphIndex, ctx] of priorAnnotationsForL5) {
             const addressedCount = ctx.priorAnnotations.filter((a) => a.addressedByEdit).length;
             const totalCount = ctx.priorAnnotations.length;
-            safeAppendCarryForwardDecision(profileForAnnotations as EssayProfile, {
+            safeAppendCarryForwardDecision(input.essayId, profileForAnnotations as EssayProfile, {
               iteration: dp2Iter,
               itemKey: `L5.P${paragraphIndex}.annotations`,
               decision: 'partial_refresh',
@@ -1965,7 +1966,7 @@ export class AnalysisOrchestrator {
     // only — cross-essay collision risk exists but is audit-only impact (not
     // load-bearing for next iter's priorAnnotations). Tracked for follow-up
     // commit before D-1.11 Step 14.
-    const events = flushEventsForIteration(iter);
+    const events = flushEventsForIteration(input.essayId, iter);
 
     // ── Drain TaughtMoves buffer (non-destructive; clear after success) ──
     // [D-1.11 Step 0] Essay-keyed to prevent concurrent-essay collision.
@@ -2091,7 +2092,7 @@ export class AnalysisOrchestrator {
     }
 
     // ── Clear transient buffers ONLY after successful checkpoint ─────────
-    clearEventsForIteration(iter);
+    clearEventsForIteration(input.essayId, iter);
     clearTaughtMovesForIteration(input.essayId, iter);
 
     // ── D-1.11 Step 13: prune recentDecisions to last 5 iterations ──
@@ -2308,7 +2309,7 @@ export class AnalysisOrchestrator {
         // failure and masking it with the secondary commit failure
         // would lose user-facing diagnostic.
         const iter = getCurrentIteration(coordinator.getProfile());
-        emitIterationEvent({
+        emitIterationEvent(input.essayId, {
           iteration: iter,
           step: 'iteration_commit_secondary_failure',
           status: 'failed',
