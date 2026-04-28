@@ -35,6 +35,7 @@ export default defineConfig({
       'tests/unit/landing-detector.test.ts',
       'tests/unit/prior-annotations-builder.test.ts',
       'tests/unit/paragraph-remap-builder.test.ts',
+      'tests/unit/carry-forward-synthesis.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',
