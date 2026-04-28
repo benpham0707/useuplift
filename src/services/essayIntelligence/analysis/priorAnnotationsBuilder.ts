@@ -61,6 +61,7 @@ import {
   getCurrentIteration,
   getPriorIterationSnapshotText,
 } from '../profileManager/essayProfileManager';
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
 import type {
   EssayProfile,
   IterationLedger,
@@ -250,10 +251,30 @@ function emitMoveDropped(payload: {
   findingId?: string;
   contentSummarySnippet: string;
 }): void {
-  console.log(
-    '[priorAnnotationsBuilder] move-dropped',
-    JSON.stringify({ ...payload, timestamp: new Date().toISOString() }),
-  );
+  // [round-1 audit §4.F / T2.4 closure] Switch from console.log to the
+  // structured iterationTelemetry channel so drops land in
+  // IterationRecord.events[] alongside every other iteration event.
+  // Drop is `status: 'succeeded'` because it IS the successful
+  // execution of the deliberate-skip path; the `error.code` carries
+  // the drop reason as structured metadata for audit filtering.
+  emitIterationEvent({
+    iteration: payload.currentIteration,
+    step: 'priorAnnotations.move_dropped',
+    paragraphIndex: payload.oldParagraphIndex,
+    status: 'succeeded',
+    error: {
+      message: `prior-iteration TaughtMove dropped from priorAnnotations (reason: ${payload.reason})`,
+      code: payload.reason,
+      context: {
+        moveId: payload.moveId,
+        taughtAtIteration: payload.taughtAtIteration,
+        findingId: payload.findingId,
+        contentSummarySnippet: payload.contentSummarySnippet,
+        source: 'priorAnnotationsBuilder',
+      },
+    },
+    timestamp: new Date().toISOString(),
+  });
 }
 
 // ─── Internal helpers ──────────────────────────────────────────────────
@@ -422,41 +443,13 @@ export function mechanicalSignificance(
   return 'transformative';
 }
 
-/**
- * Per-paragraph `changeRatio` — fraction of sentence-level events
- * (added + removed + modified) over the OLD paragraph's sentence count.
- *
- *   ratio_p = (added_p + removed_p + modified_p) / max(1, oldSentences_p.length)
- *
- * Caps implicitly at the paragraph level — a fully-replaced paragraph (all
- * sentences modified or replaced) sits near 1.0; a deleted paragraph
- * doesn't appear here (the OLD index drops via the remap, never reaching
- * the significance step). Added paragraphs (no oldSentences) → 1.0 by
- * convention; the OLD-keyed Map doesn't include them.
- */
-function computeChangeRatioForParagraph(
-  oldParaIndex: number,
-  oldSentencesCount: number,
-  diff: { paragraphChanges: ReadonlyArray<{ paragraphIndex: number; changeType: 'modified' | 'added' | 'removed'; sentenceChanges: ReadonlyArray<{ changeType: string }> }> },
-): number {
-  // computeEditDiff stores `paragraphIndex` as NEW-idx for 'modified'/'added'
-  // and OLD-idx for 'removed'. We're keyed by OLD here — for 'removed'
-  // paragraphs the ratio is 1.0 (full deletion); for 'modified' we have to
-  // find the matching pair via the remap upstream, but at this call site
-  // we approximate via "any paragraphChange entry whose paragraphIndex
-  // (NEW or OLD) corresponds to this old index". A safer-and-cheaper
-  // approach: caller passes the resolved `newParaIndex` via remap so we
-  // search for `paragraphChanges` entries that match that index.
-  // (See buildPerParagraphEdits where we wire this together.)
-  void oldParaIndex;
-  void diff;
-  return oldSentencesCount > 0 ? 0 : 1;
-}
-// (computeChangeRatioForParagraph is kept as a placeholder for the
-// signature; the actual ratio computation lives inline in
-// buildPerParagraphEdits below where both the OLD index, the NEW index from
-// the remap, and the diff entry are all in scope. Keeping a separate helper
-// here would force three lookups; inline is clearer.)
+// [round-1 audit T3.2 closure] The dead `computeChangeRatioForParagraph`
+// placeholder (zero callers; existed only to document the signature)
+// was removed. The actual per-paragraph changeRatio computation is
+// inline in `buildPerParagraphEdits` below where the OLD index, the
+// NEW index from the remap, and the diff entry are all in scope —
+// inline is clearer than three lookups via a helper that would have
+// to receive all three parameters anyway.
 
 export interface BuildPerParagraphEditsInput {
   /** Pre-edit paragraphs (`splitParagraphs(priorSnapshotText)`). */
@@ -546,7 +539,8 @@ export function buildPerParagraphEdits(
       // moves on this paragraph BEFORE looking up the edit signal, but
       // we still produce an honest entry in case the caller iterates.
       newText = '';
-      significance = editSignificance ?? 'transformative'; // wholesale loss
+      // eslint-disable-next-line no-silent-fallback -- mode-selection: when paragraph is dropped (deleted/ambiguous), `editSignificance` from upstream LLM is preferred; mechanical fallback to 'transformative' models the wholesale-loss semantics the locked D-1.8 decision §"Significance source" picked.
+      significance = editSignificance ?? 'transformative';
     } else {
       const newIdx = remapEntry; // number
       newText = newParagraphTexts[newIdx];
@@ -578,6 +572,7 @@ export function buildPerParagraphEdits(
         }
       }
 
+      // eslint-disable-next-line no-silent-fallback -- mode-selection: prefer the LLM-judged overall edit significance from upstream `editUnderstandingService` (locked D-1.8 decision: don't discard paid LLM output to redo a coarser derivation). Mechanical fallback only fires when no upstream signal exists (cold direct analyzeEssay calls, edits without an editOutput).
       significance = editSignificance ?? mechanicalSignificance(changeRatio);
     }
 
@@ -686,6 +681,17 @@ export async function buildPriorAnnotationsForOrchestrator(
 
   const currentIteration = getCurrentIteration(profile);
   if (currentIteration <= 1) {
+    // [round-1 audit §4.D / T1.4 closure] iter≤1 is structural absence,
+    // not silent fallback — there genuinely is no prior iteration on
+    // first-pass. Emit as 'succeeded' (not 'failed') because the branch
+    // is the correct, expected behavior for this iteration count, not
+    // a degradation. Console.log retained for tail-able dev visibility.
+    emitIterationEvent({
+      iteration: currentIteration,
+      step: 'priorAnnotations.composer.firstPassShortCircuit',
+      status: 'succeeded',
+      timestamp: new Date().toISOString(),
+    });
     console.log(
       '[priorAnnotationsBuilder.composer] iter <= 1 — no prior iteration exists; threading priorAnnotations=undefined',
     );
@@ -699,6 +705,24 @@ export async function buildPriorAnnotationsForOrchestrator(
   }
 
   if (priorEssayText === undefined) {
+    // [round-1 audit §4.D / T1.4 closure] iter≥2 with NO snapshot is
+    // a structural-absence DEGRADATION (the composer SHOULD have a
+    // prior text on iter≥2; missing it means the ledger's snapshotText
+    // wasn't populated by D-1.10's commit, or createNew didn't seed
+    // priorIterationLedger correctly). Emit status:'failed' so audit
+    // grep surfaces the degradation. Behavior unchanged: thread
+    // undefined gracefully so L5 still runs, just without priors.
+    emitIterationEvent({
+      iteration: currentIteration,
+      step: 'priorAnnotations.composer.snapshotUnavailable',
+      status: 'failed',
+      error: {
+        message: `prior-iteration snapshot unavailable on iter=${currentIteration} (likely pre-D-1.10 ledger or cold start)`,
+        code: 'prior_snapshot_unavailable',
+        context: { currentIteration },
+      },
+      timestamp: new Date().toISOString(),
+    });
     console.log(
       `[priorAnnotationsBuilder.composer] iter=${currentIteration}: prior-iteration snapshot ` +
         `unavailable (likely pre-D-1.10 ledger or cold start); threading priorAnnotations=undefined`,

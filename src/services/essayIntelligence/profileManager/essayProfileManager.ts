@@ -670,7 +670,7 @@ export function createInitialProfile(input: {
    * D-1.10: optional iterationLedger seed for re-analysis runs. When
    * supplied, deep-cloned in place of the default empty ledger block so
    * the new profile carries the prior iteration history forward. Validated
-   * via `assertIterationLedgerOnLoad` BEFORE seeding — a corrupt seed
+   * via `validateAndNormalizeIterationLedger` BEFORE seeding — a corrupt seed
    * throws fail-fast with the same diagnostic the load-time validator
    * produces, preventing propagation through any layer.
    *
@@ -944,14 +944,14 @@ export function createInitialProfile(input: {
     //
     // D-1.10: when `priorIterationLedger` is supplied (re-analysis path),
     // the seed REPLACES the default empty block. We validate first via
-    // `assertIterationLedgerOnLoad` so a corrupt seed throws here rather
+    // `validateAndNormalizeIterationLedger` so a corrupt seed throws here rather
     // than propagating through layers. Deep-clone via JSON round-trip so
     // the caller's mutation of their local copy doesn't bleed into this
     // profile (cheap because IterationLedger is plain-JSON and we
     // intentionally do NOT include Maps or class instances in this type).
     iterationLedger: priorIterationLedger
       ? (() => {
-          assertIterationLedgerOnLoad(
+          validateAndNormalizeIterationLedger(
             priorIterationLedger,
             '<createInitialProfile.priorIterationLedger>',
           );
@@ -1126,12 +1126,19 @@ export function incrementIteration(
 }
 
 /**
- * Validate that an iterationLedger has the required structure. Throws
- * fail-fast with a diagnostic naming which field is corrupt.
+ * Validate AND NORMALIZE an iterationLedger structurally. Throws
+ * fail-fast with a diagnostic naming which field is corrupt; otherwise
+ * mutates the ledger in place to coerce JSONB-serialized `null` arrays
+ * into empty arrays.
+ *
+ * [round-1 audit T3.4 closure] Renamed from `assertIterationLedgerOnLoad`
+ * which implied read-only validation. The function actually mutates
+ * input (null → []), so the new name is honest about both behaviors.
  *
  * Exported so D-1.1 unit tests can exercise it directly without
  * scaffolding a coordinator instance. Used internally by fromCheckpoint()
- * after the existence-check + hydration block.
+ * after the existence-check + hydration block, and by createInitialProfile
+ * (D-1.10) at the priorIterationLedger seed point.
  *
  * Defensive: legacy stores sometimes serialize empty arrays as null;
  * coerces those before validating (mutates the ledger in-place).
@@ -1139,7 +1146,7 @@ export function incrementIteration(
  * Per D-1.1 contract: "Load failure on a corrupt iterationLedger →
  * fail-fast with diagnostic naming the corrupt field."
  */
-export function assertIterationLedgerOnLoad(ledger: IterationLedger, essayId: string): void {
+export function validateAndNormalizeIterationLedger(ledger: IterationLedger, essayId: string): void {
   if (typeof ledger.currentIteration !== 'number' || ledger.currentIteration < 0) {
     throw new Error(
       `[essayProfileManager] corrupt iterationLedger.currentIteration on load (essayId=${essayId}): ` +
@@ -1498,6 +1505,11 @@ export class EssayProfileCoordinator {
     // silent — the no-fallback charter requires that the system surface
     // when it had to substitute defaults so audit can detect drift.
     if (!profile.iterationLedger) {
+      // [round-1 audit §4.B / T1.4 closure] Legacy hydration is a
+      // structural-absence DEGRADATION, not a successful step. Emit
+      // status:'failed' with code:'legacy_hydration' so audit grep
+      // surfaces it as drift (no-fallback charter §8). Hydration
+      // behavior unchanged — the warn + default-fill still happens.
       console.warn(
         `[EssayProfileCoordinator.fromCheckpoint] iterationLedger missing on loaded profile (essayId=${essayId}); hydrating with defaults. ` +
           `This indicates the JSONB row pre-dates D-0.5/D-0.8 or a migration was incomplete.`,
@@ -1505,9 +1517,13 @@ export class EssayProfileCoordinator {
       emitIterationEvent({
         iteration: 0,
         step: 'profile.fromCheckpoint.legacyHydration',
-        status: 'succeeded',
+        status: 'failed',
+        error: {
+          message: 'iterationLedger missing on loaded profile; hydrated with defaults',
+          code: 'legacy_hydration',
+          context: { essayId },
+        },
         timestamp: new Date().toISOString(),
-        error: undefined,
       });
       profile.iterationLedger = {
         currentIteration: 0,
@@ -1521,18 +1537,51 @@ export class EssayProfileCoordinator {
       // iterationLedger → fail-fast with diagnostic naming the corrupt
       // field"). Defensively coerce arrays-as-null to empty arrays
       // because some legacy stores serialize null for "empty" arrays.
-      assertIterationLedgerOnLoad(profile.iterationLedger, essayId);
+      validateAndNormalizeIterationLedger(profile.iterationLedger, essayId);
     }
+    // [round-1 audit §4.A / T1.4 closure] Each of the four legacy-backfill
+    // branches converts a silent default-fill into a structured
+    // 'legacy_backfill.<field>' event so audit can surface profiles that
+    // hydrated without these fields (charter §8). Behavior unchanged —
+    // the assignment still happens; the emit is the only addition.
     if (!profile.groundTruthFacts) {
+      emitIterationEvent({
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.groundTruthFacts',
+        status: 'failed',
+        error: { message: 'groundTruthFacts missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
       profile.groundTruthFacts = [];
     }
     if (!profile.storyFragments) {
+      emitIterationEvent({
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.storyFragments',
+        status: 'failed',
+        error: { message: 'storyFragments missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
       profile.storyFragments = [];
     }
     if (!profile.intentSignals) {
+      emitIterationEvent({
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.intentSignals',
+        status: 'failed',
+        error: { message: 'intentSignals missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
       profile.intentSignals = [];
     }
     if (!profile.conversatorSessionLog) {
+      emitIterationEvent({
+        iteration: 0,
+        step: 'profile.fromCheckpoint.legacyBackfill.conversatorSessionLog',
+        status: 'failed',
+        error: { message: 'conversatorSessionLog missing on loaded profile; hydrated with []', code: 'legacy_backfill', context: { essayId } },
+        timestamp: new Date().toISOString(),
+      });
       profile.conversatorSessionLog = [];
     }
 

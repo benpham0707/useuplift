@@ -48,6 +48,7 @@ vi.mock('../../src/services/essayIntelligence/analysis/landingDetector', async (
 });
 
 import { detectLanding } from '../../src/services/essayIntelligence/analysis/landingDetector';
+import { __resetTelemetryForTesting } from '../../src/services/essayIntelligence/telemetry/iterationTelemetry';
 import {
   buildPriorAnnotations,
   mechanicalSignificance,
@@ -525,14 +526,78 @@ function makeRemap(entries: Array<[number, ParagraphRemapEntry]>): ParagraphRema
   return new Map(entries);
 }
 
-function captureDropLogs(): { spy: ReturnType<typeof vi.spyOn>; payloads: Array<Record<string, unknown>> } {
+/**
+ * [round-1 audit T2.4 closure] Drop telemetry now flows through
+ * `iterationTelemetry` instead of `console.log`. Tests capture via
+ * `flushEventsForIteration(iter)` and reshape the structured event back
+ * into the legacy payload shape so existing assertions still work.
+ *
+ * The event shape (from priorAnnotationsBuilder.emitMoveDropped) is:
+ *   { iteration, step: 'priorAnnotations.move_dropped',
+ *     paragraphIndex, status: 'succeeded',
+ *     error: { code: <reason>, context: { moveId, taughtAtIteration,
+ *              findingId, contentSummarySnippet, source } } }
+ *
+ * We synthesize the payload shape `{ moveId, oldParagraphIndex, reason,
+ * taughtAtIteration, currentIteration, findingId?, contentSummarySnippet,
+ * timestamp }` so tests written before the telemetry switch keep
+ * passing without rewriting their `expect(payloads[0]).toMatchObject(...)`
+ * assertions.
+ *
+ * Returns a `payloads` proxy whose `.length` and indexed access reflect
+ * the events drained from the buffer at the moment the test reads it.
+ * The `spy.mockRestore()` is a no-op (kept for API symmetry with the
+ * old console-spy pattern); test cleanup happens via `__resetTelemetryForTesting`.
+ */
+function captureDropLogs(): {
+  spy: { mockRestore: () => void };
+  payloads: Array<Record<string, unknown>>;
+} {
+  // Reset the telemetry buffer so prior tests' events don't leak in.
+  __resetTelemetryForTesting();
   const payloads: Array<Record<string, unknown>> = [];
-  const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    if (args[0] === '[priorAnnotationsBuilder] move-dropped' && typeof args[1] === 'string') {
-      payloads.push(JSON.parse(args[1]) as Record<string, unknown>);
-    }
+  // Build a self-updating proxy: the test harness calls payloads.length
+  // and payloads[N] AFTER the production code has run, so we need to
+  // drain on-read. Simpler approach: return the array and have a
+  // `.refresh()` method... but the existing tests just access payloads
+  // directly. Cleanest: install a wrapper around emitIterationEvent
+  // via a vi.spyOn on the underlying console.log channel that the
+  // event ultimately writes through, OR directly on emitIterationEvent.
+  //
+  // We use vi.spyOn on console.log because emitIterationEvent calls
+  // console.log('[IterationTelemetry]', JSON.stringify(event)) on every
+  // event (iterationTelemetry.ts:79). This keeps the test architecture
+  // simple — no need to drain buffers post-hoc.
+  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+    if (args[0] !== '[IterationTelemetry]' || typeof args[1] !== 'string') return;
+    const event = JSON.parse(args[1]) as {
+      iteration: number;
+      step: string;
+      paragraphIndex?: number;
+      error?: { code?: string; context?: Record<string, unknown> };
+      timestamp: string;
+    };
+    if (event.step !== 'priorAnnotations.move_dropped') return;
+    const ctx = event.error?.context ?? {};
+    payloads.push({
+      moveId: ctx.moveId,
+      oldParagraphIndex: event.paragraphIndex,
+      reason: event.error?.code,
+      taughtAtIteration: ctx.taughtAtIteration,
+      currentIteration: event.iteration,
+      findingId: ctx.findingId,
+      contentSummarySnippet: ctx.contentSummarySnippet,
+      timestamp: event.timestamp,
+    });
   });
-  return { spy, payloads };
+  return {
+    spy: {
+      mockRestore: () => {
+        vi.restoreAllMocks();
+      },
+    },
+    payloads,
+  };
 }
 
 // ─── B1: undefined remap → identity ────────────────────────────────────

@@ -131,6 +131,7 @@ import {
 import {
   flushEventsForIteration,
   clearEventsForIteration,
+  emitIterationEvent,
 } from '../telemetry/iterationTelemetry';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
@@ -247,7 +248,7 @@ export interface PipelineInput {
    * the ledger to currentIteration=0 and loses prior taughtMoves and
    * iterations).
    *
-   * Validation: `assertIterationLedgerOnLoad` runs at the seed point inside
+   * Validation: `validateAndNormalizeIterationLedger` runs at the seed point inside
    * `createInitialProfile`; a corrupt seed throws fail-fast before any
    * layer runs.
    *
@@ -396,6 +397,7 @@ export class AnalysisOrchestrator {
     // doesn't depend on any layer running. `iterationStartedAt` is derived
     // from `startTime` (already declared above), so the ISO conversion is
     // pure formatting.
+    // eslint-disable-next-line no-silent-fallback -- mode-selection: structural default for cold-call analyzeEssay (where no caller context exists to specify the trigger). Re-analysis path (reanalysisOrchestrator.triggerReanalysis) ALWAYS supplies an explicit triggeredBy of 'edit' or 'student_request'; this default only fires for direct first-pass calls.
     const triggeredBy: IterationRecord['triggeredBy'] = input.triggeredBy ?? 'first_pass';
     const iterationStartedAt = new Date(startTime).toISOString();
 
@@ -2113,6 +2115,25 @@ export class AnalysisOrchestrator {
           partialRationale,
         );
       } catch (commitErr) {
+        // [round-1 audit §4.C / T1.4 closure] Surface the secondary
+        // failure as structured telemetry BEFORE the console.error so
+        // audit grep finds it (charter §8). The no-throw contract of
+        // buildPartialResult is preserved — we still log + return
+        // without re-throwing because the original abort is the primary
+        // failure and masking it with the secondary commit failure
+        // would lose user-facing diagnostic.
+        const iter = getCurrentIteration(coordinator.getProfile());
+        emitIterationEvent({
+          iteration: iter,
+          step: 'iteration_commit_secondary_failure',
+          status: 'failed',
+          error: {
+            message: commitErr instanceof Error ? commitErr.message : String(commitErr),
+            code: 'partial_result_commit_failure',
+            context: { triggeredBy, layersCompleted, layersFailed: layersFailed.map((f) => f.layer) },
+          },
+          timestamp: new Date().toISOString(),
+        });
         console.error(
           `[Orchestrator] D-1.10: partial-result iteration commit ALSO failed (the ` +
             `original abort is the primary failure; not re-throwing this secondary one):`,

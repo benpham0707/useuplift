@@ -136,14 +136,44 @@ function makeProfile(args: {
   } as unknown as EssayProfile;
 }
 
-function captureDropLogs(): { spy: ReturnType<typeof vi.spyOn>; payloads: Array<Record<string, unknown>> } {
+/**
+ * [round-1 audit T2.4 closure] Drop telemetry now flows through
+ * iterationTelemetry. We capture by spying on console.log (which
+ * emitIterationEvent writes through with the [IterationTelemetry] prefix)
+ * and reshape the structured event back into the legacy payload shape so
+ * existing assertions still work.
+ */
+function captureDropLogs(): {
+  spy: { mockRestore: () => void };
+  payloads: Array<Record<string, unknown>>;
+} {
   const payloads: Array<Record<string, unknown>> = [];
-  const spy = vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
-    if (args[0] === '[priorAnnotationsBuilder] move-dropped' && typeof args[1] === 'string') {
-      payloads.push(JSON.parse(args[1]) as Record<string, unknown>);
-    }
+  vi.spyOn(console, 'log').mockImplementation((...args: unknown[]) => {
+    if (args[0] !== '[IterationTelemetry]' || typeof args[1] !== 'string') return;
+    const event = JSON.parse(args[1]) as {
+      iteration: number;
+      step: string;
+      paragraphIndex?: number;
+      error?: { code?: string; context?: Record<string, unknown> };
+      timestamp: string;
+    };
+    if (event.step !== 'priorAnnotations.move_dropped') return;
+    const ctx = event.error?.context ?? {};
+    payloads.push({
+      moveId: ctx.moveId,
+      oldParagraphIndex: event.paragraphIndex,
+      reason: event.error?.code,
+      taughtAtIteration: ctx.taughtAtIteration,
+      currentIteration: event.iteration,
+      findingId: ctx.findingId,
+      contentSummarySnippet: ctx.contentSummarySnippet,
+      timestamp: event.timestamp,
+    });
   });
-  return { spy, payloads };
+  return {
+    spy: { mockRestore: () => vi.restoreAllMocks() },
+    payloads,
+  };
 }
 
 function captureComposerLogs(): {

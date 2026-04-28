@@ -10,7 +10,7 @@
 //   2. Legacy profile (iterationLedger absent on load) → defensive
 //      hydration via fromCheckpoint emits a warning + telemetry event;
 //      after hydration, arrays are empty + currentIteration = 0.
-//   3. Corrupt iterationLedger → assertIterationLedgerOnLoad throws
+//   3. Corrupt iterationLedger → validateAndNormalizeIterationLedger throws
 //      fail-fast with field-naming diagnostic.
 //   4. incrementIteration with each trigger reason → currentIteration
 //      bumps; rejects empty / dynamic-string-passing paths.
@@ -21,7 +21,7 @@ import {
   createInitialProfile,
   getCurrentIteration,
   incrementIteration,
-  assertIterationLedgerOnLoad,
+  validateAndNormalizeIterationLedger,
 } from '../../src/services/essayIntelligence/profileManager/essayProfileManager';
 import type { EssayProfile, IterationLedger } from '../../src/services/essayIntelligence/profileTypes';
 
@@ -114,7 +114,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
     });
   });
 
-  describe('5. assertIterationLedgerOnLoad — corrupt-field detection', () => {
+  describe('5. validateAndNormalizeIterationLedger — corrupt-field detection', () => {
     it('passes on a clean ledger', () => {
       const ledger: IterationLedger = {
         currentIteration: 0,
@@ -122,7 +122,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         taughtMoves: [],
         recentDecisions: [],
       };
-      expect(() => assertIterationLedgerOnLoad(ledger, 'essay-1')).not.toThrow();
+      expect(() => validateAndNormalizeIterationLedger(ledger, 'essay-1')).not.toThrow();
     });
 
     it('throws fail-fast on currentIteration as string', () => {
@@ -132,7 +132,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         taughtMoves: [],
         recentDecisions: [],
       } as IterationLedger;
-      expect(() => assertIterationLedgerOnLoad(ledger, 'essay-1')).toThrow(
+      expect(() => validateAndNormalizeIterationLedger(ledger, 'essay-1')).toThrow(
         /corrupt iterationLedger\.currentIteration on load \(essayId=essay-1\)/,
       );
     });
@@ -144,7 +144,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         taughtMoves: [],
         recentDecisions: [],
       } as IterationLedger;
-      expect(() => assertIterationLedgerOnLoad(ledger, 'essay-2')).toThrow(
+      expect(() => validateAndNormalizeIterationLedger(ledger, 'essay-2')).toThrow(
         /currentIteration on load/,
       );
     });
@@ -156,7 +156,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         taughtMoves: [],
         recentDecisions: [],
       } as IterationLedger;
-      expect(() => assertIterationLedgerOnLoad(ledger, 'essay-3')).toThrow(
+      expect(() => validateAndNormalizeIterationLedger(ledger, 'essay-3')).toThrow(
         /corrupt iterationLedger\.iterations on load/,
       );
     });
@@ -168,7 +168,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         taughtMoves: { fake: true } as unknown as [],
         recentDecisions: [],
       } as IterationLedger;
-      expect(() => assertIterationLedgerOnLoad(ledger, 'essay-4')).toThrow(
+      expect(() => validateAndNormalizeIterationLedger(ledger, 'essay-4')).toThrow(
         /corrupt iterationLedger\.taughtMoves on load/,
       );
     });
@@ -180,7 +180,7 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
         taughtMoves: null as unknown as [],
         recentDecisions: null as unknown as [],
       } as IterationLedger;
-      assertIterationLedgerOnLoad(ledger, 'essay-5');
+      validateAndNormalizeIterationLedger(ledger, 'essay-5');
       expect(ledger.iterations).toEqual([]);
       expect(ledger.taughtMoves).toEqual([]);
       expect(ledger.recentDecisions).toEqual([]);
