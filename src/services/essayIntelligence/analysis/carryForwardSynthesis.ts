@@ -21,7 +21,9 @@
 //   - Append-only invariant friendly: this function NEVER mutates its
 //     inputs; it constructs a fresh summary object each call.
 
-import type { CarryForwardDecision, IterationRecord } from '../profileTypes';
+import type { CarryForwardDecision, EssayProfile, IterationRecord } from '../profileTypes';
+import { appendCarryForwardDecision } from '../profileManager/essayProfileManager';
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
 
 /**
  * Synthesize the rolled-up `carryForwardSummary` for a given iteration
@@ -99,4 +101,69 @@ export function synthesizeCarryForwardSummary(
     rederived: [...rederived],
     refreshed: [...refreshed],
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// D-1.11 — Decision-point safe-append helper
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Safely append a CarryForwardDecision at an orchestrator decision point.
+ *
+ * Per the D-1.11 Plan agent §9 failure-surface design: the underlying
+ * `appendCarryForwardDecision` mutator throws on validation failure (the
+ * audit-trail invariants are non-negotiable), but a decision-point append
+ * MUST NOT abort the analysis — an audit-trail bug at a decision point
+ * is worse if it propagates to user-facing failure than if it's logged
+ * and skipped. So every decision-point call site wraps the append in
+ * this helper, which:
+ *
+ *   1. Tries the append.
+ *   2. On throw, emits a structured `iterationTelemetry` failure event
+ *      with code:'carry_forward_decision_append_failure' so audit grep
+ *      finds the dropped decision.
+ *   3. Logs to console.error for tail-able dev visibility.
+ *   4. Returns false to signal the append was dropped (caller can
+ *      ignore or use for further telemetry).
+ *
+ * This is the ONE charter-sanctioned swallow site in D-1.11 (per
+ * no-fallback charter §8). The justification: the alternative
+ * (aborting analysis over an audit-trail bug) is worse for the user
+ * than a missing audit entry.
+ *
+ * The ESLint `no-silent-fallback` rule is appeased via the explicit
+ * emit + console.error + structured-throw upstream. We do NOT add a
+ * `// eslint-disable-next-line` because the catch DOES emit and log;
+ * the rule only flags catches that are TRULY silent.
+ */
+export function safeAppendCarryForwardDecision(
+  profile: EssayProfile,
+  decision: CarryForwardDecision,
+): boolean {
+  try {
+    appendCarryForwardDecision(profile, decision);
+    return true;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    emitIterationEvent({
+      iteration: profile.iterationLedger?.currentIteration ?? -1,
+      step: 'carryForward.decision_append_failure',
+      status: 'failed',
+      error: {
+        message,
+        code: 'carry_forward_decision_append_failure',
+        context: {
+          itemKey: decision?.itemKey ?? '<unknown>',
+          decisionType: decision?.decision ?? '<unknown>',
+          attemptedIteration: decision?.iteration ?? -1,
+          actualCurrentIteration: profile.iterationLedger?.currentIteration ?? -1,
+        },
+      },
+      timestamp: new Date().toISOString(),
+    });
+    console.error(
+      `[carryForwardSynthesis] decision append dropped (non-fatal): ${message}`,
+    );
+    return false;
+  }
 }

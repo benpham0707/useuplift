@@ -31,6 +31,7 @@ import type {
   Finding,
   DeltaSynthesisRequest,
   HolisticSectionType,
+  CarryForwardDecision,
 } from '../profileTypes';
 
 // Coordinator + Router
@@ -203,6 +204,20 @@ export class ReanalysisOrchestrator {
   /** Most recent EditUnderstanding from processEdit().
    *  Consumed once by the next processCoachingTurn() call, then cleared. */
   private lastEditUnderstanding: EditUnderstanding | null = null;
+
+  /**
+   * D-1.11 DP-1: most recent mode-selection decision from
+   * processEditAndMaybeReanalyze. Captured at the moment
+   * FocusedAnalyzer.selectAnalysisMode runs (this orchestrator's
+   * iteration counter is still at the prior iter at that point).
+   * Threaded through pipelineInput.modeSelectionDecision when
+   * triggerReanalysis runs analyzeEssay; analyzeEssay fills in the
+   * iteration AFTER incrementIteration and appends the decision.
+   *
+   * Cleared after each triggerReanalysis call to prevent stale
+   * decisions from bleeding into subsequent iterations.
+   */
+  private lastModeSelectionDecision: Omit<CarryForwardDecision, 'iteration'> | null = null;
 
   // ── Construction ──────────────────────────────────────────────────────────
 
@@ -696,12 +711,24 @@ export class ReanalysisOrchestrator {
       priorIterationLedger,
       triggeredBy,
       editChangeTypes,
+      // D-1.11 DP-1: thread mode-selection decision so analyzeEssay can
+      // append it to recentDecisions[] AFTER incrementIteration runs.
+      // `lastModeSelectionDecision` is set by processEditAndMaybeReanalyze
+      // when an edit triggered the re-analysis. On 'student_request'
+      // triggers (no edit, no mode selection), it stays null and
+      // analyzeEssay's DP-1 append site no-ops via the `if (input.modeSelectionDecision)` guard.
+      modeSelectionDecision: this.lastModeSelectionDecision ?? undefined,
     };
 
     // Run comprehensive pipeline with the reanalysis brief
     let pipelineResult: PipelineResult;
     try {
       pipelineResult = await analyzeEssay(pipelineInput, brief);
+      // D-1.11 DP-1: clear consumed mode-selection decision so it doesn't
+      // bleed into a subsequent triggerReanalysis (each call gets a fresh
+      // decision from processEditAndMaybeReanalyze, OR null on
+      // student_request triggers).
+      this.lastModeSelectionDecision = null;
       console.log(
         `[ReanalysisOrchestrator] Re-analysis complete: ` +
         `layers=${pipelineResult.layersCompleted.join(',')}, ` +
@@ -1044,6 +1071,28 @@ export class ReanalysisOrchestrator {
       );
       selectedMode = 'focused';
     }
+
+    // ── D-1.11 DP-1: capture the mode-selection carry-forward decision ──
+    // We store the decision metadata on the orchestrator instance so
+    // triggerReanalysis can attach it to pipelineInput.modeSelectionDecision
+    // when comprehensive mode runs analyzeEssay. Focused-mode reanalyses
+    // don't go through analyzeEssay so the decision can't be attached
+    // to a new IterationRecord — documented gap (focused-mode iteration
+    // commit is a separate deliverable). For focused mode we still set
+    // the field so future deferred-fix code has access; it just won't
+    // get persisted under the current architecture.
+    //
+    // decision type:
+    //   'comprehensive' → 'rederive' (full re-analysis = re-derive everything)
+    //   'focused'       → 'partial_refresh' (focused: re-derive some, carry rest)
+    this.lastModeSelectionDecision = {
+      itemKey: 'mode_selection',
+      decision: selectedMode === 'comprehensive' ? 'rederive' : 'partial_refresh',
+      rationale: `FocusedAnalyzer.selectAnalysisMode → ${selectedMode}`,
+      costSavedIfCarry: 0, // baseline-cost reference table is D-4.11+ scope
+      costSpentIfRederive: 0,
+      arbitrationMechanism: 'validity_test', // selectAnalysisMode is a deterministic rules engine
+    };
 
     // ── Step 5: Execute analysis ──────────────────────────────────────────────
     if (selectedMode === 'focused') {

@@ -64,6 +64,7 @@ import type {
   IterationLedger,
   IterationRecord,
   EditChangeType,
+  CarryForwardDecision,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -133,6 +134,7 @@ import {
   clearEventsForIteration,
   emitIterationEvent,
 } from '../telemetry/iterationTelemetry';
+import { safeAppendCarryForwardDecision } from './carryForwardSynthesis';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
 
@@ -302,6 +304,25 @@ export interface PipelineInput {
    * Consumer: `commitIterationRecord` (D-1.11 amendment).
    */
   focusedEscalationLevel?: 0 | 1 | 2 | 3 | 4;
+  /**
+   * D-1.11 DP-1: carry-forward decision for mode selection. Populated by
+   * `reanalysisOrchestrator.processEditAndMaybeReanalyze` AFTER
+   * FocusedAnalyzer.selectAnalysisMode runs but BEFORE analyzeEssay is
+   * invoked. Threaded through here so analyzeEssay can append it to
+   * `iterationLedger.recentDecisions[]` AFTER `incrementIteration` runs
+   * (the append-time iteration validator requires the decision's
+   * iteration number to equal the post-increment currentIteration).
+   *
+   * Shape: every CarryForwardDecision field EXCEPT `iteration` (which is
+   * filled in by analyzeEssay at append time, since the iteration counter
+   * is bumped inside this function, not at the caller).
+   *
+   * Absent on cold first-pass and on focused-mode reanalyses (those don't
+   * call analyzeEssay so the decision has no iteration to attach to —
+   * documented gap to be closed when a focused-mode IterationRecord
+   * commit deliverable lands).
+   */
+  modeSelectionDecision?: Omit<CarryForwardDecision, 'iteration'>;
 }
 
 /** Complete pipeline result */
@@ -499,6 +520,24 @@ export class AnalysisOrchestrator {
     // buildPartialResult call site (including L1-fatal before this point).
     incrementIteration(coordinator.getProfile(), triggeredBy);
 
+    // ── D-1.11 DP-1: append the mode-selection CarryForwardDecision ──────
+    // The decision was made by FocusedAnalyzer.selectAnalysisMode upstream
+    // (in reanalysisOrchestrator.processEditAndMaybeReanalyze, BEFORE this
+    // function ran). The decision was threaded through `input.modeSelectionDecision`
+    // (every CarryForwardDecision field except `iteration`); we fill in
+    // the iteration here, post-increment. Absent on cold first-pass
+    // (no mode-selection happened) and on focused-mode reanalyses (which
+    // don't go through analyzeEssay so the decision can't be attached
+    // to a new IterationRecord — documented gap, deferred to a future
+    // focused-mode iteration commit deliverable).
+    if (input.modeSelectionDecision) {
+      const currentIter = getCurrentIteration(coordinator.getProfile());
+      safeAppendCarryForwardDecision(coordinator.getProfile(), {
+        ...input.modeSelectionDecision,
+        iteration: currentIter,
+      });
+    }
+
     // ── Seed prior findings for re-analysis evolution (BEFORE any layer runs) ──
     if (input.priorFindings && input.priorFindings.length > 0) {
       coordinator.seedPriorFindings(input.priorFindings);
@@ -609,6 +648,32 @@ export class AnalysisOrchestrator {
         coordinator.applyUnderstandingWalkStep(walkOutput);
       }
 
+      // ── D-1.11 DP-3a: append walk findingEvolutions decisions ──────────
+      // The walk LLM produces findingEvolutions[] for each paragraph
+      // (W1.3 design — see UnderstandingWalkOutput.findingEvolutions).
+      // Each evolution is a per-finding carry-forward decision: confirm
+      // (carry), deepen (partial_refresh), or supersede (rederive). The
+      // arbitrationMechanism is 'llm_judgment' — the walk LLM judged the
+      // evolution based on new sentence-level understanding.
+      const dp3aIter = getCurrentIteration(coordinator.getProfile());
+      for (const walkOutput of l3Result.walkOutputs) {
+        if (!walkOutput.findingEvolutions || walkOutput.findingEvolutions.length === 0) continue;
+        for (const evo of walkOutput.findingEvolutions) {
+          const decisionType: CarryForwardDecision['decision'] =
+            evo.newMaturity === 'superseded' ? 'rederive' : 'partial_refresh';
+          const supersedesNote = evo.supersedes ? ` (supersedes ${evo.supersedes})` : '';
+          safeAppendCarryForwardDecision(coordinator.getProfile(), {
+            iteration: dp3aIter,
+            itemKey: evo.findingId,
+            decision: decisionType,
+            rationale: `walk maturity → ${evo.newMaturity}${supersedesNote}: ${evo.reasoning}`,
+            costSavedIfCarry: 0, // bundled in walk cost; cost-attribution refinement is D-4.11+
+            costSpentIfRederive: 0,
+            arbitrationMechanism: 'llm_judgment',
+          });
+        }
+      }
+
       // Scope 2 Phase 5: Harvest L3 improvement candidates from sentence
       // understandings into the candidate store. L3 emits at most one
       // candidate per sentence (prompt-constrained); total across the walk
@@ -671,6 +736,28 @@ export class AnalysisOrchestrator {
       // Apply the final synthesis to the profile
       coordinator.applyHolisticSynthesis(growthResult.finalSynthesis);
       growthReadingStrategy = growthResult.readingStrategy;
+
+      // ── D-1.11 DP-3b: append synthesis findingEvolutions decisions ─────
+      // L3.75's holistic synthesis can also produce findingEvolutions
+      // (HolisticSynthesisOutput.findingEvolutions). Same shape and
+      // semantics as DP-3a's walk evolutions; arbitrationMechanism is
+      // 'llm_judgment' (the synthesis LLM produced the evolution).
+      const dp3bIter = getCurrentIteration(coordinator.getProfile());
+      const synthesisEvolutions = growthResult.finalSynthesis.findingEvolutions ?? [];
+      for (const evo of synthesisEvolutions) {
+        const decisionType: CarryForwardDecision['decision'] =
+          evo.newMaturity === 'superseded' ? 'rederive' : 'partial_refresh';
+        const supersedesNote = evo.supersedes ? ` (supersedes ${evo.supersedes})` : '';
+        safeAppendCarryForwardDecision(coordinator.getProfile(), {
+          iteration: dp3bIter,
+          itemKey: evo.findingId,
+          decision: decisionType,
+          rationale: `L3.75 synthesis maturity → ${evo.newMaturity}${supersedesNote}: ${evo.reasoning}`,
+          costSavedIfCarry: 0,
+          costSpentIfRederive: 0,
+          arbitrationMechanism: 'llm_judgment',
+        });
+      }
 
       // ── Port A2 (Wave-1a): persist derived voice back to voice_profiles ──
       // Fire-and-forget. If persistence fails, the analysis result still stands
@@ -953,6 +1040,32 @@ export class AnalysisOrchestrator {
               `isSubstantive=${deltaResult.output.isSubstantive}, ` +
               `cost=$${deltaResult.cost.toFixed(4)}`,
             );
+
+            // ── D-1.11 DP-4: append delta-synthesis decisions ─────────────
+            // One CarryForwardDecision per affected holistic section. The
+            // arbitrationMechanism is 'comprehensive_rule' (the contradiction
+            // detector — a deterministic rule applied over L4 output —
+            // triggered the synthesis, not an LLM judgment). decision
+            // type: 'rederive' if the synthesis output was substantive
+            // (the section was meaningfully rewritten); 'partial_refresh'
+            // otherwise (touched but largely preserved).
+            const dp4Iter = getCurrentIteration(coordinator.getProfile());
+            const dp4DecisionType: CarryForwardDecision['decision'] = deltaResult.output.isSubstantive
+              ? 'rederive'
+              : 'partial_refresh';
+            const dp4PerSectionCost = deltaResult.cost / Math.max(1, affectedSections.length);
+            for (const section of affectedSections) {
+              safeAppendCarryForwardDecision(coordinator.getProfile(), {
+                iteration: dp4Iter,
+                itemKey: section,
+                decision: dp4DecisionType,
+                rationale:
+                  `delta synthesis triggered by blocking contradiction; isSubstantive=${deltaResult.output.isSubstantive}`,
+                costSavedIfCarry: 0,
+                costSpentIfRederive: dp4PerSectionCost,
+                arbitrationMechanism: 'comprehensive_rule',
+              });
+            }
           }
         } catch (error) {
           // Delta synthesis failure is NOT fatal — pipeline continues with existing holistic sections
@@ -996,6 +1109,34 @@ export class AnalysisOrchestrator {
           priorEssayTextOverride: input.priorEssayText,
           editSignificance: input.editSignificance,
         });
+
+        // ── D-1.11 DP-2: append per-paragraph priorAnnotations decisions ──
+        // For each paragraph that received a priorAnnotationContext, the
+        // composer made a 'partial_refresh' choice (carry the prior context
+        // forward + walk the paragraph fresh in this iteration). For
+        // paragraphs the composer DIDN'T cover (no entry in priorAnnotationsForL5),
+        // they're either unchanged-with-no-priors (no decision needed) or
+        // first-pass / pre-D-1.10-snapshot iterations (priorAnnotationsForL5
+        // is undefined; no decisions to record). We only emit decisions
+        // for paragraphs we ACTUALLY composed prior context for.
+        if (priorAnnotationsForL5 instanceof Map) {
+          const dp2Iter = getCurrentIteration(profileForAnnotations);
+          for (const [paragraphIndex, ctx] of priorAnnotationsForL5) {
+            const addressedCount = ctx.priorAnnotations.filter((a) => a.addressedByEdit).length;
+            const totalCount = ctx.priorAnnotations.length;
+            safeAppendCarryForwardDecision(profileForAnnotations as EssayProfile, {
+              iteration: dp2Iter,
+              itemKey: `L5.P${paragraphIndex}.annotations`,
+              decision: 'partial_refresh',
+              rationale:
+                `priorAnnotations carried into L5 prompt (paragraph ${paragraphIndex}): ` +
+                `${totalCount} prior moves, ${addressedCount} marked addressed by edit`,
+              costSavedIfCarry: 0,
+              costSpentIfRederive: 0,
+              arbitrationMechanism: 'validity_test',
+            });
+          }
+        }
 
         l5Result = await deepAnnotationService.generateAnnotations(
           profileForAnnotations as EssayProfile,

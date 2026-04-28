@@ -28,8 +28,14 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { synthesizeCarryForwardSummary } from '../../src/services/essayIntelligence/analysis/carryForwardSynthesis';
-import type { CarryForwardDecision } from '../../src/services/essayIntelligence/profileTypes';
+import { vi } from 'vitest';
+import {
+  synthesizeCarryForwardSummary,
+  safeAppendCarryForwardDecision,
+} from '../../src/services/essayIntelligence/analysis/carryForwardSynthesis';
+import { createInitialProfile, incrementIteration } from '../../src/services/essayIntelligence/profileManager/essayProfileManager';
+import { __resetTelemetryForTesting } from '../../src/services/essayIntelligence/telemetry/iterationTelemetry';
+import type { CarryForwardDecision, EssayProfile } from '../../src/services/essayIntelligence/profileTypes';
 
 function makeDecision(overrides: Partial<CarryForwardDecision> = {}): CarryForwardDecision {
   return {
@@ -237,5 +243,109 @@ describe('synthesizeCarryForwardSummary — input validation', () => {
     expect(() => synthesizeCarryForwardSummary([], NaN)).toThrow(
       /iteration must be a non-negative integer/,
     );
+  });
+});
+
+describe('safeAppendCarryForwardDecision — happy path', () => {
+  function makeProfile(): EssayProfile {
+    const profile = createInitialProfile({
+      essayText: 'P0.',
+      paragraphTexts: ['P0.'],
+      sentenceTexts: [['P0.']],
+      metadata: { essayType: 'common_app', wordCount: 1 },
+    });
+    incrementIteration(profile, 'first_pass'); // currentIteration = 1
+    return profile;
+  }
+
+  function makeDecision(overrides: Partial<CarryForwardDecision> = {}): CarryForwardDecision {
+    return {
+      iteration: 1,
+      itemKey: 'mode_selection',
+      decision: 'partial_refresh',
+      rationale: 'test',
+      costSavedIfCarry: 0,
+      costSpentIfRederive: 0,
+      arbitrationMechanism: 'validity_test',
+      ...overrides,
+    };
+  }
+
+  it('returns true and appends the decision on the happy path', () => {
+    const profile = makeProfile();
+    const ok = safeAppendCarryForwardDecision(profile, makeDecision());
+    expect(ok).toBe(true);
+    expect(profile.iterationLedger.recentDecisions).toHaveLength(1);
+  });
+});
+
+describe('safeAppendCarryForwardDecision — failure swallow', () => {
+  function makeProfile(): EssayProfile {
+    const profile = createInitialProfile({
+      essayText: 'P0.',
+      paragraphTexts: ['P0.'],
+      sentenceTexts: [['P0.']],
+      metadata: { essayType: 'common_app', wordCount: 1 },
+    });
+    incrementIteration(profile, 'first_pass');
+    return profile;
+  }
+
+  it('catches iteration-mismatch errors, emits telemetry, returns false (does not abort caller)', async () => {
+    __resetTelemetryForTesting();
+    const profile = makeProfile(); // currentIteration=1
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const ok = safeAppendCarryForwardDecision(profile, {
+        iteration: 99, // mismatch — currentIteration is 1
+        itemKey: 'mode_selection',
+        decision: 'partial_refresh',
+        rationale: 'test',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0,
+        arbitrationMechanism: 'validity_test',
+      });
+      expect(ok).toBe(false);
+      // Decision NOT appended (validation rejected it).
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(0);
+      // console.error fired with the diagnostic.
+      expect(errorSpy).toHaveBeenCalled();
+      expect(String(errorSpy.mock.calls[0][0] ?? '')).toMatch(/decision append dropped/);
+
+      // Telemetry event captured the structured failure.
+      const { flushEventsForIteration } = await import(
+        '../../src/services/essayIntelligence/telemetry/iterationTelemetry'
+      );
+      const events = flushEventsForIteration(1);
+      const failureEvent = events.find(
+        (e) => e.step === 'carryForward.decision_append_failure',
+      );
+      expect(failureEvent).toBeDefined();
+      expect(failureEvent?.status).toBe('failed');
+      expect(failureEvent?.error?.code).toBe('carry_forward_decision_append_failure');
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it('catches enum-violation errors and continues (audit trail records the bug)', () => {
+    __resetTelemetryForTesting();
+    const profile = makeProfile();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      const ok = safeAppendCarryForwardDecision(profile, {
+        iteration: 1,
+        itemKey: 'mode_selection',
+        decision: 'bogus' as CarryForwardDecision['decision'], // invalid enum
+        rationale: 'test',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0,
+        arbitrationMechanism: 'validity_test',
+      });
+      expect(ok).toBe(false);
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(0);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });
