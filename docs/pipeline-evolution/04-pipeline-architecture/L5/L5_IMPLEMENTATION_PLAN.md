@@ -112,7 +112,7 @@ PHASE 1 — DEAD-WIRE FIX + ITERATION LEDGER
   D-1.7   priorAnnotations builder index-remap on structural reorder (F7 mitigation)
   D-1.8   analysisOrchestrator.ts:850 wire-up (priorAnnotations populated)
   D-1.9   reanalysisOrchestrator.ts:1177 wire-up (parallel fix)  — SUBSUMED BY D-1.8 (2026-04-28; no parallel callsite exists)
-  D-1.10  IterationLedger.iterations[] commit at orchestrator end
+  D-1.10  Iteration lifecycle bracket (5-piece: entry-increment + L5-buffer + end-commit + snapshot + re-analysis ledger continuity) — scope expanded 2026-04-28 to close 5 dead wires
   D-1.11  CarryForwardDecision append at orchestrator decision points
   D-1.12  Halt-on-error orchestration policy applied (full code-review pass)
   D-1.13  TaughtMove ID stability property test
@@ -589,17 +589,45 @@ The graph is the spine. Detail follows.
 - **Downstream:** D-1.12 and D-1.15 (which the original spec said were blocked by D-1.9) are unblocked because D-1.8 covers the surface they need.
 - **Effort:** 0 hours (deliverable closed).
 
-### D-1.10 — IterationLedger.iterations[] commit at orchestrator end
+### D-1.10 — Iteration lifecycle bracket: entry-increment, L5-output buffering, end-commit, snapshot, ledger continuity
 
-- **Type:** Service extension.
-- **File:** `analysisOrchestrator.ts` (commit point at orchestrator end).
-- **Depends on:** D-1.1, D-1.2.
-- **Blocks:** D-4.11 (budget redirection reads from this).
-- **Contract:** At orchestrator end, after all costs are tallied, push an `IterationRecord` to `iterationLedger.iterations[]` per the type at D-0.1. Also commit any queued `taughtMoves[]` to `iterationLedger.taughtMoves[]`. Both commits transactional with profile save (atomic — either both succeed or neither does).
-- **Behavior spec:** After every iteration, the ledger's `iterations[]` grows by 1; `taughtMoves[]` grows by N (count of L5 annotations).
-- **Failure surface:** Commit failure → throw; orchestrator caller surfaces "iteration N did not commit; rerun" with reasoning.
-- **Validation:** Mock-LLM integration test runs iteration 1 and 2; asserts post-iteration ledger state.
-- **Effort:** 3–4 hours.
+- **Type:** Service extension (multi-piece — the iteration lifecycle is wired here as a single unit so producer/consumer pairs activate together; the spec's original literal scope was insufficient and would have left D-1.8 and prior deliverables inert in production).
+- **Files:** `analysisOrchestrator.ts` (entry + L5-buffer + end-commit), `reanalysisOrchestrator.ts` (PipelineInput threading), `essayProfileManager.ts` (createNew accepts optional priorLedger seed; getCurrentIterationRecord helper if needed).
+- **Depends on:** D-1.1, D-1.2, D-0.9, D-1.8.
+- **Blocks:** D-4.11 (budget redirection reads from this), D-1.15 (integration test).
+
+**Audit-driven scope expansion (2026-04-28).** Pre-flight investigation surfaced FIVE dead wires across D-1.1, D-1.2, D-0.9, and D-1.8 — every Phase 1 producer's intended write site was deferred to a future deliverable and never landed. The iteration loop cannot function end-to-end without all five being closed. They share a single touch site (orchestrator entry/end) and share a transactional commit, so they belong in one deliverable. The five pieces:
+
+1. **Entry: increment iteration counter.** `incrementIteration(profile, triggeredBy)` at orchestrator entry — closes Dead Wire #1 (D-1.1's writer was orphaned). `triggeredBy: 'first_pass' | 'edit' | 'student_request'` — direct `analyzeEssay` defaults to `'first_pass'`; `reanalysisOrchestrator` threads `'edit'` or `'student_request'`. Profile arrives with `currentIteration: 0` (fresh) or `N` (resumed); increment makes it `1` or `N+1`.
+
+2. **Mid-Phase 6: buffer L5-output TaughtMoves.** After `deepAnnotationService.generateAnnotations` returns its `L5AnnotationResult`, transform via `l5AnnotationsToTaughtMoves(annotations, currentIteration)` and call `bufferTaughtMoves(currentIteration, transformedMoves)` — closes Dead Wire #2 (D-1.2's transient buffer producer was orphaned). The buffer holds moves until end-commit.
+
+3. **End: commit IterationRecord + flush taughtMoves + flush telemetry + populate snapshotText.** At orchestrator end (after costs tallied, before return), construct an `IterationRecord` with: `iteration: currentIteration`, `triggeredBy`, `editScope?` (when re-analysis), `carryForwardSummary` (D-1.11 will populate richly; first pass uses empty stubs), `costBreakdown` from costTracker, `comprehensiveBaselineCost: 0` for first pass, `escalationLevel: 0`, `rationale: ''`, `startedAt/finishedAt`, `events: flushEventsForIteration(currentIteration)`, **`snapshotText: profile.essayText`**. Push onto `iterationLedger.iterations[]`. Append flushed buffer to `iterationLedger.taughtMoves[]`. Clear both buffers (taughtMoves + telemetry) AFTER successful checkpoint write — closes Dead Wires #2 (consumer side), #4 (telemetry flush), #5 (`iterations[]` write), and activates D-1.8's `snapshotText` consumer.
+
+4. **Re-analysis ledger continuity.** `reanalysisOrchestrator.triggerReanalysis()` currently calls `analyzeEssay(pipelineInput)` which calls `EssayProfileCoordinator.createNew(...)` → resets `iterationLedger` to `{currentIteration: 0, iterations: [], taughtMoves: [], recentDecisions: []}`. **The prior history is silently discarded.** Fix: extend `PipelineInput` with `priorIterationLedger?: IterationLedger`. When supplied, `createNew` uses it as the seed for the new coordinator's profile. `reanalysisOrchestrator` reads `this.coordinator.getProfile().iterationLedger` and threads it forward — closes Dead Wire #3.
+
+5. **Atomic commit semantics.** "Transactional with profile save" interpretation: write all updates (currentIteration, iterations[], taughtMoves[], recentDecisions[]) to the in-memory profile FIRST via the coordinator's mutation path; THEN `await this.safeCheckpoint(coordinator, 'after_iteration_commit')`. If checkpoint throws, the in-memory state is in an invariant-valid post-commit shape (the ledger has the new entry), but the persistence didn't happen. The orchestrator throws with structured context so the caller sees "iteration N did not persist; rerun" — this matches the spec's "Both commits transactional with profile save (atomic — either both succeed or neither does)" interpretation. We do NOT roll back the in-memory state on checkpoint failure (a) because there's no clean rollback primitive in EssayProfileCoordinator and (b) because the next run's checkpoint write will overwrite anyway.
+
+**Behavior spec (post-D-1.10):** After every iteration:
+- `iterationLedger.currentIteration` increments by 1.
+- `iterationLedger.iterations[]` grows by 1 (containing the new IterationRecord with snapshotText, events, costBreakdown, etc.).
+- `iterationLedger.taughtMoves[]` grows by `count of L5 annotations` (or 0 if L5 was skipped).
+- D-1.8's composer transitions from "always returns undefined" to "returns populated Map on iter ≥ 2 with prior taughtMoves." This is the inflection point where the iteration loop becomes functional.
+
+**Failure surface:**
+- `incrementIteration` validation throw at entry → orchestrator halts before any layer runs; surfaces "iteration N could not start; profile state corrupt."
+- L5-buffer call failure → swallowed at the buffer level (the buffer is best-effort; a transient buffer failure is not worth halting an entire iteration over). [REVISIT during D-1.10 implementation: this may need to halt instead per the no-fallback charter; test will tell.]
+- End-commit construction error (malformed IterationRecord) → throw fail-fast.
+- Checkpoint write failure → throw with structured "iteration N did not persist; rerun" context. In-memory ledger remains in post-commit shape; rerun on the same profile will succeed if the underlying storage issue is resolved.
+
+**Validation:**
+- Integration test runs iteration 1 (first-pass via `analyzeEssay`) and asserts post-iteration ledger has `currentIteration: 1`, `iterations.length: 1`, `iterations[0].snapshotText === essayText`, `iterations[0].events` populated from telemetry.
+- Integration test runs iteration 2 (re-analysis via `reanalysisOrchestrator`) on the post-iter-1 profile; asserts `currentIteration: 2`, `iterations.length: 2`, prior `iterations[0]` preserved, `taughtMoves[]` accumulated across both iterations, D-1.8's composer received populated priorAnnotations on iter 2.
+- Property: ledger append-only invariant (every iteration only adds to arrays, never rewrites existing entries) — D-1.14's territory but provable here.
+
+**Revision discipline:** the iteration lifecycle is the foundation of every subsequent deliverable (D-1.11 carry-forward decisions, D-1.12 halt-on-error pass, D-1.15 integration test). A bug here cascades. Spawn a Plan agent to enumerate every entry/exit edge case (cold start, resumed re-analysis with stale ledger, missing L5 result, L5 skipped, partial-result early returns from buildPartialResult). The plan should enumerate where in the orchestrator each step lands (line numbers) before any code is written.
+
+**Effort:** 8–12 hours including the integration test. Up from spec's literal 3–4 because the literal scope was insufficient.
 
 ### D-1.11 — CarryForwardDecision append at orchestrator decision points
 
