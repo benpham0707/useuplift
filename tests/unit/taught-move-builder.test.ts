@@ -271,7 +271,17 @@ describe('D-1.2 — transient buffer lifecycle', () => {
 });
 
 describe('D-1.2 — light property check (foundation for D-1.13)', () => {
-  it('100 randomly-generated annotation shapes produce stable IDs across two passes', () => {
+  // [round-1 audit §5.B / T2.6 closure] Previous test ran two passes
+  // over the SAME in-memory annotation array — the determinism check
+  // was f(x) === f(x), tautologically true for any pure function. The
+  // restructured test serializes the annotations to JSON, then
+  // independently deserializes them into a SECOND array. The second
+  // array's objects are byte-identical to the first only at the JSON
+  // level — the runtime objects are distinct references. Any
+  // implementation accidentally relying on object identity (e.g.,
+  // a WeakMap cache keyed by annotation reference) would fail the
+  // round-trip test where the original tautological pattern would pass.
+  it('round-tripped annotations through JSON produce IDs identical to in-memory annotations (real determinism check)', () => {
     const annotations: L5Annotation[] = Array.from({ length: 100 }, (_, i) =>
       makeAnnotation({
         id: `A-rand-${i}-${Math.floor(Math.random() * 100000)}`,
@@ -284,10 +294,42 @@ describe('D-1.2 — light property check (foundation for D-1.13)', () => {
       }),
     );
     const iter = 4;
+
+    // Pass 1: original in-memory references
     const ids1 = annotations.map((a) => generateTaughtMoveId(a, iter));
-    const ids2 = annotations.map((a) => generateTaughtMoveId(a, iter));
+
+    // Pass 2: JSON round-trip produces structurally-identical but
+    // reference-distinct objects. If generateTaughtMoveId reads only
+    // documented fields from the input (annotation.id, annotation.location.paragraphIndex)
+    // and is otherwise pure, the IDs MUST match across the two passes.
+    // Round-tripping breaks any accidental reliance on object identity,
+    // hidden Symbol fields, or non-enumerable properties.
+    const serialized = JSON.stringify(annotations);
+    const reDeserialized = JSON.parse(serialized) as L5Annotation[];
+    const ids2 = reDeserialized.map((a) => generateTaughtMoveId(a, iter));
+
     expect(ids1).toEqual(ids2);
-    // Each id is unique within the (iter, paragraphIndex) — collision-free.
+    // Each ID is unique within the (iter, paragraphIndex, annotation.id)
+    // tuple — collision-free under randomized inputs.
     expect(new Set(ids1).size).toBe(annotations.length);
+  });
+
+  it('reference-distinct annotations with identical fields produce identical IDs (purity check)', () => {
+    // Direct purity assertion: two structurally-identical but reference-
+    // distinct annotation objects MUST produce the same ID. Catches any
+    // implementation that uses WeakMap, Object.is, ===, or other
+    // identity-based caching.
+    const a1 = makeAnnotation({
+      id: 'A-purity-1',
+      location: { paragraphIndex: 3, sentenceIndex: 0, spanText: null },
+      teachingMode: 'awareness',
+    });
+    const a2 = makeAnnotation({
+      id: 'A-purity-1',
+      location: { paragraphIndex: 3, sentenceIndex: 0, spanText: null },
+      teachingMode: 'awareness',
+    });
+    expect(a1).not.toBe(a2); // distinct references
+    expect(generateTaughtMoveId(a1, 7)).toBe(generateTaughtMoveId(a2, 7));
   });
 });
