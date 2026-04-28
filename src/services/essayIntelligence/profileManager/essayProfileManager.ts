@@ -984,6 +984,62 @@ export function getCurrentIteration(profile: EssayProfile): number {
 }
 
 /**
+ * Resolve the snapshot text from the iteration BEFORE `currentIteration` —
+ * i.e., the OLD-half of the diff that priorAnnotationsBuilder (D-1.6) and
+ * paragraphRemapBuilder (D-1.7) consume to remap prior taughtMoves into the
+ * current paragraph layout.
+ *
+ * Per profileTypes.ts §IterationLedger: `iterations[N-1]` is the audit
+ * record for iteration N. So the snapshot for iteration `currentIteration - 1`
+ * lives at index `currentIteration - 2`.
+ *
+ * Returns `undefined` (NOT a throw) for the structurally-absent cases:
+ *   - `currentIteration <= 1` (no prior iteration exists by definition).
+ *   - `iterations[]` doesn't yet have a record at the expected slot
+ *     (cold ledger, mid-build before D-1.10 lands).
+ *   - The record exists but its `snapshotText` field is undefined
+ *     (record committed before D-1.10 wired the write path).
+ *
+ * Throws fail-fast on a CORRUPT ledger: the slot exists but its
+ * `record.iteration` doesn't match `currentIteration - 1` (e.g.,
+ * `iterations[3]` holds `iteration: 2` instead of `iteration: 4`).
+ * That indicates structural ledger corruption — not a soft case to log
+ * around; the orchestrator's Phase 6 catch routes it to buildPartialResult.
+ *
+ * Producer: D-1.10 (orchestrator iteration-end commit).
+ * Consumer: D-1.8 (analysisOrchestrator priorAnnotations wire-up).
+ */
+export function getPriorIterationSnapshotText(
+  profile: EssayProfile,
+  currentIteration: number,
+): string | undefined {
+  if (currentIteration <= 1) return undefined;
+  if (!profile.iterationLedger) return undefined;
+
+  const iterations = profile.iterationLedger.iterations;
+  if (!Array.isArray(iterations)) return undefined;
+
+  const slotIdx = currentIteration - 2; // iter N → slot N-2 (since iterations[N-1] is iter N's record)
+  if (slotIdx < 0 || slotIdx >= iterations.length) return undefined;
+
+  const record = iterations[slotIdx];
+  if (!record) return undefined;
+
+  // Belt-and-suspenders: a slot that exists but holds the wrong iteration
+  // number is structural corruption, not a soft case. Halt the orchestrator.
+  if (record.iteration !== currentIteration - 1) {
+    throw new Error(
+      `[essayProfileManager.getPriorIterationSnapshotText] corrupt iterationLedger: ` +
+        `iterations[${slotIdx}].iteration=${record.iteration} but expected ${currentIteration - 1} ` +
+        `(currentIteration=${currentIteration}). Slot/iteration mismatch indicates non-monotonic ` +
+        `or out-of-order audit-record commits.`,
+    );
+  }
+
+  return record.snapshotText; // may itself be undefined (pre-D-1.10 records)
+}
+
+/**
  * Increment the iteration counter at iteration start. Must be called by
  * the orchestrator at every iteration entry — analysisOrchestrator
  * (first_pass on a fresh analysis) or reanalysisOrchestrator (edit /

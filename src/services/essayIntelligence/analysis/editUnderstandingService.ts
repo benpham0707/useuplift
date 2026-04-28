@@ -257,7 +257,14 @@ function computeWordDiff(
  * of truth rather than re-splitting with a potentially inconsistent regex).
  * The profile's sentences are the canonical boundaries established by L1.
  */
-function computeEditDiff(
+/**
+ * Exported for D-1.8: the analysisOrchestrator wires `priorAnnotations` by
+ * computing its own `EditDiff` between the prior-iteration snapshot and the
+ * current essay text, then feeding it into `buildParagraphRemap` and
+ * `buildPerParagraphEdits`. Pure mechanical function — no LLM, idempotent,
+ * cheap; safe to call from any orchestration site.
+ */
+export function computeEditDiff(
   oldText: string,
   newText: string,
   profile?: Readonly<EssayProfile>,

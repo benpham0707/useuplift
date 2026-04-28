@@ -5281,6 +5281,28 @@ export interface IterationRecord {
    *   tooling. Read-only after iteration commit.
    */
   events?: IterationTelemetryEvent[];
+  /**
+   * Snapshot of the essay text at the moment THIS iteration's analysis
+   * completed. From iteration N+1's perspective, `iterations[N-1].snapshotText`
+   * is the prior-iteration text — the OLD half of the diff that
+   * `priorAnnotationsBuilder` (D-1.6) and `paragraphRemapBuilder` (D-1.7)
+   * consume to remap prior taughtMoves into the current iteration's
+   * paragraph layout.
+   *
+   * Phase 1 D-1.8 amendment: optional addition. D-1.8 wires the orchestrator
+   * to READ this field via `getPriorIterationSnapshotText`. D-1.10 (orchestrator
+   * end-of-iteration commit) WRITES it. Until D-1.10 lands, records committed
+   * upstream may not have this field — readers handle `undefined` gracefully
+   * (structural absence, not silent fallback).
+   *
+   * Producer: orchestrator at iteration commit (Phase 1 D-1.10) — sets to
+   *   `profile.essayText` post-iteration.
+   * Consumer: priorAnnotationsBuilder via `getPriorIterationSnapshotText` in
+   *   essayProfileManager (D-1.8).
+   * Pruning: never pruned (one string per iteration; ~5KB × 20 iterations
+   *   ≈ 100KB upper bound on a heavily-iterated essay).
+   */
+  snapshotText?: string;
 }
 
 /**

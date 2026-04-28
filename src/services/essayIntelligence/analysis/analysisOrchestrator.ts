@@ -191,6 +191,36 @@ export interface PipelineInput {
    * pre-port-identical behavior.
    */
   userId?: string;
+  /**
+   * D-1.8: LLM-judged overall edit significance from upstream
+   * `editUnderstandingService.understandEdit()`. Populated by
+   * `reanalysisOrchestrator` for edit-triggered re-analysis runs; absent
+   * on cold first-pass calls (where there is no prior text to compare).
+   *
+   * When present, the orchestrator's priorAnnotations wire-up applies this
+   * uniformly to every changed paragraph's `EditSignal.significance`
+   * (locked decision: never discard paid LLM output to redo a coarser
+   * derivation; the LLM judged the whole edit at this level, propagate
+   * that judgment honestly). When absent, mechanical-significance
+   * fallback in `buildPerParagraphEdits` derives the bucket from
+   * `changeRatio` cuts (D-1.8 §4).
+   */
+  editSignificance?: 'minor' | 'moderate' | 'significant' | 'transformative';
+  /**
+   * D-1.8: prior-iteration essay text, supplied directly by the caller
+   * when available. The orchestrator prefers this over the
+   * `iterationLedger.iterations[]` snapshot when both are present (caller's
+   * intent is more authoritative than a stale ledger entry). Absent →
+   * orchestrator falls back to `getPriorIterationSnapshotText` against
+   * the profile's iterationLedger; if that's also undefined, the wire-up
+   * gracefully degrades to `priorAnnotations: undefined` (structural
+   * absence, not silent fallback).
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` populates this
+   * from `versionTracker.getPreviousAnalyzedText()` when an edit triggered
+   * the re-analysis. Direct `analyzeEssay()` callers leave it undefined.
+   */
+  priorEssayText?: string;
 }
 
 /** Complete pipeline result */
@@ -841,13 +871,30 @@ export class AnalysisOrchestrator {
         // when rendering the coaching map lineage block.
         const candidateStoreForL5 = coordinator.getImprovementCandidateStore();
 
+        // D-1.8: Carry-forward intelligence — replace the literal `undefined`
+        // with the per-paragraph priorAnnotations Map composed from the
+        // iterationLedger's prior taughtMoves[]. The composer encapsulates
+        // the full D-1.6/D-1.7/D-1.8 surface (snapshot lookup → diff →
+        // remap → per-paragraph edits → landing detection → grouping). On
+        // iter ≤ 1 or missing snapshot, returns `undefined` (structural
+        // absence — L5 prompt at deepAnnotationService.ts:1402–1416 already
+        // handles this branch). On any helper throw, propagates to Phase 6's
+        // existing catch → buildPartialResult per the no-fallback charter.
+        const { buildPriorAnnotationsForOrchestrator } = await import('./priorAnnotationsBuilder');
+        const priorAnnotationsForL5 = await buildPriorAnnotationsForOrchestrator({
+          profile: profileForAnnotations,
+          currentEssayText: input.essayText,
+          priorEssayTextOverride: input.priorEssayText,
+          editSignificance: input.editSignificance,
+        });
+
         l5Result = await deepAnnotationService.generateAnnotations(
           profileForAnnotations as EssayProfile,
           input.reanalysisBrief,
           contradictionAnnotationFlags,
           findingStoreForL5.size > 0 ? findingStoreForL5 : undefined,
           growthReadingStrategy,
-          undefined, // priorAnnotations
+          priorAnnotationsForL5,
           candidateStoreForL5,
           input.essayId,
         );

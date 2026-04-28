@@ -646,12 +646,29 @@ export class ReanalysisOrchestrator {
       );
     }
 
+    // D-1.8: thread the prior-iteration baseline text and the LLM-judged
+    // overall edit significance from upstream `editUnderstandingService` so
+    // the analysisOrchestrator's priorAnnotations composer (Phase 6) can
+    // build EditSignals against the actual edit, not a stale ledger snapshot.
+    // The baselineText is the "before" essay text from the active version
+    // window — exactly the OLD-half of the diff that prior taughtMoves
+    // recorded their location.paragraphIndex against. lastEditUnderstanding
+    // is populated by `runEditProcessing` (line 920) when an edit triggered
+    // this re-analysis; null on student_request triggers (no edit). When
+    // both are absent, the composer's mechanical-significance fallback
+    // (D-1.8 §4) and ledger-snapshot lookup (D-1.10's deliverable) take over.
+    const activeVersion = this.versionTracker.getActiveVersion();
+    const priorEssayText = activeVersion.baselineText.length > 0 ? activeVersion.baselineText : undefined;
+    const editSignificance = this.lastEditUnderstanding?.significance;
+
     const pipelineInput: PipelineInput = {
       // FIX 4.7: use stored essayId instead of synthetic one
       essayId: this.essayId,
       essayText: currentText,
       essayType,
       priorFindings: priorFindings.length > 0 ? priorFindings : undefined,
+      priorEssayText,
+      editSignificance,
     };
 
     // Run comprehensive pipeline with the reanalysis brief

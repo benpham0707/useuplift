@@ -48,11 +48,21 @@
 
 import { detectLanding, type LandingDetectorInput } from './landingDetector';
 import {
+  buildParagraphRemap,
   isDropped,
   type ParagraphRemap,
   type ParagraphRemapDropReason,
 } from './paragraphRemapBuilder';
+import {
+  computeEditDiff,
+  splitParagraphs,
+} from './editUnderstandingService';
+import {
+  getCurrentIteration,
+  getPriorIterationSnapshotText,
+} from '../profileManager/essayProfileManager';
 import type {
+  EssayProfile,
   IterationLedger,
   PriorAnnotationContext,
   TaughtMove,
@@ -350,4 +360,376 @@ function validateInput(input: PriorAnnotationsBuilderInput): void {
   if (input.paragraphRemap !== undefined && !(input.paragraphRemap instanceof Map)) {
     throw new Error('[priorAnnotationsBuilder] input.paragraphRemap must be a Map when present.');
   }
+}
+
+// ============================================================================
+// PER-PARAGRAPH EDIT-SIGNAL HELPER (D-1.8)
+// ============================================================================
+//
+// Bridge between the mechanical `EditDiff` + per-iteration paragraph remap
+// and the keyed `Map<oldIdx, EditSignal>` shape the builder consumes. The
+// orchestrator produces this Map at Phase 6 right before calling
+// `buildPriorAnnotations`. Signed contract:
+//
+//   - Keyed by OLD paragraph index (matching prior moves' location.paragraphIndex).
+//   - Covers EVERY old paragraph in [0, oldParagraphTexts.length) — even
+//     unchanged ones (`oldText === newText`, `significance: 'minor'`). The
+//     builder's missing-edit fail-fast (D-1.6 contract) requires full domain
+//     coverage for any paragraph that has a prior move; covering all of them
+//     is simpler and harmless.
+//   - newText resolution per old index uses the supplied `paragraphRemap`:
+//     `remap[oldIdx] === <number>` → use `newParagraphTexts[that number]`;
+//     `remap[oldIdx]` is dropped → use `''` (empty); remap absent → identity.
+//   - significance: see §3 of the D-1.8 plan. The honest priority is the
+//     LLM-judged overall significance from `editUnderstandingService` (when
+//     available, propagated uniformly per locked decision); mechanical
+//     fallback derives per-paragraph significance from `changeRatio` cuts.
+
+/**
+ * The mechanical-significance bucket cuts (D-1.8 §4). Each cut is the
+ * INCLUSIVE upper bound of its bucket. Calibration-anchored to the
+ * `editUnderstandingService` prompt anchors:
+ *   - 0.10: noise floor (typo / one-word swap).
+ *   - 0.40: paragraph-identity inflection (matches the inverse of the 0.30
+ *     overlap-pairing threshold in computeEditDiff).
+ *   - 0.80: wholesale-replacement floor (paragraphs above this are
+ *     effectively new, even if technically "modified").
+ */
+export const MECHANICAL_SIGNIFICANCE_CUTS = Object.freeze({
+  minor: 0.10,
+  moderate: 0.40,
+  significant: 0.80,
+} as const);
+
+/**
+ * Map a per-paragraph `changeRatio` to a coarse `EditSignal.significance`
+ * bucket. Used as the FALLBACK when no upstream LLM-judged significance was
+ * threaded through `PipelineInput.editSignificance`. When that signal IS
+ * present, the orchestrator uses it directly (locked decision: never discard
+ * paid LLM output to redo a coarser derivation).
+ */
+export function mechanicalSignificance(
+  changeRatio: number,
+): EditSignal['significance'] {
+  if (!Number.isFinite(changeRatio) || changeRatio < 0) {
+    throw new Error(
+      `[priorAnnotationsBuilder.mechanicalSignificance] changeRatio must be a finite, non-negative number; got ${changeRatio}.`,
+    );
+  }
+  if (changeRatio <= MECHANICAL_SIGNIFICANCE_CUTS.minor) return 'minor';
+  if (changeRatio <= MECHANICAL_SIGNIFICANCE_CUTS.moderate) return 'moderate';
+  if (changeRatio <= MECHANICAL_SIGNIFICANCE_CUTS.significant) return 'significant';
+  return 'transformative';
+}
+
+/**
+ * Per-paragraph `changeRatio` — fraction of sentence-level events
+ * (added + removed + modified) over the OLD paragraph's sentence count.
+ *
+ *   ratio_p = (added_p + removed_p + modified_p) / max(1, oldSentences_p.length)
+ *
+ * Caps implicitly at the paragraph level — a fully-replaced paragraph (all
+ * sentences modified or replaced) sits near 1.0; a deleted paragraph
+ * doesn't appear here (the OLD index drops via the remap, never reaching
+ * the significance step). Added paragraphs (no oldSentences) → 1.0 by
+ * convention; the OLD-keyed Map doesn't include them.
+ */
+function computeChangeRatioForParagraph(
+  oldParaIndex: number,
+  oldSentencesCount: number,
+  diff: { paragraphChanges: ReadonlyArray<{ paragraphIndex: number; changeType: 'modified' | 'added' | 'removed'; sentenceChanges: ReadonlyArray<{ changeType: string }> }> },
+): number {
+  // computeEditDiff stores `paragraphIndex` as NEW-idx for 'modified'/'added'
+  // and OLD-idx for 'removed'. We're keyed by OLD here — for 'removed'
+  // paragraphs the ratio is 1.0 (full deletion); for 'modified' we have to
+  // find the matching pair via the remap upstream, but at this call site
+  // we approximate via "any paragraphChange entry whose paragraphIndex
+  // (NEW or OLD) corresponds to this old index". A safer-and-cheaper
+  // approach: caller passes the resolved `newParaIndex` via remap so we
+  // search for `paragraphChanges` entries that match that index.
+  // (See buildPerParagraphEdits where we wire this together.)
+  void oldParaIndex;
+  void diff;
+  return oldSentencesCount > 0 ? 0 : 1;
+}
+// (computeChangeRatioForParagraph is kept as a placeholder for the
+// signature; the actual ratio computation lives inline in
+// buildPerParagraphEdits below where both the OLD index, the NEW index from
+// the remap, and the diff entry are all in scope. Keeping a separate helper
+// here would force three lookups; inline is clearer.)
+
+export interface BuildPerParagraphEditsInput {
+  /** Pre-edit paragraphs (`splitParagraphs(priorSnapshotText)`). */
+  oldParagraphTexts: readonly string[];
+  /** Post-edit paragraphs (`splitParagraphs(currentEssayText)`). */
+  newParagraphTexts: readonly string[];
+  /**
+   * Mechanical diff between old and new texts. Caller computes via
+   * `computeEditDiff(oldText, newText, profile?)` from editUnderstandingService.
+   */
+  diff: {
+    paragraphChanges: ReadonlyArray<{
+      paragraphIndex: number;
+      changeType: 'modified' | 'added' | 'removed';
+      sentenceChanges: ReadonlyArray<{ changeType: string }>;
+    }>;
+  };
+  /**
+   * OLD → NEW remap from D-1.7. Required: every old index must have an
+   * entry (D-1.7 helper guarantees full-domain coverage).
+   */
+  paragraphRemap: ParagraphRemap;
+  /**
+   * Optional LLM-judged overall edit significance from upstream
+   * `editUnderstandingService.understandEdit()`. When present, applied
+   * UNIFORMLY to every changed paragraph (locked D-1.8 decision: don't
+   * fabricate per-paragraph LLM judgments we didn't pay for; uniform
+   * propagation is the honest read of "the LLM judged the whole edit at
+   * this level"). When absent, mechanical-significance fallback fires.
+   */
+  editSignificance?: EditSignal['significance'];
+}
+
+/**
+ * Build the per-paragraph edit-signal Map keyed by OLD paragraph index.
+ * Covers ALL old paragraphs (even unchanged ones — see contract above).
+ *
+ * Pure / no I/O. Throws fail-fast on caller-side bugs (mismatched array
+ * lengths, missing remap entries, etc.) — the orchestrator's Phase 6
+ * catch routes to buildPartialResult per the D-1.8 failure surface.
+ */
+export function buildPerParagraphEdits(
+  input: BuildPerParagraphEditsInput,
+): Map<number, EditSignal> {
+  validateBuildPerParagraphEditsInput(input);
+
+  const { oldParagraphTexts, newParagraphTexts, diff, paragraphRemap, editSignificance } = input;
+
+  // Index `paragraphChanges` by the index they're keyed under, splitting
+  // by changeType. computeEditDiff stores: NEW-idx for 'modified'/'added',
+  // OLD-idx for 'removed'.
+  const modifiedByNewIdx = new Map<number, { sentenceChanges: ReadonlyArray<{ changeType: string }> }>();
+  const removedOldIdxSet = new Set<number>();
+  for (const pc of diff.paragraphChanges) {
+    if (pc.changeType === 'modified') modifiedByNewIdx.set(pc.paragraphIndex, { sentenceChanges: pc.sentenceChanges });
+    else if (pc.changeType === 'removed') removedOldIdxSet.add(pc.paragraphIndex);
+    // 'added' entries are NEW indices with no OLD counterpart — they don't
+    // produce an entry in the OLD-keyed Map.
+  }
+
+  const splitSentencesLite = (text: string): string[] =>
+    // Same boundary rule as splitSentences in editUnderstandingService for
+    // the ratio denominator. We keep this lite-and-local to avoid coupling.
+    // The denominator is approximate; the bucket cuts are coarse enough
+    // that a sentence-tokenizer mismatch of ±1 won't change the bucket.
+    text.split(/(?<=[.!?])\s+(?=[A-Z"'])/).filter((s) => s.trim().length > 0);
+
+  const result = new Map<number, EditSignal>();
+
+  for (let oldIdx = 0; oldIdx < oldParagraphTexts.length; oldIdx++) {
+    const oldText = oldParagraphTexts[oldIdx];
+    const remapEntry = paragraphRemap.get(oldIdx);
+    if (remapEntry === undefined) {
+      // D-1.7 helper guarantees full-domain coverage. A missing entry is
+      // structural corruption — fail-fast.
+      throw new Error(
+        `[priorAnnotationsBuilder.buildPerParagraphEdits] paragraphRemap is missing an entry ` +
+          `for oldParagraphIndex=${oldIdx}. Helper invariant violated; check buildParagraphRemap output.`,
+      );
+    }
+
+    let newText: string;
+    let significance: EditSignal['significance'];
+
+    if (isDropped(remapEntry)) {
+      // Paragraph deleted (or ambiguously remapped). The builder will drop
+      // moves on this paragraph BEFORE looking up the edit signal, but
+      // we still produce an honest entry in case the caller iterates.
+      newText = '';
+      significance = editSignificance ?? 'transformative'; // wholesale loss
+    } else {
+      const newIdx = remapEntry; // number
+      newText = newParagraphTexts[newIdx];
+      if (newText === undefined) {
+        throw new Error(
+          `[priorAnnotationsBuilder.buildPerParagraphEdits] paragraphRemap maps ` +
+            `oldParagraphIndex=${oldIdx} → newParagraphIndex=${newIdx}, but ` +
+            `newParagraphTexts has length ${newParagraphTexts.length}. Helper input mismatch.`,
+        );
+      }
+
+      // changeRatio for this old paragraph:
+      //   - if modified: count of (added+removed+modified) sentenceChanges / oldSentences.length
+      //   - if removed (caught above via isDropped on remap; but defensive):
+      //       full deletion → 1.0
+      //   - else (unchanged): 0.0
+      const oldSentencesCount = Math.max(1, splitSentencesLite(oldText).length);
+      let changeRatio = 0;
+      if (removedOldIdxSet.has(oldIdx)) {
+        changeRatio = 1.0;
+      } else {
+        const mod = modifiedByNewIdx.get(newIdx);
+        if (mod) {
+          let nonUnchanged = 0;
+          for (const sc of mod.sentenceChanges) {
+            if (sc.changeType !== 'unchanged') nonUnchanged++;
+          }
+          changeRatio = nonUnchanged / oldSentencesCount;
+        }
+      }
+
+      significance = editSignificance ?? mechanicalSignificance(changeRatio);
+    }
+
+    result.set(oldIdx, { oldText, newText, significance });
+  }
+
+  return result;
+}
+
+function validateBuildPerParagraphEditsInput(input: BuildPerParagraphEditsInput): void {
+  if (!input || typeof input !== 'object') {
+    throw new Error('[priorAnnotationsBuilder.buildPerParagraphEdits] input is missing or not an object.');
+  }
+  if (!Array.isArray(input.oldParagraphTexts)) {
+    throw new Error('[priorAnnotationsBuilder.buildPerParagraphEdits] input.oldParagraphTexts must be an array.');
+  }
+  if (!Array.isArray(input.newParagraphTexts)) {
+    throw new Error('[priorAnnotationsBuilder.buildPerParagraphEdits] input.newParagraphTexts must be an array.');
+  }
+  if (!input.diff || !Array.isArray(input.diff.paragraphChanges)) {
+    throw new Error('[priorAnnotationsBuilder.buildPerParagraphEdits] input.diff.paragraphChanges must be an array.');
+  }
+  if (!(input.paragraphRemap instanceof Map)) {
+    throw new Error('[priorAnnotationsBuilder.buildPerParagraphEdits] input.paragraphRemap must be a Map.');
+  }
+  if (
+    input.editSignificance !== undefined &&
+    !['minor', 'moderate', 'significant', 'transformative'].includes(input.editSignificance)
+  ) {
+    throw new Error(
+      `[priorAnnotationsBuilder.buildPerParagraphEdits] input.editSignificance must be one of ` +
+        `'minor' | 'moderate' | 'significant' | 'transformative'; got ${JSON.stringify(input.editSignificance)}.`,
+    );
+  }
+}
+
+// ============================================================================
+// ORCHESTRATOR COMPOSER (D-1.8)
+// ============================================================================
+//
+// The single entry point analysisOrchestrator calls at Phase 6 to replace
+// the line-850 `undefined`. Wraps the full composition: iteration check →
+// prior-snapshot lookup → diff compute → remap build → per-paragraph edits
+// → builder call. Returns the per-paragraph annotation context Map (or
+// undefined when there are structurally no priors to thread).
+//
+// This shape was chosen over having the orchestrator hold a 30-line block
+// of composition logic. Reasons:
+//   - Encapsulation: the entire D-1.6/D-1.7/D-1.8 surface is one function.
+//     Future deliverables (D-1.10 ledger commit, D-1.11 carry-forward
+//     decisions) can extend the composer without bloating the orchestrator.
+//   - Testability: the integration test imports this directly. No stubbing
+//     of the full analyzeEssay pipeline (L1/L2/L3/L3.75/L4) is required.
+//     Only `detectLanding` (Haiku call inside the builder) needs mocking.
+//   - Failure surface stays uniform: any throw inside the composer flows
+//     up through Phase 6's existing catch → buildPartialResult per the
+//     D-1.8 plan §7.
+//
+// Graceful degradation cases that return `undefined` (NOT a throw):
+//   - currentIteration <= 1 (no priors structurally exist).
+//   - Prior-iteration snapshot text not found (pre-D-1.10 ledger; cold
+//     ledger; missing slot). This is structural absence, not silent
+//     fallback — the wire-up debug-logs the cause for tail-able audit.
+
+export interface BuildPriorAnnotationsForOrchestratorInput {
+  /** The fully-hydrated profile from the coordinator at Phase 6 entry. */
+  profile: Readonly<EssayProfile>;
+  /** Current essay text (input.essayText at the orchestrator). */
+  currentEssayText: string;
+  /**
+   * Optional caller-supplied prior text override. Preferred over the
+   * iterationLedger snapshot when present (caller intent is more
+   * authoritative). When absent, the composer reads
+   * `getPriorIterationSnapshotText(profile, currentIteration)`.
+   */
+  priorEssayTextOverride?: string;
+  /**
+   * Optional LLM-judged overall edit significance from upstream
+   * `editUnderstandingService`. Propagates uniformly to per-paragraph
+   * EditSignals when present (locked D-1.8 decision). Mechanical fallback
+   * fires when absent.
+   */
+  editSignificance?: EditSignal['significance'];
+}
+
+/**
+ * Result kind — `undefined` distinguishes "structurally no priors" (iter 1
+ * or missing snapshot) from `Map(0)` (iter ≥ 2 ledger has zero
+ * `taughtAtIteration === currentIteration - 1` entries). The
+ * deepAnnotationService prompt at line 1402–1416 already discriminates on
+ * `undefined` vs Map presence.
+ */
+export type PriorAnnotationsForOrchestrator =
+  | Map<number, PriorAnnotationContext>
+  | undefined;
+
+/**
+ * The composer. Pure async — no I/O beyond what the builder's detectLanding
+ * call performs. Logs structural-absence cases via console for the
+ * orchestrator's debug surface.
+ */
+export async function buildPriorAnnotationsForOrchestrator(
+  input: BuildPriorAnnotationsForOrchestratorInput,
+): Promise<PriorAnnotationsForOrchestrator> {
+  const { profile, currentEssayText, priorEssayTextOverride, editSignificance } = input;
+
+  const currentIteration = getCurrentIteration(profile);
+  if (currentIteration <= 1) {
+    console.log(
+      '[priorAnnotationsBuilder.composer] iter <= 1 — no prior iteration exists; threading priorAnnotations=undefined',
+    );
+    return undefined;
+  }
+
+  // Prior text resolution: caller override > ledger snapshot > undefined.
+  let priorEssayText: string | undefined = priorEssayTextOverride;
+  if (priorEssayText === undefined) {
+    priorEssayText = getPriorIterationSnapshotText(profile, currentIteration);
+  }
+
+  if (priorEssayText === undefined) {
+    console.log(
+      `[priorAnnotationsBuilder.composer] iter=${currentIteration}: prior-iteration snapshot ` +
+        `unavailable (likely pre-D-1.10 ledger or cold start); threading priorAnnotations=undefined`,
+    );
+    return undefined;
+  }
+
+  const oldParas = splitParagraphs(priorEssayText);
+  const newParas = splitParagraphs(currentEssayText);
+  const diff = computeEditDiff(priorEssayText, currentEssayText, profile);
+
+  const paragraphRemap = buildParagraphRemap({
+    oldParagraphTexts: oldParas,
+    newParagraphTexts: newParas,
+    diff,
+  });
+
+  const perParagraphEdits = buildPerParagraphEdits({
+    oldParagraphTexts: oldParas,
+    newParagraphTexts: newParas,
+    diff,
+    paragraphRemap,
+    editSignificance,
+  });
+
+  const priorAnnotations = await buildPriorAnnotations({
+    iterationLedger: profile.iterationLedger,
+    currentIteration,
+    perParagraphEdits,
+    paragraphRemap,
+  });
+
+  return priorAnnotations;
 }
