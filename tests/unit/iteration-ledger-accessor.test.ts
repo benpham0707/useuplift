@@ -188,44 +188,161 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
     });
   });
 
-  describe('6. Legacy profile load (telemetry signal)', () => {
-    // We exercise the warning path by directly reproducing what
-    // fromCheckpoint does on a missing iterationLedger. Full
-    // fromCheckpoint scaffolding (CheckpointStore mocks) is heavier
-    // than this contract requires; the warning + emit pattern is what
-    // matters.
-    beforeEach(() => {
-      vi.resetModules();
+  describe('6. Legacy profile load via real fromCheckpoint (round-1 audit T1.5 closure)', () => {
+    // [round-1 audit §5.A / T1.5 closure] Previous test body called
+    // console.warn + emitIterationEvent BY HAND inside the test — it
+    // exercised zero production code, just the test harness's own
+    // ability to spy on its own emissions. Replaced with a real
+    // EssayProfileCoordinator.fromCheckpoint call against a minimal
+    // legacy-shaped profile (iterationLedger absent, but otherwise
+    // structurally valid) so the production hydration block actually
+    // runs and the warn + emit assertions verify production behavior.
+    //
+    // Post-T1.4: the legacy-hydration emit is now status:'failed' with
+    // code:'legacy_hydration' (was 'succeeded'). Test asserts the new
+    // severity to lock the audit closure.
+
+    beforeEach(async () => {
+      const { __resetTelemetryForTesting } = await import(
+        '../../src/services/essayIntelligence/telemetry/iterationTelemetry'
+      );
+      __resetTelemetryForTesting();
     });
 
-    it('emits a structured warning + telemetry event when the legacy hydration block fires', async () => {
-      // Reset modules so the telemetry buffer is clean.
-      const { emitIterationEvent, flushEventsForIteration, __resetTelemetryForTesting } =
-        await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
-      __resetTelemetryForTesting();
+    it('production fromCheckpoint hydrates a legacy profile with empty ledger and emits structured failure event', async () => {
+      const { EssayProfileCoordinator } = await import(
+        '../../src/services/essayIntelligence/profileManager/essayProfileManager'
+      );
+      const { InMemoryCheckpointStore } = await import(
+        '../../src/services/essayIntelligence/profileManager/checkpointStore'
+      );
+      const { flushEventsForIteration } = await import(
+        '../../src/services/essayIntelligence/telemetry/iterationTelemetry'
+      );
+
+      // Build a minimal legacy-shaped EssayProfile: every field needed for
+      // fromCheckpoint to NOT trigger the migration path, but with
+      // iterationLedger genuinely missing (the field this test exercises).
+      // We use createInitialProfile to construct a valid baseline, then
+      // delete the iterationLedger field to simulate a pre-D-0.5 row.
+      const baselineProfile = createInitialProfile({
+        essayText: 'Legacy essay text for fromCheckpoint exercise.',
+        paragraphTexts: ['Legacy essay text for fromCheckpoint exercise.'],
+        sentenceTexts: [['Legacy essay text for fromCheckpoint exercise.']],
+        metadata: { essayType: 'common_app', wordCount: 6 },
+      });
+      // Force into legacy-row shape: clear iterationLedger so the
+      // production hydration branch fires. Type cast through `unknown`
+      // because the type forbids undefined here, but JSONB rows
+      // pre-D-0.5 had this field absent.
+      const legacyProfile = {
+        ...baselineProfile,
+        // Set improvementCandidateSnapshot to an empty-but-present value
+        // so the migration block at fromCheckpoint head doesn't run
+        // (we're testing iterationLedger hydration, not migration).
+        improvementCandidateSnapshot: {
+          candidates: [],
+          version: 1,
+          lastMutatedAt: new Date().toISOString(),
+        },
+      } as EssayProfile;
+      // The actual deletion — bypass TypeScript's structural check with
+      // `as unknown as Record<...>` since `iterationLedger` is required
+      // on the EssayProfile type but legacy JSONB rows don't have it.
+      delete (legacyProfile as unknown as Record<string, unknown>).iterationLedger;
+
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       try {
-        // Mirror the fromCheckpoint legacy-hydration block's effect.
-        console.warn(
-          `[EssayProfileCoordinator.fromCheckpoint] iterationLedger missing on loaded profile (essayId=test-essay); hydrating with defaults. ` +
-            `This indicates the JSONB row pre-dates D-0.5/D-0.8 or a migration was incomplete.`,
+        // Drive the actual production path. This is where the legacy-
+        // hydration block (essayProfileManager.ts:1500-1525) fires —
+        // not in the test body.
+        const coord = EssayProfileCoordinator.fromCheckpoint(
+          legacyProfile,
+          'test-essay-legacy',
+          new InMemoryCheckpointStore(),
         );
-        emitIterationEvent({
-          iteration: 0,
-          step: 'profile.fromCheckpoint.legacyHydration',
-          status: 'succeeded',
-          timestamp: new Date().toISOString(),
-        });
+        const hydratedLedger = coord.getProfile().iterationLedger;
 
-        expect(warnSpy).toHaveBeenCalledTimes(1);
-        expect(warnSpy.mock.calls[0][0]).toMatch(/iterationLedger missing on loaded profile/);
+        // (a) Hydrated ledger has the expected default shape.
+        expect(hydratedLedger.currentIteration).toBe(0);
+        expect(hydratedLedger.iterations).toEqual([]);
+        expect(hydratedLedger.taughtMoves).toEqual([]);
+        expect(hydratedLedger.recentDecisions).toEqual([]);
 
+        // (b) console.warn fired with the actual production message.
+        expect(warnSpy).toHaveBeenCalled();
+        const warnMessage = String(warnSpy.mock.calls[0][0] ?? '');
+        expect(warnMessage).toMatch(/iterationLedger missing on loaded profile/);
+        expect(warnMessage).toMatch(/test-essay-legacy/);
+
+        // (c) Telemetry emitted via the real production emitIterationEvent
+        //     with step='profile.fromCheckpoint.legacyHydration' AND
+        //     status='failed' (post-T1.4 severity flip).
         const events = flushEventsForIteration(0);
         const legacyEvent = events.find(
           (e) => e.step === 'profile.fromCheckpoint.legacyHydration',
         );
         expect(legacyEvent).toBeDefined();
-        expect(legacyEvent?.status).toBe('succeeded');
+        expect(legacyEvent?.status).toBe('failed');
+        expect(legacyEvent?.error?.code).toBe('legacy_hydration');
+        expect((legacyEvent?.error?.context as Record<string, unknown> | undefined)?.essayId).toBe('test-essay-legacy');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
+    it('production fromCheckpoint also emits four legacyBackfill events for missing ground-truth/story/intent/conversator arrays', async () => {
+      const { EssayProfileCoordinator } = await import(
+        '../../src/services/essayIntelligence/profileManager/essayProfileManager'
+      );
+      const { InMemoryCheckpointStore } = await import(
+        '../../src/services/essayIntelligence/profileManager/checkpointStore'
+      );
+      const { flushEventsForIteration } = await import(
+        '../../src/services/essayIntelligence/telemetry/iterationTelemetry'
+      );
+
+      const baselineProfile = createInitialProfile({
+        essayText: 'P0.',
+        paragraphTexts: ['P0.'],
+        sentenceTexts: [['P0.']],
+        metadata: { essayType: 'common_app', wordCount: 1 },
+      });
+      const legacyProfile = {
+        ...baselineProfile,
+        improvementCandidateSnapshot: {
+          candidates: [],
+          version: 1,
+          lastMutatedAt: new Date().toISOString(),
+        },
+      } as EssayProfile;
+      // Strip all four legacy-backfill targets to simulate a pre-D-0.5
+      // row that lacks the conversator/ground-truth fields.
+      const stripped = legacyProfile as unknown as Record<string, unknown>;
+      delete stripped.iterationLedger;
+      delete stripped.groundTruthFacts;
+      delete stripped.storyFragments;
+      delete stripped.intentSignals;
+      delete stripped.conversatorSessionLog;
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      try {
+        EssayProfileCoordinator.fromCheckpoint(
+          legacyProfile,
+          'test-essay-bare-legacy',
+          new InMemoryCheckpointStore(),
+        );
+        const events = flushEventsForIteration(0);
+
+        // All four backfill steps emitted with status='failed' + code='legacy_backfill'.
+        for (const field of ['groundTruthFacts', 'storyFragments', 'intentSignals', 'conversatorSessionLog']) {
+          const ev = events.find(
+            (e) => e.step === `profile.fromCheckpoint.legacyBackfill.${field}`,
+          );
+          expect(ev, `expected legacyBackfill event for ${field}`).toBeDefined();
+          expect(ev?.status).toBe('failed');
+          expect(ev?.error?.code).toBe('legacy_backfill');
+        }
       } finally {
         warnSpy.mockRestore();
       }
