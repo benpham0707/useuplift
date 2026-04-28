@@ -50,6 +50,8 @@ vi.mock('../../src/services/essayIntelligence/analysis/landingDetector', async (
 import { detectLanding } from '../../src/services/essayIntelligence/analysis/landingDetector';
 import {
   buildPriorAnnotations,
+  mechanicalSignificance,
+  MECHANICAL_SIGNIFICANCE_CUTS,
   type EditSignal,
   type PriorAnnotationsBuilderInput,
 } from '../../src/services/essayIntelligence/analysis/priorAnnotationsBuilder';
@@ -903,5 +905,78 @@ describe('D-1.7 — B12: ambiguous_drop_reason', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+// ============================================================================
+// D-1.8 — mechanicalSignificance boundary calibration (audit fix 1)
+// ============================================================================
+// The bucket cuts (0.10, 0.40, 0.80) are calibration-anchored to
+// editUnderstandingService prompt anchors. A silent slip at any boundary
+// would let mis-bucketed significance flow into landing-detector inputs and
+// degrade the loop's quality without any test catching it. These tests pin
+// the boundaries explicitly so a future change must update the test
+// (visible diff) rather than drift through unnoticed.
+
+describe('D-1.8 — mechanicalSignificance: bucket cuts are stable', () => {
+  it('exposes cuts as a frozen const', () => {
+    expect(MECHANICAL_SIGNIFICANCE_CUTS.minor).toBe(0.10);
+    expect(MECHANICAL_SIGNIFICANCE_CUTS.moderate).toBe(0.40);
+    expect(MECHANICAL_SIGNIFICANCE_CUTS.significant).toBe(0.80);
+    expect(Object.isFrozen(MECHANICAL_SIGNIFICANCE_CUTS)).toBe(true);
+  });
+});
+
+describe('D-1.8 — mechanicalSignificance: minor↔moderate boundary (0.10)', () => {
+  it('changeRatio = 0 → minor (typo-only edit, trivial floor)', () => {
+    expect(mechanicalSignificance(0)).toBe('minor');
+  });
+  it('changeRatio = 0.099 → minor (just below cut)', () => {
+    expect(mechanicalSignificance(0.099)).toBe('minor');
+  });
+  it('changeRatio = 0.10 → minor (cut is INCLUSIVE upper bound)', () => {
+    expect(mechanicalSignificance(0.10)).toBe('minor');
+  });
+  it('changeRatio = 0.101 → moderate (just above cut)', () => {
+    expect(mechanicalSignificance(0.101)).toBe('moderate');
+  });
+});
+
+describe('D-1.8 — mechanicalSignificance: moderate↔significant boundary (0.40)', () => {
+  it('changeRatio = 0.399 → moderate (just below cut)', () => {
+    expect(mechanicalSignificance(0.399)).toBe('moderate');
+  });
+  it('changeRatio = 0.40 → moderate (cut is INCLUSIVE upper bound)', () => {
+    expect(mechanicalSignificance(0.40)).toBe('moderate');
+  });
+  it('changeRatio = 0.401 → significant (just above cut)', () => {
+    expect(mechanicalSignificance(0.401)).toBe('significant');
+  });
+});
+
+describe('D-1.8 — mechanicalSignificance: significant↔transformative boundary (0.80)', () => {
+  it('changeRatio = 0.799 → significant (just below cut)', () => {
+    expect(mechanicalSignificance(0.799)).toBe('significant');
+  });
+  it('changeRatio = 0.80 → significant (cut is INCLUSIVE upper bound)', () => {
+    expect(mechanicalSignificance(0.80)).toBe('significant');
+  });
+  it('changeRatio = 0.801 → transformative (just above cut)', () => {
+    expect(mechanicalSignificance(0.801)).toBe('transformative');
+  });
+  it('changeRatio = 1.0 → transformative (full deletion / replacement)', () => {
+    expect(mechanicalSignificance(1.0)).toBe('transformative');
+  });
+});
+
+describe('D-1.8 — mechanicalSignificance: input validation', () => {
+  it('rejects NaN', () => {
+    expect(() => mechanicalSignificance(NaN)).toThrow(/finite, non-negative/);
+  });
+  it('rejects Infinity', () => {
+    expect(() => mechanicalSignificance(Infinity)).toThrow(/finite, non-negative/);
+  });
+  it('rejects negative ratios', () => {
+    expect(() => mechanicalSignificance(-0.01)).toThrow(/finite, non-negative/);
   });
 });

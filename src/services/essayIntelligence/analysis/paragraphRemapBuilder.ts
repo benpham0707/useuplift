@@ -75,8 +75,14 @@ export interface BuildParagraphRemapInput {
    * deletion set matches `structural.paragraphsRemoved` — if it doesn't,
    * the helpers have drifted and we throw rather than silently disagree
    * with downstream consumers of the diff.
+   *
+   * Phase-5b cross-validation (audit fix): for every `paragraphChanges[]`
+   * entry with `changeType: 'modified'`, the remap MUST have an OLD→NEW
+   * pairing landing at that NEW index — phase-2 overlap-pairing should
+   * agree with `computeEditDiff`'s pairing on the same inputs. So we also
+   * read `paragraphChanges` here.
    */
-  diff: Pick<EditDiff, 'structural'>;
+  diff: Pick<EditDiff, 'structural' | 'paragraphChanges'>;
 }
 
 // ─── Public predicates ─────────────────────────────────────────────────
@@ -236,6 +242,41 @@ export function buildParagraphRemap(
         ? 'ambiguous_remap_no_unique_target'
         : 'paragraph_deleted';
     remap.set(oi, { dropped: true, reason });
+  }
+
+  // Phase 5b (audit fix): cross-validate phase-2 pairings against
+  // `diff.paragraphChanges[]` modified entries. The diff and the remap
+  // both pair unpaired-old-with-unpaired-new via the same 0.30 overlap
+  // threshold + greedy strategy. Phase 1 cross-validation (above) catches
+  // hash-equal drift; this phase-5b catch detects drift in the overlap
+  // pass — silent if missed because the two pipelines run independently
+  // and a misalignment only surfaces downstream as a misattributed
+  // priorAnnotation. Specifically: every `paragraphChanges[]` entry with
+  // `changeType: 'modified'` should have a corresponding OLD→NEW remap
+  // pairing landing at that NEW index. If it doesn't, phase-2 has drifted.
+  if (input.diff.paragraphChanges !== undefined) {
+    const remapNewIndices = new Set<number>();
+    for (const v of remap.values()) {
+      if (typeof v === 'number') remapNewIndices.add(v);
+    }
+    const missingPairings: number[] = [];
+    for (const pc of input.diff.paragraphChanges) {
+      if (pc.changeType !== 'modified') continue;
+      if (!remapNewIndices.has(pc.paragraphIndex)) {
+        missingPairings.push(pc.paragraphIndex);
+      }
+    }
+    if (missingPairings.length > 0) {
+      throw new Error(
+        `[paragraphRemapBuilder] phase-2 cross-validation failed: ` +
+          `diff.paragraphChanges flags NEW paragraph indices ${JSON.stringify(missingPairings)} ` +
+          `as 'modified' (paired in computeEditDiff via overlap-pairing), but the remap does not ` +
+          `contain a corresponding OLD→NEW mapping. This indicates phase-2 overlap-pairing has ` +
+          `drifted between this helper and editUnderstandingService.computeEditDiff — most ` +
+          `commonly because the 0.30 overlap threshold or the greedy ordering changed in one ` +
+          `place but not the other.`,
+      );
+    }
   }
 
   return remap;

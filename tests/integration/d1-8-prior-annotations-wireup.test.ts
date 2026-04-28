@@ -450,16 +450,20 @@ describe('D-1.8 — caller priorEssayText override takes precedence over ledger 
 describe('D-1.8 — editSignificance absent → mechanical fallback fires', () => {
   beforeEach(() => mockDetect.mockReset());
 
-  it('without editSignificance, per-paragraph significance comes from changeRatio buckets', async () => {
-    // P1 keeps high word overlap (paragraph identity preserved by remap)
-    // but every sentence is modified → ratio close to 1.0 → 'transformative'
-    // bucket. Two paragraphs, P0 unchanged.
+  it('without editSignificance, per-paragraph significance comes from changeRatio buckets — TRANSFORMATIVE bucket', async () => {
+    // High-sentence-count paragraph with all sentences modified — ratio ~1.0
+    // is unambiguously in the transformative bucket regardless of ±1
+    // sentence-tokenizer drift (because 7/8 = 0.875 is also > 0.80, and
+    // 8/9 = 0.888 is also > 0.80 — bucket is stable across reasonable
+    // tokenizer variance).
     const oldText =
       'P0 stays the same in this edit pass.\n\n' +
-      'The kettle whistled. Mom folded laundry. Sister read on couch.';
+      'The kettle whistled. Mom folded laundry. Sister read on couch. Brother stirred soup. ' +
+      'Dad pruned roses. Cat watched the kettle. Dog waited at door. Clock chimed five.';
     const newText =
       'P0 stays the same in this edit pass.\n\n' +
-      'The kettle whistled loudly. Mom folded laundry quickly. Sister read on the green couch.';
+      'The kettle whistled loudly. Mom folded laundry quickly. Sister read on the green couch. Brother stirred warm soup. ' +
+      'Dad pruned wild roses. Cat watched the silver kettle. Dog waited patiently at the door. Clock chimed five times.';
 
     const profile = makeProfile({
       ledger: makeLedger({
@@ -479,8 +483,55 @@ describe('D-1.8 — editSignificance absent → mechanical fallback fires', () =
     });
 
     const call = mockDetect.mock.calls[0][0];
-    // Significance derives mechanically. With 3 sentences all replaced,
-    // ratio is 1.0 which falls in the (0.80, 1.00] transformative bucket.
-    expect(['significant', 'transformative']).toContain(call.edit.significance);
+    // STRICT assertion (audit fix 3): pin to exact bucket. With 8 sentences
+    // all modified, ratio = 8/8 = 1.0 > 0.80 cut → transformative. Even
+    // if the tokenizer mis-counts by ±1, ratio remains > 0.80 → still
+    // transformative. The boundary is unambiguous on this fixture.
+    expect(call.edit.significance).toBe('transformative');
+  });
+
+  it('without editSignificance, MINOR bucket lands when changeRatio ≤ 0.10', async () => {
+    // 10-sentence paragraph with a single typo edit on one sentence — the
+    // diff still flags the paragraph as 'modified' (one sentenceChange of
+    // type 'modified'), but ratio 1/10 = 0.10 sits exactly at the inclusive
+    // upper bound → 'minor'. Stable under ±1 tokenizer drift: 1/9 = 0.111
+    // and 1/11 = 0.091 — both also map to 'minor' (0.091) or 'moderate'
+    // (0.111). To stay strictly in the minor bucket regardless of drift,
+    // we use 12 sentences (1/12 = 0.083, 1/11 = 0.091, 1/13 = 0.077 — all
+    // safely below the 0.10 cut).
+    const oldText =
+      'P0 stays the same in this edit pass.\n\n' +
+      'The kettle whistled. Mom folded laundry. Sister read books. ' +
+      'Brother stirred soup. Dad pruned roses. Cat watched birds. ' +
+      'Dog waited at door. Clock chimed five. Wind rustled leaves. ' +
+      'Sun set behind mountains. Moon rose over hills. Stars filled night sky.';
+    // Tweak only the first sentence — single typo correction.
+    const newText =
+      'P0 stays the same in this edit pass.\n\n' +
+      'The kettle whistled loudly. Mom folded laundry. Sister read books. ' +
+      'Brother stirred soup. Dad pruned roses. Cat watched birds. ' +
+      'Dog waited at door. Clock chimed five. Wind rustled leaves. ' +
+      'Sun set behind mountains. Moon rose over hills. Stars filled night sky.';
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [makeMove({ id: 'M-2', taughtAtIteration: 1, location: { paragraphIndex: 1 } })],
+      }),
+      essayText: newText,
+    });
+
+    mockDetect.mockResolvedValue(makeLanding());
+
+    await buildPriorAnnotationsForOrchestrator({
+      profile,
+      currentEssayText: newText,
+    });
+
+    const call = mockDetect.mock.calls[0][0];
+    // STRICT: 1 of ~12 sentences modified → ratio ~0.083 → minor. Stable
+    // under ±1 tokenizer count.
+    expect(call.edit.significance).toBe('minor');
   });
 });

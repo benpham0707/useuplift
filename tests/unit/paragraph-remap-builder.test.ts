@@ -24,6 +24,7 @@ import {
   type ParagraphRemap,
   type ParagraphRemapEntry,
 } from '../../src/services/essayIntelligence/analysis/paragraphRemapBuilder';
+import { computeEditDiff } from '../../src/services/essayIntelligence/analysis/editUnderstandingService';
 import type { EditDiff } from '../../src/services/essayIntelligence/profileTypes';
 
 // ─── Fixture helpers ───────────────────────────────────────────────────
@@ -121,16 +122,20 @@ function expectFullDomainCoverage(remap: ParagraphRemap, oldLen: number): void {
   }
 }
 
-// Build a remap from old/new paragraph arrays using a derived diff. Used
-// for every fixture except F18 (which tampers the diff explicitly).
+// Build a remap from old/new paragraph arrays using the REAL computeEditDiff
+// to derive the full EditDiff (structural + paragraphChanges). This couples
+// the fixtures to the real diff source so phase-5b cross-validation
+// (paragraphChanges paired-modifications check) is exercised on every
+// fixture — the helper produces the same inputs production does.
 function buildFromTexts(
   oldParas: readonly string[],
   newParas: readonly string[],
 ): ParagraphRemap {
+  const diff = computeEditDiff(oldParas.join('\n\n'), newParas.join('\n\n'));
   return buildParagraphRemap({
     oldParagraphTexts: oldParas,
     newParagraphTexts: newParas,
-    diff: makeStructural(oldParas, newParas),
+    diff,
   });
 }
 
@@ -362,16 +367,18 @@ describe('D-1.7 paragraphRemap — F17: ambiguous_duplicate_to_single', () => {
 
 // ─── F18: cross-validation throws on tampered diff ─────────────────────
 
-describe('D-1.7 paragraphRemap — F18: cross_validation_throws', () => {
+describe('D-1.7 paragraphRemap — F18: cross_validation_throws (phase-1 helper drift)', () => {
   it('throws when diff.structural.paragraphsRemoved disagrees with computed phase-1 set', () => {
     // OLD [A,B] === NEW [A,B] → no removals. Tamper: claim P1 was removed.
-    const tampered: Pick<EditDiff, 'structural'> = {
+    const tampered: EditDiff = {
       structural: {
         paragraphsAdded: [],
         paragraphsRemoved: [1], // wrong on purpose
         paragraphsReordered: false,
         paragraphDelta: 0,
       },
+      paragraphChanges: [],
+      stats: { totalSentencesChanged: 0, totalWordsChanged: 0, changeRatio: 0 },
     };
     expect(() =>
       buildParagraphRemap({
@@ -380,6 +387,73 @@ describe('D-1.7 paragraphRemap — F18: cross_validation_throws', () => {
         diff: tampered,
       }),
     ).toThrow(/paragraphRemap mismatch with diff\.structural\.paragraphsRemoved/);
+  });
+});
+
+// ─── F19: phase-2 cross-validation throws (audit fix 2) ────────────────
+
+describe('D-1.7 paragraphRemap — F19: phase-2 cross_validation_throws (overlap drift)', () => {
+  it('throws when diff.paragraphChanges flags a "modified" NEW idx that has no remap pairing', () => {
+    // OLD `['A', 'B']`, NEW `['A', 'B']` — no real changes; both helpers
+    // would normally agree. Tamper: claim NEW idx 1 is a 'modified' pairing
+    // when in fact phase-1 already paired it as identity (so phase-2 made
+    // no pairings). The remap won't have an OLD→NEW=1 pairing from phase-2,
+    // and the cross-validation should catch the inconsistency.
+    const tampered: EditDiff = {
+      structural: {
+        paragraphsAdded: [],
+        paragraphsRemoved: [],
+        paragraphsReordered: false,
+        paragraphDelta: 0,
+      },
+      paragraphChanges: [
+        {
+          paragraphIndex: 1,
+          changeType: 'modified',
+          sentenceChanges: [],
+        },
+      ],
+      stats: { totalSentencesChanged: 0, totalWordsChanged: 0, changeRatio: 0 },
+    };
+    // Note: the current production code's phase-1 picks NEW 1 → OLD 1 by
+    // hash-equal. So remap = {0:0, 1:1}. The tampered diff says NEW 1 is
+    // a phase-2 'modified' pair, but remap shows it was phase-1. The
+    // cross-validation should fire because the diff's claim implies
+    // phase-2 pairing happened, but remap shows otherwise. HOWEVER: the
+    // current invariant only checks that the NEW idx is somewhere in
+    // remap.values() — and here it IS (via phase-1). So this fixture
+    // does NOT trigger the throw under the current invariant strictness.
+    //
+    // To trigger, we must claim a NEW idx that's NOT in remap.values().
+    // Use OLD `[X]`, NEW `[Y]` with overlap < 0.30: phase-1 finds no
+    // identity match, phase-2 finds no overlap pair, so remap = {0: dropped}
+    // and remap.values() has no number — claiming NEW 0 is 'modified'
+    // hits the missing-pairing branch.
+    void tampered;
+
+    const oldParas = ['Mom watched the kettle whistle.'];
+    const newParas = ['Elephants stomped through dense jungle.'];
+    const realDiff = computeEditDiff(oldParas.join('\n\n'), newParas.join('\n\n'));
+    // Real diff treats this as deletion+addition (overlap < 0.30). Now
+    // tamper: claim NEW 0 was 'modified' (phase-2 paired) — drift signal.
+    const tamperedPhase2: EditDiff = {
+      ...realDiff,
+      paragraphChanges: [
+        ...realDiff.paragraphChanges.filter((pc) => pc.changeType !== 'added'),
+        {
+          paragraphIndex: 0,
+          changeType: 'modified',
+          sentenceChanges: [],
+        },
+      ],
+    };
+    expect(() =>
+      buildParagraphRemap({
+        oldParagraphTexts: oldParas,
+        newParagraphTexts: newParas,
+        diff: tamperedPhase2,
+      }),
+    ).toThrow(/phase-2 cross-validation failed.*'modified'.*remap does not contain/);
   });
 });
 
