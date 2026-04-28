@@ -1975,22 +1975,31 @@ export class AnalysisOrchestrator {
     let editScope: IterationRecord['editScope'];
     if (triggeredBy === 'edit') {
       const brief = input.reanalysisBrief;
-      // When triggeredBy === 'edit', the reanalysisOrchestrator threads
-      // a brief (lines ~661 reanalysisOrchestrator.ts) plus editSignificance
-      // and editChangeTypes. Brief.structural carries booleans for
-      // hasReordering/hasInsertions/hasDeletions; the IterationRecord type
-      // wants reordered:boolean + added:number + removed:number. We map
-      // boolean→0/1 here as a coarse stub; D-1.11+ can refine to actual
-      // counts from brief.netChanges[]. Recorded honestly as a stub via
-      // `rationale` if absent.
+      // [D-1.11 Step 13 / round-1 audit Agent 1 cleanup] Replaces D-1.10's
+      // boolean→0/1 stub with real counts derived from brief.netChanges[].
+      // The brief's `structural` block carries booleans for
+      // hasReordering/hasInsertions/hasDeletions; netChanges[] carries
+      // per-location entries with changeType. We count by changeType to
+      // populate the `added`/`removed` integer fields on
+      // IterationRecord.editScope.structural — honest counts matter for
+      // D-4.11's escalation calibration (over-escalation patterns
+      // surface in the audit only if added/removed are real counts).
+      let addedCount = 0;
+      let removedCount = 0;
+      if (brief && Array.isArray(brief.netChanges)) {
+        for (const change of brief.netChanges) {
+          if (change.changeType === 'added' || change.changeType === 'paragraph_added') addedCount++;
+          if (change.changeType === 'removed' || change.changeType === 'paragraph_removed' || change.changeType === 'deleted') removedCount++;
+        }
+      }
       editScope = {
         paragraphsChanged: brief?.structural.paragraphsChanged ?? [],
         significance: input.editSignificance ?? 'minor',
         changeTypes: input.editChangeTypes ?? [],
         structural: {
           reordered: brief?.structural.hasReordering ?? false,
-          added: brief?.structural.hasInsertions ? 1 : 0,
-          removed: brief?.structural.hasDeletions ? 1 : 0,
+          added: addedCount,
+          removed: removedCount,
         },
       };
     }
@@ -2003,24 +2012,45 @@ export class AnalysisOrchestrator {
       costBreakdown[layer.layer] = (costBreakdown[layer.layer] ?? 0) + layer.cost;
     }
 
+    // ── D-1.11 Step 13: synthesize carryForwardSummary from recentDecisions ──
+    // Replaces D-1.10's empty-arrays stub. Reads decisions appended by
+    // DP-1 through DP-4 during this iteration (filtered by iteration ===
+    // iter) and rolls them up into the carried/rederived/refreshed
+    // buckets. Synthesis runs BEFORE record construction so the rolled-up
+    // summary is fresh; runs AFTER all decision-point appends because
+    // every DP fires inside analyzeEssay UPSTREAM of commitIterationRecord
+    // (verified by the call-site ordering: DP-1 at line ~537, DP-2 at
+    // ~1052, DP-3a/b/c during L3/L3.75 phases, DP-4 inside W5.4a, ALL
+    // before this commit helper executes at orchestrator end).
+    const { synthesizeCarryForwardSummary } = await import('./carryForwardSynthesis');
+    const carryForwardSummary = synthesizeCarryForwardSummary(
+      profile.iterationLedger.recentDecisions,
+      iter,
+    );
+
     // ── Construct the IterationRecord ───────────────────────────────────
     const record: IterationRecord = {
       iteration: iter,
       triggeredBy,
       ...(editScope ? { editScope } : {}),
-      // D-1.11 STUB — these will be populated by D-1.11 (CarryForwardDecision
-      // append at orchestrator decision points). For D-1.10 first-pass and
-      // re-analysis-without-D-1.11, we honestly emit empty arrays. Empty
-      // here MEANS "carry-forward decisions not recorded for this iter."
-      carryForwardSummary: { carried: [], rederived: [], refreshed: [] },
+      // D-1.11 Step 13: real synthesized summary, not the empty-arrays stub.
+      // Empty arrays now MEAN "no decisions appended this iteration" (true
+      // first-pass with no prior context, or focused-mode-deferred DPs),
+      // not "stub not yet implemented."
+      carryForwardSummary,
       costBreakdown,
-      // D-1.11 STUB — true comprehensive baseline cost requires a per-layer
-      // baseline reference table (D-1.11+). For first-pass: actual cost IS
-      // the comprehensive baseline. For edit-triggered: degenerate equality
-      // is documented honestly via the rationale string.
+      // D-1.11 STUB (carryover) — true comprehensive baseline cost
+      // requires a per-layer baseline reference table (D-4.11+). For
+      // first-pass: actual cost IS the comprehensive baseline. For
+      // edit-triggered: degenerate equality is documented honestly via
+      // the rationale string. NOT D-1.11's scope to fix.
       comprehensiveBaselineCost: costSummary.totalCost,
       carryForwardSavings: 0, // = comprehensiveBaselineCost - sum(costBreakdown); for first_pass = 0
-      escalationLevel: 0, // D-1.11+ scope (focusedAnalyzer mode-selection wires this)
+      // D-1.11 Step 13: escalationLevel threaded from
+      // PipelineInput.focusedEscalationLevel (set by reanalysisOrchestrator
+      // when focused-mode escalation fired). Default 0 for cold first-pass
+      // and for re-analyses where no escalation occurred.
+      escalationLevel: input.focusedEscalationLevel ?? 0,
       rationale,
       startedAt,
       finishedAt,
@@ -2064,10 +2094,24 @@ export class AnalysisOrchestrator {
     clearEventsForIteration(iter);
     clearTaughtMovesForIteration(input.essayId, iter);
 
+    // ── D-1.11 Step 13: prune recentDecisions to last 5 iterations ──
+    // Per IterationLedger.recentDecisions JSDoc: "Pruned to the last 5
+    // iterations at iteration end (decisions are dense and only audit-
+    // relevant short-term)." Iteration-NUMBER window: at iter N with
+    // keepLastN=5, retain decisions where d.iteration >= N-4. Runs AFTER
+    // successful checkpoint so a checkpoint-failed retry replays
+    // unpruned data (per D-1.11 Plan agent §6 ordering).
+    const { pruneRecentDecisions } = await import('../profileManager/essayProfileManager');
+    pruneRecentDecisions(profile, 5);
+
     console.log(
       `[Orchestrator] D-1.10: iter ${iter} committed; ledger now has ` +
         `${profile.iterationLedger.iterations.length} iterations, ` +
-        `${profile.iterationLedger.taughtMoves.length} cumulative taughtMoves`,
+        `${profile.iterationLedger.taughtMoves.length} cumulative taughtMoves, ` +
+        `${profile.iterationLedger.recentDecisions.length} recent decisions ` +
+        `(carried=${record.carryForwardSummary.carried.length}, ` +
+        `rederived=${record.carryForwardSummary.rederived.length}, ` +
+        `refreshed=${record.carryForwardSummary.refreshed.length})`,
     );
     // Reference layersCompleted/layersFailed to silence unused-param lints
     // and to leave a debug breadcrumb if a future change wants to inspect
