@@ -281,6 +281,26 @@ export interface PipelineInput {
    * `this.lastEditUnderstanding.changeTypes`.
    */
   editChangeTypes?: EditChangeType[];
+  /**
+   * D-1.11: escalation level set by `focusedAnalyzer` when re-analysis
+   * triggered an escalation ladder step. Levels per
+   * ITERATION_LOOP_DESIGN §6.4:
+   *   0 — no escalation (focused / focused_structural / comprehensive ran clean)
+   *   1 — re-walk affected paragraphs only
+   *   2 — re-walk + neighbor sentences
+   *   3 — re-walk + targeted lens re-runs
+   *   4 — comprehensive escalation
+   *
+   * Threaded through to populate `IterationRecord.escalationLevel` (the
+   * D-1.10 stub at analysisOrchestrator.ts ~line 1851 hardcodes 0). Absent
+   * on first-pass; defaults to 0 when not threaded by the re-analysis
+   * caller.
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` reads from
+   *   `focusedResult.escalationLevel` when re-analysis ran focused-mode.
+   * Consumer: `commitIterationRecord` (D-1.11 amendment).
+   */
+  focusedEscalationLevel?: 0 | 1 | 2 | 3 | 4;
 }
 
 /** Complete pipeline result */

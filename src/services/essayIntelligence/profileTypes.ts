@@ -238,6 +238,32 @@ export type HolisticSectionType =
   | 'admissions_positioning';
 
 /**
+ * D-1.11: every holistic section key, frozen and ordered for deterministic
+ * iteration. Used by `CarryForwardDecision` emission at decision-point DP-5
+ * (focused-mode preserves all 10 holistic sections — the BIG carry-forward
+ * win that makes focused-mode's cost story honest). Also used by any
+ * future code that needs to enumerate all sections without re-listing the
+ * union type.
+ *
+ * The TypeScript type union (above) and this runtime array MUST stay in
+ * sync. A `const`-asserted array gives us a compile-time check via
+ * `assertSatisfies` patterns; we don't enforce that here but a future
+ * lint rule could.
+ */
+export const HOLISTIC_SECTION_KEYS: readonly HolisticSectionType[] = Object.freeze([
+  'voice_identity',
+  'voice_map',
+  'emotional_topography',
+  'moment_earnedness_map',
+  'thematic_architecture',
+  'narrative_strategy',
+  'character_revelation',
+  'craft_assessment',
+  'cross_dimension_entanglements',
+  'admissions_positioning',
+] as const);
+
+/**
  * Essay type classification — drives North Star scaling.
  * Matches the essay_type DB enum.
  */
