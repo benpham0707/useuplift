@@ -39,6 +39,7 @@ export default defineConfig({
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',
+      'tests/integration/d1-11-decisions.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
