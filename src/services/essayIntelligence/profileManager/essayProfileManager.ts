@@ -79,6 +79,7 @@ import type {
   FindingCoachingValue,
   DeltaSynthesisOutput,
   HolisticSectionType,
+  CarryForwardDecision,
   IterationLedger,
   IterationRecord,
 } from '../profileTypes';
@@ -1123,6 +1124,174 @@ export function incrementIteration(
   // append-only invariant (D-1.14) requires that every entry in
   // iterations[] is the final committed audit — placeholders would
   // violate the invariant if a crash interrupts before commit.
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// D-1.11 — CarryForwardDecision mutators
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Allowed values for `CarryForwardDecision.decision`. Kept as a runtime
+ * Set so the validator can enum-check incoming values (TypeScript only
+ * catches static call-site mistakes; runtime guard catches deserialized
+ * or upstream-bug-inserted bad values).
+ */
+const VALID_CARRY_FORWARD_DECISION_VALUES = new Set<CarryForwardDecision['decision']>([
+  'carry',
+  'rederive',
+  'partial_refresh',
+]);
+
+const VALID_CARRY_FORWARD_ARBITRATION_MECHANISMS = new Set<
+  CarryForwardDecision['arbitrationMechanism']
+>(['validity_test', 'llm_judgment', 'comprehensive_rule']);
+
+/**
+ * Maximum length for `decision.itemKey`. Generous bound that catches
+ * the obvious bug (someone pasted in a stack trace) without restricting
+ * legitimate compound keys like `'L5.P3.annotations'` or
+ * `'M-1-0-A-uuid-12345...'`.
+ */
+const ITEM_KEY_MAX_LENGTH = 200;
+
+/**
+ * Append a CarryForwardDecision to `profile.iterationLedger.recentDecisions[]`.
+ *
+ * Spec: `L5_IMPLEMENTATION_PLAN.md` §D-1.11 — closes the dead wire where
+ * `recentDecisions` was initialized but never written. Decision points
+ * across the orchestrator (mode selection, per-paragraph carry/rederive,
+ * finding maturity refresh, L3.75 section invalidation, focused-mode
+ * holistic-carry) call this helper to record their arbitration choices.
+ *
+ * Validation surface (per D-1.11 Plan agent §9):
+ *   - profile.iterationLedger must exist (mirrors D-1.1's invariant).
+ *   - decision.iteration MUST equal profile.iterationLedger.currentIteration.
+ *     Mismatch indicates either a stale closure capturing an older
+ *     iteration, a logic bug computing the wrong iteration, OR an
+ *     out-of-order commit. All three are programmer errors worth
+ *     surfacing loudly.
+ *   - decision.itemKey: non-empty, ≤ 200 chars.
+ *   - decision.decision and decision.arbitrationMechanism: enum-checked
+ *     against the runtime sets above.
+ *
+ * Failure surface: throws on any validation failure. The CALLER (the
+ * decision-point append-site) is responsible for wrapping this in a
+ * try/catch that logs structured telemetry and continues — an
+ * audit-trail bug must not abort analysis. This is the ONE charter-
+ * sanctioned swallow site (per the no-fallback charter §8); the
+ * helper itself throws so the bug is visible in tests + logs.
+ */
+export function appendCarryForwardDecision(
+  profile: EssayProfile,
+  decision: CarryForwardDecision,
+): void {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.appendCarryForwardDecision] EssayProfile.iterationLedger is missing. ' +
+        'Hydrate via fromCheckpoint() or construct via createInitialProfile() before recording decisions.',
+    );
+  }
+  if (!decision || typeof decision !== 'object') {
+    throw new Error(
+      '[essayProfileManager.appendCarryForwardDecision] decision is missing or not an object.',
+    );
+  }
+  // Iteration mismatch — the catch case the Plan agent §9 calls out as
+  // most diagnostic. Stale closures capturing a prior iteration are the
+  // failure mode this guards against; the diagnostic message names
+  // both the claimed and the actual iteration so callers can audit.
+  if (decision.iteration !== profile.iterationLedger.currentIteration) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] iteration mismatch: ` +
+        `decision claims iteration ${decision.iteration} but profile.iterationLedger.currentIteration is ` +
+        `${profile.iterationLedger.currentIteration}. This indicates a stale closure, an out-of-order commit, ` +
+        `or a logic bug computing the wrong iteration at the decision point.`,
+    );
+  }
+  if (typeof decision.itemKey !== 'string' || decision.itemKey.length === 0) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.itemKey must be a non-empty string; ` +
+        `got ${JSON.stringify(decision.itemKey)}.`,
+    );
+  }
+  if (decision.itemKey.length > ITEM_KEY_MAX_LENGTH) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.itemKey exceeds ${ITEM_KEY_MAX_LENGTH} chars ` +
+        `(got ${decision.itemKey.length}). This usually indicates an accidental paste of a stack trace or ` +
+        `serialized object into itemKey instead of a compact identifier.`,
+    );
+  }
+  if (!VALID_CARRY_FORWARD_DECISION_VALUES.has(decision.decision)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.decision must be one of ` +
+        `'carry' | 'rederive' | 'partial_refresh'; got ${JSON.stringify(decision.decision)}.`,
+    );
+  }
+  if (!VALID_CARRY_FORWARD_ARBITRATION_MECHANISMS.has(decision.arbitrationMechanism)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.arbitrationMechanism must be one of ` +
+        `'validity_test' | 'llm_judgment' | 'comprehensive_rule'; got ${JSON.stringify(decision.arbitrationMechanism)}.`,
+    );
+  }
+  if (typeof decision.rationale !== 'string') {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.rationale must be a string; ` +
+        `got ${typeof decision.rationale}.`,
+    );
+  }
+  if (typeof decision.costSavedIfCarry !== 'number' || !Number.isFinite(decision.costSavedIfCarry)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.costSavedIfCarry must be a finite number.`,
+    );
+  }
+  if (typeof decision.costSpentIfRederive !== 'number' || !Number.isFinite(decision.costSpentIfRederive)) {
+    throw new Error(
+      `[essayProfileManager.appendCarryForwardDecision] decision.costSpentIfRederive must be a finite number.`,
+    );
+  }
+  profile.iterationLedger.recentDecisions.push(decision);
+}
+
+/**
+ * Prune `profile.iterationLedger.recentDecisions[]` to retain only
+ * entries whose `decision.iteration >= currentIteration - keepLastN + 1`.
+ *
+ * Spec: `L5_IMPLEMENTATION_PLAN.md` §D-1.11 + §IterationLedger.recentDecisions
+ * JSDoc — "Pruned to last 5 iterations on commit."
+ *
+ * Pruning semantics (per D-1.11 Plan agent §6 — pinned ambiguity):
+ *   "Last 5 iterations" means an ITERATION-NUMBER WINDOW, not a record
+ *   count. When committing iteration N with keepLastN=5, retain
+ *   decisions where `iteration >= N - 4`. So at iter=7, decisions from
+ *   iters 3..7 stay; decisions from iters 1..2 are dropped.
+ *
+ * Why an iteration-number window:
+ *   1. Iteration 7 with zero decisions in iters 5–7 still correctly
+ *      retains iter 3+4 decisions.
+ *   2. After D-1.10's `priorIterationLedger` hydration, decisions from
+ *      iter N-5 are dropped on the very next commit — which is correct,
+ *      that iteration has aged out chronologically.
+ *
+ * Caller invariant: must run AFTER the iteration-end checkpoint
+ * succeeds (per D-1.11 Plan §6) so a checkpoint-failed retry replays
+ * the unpruned data.
+ */
+export function pruneRecentDecisions(profile: EssayProfile, keepLastN: number): void {
+  if (!profile.iterationLedger) {
+    throw new Error(
+      '[essayProfileManager.pruneRecentDecisions] EssayProfile.iterationLedger is missing.',
+    );
+  }
+  if (!Number.isInteger(keepLastN) || keepLastN < 0) {
+    throw new Error(
+      `[essayProfileManager.pruneRecentDecisions] keepLastN must be a non-negative integer; got ${keepLastN}.`,
+    );
+  }
+  const minIteration = profile.iterationLedger.currentIteration - keepLastN + 1;
+  // Edge: keepLastN === 0 → retain nothing. minIteration > currentIteration → filter drops everything.
+  profile.iterationLedger.recentDecisions = profile.iterationLedger.recentDecisions.filter(
+    (d) => d.iteration >= minIteration,
+  );
 }
 
 /**

@@ -22,8 +22,14 @@ import {
   getCurrentIteration,
   incrementIteration,
   validateAndNormalizeIterationLedger,
+  appendCarryForwardDecision,
+  pruneRecentDecisions,
 } from '../../src/services/essayIntelligence/profileManager/essayProfileManager';
-import type { EssayProfile, IterationLedger } from '../../src/services/essayIntelligence/profileTypes';
+import type {
+  CarryForwardDecision,
+  EssayProfile,
+  IterationLedger,
+} from '../../src/services/essayIntelligence/profileTypes';
 
 function makeBaselineProfile(): EssayProfile {
   return createInitialProfile({
@@ -346,6 +352,267 @@ describe('D-1.1 — iteration ledger accessor / mutator / validator', () => {
       } finally {
         warnSpy.mockRestore();
       }
+    });
+  });
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // D-1.11 Step 2-3: appendCarryForwardDecision + pruneRecentDecisions
+  // ═════════════════════════════════════════════════════════════════════════
+  // Mutators that close the recentDecisions[] dead wire identified in the
+  // pre-D-1.11 audit. Spec at L5_IMPLEMENTATION_PLAN.md §D-1.11.
+  //
+  // Append-time validation contract (per D-1.11 Plan agent §9):
+  //   - profile.iterationLedger must exist (mirror D-1.1's check)
+  //   - decision.iteration MUST equal profile.iterationLedger.currentIteration
+  //     (catches stale-closure / wrong-iter appends)
+  //   - decision.itemKey: non-empty, < 200 chars (sanity bound)
+  //   - decision.decision: enum-checked at runtime
+  //   - decision.arbitrationMechanism: enum-checked at runtime
+  // On validation failure: throw. The CALLER wraps in try/catch +
+  // structured log so audit-trail bugs don't abort analysis (this is the
+  // ONE swallow site; the helper itself throws).
+  //
+  // Pruning policy (per D-1.11 Plan agent §6):
+  //   "Last 5 iterations" = iteration-NUMBER window, not record count.
+  //   When committing iter N: retain decisions where decision.iteration >= N - 4.
+
+  describe('7. appendCarryForwardDecision (D-1.11)', () => {
+    function makeDecision(
+      overrides: Partial<CarryForwardDecision> = {},
+    ): CarryForwardDecision {
+      return {
+        iteration: 1,
+        itemKey: 'mode_selection',
+        decision: 'partial_refresh',
+        rationale: 'Rule 4: significance=moderate → focused mode',
+        costSavedIfCarry: 0.10,
+        costSpentIfRederive: 0,
+        arbitrationMechanism: 'validity_test',
+        ...overrides,
+      };
+    }
+
+    it('appends a valid decision to recentDecisions[]', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass'); // currentIteration → 1
+
+      const decision = makeDecision({ iteration: 1 });
+      appendCarryForwardDecision(profile, decision);
+
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(1);
+      expect(profile.iterationLedger.recentDecisions[0]).toEqual(decision);
+    });
+
+    it('accumulates multiple decisions across appends', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      appendCarryForwardDecision(profile, makeDecision({ iteration: 1, itemKey: 'mode_selection' }));
+      appendCarryForwardDecision(profile, makeDecision({ iteration: 1, itemKey: 'F7' }));
+      appendCarryForwardDecision(profile, makeDecision({ iteration: 1, itemKey: 'voice_map' }));
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(3);
+      expect(profile.iterationLedger.recentDecisions.map((d) => d.itemKey)).toEqual([
+        'mode_selection',
+        'F7',
+        'voice_map',
+      ]);
+    });
+
+    it('throws when iterationLedger is missing on profile', () => {
+      const profile = makeBaselineProfile();
+      delete (profile as unknown as Record<string, unknown>).iterationLedger;
+      expect(() => appendCarryForwardDecision(profile, makeDecision())).toThrow(
+        /iterationLedger is missing/,
+      );
+    });
+
+    it('throws when decision.iteration mismatches profile.currentIteration', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass'); // currentIteration → 1
+      // Decision claims iteration 2 — stale closure or logic bug.
+      expect(() =>
+        appendCarryForwardDecision(profile, makeDecision({ iteration: 2 })),
+      ).toThrow(/iteration mismatch/);
+    });
+
+    it('throws when itemKey is empty', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      expect(() =>
+        appendCarryForwardDecision(profile, makeDecision({ itemKey: '' })),
+      ).toThrow(/itemKey/);
+    });
+
+    it('throws when itemKey exceeds 200 characters', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      const huge = 'x'.repeat(201);
+      expect(() =>
+        appendCarryForwardDecision(profile, makeDecision({ itemKey: huge })),
+      ).toThrow(/itemKey/);
+    });
+
+    it('throws on invalid decision enum', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      expect(() =>
+        appendCarryForwardDecision(profile, makeDecision({
+          decision: 'bogus' as CarryForwardDecision['decision'],
+        })),
+      ).toThrow(/decision must be one of/);
+    });
+
+    it('throws on invalid arbitrationMechanism enum', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      expect(() =>
+        appendCarryForwardDecision(profile, makeDecision({
+          arbitrationMechanism: 'bogus' as CarryForwardDecision['arbitrationMechanism'],
+        })),
+      ).toThrow(/arbitrationMechanism must be one of/);
+    });
+
+    it('preserves prior decisions across an append (append-only invariant)', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      const original = makeDecision({ iteration: 1, itemKey: 'original' });
+      appendCarryForwardDecision(profile, original);
+      const snapshot = JSON.stringify(profile.iterationLedger.recentDecisions);
+
+      appendCarryForwardDecision(profile, makeDecision({ iteration: 1, itemKey: 'second' }));
+      // Original must be byte-identical to its snapshot (append-only).
+      expect(JSON.stringify(profile.iterationLedger.recentDecisions[0])).toBe(
+        JSON.stringify(JSON.parse(snapshot)[0]),
+      );
+    });
+
+    it('accepts all three valid decision enum values', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      const decisions: Array<CarryForwardDecision['decision']> = ['carry', 'rederive', 'partial_refresh'];
+      for (const d of decisions) {
+        expect(() =>
+          appendCarryForwardDecision(profile, makeDecision({ decision: d, itemKey: `key-${d}` })),
+        ).not.toThrow();
+      }
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(3);
+    });
+
+    it('accepts all three valid arbitrationMechanism enum values', () => {
+      const profile = makeBaselineProfile();
+      incrementIteration(profile, 'first_pass');
+      const mechs: Array<CarryForwardDecision['arbitrationMechanism']> = [
+        'validity_test',
+        'llm_judgment',
+        'comprehensive_rule',
+      ];
+      for (const m of mechs) {
+        expect(() =>
+          appendCarryForwardDecision(profile, makeDecision({ arbitrationMechanism: m, itemKey: `key-${m}` })),
+        ).not.toThrow();
+      }
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(3);
+    });
+  });
+
+  describe('8. pruneRecentDecisions (D-1.11)', () => {
+    function makeDecision(iter: number, itemKey: string): CarryForwardDecision {
+      return {
+        iteration: iter,
+        itemKey,
+        decision: 'partial_refresh',
+        rationale: 'test',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0,
+        arbitrationMechanism: 'validity_test',
+      };
+    }
+
+    it('retains decisions from the last N iterations (iteration-number window, not record count)', () => {
+      const profile = makeBaselineProfile();
+      // Seed currentIteration directly; pretend we're at iter 7.
+      profile.iterationLedger.currentIteration = 7;
+      // Pre-populate decisions across iters 1-7 (3 per iter).
+      for (let i = 1; i <= 7; i++) {
+        profile.iterationLedger.recentDecisions.push(
+          makeDecision(i, `key-${i}-A`),
+          makeDecision(i, `key-${i}-B`),
+          makeDecision(i, `key-${i}-C`),
+        );
+      }
+
+      pruneRecentDecisions(profile, 5);
+
+      // Iter 7 — keepLastN=5 → retain iters 3-7 (window of 5 iter numbers).
+      const remainingIters = new Set(profile.iterationLedger.recentDecisions.map((d) => d.iteration));
+      expect([...remainingIters].sort()).toEqual([3, 4, 5, 6, 7]);
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(5 * 3); // 5 iters × 3 decisions
+    });
+
+    it('preserves order of retained decisions (no resorting)', () => {
+      const profile = makeBaselineProfile();
+      profile.iterationLedger.currentIteration = 4;
+      // Append in a deliberate order across iters 1-4
+      for (let i = 1; i <= 4; i++) {
+        profile.iterationLedger.recentDecisions.push(
+          makeDecision(i, `iter${i}-first`),
+          makeDecision(i, `iter${i}-second`),
+        );
+      }
+      pruneRecentDecisions(profile, 3); // retain iters 2-4
+
+      const keys = profile.iterationLedger.recentDecisions.map((d) => d.itemKey);
+      expect(keys).toEqual([
+        'iter2-first', 'iter2-second',
+        'iter3-first', 'iter3-second',
+        'iter4-first', 'iter4-second',
+      ]);
+    });
+
+    it('no-op when all decisions are already within the window', () => {
+      const profile = makeBaselineProfile();
+      profile.iterationLedger.currentIteration = 3;
+      profile.iterationLedger.recentDecisions.push(
+        makeDecision(1, 'k1'),
+        makeDecision(2, 'k2'),
+        makeDecision(3, 'k3'),
+      );
+      pruneRecentDecisions(profile, 5); // window [-1, 3] retains all
+      expect(profile.iterationLedger.recentDecisions).toHaveLength(3);
+    });
+
+    it('drops everything when keepLastN is 0', () => {
+      const profile = makeBaselineProfile();
+      profile.iterationLedger.currentIteration = 3;
+      profile.iterationLedger.recentDecisions.push(
+        makeDecision(1, 'k1'),
+        makeDecision(2, 'k2'),
+        makeDecision(3, 'k3'),
+      );
+      pruneRecentDecisions(profile, 0); // window above currentIteration → empty
+      expect(profile.iterationLedger.recentDecisions).toEqual([]);
+    });
+
+    it('handles empty recentDecisions gracefully', () => {
+      const profile = makeBaselineProfile();
+      profile.iterationLedger.currentIteration = 5;
+      expect(() => pruneRecentDecisions(profile, 5)).not.toThrow();
+      expect(profile.iterationLedger.recentDecisions).toEqual([]);
+    });
+
+    it('throws when iterationLedger is missing', () => {
+      const profile = makeBaselineProfile();
+      delete (profile as unknown as Record<string, unknown>).iterationLedger;
+      expect(() => pruneRecentDecisions(profile, 5)).toThrow(/iterationLedger is missing/);
+    });
+
+    it('throws when keepLastN is negative', () => {
+      const profile = makeBaselineProfile();
+      expect(() => pruneRecentDecisions(profile, -1)).toThrow(/keepLastN must be a non-negative integer/);
+    });
+
+    it('throws when keepLastN is non-integer', () => {
+      const profile = makeBaselineProfile();
+      expect(() => pruneRecentDecisions(profile, 2.5)).toThrow(/keepLastN must be a non-negative integer/);
     });
   });
 });
