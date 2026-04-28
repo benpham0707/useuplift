@@ -1018,9 +1018,13 @@ export class AnalysisOrchestrator {
           l5Result.crossParagraphAnnotations,
           currentIter,
         );
-        bufferTaughtMoves(currentIter, taughtMoves);
+        // D-1.11 Step 0: essay-keyed buffer prevents cross-essay collision
+        // when two essays at iter=N run in the same process (defense-in-depth
+        // before any future shared-worker refactor).
+        bufferTaughtMoves(input.essayId, currentIter, taughtMoves);
         console.log(
-          `[Orchestrator] D-1.10: buffered ${taughtMoves.length} TaughtMoves for iter ${currentIter}`,
+          `[Orchestrator] D-1.10: buffered ${taughtMoves.length} TaughtMoves for ` +
+            `essayId=${input.essayId} iter=${currentIter}`,
         );
 
         // Checkpoint after L5
@@ -1794,10 +1798,15 @@ export class AnalysisOrchestrator {
     const finishedAt = new Date().toISOString();
 
     // ── Drain telemetry events (non-destructive read; clear after success) ──
+    // [D-1.11 Step 0 deferred] Telemetry buffer is still keyed by iteration
+    // only — cross-essay collision risk exists but is audit-only impact (not
+    // load-bearing for next iter's priorAnnotations). Tracked for follow-up
+    // commit before D-1.11 Step 14.
     const events = flushEventsForIteration(iter);
 
     // ── Drain TaughtMoves buffer (non-destructive; clear after success) ──
-    const flushedMoves = flushTaughtMovesForIteration(iter);
+    // [D-1.11 Step 0] Essay-keyed to prevent concurrent-essay collision.
+    const flushedMoves = flushTaughtMovesForIteration(input.essayId, iter);
 
     // ── Build editScope (only when edit-triggered) ──────────────────────
     let editScope: IterationRecord['editScope'];
@@ -1890,7 +1899,7 @@ export class AnalysisOrchestrator {
 
     // ── Clear transient buffers ONLY after successful checkpoint ─────────
     clearEventsForIteration(iter);
-    clearTaughtMovesForIteration(iter);
+    clearTaughtMovesForIteration(input.essayId, iter);
 
     console.log(
       `[Orchestrator] D-1.10: iter ${iter} committed; ledger now has ` +

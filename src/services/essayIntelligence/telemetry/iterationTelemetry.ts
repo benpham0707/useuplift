@@ -29,6 +29,32 @@ import type { IterationTelemetryEvent } from '../profileTypes';
  * Map<iteration, IterationTelemetryEvent[]>. Pure module-level state —
  * the telemetry module is a singleton in process. The orchestrator
  * flushes per iteration; tests reset via `__resetTelemetryForTesting()`.
+ *
+ * ⚠️ [thread-safety / D-1.11 Step 0 deferred fix] This buffer is keyed
+ * ONLY by iteration number. Two essays both running iter=N in the same
+ * process will write to the same bucket; `flushEventsForIteration(N)`
+ * returns the merged event stream of BOTH essays (the flush returns
+ * a `.slice()` non-destructive copy, then `clearEventsForIteration`
+ * deletes the entire bucket).
+ *
+ * IMPACT: AUDIT-ONLY corruption — events end up in the wrong essay's
+ * `IterationRecord.events[]` audit trail. NOT load-bearing for next
+ * iteration's analysis (unlike the TaughtMove buffer, which D-1.11
+ * Step 0 already keyed by `(essayId, iter)`).
+ *
+ * RUNTIME ASSUMPTION: today's production model is one
+ * `ReanalysisOrchestrator` instance per essay session, single-essay-at-a-
+ * time. Two `analyzeEssay` calls don't interleave at the same iteration
+ * in this model. The collision is LATENT — one shared-worker /
+ * batch-analysis refactor away from corrupting audit trails silently.
+ *
+ * DEFERRED FIX (tracked): rekey by `(essayId, iter)` — same pattern
+ * as `taughtMoveBuilder` (D-1.11 Step 0). Requires threading `essayId`
+ * through `emitStepStart`/`emitStepSuccess`/`emitStepFailure` and their
+ * callers (`landingDetector.ts`, `essayProfileManager.ts`,
+ * `buildCostLedger.ts`). Wider refactor; landing as its own focused
+ * commit before D-1.11 Step 14 (integration test) so the test can
+ * cover the concurrent-essay path.
  */
 const eventsByIteration: Map<number, IterationTelemetryEvent[]> = new Map();
 

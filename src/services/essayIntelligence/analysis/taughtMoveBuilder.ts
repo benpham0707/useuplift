@@ -176,9 +176,9 @@ export function l5AnnotationsToTaughtMoves(
 // ─── Transient buffer ──────────────────────────────────────────────────
 //
 // The buffer holds TaughtMoves between L5 emission and iteration-end
-// commit (D-1.10). Keyed by iteration number. The orchestrator:
+// commit (D-1.10). Keyed by (essayId, iteration) compound key. The orchestrator:
 //   1. After deepAnnotationService.generateAnnotations returns, calls
-//      bufferTaughtMoves(iteration, transformedMoves).
+//      bufferTaughtMoves(essayId, iteration, transformedMoves).
 //   2. At iteration end (D-1.10), calls flushTaughtMovesForIteration
 //      to retrieve the moves, pushes them onto profile.iterationLedger.
 //      taughtMoves[] atomically with the IterationRecord, then calls
@@ -186,16 +186,48 @@ export function l5AnnotationsToTaughtMoves(
 //
 // If the iteration crashes between buffer + commit, the buffer entries
 // are lost — that's correct. No half-committed audit trail.
-
-const taughtMoveBuffer: Map<number, TaughtMove[]> = new Map();
+//
+// [thread-safety / D-1.11 Step 0 (audit fix)] The buffer is module-level
+// shared across the process. Pre-D-1.11 the key was `iteration: number` only —
+// two essays both running iter=1 in the same process would cross-pollinate
+// each other's buffered moves (the flush returned a `.slice()` copy, so
+// both essays' commits would see the merged set). Apr-28 5-agent audit
+// surfaced this as a 🔴 latent bug: not actively triggering today (one
+// orchestrator instance per essay session, single-essay-at-a-time runtime),
+// but defense-in-depth before any future shared-worker / batch-analysis
+// refactor silently corrupts audit trails. Compound (essayId, iter) keying
+// makes cross-essay collision impossible at the type level.
 
 /**
- * Append moves to the buffer for the given iteration. Pushed onto the
- * existing entry or initializes a new one.
- *
- * Defensive: throws if `iteration` is invalid or `moves` is not an array.
+ * Compound key for the transient buffer. We use a string concatenation
+ * with a delimiter unlikely to appear in essayIds (` ` is reserved
+ * for type-level seg separation). Map keying on objects/arrays is by
+ * reference, so a tuple wouldn't work; a structurally-unique string is
+ * the simplest correct approach.
  */
-export function bufferTaughtMoves(iteration: number, moves: TaughtMove[]): void {
+function bufferKey(essayId: string, iteration: number): string {
+  return `${essayId} ${iteration}`;
+}
+
+const taughtMoveBuffer: Map<string, TaughtMove[]> = new Map();
+
+/**
+ * Append moves to the buffer for the given (essayId, iteration). Pushed
+ * onto the existing entry or initializes a new one.
+ *
+ * Defensive: throws if `essayId` is not a non-empty string, `iteration`
+ * is invalid, or `moves` is not an array.
+ */
+export function bufferTaughtMoves(
+  essayId: string,
+  iteration: number,
+  moves: TaughtMove[],
+): void {
+  if (typeof essayId !== 'string' || essayId.length === 0) {
+    throw new Error(
+      `[taughtMoveBuilder.bufferTaughtMoves] essayId must be a non-empty string; got ${JSON.stringify(essayId)}.`,
+    );
+  }
   if (!Number.isFinite(iteration) || iteration < 0) {
     throw new Error(
       `[taughtMoveBuilder.bufferTaughtMoves] iteration must be non-negative finite number; got ${JSON.stringify(iteration)}.`,
@@ -206,32 +238,40 @@ export function bufferTaughtMoves(iteration: number, moves: TaughtMove[]): void 
       `[taughtMoveBuilder.bufferTaughtMoves] moves must be an array; got ${typeof moves}.`,
     );
   }
-  const existing = taughtMoveBuffer.get(iteration);
+  const k = bufferKey(essayId, iteration);
+  const existing = taughtMoveBuffer.get(k);
   if (existing) {
     existing.push(...moves);
   } else {
-    taughtMoveBuffer.set(iteration, [...moves]);
+    taughtMoveBuffer.set(k, [...moves]);
   }
 }
 
 /**
- * Read the buffered moves for an iteration without removing them.
- * Returns a defensive copy so the caller can't mutate the buffer.
+ * Read the buffered moves for an (essayId, iteration) without removing
+ * them. Returns a defensive copy so the caller can't mutate the buffer.
  */
-export function flushTaughtMovesForIteration(iteration: number): TaughtMove[] {
-  return taughtMoveBuffer.get(iteration)?.slice() ?? [];
+export function flushTaughtMovesForIteration(
+  essayId: string,
+  iteration: number,
+): TaughtMove[] {
+  return taughtMoveBuffer.get(bufferKey(essayId, iteration))?.slice() ?? [];
 }
 
 /**
- * Clear the buffer for an iteration. Called by the orchestrator AFTER
- * a successful flush + commit so memory doesn't grow unboundedly.
+ * Clear the buffer for an (essayId, iteration). Called by the
+ * orchestrator AFTER a successful flush + commit so memory doesn't grow
+ * unboundedly.
  */
-export function clearTaughtMovesForIteration(iteration: number): void {
-  taughtMoveBuffer.delete(iteration);
+export function clearTaughtMovesForIteration(
+  essayId: string,
+  iteration: number,
+): void {
+  taughtMoveBuffer.delete(bufferKey(essayId, iteration));
 }
 
 /**
- * Test-only reset. Clears every iteration's buffer.
+ * Test-only reset. Clears every (essayId, iteration) entry's buffer.
  */
 export function __resetTaughtMoveBufferForTesting(): void {
   taughtMoveBuffer.clear();

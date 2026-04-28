@@ -182,52 +182,91 @@ describe('D-1.2 — l5AnnotationsToTaughtMoves (whole-result transform)', () => 
 });
 
 describe('D-1.2 — transient buffer lifecycle', () => {
+  // D-1.11 Step 0: buffer is now keyed by (essayId, iteration). Tests use
+  // a stable test essayId; cross-essay collision tests use distinct ids.
+  const TEST_ESSAY_ID = 'test-essay-uuid-1';
+
   beforeEach(() => {
     __resetTaughtMoveBufferForTesting();
   });
 
   it('starts empty for a fresh iteration', () => {
-    expect(flushTaughtMovesForIteration(1)).toEqual([]);
+    expect(flushTaughtMovesForIteration(TEST_ESSAY_ID, 1)).toEqual([]);
   });
 
   it('accumulates moves across multiple bufferTaughtMoves calls in the same iteration', () => {
     const m1 = l5AnnotationToTaughtMove(makeAnnotation({ id: 'A-1' }), 1);
     const m2 = l5AnnotationToTaughtMove(makeAnnotation({ id: 'A-2', location: { paragraphIndex: 1, sentenceIndex: 0, spanText: null } }), 1);
-    bufferTaughtMoves(1, [m1]);
-    bufferTaughtMoves(1, [m2]);
-    expect(flushTaughtMovesForIteration(1).map((m) => m.id)).toEqual(['M-1-0-A-1', 'M-1-1-A-2']);
+    bufferTaughtMoves(TEST_ESSAY_ID, 1, [m1]);
+    bufferTaughtMoves(TEST_ESSAY_ID, 1, [m2]);
+    expect(flushTaughtMovesForIteration(TEST_ESSAY_ID, 1).map((m) => m.id)).toEqual(['M-1-0-A-1', 'M-1-1-A-2']);
   });
 
   it('keeps separate buffers per iteration', () => {
     const m1 = l5AnnotationToTaughtMove(makeAnnotation({ id: 'A-1' }), 1);
     const m2 = l5AnnotationToTaughtMove(makeAnnotation({ id: 'A-2' }), 2);
-    bufferTaughtMoves(1, [m1]);
-    bufferTaughtMoves(2, [m2]);
-    expect(flushTaughtMovesForIteration(1)).toHaveLength(1);
-    expect(flushTaughtMovesForIteration(2)).toHaveLength(1);
+    bufferTaughtMoves(TEST_ESSAY_ID, 1, [m1]);
+    bufferTaughtMoves(TEST_ESSAY_ID, 2, [m2]);
+    expect(flushTaughtMovesForIteration(TEST_ESSAY_ID, 1)).toHaveLength(1);
+    expect(flushTaughtMovesForIteration(TEST_ESSAY_ID, 2)).toHaveLength(1);
   });
 
   it('flush returns a defensive copy — caller mutation does not leak', () => {
     const m = l5AnnotationToTaughtMove(makeAnnotation(), 1);
-    bufferTaughtMoves(1, [m]);
-    const flushed = flushTaughtMovesForIteration(1);
+    bufferTaughtMoves(TEST_ESSAY_ID, 1, [m]);
+    const flushed = flushTaughtMovesForIteration(TEST_ESSAY_ID, 1);
     flushed.pop();
-    expect(flushTaughtMovesForIteration(1)).toHaveLength(1);
+    expect(flushTaughtMovesForIteration(TEST_ESSAY_ID, 1)).toHaveLength(1);
   });
 
   it('clearTaughtMovesForIteration empties the buffer', () => {
-    bufferTaughtMoves(3, [l5AnnotationToTaughtMove(makeAnnotation(), 3)]);
-    clearTaughtMovesForIteration(3);
-    expect(flushTaughtMovesForIteration(3)).toEqual([]);
+    bufferTaughtMoves(TEST_ESSAY_ID, 3, [l5AnnotationToTaughtMove(makeAnnotation(), 3)]);
+    clearTaughtMovesForIteration(TEST_ESSAY_ID, 3);
+    expect(flushTaughtMovesForIteration(TEST_ESSAY_ID, 3)).toEqual([]);
   });
 
   it('throws on invalid iteration in bufferTaughtMoves', () => {
-    expect(() => bufferTaughtMoves(-1, [])).toThrow(/non-negative finite number/);
-    expect(() => bufferTaughtMoves(NaN, [])).toThrow(/non-negative finite number/);
+    expect(() => bufferTaughtMoves(TEST_ESSAY_ID, -1, [])).toThrow(/non-negative finite number/);
+    expect(() => bufferTaughtMoves(TEST_ESSAY_ID, NaN, [])).toThrow(/non-negative finite number/);
   });
 
   it('throws when moves is not an array', () => {
-    expect(() => bufferTaughtMoves(1, undefined as unknown as never[])).toThrow(/moves must be an array/);
+    expect(() => bufferTaughtMoves(TEST_ESSAY_ID, 1, undefined as unknown as never[])).toThrow(/moves must be an array/);
+  });
+
+  it('throws on invalid essayId (D-1.11 Step 0)', () => {
+    expect(() => bufferTaughtMoves('', 1, [])).toThrow(/essayId must be a non-empty string/);
+    expect(() => bufferTaughtMoves(undefined as unknown as string, 1, [])).toThrow(/essayId must be a non-empty string/);
+  });
+
+  // D-1.11 Step 0: concurrent-essay collision regression test.
+  // Pre-fix: two essays both buffering at iter=1 would cross-pollinate
+  // (single-key Map<iter, moves> + non-destructive flush returned merged
+  // moves to both essays' commits). Post-fix: compound key prevents the
+  // collision at the type level.
+  it('two essays buffering at the same iteration do not cross-pollinate (concurrent-essay safety)', () => {
+    const ESSAY_A = 'essay-A-uuid';
+    const ESSAY_B = 'essay-B-uuid';
+
+    const aMove = l5AnnotationToTaughtMove(makeAnnotation({ id: 'A-from-essay-A' }), 1);
+    const bMove = l5AnnotationToTaughtMove(makeAnnotation({ id: 'A-from-essay-B' }), 1);
+
+    bufferTaughtMoves(ESSAY_A, 1, [aMove]);
+    bufferTaughtMoves(ESSAY_B, 1, [bMove]);
+
+    // Each essay sees ONLY its own move
+    const aFlushed = flushTaughtMovesForIteration(ESSAY_A, 1);
+    const bFlushed = flushTaughtMovesForIteration(ESSAY_B, 1);
+
+    expect(aFlushed).toHaveLength(1);
+    expect(aFlushed[0].annotationId).toBe('A-from-essay-A');
+    expect(bFlushed).toHaveLength(1);
+    expect(bFlushed[0].annotationId).toBe('A-from-essay-B');
+
+    // Clearing one essay's buffer does not touch the other's
+    clearTaughtMovesForIteration(ESSAY_A, 1);
+    expect(flushTaughtMovesForIteration(ESSAY_A, 1)).toEqual([]);
+    expect(flushTaughtMovesForIteration(ESSAY_B, 1)).toHaveLength(1);
   });
 });
 

@@ -201,17 +201,20 @@ describe('D-1.10 — Scenario 3: re-analysis advances counter on seeded ledger',
 // ─── Scenario 4: bufferTaughtMoves accumulates, flush returns them ─────
 
 describe('D-1.10 — Scenario 4: TaughtMove buffer accumulates and flushes', () => {
+  // D-1.11 Step 0: buffer is now keyed by (essayId, iteration).
+  const ESSAY_ID = 'test-essay-id';
+
   it('bufferTaughtMoves at iter N → flushTaughtMovesForIteration(N) returns the moves', () => {
     const moves = [makeMove({ id: 'M-A' }), makeMove({ id: 'M-B' })];
-    bufferTaughtMoves(1, moves);
-    bufferTaughtMoves(1, [makeMove({ id: 'M-C' })]); // append
+    bufferTaughtMoves(ESSAY_ID, 1, moves);
+    bufferTaughtMoves(ESSAY_ID, 1, [makeMove({ id: 'M-C' })]); // append
 
-    const flushed = flushTaughtMovesForIteration(1);
+    const flushed = flushTaughtMovesForIteration(ESSAY_ID, 1);
     expect(flushed.map((m) => m.id)).toEqual(['M-A', 'M-B', 'M-C']);
   });
 
   it('flushTaughtMovesForIteration(N) where N has no entries returns []', () => {
-    expect(flushTaughtMovesForIteration(7)).toEqual([]);
+    expect(flushTaughtMovesForIteration(ESSAY_ID, 7)).toEqual([]);
   });
 });
 
@@ -233,14 +236,16 @@ describe('D-1.10 — Scenario 5: orchestrator-shape lifecycle bracket', () => {
     emitStepSuccess(stepId, { cost: 0.005, model: 'claude-haiku-4-5-20251001' });
 
     // After L5: buffer some TaughtMoves
-    bufferTaughtMoves(iter, [
+    // D-1.11 Step 0: buffer is now keyed by (essayId, iteration).
+    const ESSAY_ID = 'test-essay-id';
+    bufferTaughtMoves(ESSAY_ID, iter, [
       makeMove({ id: 'M-1', taughtAtIteration: iter }),
       makeMove({ id: 'M-2', taughtAtIteration: iter }),
     ]);
 
     // End: assemble IterationRecord, flush buffers, push, checkpoint
     const events = flushEventsForIteration(iter);
-    const flushedMoves = flushTaughtMovesForIteration(iter);
+    const flushedMoves = flushTaughtMovesForIteration(ESSAY_ID, iter);
 
     const record: IterationRecord = {
       iteration: iter,
@@ -291,12 +296,15 @@ describe('D-1.10 — Scenario 6: cross-iteration ledger accumulation', () => {
     const iter1Text = 'P0 first.\n\nP1 second.';
     const iter2Text = 'P0 edited.\n\nP1 second.';
 
+    // D-1.11 Step 0: buffer keyed by (essayId, iter)
+    const ESSAY_ID = 'test-essay-id';
+
     // Iter 1: cold start
     const coord1 = makeCoordinator({ essayText: iter1Text });
     const profile1 = coord1.getProfile() as EssayProfile;
     incrementIteration(profile1, 'first_pass');
-    bufferTaughtMoves(1, [makeMove({ id: 'M-iter1', taughtAtIteration: 1 })]);
-    const iter1Moves = flushTaughtMovesForIteration(1);
+    bufferTaughtMoves(ESSAY_ID, 1, [makeMove({ id: 'M-iter1', taughtAtIteration: 1 })]);
+    const iter1Moves = flushTaughtMovesForIteration(ESSAY_ID, 1);
     profile1.iterationLedger.iterations.push(makeStubRecord(1, iter1Text));
     profile1.iterationLedger.taughtMoves.push(...iter1Moves);
 
@@ -318,8 +326,8 @@ describe('D-1.10 — Scenario 6: cross-iteration ledger accumulation', () => {
     expect(getCurrentIteration(profile2)).toBe(2);
 
     // Iter 2 buffers its own moves
-    bufferTaughtMoves(2, [makeMove({ id: 'M-iter2-A', taughtAtIteration: 2 }), makeMove({ id: 'M-iter2-B', taughtAtIteration: 2 })]);
-    const iter2Moves = flushTaughtMovesForIteration(2);
+    bufferTaughtMoves(ESSAY_ID, 2, [makeMove({ id: 'M-iter2-A', taughtAtIteration: 2 }), makeMove({ id: 'M-iter2-B', taughtAtIteration: 2 })]);
+    const iter2Moves = flushTaughtMovesForIteration(ESSAY_ID, 2);
     profile2.iterationLedger.iterations.push(makeStubRecord(2, iter2Text));
     profile2.iterationLedger.taughtMoves.push(...iter2Moves);
 
