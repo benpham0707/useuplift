@@ -37,6 +37,7 @@ export default defineConfig({
       'tests/unit/paragraph-remap-builder.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
+      'tests/integration/d1-10-iteration-bracket.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.

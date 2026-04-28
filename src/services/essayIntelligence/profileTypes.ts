@@ -473,6 +473,7 @@ export type CheckpointReason =
   | 'after_l3_5'
   | 'after_l4'
   | 'after_l5'
+  | 'after_iteration_commit'
   | 'conversation_save'
   | 'before_reanalysis'
   | 'circuit_breaker';

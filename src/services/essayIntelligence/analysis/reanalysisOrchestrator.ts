@@ -661,6 +661,30 @@ export class ReanalysisOrchestrator {
     const priorEssayText = activeVersion.baselineText.length > 0 ? activeVersion.baselineText : undefined;
     const editSignificance = this.lastEditUnderstanding?.significance;
 
+    // ── D-1.10: thread iteration-ledger continuity + triggeredBy + edit metadata ──
+    // Closes Dead Wire #3 (analyzeEssay always called createNew with a
+    // fresh empty ledger, silently discarding prior history). Capture the
+    // existing iterationLedger from this.coordinator's profile NOW —
+    // before analyzeEssay runs, because line 717's fromCheckpoint rebuild
+    // will overwrite this.coordinator with the post-pipeline profile that
+    // ALREADY has the new iteration record appended. The seed flows
+    // through PipelineInput → createNew → createInitialProfile, replacing
+    // the default empty ledger with a deep-clone of the prior state so the
+    // new iteration appends rather than starts fresh.
+    //
+    // triggeredBy: 'edit' when an edit fired upstream (lastEditUnderstanding
+    // is populated by runEditProcessing line 920 when edit-triggered);
+    // 'student_request' when re-analysis was triggered via this orchestrator
+    // without an edit (e.g., manual rerun from the chat interface).
+    //
+    // editChangeTypes: surfaced from the same upstream edit understanding;
+    // used by analysisOrchestrator.commitIterationRecord to populate
+    // IterationRecord.editScope.changeTypes when triggeredBy === 'edit'.
+    const currentProfile = this.coordinator.getProfile();
+    const priorIterationLedger = currentProfile.iterationLedger;
+    const triggeredBy: 'edit' | 'student_request' = this.lastEditUnderstanding ? 'edit' : 'student_request';
+    const editChangeTypes = this.lastEditUnderstanding?.changeTypes;
+
     const pipelineInput: PipelineInput = {
       // FIX 4.7: use stored essayId instead of synthetic one
       essayId: this.essayId,
@@ -669,6 +693,9 @@ export class ReanalysisOrchestrator {
       priorFindings: priorFindings.length > 0 ? priorFindings : undefined,
       priorEssayText,
       editSignificance,
+      priorIterationLedger,
+      triggeredBy,
+      editChangeTypes,
     };
 
     // Run comprehensive pipeline with the reanalysis brief

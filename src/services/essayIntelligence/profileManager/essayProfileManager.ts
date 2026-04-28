@@ -666,8 +666,25 @@ export function createInitialProfile(input: {
    * can look up college-specific guidance on every coaching turn.
    */
   collegeId?: string;
+  /**
+   * D-1.10: optional iterationLedger seed for re-analysis runs. When
+   * supplied, deep-cloned in place of the default empty ledger block so
+   * the new profile carries the prior iteration history forward. Validated
+   * via `assertIterationLedgerOnLoad` BEFORE seeding — a corrupt seed
+   * throws fail-fast with the same diagnostic the load-time validator
+   * produces, preventing propagation through any layer.
+   *
+   * Producer: `EssayProfileCoordinator.createNew` forwards from
+   *   `PipelineInput.priorIterationLedger`, which `reanalysisOrchestrator`
+   *   captures from `this.coordinator.getProfile().iterationLedger` BEFORE
+   *   invoking `analyzeEssay`.
+   * Default (when absent): the empty ledger block at line ~927 with
+   *   `currentIteration: 0`. Direct `analyzeEssay` callers (cold first-pass)
+   *   leave it undefined.
+   */
+  priorIterationLedger?: IterationLedger;
 }): EssayProfile {
-  const { paragraphTexts, sentenceTexts, metadata, collegeId } = input;
+  const { paragraphTexts, sentenceTexts, metadata, collegeId, priorIterationLedger } = input;
 
   const now = new Date().toISOString();
 
@@ -924,12 +941,28 @@ export function createInitialProfile(input: {
     // Required fields per D-0.5 contract; defaults are empty arrays plus
     // a fresh IterationLedger with currentIteration=0 (the orchestrator
     // increments to 1 on first-pass entry).
-    iterationLedger: {
-      currentIteration: 0,
-      iterations: [],
-      taughtMoves: [],
-      recentDecisions: [],
-    },
+    //
+    // D-1.10: when `priorIterationLedger` is supplied (re-analysis path),
+    // the seed REPLACES the default empty block. We validate first via
+    // `assertIterationLedgerOnLoad` so a corrupt seed throws here rather
+    // than propagating through layers. Deep-clone via JSON round-trip so
+    // the caller's mutation of their local copy doesn't bleed into this
+    // profile (cheap because IterationLedger is plain-JSON and we
+    // intentionally do NOT include Maps or class instances in this type).
+    iterationLedger: priorIterationLedger
+      ? (() => {
+          assertIterationLedgerOnLoad(
+            priorIterationLedger,
+            '<createInitialProfile.priorIterationLedger>',
+          );
+          return JSON.parse(JSON.stringify(priorIterationLedger)) as IterationLedger;
+        })()
+      : {
+          currentIteration: 0,
+          iterations: [],
+          taughtMoves: [],
+          recentDecisions: [],
+        },
     groundTruthFacts: [],
     storyFragments: [],
     intentSignals: [],
@@ -1326,6 +1359,13 @@ export class EssayProfileCoordinator {
     /** Target college (supplement/PIQ only). Normalized lowercase. */
     collegeId?: string;
     checkpointStore: CheckpointStore;
+    /**
+     * D-1.10: optional iteration-ledger seed for re-analysis runs.
+     * Forwarded to `createInitialProfile`. See its JSDoc for the full
+     * contract; in short: seeded ledger is validated then deep-cloned in
+     * place of the default empty block, carrying iter history forward.
+     */
+    priorIterationLedger?: IterationLedger;
     mutators?: Partial<{
       sentence: ISentenceMutator;
       paragraph: IParagraphMutator;
@@ -1343,6 +1383,7 @@ export class EssayProfileCoordinator {
       sentenceTexts: input.sentenceTexts,
       metadata: input.metadata,
       collegeId: input.collegeId,
+      priorIterationLedger: input.priorIterationLedger,
     });
     return new EssayProfileCoordinator(
       profile,

@@ -61,6 +61,9 @@ import type {
   ImprovementEntry,
   ImprovementCandidate,
   ImprovementCandidateStoreSnapshot,
+  IterationLedger,
+  IterationRecord,
+  EditChangeType,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -114,7 +117,21 @@ import type { ContradictionConsumptionResult } from './contradictionConsumer';
 import { detectProgrammaticContradictions } from '../profileManager/validation/crossDomainValidation';
 
 // Profile manager
-import { EssayProfileCoordinator } from '../profileManager/essayProfileManager';
+import {
+  EssayProfileCoordinator,
+  getCurrentIteration,
+  incrementIteration,
+} from '../profileManager/essayProfileManager';
+import {
+  l5AnnotationsToTaughtMoves,
+  bufferTaughtMoves,
+  flushTaughtMovesForIteration,
+  clearTaughtMovesForIteration,
+} from './taughtMoveBuilder';
+import {
+  flushEventsForIteration,
+  clearEventsForIteration,
+} from '../telemetry/iterationTelemetry';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
 
@@ -221,6 +238,49 @@ export interface PipelineInput {
    * the re-analysis. Direct `analyzeEssay()` callers leave it undefined.
    */
   priorEssayText?: string;
+  /**
+   * D-1.10: seed for the new coordinator's `iterationLedger`. When supplied,
+   * `EssayProfileCoordinator.createNew(...)` deep-clones this onto the new
+   * profile in place of the default empty ledger. This is the seam that
+   * lets `reanalysisOrchestrator` carry iteration history across the
+   * `createNew` boundary (without it, every re-analysis silently resets
+   * the ledger to currentIteration=0 and loses prior taughtMoves and
+   * iterations).
+   *
+   * Validation: `assertIterationLedgerOnLoad` runs at the seed point inside
+   * `createInitialProfile`; a corrupt seed throws fail-fast before any
+   * layer runs.
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` captures
+   * `this.coordinator.getProfile().iterationLedger` BEFORE invoking
+   * `analyzeEssay`. Direct `analyzeEssay()` callers (cold first-pass)
+   * leave it undefined → fresh empty ledger.
+   *
+   * Consumer: `createInitialProfile` (new optional input field).
+   */
+  priorIterationLedger?: IterationLedger;
+  /**
+   * D-1.10: how the iteration was triggered. Recorded on the IterationRecord
+   * the orchestrator commits at iteration end. Defaults to `'first_pass'`
+   * when absent (cold direct call to `analyzeEssay`). `reanalysisOrchestrator`
+   * sets this to `'edit'` when an edit-understanding fired upstream, or
+   * `'student_request'` when re-analysis was triggered without an edit.
+   *
+   * Used at commit time to populate `IterationRecord.triggeredBy` and to
+   * gate the optional `editScope` field (only populated when triggeredBy
+   * === 'edit').
+   */
+  triggeredBy?: IterationRecord['triggeredBy'];
+  /**
+   * D-1.10: the LLM-classified change types from upstream
+   * `editUnderstandingService.understandEdit()`. Threaded through to populate
+   * `IterationRecord.editScope.changeTypes` when triggeredBy === 'edit'.
+   * Absent on first-pass and student-request triggers.
+   *
+   * Producer: `reanalysisOrchestrator.triggerReanalysis()` reads
+   * `this.lastEditUnderstanding.changeTypes`.
+   */
+  editChangeTypes?: EditChangeType[];
 }
 
 /** Complete pipeline result */
@@ -309,6 +369,16 @@ export class AnalysisOrchestrator {
 
     const checkpointStore = input.checkpointStore ?? new InMemoryCheckpointStore();
 
+    // ── D-1.10: hoist iteration-lifecycle values to the top so they're in
+    // scope for every buildPartialResult call site (including L1-fatal at
+    // ~line 397 before coordinator creation) and for the success-path
+    // commit. `triggeredBy` is determined entirely from the input shape and
+    // doesn't depend on any layer running. `iterationStartedAt` is derived
+    // from `startTime` (already declared above), so the ISO conversion is
+    // pure formatting.
+    const triggeredBy: IterationRecord['triggeredBy'] = input.triggeredBy ?? 'first_pass';
+    const iterationStartedAt = new Date(startTime).toISOString();
+
     console.log(
       `[Orchestrator] Starting full analysis — essayId=${input.essayId}, ` +
       `type=${input.essayType}, textLength=${input.essayText.length}`,
@@ -334,7 +404,7 @@ export class AnalysisOrchestrator {
       const msg = l1Settled.reason instanceof Error ? l1Settled.reason.message : String(l1Settled.reason);
       console.error('[Orchestrator] L1 FATAL:', msg);
       layersFailed.push(this.buildLayerError('L1', l1Settled.reason, 0));
-      return this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(null, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
     l1Result = l1Settled.value;
     costTracker.record('L1', l1Result.cost, l1Result.tokenUsage, l1Result.timingMs);
@@ -388,7 +458,24 @@ export class AnalysisOrchestrator {
         promptText: input.promptText,
       },
       checkpointStore,
+      // D-1.10: thread the prior-iteration ledger from re-analysis callers.
+      // When absent (cold first-pass), createInitialProfile uses the default
+      // empty ledger block. When present, the ledger is validated and
+      // deep-cloned onto the new profile, preserving iteration history
+      // across the createNew boundary.
+      priorIterationLedger: input.priorIterationLedger,
     });
+
+    // ── D-1.10: Iteration lifecycle — entry increment ───────────────────
+    // Closes Dead Wire #1 (incrementIteration had zero production callers
+    // before this step). The increment happens AFTER the coordinator is
+    // built (so the profile has an iterationLedger to mutate) and BEFORE
+    // any layer-applying coordinator mutation (applyFirstImpressions on
+    // line ~449), so every layer that reads getCurrentIteration sees the
+    // post-increment value. `triggeredBy` and `iterationStartedAt` were
+    // hoisted to the top of analyzeEssay so they're in scope for every
+    // buildPartialResult call site (including L1-fatal before this point).
+    incrementIteration(coordinator.getProfile(), triggeredBy);
 
     // ── Seed prior findings for re-analysis evolution (BEFORE any layer runs) ──
     if (input.priorFindings && input.priorFindings.length > 0) {
@@ -438,7 +525,7 @@ export class AnalysisOrchestrator {
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L2/L2.5', error, costTracker.summarize(0).totalCost));
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ── Checkpoint after Phase 1 ──
@@ -523,7 +610,7 @@ export class AnalysisOrchestrator {
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3', error, costTracker.summarize(0).totalCost));
       await this.safeCheckpoint(coordinator, 'after_l3');
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ── Checkpoint after Phase 2 ──
@@ -597,7 +684,7 @@ export class AnalysisOrchestrator {
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3.75', error, costTracker.summarize(0).totalCost));
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -646,7 +733,7 @@ export class AnalysisOrchestrator {
     } catch (error) {
       layersFailed.push(this.buildLayerError('L3.5', error, costTracker.summarize(0).totalCost));
       await this.safeCheckpoint(coordinator, 'after_l3_5');
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ── Checkpoint after Phase 4 ──
@@ -746,7 +833,7 @@ export class AnalysisOrchestrator {
       );
     } catch (error) {
       layersFailed.push(this.buildLayerError('L4', error, costTracker.summarize(0).totalCost));
-      return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+      return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -909,11 +996,38 @@ export class AnalysisOrchestrator {
           `cost=$${l5Result.cost.toFixed(4)}, time=${l5Result.timingMs}ms`,
         );
 
+        // ── D-1.10: buffer L5-output TaughtMoves ──────────────────────────
+        // Closes Dead Wire #2 (bufferTaughtMoves had zero production callers
+        // before this step). Transform the L5AnnotationResult into TaughtMove
+        // objects (one per paragraph annotation + essay-level + cross-para)
+        // and push to the iteration's transient buffer. The buffer is
+        // flushed onto profile.iterationLedger.taughtMoves[] at iteration
+        // end via commitIterationRecord. If commit fails, the buffer is
+        // preserved (Step 6 design) so a forensic recovery can still find
+        // the moves in memory.
+        //
+        // Failure surface: bufferTaughtMoves throws ONLY on invariant
+        // violations (negative iter, non-array moves) — both programmer
+        // errors. Not silently degraded. The throw routes through the
+        // surrounding try/catch at Phase 6 → buildPartialResult per the
+        // no-fallback charter (Q9 in the D-1.10 plan).
+        const currentIter = getCurrentIteration(coordinator.getProfile());
+        const taughtMoves = l5AnnotationsToTaughtMoves(
+          l5Result.paragraphAnnotations,
+          l5Result.essayLevelAnnotations,
+          l5Result.crossParagraphAnnotations,
+          currentIter,
+        );
+        bufferTaughtMoves(currentIter, taughtMoves);
+        console.log(
+          `[Orchestrator] D-1.10: buffered ${taughtMoves.length} TaughtMoves for iter ${currentIter}`,
+        );
+
         // Checkpoint after L5
         await this.safeCheckpoint(coordinator, 'after_l5');
       } catch (error) {
         layersFailed.push(this.buildLayerError('L5', error, costTracker.summarize(0).totalCost));
-        return this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime);
+        return await this.buildPartialResult(coordinator, layersCompleted, layersFailed, costTracker, startTime, iterationStartedAt, triggeredBy, input);
       }
     } else {
       console.log('[Orchestrator] L5 skipped: annotations disabled');
@@ -1057,6 +1171,29 @@ export class AnalysisOrchestrator {
     // mutation — updating only index would be clobbered by the next refresh.
     (finalProfile as EssayProfile).index.confidenceLevel = computedConfidence;
     (finalProfile as EssayProfile).metadata.confidenceLevel = computedConfidence;
+
+    // ── D-1.10: commit IterationRecord at orchestrator end ────────────────
+    // The success-path commit. NO try/catch here — the helper throws a
+    // structured PipelineError on checkpoint failure, and the failure must
+    // propagate to the caller so they see "iteration N did not persist;
+    // rerun" with the inner cause. Per the no-fallback charter and the
+    // plan's atomicity decision: in-memory ledger has the new record;
+    // checkpoint failure leaves the persisted store at pre-iteration state;
+    // caller decides whether to retry. This unblocks D-1.8 (snapshotText)
+    // and D-1.11 (carryForwardSummary read paths).
+    const successRationale =
+      `${triggeredBy} iteration completed with layers=[${layersCompleted.join(',')}]` +
+      (layersFailed.length > 0 ? `, failed=[${layersFailed.map((f) => f.layer).join(',')}]` : '');
+    await this.commitIterationRecord(
+      coordinator,
+      costSummary,
+      layersCompleted,
+      layersFailed,
+      iterationStartedAt,
+      triggeredBy,
+      input,
+      successRationale,
+    );
 
     return {
       profile: finalProfile,
@@ -1616,6 +1753,157 @@ export class AnalysisOrchestrator {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // D-1.10: Iteration lifecycle commit
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Build an IterationRecord from the iteration's runtime state and append
+   * it to `iterationLedger.iterations[]`, alongside flushing the
+   * `taughtMoves` transient buffer onto `iterationLedger.taughtMoves[]`.
+   *
+   * This is THE method that closes Dead Wires #2 (consumer side), #4
+   * (telemetry flush), and #5 (`iterations[]` write), and activates D-1.8's
+   * `snapshotText` consumer (records the post-iteration text so iter N+1's
+   * priorAnnotations composer can compute the diff against this iteration's
+   * text rather than degrading to `undefined`).
+   *
+   * Atomicity per the D-1.10 plan §"Atomic-commit decision": write all
+   * mutations to the in-memory profile, then `coordinator.checkpoint()`.
+   * If checkpoint throws, propagate the structured error WITHOUT clearing
+   * the transient buffers — buffer state is preserved for forensic recovery
+   * and so a retry can re-attempt the persistence. The caller (the
+   * orchestrator's BUILD RESULT block, or `buildPartialResult`) decides
+   * whether to re-throw or swallow per its contract.
+   *
+   * D-1.11 stub fields documented inline. They are NOT TODOs to silently
+   * fix later — they are scope-bounded handoffs to the next deliverable.
+   */
+  private async commitIterationRecord(
+    coordinator: EssayProfileCoordinator,
+    costSummary: CostSummary,
+    layersCompleted: string[],
+    layersFailed: LayerError[],
+    startedAt: string,
+    triggeredBy: IterationRecord['triggeredBy'],
+    input: PipelineInput,
+    rationale: string,
+  ): Promise<void> {
+    const profile = coordinator.getProfile() as EssayProfile;
+    const iter = getCurrentIteration(profile);
+    const finishedAt = new Date().toISOString();
+
+    // ── Drain telemetry events (non-destructive read; clear after success) ──
+    const events = flushEventsForIteration(iter);
+
+    // ── Drain TaughtMoves buffer (non-destructive; clear after success) ──
+    const flushedMoves = flushTaughtMovesForIteration(iter);
+
+    // ── Build editScope (only when edit-triggered) ──────────────────────
+    let editScope: IterationRecord['editScope'];
+    if (triggeredBy === 'edit') {
+      const brief = input.reanalysisBrief;
+      // When triggeredBy === 'edit', the reanalysisOrchestrator threads
+      // a brief (lines ~661 reanalysisOrchestrator.ts) plus editSignificance
+      // and editChangeTypes. Brief.structural carries booleans for
+      // hasReordering/hasInsertions/hasDeletions; the IterationRecord type
+      // wants reordered:boolean + added:number + removed:number. We map
+      // boolean→0/1 here as a coarse stub; D-1.11+ can refine to actual
+      // counts from brief.netChanges[]. Recorded honestly as a stub via
+      // `rationale` if absent.
+      editScope = {
+        paragraphsChanged: brief?.structural.paragraphsChanged ?? [],
+        significance: input.editSignificance ?? 'minor',
+        changeTypes: input.editChangeTypes ?? [],
+        structural: {
+          reordered: brief?.structural.hasReordering ?? false,
+          added: brief?.structural.hasInsertions ? 1 : 0,
+          removed: brief?.structural.hasDeletions ? 1 : 0,
+        },
+      };
+    }
+
+    // ── Build per-layer cost breakdown from CostSummary.layers ──────────
+    const costBreakdown: Record<string, number> = {};
+    for (const layer of costSummary.layers) {
+      // CostTracker may emit multiple entries for the same layer (e.g.,
+      // delta_synthesis on top of L3.75); accumulate.
+      costBreakdown[layer.layer] = (costBreakdown[layer.layer] ?? 0) + layer.cost;
+    }
+
+    // ── Construct the IterationRecord ───────────────────────────────────
+    const record: IterationRecord = {
+      iteration: iter,
+      triggeredBy,
+      ...(editScope ? { editScope } : {}),
+      // D-1.11 STUB — these will be populated by D-1.11 (CarryForwardDecision
+      // append at orchestrator decision points). For D-1.10 first-pass and
+      // re-analysis-without-D-1.11, we honestly emit empty arrays. Empty
+      // here MEANS "carry-forward decisions not recorded for this iter."
+      carryForwardSummary: { carried: [], rederived: [], refreshed: [] },
+      costBreakdown,
+      // D-1.11 STUB — true comprehensive baseline cost requires a per-layer
+      // baseline reference table (D-1.11+). For first-pass: actual cost IS
+      // the comprehensive baseline. For edit-triggered: degenerate equality
+      // is documented honestly via the rationale string.
+      comprehensiveBaselineCost: costSummary.totalCost,
+      carryForwardSavings: 0, // = comprehensiveBaselineCost - sum(costBreakdown); for first_pass = 0
+      escalationLevel: 0, // D-1.11+ scope (focusedAnalyzer mode-selection wires this)
+      rationale,
+      startedAt,
+      finishedAt,
+      ...(events.length > 0 ? { events } : {}),
+      // D-1.10: snapshotText is the post-iteration essay text. Activates
+      // D-1.8's `getPriorIterationSnapshotText` consumer for iter N+1.
+      snapshotText: input.essayText,
+    };
+
+    // ── Mutate ledger in memory ─────────────────────────────────────────
+    profile.iterationLedger.iterations.push(record);
+    if (flushedMoves.length > 0) {
+      profile.iterationLedger.taughtMoves.push(...flushedMoves);
+    }
+
+    console.log(
+      `[Orchestrator] D-1.10: committing iter ${iter} record ` +
+        `(triggeredBy=${triggeredBy}, taughtMoves=+${flushedMoves.length}, ` +
+        `events=${events.length}, layers=[${Object.keys(costBreakdown).join(',')}])`,
+    );
+
+    // ── Persist (atomic boundary). On failure: throw, do NOT clear buffers.
+    try {
+      await coordinator.checkpoint('after_iteration_commit');
+    } catch (error) {
+      // The in-memory ledger HAS the new record; the persisted store does
+      // not. Per the plan's atomicity interpretation: throw with structured
+      // context, leave buffers intact for forensic recovery, let the caller
+      // surface "iteration N did not persist; rerun." We do NOT clear the
+      // transient buffers because a rerun may want to reuse them.
+      throw PipelineError.wrap(
+        'iteration_commit',
+        error,
+        `[Orchestrator] D-1.10: checkpoint failed during iteration commit ` +
+          `(iter=${iter}, triggeredBy=${triggeredBy}). In-memory ledger has the record; ` +
+          `transient buffers preserved for retry. Checkpoint store may be down or rejecting writes.`,
+      );
+    }
+
+    // ── Clear transient buffers ONLY after successful checkpoint ─────────
+    clearEventsForIteration(iter);
+    clearTaughtMovesForIteration(iter);
+
+    console.log(
+      `[Orchestrator] D-1.10: iter ${iter} committed; ledger now has ` +
+        `${profile.iterationLedger.iterations.length} iterations, ` +
+        `${profile.iterationLedger.taughtMoves.length} cumulative taughtMoves`,
+    );
+    // Reference layersCompleted/layersFailed to silence unused-param lints
+    // and to leave a debug breadcrumb if a future change wants to inspect
+    // the post-commit summary at this site.
+    void layersCompleted;
+    void layersFailed;
+  }
+
   /**
    * Determine confidence level based on which layers completed and coherence.
    *
@@ -1714,14 +2002,37 @@ export class AnalysisOrchestrator {
 
   /**
    * Build a partial result when the pipeline aborts early due to a fatal error.
+   *
+   * D-1.10: now async. When `coordinator !== null`, commits a partial
+   * IterationRecord to preserve the `iterations[N-1]` = audit-for-iter-N
+   * invariant (per profileTypes.ts:5150). Without this commit, an iteration
+   * that incremented `currentIteration` (analysisOrchestrator.ts entry) but
+   * aborted at L2/L3/L3.75/L3.5/L4/L5 would create a hole in `iterations[]`,
+   * silently breaking every downstream consumer's slot-based lookup.
+   *
+   * Per the D-1.10 plan §"Failure-surface design" Q4: this is the SOLE
+   * place where checkpoint-write-failure is logged-and-swallowed instead
+   * of thrown. The contract of `buildPartialResult` is "always returns a
+   * PipelineResult, never throws" — masking the partial-commit failure
+   * with the original abort failure is correct here. Buffers are NOT
+   * cleared on commit failure (Step 6's design) so a forensic recovery
+   * can still find the events/moves.
+   *
+   * When `coordinator === null` (L1 fatal — coordinator never built),
+   * skip commit entirely. `currentIteration` was never incremented for
+   * this run (the increment lives at line ~459 AFTER coordinator creation),
+   * so no hole is created.
    */
-  private buildPartialResult(
+  private async buildPartialResult(
     coordinator: EssayProfileCoordinator | null,
     layersCompleted: string[],
     layersFailed: LayerError[],
     costTracker: CostTracker,
     startTime: number,
-  ): PipelineResult {
+    iterationStartedAt: string,
+    triggeredBy: IterationRecord['triggeredBy'],
+    input: PipelineInput,
+  ): Promise<PipelineResult> {
     const totalTimingMs = Date.now() - startTime;
     const costSummary = costTracker.summarize(totalTimingMs);
 
@@ -1749,6 +2060,38 @@ export class AnalysisOrchestrator {
       `  reason:    ${layersFailed[layersFailed.length - 1]?.message ?? 'unknown'}\n` +
       `${'▓'.repeat(72)}\n`,
     );
+
+    // D-1.10: commit a partial IterationRecord when coordinator is non-null.
+    // The abort happened AFTER incrementIteration ran, so currentIteration
+    // is the new value; without committing a record, iterations[N-1] would
+    // be missing. Commit failure here is logged and swallowed (see method
+    // JSDoc) because buildPartialResult's contract is to always return.
+    if (coordinator) {
+      const failedLayers = layersFailed.map((f) => `${f.layer}(${f.errorType})`).join(',');
+      const lastReason = layersFailed[layersFailed.length - 1]?.message ?? 'unknown';
+      const partialRationale =
+        `aborted iteration: layers=[${layersCompleted.join(',') || 'none'}], ` +
+        `failed=[${failedLayers}], reason="${lastReason}"`;
+      try {
+        await this.commitIterationRecord(
+          coordinator,
+          costSummary,
+          layersCompleted,
+          layersFailed,
+          iterationStartedAt,
+          triggeredBy,
+          input,
+          partialRationale,
+        );
+      } catch (commitErr) {
+        console.error(
+          `[Orchestrator] D-1.10: partial-result iteration commit ALSO failed (the ` +
+            `original abort is the primary failure; not re-throwing this secondary one):`,
+          commitErr instanceof Error ? commitErr.message : String(commitErr),
+        );
+        // Buffers stay populated for forensic recovery (Step 6 design).
+      }
+    }
 
     return {
       profile,
