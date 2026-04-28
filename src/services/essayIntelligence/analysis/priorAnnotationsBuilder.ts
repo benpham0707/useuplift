@@ -264,14 +264,23 @@ function emitMoveDropped(payload: {
   // [round-1 audit §4.F / T2.4 closure] Switch from console.log to the
   // structured iterationTelemetry channel so drops land in
   // IterationRecord.events[] alongside every other iteration event.
-  // Drop is `status: 'succeeded'` because it IS the successful
-  // execution of the deliberate-skip path; the `error.code` carries
-  // the drop reason as structured metadata for audit filtering.
+  //
+  // [round-2 audit LOW-1 closure 2026-04-28] Status flipped from
+  // 'succeeded' to 'failed'. The IterationTelemetryEvent type
+  // (profileTypes.ts:IterationTelemetryEvent) documents `error` as
+  // "populated only on `status: 'failed'`" — populating `error`
+  // alongside `status: 'succeeded'` violated that invariant.
+  // Semantically a drop IS a degradation from the audit-trail's
+  // perspective (the move's prior context is lost from the L5 prompt
+  // even though the no-misattribution contract makes the drop
+  // deliberate); 'failed' makes that visible in audit grep without
+  // changing the system's graceful-degradation behavior. Matches the
+  // sibling `carryForward.decision_append_failure` event's status.
   emitIterationEvent(payload.essayId, {
     iteration: payload.currentIteration,
     step: 'priorAnnotations.move_dropped',
     paragraphIndex: payload.oldParagraphIndex,
-    status: 'succeeded',
+    status: 'failed',
     error: {
       message: `prior-iteration TaughtMove dropped from priorAnnotations (reason: ${payload.reason})`,
       code: payload.reason,

@@ -631,14 +631,78 @@ The graph is the spine. Detail follows.
 
 ### D-1.11 — CarryForwardDecision append at orchestrator decision points
 
-- **Type:** Service extension.
-- **File:** `analysisOrchestrator.ts`, `focusedAnalyzer.ts`.
-- **Depends on:** D-1.1.
+- **Type:** Service extension (multi-piece — the decision-point producer wiring + the synthesis bridge that closes the consumer dead-wire are both required for the audit data to be load-bearing within Phase 1; see scope expansion below).
+- **Files:** `analysisOrchestrator.ts`, `focusedAnalyzer.ts`, `reanalysisOrchestrator.ts`, `essayProfileManager.ts` (mutators), `analysis/carryForwardSynthesis.ts` (new).
+- **Depends on:** D-1.1, D-1.10, D-1.8.
 - **Blocks:** D-4.11.
-- **Contract:** At every carry-forward decision point (mode selection, per-paragraph re-derive vs carry, finding maturity refresh, L3.75 section invalidation), append a `CarryForwardDecision` entry to `iterationLedger.recentDecisions[]`. Pruned to last 5 iterations on commit.
-- **Behavior spec:** After an iteration, `recentDecisions[]` reflects the iteration's actual decisions with rationale.
-- **Validation:** Integration test asserts recentDecisions populated after iteration 2.
-- **Effort:** 3–4 hours (mostly call-site additions; the locations are scattered).
+
+**Audit-driven scope expansion (2026-04-28).** Pre-D-1.11 audit surfaced
+that `recentDecisions[]` had ZERO downstream readers — without an in-build
+consumer, D-1.11 would land inert (same dead-wire shape as D-1.1's
+`incrementIteration` pre-D-1.10). The expansion makes `commitIterationRecord`
+itself the primary consumer (synthesizes `IterationRecord.carryForwardSummary`
+from filtered decisions) so the audit data is load-bearing within Phase 1
+rather than write-only until D-4.11. The expansion also surfaced a 5th
+decision point the original spec missed (DP-5: focused-mode preserves all
+10 holistic sections — the BIG carry-forward win that makes focused-mode's
+cost story honest).
+
+**Contract:** Append a `CarryForwardDecision` entry to
+`iterationLedger.recentDecisions[]` at every orchestrator decision point.
+Original spec named four (mode selection, per-paragraph re-derive vs carry,
+finding maturity refresh, L3.75 section invalidation); the audit added a
+fifth (DP-5: focused-mode holistic-carry). At iteration end, synthesize
+`IterationRecord.carryForwardSummary` from the iteration's decisions and
+prune `recentDecisions[]` to the last 5 iterations.
+
+Five decision points (DP-1 through DP-5):
+- DP-1 mode-selection (`reanalysisOrchestrator.processEditAndMaybeReanalyze`
+  threads through PipelineInput.modeSelectionDecision; analyzeEssay appends
+  AFTER incrementIteration so the iteration validator passes)
+- DP-2 per-paragraph priorAnnotations (analysisOrchestrator Phase 6)
+- DP-3a walk findingEvolutions (analysisOrchestrator after L3 walk)
+- DP-3b synthesis findingEvolutions (analysisOrchestrator after L3.75)
+- DP-4 delta synthesis (analysisOrchestrator W5.4a block)
+- DP-5 focused-mode holistic-carry — DEFERRED to a future focused-mode
+  iteration commit deliverable; focused-mode doesn't go through analyzeEssay
+  so has no IterationRecord to attach decisions to.
+- DP-3c focused-mode findingEvolutions — same deferral.
+
+15-step audit-driven implementation: Step 0 (essay-keyed taughtMove buffer)
++ Step 1 (type prep) + Steps 2-3 (ledger mutators with test-first) + Steps
+4-5 (synthesizer pure helper) + Steps 6-12 (4 decision-point wirings +
+safe-append helper) + Step 13 (commitIterationRecord amendment) + Step 14
+(integration test scenarios A-F) + Step 15 (essay-keyed telemetry buffer).
+Supporting work bundled across 8 commits.
+
+**Behavior spec (post-D-1.11):**
+- Every iteration's recentDecisions[] reflects that iteration's actual
+  decisions with rationale (until pruned).
+- IterationRecord.carryForwardSummary contains the rolled-up
+  carried/rederived/refreshed buckets synthesized from the decisions.
+- `safeAppendCarryForwardDecision` swallows append-time validation throws
+  with structured telemetry (the ONE charter-sanctioned swallow site;
+  audit-trail bugs MUST NOT abort analysis).
+
+**Failure surface:**
+- `appendCarryForwardDecision` validation throw (iteration mismatch,
+  missing fields, enum violations) → caller's safe-append helper logs +
+  emits structured telemetry + returns false; analysis continues.
+- Synthesis at commit-time: pure function over already-validated decisions;
+  out-of-enum decision values silently dropped (caller's responsibility
+  to validate at append time, not synthesizer's).
+
+**Validation:** Integration test asserts recentDecisions populated and
+carryForwardSummary synthesized correctly after iteration 2 across 6
+scenarios (A: empty first-pass, B: focused/comprehensive arbitration,
+C: per-paragraph carry, D: pruning, E: validation throw, F: walk
+findingEvolution). Plus `safeAppendCarryForwardDecision` failure-swallow
+unit tests.
+
+**Effort:** 6–8 hours (audit-driven scope; up from spec's literal "3-4
+hours mostly call-site additions" because the audit added the synthesis
+bridge as a Phase-1 consumer to avoid the dead-wire pattern). Round 2
+audit ratified the expansion 2026-04-28.
 
 ### D-1.12 — Halt-on-error orchestration policy applied (full code-review pass)
 

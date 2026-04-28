@@ -161,7 +161,7 @@ describe('D-1.10 — Scenario 2a: seeded ledger persists & deep-clones', () => {
 });
 
 describe('D-1.10 — Scenario 2b: corrupt seed throws fail-fast at createInitialProfile', () => {
-  it('rejects negative currentIteration via assertIterationLedgerOnLoad', () => {
+  it('rejects negative currentIteration via validateAndNormalizeIterationLedger', () => {
     const corruptSeed: IterationLedger = {
       currentIteration: -1,
       iterations: [],

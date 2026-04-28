@@ -200,13 +200,22 @@ export function l5AnnotationsToTaughtMoves(
 
 /**
  * Compound key for the transient buffer. We use a string concatenation
- * with a delimiter unlikely to appear in essayIds (` ` is reserved
- * for type-level seg separation). Map keying on objects/arrays is by
- * reference, so a tuple wouldn't work; a structurally-unique string is
- * the simplest correct approach.
+ * with the ASCII Unit Separator (U+001F, `\x1F`) as the delimiter —
+ * chosen because (a) it's a non-printable control character so it
+ * cannot appear naturally in a user-supplied or UUID-derived essayId,
+ * eliminating ambiguity at the parse boundary, and (b) it's documented
+ * in the ASCII spec as a record/unit separator so the intent is
+ * greppable for future maintainers. Map keying on objects/arrays is
+ * by reference so a tuple wouldn't work; a structurally-unique string
+ * is the simplest correct approach.
+ *
+ * [Round 2 audit MED-1 closure 2026-04-28] Pre-fix the delimiter byte
+ * was a NUL (`\0`) but the JSDoc claimed it was `\x1F`. Harmonized to
+ * match the JSDoc claim and the sibling `iterationTelemetry.ts:bufferKey`
+ * (D-1.11 Step 15) so both buffers use the same scheme.
  */
 function bufferKey(essayId: string, iteration: number): string {
-  return `${essayId} ${iteration}`;
+  return `${essayId}${iteration}`;
 }
 
 const taughtMoveBuffer: Map<string, TaughtMove[]> = new Map();

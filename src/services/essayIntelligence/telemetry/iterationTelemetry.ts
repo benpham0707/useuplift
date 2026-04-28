@@ -37,9 +37,11 @@ import type { IterationTelemetryEvent } from '../profileTypes';
  * keying makes cross-essay collision impossible at the type level,
  * matching the taughtMoveBuilder pattern (D-1.11 Step 0).
  *
- * Compound key built via `bufferKey(essayId, iteration)` using a
- * delimiter character unlikely to appear in essayIds (chr 0x1F unit
- * separator).
+ * Compound key built via `bufferKey(essayId, iteration)` using the
+ * ASCII Unit Separator (U+001F, `\x1F`) as the delimiter. Same scheme
+ * as `taughtMoveBuilder.ts:bufferKey` (Round 2 audit MED-1 harmonized
+ * the two on 2026-04-28). The control char cannot appear naturally
+ * in essayIds, eliminating parse-boundary ambiguity.
  */
 function bufferKey(essayId: string, iteration: number): string {
   return `${essayId}${iteration}`;

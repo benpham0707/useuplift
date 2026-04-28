@@ -547,7 +547,7 @@ function makeRemap(entries: Array<[number, ParagraphRemapEntry]>): ParagraphRema
  *
  * The event shape (from priorAnnotationsBuilder.emitMoveDropped) is:
  *   { iteration, step: 'priorAnnotations.move_dropped',
- *     paragraphIndex, status: 'succeeded',
+ *     paragraphIndex, status: 'failed',  // round-2 audit LOW-1: was 'succeeded'
  *     error: { code: <reason>, context: { moveId, taughtAtIteration,
  *              findingId, contentSummarySnippet, source } } }
  *
