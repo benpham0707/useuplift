@@ -431,9 +431,17 @@ essayCoachingRouter.post('/essay-coaching/start', requireAuth, async (req: Reque
           error: 'analysis_pipeline_failed',
           message:
             'Essay analysis did not complete. Coaching cannot start until the analysis pipeline finishes successfully.',
+          // [D-1.12 ratification fix 2026-04-29] LayerError shape is
+          // { layer, errorType, message, ... } — the `message` field is
+          // top-level, not nested under `.error`. The original `l.error?.message`
+          // read a non-existent path; optional chaining masked the bug
+          // from typecheck so every entry reported 'unknown' at runtime,
+          // defeating the diagnostic intent of the 503 body.
           layersFailed: result.layersFailed.map((l) => ({
             layer: l.layer,
-            error: l.error?.message ?? 'unknown',
+            errorType: l.errorType,
+            message: l.message,
+            paragraphIndex: l.paragraphIndex,
           })),
         });
       }
