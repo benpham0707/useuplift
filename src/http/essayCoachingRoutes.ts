@@ -410,6 +410,33 @@ essayCoachingRouter.post('/essay-coaching/start', requireAuth, async (req: Reque
         includeAnnotations: false, checkpointStore,
         userId, // Port A2 (Wave-1a): enables cross-essay voice prior + persistence when env-flagged
       });
+      // [D-1.12 C5 closure 2026-04-29] Pre-fix this site read result.profile
+      // unconditionally, ignoring result.completedAllLayers / result.layersFailed.
+      // A partial result (when L1 / L2 / L3 / L3.75 / L3.5 / L4 / L5 had a fatal
+      // failure inside analysisOrchestrator's buildPartialResult path) carries a
+      // placeholder profile with no iterationLedger, no findingStore, no
+      // northStar — coaching would run against a near-empty profile and surface
+      // garbage to the user. Repo-wide grep confirmed ZERO consumers of
+      // completedAllLayers / layersFailed outside the orchestrator file. The
+      // boundary now surfaces the failure as a 503 with structured layersFailed
+      // info so the user / monitoring sees the genuine state instead of garbage.
+      if (!result.completedAllLayers) {
+        const failedLayerNames = result.layersFailed.map((l) => l.layer).join(', ');
+        console.error(
+          `[essay-coaching/start] Partial pipeline result for essay ${essayId}: ` +
+            `failed layers=[${failedLayerNames}]. Refusing to seed a coaching session ` +
+            `against a degraded profile.`,
+        );
+        return res.status(503).json({
+          error: 'analysis_pipeline_failed',
+          message:
+            'Essay analysis did not complete. Coaching cannot start until the analysis pipeline finishes successfully.',
+          layersFailed: result.layersFailed.map((l) => ({
+            layer: l.layer,
+            error: l.error?.message ?? 'unknown',
+          })),
+        });
+      }
       profile = result.profile as EssayProfile;
       pipelineCost = result.costSummary.totalCost;
       pipelinePhase = result.improvementPhase?.level ?? 'unknown';

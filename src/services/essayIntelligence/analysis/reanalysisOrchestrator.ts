@@ -60,6 +60,13 @@ import type { CoachingSessionMemory, LearningStyleObservations, CognitiveAssessm
 import { detectCoachingMode } from '../coaching/modeDetection';
 import { holisticSynthesisService } from './holisticSynthesis';
 
+// [D-1.12 closure 2026-04-29] Iteration telemetry for halt-on-error
+// surfacing. Failures in focused-mode / comprehensive-mode catches now
+// emit structured iteration events so the audit trail captures the
+// rejection (parity with F-2's AO First Read closure pattern).
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
+import { getCurrentIteration } from '../profileManager/essayProfileManager';
+
 // Re-export ConversationTurn so callers can use it without importing from coachingService
 export type { ConversationTurn };
 
@@ -89,6 +96,39 @@ export interface EditProcessResult {
   totalCost: number;
   /** Per-layer cost breakdown */
   costBreakdown: LayerCost[];
+
+  /**
+   * [D-1.12 C3+C4 closure 2026-04-29] Why a return shape with
+   * `mode === 'deferred'` or `reanalysisTriggered: false` was produced.
+   *
+   * Pre-fix the orchestrator returned `mode: 'deferred'` for THREE
+   * semantically-distinct conditions: (i) version-tracker policy chose
+   * to defer, (ii) the focused analyzer threw and we silently absorbed,
+   * (iii) the comprehensive triggerReanalysis threw and we silently
+   * absorbed. Same return shape, three different realities. Consumer
+   * could not route differently on each.
+   *
+   * `deferReason` is the discriminator. When the consumer sees
+   * `deferReason === 'policy_defer'`, it's a clean policy decision and
+   * the caller can retry / surface as "we'll get to this." When it's
+   * `'focused_failed'` or `'comprehensive_failed'`, an inner sub-layer
+   * crashed and the caller should surface the `error` field's diagnostic
+   * to the user / logs / a 5xx response.
+   *
+   * `error` is populated alongside the failure variants. Consumers
+   * MUST check `deferReason` before reading `error`; the field is
+   * undefined on the policy-defer path and on the success paths.
+   *
+   * Backwards compatibility: every pre-existing consumer of
+   * `EditProcessResult.mode` continues to work unchanged. The new
+   * fields are additive.
+   */
+  deferReason?: 'policy_defer' | 'focused_failed' | 'comprehensive_failed';
+  error?: {
+    layer: 'focusedAnalyzer' | 'triggerReanalysis';
+    message: string;
+    code?: string;
+  };
 }
 
 /**
@@ -768,6 +808,16 @@ export class ReanalysisOrchestrator {
     // post-hoc migration needed.
     //
     // FIX P0.5: Preserve the existing checkpoint store across coordinator rebuilds.
+    //
+    // [D-1.12 C1 closure 2026-04-29] Pre-fix this catch logged "(CRITICAL)"
+    // and then RETURNED THE RESULT ANYWAY, leaving `this.coordinator`
+    // pointing at the pre-reanalysis state while the caller received the
+    // post-reanalysis result. Invariant violation: returned data and
+    // orchestrator state diverge silently. Now we throw — the caller's
+    // catch (in runComprehensiveMode) populates EditProcessResult.error
+    // and deferReason='comprehensive_failed' so the HTTP boundary can
+    // surface a 5xx instead of routing into a divergent-state coaching
+    // session.
     try {
       const freshProfile = pipelineResult.profile as EssayProfile;
       this.coordinator = EssayProfileCoordinator.fromCheckpoint(
@@ -778,28 +828,29 @@ export class ReanalysisOrchestrator {
       console.log('[ReanalysisOrchestrator] Coordinator updated with fresh post-reanalysis profile (checkpoint store preserved)');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error(
-        `[ReanalysisOrchestrator] Failed to update coordinator after reanalysis (CRITICAL): ${msg}`,
+      throw new Error(
+        `[ReanalysisOrchestrator] coordinator_rebuild failed — orchestrator state would diverge from returned result; halting: ${msg}`,
       );
-      // This is a serious issue — the coordinator is now stale. But we still return
-      // the result so the caller can see the reanalysis output.
     }
 
-    // Close the version record
+    // Close the version record.
+    //
+    // [D-1.12 C2 closure 2026-04-29] Pre-fix this catch synthesized a
+    // fake VersionRecord with `version: 0`, empty arrays, current
+    // timestamp. Banned shape per CLAUDE.md "no degraded fallbacks":
+    // hardcoded substitute that downstream consumers cannot distinguish
+    // from a real version=0. The version record is part of the audit
+    // trail (cross-iteration continuity, change diffing); faking it
+    // corrupts the very thing D-1.10 was built to preserve. Now we
+    // throw — same caller-side surfacing as C1.
     let versionRecord: VersionRecord;
     try {
       versionRecord = this.versionTracker.closeVersion(currentText);
     } catch (err) {
-      console.error('[ReanalysisOrchestrator] Failed to close version (non-fatal):', err);
-      // Synthesize a minimal version record so we can still return a result
-      versionRecord = {
-        version: 0,
-        snapshotText: currentText,
-        analyzedAt: new Date().toISOString(),
-        changes: [],
-        insightsSinceLastVersion: [],
-        lightTouchAdjustments: [],
-      };
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `[ReanalysisOrchestrator] versionTracker.closeVersion failed — cannot synthesize a placeholder VersionRecord without corrupting audit trail; halting: ${msg}`,
+      );
     }
 
     return {
@@ -1213,17 +1264,39 @@ export class ReanalysisOrchestrator {
 
       console.log('[ReanalysisOrchestrator] Focused analysis escalated to comprehensive');
     } catch (error) {
+      // [D-1.12 C3 closure 2026-04-29] Pre-fix this catch returned
+      // `{ mode: 'deferred', reanalysisTriggered: false }` indistinguishable
+      // from the legitimate "policy chose to defer" path below. Caller
+      // could not route differently between "policy decision" and "analyzer
+      // crashed." Now: emit structured telemetry + populate the new
+      // deferReason='focused_failed' + error fields on EditProcessResult so
+      // the HTTP boundary can surface a 5xx instead of routing into a
+      // garbage coaching session.
+      const msg = error instanceof Error ? error.message : String(error);
       console.error(
-        '[ReanalysisOrchestrator] focusedAnalyzer.runFocusedAnalysis failed (deferring):',
-        error instanceof Error ? error.message : String(error),
+        '[ReanalysisOrchestrator] focusedAnalyzer.runFocusedAnalysis failed:',
+        msg,
       );
-      // On focused analysis failure: defer — don't escalate automatically
+      const iter = getCurrentIteration(this.coordinator.getProfile());
+      emitIterationEvent(this.essayId, {
+        iteration: iter,
+        step: 'runFocusedMode',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'focused_analyzer_threw',
+          context: { downstreamBehavior: 'EditProcessResult.deferReason=focused_failed; caller surfaces error.' },
+        },
+        timestamp: new Date().toISOString(),
+      });
       return {
         editOutput,
         mode: 'deferred',
         reanalysisTriggered: false,
         totalCost,
         costBreakdown,
+        deferReason: 'focused_failed',
+        error: { layer: 'focusedAnalyzer', message: msg, code: 'focused_analyzer_threw' },
       };
     }
 
@@ -1250,6 +1323,9 @@ export class ReanalysisOrchestrator {
         `[ReanalysisOrchestrator] Comprehensive re-analysis recommended but deferred ` +
         `(urgency=${trigger.urgency}): ${trigger.reason}`,
       );
+      // [D-1.12 C4 partial — policy-defer branch] Mark deferReason so
+      // consumers can distinguish this clean policy decision from the
+      // failure paths below. No `error` field; this is a healthy outcome.
       return {
         editOutput,
         mode: 'comprehensive',
@@ -1257,6 +1333,7 @@ export class ReanalysisOrchestrator {
         reanalysisTriggered: false,
         totalCost,
         costBreakdown,
+        deferReason: 'policy_defer',
       };
     }
 
@@ -1297,10 +1374,31 @@ export class ReanalysisOrchestrator {
         costBreakdown,
       };
     } catch (error) {
-      console.error(
-        '[ReanalysisOrchestrator] triggerReanalysis failed:',
-        error instanceof Error ? error.message : String(error),
-      );
+      // [D-1.12 C4 closure 2026-04-29] Pre-fix this catch returned
+      // `{ mode: 'comprehensive', reanalysisTriggered: false }` —
+      // shape-indistinguishable from the policy-defer branch above.
+      // Same caller-visibility gap as C3. Now: emit structured telemetry
+      // + populate deferReason='comprehensive_failed' + error so the
+      // boundary can route correctly. C1 (coordinator-rebuild) and C2
+      // (closeVersion) inside triggerReanalysis now throw cleanly into
+      // this catch instead of silently swallowing.
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[ReanalysisOrchestrator] triggerReanalysis failed:', msg);
+      const iter = getCurrentIteration(this.coordinator.getProfile());
+      emitIterationEvent(this.essayId, {
+        iteration: iter,
+        step: 'runComprehensiveMode',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'trigger_reanalysis_threw',
+          context: {
+            downstreamBehavior: 'EditProcessResult.deferReason=comprehensive_failed; caller surfaces error.',
+            wasEscalation: focusedResult !== undefined,
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
       return {
         editOutput,
         mode: 'comprehensive',
@@ -1308,6 +1406,8 @@ export class ReanalysisOrchestrator {
         reanalysisTriggered: false,
         totalCost,
         costBreakdown,
+        deferReason: 'comprehensive_failed',
+        error: { layer: 'triggerReanalysis', message: msg, code: 'trigger_reanalysis_threw' },
       };
     }
   }
