@@ -618,7 +618,20 @@ export class ReanalysisOrchestrator {
    * 5. Close version record
    * 6. Return result
    */
-  async triggerReanalysis(): Promise<ReanalysisResult> {
+  async triggerReanalysis(
+    /**
+     * [F-1 wire-up 2026-04-29] When the comprehensive re-analysis is the
+     * escalation tail of a focused-mode run, the focused result's
+     * escalationLevel (1|2|3|4) is threaded into PipelineInput so
+     * commitIterationRecord populates IterationRecord.escalationLevel
+     * with the level that actually triggered the comprehensive re-run
+     * — not the silent 0 the consumer was reading before. Optional
+     * because direct comprehensive re-analyses (no focused predecessor)
+     * legitimately have no escalation level and `?? 0` keeps the
+     * field at 0 in that case (per its declared 0|1|2|3|4 type).
+     */
+    focusedEscalationLevel?: 0 | 1 | 2 | 3 | 4,
+  ): Promise<ReanalysisResult> {
     console.log('[ReanalysisOrchestrator] Triggering comprehensive re-analysis');
 
     // Generate brief from accumulated changes
@@ -718,6 +731,11 @@ export class ReanalysisOrchestrator {
       // triggers (no edit, no mode selection), it stays null and
       // analyzeEssay's DP-1 append site no-ops via the `if (input.modeSelectionDecision)` guard.
       modeSelectionDecision: this.lastModeSelectionDecision ?? undefined,
+      // [F-1 wire-up 2026-04-29] Thread focused-mode escalation level so
+      // IterationRecord.escalationLevel reflects the level that actually
+      // triggered comprehensive escalation, not a silent 0. See parameter
+      // doc above; consumer at analysisOrchestrator.ts:2054.
+      focusedEscalationLevel,
     };
 
     // Run comprehensive pipeline with the reanalysis brief
@@ -1248,7 +1266,12 @@ export class ReanalysisOrchestrator {
     let reanalysisBrief: ReanalysisBrief | undefined;
 
     try {
-      const reanalysisResult = await this.triggerReanalysis();
+      // [F-1 wire-up 2026-04-29] Pass focused-mode escalation level through
+      // so the resulting IterationRecord.escalationLevel reflects the
+      // actual escalation tier (1|2|3|4) instead of the previous silent 0.
+      // focusedResult is undefined on direct-comprehensive paths (no focused
+      // predecessor); the consumer's `?? 0` handles that case correctly.
+      const reanalysisResult = await this.triggerReanalysis(focusedResult?.escalationLevel);
       reanalysisBrief = reanalysisResult.brief;
       totalCost += reanalysisResult.totalCost;
 

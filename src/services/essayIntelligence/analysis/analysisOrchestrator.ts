@@ -433,7 +433,15 @@ export class AnalysisOrchestrator {
 
     // ── L1: First Impressions (FATAL) + AO First Read (non-fatal) — PARALLEL ──
     // GAP-4: AO First Read runs alongside L1 at zero added latency.
-    // L1 failure is FATAL. AO failure is gracefully degraded (null on profile).
+    // L1 failure is FATAL. AO First Read failure is non-fatal BY DESIGN —
+    // every downstream consumer is null-guarded (profileTypes.ts:2354 types
+    // aoFirstRead as optional+nullable; coachingService.ts:2799/2876,
+    // edgeProtocol.ts:157, presentation/renderAnalysisForStudent.ts:151
+    // all skip cleanly when absent). On rejection we emit a structured
+    // telemetry event for the audit trail and push to layersFailed[] —
+    // this is NOT charter-banned graceful degradation, because no
+    // fake/placeholder data is injected; consumers see the genuine
+    // "AO read absent" state. [F-2 closure 2026-04-29.]
     let l1Result: FirstImpressionsResult;
     let aoFirstReadResult: AOFirstReadResult | null = null;
 
@@ -457,7 +465,7 @@ export class AnalysisOrchestrator {
       `cost=$${l1Result.cost.toFixed(4)}, time=${l1Result.timingMs}ms`,
     );
 
-    // Handle AO First Read (non-fatal — graceful degradation)
+    // Handle AO First Read (non-fatal by design — see block comment above).
     if (aoSettled.status === 'fulfilled') {
       aoFirstReadResult = aoSettled.value;
       costTracker.record('AOFirstRead', aoFirstReadResult.cost, aoFirstReadResult.tokenUsage, aoFirstReadResult.timingMs);
@@ -466,10 +474,43 @@ export class AnalysisOrchestrator {
         `cost=$${aoFirstReadResult.cost.toFixed(4)}, time=${aoFirstReadResult.timingMs}ms`,
       );
     } else {
-      console.warn(
-        `[Orchestrator] AO First Read failed (non-fatal): ` +
-        `${aoSettled.reason instanceof Error ? aoSettled.reason.message : String(aoSettled.reason)}`,
-      );
+      // [F-2 closure 2026-04-29] Pre-fix this branch only `console.warn`-ed
+      // and silently set aoFirstReadResult=null — invisible to the audit
+      // trail and to the orchestrator's own layersFailed ledger. Now we:
+      //   1. Emit a structured `status:'failed'` telemetry event so the
+      //      iterationLedger / external observers see the rejection.
+      //   2. Push to layersFailed[] for parity with L1's failure path
+      //      (see line 449), so PipelineResult.layersFailed callers get
+      //      a uniform shape regardless of which layer rejected.
+      //   3. Preserve the existing `aoFirstReadResult = null` semantic
+      //      (no assignment — it was already null at declaration).
+      // iteration=-1 is the documented sentinel for "pre-iteration step"
+      // (matches emitStepFailure's removed sentinel pattern). AO First
+      // Read runs before incrementIteration (line 521) and before the
+      // coordinator is constructed (line 493), so no live iteration
+      // counter exists yet. The telemetry consumer can filter iteration
+      // < 1 if it only cares about per-iteration steps; the audit trail
+      // still has the rejection on record.
+      const errMsg = aoSettled.reason instanceof Error
+        ? aoSettled.reason.message
+        : String(aoSettled.reason);
+      console.warn(`[Orchestrator] AO First Read failed (non-fatal): ${errMsg}`);
+      emitIterationEvent(input.essayId, {
+        iteration: -1,
+        step: 'AOFirstRead',
+        status: 'failed',
+        error: {
+          message: errMsg,
+          code: 'ao_first_read_rejected',
+          context: {
+            nonFatal: true,
+            downstreamBehavior:
+              'profile.aoFirstRead remains null; all consumers null-guarded.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+      layersFailed.push(this.buildLayerError('AOFirstRead', aoSettled.reason, 0));
     }
 
     // ── Parse essay structure from L1 output ──
@@ -2050,6 +2091,11 @@ export class AnalysisOrchestrator {
       // PipelineInput.focusedEscalationLevel (set by reanalysisOrchestrator
       // when focused-mode escalation fired). Default 0 for cold first-pass
       // and for re-analyses where no escalation occurred.
+      // [F-1 wire-up closure 2026-04-29] Producer wired at
+      // reanalysisOrchestrator.ts:1255 (passes focusedResult?.escalationLevel
+      // into triggerReanalysis, which threads it into PipelineInput here).
+      // Pre-fix this field always read 0 because the focused result was
+      // discarded between runComprehensiveMode and triggerReanalysis.
       escalationLevel: input.focusedEscalationLevel ?? 0,
       rationale,
       startedAt,

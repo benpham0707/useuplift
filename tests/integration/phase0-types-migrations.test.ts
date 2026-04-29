@@ -228,6 +228,32 @@ describe('Phase 0 → Phase 1 integration gate (D-0.19)', () => {
         }),
       ).toThrow(/essayId must be a non-empty string/);
     });
+
+    // [F-8 closure 2026-04-29] Symmetry tests across emitStepStart /
+    // emitStepSuccess / emitStepFailure. Pre-fix emitStepFailure had a
+    // sentinel-bucket fallback for unknown stepId that hid programming
+    // errors behind a `'<unknown-essay>'` Map entry no caller flushed.
+    // Now all three throw on their respective programming-error inputs.
+    it('emitStepStart throws on missing or empty essayId (F-8 symmetry)', async () => {
+      const tel = await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
+      expect(() => tel.emitStepStart('', 1, 'any-step')).toThrow(
+        /essayId must be a non-empty string/,
+      );
+    });
+
+    it('emitStepSuccess throws on unknown stepId (F-8 symmetry)', async () => {
+      const tel = await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
+      expect(() => tel.emitStepSuccess('step-never-started')).toThrow(
+        /unknown stepId="step-never-started"/,
+      );
+    });
+
+    it('emitStepFailure throws on unknown stepId (F-8 closure — was sentinel-bucket fallback pre-fix)', async () => {
+      const tel = await import('../../src/services/essayIntelligence/telemetry/iterationTelemetry');
+      expect(() =>
+        tel.emitStepFailure('step-never-started', new Error('whatever')),
+      ).toThrow(/unknown stepId="step-never-started"/);
+    });
   });
 
   describe('5. Mock-LLM framework returns deterministic responses + throws errors', () => {

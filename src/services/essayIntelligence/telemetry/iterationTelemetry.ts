@@ -196,30 +196,21 @@ export function emitStepFailure(
 ): void {
   const inFlight = inFlightSteps.get(stepId);
   if (!inFlight) {
-    // Failure path is harder to be strict about — if a step throws
-    // before emitStepStart returned (extreme race), or if the caller
-    // forgot the start, we still want the failure logged. Emit a
-    // best-effort event without iteration / step context, but mark
-    // the missing-start in the error.context so the audit trail
-    // surfaces it. essayId is also unknown here, so the event lands
-    // in a sentinel `'<unknown-essay>'` bucket — visible to flush via
-    // explicit query but won't pollute any real essay's events[].
-    const fallbackEvent: IterationTelemetryEvent = {
-      iteration: -1,
-      step: 'unknown',
-      status: 'failed',
-      error: {
-        message: error.message,
-        code: context?.code,
-        context: {
-          ...context?.extra,
-          telemetryNote: `emitStepFailure called with unknown stepId="${stepId}" — emitStepStart never registered or already completed.`,
-        },
-      },
-      timestamp: new Date().toISOString(),
-    };
-    emitIterationEvent('<unknown-essay>', fallbackEvent);
-    return;
+    // [F-8 closure 2026-04-29] Symmetric strictness with emitStepSuccess.
+    // Pre-fix this branch landed events in a `'<unknown-essay>'` sentinel
+    // bucket that no caller flushes, hiding a programming error behind a
+    // dangling buffer. The defensive "extreme race" rationale was
+    // unreachable: emitStepStart is synchronous and returns the stepId
+    // before any async work begins, so there's no path where a `try { ...
+    // emitStepStart(...) ... } catch { emitStepFailure(stepId) }` could
+    // bind stepId without start having registered. The remaining cause —
+    // caller forgot start, or success/failure already emitted — is a
+    // programming error worth surfacing immediately, matching the file
+    // header's "NO retries. NO fallback. NO swallowed errors." charter.
+    throw new Error(
+      `[IterationTelemetry] emitStepFailure called with unknown stepId="${stepId}". ` +
+        `Either emitStepStart was never called for this step, or success/failure was already emitted.`,
+    );
   }
   inFlightSteps.delete(stepId);
   const finishedAtMs = Date.now();
