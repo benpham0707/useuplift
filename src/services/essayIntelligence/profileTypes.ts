@@ -5395,7 +5395,16 @@ export interface IterationTelemetryEvent {
  *   cross-iteration synthesizer.
  */
 export interface TaughtMove {
-  /** Stable ID, e.g., `M-{iteration}-{paragraph}-{seq}`. Property-tested for stability per Phase 1 D-1.13. */
+  /**
+   * Stable ID: `M-{iteration}-{paragraphIndex}-{annotation.id}`. Property-tested
+   * for stability per Phase 1 D-1.13 (8-property battery in
+   * `tests/property/taughtMoveIdStability.ts`). The trailing segment is the
+   * `L5Annotation.id` rather than a per-paragraph sequence counter because
+   * sequence counters aren't deterministic across runs (annotation generation
+   * order is not guaranteed stable). `L5Annotation.id` is itself stable and
+   * unique within an `L5AnnotationResult`. Construction lives at
+   * `analysis/taughtMoveBuilder.ts:50` (generateTaughtMoveId).
+   */
   id: string;
   /** L5Annotation.id at time of generation. Bridges to the full annotation in the iteration checkpoint. */
   annotationId: string;

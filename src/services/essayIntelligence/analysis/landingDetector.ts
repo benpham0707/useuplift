@@ -136,8 +136,9 @@ export interface LandingDetectorOutput {
 /**
  * Run the landing detector on a single (priorTaughtMove, edit) pair.
  *
- * Single Haiku call per pair. Structured-output JSON mode. Airtight
- * runtime validation; throws on any schema deviation.
+ * Single Sonnet call per pair (per Tue's 2026-04-27 model policy — see
+ * the LANDING_DETECTOR_MODEL doc above). Structured-output JSON mode.
+ * Airtight runtime validation; throws on any schema deviation.
  *
  * Q4 enforcement: if the detector returns `addressed` with confidence
  * below `ADDRESSED_CONFIDENCE_FLOOR` (0.7), downgrades the status to
@@ -208,10 +209,10 @@ export async function detectLanding(
 // ─── Validation helpers ────────────────────────────────────────────────
 
 /**
- * Validate the input shape before calling Haiku. Throws fail-fast on
+ * Validate the input shape before calling the LLM. Throws fail-fast on
  * missing required fields. Catches caller-side bugs (e.g.,
  * priorTaughtMove from a malformed checkpoint, edit.significance not
- * in the expected enum) before spending a Haiku call on them.
+ * in the expected enum) before spending a Sonnet call on them.
  */
 function validateInput(input: LandingDetectorInput): void {
   if (!input || typeof input !== 'object') {

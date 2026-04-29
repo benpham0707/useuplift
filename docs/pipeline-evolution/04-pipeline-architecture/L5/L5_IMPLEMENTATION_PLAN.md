@@ -467,14 +467,14 @@ The graph is the spine. Detail follows.
 - **File:** `src/services/essayIntelligence/analysis/deepAnnotationService.ts` (post-call hook) + `analysisOrchestrator.ts` (commit point).
 - **Depends on:** D-1.1.
 - **Blocks:** D-1.3, D-1.6, D-4.9.
-- **Contract:** After `deepAnnotationService.generateAnnotations()` returns its `L5AnnotationResult`, transform each `L5Annotation` into a `TaughtMove` per the type at D-0.1. Stable ID format: `M-{iteration}-{paragraphIndex}-{sequenceInParagraph}`. Append to a transient buffer (the `iterationLedger.taughtMoves[]` commit happens at orchestrator end via D-1.10, not in deepAnnotationService directly — keeps the L5 call pure).
+- **Contract:** After `deepAnnotationService.generateAnnotations()` returns its `L5AnnotationResult`, transform each `L5Annotation` into a `TaughtMove` per the type at D-0.1. Stable ID format: `M-{iteration}-{paragraphIndex}-{annotation.id}`. *(Spec amendment 2026-04-29 — original spec text said `{sequenceInParagraph}`; the implementation uses `annotation.id` because a per-paragraph sequence counter is non-deterministic across runs (annotation generation order is not guaranteed stable). `L5Annotation.id` is itself stable and unique within an `L5AnnotationResult`, satisfying both "stable across runs" (D-1.13) and "unique within (iteration, paragraphIndex)". Rationale lives at `taughtMoveBuilder.ts:24-31`.)* Append to a transient buffer (the `iterationLedger.taughtMoves[]` commit happens at orchestrator end via D-1.10, not in deepAnnotationService directly — keeps the L5 call pure).
 - **Behavior spec:** After every L5 generation in a fresh-or-iteration run, the relevant TaughtMoves are queued for commit. `landing` field is null at this stage (populated next iteration by landing detector).
 - **Failure surface:** TaughtMove construction throws on missing required L5Annotation fields → fail-fast; iteration halts before commit.
 - **Validation:** Mock-LLM unit test: feed a fixture L5AnnotationResult, assert the buffered TaughtMoves match the expected shape. Property test: TaughtMove ID stability — same L5Annotation in two runs produces the same TaughtMove ID (deterministic) (D-1.13).
 - **Revision discipline:** the ID format is load-bearing for cross-iteration carry-forward; verify it's stable under all the L5Annotation shapes that exist in the existing codebase (Explore agent reads existing L5AnnotationResult fixtures, lists every shape, confirms ID generation handles all of them).
 - **Effort:** 4–6 hours.
 
-### D-1.3 — Landing detector skeleton (Haiku call + structured output validation)
+### D-1.3 — Landing detector skeleton (Sonnet call + structured output validation)
 
 - **Type:** Service.
 - **File:** `src/services/essayIntelligence/analysis/landingDetector.ts` (new).
@@ -498,9 +498,9 @@ The graph is the spine. Detail follows.
 
   export async function detectLanding(input: LandingDetectorInput): Promise<LandingDetectorOutput>;
   ```
-  Single Haiku call per (TaughtMove, iteration). Structured output enforced via Anthropic SDK's tool-use or JSON-mode. **Confidence floor 0.7 to count as `addressed`; below → `partially_addressed`.** Per Q4 confirmation.
+  Single Sonnet call per (TaughtMove, iteration). *(Spec amendment 2026-04-29 — original spec text said "Haiku"; implementation uses `claude-sonnet-4-5-20250929` per Tue's 2026-04-27 model policy: new build-phase sites use Sonnet when single-call cost stays under $0.10 OR when judgment matters. Landing detection weighs three signals into a 4-way classification — narrow taxonomy but the weighting is judgment, not pattern-matching. Per-call cost ≈ $0.0019 on a typical payload, well under the $0.10 ceiling. Cost budget at D-1.5 below is unchanged in absolute dollars; if anything Sonnet's per-call cost is comparable to Haiku at this token volume.)* Structured output enforced via Anthropic SDK's tool-use or JSON-mode. **Confidence floor 0.7 to count as `addressed`; below → `partially_addressed`.** Per Q4 confirmation.
 - **Behavior spec:** LLM-judged combiner reads all three signals; outputs structured shape.
-- **Failure surface:** Haiku call failure → throw; caller halts. JSON parse failure → throw with raw output in error context. Confidence < 0 or > 1 → throw schema-validation error.
+- **Failure surface:** Sonnet call failure → throw; caller halts. JSON parse failure → throw with raw output in error context. Confidence < 0 or > 1 → throw schema-validation error.
 - **Validation:** Mock-LLM unit test for the orchestration; the prompt's quality is validated at D-1.5 (mid-build API touchpoint).
 - **Revision discipline:** the structured-output validation has to be airtight — schema mismatch is one of the easiest LLM bugs to ship and one of the hardest to debug post-hoc.
 - **Effort:** 5–7 hours.
@@ -544,7 +544,7 @@ The graph is the spine. Detail follows.
 - **File:** `src/services/essayIntelligence/analysis/priorAnnotationsBuilder.ts` (new).
 - **Depends on:** D-1.2, D-1.3.
 - **Blocks:** D-1.7, D-1.8.
-- **Contract:** Per `L5_ITERATION_LOOP_DESIGN.md` §7.5 pseudo-flow. Reads `iterationLedger.taughtMoves[]` filtered to `taughtAtIteration === currentIteration - 1`. For each, runs landing detector. Groups by `paragraphIndex`. Returns `Map<number, PriorAnnotationContext>` matching the existing type at `profileTypes.ts:4613–4622`.
+- **Contract:** Per `L5_ITERATION_LOOP_DESIGN.md` §7.5 pseudo-flow. Reads `iterationLedger.taughtMoves[]` filtered to `taughtAtIteration === currentIteration - 1`. For each, runs landing detector. Groups by `paragraphIndex`. Returns `Map<number, PriorAnnotationContext>` matching the existing type at `profileTypes.ts:4839–4848`. *(Spec amendment 2026-04-29 — original line range 4613–4622 was correct at spec authoring time but drifted with file growth; the type itself is unchanged.)*
 - **Behavior spec:** On iteration 1, returns `undefined` (no priors). On iteration ≥ 2, returns a populated Map; each PriorAnnotationContext includes the original annotation summary and the `addressedByEdit: boolean` derived from landing.status (`'addressed'` → true; everything else → false).
 - **Failure surface:** Landing detector failure on any move → throw with structured context naming the move id; orchestrator halts. Index-remap on structural reorder is D-1.7.
 - **Validation:** Mock-LLM unit test feeding mock landing-detector responses; asserting the Map structure matches expected.
@@ -558,18 +558,18 @@ The graph is the spine. Detail follows.
 - **Blocks:** D-1.8.
 - **Contract:** On structural reorder (paragraphs reordered, added, removed), the builder applies index remapping from `editUnderstandingService.diff.paragraphChanges[]` before constructing the Map. If the remapping is ambiguous (paragraph deleted), the move is dropped from priorAnnotations rather than misattributed; the underlying Finding (if any) carries the durable claim instead.
 - **Behavior spec:** A reorder edit (P2↔P3) produces a correctly-keyed priorAnnotations Map (the iter-1 P3 moves go to iter-2 P2's slot). A delete (paragraph removed) drops associated moves from the Map but doesn't error. A insert (paragraph added) leaves the Map's existing entries unchanged but doesn't error.
-- **Failure surface:** Remap function error → throw; orchestrator halts. Drop decision (when remap is ambiguous) is logged to telemetry but not an error.
+- **Failure surface:** Remap function error → throw; orchestrator halts. Drop decision (when remap is ambiguous) emits a structured telemetry event with `status:'failed'` and a `move_dropped` code (per round-2 audit LOW-1 — drops are visible in the audit trail, not silent). The drop is not an iteration-fatal error; the orchestrator continues with a reduced priorAnnotations map. *(Spec amendment 2026-04-29 — original spec text said "logged but not an error"; round-2 audit deliberately strengthened this to a status:'failed' event so the audit trail captures the drop site.)*
 - **Validation:** Synthetic fixtures simulating each edit type (reorder, insert, delete, multi-paragraph) — assert the remapped Map for each.
 - **Revision discipline:** the index remapping is the part of the system that's hardest to debug post-hoc. Test extensively with synthetic cases. Spawn a Plan agent to enumerate every edge case.
 - **Effort:** 5–7 hours.
 
-### D-1.8 — `analysisOrchestrator.ts:850` wire-up (priorAnnotations populated)
+### D-1.8 — `analysisOrchestrator.ts:891` wire-up (priorAnnotations populated)
 
 - **Type:** Service extension.
 - **File:** `src/services/essayIntelligence/analysis/analysisOrchestrator.ts`.
 - **Depends on:** D-1.6, D-1.7.
 - **Blocks:** D-1.10, D-1.12, D-1.15.
-- **Contract:** Replace the hard-coded `undefined` at line 850 with a call to `priorAnnotationsBuilder.build(profile, currentIteration)`.
+- **Contract:** Replace the hard-coded `undefined` at line 891 with a call to `priorAnnotationsBuilder.build(profile, currentIteration)`. *(Spec amendment 2026-04-29 — original line was 850 at spec authoring time but the call site moved to 891 by the time D-1.8 landed; D-1.9's closure note already cites line 891.)*
 - **Behavior spec:** L5 generation in iteration ≥ 2 receives populated priorAnnotations Map. The L5 prompt at deepAnnotationService.ts:1402–1416 already consumes this correctly.
 - **Failure surface:** Builder failure → orchestrator halts.
 - **Validation:** Mock-LLM integration test asserts the L5 call's argument list contains a populated Map on iteration 2.
@@ -722,9 +722,17 @@ audit ratified the expansion 2026-04-28.
 - **File:** `tests/property/taughtMoveIdStability.ts`.
 - **Depends on:** D-1.2.
 - **Blocks:** D-1.15.
-- **Contract:** Property test asserting that for any given `(L5Annotation, iteration)` pair, `generateTaughtMoveId(annotation, iteration)` produces the same id regardless of context, time, or call order.
-- **Validation:** Test runs 1000 randomly-generated annotation shapes; asserts ID determinism.
-- **Effort:** 2 hours.
+- **Contract:** Property test battery asserting that for any given `(L5Annotation, iteration)` pair, `generateTaughtMoveId(annotation, iteration)` produces the same id regardless of context, time, or call order. *(Spec amendment 2026-04-29 — landed implementation expanded the original one-line contract into 8 orthogonal properties after parallel three-agent review; the expansion was audit-driven, not scope creep. Each property is justified inline in the test file.)*
+- **Validation:** 8 properties × 1000 randomized shapes each (100 for the Symbol-cache check). Deterministic LCG seed (`0xD1130001`) so failures are reproducible at a specific commit hash.
+  1. **Determinism** — repeated calls on the same `(annotation, iteration)` return the same id (back-to-back, no interleaving).
+  2. **Reference-independence** — JSON round-trip yields a reference-distinct annotation whose id equals the original (catches WeakMap/Object.is/=== identity caches; does NOT catch Symbol-keyed caches — see Property 8).
+  3. **Iteration sensitivity** — distinct iterations on the same annotation produce distinct ids.
+  4. **Paragraph-index sensitivity** — distinct `paragraphIndex` (with same id, iteration) produces distinct ids.
+  5. **Annotation-id sensitivity** — distinct `annotation.id` (with same paragraphIndex, iteration) produces distinct ids.
+  6. **Field-only dependence** — mutating any field other than `id` or `location.paragraphIndex` leaves the id unchanged. Walks `Object.keys(annotation)` and throws on unhandled field shapes so future L5Annotation fields fail loud rather than silently slipping through.
+  7. **Call-order independence** — interleaved/Fisher-Yates-shuffled call order produces the same ids as canonical order (catches stateful "last-call cache" or cross-call buffer pollution that Property 1's repetition would not catch).
+  8. **Symbol-keyed cache resistance** — attaching/mutating a Symbol-keyed property on the SAME annotation reference does not affect the id (covers a bug class Property 2's JSON round-trip silently misses, since round-tripping strips Symbols).
+- **Effort:** 2 hours (original); +1 hour for the audit-driven expansion at landing.
 
 ### D-1.14 — IterationLedger append-only invariant test
 
