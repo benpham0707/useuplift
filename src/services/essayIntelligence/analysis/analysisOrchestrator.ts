@@ -1962,10 +1962,9 @@ export class AnalysisOrchestrator {
     const finishedAt = new Date().toISOString();
 
     // ── Drain telemetry events (non-destructive read; clear after success) ──
-    // [D-1.11 Step 0 deferred] Telemetry buffer is still keyed by iteration
-    // only — cross-essay collision risk exists but is audit-only impact (not
-    // load-bearing for next iter's priorAnnotations). Tracked for follow-up
-    // commit before D-1.11 Step 14.
+    // [D-1.11 Step 15 closed at bcc5be6] Telemetry buffer is essay-keyed end-
+    // to-end; cross-essay collision impossible at the type level. Sister to
+    // the TaughtMove buffer keying immediately below.
     const events = flushEventsForIteration(input.essayId, iter);
 
     // ── Drain TaughtMoves buffer (non-destructive; clear after success) ──

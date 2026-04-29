@@ -8,8 +8,11 @@
 //
 // Sister to the unit test at tests/unit/taught-move-builder.test.ts:273-335
 // (round-2 audit T2.6 closure: light property check, 100 cases). This file
-// is the full property battery: 1000 randomized shapes per property,
-// covering six orthogonal claims.
+// is the full property battery: 1000 randomized shapes per property
+// (100 for the Symbol-cache check), covering eight orthogonal claims —
+// determinism, JSON-roundtrip purity, iteration sensitivity, paragraphIndex
+// sensitivity, annotation.id sensitivity, field-only dependence,
+// call-order independence, and Symbol-keyed cache resistance.
 //
 // [D-1.13 scope] This test asserts (id, paragraphIndex, iteration)
 // determinism + sensitivity. It does NOT assert global id-string uniqueness
@@ -327,27 +330,19 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
     expect(shuffledIds).toEqual(canonicalIds);
   });
 
-  // Property 8: time independence. Spec literal: "regardless of context,
-  // time, or call order." Insert microtask boundaries (await Promise) and
-  // a queueMicrotask between two calls on the same input; assert id matches.
-  // Catches a regression where the function reads Date.now() / performance.now()
-  // / process.hrtime() into the id (or where a future async refactor ties the
-  // id to a tick-scoped state).
-  it('Property 8: time independence — calls separated by microtask boundaries produce the same id', async () => {
-    for (let i = 0; i < 100; i++) {
-      // 100 cases is sufficient — each case crosses 3 microtask boundaries; 1000 would slow the suite.
-      const ann = makeRandomAnnotation();
-      const iter = randInt(0, 50);
-      const id1 = generateTaughtMoveId(ann, iter);
-      await Promise.resolve();
-      await new Promise<void>((resolve) => queueMicrotask(resolve));
-      await new Promise<void>((resolve) => setTimeout(resolve, 0));
-      const id2 = generateTaughtMoveId(ann, iter);
-      expect(id2, `case ${i}: ann.id=${ann.id} paraIdx=${ann.location.paragraphIndex} iter=${iter}`).toBe(id1);
-    }
-  });
+  // [Time-independence property removed in harmony-audit follow-up
+  //  2026-04-29] An earlier review pass added a "Property 8" that awaited
+  //  microtask + setTimeout(0) boundaries between two calls on the same
+  //  input. For a pure 4-token template-string concat with zero state, that
+  //  property is redundant with Property 1 (back-to-back determinism): if
+  //  the function read Date.now() / performance.now() into the id, Property
+  //  1's repeated calls would already diverge. The microtask version added
+  //  ~15 lines + async machinery to assert a bug class the existing
+  //  property already catches. Removed to honor "complex but not
+  //  overengineered." Spec literal-conformance for "regardless of … time"
+  //  is satisfied by Property 1's determinism check.
 
-  // Property 9: Symbol-keyed identity-cache resistance. JSON.parse(JSON.stringify(...))
+  // Property 8: Symbol-keyed identity-cache resistance. JSON.parse(JSON.stringify(...))
   // in Property 2 strips Symbol keys, so a Symbol-keyed cache attached to the
   // original would silently miss-and-recompute on the clone — passing the
   // round-trip check vacuously. This property attaches a Symbol-keyed
@@ -355,8 +350,11 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
   // again on the SAME reference; any cache that read its own Symbol key
   // would still hit, and any mutation we make to the Symbol value would not
   // affect the id (because the SUT never reads Symbols). Net assertion:
-  // adding/changing a Symbol-keyed property leaves the id unchanged.
-  it('Property 9: Symbol-keyed property mutations do not affect the id (catches Symbol-keyed identity caches)', () => {
+  // adding/changing a Symbol-keyed property leaves the id unchanged. NOT
+  // redundant with Property 2: round-trip drops Symbols, so the clone path
+  // would always miss the cache; the SAME-REFERENCE path is what proves
+  // the SUT doesn't key its own cache by an attached Symbol.
+  it('Property 8: Symbol-keyed property mutations do not affect the id (catches Symbol-keyed identity caches)', () => {
     const tag = Symbol.for('d113.symbol.cache.probe');
     for (let i = 0; i < 100; i++) {
       const ann = makeRandomAnnotation();
