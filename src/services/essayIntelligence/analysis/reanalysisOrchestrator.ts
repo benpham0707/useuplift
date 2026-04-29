@@ -1300,6 +1300,39 @@ export class ReanalysisOrchestrator {
       };
     }
 
+    // [D-1.12 Commit B 2026-04-29] Read focused-analyzer's new structured
+    // failure flags. If any step caught (escalationLevelTrustworthy=false),
+    // emit one iteration-telemetry event per failed step so the audit trail
+    // captures the silent failures that were previously console-only.
+    // The orchestrator is the emitter (not focusedAnalyzer) because
+    // emitIterationEvent requires essayId, which lives on this.essayId
+    // and would force a signature change to thread into the analyzer.
+    if (focusedResult && !focusedResult.escalationLevelTrustworthy) {
+      const iter = getCurrentIteration(this.coordinator.getProfile());
+      for (const step of focusedResult.failedSteps) {
+        emitIterationEvent(this.essayId, {
+          iteration: iter,
+          step: `focusedAnalyzer.${step}`,
+          status: 'failed',
+          error: {
+            message: `[FocusedAnalyzer] step ${step} caught and continued; escalationLevel may be misleading`,
+            code: `focused_${step}_swallowed`,
+            context: {
+              resultEscalationLevel: focusedResult.escalationLevel,
+              allFailedSteps: focusedResult.failedSteps,
+              note: 'Telemetry emit is the audit trail; the result was returned with escalationLevelTrustworthy=false.',
+            },
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+      console.warn(
+        `[ReanalysisOrchestrator] focused-analysis result has ${focusedResult.failedSteps.length} ` +
+          `failed step(s): [${focusedResult.failedSteps.join(', ')}]; escalationLevel ` +
+          `(${focusedResult.escalationLevel}) is untrustworthy and will not feed IterationRecord.escalationLevel.`,
+      );
+    }
+
     // Escalated: fall through to comprehensive
     return await this.runComprehensiveMode(editOutput, costBreakdown, totalCost, focusedResult);
   }
@@ -1345,12 +1378,19 @@ export class ReanalysisOrchestrator {
     let reanalysisBrief: ReanalysisBrief | undefined;
 
     try {
-      // [F-1 wire-up 2026-04-29] Pass focused-mode escalation level through
-      // so the resulting IterationRecord.escalationLevel reflects the
-      // actual escalation tier (1|2|3|4) instead of the previous silent 0.
-      // focusedResult is undefined on direct-comprehensive paths (no focused
-      // predecessor); the consumer's `?? 0` handles that case correctly.
-      const reanalysisResult = await this.triggerReanalysis(focusedResult?.escalationLevel);
+      // [F-1 wire-up 2026-04-29 + D-1.12 Commit B 2026-04-29] Pass focused-mode
+      // escalation level through so the resulting IterationRecord.escalationLevel
+      // reflects the actual escalation tier (1|2|3|4) — UNLESS the focused
+      // analyzer reported escalationLevelTrustworthy=false, in which case
+      // pass undefined so the consumer's `?? 0` defaults honestly instead
+      // of recording the (misleading) hardcoded fallback. Telemetry was
+      // already emitted above, so the failure is captured in the audit
+      // trail; this prevents a load-bearing audit field from carrying a lie.
+      const trustedEscalationLevel =
+        focusedResult && focusedResult.escalationLevelTrustworthy
+          ? focusedResult.escalationLevel
+          : undefined;
+      const reanalysisResult = await this.triggerReanalysis(trustedEscalationLevel);
       reanalysisBrief = reanalysisResult.brief;
       totalCost += reanalysisResult.totalCost;
 
