@@ -3000,6 +3000,16 @@ export class EssayProfileCoordinator {
   }
 
   /**
+   * [D-1.12 Commit C 2026-04-29] Read-only essayId accessor.
+   * Added so orchestrator paths that need to emit telemetry (which
+   * requires essayId for buffer keying) can read it without widening
+   * helper signatures. Used by safeCheckpoint's failure-emit path.
+   */
+  getEssayId(): string {
+    return this.essayId;
+  }
+
+  /**
    * W1.2: Get the FindingStore for direct access by pipeline stages.
    */
   getFindingStore(): FindingStore {

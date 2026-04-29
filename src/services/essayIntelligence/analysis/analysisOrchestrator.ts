@@ -1027,11 +1027,30 @@ export class AnalysisOrchestrator {
         );
       }
     } catch (error) {
-      // Contradiction consumption is NOT fatal — log and continue
-      console.error(
-        '[Orchestrator] W4.4: Contradiction consumption failed (non-fatal):',
-        error instanceof Error ? error.message : String(error),
-      );
+      // [D-1.12 H5 closure 2026-04-29] Pre-fix this catch logged "(non-fatal)"
+      // and continued silently. Failure means contradictions detected by L4
+      // are NOT consumed into FindingStore + annotation flags NOT generated;
+      // downstream L5 misses contradiction-aware annotations. Now: emit
+      // structured iterationTelemetry (parity with F-2). Continue semantics
+      // preserved — Phase 5.5 is genuinely downstream-optional within a
+      // single iteration; the audit trail is the missing piece.
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('[Orchestrator] W4.4: Contradiction consumption failed (non-fatal):', msg);
+      const iter = getCurrentIteration(coordinator.getProfile());
+      emitIterationEvent(input.essayId, {
+        iteration: iter,
+        step: 'phase5_5_contradiction_consumption',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'contradiction_consumption_failed',
+          context: {
+            downstreamBehavior:
+              'Pipeline continues; L5 will not see contradiction-aware findings/flags from this iteration.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
     }
 
     // ═════════════════════════════════���═════════════════════════════════════
@@ -1109,11 +1128,30 @@ export class AnalysisOrchestrator {
             }
           }
         } catch (error) {
-          // Delta synthesis failure is NOT fatal — pipeline continues with existing holistic sections
-          console.error(
-            '[Orchestrator] W5.4a: Delta synthesis failed (non-fatal):',
-            error instanceof Error ? error.message : String(error),
-          );
+          // [D-1.12 H6 closure 2026-04-29] Pre-fix this catch was silent;
+          // when blocking contradictions can't be resolved by delta synthesis,
+          // the contradictions remain in the coherence report but no synthesis
+          // ran and no DP-4 decisions were appended. Now: emit telemetry so
+          // the audit trail captures the resolution failure. Continue
+          // semantics preserved.
+          const msg = error instanceof Error ? error.message : String(error);
+          console.error('[Orchestrator] W5.4a: Delta synthesis failed (non-fatal):', msg);
+          const iter = getCurrentIteration(coordinator.getProfile());
+          emitIterationEvent(input.essayId, {
+            iteration: iter,
+            step: 'phase5_75_w54a_delta_synthesis',
+            status: 'failed',
+            error: {
+              message: msg,
+              code: 'blocking_contradiction_synthesis_failed',
+              context: {
+                blockingContradictionCount: blockingContradictions.length,
+                downstreamBehavior:
+                  'Pipeline continues with existing holistic sections; blocking contradictions remain unresolved.',
+              },
+            },
+            timestamp: new Date().toISOString(),
+          });
         }
       }
     }
@@ -1680,36 +1718,22 @@ export class AnalysisOrchestrator {
               const { connectionIds } = coordinator.addConnections(connectionsToAdd);
               reReadConnectionsAbsorbed = connectionIds.filter(id => id !== '').length;
             } else {
-              // Fallback: direct push (should not happen in normal pipeline)
-              console.warn(
-                `[Orchestrator] No coordinator available for re-read connection absorption — ` +
-                `falling back to direct push (bypasses duplicate detection + connectionRef management)`,
+              // [D-1.12 H10 closure 2026-04-29] Pre-fix this branch warned
+              // "(should not happen in normal pipeline)" then silently fell
+              // back to direct profile.connections.all.push, bypassing
+              // ConnectionMutator's duplicate detection + connectionRef
+              // management. The "should not happen" guard is exactly the
+              // place to fail loud — silent bypass of an integrity layer
+              // is the dead-wire pattern the no-fallback charter exists to
+              // prevent. Now we throw so the bug surfaces in tests / logs
+              // instead of letting it whisper through into corrupt
+              // connection state.
+              throw new Error(
+                `[Orchestrator] runGrowthCycle: coordinator is missing during re-read connection absorption. ` +
+                  `This branch was previously a silent direct-push fallback that bypassed the ConnectionMutator ` +
+                  `integrity layer. The orchestrator must always have a coordinator at this point in the pipeline; ` +
+                  `arriving here indicates an upstream wiring bug. Halting per the no-fallback charter.`,
               );
-              for (const conn of connectionsToAdd) {
-                try {
-                  profile.connections.all.push({
-                    id: `CR${state.iteration}_P${reRead.paragraph}_${reReadConnectionsAbsorbed}`,
-                    from: conn.from,
-                    to: conn.to,
-                    description: conn.description,
-                    reverseIllumination: conn.reverseIllumination,
-                    significance: conn.significance,
-                    strengthCategory: conn.strengthCategory,
-                    directionality: conn.directionality,
-                    discoveredBy: conn.discoveredBy,
-                    routingTags: [],
-                    status: 'active',
-                    relatedFindings: [],
-                    createdAt: new Date().toISOString(),
-                  });
-                  reReadConnectionsAbsorbed++;
-                } catch (e) {
-                  console.warn(
-                    `[Orchestrator] Failed to absorb re-read connection from P${reRead.paragraph}: ` +
-                    `${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
             }
 
             if (reReadConnectionsAbsorbed > 0) {
@@ -1947,6 +1971,22 @@ export class AnalysisOrchestrator {
 
   /**
    * Safe checkpoint — never lets checkpoint failure kill the pipeline.
+   *
+   * [D-1.12 H4 closure 2026-04-29] Pre-fix this method swallowed
+   * checkpoint failures with `console.error` only — across 8 call sites
+   * in this file (`after_l1_l2`, `after_l3` ×2, `after_l3_5` ×2,
+   * `after_l5`, plus inside the L3 + L3.5 + L5 catches). The persistence
+   * failure was invisible to telemetry / iterationLedger; consumers
+   * reading from the checkpoint store would see stale state with no
+   * signal that the write didn't happen.
+   *
+   * The "non-fatal within a single run" semantics are correct (per
+   * D-1.10 §"Failure-surface design": checkpoints are recovery
+   * affordances, not load-bearing for the in-memory iteration). What
+   * was missing was the audit trail. Now we emit a structured
+   * iterationTelemetry event (parity with F-2's AO First Read closure)
+   * so external observers + iterationLedger.events[] capture the
+   * rejection. Continue semantics preserved — the caller proceeds.
    */
   private async safeCheckpoint(
     coordinator: EssayProfileCoordinator,
@@ -1955,10 +1995,30 @@ export class AnalysisOrchestrator {
     try {
       await coordinator.checkpoint(reason);
     } catch (error) {
-      console.error(
-        `[Orchestrator] Checkpoint failed (${reason}):`,
-        error instanceof Error ? error.message : String(error),
-      );
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error(`[Orchestrator] Checkpoint failed (${reason}):`, msg);
+      // Emit telemetry. essayId via the new getEssayId() accessor (D-1.12
+      // Commit C). iteration via getCurrentIteration; safe to read since
+      // checkpoint failures only fire after the pipeline has progressed
+      // to at least one layer (which means the coordinator was already
+      // constructed with a valid iterationLedger).
+      const iter = getCurrentIteration(coordinator.getProfile() as EssayProfile);
+      emitIterationEvent(coordinator.getEssayId(), {
+        iteration: iter,
+        step: `checkpoint.${reason}`,
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'checkpoint_write_failed',
+          context: {
+            reason,
+            downstreamBehavior:
+              'In-memory iteration continues; persisted checkpoint store does not have this write. ' +
+              'Recovery from a fresh process load will see stale state.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
     }
   }
 
