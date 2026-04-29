@@ -131,7 +131,12 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
       expect(cloned).not.toBe(ann);
       expect(cloned.id).toBe(ann.id);
       expect(cloned.location.paragraphIndex).toBe(ann.location.paragraphIndex);
-      // Ids match — catches WeakMap/Object.is/=== identity caches.
+      // Ids match — catches WeakMap, Object.is, and `===` identity caches
+      // (the clone is a distinct reference, so any cache keyed on the
+      // original reference would miss and recompute, exposing impurity if
+      // the recomputation produced a different id). Note: JSON round-trip
+      // strips Symbol-keyed properties, so a Symbol-keyed cache slips
+      // through here — that bug class is covered by Property 9 below.
       expect(generateTaughtMoveId(cloned, iter), `case ${i}: ann.id=${ann.id}`).toBe(
         generateTaughtMoveId(ann, iter),
       );
@@ -188,6 +193,27 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
   // We iterate Object.keys(annotation) rather than hand-listing fields so
   // any future field added to L5Annotation is automatically covered — a
   // hand-listed sweep would silently miss new fields.
+  //
+  // [round-3-style review fix 2026-04-29] Two upgrades:
+  //   1. The location handler now ALSO asserts that mutating paragraphIndex
+  //      DOES change the id (positive sensitivity + negative sensitivity in
+  //      the same place — symmetry catches stale-cache regressions where a
+  //      future paragraphIndex read might miss the cache invalidation).
+  //   2. The unhandled-type branch now THROWS instead of silently `continue`-ing.
+  //      Prior shape silently skipped any future field whose value was a
+  //      non-array object — exactly the dead-wire pattern the round-2 audit
+  //      flagged. Failing loud surfaces new fields the moment they land.
+  //
+  // [enum-cast hygiene] The `as L5Annotation` casts below intentionally
+  // construct values that violate the L5AnnotationType / L5TeachingMode /
+  // ImprovementPhaseLevel unions (e.g., type = "mutated-type-N"). This is
+  // safe and intentional: generateTaughtMoveId reads ONLY annotation.id and
+  // annotation.location.paragraphIndex per the format contract, so the
+  // unioned fields are not consulted at runtime. The test's claim is "if
+  // the SUT silently starts reading any of these fields, the id will
+  // change" — runtime divergence is what we're checking, not type validity.
+  // Violating the union is the point: it's how we prove the SUT doesn't
+  // depend on the field.
   it('Property 6: field-only dependence — mutating any field other than id or location.paragraphIndex leaves the id unchanged', () => {
     for (let i = 0; i < N; i++) {
       const original = makeRandomAnnotation();
@@ -199,19 +225,29 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
       for (const key of Object.keys(original) as Array<keyof L5Annotation>) {
         if (key === 'id') continue; // id IS in the format; mutating must change the id (covered by Property 5)
         if (key === 'location') {
-          // location is special: paragraphIndex is in the format, sentenceIndex/spanText are not.
-          // Mutate sentenceIndex and spanText (NOT paragraphIndex) and assert id unchanged.
-          const mutatedLocation = {
-            ...original.location,
-            sentenceIndex:
-              original.location.sentenceIndex === null
-                ? randInt(0, 12)
-                : null,
-            spanText: original.location.spanText === null ? `mutated-span-${i}` : null,
+          // location.paragraphIndex IS in the format → mutating must change the id.
+          // location.sentenceIndex / location.spanText are NOT → mutating must leave the id unchanged.
+          // Assert both halves to enforce symmetry.
+          const newPara = original.location.paragraphIndex + 1 + randInt(0, 24);
+          const paraMutated: L5Annotation = {
+            ...original,
+            location: { ...original.location, paragraphIndex: newPara },
           };
-          const mutated: L5Annotation = { ...original, location: mutatedLocation };
           expect(
-            generateTaughtMoveId(mutated, iter),
+            generateTaughtMoveId(paraMutated, iter),
+            `case ${i} key=location.paragraphIndex: mutation MUST change id; original.id=${original.id}, oldPara=${original.location.paragraphIndex}, newPara=${newPara}, iter=${iter}`,
+          ).not.toBe(baseId);
+
+          const sentSpanMutated: L5Annotation = {
+            ...original,
+            location: {
+              ...original.location,
+              sentenceIndex: original.location.sentenceIndex === null ? randInt(0, 12) : null,
+              spanText: original.location.spanText === null ? `mutated-span-${i}` : null,
+            },
+          };
+          expect(
+            generateTaughtMoveId(sentSpanMutated, iter),
             `case ${i} key=location.sentenceIndex/spanText: original.id=${original.id}`,
           ).toBe(baseId);
           continue;
@@ -236,8 +272,17 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
           // Optional fields like groundingQuality. Set to a defined value.
           mutated = { ...original, [key]: 'grounded' } as L5Annotation;
         } else {
-          // Object / other — skip (id and location handled above; no other object fields exist today).
-          continue;
+          // Fail-loud (round-3-style review fix). A future L5Annotation field
+          // whose value is a non-array object would have silently slipped
+          // through under the prior `continue`. Throwing here forces the
+          // test author to extend Property 6's mutation strategy when a new
+          // field shape arrives — the dead-wire pattern this property is
+          // designed to prevent.
+          throw new Error(
+            `[D-1.13 Property 6] Unhandled field type for key=${String(key)} (typeof=${typeof value}). ` +
+              `A new L5Annotation field shape was added without extending the property test. ` +
+              `Add a mutation branch for this type so the field is covered by the field-only-dependence check.`,
+          );
         }
 
         expect(
@@ -245,6 +290,86 @@ describe('D-1.13 — TaughtMove ID stability property test (1000 randomized shap
           `case ${i} key=${String(key)}: mutating this field must not change the id; original.id=${original.id}, paraIdx=${original.location.paragraphIndex}, iter=${iter}`,
         ).toBe(baseId);
       }
+    }
+  });
+
+  // Property 7: call-order independence. Spec literal: "regardless of context,
+  // time, or call order." Property 1 covers repeated calls on the same input
+  // (no order effect when there's no other call). This property covers
+  // INTERLEAVED calls: a sequence of distinct (annotation, iteration) pairs
+  // computed in canonical order vs in a shuffled order; ids must match
+  // pair-by-pair. A regression that introduces a stateful "last call cache"
+  // or a buffer that pollutes across calls would fail here but pass Property 1.
+  it('Property 7: call-order independence — interleaved/shuffled call order produces the same ids as canonical order', () => {
+    // Build N distinct (annotation, iteration) pairs.
+    const pairs: Array<{ ann: L5Annotation; iter: number }> = [];
+    for (let i = 0; i < N; i++) {
+      pairs.push({ ann: makeRandomAnnotation(), iter: randInt(0, 50) });
+    }
+
+    // Canonical order: compute id by walking pairs[] front-to-back.
+    const canonicalIds = pairs.map(({ ann, iter }) => generateTaughtMoveId(ann, iter));
+
+    // Shuffled order: Fisher-Yates with the seeded LCG, walk in shuffled
+    // order, store result back at the original index. If the function is
+    // stateless / call-order-independent, the two arrays must match
+    // element-by-element.
+    const indices = pairs.map((_, idx) => idx);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const shuffledIds: string[] = new Array(pairs.length);
+    for (const idx of indices) {
+      shuffledIds[idx] = generateTaughtMoveId(pairs[idx].ann, pairs[idx].iter);
+    }
+
+    expect(shuffledIds).toEqual(canonicalIds);
+  });
+
+  // Property 8: time independence. Spec literal: "regardless of context,
+  // time, or call order." Insert microtask boundaries (await Promise) and
+  // a queueMicrotask between two calls on the same input; assert id matches.
+  // Catches a regression where the function reads Date.now() / performance.now()
+  // / process.hrtime() into the id (or where a future async refactor ties the
+  // id to a tick-scoped state).
+  it('Property 8: time independence — calls separated by microtask boundaries produce the same id', async () => {
+    for (let i = 0; i < 100; i++) {
+      // 100 cases is sufficient — each case crosses 3 microtask boundaries; 1000 would slow the suite.
+      const ann = makeRandomAnnotation();
+      const iter = randInt(0, 50);
+      const id1 = generateTaughtMoveId(ann, iter);
+      await Promise.resolve();
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const id2 = generateTaughtMoveId(ann, iter);
+      expect(id2, `case ${i}: ann.id=${ann.id} paraIdx=${ann.location.paragraphIndex} iter=${iter}`).toBe(id1);
+    }
+  });
+
+  // Property 9: Symbol-keyed identity-cache resistance. JSON.parse(JSON.stringify(...))
+  // in Property 2 strips Symbol keys, so a Symbol-keyed cache attached to the
+  // original would silently miss-and-recompute on the clone — passing the
+  // round-trip check vacuously. This property attaches a Symbol-keyed
+  // property to the original object, computes the id once, then computes
+  // again on the SAME reference; any cache that read its own Symbol key
+  // would still hit, and any mutation we make to the Symbol value would not
+  // affect the id (because the SUT never reads Symbols). Net assertion:
+  // adding/changing a Symbol-keyed property leaves the id unchanged.
+  it('Property 9: Symbol-keyed property mutations do not affect the id (catches Symbol-keyed identity caches)', () => {
+    const tag = Symbol.for('d113.symbol.cache.probe');
+    for (let i = 0; i < 100; i++) {
+      const ann = makeRandomAnnotation();
+      const iter = randInt(0, 50);
+      const baseId = generateTaughtMoveId(ann, iter);
+      // Mutate a Symbol-keyed field on the SAME reference.
+      (ann as unknown as Record<symbol, unknown>)[tag] = `probe-${i}`;
+      const afterId = generateTaughtMoveId(ann, iter);
+      expect(afterId, `case ${i}: Symbol-keyed property must not influence id; ann.id=${ann.id}`).toBe(baseId);
+      // Change the Symbol value and re-check.
+      (ann as unknown as Record<symbol, unknown>)[tag] = { nested: i };
+      const afterId2 = generateTaughtMoveId(ann, iter);
+      expect(afterId2).toBe(baseId);
     }
   });
 });

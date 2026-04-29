@@ -40,9 +40,10 @@ export default defineConfig({
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',
       'tests/integration/d1-11-decisions.test.ts',
-      // tests/property/ — D-1.13 onward. Spec mandates filenames without
-      // the `.test.ts` suffix (separate test category from unit/integration);
-      // they're enumerated explicitly here so vitest picks them up.
+      // tests/property/ — D-1.13 onward. Spec uses literal filenames
+      // without the `.test.ts` suffix (separate test category from
+      // unit/integration); they're enumerated explicitly here so vitest
+      // picks them up.
       'tests/property/taughtMoveIdStability.ts',
     ],
     // Node environment — these are unit tests of business logic, not
