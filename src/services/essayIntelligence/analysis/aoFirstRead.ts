@@ -74,78 +74,79 @@ Output JSON:
  * On failure, returns a degraded result (never crashes the pipeline).
  */
 export async function runAOFirstRead(essayText: string): Promise<AOFirstReadResult> {
+  // [F-2 spillover closure 2026-04-29] No internal try/catch. Pre-fix
+  // this function had a `try { ... } catch (error) { return placeholder }`
+  // wrapper that silently degraded any failure (LLM throw, JSON parse
+  // throw, schema mismatch) into a fake-success result containing
+  // `committeeOneLiner: '(AO first read unavailable)'` and
+  // `putDownRisk: 'moderate'` — a charter violation by a different name
+  // (silent fallback returning hardcoded results). The orchestrator's
+  // Promise.allSettled rejection branch is the single failure handler:
+  // it emits structured iteration telemetry, pushes to layersFailed[],
+  // and leaves profile.aoFirstRead null (every downstream consumer is
+  // null-guarded — see analysisOrchestrator.ts:438 block comment for
+  // the verified consumer list). Throws here propagate cleanly to that
+  // handler.
   const callStart = Date.now();
+  const response = await callClaudeWithRetry<string>(
+    {
+      model: HAIKU,
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt: `Read this essay:\n\n${essayText}`,
+      maxTokens: 400,
+      temperature: 0.5, // Slightly higher for authentic, varied voice
+      useJsonMode: true,
+      cacheSystemPrompt: true,
+    },
+  );
 
-  try {
-    const response = await callClaudeWithRetry<string>(
-      {
-        model: HAIKU,
-        systemPrompt: SYSTEM_PROMPT,
-        userPrompt: `Read this essay:\n\n${essayText}`,
-        maxTokens: 400,
-        temperature: 0.5, // Slightly higher for authentic, varied voice
-        useJsonMode: true,
-        cacheSystemPrompt: true,
-      },
-    );
+  const timingMs = Date.now() - callStart;
+  const usage = response.usage ?? { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
-    const timingMs = Date.now() - callStart;
-    const usage = response.usage ?? { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
+  // Parse — callClaude with useJsonMode returns pre-parsed object.
+  // Throws on malformed JSON (caught by orchestrator's allSettled branch).
+  const raw = (typeof response.content === 'string'
+    ? JSON.parse(response.content)
+    : response.content) as Record<string, unknown>;
 
-    // Parse — callClaude with useJsonMode returns pre-parsed object
-    const raw = (typeof response.content === 'string'
-      ? JSON.parse(response.content)
-      : response.content) as Record<string, unknown>;
+  // Validate and coerce. NOTE: the soft-fallback coercion here (`??`
+  // defaults for missing fields, putDownRisk falls back to 'moderate'
+  // when not in the enum) is a SECONDARY charter concern — the LLM
+  // judgment is pre-determined when a missing/malformed field gets
+  // silently filled with a default. Tracked as a separate follow-up;
+  // the F-2 spillover scope was the outer try/catch only. Hard schema
+  // validation here is a follow-up that needs Tue's call on whether
+  // Haiku's known-rare malformed outputs should fail the call or
+  // silently coerce as today.
+  const validPutDown = ['high', 'moderate', 'low'] as const;
+  const rawPutDown = String(raw.putDownRisk ?? 'moderate');
+  const putDownRisk = validPutDown.includes(rawPutDown as typeof validPutDown[number])
+    ? (rawPutDown as typeof validPutDown[number])
+    : 'moderate';
 
-    // Validate and coerce
-    const validPutDown = ['high', 'moderate', 'low'] as const;
-    const rawPutDown = String(raw.putDownRisk ?? 'moderate');
-    const putDownRisk = validPutDown.includes(rawPutDown as typeof validPutDown[number])
-      ? (rawPutDown as typeof validPutDown[number])
-      : 'moderate';
+  const firstRead: AOFirstRead = {
+    hookMoment: raw.hookMoment ? String(raw.hookMoment) : null,
+    committeeOneLiner: String(raw.committeeOneLiner ?? 'Unable to summarize'),
+    distinctivenessSignal: raw.distinctivenessSignal ? String(raw.distinctivenessSignal) : null,
+    putDownRisk,
+    gutReaction: String(raw.gutReaction ?? ''),
+  };
 
-    const firstRead: AOFirstRead = {
-      hookMoment: raw.hookMoment ? String(raw.hookMoment) : null,
-      committeeOneLiner: String(raw.committeeOneLiner ?? 'Unable to summarize'),
-      distinctivenessSignal: raw.distinctivenessSignal ? String(raw.distinctivenessSignal) : null,
-      putDownRisk,
-      gutReaction: String(raw.gutReaction ?? ''),
-    };
+  // Calculate cost (Haiku pricing)
+  const inputCost = (usage.input_tokens / 1_000_000) * 0.80;
+  const outputCost = (usage.output_tokens / 1_000_000) * 4.00;
+  const cacheReadCost = ((usage.cache_read_input_tokens ?? 0) / 1_000_000) * 0.08;
+  const cost = inputCost + outputCost + cacheReadCost;
 
-    // Calculate cost (Haiku pricing)
-    const inputCost = (usage.input_tokens / 1_000_000) * 0.80;
-    const outputCost = (usage.output_tokens / 1_000_000) * 4.00;
-    const cacheReadCost = ((usage.cache_read_input_tokens ?? 0) / 1_000_000) * 0.08;
-    const cost = inputCost + outputCost + cacheReadCost;
-
-    return {
-      firstRead,
-      cost,
-      tokenUsage: {
-        inputTokens: usage.input_tokens,
-        outputTokens: usage.output_tokens,
-        cacheReadTokens: usage.cache_read_input_tokens ?? 0,
-        cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
-      },
-      timingMs,
-    };
-  } catch (error) {
-    const timingMs = Date.now() - callStart;
-    const errMsg = error instanceof Error ? error.message : String(error);
-    console.warn(`[AOFirstRead] Failed (non-fatal): ${errMsg}`);
-
-    // Graceful degradation — pipeline continues without AO first read
-    return {
-      firstRead: {
-        hookMoment: null,
-        committeeOneLiner: '(AO first read unavailable)',
-        distinctivenessSignal: null,
-        putDownRisk: 'moderate',
-        gutReaction: '',
-      },
-      cost: 0,
-      tokenUsage: { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
-      timingMs,
-    };
-  }
+  return {
+    firstRead,
+    cost,
+    tokenUsage: {
+      inputTokens: usage.input_tokens,
+      outputTokens: usage.output_tokens,
+      cacheReadTokens: usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: usage.cache_creation_input_tokens ?? 0,
+    },
+    timingMs,
+  };
 }

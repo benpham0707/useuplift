@@ -734,7 +734,9 @@ export class ReanalysisOrchestrator {
       // [F-1 wire-up 2026-04-29] Thread focused-mode escalation level so
       // IterationRecord.escalationLevel reflects the level that actually
       // triggered comprehensive escalation, not a silent 0. See parameter
-      // doc above; consumer at analysisOrchestrator.ts:2054.
+      // doc above; consumer at analysisOrchestrator.ts (search for
+      // `escalationLevel: input.focusedEscalationLevel ?? 0`) — line
+      // numbers drift across commits, so a textual anchor is more durable.
       focusedEscalationLevel,
     };
 
