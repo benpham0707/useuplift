@@ -45,6 +45,7 @@ export default defineConfig({
       // unit/integration); they're enumerated explicitly here so vitest
       // picks them up.
       'tests/property/taughtMoveIdStability.ts',
+      'tests/property/iterationLedgerAppendOnly.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
