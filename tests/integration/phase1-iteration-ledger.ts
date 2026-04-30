@@ -99,6 +99,7 @@ import {
   SCENARIO_1_SMALL_EDIT,
   SCENARIO_2_STRUCTURAL_REORDER,
   SCENARIO_3_PARAGRAPH_DELETE,
+  SCENARIO_4_PARAGRAPH_INSERT,
   applyScenarioEdit,
   buildLanding,
   expectedEditSignificance,
@@ -929,6 +930,228 @@ describe('D-1.15 Scenario 3 — paragraph delete (P2 removed)', () => {
       // iter-1 P3 and P4 shift down by 1.
       expect(iter2Paras[2]).toBe(iter1Paras[3]);
       expect(iter2Paras[3]).toBe(iter1Paras[4]);
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 4 — paragraph insert (new paragraph between P1 and P2)
+// ============================================================================
+//
+// Tests the **shift-on-insert** path of priorAnnotationsBuilder. Harvard
+// MITES essay (4 paragraphs); iter-1 has moves on P1 and P2. Iter-2
+// inserts a new bridge paragraph AFTER P1 (so the new paragraph becomes
+// iter-2 index 2; existing P2 shifts to P3, P3 shifts to P4).
+//
+// Expected post-insert remap (paragraphRemapBuilder hash-positional matching):
+//   - old 0 → new 0 (identity)
+//   - old 1 → new 1 (identity — insertion is AFTER P1, so P1 keeps position)
+//   - old 2 → new 3 (shifted +1 by the inserted paragraph)
+//   - old 3 → new 4 (shifted +1)
+//   - new 2 (the inserted bridge) → has no old counterpart; not in the remap
+//
+// Effect on iter-1 priors:
+//   - P1 move: lands at iter-2 Map key 1 (identity), landing populated
+//   - P2 move: lands at iter-2 Map key 3 (shifted +1), landing populated
+//   - The new iter-2 P2 (the bridge) has NO priorAnnotations entry (no
+//     iter-1 history exists for that paragraph)
+
+describe('D-1.15 Scenario 4 — paragraph insert (new bridge between P1 and P2)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions ──────────────────────────────────
+
+  describe('mock surface — landingDetector firing pattern (no insert phantom calls)', () => {
+    it('detectLanding called once per iter-1 prior move (2 priors → 2 calls; new paragraph adds no detection)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      });
+      // SCENARIO_4 anchors 2 moves at P1, P2. The inserted paragraph has
+      // no iter-1 history → no detection. Expected: 2 calls.
+      expect(mockDetect).toHaveBeenCalledTimes(2);
+    });
+
+    it('detectLanding receives every iter-1 prior move id (no priors silently dropped on insert)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      });
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id).sort();
+      const expectedIds = expectedIter1MoveIds(SCENARIO_4_PARAGRAPH_INSERT).sort();
+      expect(calledMoveIds).toEqual(expectedIds);
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map — shift semantics + new-paragraph absence ─
+
+  describe('priorAnnotations Map (shift-on-insert; new paragraph has no entry)', () => {
+    it('Map size === 2 (one per surviving prior; inserted paragraph absent)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+      expect(priors.size).toBe(2);
+    });
+
+    it('Map keys reflect post-insert index shift: P1 stays at 1; P2 shifts to 3', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      // P1 → 1 (identity, insertion is AFTER P1); P2 → 3 (shifted by +1).
+      expect(keys).toEqual([1, 3]);
+
+      // Content distinguishability — iter-1 P1 source landed at key 1;
+      // iter-1 P2 source landed at key 3.
+      expect(priors.get(1)?.priorAnnotations[0].content).toMatch(/anchor at P1/);
+      expect(priors.get(3)?.priorAnnotations[0].content).toMatch(/anchor at P2/);
+    });
+
+    it('inserted paragraph (iter-2 index 2) has NO priorAnnotations entry (no iter-1 history)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      // The inserted paragraph (now at iter-2 P2, the "bridge") has no
+      // iter-1 ancestor — no Map entry exists for it. Verify the
+      // structural absence: get(2) returns undefined.
+      expect(
+        priors.get(2),
+        'inserted iter-2 P2 (the bridge paragraph) must have no priorAnnotations entry — no history exists',
+      ).toBeUndefined();
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing write-back (every surviving move populated) ─
+
+  describe('D-1.6.5 landing write-back (every iter-1 move gets landing populated post-insert)', () => {
+    it('both iter-1 taughtMoves have landing populated post-insert', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(move.landing).toBeUndefined();
+      }
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(
+          move.landing,
+          `move.landing populated for ${move.id} post-insert (D-1.6.5 wire)`,
+        ).toBeDefined();
+        expect(move.landing?.detectedAtIteration).toBe(2);
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the insertion ────────────
+
+  describe('iter-2 commit shape reflects paragraph insertion', () => {
+    it('iter-2 IterationRecord.editScope.structural.added === 1; paragraphsChanged covers insert anchor', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_4_PARAGRAPH_INSERT);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 paragraph_insert — Rule 4 (paragraph added) forces comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_4_PARAGRAPH_INSERT.edit),
+          significance: expectedEditSignificance(SCENARIO_4_PARAGRAPH_INSERT.edit),
+          changeTypes: [],
+          // Paragraph inserted: added=1, removed=0, reordered=false.
+          structural: { reordered: false, added: 1, removed: 0 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 paragraph_insert comprehensive re-analysis (D-1.15 Scenario 4)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.added).toBe(1);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.removed).toBe(0);
+      // paragraphsChanged for paragraph_insert = [insertAfterIndex] per
+      // getEditedParagraphIndices. SCENARIO_4 has insertAfterIndex=1.
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged).toEqual([1]);
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the insertion', () => {
+    it('iter-2 paragraph count = iter-1 + 1; bridge paragraph at index 2; existing paragraphs shifted', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_4_PARAGRAPH_INSERT.essayText,
+        SCENARIO_4_PARAGRAPH_INSERT.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_4_PARAGRAPH_INSERT.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length + 1);
+      // P0, P1 stay at 0, 1.
+      expect(iter2Paras[0]).toBe(iter1Paras[0]);
+      expect(iter2Paras[1]).toBe(iter1Paras[1]);
+      // P2 in iter-2 is the inserted bridge.
+      if (SCENARIO_4_PARAGRAPH_INSERT.edit.kind === 'paragraph_insert') {
+        expect(iter2Paras[2]).toBe(SCENARIO_4_PARAGRAPH_INSERT.edit.newParagraphText);
+      }
+      // iter-1 P2 and P3 shifted to iter-2 P3 and P4.
+      expect(iter2Paras[3]).toBe(iter1Paras[2]);
+      expect(iter2Paras[4]).toBe(iter1Paras[3]);
     });
   });
 });
