@@ -79,8 +79,13 @@
 //       (no `populated → mutated`, no `populated → undefined`).
 //     - Disallowed: any other field mutation on a committed TaughtMove
 //       (`id`, `annotationId`, `location`, `taughtAtIteration`,
-//       `teachingMode`, `contentSummary`, `stakesSnapshot`, `findingId`,
-//       `deepenedBy`, `supersededBy` all stay byte-identical post-commit).
+//       `teachingMode`, `contentSummary`, `stakesSnapshot`, `findingId`
+//       all stay byte-identical post-commit). [D-1.6.6 closure 2026-04-30:
+//       `deepenedBy?: string[]` and `supersededBy?: string` were removed
+//       from the TaughtMove type — they had zero producer/consumer in
+//       Phase 1. Kept off the enumeration; if a future deliverable
+//       re-adds them, list them here AND verify Property 1 / Property 5
+//       still hold for the re-added fields.]
 //
 //   IterationRecord remains FULLY append-only — no field carve-outs.
 //
@@ -96,10 +101,14 @@
 // loosened) — `populated → mutated` and `populated → undefined` are now
 // active assertions.
 //
-// If you ever consider widening the carve-out (e.g., "let `deepenedBy`
-// also be post-commit-mutable"), STOP and surface to product/spec
-// review. Each new carve-out is precedent that makes the next one easier
-// — that's the slippery slope this comment block is designed to halt.
+// If you ever consider widening the carve-out (e.g., "let
+// `stakesSnapshot` also be post-commit-mutable" if some future
+// deliverable wants to refresh stakes phrasing on later iterations),
+// STOP and surface to product/spec review. Each new carve-out is
+// precedent that makes the next one easier — that's the slippery slope
+// this comment block is designed to halt. The narrow scope ("landing
+// only, undefined → populated, exactly once") is deliberate and
+// load-bearing for the iteration ledger's audit-trail honesty.
 //
 // Seed convention: deterministic LCG seeded with 0xD1140002 (constant; no
 // semantic meaning beyond reproducibility on CI). Same convention as D-1.13.
