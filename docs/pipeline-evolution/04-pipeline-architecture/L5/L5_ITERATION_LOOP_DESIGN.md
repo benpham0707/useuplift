@@ -475,10 +475,14 @@ interface TaughtMove {
     reasoning: string;
     signalsUsed: Array<'edit_vs_critique' | 'redetection' | 'chat_behavior'>;
   };
-  /** If this move was deepened in a later iteration, the chain. */
-  deepenedBy?: string[];              // TaughtMove IDs
-  /** If this move was superseded by a later move at the same location, the link. */
-  supersededBy?: string;
+  // [D-1.6.6 closure 2026-04-30] `deepenedBy?: string[]` and
+  // `supersededBy?: string` were removed from the runtime type — they
+  // had zero producers and zero consumers in src/services/essayIntelligence/
+  // (Phase 1 dead-wire audit findings F-02, F-03). The fields will be
+  // re-added when a future deliverable lands a producer (mutator + write
+  // site) AND a consumer (the code that reads the chain) in the same
+  // commit. Don't grow a new dead wire. Note: `Finding.supersededBy` and
+  // `ImprovementCandidate.supersededBy` ARE wired and remain.
 }
 
 interface CarryForwardDecision {

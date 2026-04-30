@@ -5455,10 +5455,18 @@ export interface TaughtMove {
     /** Which signals fed the LLM-judged combiner. */
     signalsUsed: Array<'edit_vs_critique' | 'redetection' | 'chat_behavior'>;
   };
-  /** If this move was deepened in a later iteration, the deepening-chain by TaughtMove ID. */
-  deepenedBy?: string[];
-  /** If this move was superseded by a later move at the same location, the link. */
-  supersededBy?: string;
+  // [D-1.6.6 closure 2026-04-30] `deepenedBy?: string[]` and
+  // `supersededBy?: string` were declared here for cross-iteration
+  // chain-tracking but had ZERO producers and ZERO consumers anywhere
+  // in src/services/essayIntelligence/. Phase 1 dead-wire audit (F-02,
+  // F-03) flagged them as type-level ceremony. Removed to keep the
+  // schema honest. If a Phase 2/3 deliverable needs cross-iteration
+  // chain-tracking on TaughtMove, add the fields back ALONGSIDE the
+  // producer (mutator + write site) and the consumer (the code path
+  // that READS the chain) in the same commit — so we don't grow a
+  // new dead wire. Note: `Finding.supersededBy` (profileTypes.ts:3622)
+  // and `ImprovementCandidate.supersededBy` (profileTypes.ts:2270)
+  // ARE wired and remain.
 }
 
 /**

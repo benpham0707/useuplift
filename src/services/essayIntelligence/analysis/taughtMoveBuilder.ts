@@ -136,9 +136,12 @@ export function l5AnnotationToTaughtMove(
     teachingMode: annotation.teachingMode,
     contentSummary: annotation.content,
     stakesSnapshot: annotation.stakes !== null ? annotation.stakes : undefined,
-    // landing left undefined — set by landing detector next iteration.
-    // deepenedBy / supersededBy left undefined — set if/when this move
-    // is later linked into a chain.
+    // landing left undefined — populated post-detection by
+    // priorAnnotationsBuilder per the D-1.15.0 carve-out (D-1.6.5
+    // closure). [D-1.6.6 closure 2026-04-30] deepenedBy / supersededBy
+    // removed from TaughtMove type; chain-tracking dropped from
+    // Phase 1 scope until a producer + consumer co-land in a future
+    // deliverable.
   };
 }
 
