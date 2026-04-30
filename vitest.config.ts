@@ -57,6 +57,13 @@ export default defineConfig({
       // live-derivation chain tests (computeEditDiff → constructed brief →
       // buildEditScopeFromBrief → editScope).
       'tests/integration/d1-15-brief-editscope-translation.test.ts',
+      // D-1.15 deferred-item closure (2026-04-30) — Item 5: iter-2
+      // IterationRecord fidelity. Drives analyzeEssay through the L2-abort
+      // seam so the REAL commitIterationRecord runs and every IterationRecord
+      // field is asserted to flow honestly from PipelineInput / costTracker /
+      // telemetry buffer / recentDecisions, replacing D-1.15.x's manually-
+      // pushed hard-coded record.
+      'tests/integration/d1-15-iter2-iteration-record-fidelity.test.ts',
       // tests/property/ — D-1.13 onward. Spec uses literal filenames
       // without the `.test.ts` suffix (separate test category from
       // unit/integration); they're enumerated explicitly here so vitest
