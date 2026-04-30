@@ -26,6 +26,8 @@ export {
   SCENARIO_5_MULTI_PARAGRAPH_CASCADE,
   applyScenarioEdit,
   splitParagraphs,
+  getEditedParagraphIndices,
+  expectedEditSignificance,
 } from './scenarios';
 export type { Scenario, ScenarioEdit } from './scenarios';
 
@@ -42,5 +44,6 @@ export {
   ITER1_STARTED_AT,
   ITER1_FINISHED_AT,
   buildIter1Profile,
+  setupIter2,
   expectedIter1MoveIds,
 } from './iter1Setup';

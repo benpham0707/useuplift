@@ -45,6 +45,10 @@ export default defineConfig({
       'tests/integration/d1-11-decisions.test.ts',
       // D-1.15.1 harness foundation smoke test (2026-04-30).
       'tests/integration/d1-15-harness.test.ts',
+      // D-1.15 mock-LLM iteration ledger integration test (no .test.ts
+      // suffix per spec — separate test category, matching D-1.13/D-1.14
+      // property test convention).
+      'tests/integration/phase1-iteration-ledger.ts',
       // tests/property/ — D-1.13 onward. Spec uses literal filenames
       // without the `.test.ts` suffix (separate test category from
       // unit/integration); they're enumerated explicitly here so vitest

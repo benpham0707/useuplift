@@ -118,9 +118,14 @@ export type ScenarioEdit =
  *   buffered moves before commit, AND to assert iter-2's priorAnnotations
  *   Map population semantics post-edit.
  * - `edit` is the iter-2 transformation.
- * - `expectedMode` is what the iter-2 mode-selection should pick (focused
- *   for small/single-paragraph edits, comprehensive for multi-paragraph
- *   cascades or transformative changes).
+ * - `expectedMode` is what the iter-2 mode-selection should pick. NOTE
+ *   (D-1.15.2 H-4 audit closure 2026-04-30): all 5 D-1.15 scenarios run
+ *   on a fresh profile with `confidenceLevel='initial'`, which forces
+ *   comprehensive mode via FocusedAnalyzer.selectAnalysisMode Rule 1
+ *   (focusedAnalyzer.ts:759-762). The field is preserved on the type for
+ *   future scenarios that might seed a higher-confidence profile and
+ *   exercise the focused branch — but for the current 5 scenarios,
+ *   expectedMode === 'comprehensive' uniformly.
  * - `provenance` is the human-readable comment explaining where the essay
  *   came from and why it suits the scenario.
  */
@@ -160,10 +165,14 @@ export function splitParagraphs(text: string): string[] {
 // ─── Scenarios (one per iter-2 edit shape) ──────────────────────────────
 
 /**
- * Scenario 1: small edit — single sentence in P3 of the Harvard MITES
- * essay. Provenance: real admitted essay, 4 paragraphs, narrative-voice
- * register. Small-edit pattern (≤1 paragraph touched, < significant
- * threshold) is the canonical happy path that exercises focused mode.
+ * Scenario 1: small edit — single paragraph (P2) of the Harvard MITES
+ * essay revised. Provenance: real admitted essay, 4 paragraphs,
+ * narrative-voice register. Small-edit pattern (≤1 paragraph touched,
+ * < significant threshold) is the canonical iter-2 happy path —
+ * exercises the priorAnnotations builder, the D-1.6.5 landing write-back
+ * wire, and a clean mode-selection decision (comprehensive due to Rule 1
+ * fresh-profile confidence; would be focused if iter-1 had already
+ * matured the profile).
  */
 export const SCENARIO_1_SMALL_EDIT: Scenario = {
   id: 'scenario-1-small-edit',
@@ -185,9 +194,17 @@ export const SCENARIO_1_SMALL_EDIT: Scenario = {
     newParagraphText:
       "Living in a building with eighty strangers, in a place I had never been, while quitting milk cold-turkey was not easy. The first few days were brutal: stomach ulcers, awkward silences, the persistent feeling I did not belong. That first Thursday night, everything started to shift.",
   },
-  expectedMode: 'focused',
+  // Mode-selection rule 1 (FocusedAnalyzer.selectAnalysisMode at
+  // focusedAnalyzer.ts:759-762): confidenceLevel='initial' forces
+  // 'comprehensive' regardless of edit shape. The default
+  // createInitialProfile sets confidenceLevel='initial', so iter-2's first
+  // re-analysis on a fresh profile always goes comprehensive in production.
+  // This is realistic: a profile only earns 'developing' / 'high' confidence
+  // after multiple iterations; iter-2 of a fresh essay always re-runs the
+  // full pipeline. All 5 D-1.15 scenarios share this property.
+  expectedMode: 'comprehensive',
   provenance:
-    'Harvard MITES 2029 admitted essay (elite-examples-2025.ts:harvard-mites-2029); 4 paragraphs; narrative-voice. Small-edit scenario revises P2 with a tightened sentence — single-paragraph touch under significant threshold.',
+    'Harvard MITES 2029 admitted essay (elite-examples-2025.ts:harvard-mites-2029); 4 paragraphs; narrative-voice. Small-edit scenario revises P2 with a tightened sentence — single-paragraph touch under significant threshold. Comprehensive mode triggered by confidence=initial (Rule 1).',
 };
 
 /**
@@ -212,7 +229,7 @@ export const SCENARIO_2_STRUCTURAL_REORDER: Scenario = {
     indexA: 1,
     indexB: 2,
   },
-  expectedMode: 'focused',
+  expectedMode: 'comprehensive',
   provenance:
     'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs; reflection-action-action-resolution arc. Structural-reorder scenario swaps P1 (in-the-bubble reflection) with P2 (the awareness-week action), creating action-before-reflection. Tests D-1.7 paragraph remap on prior moves.',
 };
@@ -235,7 +252,7 @@ export const SCENARIO_3_PARAGRAPH_DELETE: Scenario = {
     kind: 'paragraph_delete',
     paragraphIndex: 2,
   },
-  expectedMode: 'focused',
+  expectedMode: 'comprehensive',
   provenance:
     'UCB cell-tower 2029 admitted essay (elite-examples-2025.ts:ucb-cell-tower-2029); 5 paragraphs; political-advocacy narrative. Paragraph-delete scenario removes P2 (the realization paragraph) — a deliberate digression cut. P2 carries a prior taughtMove that must drop with structured telemetry per D-1.7 round-2 LOW-1 closure.',
 };
@@ -262,7 +279,7 @@ export const SCENARIO_4_PARAGRAPH_INSERT: Scenario = {
     newParagraphText:
       "Looking back, the conversation with my chiropractor was just the surface of what scared me. Underneath was a quieter fear: that the body I had treated like a passenger had been keeping its own ledger — and the totals were due.",
   },
-  expectedMode: 'focused',
+  expectedMode: 'comprehensive',
   provenance:
     'Harvard MITES 2029 admitted essay (elite-examples-2025.ts:harvard-mites-2029) with a synthetic bridge paragraph inserted between P1 and P2. The insertion is realistic in shape — the kind of "missing reflection" beat a coach might surface on a teaching pass. Tests post-insert index shift on prior moves AND the no-history-for-new-paragraph invariant.',
 };
@@ -412,5 +429,66 @@ export function applyScenarioEdit(iter1Text: string, edit: ScenarioEdit): string
       }
       return out.join('\n\n');
     }
+  }
+}
+
+// ─── Edit-shape helpers (R-3 audit closure 2026-04-30) ─────────────────
+
+/**
+ * Return the paragraph indices an edit touches in iter-1 indexing space.
+ * Used by integration assertions to populate `editScope.paragraphsChanged`
+ * without spelling out the discriminated-union narrowing in every test.
+ *
+ * Semantics per edit kind:
+ *   - small_edit: [paragraphIndex]
+ *   - structural_reorder: [indexA, indexB]
+ *   - paragraph_delete: [paragraphIndex]
+ *   - paragraph_insert: [insertAfterIndex] (adjacent paragraph; the new
+ *     paragraph itself is at insertAfterIndex+1 in iter-2 space, but the
+ *     "what changed" for editScope is the surrounding context)
+ *   - multi_paragraph_cascade: [...edits.map(e => e.paragraphIndex)]
+ */
+export function getEditedParagraphIndices(edit: ScenarioEdit): number[] {
+  switch (edit.kind) {
+    case 'small_edit':
+      return [edit.paragraphIndex];
+    case 'structural_reorder':
+      return [edit.indexA, edit.indexB];
+    case 'paragraph_delete':
+      return [edit.paragraphIndex];
+    case 'paragraph_insert':
+      return [edit.insertAfterIndex];
+    case 'multi_paragraph_cascade':
+      return edit.edits.map((e) => e.paragraphIndex);
+  }
+}
+
+/**
+ * The scenario-canonical edit-significance label. Used by integration
+ * assertions and by the buildPriorAnnotationsForOrchestrator call's
+ * `editSignificance` argument so the harness threads a consistent
+ * mechanical-fallback equivalent that matches what the real
+ * editUnderstandingService would classify for the edit shape.
+ */
+export function expectedEditSignificance(
+  edit: ScenarioEdit,
+): 'minor' | 'moderate' | 'significant' | 'transformative' {
+  switch (edit.kind) {
+    case 'small_edit':
+      return 'minor';
+    case 'structural_reorder':
+      // Reordering same paragraphs preserves words; significance is
+      // architectural, not lexical. 'significant' is the LLM-realistic
+      // label for "structure changed but voice preserved."
+      return 'significant';
+    case 'paragraph_delete':
+    case 'paragraph_insert':
+      // Structural shape change → significant.
+      return 'significant';
+    case 'multi_paragraph_cascade':
+      // Multiple paragraphs rewritten → transformative (the LLM-realistic
+      // label for >2 paragraphs touched simultaneously per
+      // FocusedAnalyzer.selectAnalysisMode Rule 5).
+      return 'transformative';
   }
 }

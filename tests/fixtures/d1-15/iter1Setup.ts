@@ -60,7 +60,7 @@ import type {
   TaughtMove,
 } from '../../../src/services/essayIntelligence/profileTypes';
 import type { Scenario } from './scenarios';
-import { splitParagraphs } from './scenarios';
+import { applyScenarioEdit, splitParagraphs } from './scenarios';
 import { buildIter1L5Annotations } from './layerFixtures';
 
 /**
@@ -184,6 +184,36 @@ export function buildIter1Profile(scenario: Scenario): EssayProfile {
   }
 
   return profile;
+}
+
+// ─── Iter-2 setup helper (R-1 audit closure 2026-04-30) ────────────────
+
+/**
+ * Bundle the common iter-2 preparation flow. Used by integration tests
+ * across all 5 scenarios to avoid duplicating `buildIter1Profile +
+ * applyScenarioEdit + incrementIteration` in every `it`.
+ *
+ * Returns the iter-2-ready `profile` (currentIteration=2, iter-1 fully
+ * committed) plus the `iter2Text` (iter-2 essay after applying the
+ * scenario's edit).
+ *
+ * Diagnosability: the helper is deterministic — same scenario in,
+ * same outputs out. When a downstream assertion fails, the failure
+ * points at the assertion, not at setup variability.
+ *
+ * NOTE: callers MUST set their `mockDetect.mockResolvedValue(...)`
+ * BEFORE calling buildPriorAnnotationsForOrchestrator. The helper does
+ * NOT install a default mock — that decision is the test's, since
+ * different scenarios may want different landing semantics.
+ */
+export function setupIter2(scenario: Scenario): {
+  profile: EssayProfile;
+  iter2Text: string;
+} {
+  const profile = buildIter1Profile(scenario);
+  const iter2Text = applyScenarioEdit(scenario.essayText, scenario.edit);
+  incrementIteration(profile, 'edit');
+  return { profile, iter2Text };
 }
 
 /**
