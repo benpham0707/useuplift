@@ -150,6 +150,76 @@ Bake the "$500/hr counselor benchmark" into every prompt — the LLM
 should be told what tone, depth, and texture to produce, with examples
 of strong vs weak emissions.
 
+### 5a. The tailored-not-generic principle (load-bearing)
+
+Tue's directive (2026-04-30): *"the system is supposed to make
+everything very tailored to and specific. Like the essay is talking to
+that specific user and that specific essay as it truly understands them
+and what they are trying to do or convey or what our system suggests it
+should do to convey better or deeper or stronger meaning and create a
+stronger essay for themselves and their character/narrative. But it
+shouldn't be generic explanations or generic advice based on what our
+system noticed but rather it should feel tailored like a $500/hr
+counselor would understand the best qualities that can be highlighted
+for that student and the possible layers and depths to them that can be
+showcased. Everything is specific in terms of how it works or what part
+of the essay we're referencing and why in that particular case would our
+suggestion be better and connect to other parts within the essay.
+Basically an extremely tailored experience and guidance where nothing is
+generic and everything is grounded in depth of knowledge of best
+practices and understanding of the user/essay."*
+
+This is **load-bearing for every Phase 2 prompt**. Translate into
+prompt-engineering rules:
+
+- **Every emission must reference a SPECIFIC text span** (not "in the
+  essay's voice" but `"the way you opened P2 with 'I picked my jaw up
+  off the ground'"`). The student should recognize THEIR essay in the
+  feedback, sentence by sentence.
+- **Every suggestion must connect to ANOTHER PART of the essay.**
+  ("This stronger turning-point detail in P3 amplifies the
+  noticing-discipline thread you set up in P0's wheelchair scene.")
+  Cross-paragraph grounding is the hallmark of $500/hr counselor work
+  vs generic-rubric output.
+- **Every "you should..." must be PARTICULAR to this student's
+  narrative architecture.** Banned shape: "Add concrete sensory detail."
+  Required shape: "The bleach-and-citrus opening in your P0 is the
+  texture-anchor your other paragraphs are reaching for — tighten P3's
+  abstract closing toward that same kind of physical particularity."
+- **The LLM must read the WHOLE essay in context for every emission**
+  — never let a layer emit a critique on P3 without prior-paragraph
+  + later-paragraph context threaded into the prompt. Cross-paragraph
+  awareness is structural, not optional.
+- **Banned vocabulary in prompts**: "the essay should..." (impersonal),
+  "in general..." (generic), "consider adding..." (vague). Required
+  vocabulary: "your P3 is..." "what you're doing in P0..." "the
+  through-line you started with X gets weaker when you...".
+- **Reject any output where 80%+ of the words could apply to a
+  different essay.** This is the test for genericity — if you swapped
+  in a different student's essay text, would the feedback still read
+  as plausible? If yes, the feedback is generic. The prompt must force
+  the LLM to produce feedback that is structurally bound to THIS
+  essay's specific architecture, character, and narrative arc.
+- **Reading-strategy discovery (LLM-first per `feedback_llm-first-design.md`
+  Rule 5)**: the L3 walk should DISCOVER what matters most for THIS
+  particular essay during the reading, not apply a fixed dimension
+  weighting. Then every later layer's emissions reference that
+  discovered reading strategy by name. This makes the whole pipeline's
+  output coherent to one student's essay rather than a pre-determined
+  rubric.
+- **Test the principle empirically**: when reviewing prompt outputs
+  with Tue, the first quality test is "could this paragraph of feedback
+  appear word-for-word on a different student's essay?" If yes, the
+  prompt is failing the tailored-not-generic discipline and needs
+  another revision round.
+
+This principle is what separates a $500/hr counselor's work from a
+$50/hr review service. Phase 2's prompts must produce the former, not
+the latter. Every prompt round-1 draft includes a section that
+explicitly tells the LLM "the student should be able to identify their
+own essay from this feedback — if they couldn't, the feedback is
+failing."
+
 ### 6. The standing operational charter still holds
 
 Per the prior session's discipline:
@@ -195,14 +265,30 @@ Per the prior session's discipline:
 ## Begin by
 
 1. Reading the critical context files (1–10 above) — surface back to
-   Tue when complete with a summary of the PIQ prompt-strength findings
-   AND the 7 OPEN deferred items rolled into a concrete first-pass
-   closure plan
-2. Do NOT start D-2.1 or any prompt work until Tue ratifies the
-   PHASE_2_PROMPT_BENCHMARK.md and the deferred-items closure plan
+   Tue when complete with:
+   (a) a summary of the PIQ prompt-strength findings
+   (b) the 7 OPEN deferred items rolled into a concrete first-pass
+       closure plan
+   (c) a first-pass take on how the PIQ prompts honor (or fail) the
+       tailored-not-generic principle from §5a — this becomes the
+       seed of `PHASE_2_PROMPT_BENCHMARK.md` because the benchmark's
+       core test ("could this feedback paragraph apply to a different
+       student's essay?") IS the tailored-not-generic principle
+       operationalized
+2. Do NOT start D-2.1 or any prompt work until Tue ratifies:
+   (a) PHASE_2_PROMPT_BENCHMARK.md
+   (b) the deferred-items closure plan
+   (c) the tailored-not-generic test pattern (concrete examples of
+       passing / failing emissions for each of the 5 layers)
 3. Surface every Phase 2 high-level decision to Tue immediately —
    prompt round-1 drafts, cost-spend pre-ratification, scope
    expansions, product-direction questions
+4. **The first quality test at every prompt review round**: take 3-5
+   sample emissions, ask "could each of these appear word-for-word on a
+   different student's essay?" If yes for any → the prompt is failing
+   §5a and needs another revision round. This test runs BEFORE any
+   other quality check (length, tone, evidence-grounding) because
+   tailored-not-generic is the foundation; the others are polish.
 
 The session standing authorization is to work autonomously WITHIN each
 non-prompt deliverable's audit cycle, AND to pause for Tue review at
