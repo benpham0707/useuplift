@@ -85,6 +85,47 @@ vi.mock('../../src/services/essayIntelligence/analysis/landingDetector', async (
   };
 });
 
+// ─── Layer 6/7 mocks (D-1.12 catch-site coverage — Item 13) ─────────────
+//
+// Item 13 extends this file to cover the orchestrator-side catches D-1.12
+// closed (5 CRITICAL + 9 HIGH violations). The closures introduced new
+// structured-failure surfaces (EditProcessResult.deferReason+error,
+// FocusedAnalysisResult.escalationLevelTrustworthy+failedSteps, plus
+// orchestrator-side telemetry emits). Item 13 verifies each closure
+// FIRES and produces the expected diagnostic shape under runtime
+// failure injection — D-1.12 itself was code-review-only.
+//
+// Mock surface chosen at the boundary closest to each catch:
+//   - `focusedAnalyzer.runFocusedAnalysis` — controls the C3 catch + the
+//     Commit B failure-flag consumption in `runFocusedMode`.
+//   - `analyzeEssay` (the function) — controls the C4 catch in
+//     `runComprehensiveMode` (triggerReanalysis calls analyzeEssay).
+// Both are imported by reanalysisOrchestrator; mocking at the module
+// boundary is the cleanest way to inject failure without instantiating
+// real layer pipelines (zero API spend per the cost charter).
+vi.mock('../../src/services/essayIntelligence/analysis/focusedAnalyzer', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../src/services/essayIntelligence/analysis/focusedAnalyzer')
+  >('../../src/services/essayIntelligence/analysis/focusedAnalyzer');
+  return {
+    ...actual,
+    focusedAnalyzer: {
+      ...actual.focusedAnalyzer,
+      runFocusedAnalysis: vi.fn(),
+    },
+  };
+});
+
+vi.mock('../../src/services/essayIntelligence/analysis/analysisOrchestrator', async () => {
+  const actual = await vi.importActual<
+    typeof import('../../src/services/essayIntelligence/analysis/analysisOrchestrator')
+  >('../../src/services/essayIntelligence/analysis/analysisOrchestrator');
+  return {
+    ...actual,
+    analyzeEssay: vi.fn(),
+  };
+});
+
 import { detectLanding } from '../../src/services/essayIntelligence/analysis/landingDetector';
 import { buildPriorAnnotationsForOrchestrator } from '../../src/services/essayIntelligence/analysis/priorAnnotationsBuilder';
 import { incrementIteration } from '../../src/services/essayIntelligence/profileManager/essayProfileManager';
@@ -98,6 +139,19 @@ import {
   expectedEditSignificance,
   setupIter2,
 } from '../fixtures/d1-15';
+
+// ─── Item-13-specific imports (orchestrator catch-site drivers) ─────────
+import { ReanalysisOrchestrator } from '../../src/services/essayIntelligence/analysis/reanalysisOrchestrator';
+import type { EditProcessResult } from '../../src/services/essayIntelligence/analysis/reanalysisOrchestrator';
+import { focusedAnalyzer } from '../../src/services/essayIntelligence/analysis/focusedAnalyzer';
+import type { FocusedAnalysisResult } from '../../src/services/essayIntelligence/analysis/focusedAnalyzer';
+import { analyzeEssay } from '../../src/services/essayIntelligence/analysis/analysisOrchestrator';
+import { InMemoryCheckpointStore } from '../../src/services/essayIntelligence/profileManager/checkpointStore';
+import {
+  flushEventsForIteration,
+  __resetTelemetryForTesting,
+} from '../../src/services/essayIntelligence/telemetry/iterationTelemetry';
+import type { EditUnderstandingOutput } from '../../src/services/essayIntelligence/profileTypes';
 
 const mockDetect = vi.mocked(detectLanding);
 
@@ -549,5 +603,672 @@ describe('D-1.16 Layer 5 — enrichment contract for arbitrary detector errors',
       expect(msg).toMatch(/\[priorAnnotationsBuilder\]/);
       expect(msg).toMatch(/detector returned a non-Error rejection/);
     }
+  });
+});
+
+// ============================================================================
+// Layer 6 — Orchestrator-side D-1.12 catch-site failure injection (Item 13)
+// ============================================================================
+//
+// Item 13 (deferred from `phase-1-integrity-audit.md` §6 #13 / MED-1)
+// extends D-1.16's coverage to the orchestrator-side catches that D-1.12
+// closed via code-review-only. The original D-1.16 layered around the
+// priorAnnotationsBuilder + landingDetector + carve-out + edit-signal
+// surfaces — none of which exercise the reanalysisOrchestrator's
+// `runFocusedMode` (C3) and `runComprehensiveMode` (C4) catch sites that
+// D-1.12 Commit A reshaped, nor the focusedAnalyzer-failure-flag
+// consumption (Commit B) that the orchestrator now reads.
+//
+// Item 13 covers the load-bearing closures D-1.12's audit named CRITICAL
+// or HIGH:
+//   - C3 (focused_failed)         — runFocusedMode catch + telemetry + EditProcessResult discriminator
+//   - C4 (comprehensive_failed)   — runComprehensiveMode catch + telemetry + EditProcessResult discriminator
+//   - Commit B (escalation_lying) — orchestrator consumes focusedAnalyzer.escalationLevelTrustworthy=false
+//                                  and emits per-failedStep telemetry + suppresses misleading escalationLevel
+//
+// Skipped (out-of-scope for Item 13):
+//   - C1/C2 (coordinator-rebuild + closeVersion) — reachable only inside
+//     `triggerReanalysis`; their throws are absorbed by C4's catch, so
+//     C4's coverage already exercises the surfaced shape. C1/C2 internal
+//     rethrow paths are code-review-validated by D-1.12's audit doc.
+//   - C5 (HTTP boundary) — covered by `tests/unit/edit-process-response.test.ts`
+//     (D-1.16-prefix F-04 closure).
+//   - H4-H6, H10 (analysisOrchestrator deep-stack catches) — reachable only
+//     by driving analyzeEssay end-to-end with mocked-LLM substrate that
+//     advances the orchestrator past Phase 5 / 5.5 / 5.75 / Phase 6. Each
+//     would require a multi-layer mock harness larger than this deliverable.
+//     Coverage at the catch-emission shape is via D-1.12's commit code-review;
+//     runtime-emission proof is deferred to Phase 2's full-pipeline harness.
+//
+// Mock surface: `focusedAnalyzer.runFocusedAnalysis` (a method on a singleton)
+// and `analyzeEssay` (a function export). Both are mocked at the module
+// boundary via vi.mock at file top. `triggerReanalysis` is the orchestrator's
+// own public method but its only LLM-bound call is `analyzeEssay`; mocking
+// `analyzeEssay` to throw produces the same shape the C4 catch sees in
+// production (the inner closure catches like C1/C2 also rethrow into this
+// boundary).
+//
+// Test-driving discipline: the orchestrator's `runFocusedMode` and
+// `runComprehensiveMode` are private methods. Calling them via
+// `(orchestrator as unknown as { runFocusedMode: ... }).runFocusedMode(...)`
+// is the surgical interposition — the alternative (driving `processEdit`
+// end-to-end) requires mocking `editUnderstandingService` AND nudging
+// the profile's `confidenceLevel` to bypass `selectAnalysisMode`'s
+// comprehensive-default rules. The private-method drive isolates each
+// catch precisely; the success of `processEdit` end-to-end is covered
+// by the D-1.15 scenario tests (which run the whole flow with
+// confidence-level-mature profiles + non-throwing focusedAnalyzer mocks).
+//
+// ─── Pre-existing wiring gap surfaced by Item 13 ────────────────────────
+//
+// The Commit B per-failedStep telemetry emit at
+// reanalysisOrchestrator.ts:1319-1343 sits AFTER the mode='focused'
+// (non-escalated) early-return at line 1264. This means: when
+// focusedResult.mode='focused' (clean focused, no escalation) AND
+// failedSteps is non-empty (some inner step caught), the per-step emit
+// NEVER fires — the audit trail is missing for the most common case
+// where the focused pipeline partially succeeded.
+//
+// Item 13 verifies the closure on the load-bearing escalation path
+// (where F-1's wire to IterationRecord.escalationLevel lives). The
+// non-escalated gap is a real defect worth fixing in a follow-up:
+// either (a) move the per-step emit BEFORE the if(!escalated) early
+// return, or (b) duplicate the emit block inside the early-return so
+// both paths surface failedSteps. Recommended fix is (a) — single
+// source-of-truth for the emit. Surfaced to Tue in Item 13's commit
+// message as a residual concern.
+
+// ─── Item 13 helpers ────────────────────────────────────────────────────
+
+/**
+ * Build a syntactically-valid EditUnderstandingOutput for driving the
+ * orchestrator's runFocusedMode / runComprehensiveMode. The shape only
+ * needs to satisfy the type contract — the catches under test never
+ * read its content (the focused analyzer / analyzeEssay mocks make
+ * the decision before any field is consulted).
+ */
+function buildSyntheticEditOutput(): EditUnderstandingOutput {
+  return {
+    diff: {
+      structural: {
+        paragraphsAdded: [],
+        paragraphsRemoved: [],
+        paragraphsReordered: false,
+        paragraphDelta: 0,
+      },
+      paragraphChanges: [],
+      stats: { totalSentencesChanged: 0, totalWordsChanged: 0, changeRatio: 0 },
+    },
+    understanding: {
+      significance: 'minor',
+      significanceReasoning: 'synthetic for Item 13 — content unread by catches under test',
+      changeType: 'word_refinement',
+      apparentPurpose: 'synthetic',
+      purposeConfidence: 0.5,
+      profileImpact: {
+        directImpact: 'synthetic',
+        connectionImpact: [],
+        paragraphImpact: null,
+        holisticImpact: null,
+      },
+      scopeRecommendation: { scope: 'sentence_update', reasoning: 'synthetic' },
+    },
+    stalenessEffects: [],
+    analysisMode: 'focused',
+  };
+}
+
+/**
+ * Construct a ReanalysisOrchestrator on an iter-1 fixture profile. We use
+ * SCENARIO_1's small-edit shape so the iter-1 setup matches the rest of
+ * D-1.16's surface, but we never actually drive the edit through —
+ * Item 13's tests exercise the focused-mode / comprehensive-mode paths
+ * directly via the private-method handles.
+ */
+function buildItem13Orchestrator(): ReanalysisOrchestrator {
+  __resetTelemetryForTesting();
+  const profile = buildIter1Profile(SCENARIO_1_SMALL_EDIT);
+  // Iter-2 ledger increment is required so getCurrentIteration() (used
+  // by the catch sites' telemetry emits) returns iter=2, matching the
+  // production shape where catches fire during iter-2 processing.
+  incrementIteration(profile, 'edit');
+  // Pre-populate the improvementCandidateSnapshot so EssayProfileCoordinator.fromCheckpoint
+  // does NOT trigger the legacy-profile migration branch (which uses a runtime
+  // `require('../improvements/profileMigration')` that vitest's vite-node
+  // transform cannot resolve at runtime). The fixture profile is an iter-1
+  // first-pass that hasn't yet had any L3 layer populate candidates; an empty
+  // snapshot satisfies the post-Phase-1.5 invariant the migration branch enforces.
+  profile.improvementCandidateSnapshot = { candidates: [], nextId: 0 };
+  const checkpointStore = new InMemoryCheckpointStore();
+  return new ReanalysisOrchestrator(profile, checkpointStore, D1_15_ESSAY_ID);
+}
+
+/**
+ * Type-narrow handle to the orchestrator's private runFocusedMode /
+ * runComprehensiveMode. Pattern matches D-1.10's seam-test discipline
+ * where private orchestrator methods are exercised directly with a
+ * documented shape contract.
+ */
+type OrchestratorPrivateMethods = {
+  runFocusedMode: (
+    editOutput: EditUnderstandingOutput,
+    costBreakdown: unknown[],
+    totalCostSoFar: number,
+  ) => Promise<EditProcessResult>;
+  runComprehensiveMode: (
+    editOutput: EditUnderstandingOutput,
+    costBreakdown: unknown[],
+    totalCostSoFar: number,
+    focusedResult?: FocusedAnalysisResult,
+  ) => Promise<EditProcessResult>;
+};
+
+/** Build a clean FocusedAnalysisResult with escalationLevelTrustworthy=true. */
+function buildCleanFocusedResult(
+  overrides: Partial<FocusedAnalysisResult> = {},
+): FocusedAnalysisResult {
+  return {
+    mode: 'focused',
+    escalationLevel: 1,
+    updatedParagraphIndex: 0,
+    updatedSentenceIndex: 0,
+    understandingDelta: null,
+    analysisDelta: null,
+    phaseUpdate: null,
+    cost: [],
+    totalCost: 0,
+    escalationLevelTrustworthy: true,
+    failedSteps: [],
+    ...overrides,
+  };
+}
+
+const mockedFocusedRun = vi.mocked(focusedAnalyzer.runFocusedAnalysis);
+const mockedAnalyzeEssay = vi.mocked(analyzeEssay);
+
+// ─── Item 13 sub-cases — C3 (runFocusedMode catch) ──────────────────────
+
+describe('D-1.16 Item 13 — C3: runFocusedMode catch (focused_failed)', () => {
+  beforeEach(() => {
+    mockedFocusedRun.mockReset();
+    mockedAnalyzeEssay.mockReset();
+  });
+
+  it('C3 (a) — focusedAnalyzer.runFocusedAnalysis throws → EditProcessResult.deferReason="focused_failed" + populated error', async () => {
+    // Mock the focused analyzer to throw a generic Error. This is the
+    // production shape the C3 catch handles — pre-fix it returned
+    // `{mode:'deferred', reanalysisTriggered:false}` indistinguishable
+    // from the policy-defer path. Post-fix it must return
+    // deferReason='focused_failed' with populated error.layer/message/code.
+    mockedFocusedRun.mockRejectedValueOnce(new Error('synthetic focused-analyzer crash'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const editOutput = buildSyntheticEditOutput();
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(editOutput, [], 0);
+
+    // Halt-on-error contract: the catch returns a structured result, not
+    // a thrown exception. mode='deferred' is the agreed shape; the
+    // discriminator is `deferReason`.
+    expect(result.mode).toBe('deferred');
+    expect(result.reanalysisTriggered).toBe(false);
+    expect(result.deferReason).toBe('focused_failed');
+
+    // error must be populated with the SDK-shape fields the HTTP boundary
+    // (D-1.12 C5 closure) reads at essayCoachingRoutes.ts:413.
+    expect(result.error).toBeDefined();
+    expect(result.error?.layer).toBe('focusedAnalyzer');
+    expect(result.error?.code).toBe('focused_analyzer_threw');
+    expect(result.error?.message).toMatch(/synthetic focused-analyzer crash/);
+  });
+
+  it('C3 (b) — telemetry: structured iterationTelemetry event fires with code="focused_analyzer_threw"', async () => {
+    // Pre-fix the catch logged via console.error only. The audit trail
+    // gap was the load-bearing concern — no consumer of iterationLedger
+    // events could see the failure. Post-fix the catch emits a
+    // structured iteration event; this assertion verifies the emission
+    // shape matches the production contract.
+    mockedFocusedRun.mockRejectedValueOnce(new Error('synthetic for telemetry-shape assertion'));
+
+    const orchestrator = buildItem13Orchestrator();
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    // Iter-2 because buildItem13Orchestrator advanced the ledger.
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failureEvent = events.find(
+      (e) => e.step === 'runFocusedMode' && e.status === 'failed',
+    );
+    expect(failureEvent, 'runFocusedMode failure telemetry event must fire').toBeDefined();
+    expect(failureEvent?.error?.code).toBe('focused_analyzer_threw');
+    expect(failureEvent?.error?.message).toMatch(/synthetic for telemetry-shape assertion/);
+    // Diagnostic context: downstreamBehavior names the consumer-visible
+    // effect so an operator reading the telemetry knows what the caller
+    // did with the failure.
+    const errorContext = failureEvent?.error?.context as { downstreamBehavior?: string } | undefined;
+    expect(errorContext?.downstreamBehavior).toMatch(/EditProcessResult\.deferReason=focused_failed/);
+  });
+
+  it('C3 (c) — Error subclass (TimeoutError) propagates SDK-shape into EditProcessResult.error.message', async () => {
+    // Verify the catch preserves the original Error's message text. SDK
+    // routing (different backoff for TIMEOUT vs OVERLOAD) depends on
+    // operators being able to read the original failure mode from the
+    // surfaced shape. The catch uses `error.message` directly per
+    // reanalysisOrchestrator.ts:1275-1280 — no subclass-specific masking.
+    const sdkError = await mockLlmFailure('focused.runFocusedAnalysis', 'timeout').catch((e) => e);
+    mockedFocusedRun.mockRejectedValueOnce(sdkError);
+
+    const orchestrator = buildItem13Orchestrator();
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    expect(result.error?.message).toMatch(/simulated timeout/);
+    expect(result.deferReason).toBe('focused_failed');
+  });
+});
+
+// ─── Item 13 sub-cases — C4 (runComprehensiveMode catch) ────────────────
+
+describe('D-1.16 Item 13 — C4: runComprehensiveMode catch (comprehensive_failed)', () => {
+  beforeEach(() => {
+    mockedFocusedRun.mockReset();
+    mockedAnalyzeEssay.mockReset();
+  });
+
+  it('C4 (a) — analyzeEssay throws inside triggerReanalysis → deferReason="comprehensive_failed" + populated error', async () => {
+    // The C4 catch wraps `triggerReanalysis()` which internally calls
+    // analyzeEssay. Mocking analyzeEssay to throw produces the production
+    // failure shape. Pre-fix this catch returned indistinguishably from
+    // the policy-defer branch; post-fix it populates deferReason +
+    // error.layer='triggerReanalysis'.
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('synthetic analyzeEssay crash'));
+
+    const orchestrator = buildItem13Orchestrator();
+    // Force the version-tracker's policy to recommend triggering by
+    // recording a transformative edit. The runComprehensiveMode path
+    // checks `shouldTriggerReanalysis()` BEFORE calling triggerReanalysis;
+    // without the trigger nudge it returns the policy-defer branch and
+    // never reaches the C4 catch. Use the orchestrator's public version
+    // tracker via a typed handle.
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: {
+          recordEdit: (o: EditUnderstandingOutput, t: string) => void;
+          shouldTriggerReanalysis: () => { shouldTrigger: boolean; reason: string; urgency: string };
+        };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text for trigger nudge');
+    // Sanity: the policy gate now allows trigger.
+    expect(versionTracker.shouldTriggerReanalysis().shouldTrigger).toBe(true);
+
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0);
+
+    expect(result.mode).toBe('comprehensive');
+    expect(result.reanalysisTriggered).toBe(false);
+    expect(result.deferReason).toBe('comprehensive_failed');
+    expect(result.error).toBeDefined();
+    expect(result.error?.layer).toBe('triggerReanalysis');
+    expect(result.error?.code).toBe('trigger_reanalysis_threw');
+    expect(result.error?.message).toMatch(/synthetic analyzeEssay crash/);
+  });
+
+  it('C4 (b) — telemetry: structured event fires with code="trigger_reanalysis_threw" + wasEscalation flag', async () => {
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('synthetic for C4 telemetry-shape assertion'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    // Direct comprehensive (no focusedResult) → wasEscalation should be false.
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0, undefined);
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failureEvent = events.find(
+      (e) => e.step === 'runComprehensiveMode' && e.status === 'failed',
+    );
+    expect(failureEvent, 'runComprehensiveMode failure telemetry event must fire').toBeDefined();
+    expect(failureEvent?.error?.code).toBe('trigger_reanalysis_threw');
+    const ctx = failureEvent?.error?.context as
+      | { downstreamBehavior?: string; wasEscalation?: boolean }
+      | undefined;
+    expect(ctx?.wasEscalation).toBe(false);
+    expect(ctx?.downstreamBehavior).toMatch(/EditProcessResult\.deferReason=comprehensive_failed/);
+  });
+
+  it('C4 (c) — escalation tail: focusedResult passed → wasEscalation=true in telemetry context', async () => {
+    // When runComprehensiveMode is called as the escalation tail of a
+    // focused-mode run, the original focusedResult is threaded through
+    // so the orchestrator can mark wasEscalation=true. Operators reading
+    // telemetry need to distinguish "comprehensive crashed standalone"
+    // from "comprehensive crashed AFTER focused already ran" because
+    // the latter implies double-cost waste.
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('escalation-tail crash'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    const escalatedFocusedResult = buildCleanFocusedResult({
+      mode: 'escalated_to_comprehensive',
+      escalationLevel: 4,
+    });
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0, escalatedFocusedResult);
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failureEvent = events.find(
+      (e) => e.step === 'runComprehensiveMode' && e.status === 'failed',
+    );
+    expect(failureEvent).toBeDefined();
+    const ctx = failureEvent?.error?.context as { wasEscalation?: boolean } | undefined;
+    expect(ctx?.wasEscalation).toBe(true);
+  });
+
+  it('C4 (d) — policy_defer (no failure) does NOT emit failure telemetry — clean policy decision', async () => {
+    // Negative control: the policy-defer branch (added in D-1.12 C4 partial)
+    // sets deferReason='policy_defer' WITHOUT firing a failure telemetry
+    // event. This guards against regression where a future change makes
+    // every comprehensive-mode return path emit a failure event,
+    // corrupting the audit trail.
+    const orchestrator = buildItem13Orchestrator();
+    // No versionTracker.recordEdit nudge → shouldTriggerReanalysis returns
+    // false → runComprehensiveMode hits the policy-defer branch.
+
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0);
+
+    expect(result.deferReason).toBe('policy_defer');
+    expect(result.error).toBeUndefined();
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failureEvent = events.find(
+      (e) => e.step === 'runComprehensiveMode' && e.status === 'failed',
+    );
+    expect(failureEvent, 'policy-defer must NOT emit failure telemetry').toBeUndefined();
+  });
+});
+
+// ============================================================================
+// Layer 7 — Commit B failure-flag consumption (Item 13)
+// ============================================================================
+//
+// D-1.12 Commit B reshaped focusedAnalyzer to surface
+// `escalationLevelTrustworthy` + `failedSteps[]` instead of silently
+// hardcoding escalationLevel on internal catches. The orchestrator's
+// `runFocusedMode` is now the consumer that:
+//   (1) emits one iterationTelemetry event per entry in failedSteps[]
+//       (parity with F-2's AO First Read closure pattern); and
+//   (2) when the result is `mode='escalated_to_comprehensive'`, passes
+//       UNDEFINED escalationLevel to triggerReanalysis (instead of the
+//       potentially-misleading hardcoded value), so IterationRecord.escalationLevel
+//       defaults honestly to 0 via the consumer's `?? 0`.
+//
+// These are the "Commit B HIGH violations" closures the audit named
+// (H1-H3 in §4 of d1-12-halt-on-error-pass.md). Item 13 verifies the
+// consumer-side wiring fires under runtime conditions.
+
+describe('D-1.16 Item 13 — Commit B: focusedAnalyzer failure-flag consumption', () => {
+  beforeEach(() => {
+    mockedFocusedRun.mockReset();
+    mockedAnalyzeEssay.mockReset();
+  });
+
+  it('Commit B (a) — single failed step on escalation tail → orchestrator emits one telemetry event named focusedAnalyzer.<step>', async () => {
+    // Mock focusedAnalyzer to RESOLVE (not throw) with
+    // escalationLevelTrustworthy=false and a single failedStep. This is
+    // the production shape after Commit B's catches push to failedSteps
+    // and the success-path return at line 1685 of focusedAnalyzer.ts
+    // sets escalationLevelTrustworthy = failedSteps.length === 0.
+    //
+    // [Item 13 audit closure 2026-04-30] We exercise the ESCALATION-TAIL
+    // path (mode='escalated_to_comprehensive') because the per-step
+    // telemetry emit at reanalysisOrchestrator.ts:1319 sits AFTER the
+    // mode='focused' early-return at line 1264. A pre-existing wiring
+    // gap: when mode='focused' (non-escalated) but failedSteps is
+    // non-empty, the per-step emit never fires. The escalation path
+    // is where F-1's load-bearing wire (focusedEscalationLevel →
+    // IterationRecord.escalationLevel) lives, so verifying the emit
+    // there covers the load-bearing audit trail. The non-escalated
+    // gap is surfaced as a residual concern in the commit message.
+    //
+    // We also need analyzeEssay to throw (since escalation falls through
+    // to runComprehensiveMode → triggerReanalysis → analyzeEssay) — the
+    // throw halts after the per-step emits but before any further state
+    // mutation, isolating the assertion surface to the Commit B emits.
+    mockedFocusedRun.mockResolvedValueOnce(
+      buildCleanFocusedResult({
+        mode: 'escalated_to_comprehensive',
+        escalationLevel: 4,
+        escalationLevelTrustworthy: false,
+        failedSteps: ['step1_understanding'],
+      }),
+    );
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('halt after Commit B emits'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const stepFailureEvent = events.find(
+      (e) => e.step === 'focusedAnalyzer.step1_understanding' && e.status === 'failed',
+    );
+    expect(stepFailureEvent, 'per-failedStep telemetry must fire on escalation tail').toBeDefined();
+    expect(stepFailureEvent?.error?.code).toBe('focused_step1_understanding_swallowed');
+    const ctx = stepFailureEvent?.error?.context as
+      | { resultEscalationLevel?: number; allFailedSteps?: string[] }
+      | undefined;
+    expect(ctx?.resultEscalationLevel).toBe(4);
+    expect(ctx?.allFailedSteps).toEqual(['step1_understanding']);
+  });
+
+  it('Commit B (b) — multiple failed steps on escalation tail → one telemetry event PER step (parity with F-2 closure)', async () => {
+    // The audit-trail contract is one event per failedStep. This guards
+    // against regressions where a future refactor batches the events
+    // (one summary event with all steps in context) — the audit shape
+    // expects one-per-step so a downstream consumer can grep by step name.
+    // Same escalation-tail reasoning as Commit B (a) — see audit-closure
+    // comment there.
+    mockedFocusedRun.mockResolvedValueOnce(
+      buildCleanFocusedResult({
+        mode: 'escalated_to_comprehensive',
+        escalationLevel: 4,
+        escalationLevelTrustworthy: false,
+        failedSteps: ['step1_understanding', 'level2_rewalk', 'phase_recompute'],
+      }),
+    );
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('halt after Commit B emits'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failedStepEvents = events.filter(
+      (e) => typeof e.step === 'string' && e.step.startsWith('focusedAnalyzer.') && e.status === 'failed',
+    );
+    expect(failedStepEvents).toHaveLength(3);
+    const stepNames = failedStepEvents.map((e) => e.step).sort();
+    expect(stepNames).toEqual([
+      'focusedAnalyzer.level2_rewalk',
+      'focusedAnalyzer.phase_recompute',
+      'focusedAnalyzer.step1_understanding',
+    ]);
+    // Every event carries the full allFailedSteps list so an operator
+    // grepping by ANY step name sees the whole picture.
+    for (const event of failedStepEvents) {
+      const ctx = event.error?.context as { allFailedSteps?: string[] } | undefined;
+      expect(ctx?.allFailedSteps).toEqual([
+        'step1_understanding',
+        'level2_rewalk',
+        'phase_recompute',
+      ]);
+    }
+  });
+
+  it('Commit B (c) — escalation with trustworthy=false → triggerReanalysis receives UNDEFINED escalationLevel', async () => {
+    // The load-bearing wire-up: F-1 wired focusedResult.escalationLevel
+    // through to IterationRecord.escalationLevel. Pre-Commit-B, every
+    // catch left escalationLevel at a hardcoded value, feeding F-1's wire
+    // a lie. Post-Commit-B, when escalationLevelTrustworthy=false, the
+    // orchestrator passes UNDEFINED to triggerReanalysis so the consumer's
+    // `?? 0` defaults honestly (telemetry has the real audit trail).
+    //
+    // We mock analyzeEssay (which triggerReanalysis calls internally) to
+    // observe the focusedEscalationLevel that ends up in PipelineInput.
+    // mockedAnalyzeEssay's first arg is the PipelineInput.
+    mockedFocusedRun.mockResolvedValueOnce(
+      buildCleanFocusedResult({
+        mode: 'escalated_to_comprehensive',
+        escalationLevel: 4,
+        escalationLevelTrustworthy: false,
+        failedSteps: ['step2_analysis'],
+      }),
+    );
+    // analyzeEssay throws so we don't have to construct a full PipelineResult
+    // — the ASSERTION is on the input it was called with, not its return.
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('halt after capturing input'));
+
+    const orchestrator = buildItem13Orchestrator();
+    // Nudge versionTracker so triggerReanalysis's policy gate fires.
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    expect(mockedAnalyzeEssay).toHaveBeenCalled();
+    const pipelineInput = mockedAnalyzeEssay.mock.calls[0]?.[0];
+    expect(pipelineInput).toBeDefined();
+    expect(
+      pipelineInput?.focusedEscalationLevel,
+      'untrustworthy escalationLevel must be undefined-passed (not 4) so IterationRecord defaults honestly',
+    ).toBeUndefined();
+  });
+
+  it('Commit B (d) — clean escalated run (trustworthy=true, failedSteps=[]) emits NO per-step failure telemetry', async () => {
+    // Negative control: when the focused analyzer reports a clean run
+    // on the escalation path (where the per-step emit IS reachable),
+    // the orchestrator must NOT spuriously emit per-step failure events.
+    // Guards against a regression where the `if (focusedResult &&
+    // !focusedResult.escalationLevelTrustworthy)` guard at line 1319 is
+    // accidentally inverted.
+    mockedFocusedRun.mockResolvedValueOnce(
+      buildCleanFocusedResult({
+        mode: 'escalated_to_comprehensive',
+        escalationLevel: 4,
+        escalationLevelTrustworthy: true,
+        failedSteps: [],
+      }),
+    );
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('halt after capturing input'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failedStepEvents = events.filter(
+      (e) => typeof e.step === 'string' && e.step.startsWith('focusedAnalyzer.') && e.status === 'failed',
+    );
+    expect(failedStepEvents, 'clean run must emit zero per-step failure telemetry').toHaveLength(0);
+  });
+
+  it('Commit B (e) — escalation with trustworthy=true → triggerReanalysis receives the REAL escalationLevel', async () => {
+    // Positive companion to Commit B (c): when escalationLevelTrustworthy=true,
+    // the real escalationLevel must be passed through. This proves the
+    // orchestrator's branch is `trustworthy ? real : undefined`, not
+    // unconditional undefined.
+    mockedFocusedRun.mockResolvedValueOnce(
+      buildCleanFocusedResult({
+        mode: 'escalated_to_comprehensive',
+        escalationLevel: 4,
+        escalationLevelTrustworthy: true,
+        failedSteps: [],
+      }),
+    );
+    mockedAnalyzeEssay.mockRejectedValueOnce(new Error('halt after capturing input'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    expect(mockedAnalyzeEssay).toHaveBeenCalled();
+    const pipelineInput = mockedAnalyzeEssay.mock.calls[0]?.[0];
+    expect(
+      pipelineInput?.focusedEscalationLevel,
+      'trustworthy escalationLevel must be passed through (not undefined-erased)',
+    ).toBe(4);
   });
 });

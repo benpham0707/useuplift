@@ -748,8 +748,17 @@ export class ReanalysisOrchestrator {
     // editChangeTypes: surfaced from the same upstream edit understanding;
     // used by analysisOrchestrator.commitIterationRecord to populate
     // IterationRecord.editScope.changeTypes when triggeredBy === 'edit'.
-    const currentProfile = this.coordinator.getProfile();
-    const priorIterationLedger = currentProfile.iterationLedger;
+    //
+    // [Item 13 drive-by fix 2026-04-30] Pre-existing duplicate `const currentProfile`
+    // declaration in the same function scope (the first declaration is at line 691
+    // for the essayType derivation). tsc tolerates this in the project's lib mode
+    // but esbuild (used by vitest) rejects it as a hard transform error, blocking
+    // any test that imports this file. Renamed the second to `profileForLedger` —
+    // it's a separate semantic (the profile snapshot taken NOW, before analyzeEssay
+    // overwrites this.coordinator). The two reads return the same Readonly snapshot
+    // via the coordinator's pure getProfile, so behavior is identical.
+    const profileForLedger = this.coordinator.getProfile();
+    const priorIterationLedger = profileForLedger.iterationLedger;
     const triggeredBy: 'edit' | 'student_request' = this.lastEditUnderstanding ? 'edit' : 'student_request';
     const editChangeTypes = this.lastEditUnderstanding?.changeTypes;
 
