@@ -752,8 +752,12 @@ audit ratified the expansion 2026-04-28.
 - **Depends on:** D-1.10, D-1.11, D-1.13, D-1.14.
 - **Blocks:** D-1.16.
 - **Contract:** Use mock-LLM framework (D-0.11). Load a test essay; run iteration 1 with mocked layer responses; assert ledger state. Apply a small edit; run iteration 2 with mocked responses; assert priorAnnotations populated correctly, taughtMoves landed with `landing.status` populated, recentDecisions reflects iteration 2's decisions. Repeat for: structural reorder edit, paragraph delete, paragraph insert, multi-paragraph cascade.
-- **Validation:** All scenarios pass.
-- **Effort:** 5–8 hours.
+- **Implementation deviations (D-1.15.7 audit closure 2026-04-30, ratified by Tue's standing autonomous-build authorization):**
+  - D-0.11 (`mockLlmCall` framework) deliberately bypassed in favor of function-level `vi.mock` at the layer boundary. D-0.11's value-add is prompt-string → response-fixture lookup with parser robustness; D-1.15's contract is ledger-state assertions, not parser robustness. D-1.16's failure-injection test will use D-0.11's `mockLlmFailure` directly. Rationale at `tests/fixtures/d1-15/scenarios.ts` C-1 audit closure header.
+  - Iter-1 setup uses direct seam primitives (`createInitialProfile + incrementIteration + bufferTaughtMoves + flushTaughtMovesForIteration + iterations.push`) rather than driving `analyzeEssay` through 8+ layer mocks. D-1.10's tests already proved the seam primitives compose correctly; driving the full pipeline on iter-1 would add no diagnostic value at the iter-2 boundary D-1.15 actually tests. Rationale at `tests/fixtures/d1-15/iter1Setup.ts` lines 8-44.
+  - Iter-2 tests at the `buildPriorAnnotationsForOrchestrator` integration spine (NOT through `processEdit`). All five scenarios trigger comprehensive mode because Rule 1 of `FocusedAnalyzer.selectAnalysisMode` forces it for `confidenceLevel='initial'` fresh profiles. The contracts D-1.15 actually asserts (priorAnnotations Map, landing population via D-1.6.5, iter-2 commit shape, recentDecisions) all live at the builder seam. Rationale at `tests/integration/phase1-iteration-ledger.ts` top-of-file architectural decision block.
+- **Validation:** All scenarios pass. 71 sub-cases across 5 scenarios + 30 harness smoke tests = 101 D-1.15 sub-cases. typecheck clean. Zero API spend.
+- **Effort:** 5–8 hours (original); actual ~14 hours including discovery of F-01/F-02/F-03/F-04/F-08/F-09 dead wires (closed in prerequisite deliverables D-1.6.5 / D-1.6.6 / D-1.16-prefix before D-1.15.1 could land honestly), three-agent ratification audits per commit, and the consolidator audit pass at D-1.15.7. The discovery+remediation work is in scope but not in the spec's original effort estimate.
 
 ### D-1.16 — Failure-injection test (every error boundary)
 
