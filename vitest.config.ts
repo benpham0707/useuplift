@@ -57,6 +57,15 @@ export default defineConfig({
       // live-derivation chain tests (computeEditDiff → constructed brief →
       // buildEditScopeFromBrief → editScope).
       'tests/integration/d1-15-brief-editscope-translation.test.ts',
+      // D-1.15 Item 6 sibling closure (2026-04-30) — analyzeEdit-brief-
+      // fidelity. Drives editUnderstandingService.understandEdit (real
+      // production code, mocked LLM boundary) → versionTracker →
+      // ReanalysisBrief → editScope as a unit. Closes the gap honestly
+      // named at d1-15-brief-editscope-translation.test.ts:13-44 where
+      // Item 6's tests synthesize the brief in-test rather than driving
+      // production. Default (CI): captured-fixture replay; gated real-
+      // API path via env RUN_ANALYZE_EDIT_FIDELITY=1.
+      'tests/integration/d1-15-analyze-edit-brief-fidelity.test.ts',
       // D-1.15 deferred-item closure (2026-04-30) — Item 5: iter-2
       // IterationRecord fidelity. Drives analyzeEssay through the L2-abort
       // seam so the REAL commitIterationRecord runs and every IterationRecord
