@@ -98,6 +98,7 @@ import {
   D1_15_ESSAY_ID,
   SCENARIO_1_SMALL_EDIT,
   SCENARIO_2_STRUCTURAL_REORDER,
+  SCENARIO_3_PARAGRAPH_DELETE,
   applyScenarioEdit,
   buildLanding,
   expectedEditSignificance,
@@ -709,6 +710,225 @@ describe('D-1.15 Scenario 2 — structural reorder (P1 ↔ P2 swap)', () => {
       expect(iter2Paras[1], 'iter-2 P1 = iter-1 P2 (swap)').toBe(iter1Paras[2]);
       expect(iter2Paras[2], 'iter-2 P2 = iter-1 P1 (swap)').toBe(iter1Paras[1]);
       expect(iter2Paras[3], 'P3 unchanged').toBe(iter1Paras[3]);
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 3 — paragraph delete (P2 removed)
+// ============================================================================
+//
+// Tests the **drop-on-delete** path of priorAnnotationsBuilder. UCB
+// cell-tower essay has 5 paragraphs; iter-1 has moves on P0/P2/P4. Iter-2
+// deletes P2.
+//
+// Expected post-delete remap:
+//   - old 0 → new 0 (identity)
+//   - old 1 → new 1 (identity)
+//   - old 2 → DROPPED (paragraph_deleted) — D-1.7 round-2 LOW-1 closure
+//   - old 3 → new 2 (shift down)
+//   - old 4 → new 3 (shift down)
+//
+// Effect on iter-1 priors:
+//   - P0 move: lands at iter-2 Map key 0 (identity), landing populated
+//   - P2 move: DROPPED before detection (priorAnnotationsBuilder.ts:200-213
+//     drop-on-deleted-paragraph branch) — landing stays undefined per
+//     the D-1.6.5 contract verified in d1-8 tests case (iii)
+//   - P4 move: lands at iter-2 Map key 3 (shifted), landing populated
+//
+// Detector call count: 2 (not 3) — the dropped move skips detection.
+
+describe('D-1.15 Scenario 3 — paragraph delete (P2 removed)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions (drop bypasses detector) ─────────
+
+  describe('mock surface — landingDetector NOT called for dropped paragraph', () => {
+    it('detectLanding called 2 times (3 priors with 1 dropped → 2 detections)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_3_PARAGRAPH_DELETE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+      });
+      // SCENARIO_3 anchors 3 moves at P0/P2/P4. P2 is deleted in iter-2,
+      // so its move drops before detection. Expected: 2 calls.
+      expect(mockDetect).toHaveBeenCalledTimes(2);
+    });
+
+    it('detectLanding receives ONLY the surviving (non-dropped) iter-1 prior move ids', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_3_PARAGRAPH_DELETE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+      });
+      // The dropped move's id should NOT be in the called set. The
+      // surviving moves are at P0 and P4 (per SCENARIO_3.iter1MoveAnchors
+      // ordering: index 0 = P0, index 1 = P2 (dropped), index 2 = P4).
+      const allExpectedIds = expectedIter1MoveIds(SCENARIO_3_PARAGRAPH_DELETE);
+      const survivingIds = [allExpectedIds[0], allExpectedIds[2]].sort();
+      const droppedId = allExpectedIds[1];
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id).sort();
+      expect(calledMoveIds).toEqual(survivingIds);
+      expect(calledMoveIds).not.toContain(droppedId);
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map — drop semantics ─────────────────
+
+  describe('priorAnnotations Map (drop on deleted paragraph; surviving moves shift)', () => {
+    it('Map size === 2 (one entry per surviving prior; dropped move absent)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_3_PARAGRAPH_DELETE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+      expect(priors.size).toBe(2);
+    });
+
+    it('Map keys reflect post-delete index shift: P0 stays at 0; P4 shifts to 3', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_3_PARAGRAPH_DELETE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      // P0 → 0 (identity); P2 → DROPPED; P4 → 3 (because P2's removal
+      // shifts everything from old-P3 onward down by 1).
+      expect(keys).toEqual([0, 3]);
+
+      // Content distinguishability — the iter-1 P0 source landed at key 0;
+      // iter-1 P4 source landed at key 3.
+      expect(priors.get(0)?.priorAnnotations[0].content).toMatch(/anchor at P0/);
+      expect(priors.get(3)?.priorAnnotations[0].content).toMatch(/anchor at P4/);
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing write-back (drop = no detection = undefined) ─
+
+  describe('D-1.6.5 landing write-back semantics under drop', () => {
+    it('surviving iter-1 moves get landing populated; dropped move stays undefined', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_3_PARAGRAPH_DELETE);
+      const allMoveIds = expectedIter1MoveIds(SCENARIO_3_PARAGRAPH_DELETE);
+      const droppedMoveId = allMoveIds[1]; // SCENARIO_3.iter1MoveAnchors[1] is P2.
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        if (move.id === droppedMoveId) {
+          // Dropped move: drop happens at priorAnnotationsBuilder.ts:200-213
+          // BEFORE the detector call site at line 221. Detector never runs
+          // for this move; landing stays undefined.
+          expect(
+            move.landing,
+            `dropped move ${move.id} (P2) landing must remain undefined (drop = no detection)`,
+          ).toBeUndefined();
+        } else {
+          // Surviving moves: detector runs, landing populated by D-1.6.5
+          // wire.
+          expect(
+            move.landing,
+            `surviving move ${move.id} landing populated post-iter-2 (D-1.6.5 wire)`,
+          ).toBeDefined();
+          expect(move.landing?.detectedAtIteration).toBe(2);
+        }
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the deletion ─────────────
+
+  describe('iter-2 commit shape reflects paragraph deletion', () => {
+    it('iter-2 IterationRecord.editScope.structural.removed === 1; paragraphsChanged covers deleted index', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_3_PARAGRAPH_DELETE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 paragraph_delete — Rule 4 (paragraph removed) forces comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_3_PARAGRAPH_DELETE.edit),
+          significance: expectedEditSignificance(SCENARIO_3_PARAGRAPH_DELETE.edit),
+          changeTypes: [],
+          // Paragraph deleted: removed=1, added=0, reordered=false.
+          structural: { reordered: false, added: 0, removed: 1 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 paragraph_delete comprehensive re-analysis (D-1.15 Scenario 3)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.removed).toBe(1);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.added).toBe(0);
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged).toEqual([2]);
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the deletion', () => {
+    it('iter-2 has paragraph count = iter-1 - 1; deleted paragraph absent', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_3_PARAGRAPH_DELETE.essayText,
+        SCENARIO_3_PARAGRAPH_DELETE.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_3_PARAGRAPH_DELETE.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length - 1);
+      // The deleted paragraph (iter-1 P2) is gone from iter-2 entirely.
+      expect(iter2Paras).not.toContain(iter1Paras[2]);
+      // iter-1 P0 and P1 remain at indices 0 and 1.
+      expect(iter2Paras[0]).toBe(iter1Paras[0]);
+      expect(iter2Paras[1]).toBe(iter1Paras[1]);
+      // iter-1 P3 and P4 shift down by 1.
+      expect(iter2Paras[2]).toBe(iter1Paras[3]);
+      expect(iter2Paras[3]).toBe(iter1Paras[4]);
     });
   });
 });
