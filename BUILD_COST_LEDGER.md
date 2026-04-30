@@ -59,3 +59,4 @@
 | 2026-04-27T14:40:00.303Z |   | claude-sonnet-4-5-20250929 |   |   | 3462 | 148 | 0 | 0 | 0.0126 |   | 0.4983 |
 | 2026-04-27T14:40:04.646Z |   | claude-sonnet-4-5-20250929 |   |   | 3412 | 161 | 0 | 0 | 0.0127 |   | 0.5110 |
 | 2026-04-27T14:40:04.647Z | D-1.5 | claude-sonnet-4-5-20250929 | landingDetector.prompt | calibration-summary | 0 | 0 |   |   | 0.0000 | D-1.5 calibration summary: 10/10 cases match expectation; total spent $0.1230 | 0.5110 |
+| 2026-04-30T07:55:00.000Z | D-1.18 | n/a | n/a | phase-1-closure | 0 | 0 |   |   | 0.0000 | Phase 1 closure: cumulative API spend $0.5110 / $1.00 mid-Phase-1 threshold (51.1%); $9.00 hard cap untouched (5.7%). Only D-1.5 was API-touching across 18 deliverables + 5 audit-driven prerequisites. D-1.6.5 / D-1.6.6 / D-1.16-prefix / D-1.15.0 / D-1.15.x / D-1.16 / D-1.17 all zero-API per the mock-LLM + integration-spine architectural decisions ratified in their respective audits. | 0.5110 |
