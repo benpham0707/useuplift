@@ -25,6 +25,7 @@ import type {
   LearningStyleObservations,
   StudentTheory,
 } from '@/services/essayIntelligence/profileTypes';
+import { buildEditProcessResponse } from './editProcessResponse';
 import {
   CREDIT_COSTS,
   atomicDebit,
@@ -79,6 +80,12 @@ function classifyError(err: unknown): ClassifiedError {
 }
 
 const essayCoachingRouter = Router();
+
+// EditProcessResult → HTTP response shape lives in ./editProcessResponse.
+// Extracted as a pure module to keep the four-branch logic unit-testable
+// without pulling in this route file's transitive dependencies. F-04
+// closure (D-1.16-prefix 2026-04-30) — see editProcessResponse.ts
+// top-of-file comment for the branch mapping and rationale.
 
 // ============================================================================
 // SESSION STORE (in-memory hot cache — backed by DB persistence)
@@ -632,10 +639,11 @@ essayCoachingRouter.post('/essay-coaching/edit', requireAuth, async (req: Reques
 
     const editResult = await session.orchestrator.processEdit(oldText, newText);
 
-    return res.json({
-      success: true,
-      data: { mode: editResult.mode, reanalysisTriggered: editResult.reanalysisTriggered, totalCost: editResult.totalCost },
-    });
+    // [F-04 closure D-1.16-prefix 2026-04-30] Branch the response on
+    // EditProcessResult.deferReason. See buildEditProcessResponse top-of-file
+    // comment for the 4-case mapping.
+    const { status, body } = buildEditProcessResponse(editResult);
+    return res.status(status).json(body);
   } catch (error: unknown) {
     console.error('[essay-coaching/edit] Error:', error);
     return res.status(500).json({ success: false, error: error instanceof Error ? error.message : 'Failed to process edit' });

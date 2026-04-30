@@ -5200,10 +5200,25 @@ export interface IterationLedger {
    * Per-iteration carry-forward decisions for diagnostic / audit.
    *
    * Producer: orchestrator appends at every carry-forward decision point
-   *   (per-paragraph, per-Finding, per-lens-emission, etc.).
-   * Consumers: regression detection ("voiceMap was carried 5 iterations
-   *   running but the essay's voice register evolved"), per-iteration
-   *   cost-vs-baseline regression detection.
+   *   (per-paragraph, per-Finding, per-lens-emission, etc.) via
+   *   `safeAppendCarryForwardDecision`.
+   *
+   * Consumers (Phase 1): the orchestrator reads this on commit to feed
+   *   `synthesizeCarryForwardSummary`, producing
+   *   `IterationRecord.carryForwardSummary` (the rolled-up audit shape).
+   *   That summary is persisted on the IterationRecord but has no Phase 1
+   *   runtime read consumer beyond the orchestrator's own debug log.
+   *
+   * Consumers (future, NOT YET WIRED — D-1.16-prefix F-08 honesty pass
+   * 2026-04-30): the regression-detection tooling and per-iteration
+   * cost-vs-baseline drift surface anticipated by the original spec are
+   * post-Phase-1 deliverables. Until they ship, this field's value is
+   * an audit trail only — populated correctly, persisted via checkpoint,
+   * but read by no live runtime feature. Any Phase 2/3 deliverable that
+   * adds a runtime consumer should update this JSDoc and add a
+   * branching-consumer test (see tests/unit/edit-process-response.test.ts
+   * for the pattern).
+   *
    * Pruning: pruned to the last 5 iterations at iteration end (decisions
    *   are dense and only audit-relevant short-term).
    */
@@ -5244,6 +5259,21 @@ export interface IterationRecord {
    * What the orchestrator decided to re-derive vs carry. Item-keyed for
    * audit traceability; the `recentDecisions[]` ledger holds the per-decision
    * detail, this is the rolled-up summary.
+   *
+   * Consumers (Phase 1): the orchestrator reads `(carried.length,
+   * rederived.length, refreshed.length)` at commit time for a debug log
+   * line; the summary is then persisted on this IterationRecord and
+   * serialized via the checkpoint store. Beyond that one debug-log read,
+   * NO Phase 1 runtime consumer queries this field.
+   *
+   * Consumers (future, NOT YET WIRED — D-1.16-prefix F-09 honesty pass
+   * 2026-04-30): the original spec anticipated a student-facing surface
+   * showing "what we kept understanding from last iteration" (Tue's
+   * 2026-04-15 vision per L5_ITERATION_LOOP_DESIGN.md §9.4); that
+   * deliverable has not landed. The field's data is correct and persisted;
+   * activating a runtime consumer is post-Phase-1 work. Any future
+   * deliverable that surfaces this in L5/L6/UI should update this JSDoc
+   * and add a branching-consumer test.
    */
   carryForwardSummary: {
     /** Items carried forward unchanged. e.g., `['voiceMap', 'P1.understanding', 'F3', 'F5']`. */
