@@ -1158,70 +1158,63 @@ describe('D-1.15 Scenario 4 — paragraph insert (new bridge between P1 and P2)'
 });
 
 // ============================================================================
-// Scenario 5 — multi-paragraph cascade (P0, P2, P3 simultaneously rewritten)
+// Scenario 5 — multi-paragraph cascade (surgical voice-preserving improvements)
 // ============================================================================
 //
-// Tests the **cascade-rewrite** behavior of priorAnnotationsBuilder under
-// realistic production semantics. UCLA cancer-awareness essay (4 paragraphs);
-// iter-1 has moves on every paragraph (P0/P1/P2/P3). Iter-2 rewrites P0,
-// P2, P3 in one commit; P1 unchanged.
+// Tests the **multi-survivor cascade** of priorAnnotationsBuilder under
+// realistic product behavior. UCLA cancer-awareness essay (4 paragraphs);
+// iter-1 has moves on every paragraph (P0/P1/P2/P3). Iter-2 applies
+// surgical 1-sentence-per-paragraph improvements to P0, P2, P3 — the
+// kind of coaching-style edit the system actually encourages
+// (specificity, concrete sensory detail, sharper verbs, tightening
+// grammatical messes). P1 unchanged.
 //
-// ─── Production behavior discovered (D-1.15.6 ratification 2026-04-30) ──
+// ─── Edit shape (D-1.15.6a ratification 2026-04-30) ─────────────────────
 //
-// `editUnderstandingService.computeEditDiff` classifies each rewritten
-// paragraph as a removed+added pair when overlap-ratio falls below the
-// **0.30 threshold defined at editUnderstandingService.ts:374** (Scenario
-// 5's rewrites are substantial enough to fall below — they preserve
-// theme but rewrite prose at the sentence level). The resulting diff
-// reports:
-//   - paragraphsAdded: [0, 2, 3]
-//   - paragraphsRemoved: [0, 2, 3]
-//   - paragraphsReordered: false
-// `paragraphRemapBuilder` consumes that classification (mirrored at
-// paragraphRemapBuilder.ts:210): the rewritten paragraphs DROP as
-// `paragraph_deleted` even though the iter-2 essay still has 4
-// paragraphs at the same indices. Only iter-1 P1 (unchanged content)
-// survives via hash-equal pairing.
-//
-// **Threshold coupling (C-4 audit closure 2026-04-30):** if a future
-// deliverable tunes the 0.30 constant — OR introduces a `'rewritten'`
-// classification that survives at lower overlap — the assertions below
-// will flip from `Map size === 1` to `Map size === 4` and `detectLanding
-// called 1 time` to `4 times`. When that happens, this comment block
-// signals "threshold drift, not test bug." The pinned constants
-// (Map size, call count) are deliberate threshold sentinels.
-//
-// This is meaningful production behavior, NOT a harness bug:
-//   - The system cannot distinguish "P0 was rewritten" from "P0 was
-//     deleted and a new P0 was inserted" when overlap is low.
-//   - From the iteration loop's perspective, this is conservative: better
-//     to drop the prior and regenerate fresh annotations than to thread
-//     stale annotations against rewritten content.
-//   - The drops fire structured `priorAnnotations.move_dropped` telemetry
-//     per D-1.7 round-2 LOW-1 — same wire as Scenario 3's delete.
+// Per Tue's product-direction clarification (2026-04-30): the system
+// tests improvement paths that PRESERVE voice and authentic meaning, not
+// full-paragraph rewrites. Each iter-2 edit modifies one sentence per
+// paragraph; the surrounding text is preserved verbatim. This:
+//   (i) reflects realistic student-system interaction — a coach surfaces
+//       a teaching point, the student tightens one sentence in response.
+//   (ii) keeps overlap-ratio well above the 0.30 threshold defined at
+//        editUnderstandingService.ts:374, so computeEditDiff classifies
+//        each as `modified` rather than remove+add.
+//   (iii) lets paragraphRemapBuilder thread all 4 iter-1 priors through
+//        to iter-2 with identity remap (0→0, 1→1, 2→2, 3→3); zero drops.
 //
 // Effect on iter-1 priors:
-//   - P0 move: DROPPED (paragraph_deleted via overlap < 0.30) — landing
-//     stays undefined
-//   - P1 move: lands at iter-2 Map key 1 (identity, unchanged), landing
-//     populated
-//   - P2 move: DROPPED — landing stays undefined
-//   - P3 move: DROPPED — landing stays undefined
+//   - P0 move: lands at iter-2 Map key 0 (modified, identity remap), landing populated
+//   - P1 move: lands at iter-2 Map key 1 (unchanged, identity remap), landing populated
+//   - P2 move: lands at iter-2 Map key 2 (modified, identity remap), landing populated
+//   - P3 move: lands at iter-2 Map key 3 (modified, identity remap), landing populated
 //
-// This is the spec's "multi-paragraph cascade" — verified to exercise
-// the carry-forward integration spine under cascade pressure: 3 priors
-// drop with telemetry, 1 prior survives with full landing-detection wire.
+// This exercises the multi-survivor cascade carry-forward arbitration
+// spine: 4 surviving priors, 4 simultaneous landing detections, full
+// iter-2 commit shape with editScope.paragraphsChanged covering [0,2,3].
+// The cascade pressure here is on the *landing-detection wire* (4
+// detectors fire, all results threaded back to source moves via D-1.6.5),
+// NOT the drop-wire (which Scenario 3's paragraph_delete already covers
+// at the dedicated drop-on-deletion path).
+//
+// **Threshold coupling note:** if a future deliverable tunes the 0.30
+// constant in editUnderstandingService.ts:374, the modified-vs-add+remove
+// boundary shifts. The assertions below pin Map size === 4 + detectLanding
+// called 4 times as deliberate threshold sentinels. If those flip to
+// Map size === 1 + 1 detection, that signals the surgical edits crossed
+// below the new threshold — at which point the FIXTURE's edit shape
+// needs gentling (smaller surgical changes), not the test's behavior.
 
-describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', () => {
+describe('D-1.15 Scenario 5 — multi-paragraph cascade (surgical voice-preserving improvements)', () => {
   beforeEach(() => {
     mockDetect.mockReset();
     mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
   });
 
-  // ─── Layer 1: mock-call assertions (3 drops + 1 survive = 1 detection) ─
+  // ─── Layer 1: mock-call assertions (4 surviving priors → 4 detections) ─
 
-  describe('mock surface — landingDetector firing only for surviving prior', () => {
-    it('detectLanding called 1 time (3 priors dropped via cascade rewrite + 1 survives)', async () => {
+  describe('mock surface — landingDetector firing on every surviving prior', () => {
+    it('detectLanding called 4 times (all 4 iter-1 priors survive the surgical-edit cascade)', async () => {
       const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
       await buildPriorAnnotationsForOrchestrator({
         essayId: D1_15_ESSAY_ID,
@@ -1229,12 +1222,13 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
         currentEssayText: iter2Text,
         editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
       });
-      // Only iter-1 P1 (unchanged) survives the remap; the three
-      // rewritten paragraphs' priors drop. Expected: 1 call.
-      expect(mockDetect).toHaveBeenCalledTimes(1);
+      // Surgical 1-sentence-per-paragraph improvements preserve overlap
+      // > 0.30 → all 4 iter-1 priors classified `modified` and survive
+      // into iter-2 priorAnnotations Map. Expected: 4 calls.
+      expect(mockDetect).toHaveBeenCalledTimes(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.iter1MoveAnchors.length);
     });
 
-    it('detectLanding receives ONLY the iter-1 P1 move id (the unchanged paragraph)', async () => {
+    it('detectLanding receives every iter-1 prior move id (multi-survivor cascade)', async () => {
       const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
       await buildPriorAnnotationsForOrchestrator({
         essayId: D1_15_ESSAY_ID,
@@ -1242,20 +1236,16 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
         currentEssayText: iter2Text,
         editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
       });
-      // Per SCENARIO_5.iter1MoveAnchors ordering: indices [0, 1, 2, 3]
-      // map to anchor paragraphs [P0, P1, P2, P3]. Only allMoveIds[1]
-      // (P1's move) survives.
-      const allMoveIds = expectedIter1MoveIds(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
-      const survivingId = allMoveIds[1];
-      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id);
-      expect(calledMoveIds).toEqual([survivingId]);
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id).sort();
+      const expectedIds = expectedIter1MoveIds(SCENARIO_5_MULTI_PARAGRAPH_CASCADE).sort();
+      expect(calledMoveIds).toEqual(expectedIds);
     });
   });
 
-  // ─── Layer 2: priorAnnotations Map — three drops, one survivor ──────
+  // ─── Layer 2: priorAnnotations Map — all 4 priors survive ───────────
 
-  describe('priorAnnotations Map (cascade drops 3 priors; only P1 survives)', () => {
-    it('Map size === 1 (only the unchanged-paragraph prior survives)', async () => {
+  describe('priorAnnotations Map (multi-survivor cascade: all 4 priors thread through)', () => {
+    it('Map size === 4 (all surviving priors at identity-remapped keys)', async () => {
       const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
       const priors = (await buildPriorAnnotationsForOrchestrator({
         essayId: D1_15_ESSAY_ID,
@@ -1263,10 +1253,10 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
         currentEssayText: iter2Text,
         editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
       })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
-      expect(priors.size).toBe(1);
+      expect(priors.size).toBe(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.iter1MoveAnchors.length);
     });
 
-    it('surviving Map entry is at key 1 (iter-1 P1 → iter-2 P1, identity remap)', async () => {
+    it('Map keys span the full set of iter-2 paragraph indices (identity remap: 0,1,2,3)', async () => {
       const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
       const priors = (await buildPriorAnnotationsForOrchestrator({
         essayId: D1_15_ESSAY_ID,
@@ -1275,40 +1265,51 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
         editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
       })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
 
-      const keys = Array.from(priors.keys());
-      expect(keys).toEqual([1]);
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      expect(keys).toEqual([0, 1, 2, 3]);
+
+      // Content distinguishability — each iter-1 source landed at its
+      // identity-remapped iter-2 key (no swap, no drop, no shift).
+      expect(priors.get(0)?.priorAnnotations[0].content).toMatch(/anchor at P0/);
       expect(priors.get(1)?.priorAnnotations[0].content).toMatch(/anchor at P1/);
+      expect(priors.get(2)?.priorAnnotations[0].content).toMatch(/anchor at P2/);
+      expect(priors.get(3)?.priorAnnotations[0].content).toMatch(/anchor at P3/);
     });
   });
 
-  // ─── Layer 3: D-1.6.5 landing — selective population ────────────────
+  // ─── Layer 3: D-1.6.5 landing — every surviving move populated ──────
 
-  describe('D-1.6.5 landing write-back (only surviving move populated; dropped moves stay undefined)', () => {
-    it('iter-1 P1 move has landing populated; P0/P2/P3 moves stay undefined', async () => {
+  describe('D-1.6.5 landing write-back (every iter-1 move gets landing populated post-cascade)', () => {
+    it('all 4 iter-1 taughtMoves have landing populated post-cascade (4 simultaneous detections)', async () => {
       const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
-      const allMoveIds = expectedIter1MoveIds(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
-      const survivingMoveId = allMoveIds[1]; // iter-1 P1 move.
-
-      await buildPriorAnnotationsForOrchestrator({
-        essayId: D1_15_ESSAY_ID,
-        profile,
-        currentEssayText: iter2Text,
-        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
-      });
 
       for (const move of profile.iterationLedger.taughtMoves) {
-        if (move.id === survivingMoveId) {
-          expect(
-            move.landing,
-            `surviving move ${move.id} (P1, unchanged) landing populated post-cascade (D-1.6.5 wire)`,
-          ).toBeDefined();
-          expect(move.landing?.detectedAtIteration).toBe(2);
-        } else {
-          expect(
-            move.landing,
-            `dropped move ${move.id} landing stays undefined (drop = no detection)`,
-          ).toBeUndefined();
-        }
+        expect(
+          move.landing,
+          `pre-condition: move.landing undefined for ${move.id}`,
+        ).toBeUndefined();
+      }
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      });
+
+      // Multi-survivor cascade: every iter-1 prior gets landing populated
+      // by D-1.6.5 wire. The cascade pressure here is on the
+      // landing-detection wire (4 detectors fire, all results threaded
+      // back to source moves), not the drop-wire.
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(
+          move.landing,
+          `move.landing populated for ${move.id} post-cascade (D-1.6.5 wire)`,
+        ).toBeDefined();
+        expect(
+          move.landing?.detectedAtIteration,
+          `landing.detectedAtIteration for ${move.id}`,
+        ).toBe(2);
       }
     });
   });
@@ -1330,7 +1331,7 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
         itemKey: 'mode_selection',
         decision: 'rederive',
         rationale:
-          'iter-2 multi_paragraph_cascade — Rule 5 (transformative AND >2 paragraphs changed) forces comprehensive.',
+          'iter-2 multi_paragraph_cascade (surgical voice-preserving) — Rule 5 (transformative AND >2 paragraphs changed) forces comprehensive.',
         arbitrationMechanism: 'comprehensive_rule',
         costSavedIfCarry: 0,
         costSpentIfRederive: 0.05,
@@ -1341,10 +1342,11 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
         2,
       );
 
-      // Cascade structural: rewrites classified as remove+add per
-      // overlap-ratio < 0.30 in computeEditDiff. iter-2 still has 4
-      // paragraphs but added=3, removed=3 (the rewritten paragraphs
-      // count both ways).
+      // Cascade structural for surgical voice-preserving edits: paragraph
+      // count is preserved (4 in, 4 out — no net add/remove). The
+      // `paragraphChanges` array classifies each edited paragraph as
+      // `modified`. So structural.{added,removed} are 0 (count semantics:
+      // net change in paragraph count). reordered=false (identity remap).
       const iter2Record: IterationRecord = {
         iteration: 2,
         triggeredBy: 'edit',
@@ -1352,7 +1354,7 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', (
           paragraphsChanged: getEditedParagraphIndices(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
           significance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
           changeTypes: [],
-          structural: { reordered: false, added: 3, removed: 3 },
+          structural: { reordered: false, added: 0, removed: 0 },
         },
         carryForwardSummary: summary,
         costBreakdown: {},

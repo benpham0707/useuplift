@@ -17,7 +17,7 @@ D-1.15 is the integration test for the iteration loop's continuity wire. Five sc
 | 2 | structural_reorder | swap P1 ↔ P2 | UCLA cancer-awareness 2029 | P0/P1/P2/P3 | 0 | 4 |
 | 3 | paragraph_delete | remove P2 | UCB cell-tower 2029 | P0/P2/P4 | 1 (P2) | 2 |
 | 4 | paragraph_insert | new paragraph after P1 | Harvard MITES 2029 | P1/P2 | 0 | 2 |
-| 5 | multi_paragraph_cascade | rewrite P0/P2/P3 simultaneously | UCLA cancer-awareness 2029 | P0/P1/P2/P3 | 3 (P0/P2/P3) | 1 |
+| 5 | multi_paragraph_cascade | surgical 1-sentence improvements to P0/P2/P3 (voice-preserving) | UCLA cancer-awareness 2029 | P0/P1/P2/P3 | 0 | 4 |
 
 All five scenarios trigger comprehensive mode in production (`FocusedAnalyzer.selectAnalysisMode` Rule 1: `confidenceLevel='initial'` on a fresh profile). Multi-essay diversity per Tue's directive: harvard-mites-2029 (S1, S4), ucla-cancer-awareness-2029 (S2, S5), ucb-cell-tower-2029 (S3).
 
@@ -120,17 +120,17 @@ Three distinct admitted essays from elite-examples-2025.ts. Each scenario uses a
 | 1 | paragraph-merge edit shape | `scenarios.ts` C-4 closure | Deferred to D-1.16 failure-injection scenarios |
 | 2 | paragraph-split edit shape | `scenarios.ts` C-4 closure | Deferred to D-1.16 failure-injection scenarios |
 | 3 | transformative-significance pure rewrite (>50% paragraphs touched) | `scenarios.ts` C-4 closure | Deferred to D-1.17 cross-phase audit |
-| 4 | **Scenario 5b — multi-survivor cascade** (1-sentence swaps preserving overlap > 0.30 so all 4 priors survive as `modified` and 4 detectors fire) | D-1.15.6 audit C-5/C-6 | **REQUIRES TUE RATIFICATION** — would expand to 6 scenarios; explicitly flagged for high-level decision-making per the standing operational charter |
+| 4 | ~~Scenario 5b — multi-survivor cascade~~ | D-1.15.6 audit C-5/C-6 | **CLOSED in D-1.15.6a** — Tue's product-direction clarification (2026-04-30) replaced Scenario 5's edit shape with surgical 1-sentence-per-paragraph voice-preserving improvements. Overlap stays > 0.30, all 4 priors survive as `modified`, all 4 detectors fire. The gap is now closed within the original 5-scenario contract (no spec expansion). The product-direction signal also sharpens the system's intended use: improvement paths preserve voice, not full rewrites. |
 | 5 | iter-2 IterationRecord synthesis fidelity (manual push omits `events`, `comprehensiveBaselineCost` placeholder, `escalationLevel`, `costBreakdown`) | D-1.15.2 C-5 closure | Deferred unless Phase 2+ surfaces regression |
 | 6 | brief→editScope translation untested (test hard-codes `structural` shape; the live derivation in `editUnderstandingService.computeEditDiff` → `briefBuilder` → `commitIterationRecord` isn't exercised) | D-1.15.4 Q5 | Deferred to D-1.16 / D-1.17 |
 | 7 | telemetry stdout volume in tests | consolidator S-6 | Cosmetic — defer or address with env flag |
-| 8 | Scenario 5's coverage gap explicitly flagged in fixture provenance | D-1.15.6 C-5 closure | Honest documentation; resolution depends on item 4 |
+| 8 | ~~Scenario 5's coverage gap flagged in fixture provenance~~ | D-1.15.6 C-5 closure | **CLOSED in D-1.15.6a alongside item 4.** The provenance string was rewritten to describe the new surgical-voice-preserving cascade behavior (4 surviving priors, 4 landing detections); no caveat remains. |
 
-### Item 4 deserves explicit surfacing
+### Item 4 — closed
 
-The audit recommended a Scenario 5b sub-case to close the gap that Scenario 5 (under production behavior) tests the drop-wire under cascade pressure but NOT multi-prior landing-detection. The spec's literal "5 scenarios" language and the operational charter's directive ("If you find yourself adding a 6th scenario, STOP and surface to Tue for ratification") block autonomous landing of 5b.
+Originally surfaced as needing Tue's ratification (would have expanded to 6 scenarios). Tue's product-direction clarification (2026-04-30) closed it differently — by REPLACING Scenario 5's edit shape rather than adding a 5b. The revised Scenario 5 uses surgical 1-sentence-per-paragraph improvements that preserve voice and authentic meaning (the kind of coaching-style edit the system actually encourages), keeping overlap > 0.30 so all 4 priors survive as `modified`. The multi-survivor cascade is now inside the 5-scenario contract; no expansion needed; product-direction signal preserved in the fixture's edit shape.
 
-**Recommendation for Tue's decision:** add Scenario 5b in a follow-up D-1.15.x deliverable that's narrowly scoped (1 commit, ~7 sub-cases, 2-3 hours of work). Current Scenario 5 is honest about what it tests; 5b would close the multi-survivor cascade coverage gap. The spec didn't anticipate the overlap-threshold-driven drop classification — adding 5b is faithful to the spec's intent even if it diverges from the literal "5 scenarios" line.
+D-1.15.6a is the closure commit.
 
 ---
 
@@ -180,7 +180,7 @@ The audit recommended a Scenario 5b sub-case to close the gap that Scenario 5 (u
 
 **Architectural deviations from spec literal** (D-0.11 bypass, seam-direct iter-1 setup, builder-seam iter-2 testing) are ratified and documented at three levels: source files, this audit doc, and an "Implementation deviations" footnote on the spec line itself. No silent divergence.
 
-**Eight deferred items** enumerated above. Item 4 (Scenario 5b multi-survivor cascade) is the highest-value follow-up; explicitly surfaced for Tue's high-level decision because adding it requires 6-scenario expansion ratification.
+**Eight items** enumerated above. Items 4 and 8 (the Scenario 5 multi-survivor cascade gap) **closed in D-1.15.6a** by replacing Scenario 5's edit shape with surgical voice-preserving improvements per Tue's product-direction clarification — the gap is now inside the 5-scenario contract, no spec expansion needed. Items 1, 2, 3 (paragraph-merge / -split / transformative pure rewrite) remain deferred to D-1.16/D-1.17. Item 5 (iter-2 IterationRecord synthesis fidelity) deferred. Items 6, 7 are operational/cosmetic.
 
 **Three-agent ratification audit pattern** held across all six scenario commits (heavier on D-1.15.0/1/2/6 where the architectural decisions were made; lighter on D-1.15.3/4/5 where patterns inherited from earlier scenarios).
 

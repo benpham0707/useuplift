@@ -301,47 +301,59 @@ export const SCENARIO_5_MULTI_PARAGRAPH_CASCADE: Scenario = {
   ],
   edit: {
     kind: 'multi_paragraph_cascade',
+    // [D-1.15.6a closure 2026-04-30] Edit shape replaced. Originally these
+    // were full-paragraph rewrites — but Tue's product-direction clarification
+    // (2026-04-30) is that the system tests improvement paths that PRESERVE
+    // voice and authentic meaning, not full rewrites. Each entry below
+    // changes exactly ONE sentence per paragraph (the kind of surgical
+    // coaching-style improvement the system actually encourages: replace a
+    // cliché with concrete sensory detail, tighten a grammatical mess,
+    // sharpen a vague verb). Surrounding sentences are preserved verbatim
+    // so overlap with the original stays well above the 0.30 threshold,
+    // computeEditDiff classifies each as `modified` (not remove+add), and
+    // all 4 iter-1 priors survive into iter-2's priorAnnotations Map with
+    // landing detection firing on each.
     edits: [
       {
         paragraphIndex: 0,
+        // Surgical change: clichéd "Classmates even smirked" + filler
+        // dialogue → sharper single classmate + concrete noun. First and
+        // third sentences identical.
         newParagraphText:
-          "The first day I rolled [Name's] wheelchair around campus, I expected sympathy. What I got instead were stares — long, evaluating stares, the kind that classify a person before they speak. One classmate even laughed and said, \"Sure to land you the National Honor Society.\" I felt my jaw set. \"[Name] isn't a project for my résumé. He's my friend.\"",
+          "The first day I rolled [Name's] wheelchair around school, people stared and whispered about him. One classmate snickered, \"This will land you an automatic A in service hours.\" Dumbstruck by the lack of empathy around me, I picked my jaw up off the ground and replied, \"[Name] isn't some charity project for his incurable cancer. He is my friend.\"",
       },
       {
         paragraphIndex: 2,
+        // Surgical change: clichéd "fight alongside him during his battle"
+        // → concrete action paired with sensory specificity. First, second,
+        // and fourth sentences identical.
         newParagraphText:
-          "Awareness Week began as a wall of names — donors, sponsors, volunteers — and ended as something I could not have named at the start: a community willing to sit, listen, and refuse to look away. We raised enough to cover three months of [Name's] treatments, but the real number was the count of people who showed up the morning after the walkathon to thank his mother by name.",
+          "Weeks following, I hosted a [Cancer] Awareness Week to help my peers to not only empathize with [Name], but also see life through his eyes. Through spending time with [Name], I've been inspired by his positive outlook. I wanted to show him that his school community would walk into the same waiting rooms he walked into, learn the same vocabulary his doctors used. As people began to put their priorities in perspective, hundreds of community members participated in the walkathons and school fundraisers that I hosted for him, raising $15,000 to ease his family's financial burden for his monthly treatments.",
       },
       {
         paragraphIndex: 3,
+        // Surgical change: tighten the grammatically tangled second
+        // sentence ("The shortsightedness in... are meaningless without...")
+        // into clean parallel construction. First sentence identical.
         newParagraphText:
-          "Today the halls feel different. Classmates still stop to greet [Name], but the stares have shifted register — admiration, recognition, a willingness to slow down. What he taught me, without ever sitting me down to say it, is that empathy is not a soft virtue. It is the discipline of paying attention when paying attention is inconvenient.",
+          "Today, as we walk down the halls together, classmates still stare–they stare with admiration as they give [Name] a warm \"What's up!\" Through my friendship with [Name], both my community and I understand the lesson most adults only learn at the end of their lives: the race to superficial success goes flat without the people we forget to thank along the way.",
       },
     ],
   },
   expectedMode: 'comprehensive',
-  // [D-1.15.6 audit C-5 closure 2026-04-30] Provenance updated to match
-  // ACTUAL production behavior. The original promise — "exercises landing
-  // detection on EVERY prior taughtMove" — turned out to be wrong:
-  // editUnderstandingService.computeEditDiff applies a 0.30 overlap-ratio
-  // threshold (editUnderstandingService.ts:374) and classifies the
-  // rewrites as remove+add pairs (no `modified` classification when
-  // overlap < 0.30). paragraphRemapBuilder consequently DROPS iter-1
-  // P0/P2/P3 priors with `paragraph_deleted` reason; only iter-1 P1
-  // (unchanged content) survives via hash-equal pairing. Detector fires
-  // exactly once. The cascade tests the DROP-WIRE under cascade
-  // pressure, NOT the multi-prior landing-detection surface.
-  //
-  // Spec-vs-behavior gap (surfaced to D-1.15.7 audit doc): the spec at
-  // L5_IMPLEMENTATION_PLAN.md §D-1.15 implied multi-survivor cascade
-  // coverage. The current scenario shape under-tests that surface.
-  // Adding a Scenario 5b sub-case (1-sentence swaps per paragraph,
-  // preserving overlap > 0.30) would close the gap by exercising
-  // multi-prior landing detection on 4 surviving priors, but that's a
-  // 6-scenario expansion requiring spec ratification per the standing
-  // operational charter.
+  // [D-1.15.6a closure 2026-04-30] Per Tue's product-direction clarification:
+  // the system tests voice-preserving surgical improvements, not full
+  // rewrites. Each iter-2 edit modifies one sentence per paragraph; the
+  // surrounding text is preserved. Overlap with each original paragraph
+  // stays well above the 0.30 threshold (editUnderstandingService.ts:374),
+  // so computeEditDiff classifies each as `modified` rather than
+  // remove+add. paragraphRemapBuilder threads all 4 iter-1 priors through
+  // to iter-2; landing-detection fires on every prior; the priorAnnotations
+  // Map populates fully. This is the multi-survivor cascade the spec
+  // intended — 4 surviving priors, 4 landing detections, full carry-forward
+  // arbitration spine exercised.
   provenance:
-    'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs. Multi-paragraph-cascade scenario rewrites P0, P2, P3 in one iter-2 commit. Production behavior: rewrites have overlap-ratio < 0.30 with originals, so computeEditDiff classifies them as remove+add pairs and paragraphRemapBuilder DROPS the corresponding iter-1 priors (`paragraph_deleted` reason). Only iter-1 P1 (unchanged content) survives. Tests the DROP-WIRE under cascade pressure (3 simultaneous drops with structured telemetry per D-1.7 round-2 LOW-1) plus a single multi-paragraph-cascade carry-forward arbitration. The multi-survivor cascade coverage gap is surfaced to D-1.15.7.',
+    'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs. Multi-paragraph-cascade scenario applies surgical voice-preserving improvements to P0, P2, P3 (one sentence per paragraph, surrounding text preserved verbatim — the kind of coaching-style edit the system encourages). Overlap stays above 0.30 → computeEditDiff classifies each as `modified`; paragraphRemapBuilder threads all 4 iter-1 priors through to iter-2; landing detection fires on every prior. Tests the multi-survivor cascade carry-forward arbitration spine: 4 simultaneous landing detections + iter-2 commit shape with editScope.paragraphsChanged covering [0,2,3].',
 };
 
 // ─── Public registry ────────────────────────────────────────────────────
