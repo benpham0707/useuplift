@@ -1211,6 +1211,55 @@ export class ReanalysisOrchestrator {
       totalCost += focusedResult.totalCost;
       costBreakdown.push(...focusedResult.cost);
 
+      // [D-1.16 Item 13 follow-up closure 2026-04-30 — per-failedStep
+      // telemetry pre-early-return wiring] Emit one iterationTelemetry
+      // event per entry in failedSteps[] BEFORE the if(!escalated)
+      // branch, so the audit trail captures partial failures regardless
+      // of whether focused mode succeeded with swallowed errors (PATH A,
+      // mode='focused') or escalated to comprehensive (PATH B,
+      // mode='escalated_to_comprehensive').
+      //
+      // Pre-fix this block sat AFTER the if(!escalated) early-return at
+      // the function tail, so PATH A (the most common partial-success
+      // case — focused mode resolves with mode='focused' but with
+      // non-empty failedSteps) silently lost its audit trail. Item 13's
+      // existing tests (`d1-16-failure-injection.ts`) explicitly
+      // documented the gap at line 1048-1058 and routed around it by
+      // testing only the escalation tail. This fix closes the audit-
+      // trail gap; D-4.11 escalation calibration depends on these
+      // events for over-escalation drift detection.
+      //
+      // focusedResult is guaranteed non-undefined here because it was
+      // assigned by the await at line 1203 — if that threw, control
+      // would be in the catch block, not here.
+      if (!focusedResult.escalationLevelTrustworthy) {
+        const iter = getCurrentIteration(this.coordinator.getProfile());
+        for (const step of focusedResult.failedSteps) {
+          emitIterationEvent(this.essayId, {
+            iteration: iter,
+            step: `focusedAnalyzer.${step}`,
+            status: 'failed',
+            error: {
+              message: `[FocusedAnalyzer] step ${step} caught and continued; escalationLevel may be misleading`,
+              code: `focused_${step}_swallowed`,
+              context: {
+                resultEscalationLevel: focusedResult.escalationLevel,
+                resultMode: focusedResult.mode,
+                allFailedSteps: focusedResult.failedSteps,
+                note: 'Telemetry emit is the audit trail; the result was returned with escalationLevelTrustworthy=false.',
+              },
+            },
+            timestamp: new Date().toISOString(),
+          });
+        }
+        console.warn(
+          `[ReanalysisOrchestrator] focused-analysis result has ${focusedResult.failedSteps.length} ` +
+            `failed step(s): [${focusedResult.failedSteps.join(', ')}]; escalationLevel ` +
+            `(${focusedResult.escalationLevel}) is untrustworthy and will not feed IterationRecord.escalationLevel. ` +
+            `mode=${focusedResult.mode}.`,
+        );
+      }
+
       // FIX 1.6: escalation is checked via mode field, not boolean
       const escalated = focusedResult.mode === 'escalated_to_comprehensive';
 
@@ -1309,38 +1358,11 @@ export class ReanalysisOrchestrator {
       };
     }
 
-    // [D-1.12 Commit B 2026-04-29] Read focused-analyzer's new structured
-    // failure flags. If any step caught (escalationLevelTrustworthy=false),
-    // emit one iteration-telemetry event per failed step so the audit trail
-    // captures the silent failures that were previously console-only.
-    // The orchestrator is the emitter (not focusedAnalyzer) because
-    // emitIterationEvent requires essayId, which lives on this.essayId
-    // and would force a signature change to thread into the analyzer.
-    if (focusedResult && !focusedResult.escalationLevelTrustworthy) {
-      const iter = getCurrentIteration(this.coordinator.getProfile());
-      for (const step of focusedResult.failedSteps) {
-        emitIterationEvent(this.essayId, {
-          iteration: iter,
-          step: `focusedAnalyzer.${step}`,
-          status: 'failed',
-          error: {
-            message: `[FocusedAnalyzer] step ${step} caught and continued; escalationLevel may be misleading`,
-            code: `focused_${step}_swallowed`,
-            context: {
-              resultEscalationLevel: focusedResult.escalationLevel,
-              allFailedSteps: focusedResult.failedSteps,
-              note: 'Telemetry emit is the audit trail; the result was returned with escalationLevelTrustworthy=false.',
-            },
-          },
-          timestamp: new Date().toISOString(),
-        });
-      }
-      console.warn(
-        `[ReanalysisOrchestrator] focused-analysis result has ${focusedResult.failedSteps.length} ` +
-          `failed step(s): [${focusedResult.failedSteps.join(', ')}]; escalationLevel ` +
-          `(${focusedResult.escalationLevel}) is untrustworthy and will not feed IterationRecord.escalationLevel.`,
-      );
-    }
+    // [D-1.16 Item 13 follow-up closure 2026-04-30] Per-failedStep emit
+    // was moved into the try block (search marker
+    // `[D-1.16 Item 13 follow-up closure 2026-04-30 — per-failedStep
+    // telemetry pre-early-return wiring]`). This region only handles
+    // the escalation fall-through to runComprehensiveMode.
 
     // Escalated: fall through to comprehensive
     return await this.runComprehensiveMode(editOutput, costBreakdown, totalCost, focusedResult);

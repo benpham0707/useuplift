@@ -1045,15 +1045,14 @@ describe('D-1.16 Item 13 — Commit B: focusedAnalyzer failure-flag consumption'
     // sets escalationLevelTrustworthy = failedSteps.length === 0.
     //
     // [Item 13 audit closure 2026-04-30] We exercise the ESCALATION-TAIL
-    // path (mode='escalated_to_comprehensive') because the per-step
-    // telemetry emit at reanalysisOrchestrator.ts:1319 sits AFTER the
-    // mode='focused' early-return at line 1264. A pre-existing wiring
-    // gap: when mode='focused' (non-escalated) but failedSteps is
-    // non-empty, the per-step emit never fires. The escalation path
-    // is where F-1's load-bearing wire (focusedEscalationLevel →
-    // IterationRecord.escalationLevel) lives, so verifying the emit
-    // there covers the load-bearing audit trail. The non-escalated
-    // gap is surfaced as a residual concern in the commit message.
+    // path here. The companion sub-case `Commit B (f)` exercises the
+    // focused-success-with-partial-failures path. Pre-D-1.16-follow-up,
+    // the per-step emit only fired on the escalation path because the
+    // emit block sat after a mode='focused' early-return; that wiring
+    // gap was closed by the D-1.16 follow-up commit which moved the
+    // emit BEFORE the if(!escalated) branch (see
+    // reanalysisOrchestrator.ts inline closure marker
+    // "[D-1.16 Item 13 follow-up closure 2026-04-30]").
     //
     // We also need analyzeEssay to throw (since escalation falls through
     // to runComprehensiveMode → triggerReanalysis → analyzeEssay) — the
@@ -1199,11 +1198,11 @@ describe('D-1.16 Item 13 — Commit B: focusedAnalyzer failure-flag consumption'
 
   it('Commit B (d) — clean escalated run (trustworthy=true, failedSteps=[]) emits NO per-step failure telemetry', async () => {
     // Negative control: when the focused analyzer reports a clean run
-    // on the escalation path (where the per-step emit IS reachable),
-    // the orchestrator must NOT spuriously emit per-step failure events.
-    // Guards against a regression where the `if (focusedResult &&
-    // !focusedResult.escalationLevelTrustworthy)` guard at line 1319 is
-    // accidentally inverted.
+    // on the escalation path, the orchestrator must NOT spuriously emit
+    // per-step failure events. Guards against a regression where the
+    // `if (!focusedResult.escalationLevelTrustworthy)` guard inside the
+    // try block (post-D-1.16-follow-up location, see
+    // reanalysisOrchestrator.ts closure marker) is accidentally inverted.
     mockedFocusedRun.mockResolvedValueOnce(
       buildCleanFocusedResult({
         mode: 'escalated_to_comprehensive',
@@ -1270,5 +1269,71 @@ describe('D-1.16 Item 13 — Commit B: focusedAnalyzer failure-flag consumption'
       pipelineInput?.focusedEscalationLevel,
       'trustworthy escalationLevel must be passed through (not undefined-erased)',
     ).toBe(4);
+  });
+
+  it('Commit B (f) — focused-SUCCESS path with partial failures → per-step telemetry fires (D-1.16 follow-up closure)', async () => {
+    // [D-1.16 Item 13 follow-up closure 2026-04-30] This sub-case pins
+    // the wiring fix that moved the per-failedStep emit BEFORE the
+    // if(!escalated) early-return in runFocusedMode. Pre-fix, when
+    // focusedAnalyzer resolved with mode='focused' (non-escalated) AND
+    // failedSteps was non-empty, the per-step telemetry NEVER fired —
+    // the most common partial-success case had no audit trail. Sub-cases
+    // (a)-(e) above all use mode='escalated_to_comprehensive', which
+    // worked even pre-fix because the emit block was reachable on the
+    // fall-through to runComprehensiveMode. THIS sub-case proves the
+    // bug case is now closed.
+    //
+    // The mock returns mode='focused' (success) with failedSteps
+    // populated. The orchestrator's runFocusedMode should:
+    //   1. Emit per-step telemetry events (the load-bearing fix)
+    //   2. Return result with mode='focused' (success path preserved)
+    //   3. NOT call analyzeEssay (no escalation → no comprehensive run)
+    mockedFocusedRun.mockResolvedValueOnce(
+      buildCleanFocusedResult({
+        mode: 'focused',
+        escalationLevel: 2,
+        escalationLevelTrustworthy: false,
+        failedSteps: ['step2_analysis', 'phase_recompute'],
+      }),
+    );
+    // No analyzeEssay mock setup — if the orchestrator unexpectedly
+    // calls into runComprehensiveMode, the mock will return undefined
+    // and downstream assertions catch it.
+
+    const orchestrator = buildItem13Orchestrator();
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runFocusedMode(buildSyntheticEditOutput(), [], 0);
+
+    // Contract 1: per-step telemetry fires (the load-bearing fix).
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failedStepEvents = events.filter(
+      (e) => typeof e.step === 'string' && e.step.startsWith('focusedAnalyzer.') && e.status === 'failed',
+    );
+    expect(failedStepEvents, 'per-step telemetry must fire on focused-success path with partial failures').toHaveLength(2);
+    const stepNames = failedStepEvents.map((e) => e.step).sort();
+    expect(stepNames).toEqual(['focusedAnalyzer.phase_recompute', 'focusedAnalyzer.step2_analysis']);
+    // Each event carries resultMode so an audit consumer can distinguish
+    // partial-failure-on-success from partial-failure-on-escalation.
+    for (const event of failedStepEvents) {
+      const ctx = event.error?.context as { resultMode?: string; allFailedSteps?: string[] } | undefined;
+      expect(ctx?.resultMode).toBe('focused');
+      expect(ctx?.allFailedSteps).toEqual(['step2_analysis', 'phase_recompute']);
+    }
+
+    // Contract 2: the focused-success result is preserved (no escalation,
+    // no comprehensive run). The mode='focused' early-return path stays
+    // structurally identical. Round-1 audit MED closure 2026-04-30:
+    // strengthen with positive focusedResult-shape assertions so a
+    // regression that early-returns without preserving the focusedResult
+    // reference would fail (negative-only `not.toHaveBeenCalled()` could
+    // pass spuriously if a future change silently dropped the result).
+    expect(result.mode).toBe('focused');
+    expect(result.reanalysisTriggered).toBe(false);
+    expect(mockedAnalyzeEssay).not.toHaveBeenCalled();
+    expect(result.focusedResult).toBeDefined();
+    expect(result.focusedResult?.failedSteps).toEqual(['step2_analysis', 'phase_recompute']);
+    expect(result.focusedResult?.mode).toBe('focused');
+    expect(result.focusedResult?.escalationLevelTrustworthy).toBe(false);
   });
 });
