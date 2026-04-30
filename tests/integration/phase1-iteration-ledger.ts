@@ -97,6 +97,7 @@ import type {
 import {
   D1_15_ESSAY_ID,
   SCENARIO_1_SMALL_EDIT,
+  SCENARIO_2_STRUCTURAL_REORDER,
   applyScenarioEdit,
   buildLanding,
   expectedEditSignificance,
@@ -488,6 +489,226 @@ describe('D-1.15 Scenario 1 — small edit (single-paragraph revision in P2)', (
           expect(iter2Paras[i], `paragraph ${i} unchanged`).toBe(iter1Paras[i]);
         }
       }
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 2 — structural reorder (P1 ↔ P2 swap)
+// ============================================================================
+//
+// Tests the **paragraph remap** wire (D-1.7). Iter-1 has moves on P0/P1/P2/P3
+// (all 4 paragraphs, max remap coverage). Iter-2 swaps P1 ↔ P2.
+// paragraphRemapBuilder uses content-hash matching: identical text matches
+// at any position, so the swap is detected as:
+//   - 0 → 0 (P0 identity)
+//   - 1 → 2 (iter-1's P1 content now lives at iter-2's P2)
+//   - 2 → 1 (iter-1's P2 content now lives at iter-2's P1)
+//   - 3 → 3 (P3 identity)
+// The Map keys post-remap should be {0, 1, 2, 3} (sorted) but the iter-1
+// move from P1 must land at iter-2 Map key 2, and the iter-1 move from P2
+// must land at iter-2 Map key 1. This swap is what Scenario 2 specifically
+// verifies — annotation content is per-paragraph-unique (P0/P1/P2/P3
+// embedded in content per buildIter1L5Annotations) so the test can pinpoint
+// which iter-1 source landed at which iter-2 slot.
+
+describe('D-1.15 Scenario 2 — structural reorder (P1 ↔ P2 swap)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions ──────────────────────────────────
+
+  describe('mock surface — landingDetector firing pattern', () => {
+    it('detectLanding is called once per iter-1 prior move (4 priors → 4 calls)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      });
+      // SCENARIO_2 anchors 4 moves (one per paragraph). Reorder doesn't
+      // drop any prior — all 4 detector calls expected.
+      expect(mockDetect).toHaveBeenCalledTimes(SCENARIO_2_STRUCTURAL_REORDER.iter1MoveAnchors.length);
+    });
+
+    it('detectLanding receives every iter-1 prior move id (no priors silently dropped during remap)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      });
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id).sort();
+      const expectedIds = expectedIter1MoveIds(SCENARIO_2_STRUCTURAL_REORDER).sort();
+      expect(calledMoveIds).toEqual(expectedIds);
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map shape (THE remap wire under test) ─
+
+  describe('priorAnnotations Map population (paragraph remap: 1↔2 swap)', () => {
+    it('Map keys span the full set of iter-2 paragraph indices (4 keys: 0-3)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      // No drops, no duplicates — every iter-1 move lands at exactly one
+      // iter-2 paragraph slot.
+      expect(keys).toEqual([0, 1, 2, 3]);
+    });
+
+    it('iter-1 P1 move lands at iter-2 Map key 2 (swap target); iter-1 P2 move lands at key 1', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      // iter-1's P1 move (content embeds "anchor at P1") should land at
+      // iter-2 Map key 2 because P1's content is now at index 2 post-swap.
+      const atKey1 = priors.get(1)?.priorAnnotations ?? [];
+      const atKey2 = priors.get(2)?.priorAnnotations ?? [];
+      expect(atKey1).toHaveLength(1);
+      expect(atKey2).toHaveLength(1);
+      // Content distinguishability proves which iter-1 source landed where.
+      expect(
+        atKey2[0].content,
+        'iter-2 Map key 2 should hold iter-1 P1 source (P1 content moved to index 2)',
+      ).toMatch(/anchor at P1/);
+      expect(
+        atKey1[0].content,
+        'iter-2 Map key 1 should hold iter-1 P2 source (P2 content moved to index 1)',
+      ).toMatch(/anchor at P2/);
+    });
+
+    it('identity-remapped paragraphs (P0, P3) keep their iter-1 sources at the same key', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const atKey0 = priors.get(0)?.priorAnnotations ?? [];
+      const atKey3 = priors.get(3)?.priorAnnotations ?? [];
+      expect(atKey0[0].content).toMatch(/anchor at P0/);
+      expect(atKey3[0].content).toMatch(/anchor at P3/);
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing write-back across the remap ───────────
+
+  describe('D-1.6.5 landing write-back (every prior gets landing populated even after remap)', () => {
+    it('every iter-1 taughtMove has landing populated post-remap', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(move.landing, `pre-condition: move.landing undefined for ${move.id}`).toBeUndefined();
+      }
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(
+          move.landing,
+          `move.landing populated for ${move.id} post-reorder (D-1.6.5 wire)`,
+        ).toBeDefined();
+        expect(move.landing?.detectedAtIteration).toBe(2);
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the structural reorder ───
+
+  describe('iter-2 commit shape reflects structural reorder', () => {
+    it('iter-2 IterationRecord.editScope.structural.reordered === true; paragraphsChanged covers swapped indices', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_2_STRUCTURAL_REORDER);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 structural_reorder — Rule 3 (paragraphs reordered) forces comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_2_STRUCTURAL_REORDER.edit),
+          significance: expectedEditSignificance(SCENARIO_2_STRUCTURAL_REORDER.edit),
+          changeTypes: [],
+          // Structural reorder: reordered=true; no paragraphs added or
+          // removed (count unchanged).
+          structural: { reordered: true, added: 0, removed: 0 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 structural_reorder comprehensive re-analysis (D-1.15 Scenario 2)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.reordered).toBe(true);
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged.sort()).toEqual([1, 2]);
+      expect(profile.iterationLedger.iterations[1].editScope?.significance).toBe('significant');
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the swap', () => {
+    it('iter-2 P1 content equals iter-1 P2 content (and vice versa); P0 and P3 unchanged', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_2_STRUCTURAL_REORDER.essayText,
+        SCENARIO_2_STRUCTURAL_REORDER.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_2_STRUCTURAL_REORDER.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length);
+      expect(iter2Paras[0], 'P0 unchanged').toBe(iter1Paras[0]);
+      expect(iter2Paras[1], 'iter-2 P1 = iter-1 P2 (swap)').toBe(iter1Paras[2]);
+      expect(iter2Paras[2], 'iter-2 P2 = iter-1 P1 (swap)').toBe(iter1Paras[1]);
+      expect(iter2Paras[3], 'P3 unchanged').toBe(iter1Paras[3]);
     });
   });
 });

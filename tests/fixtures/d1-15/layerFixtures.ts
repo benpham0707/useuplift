@@ -120,6 +120,14 @@ export function buildL5Annotation(args: {
  * this" record; the corresponding TaughtMoves derive deterministically via
  * `l5AnnotationToTaughtMove` so iter-2 assertions can re-derive expected
  * IDs from the source annotations.
+ *
+ * Content uniqueness: each annotation's `content` embeds the source
+ * paragraph index (e.g., "[D-1.15 iter-1 anchor at P2] ...") so the
+ * iter-2 priorAnnotations Map can be inspected to verify which iter-1
+ * move landed at which iter-2 paragraph after a remap. Without this,
+ * scenarios that test paragraph-index remap (Scenario 2 reorder, 3
+ * delete, 4 insert, 5 cascade) couldn't distinguish the moves at the
+ * Map's value layer.
  */
 export function buildIter1L5Annotations(scenario: Scenario): L5Annotation[] {
   return scenario.iter1MoveAnchors.map((anchor, idx) =>
@@ -127,6 +135,9 @@ export function buildIter1L5Annotations(scenario: Scenario): L5Annotation[] {
       id: `A-iter1-${scenario.id}-${idx}`,
       paragraphIndex: anchor.paragraphIndex,
       sentenceIndex: anchor.sentenceIndex,
+      // Embed the source paragraph in content so post-remap assertions
+      // can verify which iter-1 move landed at which iter-2 paragraph.
+      content: `[D-1.15 iter-1 anchor at P${anchor.paragraphIndex}] The transition into the focal moment lands with stronger sensory detail than the surrounding context — a craft choice the essay can lean into elsewhere.`,
     }),
   );
 }
