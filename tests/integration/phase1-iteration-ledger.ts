@@ -100,6 +100,7 @@ import {
   SCENARIO_2_STRUCTURAL_REORDER,
   SCENARIO_3_PARAGRAPH_DELETE,
   SCENARIO_4_PARAGRAPH_INSERT,
+  SCENARIO_5_MULTI_PARAGRAPH_CASCADE,
   applyScenarioEdit,
   buildLanding,
   expectedEditSignificance,
@@ -1152,6 +1153,243 @@ describe('D-1.15 Scenario 4 — paragraph insert (new bridge between P1 and P2)'
       // iter-1 P2 and P3 shifted to iter-2 P3 and P4.
       expect(iter2Paras[3]).toBe(iter1Paras[2]);
       expect(iter2Paras[4]).toBe(iter1Paras[3]);
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 5 — multi-paragraph cascade (P0, P2, P3 simultaneously rewritten)
+// ============================================================================
+//
+// Tests the **cascade-rewrite** behavior of priorAnnotationsBuilder under
+// realistic production semantics. UCLA cancer-awareness essay (4 paragraphs);
+// iter-1 has moves on every paragraph (P0/P1/P2/P3). Iter-2 rewrites P0,
+// P2, P3 in one commit; P1 unchanged.
+//
+// ─── Production behavior discovered (D-1.15.6 ratification 2026-04-30) ──
+//
+// `editUnderstandingService.computeEditDiff` classifies each rewritten
+// paragraph as a removed+added pair when overlap-ratio falls below the
+// **0.30 threshold defined at editUnderstandingService.ts:374** (Scenario
+// 5's rewrites are substantial enough to fall below — they preserve
+// theme but rewrite prose at the sentence level). The resulting diff
+// reports:
+//   - paragraphsAdded: [0, 2, 3]
+//   - paragraphsRemoved: [0, 2, 3]
+//   - paragraphsReordered: false
+// `paragraphRemapBuilder` consumes that classification (mirrored at
+// paragraphRemapBuilder.ts:210): the rewritten paragraphs DROP as
+// `paragraph_deleted` even though the iter-2 essay still has 4
+// paragraphs at the same indices. Only iter-1 P1 (unchanged content)
+// survives via hash-equal pairing.
+//
+// **Threshold coupling (C-4 audit closure 2026-04-30):** if a future
+// deliverable tunes the 0.30 constant — OR introduces a `'rewritten'`
+// classification that survives at lower overlap — the assertions below
+// will flip from `Map size === 1` to `Map size === 4` and `detectLanding
+// called 1 time` to `4 times`. When that happens, this comment block
+// signals "threshold drift, not test bug." The pinned constants
+// (Map size, call count) are deliberate threshold sentinels.
+//
+// This is meaningful production behavior, NOT a harness bug:
+//   - The system cannot distinguish "P0 was rewritten" from "P0 was
+//     deleted and a new P0 was inserted" when overlap is low.
+//   - From the iteration loop's perspective, this is conservative: better
+//     to drop the prior and regenerate fresh annotations than to thread
+//     stale annotations against rewritten content.
+//   - The drops fire structured `priorAnnotations.move_dropped` telemetry
+//     per D-1.7 round-2 LOW-1 — same wire as Scenario 3's delete.
+//
+// Effect on iter-1 priors:
+//   - P0 move: DROPPED (paragraph_deleted via overlap < 0.30) — landing
+//     stays undefined
+//   - P1 move: lands at iter-2 Map key 1 (identity, unchanged), landing
+//     populated
+//   - P2 move: DROPPED — landing stays undefined
+//   - P3 move: DROPPED — landing stays undefined
+//
+// This is the spec's "multi-paragraph cascade" — verified to exercise
+// the carry-forward integration spine under cascade pressure: 3 priors
+// drop with telemetry, 1 prior survives with full landing-detection wire.
+
+describe('D-1.15 Scenario 5 — multi-paragraph cascade (P0/P2/P3 rewritten)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions (3 drops + 1 survive = 1 detection) ─
+
+  describe('mock surface — landingDetector firing only for surviving prior', () => {
+    it('detectLanding called 1 time (3 priors dropped via cascade rewrite + 1 survives)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      });
+      // Only iter-1 P1 (unchanged) survives the remap; the three
+      // rewritten paragraphs' priors drop. Expected: 1 call.
+      expect(mockDetect).toHaveBeenCalledTimes(1);
+    });
+
+    it('detectLanding receives ONLY the iter-1 P1 move id (the unchanged paragraph)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      });
+      // Per SCENARIO_5.iter1MoveAnchors ordering: indices [0, 1, 2, 3]
+      // map to anchor paragraphs [P0, P1, P2, P3]. Only allMoveIds[1]
+      // (P1's move) survives.
+      const allMoveIds = expectedIter1MoveIds(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      const survivingId = allMoveIds[1];
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id);
+      expect(calledMoveIds).toEqual([survivingId]);
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map — three drops, one survivor ──────
+
+  describe('priorAnnotations Map (cascade drops 3 priors; only P1 survives)', () => {
+    it('Map size === 1 (only the unchanged-paragraph prior survives)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+      expect(priors.size).toBe(1);
+    });
+
+    it('surviving Map entry is at key 1 (iter-1 P1 → iter-2 P1, identity remap)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys());
+      expect(keys).toEqual([1]);
+      expect(priors.get(1)?.priorAnnotations[0].content).toMatch(/anchor at P1/);
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing — selective population ────────────────
+
+  describe('D-1.6.5 landing write-back (only surviving move populated; dropped moves stay undefined)', () => {
+    it('iter-1 P1 move has landing populated; P0/P2/P3 moves stay undefined', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      const allMoveIds = expectedIter1MoveIds(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      const survivingMoveId = allMoveIds[1]; // iter-1 P1 move.
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        if (move.id === survivingMoveId) {
+          expect(
+            move.landing,
+            `surviving move ${move.id} (P1, unchanged) landing populated post-cascade (D-1.6.5 wire)`,
+          ).toBeDefined();
+          expect(move.landing?.detectedAtIteration).toBe(2);
+        } else {
+          expect(
+            move.landing,
+            `dropped move ${move.id} landing stays undefined (drop = no detection)`,
+          ).toBeUndefined();
+        }
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the cascade ──────────────
+
+  describe('iter-2 commit shape reflects multi-paragraph cascade', () => {
+    it('iter-2 IterationRecord captures the cascade — paragraphsChanged covers 3 indices, significance=transformative', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_5_MULTI_PARAGRAPH_CASCADE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 multi_paragraph_cascade — Rule 5 (transformative AND >2 paragraphs changed) forces comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      // Cascade structural: rewrites classified as remove+add per
+      // overlap-ratio < 0.30 in computeEditDiff. iter-2 still has 4
+      // paragraphs but added=3, removed=3 (the rewritten paragraphs
+      // count both ways).
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+          significance: expectedEditSignificance(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit),
+          changeTypes: [],
+          structural: { reordered: false, added: 3, removed: 3 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 multi_paragraph_cascade comprehensive re-analysis (D-1.15 Scenario 5)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged.sort((a, b) => a - b)).toEqual([0, 2, 3]);
+      expect(profile.iterationLedger.iterations[1].editScope?.significance).toBe('transformative');
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the cascade', () => {
+    it('iter-2 P0/P2/P3 differ from iter-1; P1 unchanged; paragraph count preserved', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_5_MULTI_PARAGRAPH_CASCADE.essayText,
+        SCENARIO_5_MULTI_PARAGRAPH_CASCADE.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_5_MULTI_PARAGRAPH_CASCADE.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length);
+      // P0, P2, P3 differ.
+      expect(iter2Paras[0]).not.toBe(iter1Paras[0]);
+      expect(iter2Paras[2]).not.toBe(iter1Paras[2]);
+      expect(iter2Paras[3]).not.toBe(iter1Paras[3]);
+      // P1 unchanged.
+      expect(iter2Paras[1]).toBe(iter1Paras[1]);
     });
   });
 });

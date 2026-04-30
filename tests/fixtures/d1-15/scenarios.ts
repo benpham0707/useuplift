@@ -320,8 +320,28 @@ export const SCENARIO_5_MULTI_PARAGRAPH_CASCADE: Scenario = {
     ],
   },
   expectedMode: 'comprehensive',
+  // [D-1.15.6 audit C-5 closure 2026-04-30] Provenance updated to match
+  // ACTUAL production behavior. The original promise — "exercises landing
+  // detection on EVERY prior taughtMove" — turned out to be wrong:
+  // editUnderstandingService.computeEditDiff applies a 0.30 overlap-ratio
+  // threshold (editUnderstandingService.ts:374) and classifies the
+  // rewrites as remove+add pairs (no `modified` classification when
+  // overlap < 0.30). paragraphRemapBuilder consequently DROPS iter-1
+  // P0/P2/P3 priors with `paragraph_deleted` reason; only iter-1 P1
+  // (unchanged content) survives via hash-equal pairing. Detector fires
+  // exactly once. The cascade tests the DROP-WIRE under cascade
+  // pressure, NOT the multi-prior landing-detection surface.
+  //
+  // Spec-vs-behavior gap (surfaced to D-1.15.7 audit doc): the spec at
+  // L5_IMPLEMENTATION_PLAN.md §D-1.15 implied multi-survivor cascade
+  // coverage. The current scenario shape under-tests that surface.
+  // Adding a Scenario 5b sub-case (1-sentence swaps per paragraph,
+  // preserving overlap > 0.30) would close the gap by exercising
+  // multi-prior landing detection on 4 surviving priors, but that's a
+  // 6-scenario expansion requiring spec ratification per the standing
+  // operational charter.
   provenance:
-    'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs. Multi-paragraph-cascade scenario rewrites P0, P2, P3 in one iter-2 commit — three-paragraph touch exceeds focused-mode threshold and triggers comprehensive re-analysis. Exercises landing detection on EVERY prior taughtMove (one per paragraph) plus the carry-forward arbitration ladder.',
+    'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs. Multi-paragraph-cascade scenario rewrites P0, P2, P3 in one iter-2 commit. Production behavior: rewrites have overlap-ratio < 0.30 with originals, so computeEditDiff classifies them as remove+add pairs and paragraphRemapBuilder DROPS the corresponding iter-1 priors (`paragraph_deleted` reason). Only iter-1 P1 (unchanged content) survives. Tests the DROP-WIRE under cascade pressure (3 simultaneous drops with structured telemetry per D-1.7 round-2 LOW-1) plus a single multi-paragraph-cascade carry-forward arbitration. The multi-survivor cascade coverage gap is surfaced to D-1.15.7.',
 };
 
 // ─── Public registry ────────────────────────────────────────────────────
