@@ -101,6 +101,12 @@ import {
   SCENARIO_3_PARAGRAPH_DELETE,
   SCENARIO_4_PARAGRAPH_INSERT,
   SCENARIO_5_MULTI_PARAGRAPH_CASCADE,
+  // [Phase-1 Items 1, 2, 3 closure 2026-04-30] Three additional scenarios
+  // cover the deferred edit shapes from docs/audit/phase-1-integrity-audit.md
+  // §6 #1, #2, #3.
+  SCENARIO_6_PARAGRAPH_MERGE,
+  SCENARIO_7_PARAGRAPH_SPLIT,
+  SCENARIO_8_TRANSFORMATIVE_REWRITE,
   applyScenarioEdit,
   buildLanding,
   expectedEditSignificance,
@@ -1392,6 +1398,721 @@ describe('D-1.15 Scenario 5 — multi-paragraph cascade (surgical voice-preservi
       expect(iter2Paras[3]).not.toBe(iter1Paras[3]);
       // P1 unchanged.
       expect(iter2Paras[1]).toBe(iter1Paras[1]);
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 6 — paragraph merge (UCB cell-tower P1 + P2 → merged at iter-2 P1)
+// ============================================================================
+//
+// [Phase-1 Item 1 closure 2026-04-30] Closes docs/audit/phase-1-integrity-audit.md
+// §6 #1 ("paragraph-merge edit shape"). Tests a sibling case to Scenario 3
+// (paragraph_delete) — instead of a paragraph being removed outright, two
+// adjacent paragraphs collapse into one. The merged paragraph keeps iter-1
+// P1's content verbatim and folds in the first sentence of iter-1 P2.
+//
+// Expected post-merge remap (paragraphRemapBuilder Phase 1 + Phase 2):
+//   - old 0 → new 0 (Phase 1, hash identity)
+//   - old 1 → new 1 (Phase 2, overlap pair: merged paragraph contains all
+//     of P1's words → high Jaccard overlap → wins greedy pairing)
+//   - old 2 → DROPPED (Phase 2 found no remaining unpaired-old to pair
+//     with; merged paragraph already consumed by old 1 → reason
+//     'paragraph_deleted')
+//   - old 3 → new 2 (Phase 1, hash identity, shifted -1)
+//   - old 4 → new 3 (Phase 1, hash identity, shifted -1)
+//
+// Effect on iter-1 priors (5 anchors, 1 dropped):
+//   - P0 move: lands at iter-2 Map key 0, landing populated
+//   - P1 move: lands at iter-2 Map key 1 (merged paragraph), landing populated
+//   - P2 move: DROPPED before detection (paragraph_deleted)
+//   - P3 move: lands at iter-2 Map key 2 (shifted), landing populated
+//   - P4 move: lands at iter-2 Map key 3 (shifted), landing populated
+//
+// Detector calls: 4 (one fewer than priors because the dropped move
+// skips detection — same drop-bypass-detector wire that Scenario 3 verifies).
+
+describe('D-1.15 Scenario 6 — paragraph merge (UCB P1 + P2 collapse into merged P1)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions (drop bypasses detector) ─────────
+
+  describe('mock surface — landingDetector NOT called for dropped paragraph', () => {
+    it('detectLanding called 4 times (5 priors with 1 dropped via paragraph_deleted → 4 detections)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_6_PARAGRAPH_MERGE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+      });
+      // SCENARIO_6 anchors 5 moves at P0/P1/P2/P3/P4. P2 is dropped via
+      // paragraph_deleted (its content folded into merged P1 but iter-1
+      // P1 already claimed the pairing). Expected: 4 calls.
+      expect(mockDetect).toHaveBeenCalledTimes(4);
+    });
+
+    it('detectLanding receives ONLY the surviving (non-dropped) iter-1 prior move ids', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_6_PARAGRAPH_MERGE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+      });
+      // Surviving moves are at P0, P1, P3, P4 (anchors[0,1,3,4]). P2 is
+      // anchors[2] — dropped.
+      const allExpectedIds = expectedIter1MoveIds(SCENARIO_6_PARAGRAPH_MERGE);
+      const survivingIds = [allExpectedIds[0], allExpectedIds[1], allExpectedIds[3], allExpectedIds[4]].sort();
+      const droppedId = allExpectedIds[2];
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id).sort();
+      expect(calledMoveIds).toEqual(survivingIds);
+      expect(calledMoveIds).not.toContain(droppedId);
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map — merge collapse semantics ───────
+
+  describe('priorAnnotations Map (merge collapse: P1 wins overlap pairing; P2 drops; P3/P4 shift -1)', () => {
+    it('Map size === 4 (one entry per surviving prior; dropped P2 absent)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_6_PARAGRAPH_MERGE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+      expect(priors.size).toBe(4);
+    });
+
+    it('Map keys reflect post-merge remap: P0→0 (identity), P1→1 (overlap), P3→2 (-1), P4→3 (-1)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_6_PARAGRAPH_MERGE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      // P0 identity, P1 wins overlap pair to merged paragraph, P3/P4
+      // shift down by 1 (because the merge removed one paragraph slot).
+      expect(keys).toEqual([0, 1, 2, 3]);
+
+      // Content distinguishability: each iter-1 source landed at the
+      // expected key per the remap's combined Phase-1 + Phase-2 logic.
+      expect(priors.get(0)?.priorAnnotations[0].content).toMatch(/anchor at P0/);
+      expect(priors.get(1)?.priorAnnotations[0].content).toMatch(/anchor at P1/);
+      expect(priors.get(2)?.priorAnnotations[0].content).toMatch(/anchor at P3/);
+      expect(priors.get(3)?.priorAnnotations[0].content).toMatch(/anchor at P4/);
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing — surviving move semantics under drop ─
+
+  describe('D-1.6.5 landing write-back semantics under merge-induced drop', () => {
+    it('surviving iter-1 moves get landing populated; dropped P2 move stays undefined', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_6_PARAGRAPH_MERGE);
+      const allMoveIds = expectedIter1MoveIds(SCENARIO_6_PARAGRAPH_MERGE);
+      const droppedMoveId = allMoveIds[2]; // anchors[2] = P2.
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(move.landing, `pre-condition: move.landing undefined for ${move.id}`).toBeUndefined();
+      }
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        if (move.id === droppedMoveId) {
+          expect(
+            move.landing,
+            `dropped move ${move.id} (P2) landing must remain undefined (merge-drop = no detection)`,
+          ).toBeUndefined();
+        } else {
+          expect(
+            move.landing,
+            `surviving move ${move.id} landing populated post-merge (D-1.6.5 wire)`,
+          ).toBeDefined();
+          expect(move.landing?.detectedAtIteration).toBe(2);
+        }
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the merge ────────────────
+
+  describe('iter-2 commit shape reflects paragraph merge', () => {
+    it('iter-2 IterationRecord.editScope.structural.removed === 1; paragraphsChanged covers merged indices', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_6_PARAGRAPH_MERGE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 paragraph_merge — Rule 4 (paragraph removed: net count -1) forces comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_6_PARAGRAPH_MERGE.edit),
+          significance: expectedEditSignificance(SCENARIO_6_PARAGRAPH_MERGE.edit),
+          changeTypes: [],
+          // Merge: net paragraph count -1 (one paragraph absorbed into
+          // another). The merged paragraph at iter-2 P1 is "modified"
+          // (paired via overlap with iter-1 P1), and iter-1 P2 is
+          // structurally removed.
+          structural: { reordered: false, added: 0, removed: 1 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 paragraph_merge comprehensive re-analysis (D-1.15 Scenario 6)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.removed).toBe(1);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.added).toBe(0);
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged.sort()).toEqual([1, 2]);
+      expect(profile.iterationLedger.iterations[1].editScope?.significance).toBe('significant');
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the merge', () => {
+    it('iter-2 paragraph count = iter-1 - 1; merged content at P1; P3/P4 shift to P2/P3', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_6_PARAGRAPH_MERGE.essayText,
+        SCENARIO_6_PARAGRAPH_MERGE.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_6_PARAGRAPH_MERGE.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length - 1);
+      // P0 unchanged.
+      expect(iter2Paras[0]).toBe(iter1Paras[0]);
+      // iter-2 P1 is the merged paragraph (mergedText, NOT iter-1 P1 verbatim).
+      if (SCENARIO_6_PARAGRAPH_MERGE.edit.kind === 'paragraph_merge') {
+        expect(iter2Paras[1]).toBe(SCENARIO_6_PARAGRAPH_MERGE.edit.mergedText);
+      }
+      // iter-1 P3, P4 shift to iter-2 P2, P3.
+      expect(iter2Paras[2]).toBe(iter1Paras[3]);
+      expect(iter2Paras[3]).toBe(iter1Paras[4]);
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 7 — paragraph split (Harvard MITES P3 splits after first sentence)
+// ============================================================================
+//
+// [Phase-1 Item 2 closure 2026-04-30] Closes docs/audit/phase-1-integrity-audit.md
+// §6 #2 ("paragraph-split edit shape"). Tests a sibling case to Scenario 4
+// (paragraph_insert) — instead of a wholly-new bridge paragraph being
+// inserted, an existing paragraph cleaves into two adjacent paragraphs.
+//
+// Expected post-split remap (paragraphRemapBuilder Phase 1 + Phase 2):
+//   - old 0 → new 0 (Phase 1, hash identity)
+//   - old 1 → new 1 (Phase 1, hash identity)
+//   - old 2 → new 2 (Phase 1, hash identity)
+//   - old 3 → new 3 (Phase 2, overlap pair: firstHalf overlap ≈ 0.37 with
+//     iter-1 P3, ABOVE the 0.30 threshold; Phase-2 iterates new indices
+//     low-to-high so new 3 (firstHalf) is paired BEFORE new 4 (secondHalf),
+//     consuming the only unpaired-old slot)
+//   - new 4 (secondHalf) → no iter-1 counterpart → paragraph_added
+//
+// Effect on iter-1 priors (2 anchors, 0 dropped):
+//   - P1 move: lands at iter-2 Map key 1 (identity), landing populated
+//   - P3 move: lands at iter-2 Map key 3 (firstHalf, modified pair),
+//     landing populated
+//   - The new iter-2 P4 (secondHalf) has NO priorAnnotations entry
+//
+// **Phase-2 iteration-order coupling note:** the load-bearing detail
+// here is that paragraphRemapBuilder Phase-2 (paragraphRemapBuilder.ts:208)
+// iterates `unpairedNewIndices` in insertion order, NOT by descending
+// overlap. So the LOWER-INDEXED unpaired new wins the unpaired-old
+// pairing when multiple news qualify. If that direction ever flips
+// (e.g., a future tuning sorts by overlap descending), Scenario 7's
+// Map key 3 / Map key 4 expectation flips with it, AND Scenario 7's
+// scenarios.ts comment block needs updating in lockstep — those two
+// surfaces are pinned together as deliberate sentinels.
+
+describe('D-1.15 Scenario 7 — paragraph split (Harvard MITES P3 cleaves into firstHalf + secondHalf)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions ──────────────────────────────────
+
+  describe('mock surface — landingDetector firing pattern (no split phantom calls)', () => {
+    it('detectLanding called once per iter-1 prior move (2 priors → 2 calls; new secondHalf adds no detection)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      });
+      // SCENARIO_7 anchors 2 moves at P1, P3. Both survive (P1 identity,
+      // P3 → firstHalf via Phase-2 first-seen-new pairing). The new
+      // secondHalf has no iter-1 history → no detection. Expected: 2 calls.
+      expect(mockDetect).toHaveBeenCalledTimes(2);
+    });
+
+    it('detectLanding receives every iter-1 prior move id (no priors silently dropped on split)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      });
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id).sort();
+      const expectedIds = expectedIter1MoveIds(SCENARIO_7_PARAGRAPH_SPLIT).sort();
+      expect(calledMoveIds).toEqual(expectedIds);
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map — split semantics + new-paragraph absence ─
+
+  describe('priorAnnotations Map (Phase-2 first-seen-new pairing: P3 → firstHalf; secondHalf is paragraph_added)', () => {
+    it('Map size === 2 (one per surviving prior; secondHalf paragraph_added with no entry)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+      expect(priors.size).toBe(2);
+    });
+
+    it('Map keys reflect post-split remap: P1 stays at 1 (identity); P3 lands at 3 (firstHalf via Phase-2 first-seen-new)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      // P1 → 1 (identity); P3 → 3 (firstHalf wins Phase-2 first-seen-new
+      // pairing); secondHalf at iter-2 P4 has no iter-1 counterpart.
+      expect(keys).toEqual([1, 3]);
+
+      // Content distinguishability — iter-1 P1 source at key 1; iter-1 P3
+      // source at key 3.
+      expect(priors.get(1)?.priorAnnotations[0].content).toMatch(/anchor at P1/);
+      expect(priors.get(3)?.priorAnnotations[0].content).toMatch(/anchor at P3/);
+    });
+
+    it('secondHalf paragraph (iter-2 P4) has NO priorAnnotations entry (paragraph_added by exclusion)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      // secondHalf (iter-2 P4) is paragraph_added — Phase-2 already
+      // consumed iter-1 P3 by pairing with firstHalf. Verify the
+      // structural absence: get(4) returns undefined.
+      expect(
+        priors.get(4),
+        'iter-2 P4 (secondHalf) must have no priorAnnotations entry — Phase-2 first-seen-new consumed iter-1 P3 ancestor for firstHalf',
+      ).toBeUndefined();
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing write-back ────────────────────────────
+
+  describe('D-1.6.5 landing write-back (every iter-1 move gets landing populated post-split)', () => {
+    it('both iter-1 taughtMoves have landing populated post-split', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(move.landing).toBeUndefined();
+      }
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(
+          move.landing,
+          `move.landing populated for ${move.id} post-split (D-1.6.5 wire)`,
+        ).toBeDefined();
+        expect(move.landing?.detectedAtIteration).toBe(2);
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the split ────────────────
+
+  describe('iter-2 commit shape reflects paragraph split', () => {
+    it('iter-2 IterationRecord.editScope.structural.added === 1; paragraphsChanged covers split paragraph', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_7_PARAGRAPH_SPLIT);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 paragraph_split — Rule 4 (paragraph added: net count +1) forces comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+          significance: expectedEditSignificance(SCENARIO_7_PARAGRAPH_SPLIT.edit),
+          changeTypes: [],
+          // Split: net paragraph count +1 (secondHalf is paragraph_added;
+          // firstHalf is paired with iter-1 P3 as modified). reordered=false
+          // (no positional reorder of identity-paired paragraphs).
+          structural: { reordered: false, added: 1, removed: 0 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 paragraph_split comprehensive re-analysis (D-1.15 Scenario 7)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.added).toBe(1);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.removed).toBe(0);
+      // paragraphsChanged for paragraph_split = [paragraphIndex] per
+      // getEditedParagraphIndices (the iter-1 paragraph that split).
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged).toEqual([3]);
+      expect(profile.iterationLedger.iterations[1].editScope?.significance).toBe('significant');
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the split', () => {
+    it('iter-2 paragraph count = iter-1 + 1; firstHalf at P3; secondHalf at P4; P0/P1/P2 unchanged', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_7_PARAGRAPH_SPLIT.essayText,
+        SCENARIO_7_PARAGRAPH_SPLIT.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_7_PARAGRAPH_SPLIT.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length + 1);
+      // P0, P1, P2 unchanged.
+      expect(iter2Paras[0]).toBe(iter1Paras[0]);
+      expect(iter2Paras[1]).toBe(iter1Paras[1]);
+      expect(iter2Paras[2]).toBe(iter1Paras[2]);
+      // iter-2 P3 is firstHalf; iter-2 P4 is secondHalf.
+      if (SCENARIO_7_PARAGRAPH_SPLIT.edit.kind === 'paragraph_split') {
+        expect(iter2Paras[3]).toBe(SCENARIO_7_PARAGRAPH_SPLIT.edit.firstHalf);
+        expect(iter2Paras[4]).toBe(SCENARIO_7_PARAGRAPH_SPLIT.edit.secondHalf);
+      }
+    });
+  });
+});
+
+// ============================================================================
+// Scenario 8 — transformative pure-rewrite (UCLA P0/P1/P3 replaced; P2 verbatim)
+// ============================================================================
+//
+// [Phase-1 Item 3 closure 2026-04-30] Closes docs/audit/phase-1-integrity-audit.md
+// §6 #3 ("transformative-significance pure rewrite (>50% paragraphs touched)").
+// Tests the maximum-drop case the spec contemplates: 75% of paragraphs
+// (3 of 4) replaced with non-voice-preserving overhauls. Each replacement
+// uses disjoint vocabulary from EVERY iter-1 paragraph so Jaccard overlap
+// stays well below the 0.30 threshold — paragraphRemapBuilder Phase-2
+// finds no rescue, classifies each replacement as paragraph_added + each
+// displaced original as paragraph_removed.
+//
+// Expected post-rewrite remap:
+//   - old 0 → DROPPED (paragraph_deleted, no overlap >= 0.30 anywhere)
+//   - old 1 → DROPPED (same)
+//   - old 2 → new 2 (Phase 1, hash identity — P2 preserved verbatim)
+//   - old 3 → DROPPED (same)
+//
+// Effect on iter-1 priors (4 anchors, 3 dropped):
+//   - P0 move: DROPPED before detection (paragraph_deleted)
+//   - P1 move: DROPPED before detection (paragraph_deleted)
+//   - P2 move: lands at iter-2 Map key 2, landing populated
+//   - P3 move: DROPPED before detection (paragraph_deleted)
+//
+// Detector calls: 1 (only the surviving P2 prior).
+// Map size: 1.
+//
+// **Mode-selection note:** this edit shape triggers Rule 4
+// (paragraphsAdded > 0 OR paragraphsRemoved > 0) at FocusedAnalyzer.
+// selectAnalysisMode BEFORE Rule 5 (transformative significance) gets a
+// chance — both lead to comprehensive, but Rule 4 is the proximate
+// trigger. The expectedEditSignificance helper still labels this
+// 'transformative' for the editScope.significance field per the spec's
+// taxonomy (the LLM edit-understanding service produces this label for
+// pure rewrites with low cross-version overlap).
+//
+// **Threshold-sentinel note:** the smoke test
+// (d1-15-harness.test.ts §"overlap-threshold sentinels") pins the
+// invariant that every replacement-vs-old pair has overlap < 0.30.
+// If a future fixture-text tweak nudges any pair above the threshold,
+// THAT test fires loudly — and this scenario's "Map size === 1 +
+// detector calls === 1" expectation here flips to a different shape.
+// The two surfaces are pinned in lockstep on purpose.
+
+describe('D-1.15 Scenario 8 — transformative pure-rewrite (UCLA P0/P1/P3 replaced; P2 verbatim)', () => {
+  beforeEach(() => {
+    mockDetect.mockReset();
+    mockDetect.mockResolvedValue(buildLanding({ status: 'addressed' }));
+  });
+
+  // ─── Layer 1: mock-call assertions (3 drops bypass detector) ────────
+
+  describe('mock surface — landingDetector NOT called for 3 dropped paragraphs', () => {
+    it('detectLanding called 1 time (4 priors with 3 dropped via paragraph_deleted → 1 detection)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+      });
+      // SCENARIO_8 anchors 4 moves at P0/P1/P2/P3. P0/P1/P3 drop
+      // (paragraph_deleted; replacements have <0.30 overlap with all
+      // iter-1 paragraphs). Only P2 survives (hash-identity remap).
+      // Expected: 1 call.
+      expect(mockDetect).toHaveBeenCalledTimes(1);
+    });
+
+    it('detectLanding receives ONLY the surviving P2 iter-1 move id', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+      });
+      const allExpectedIds = expectedIter1MoveIds(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      const survivingId = allExpectedIds[2]; // anchors[2] = P2.
+      const droppedIds = [allExpectedIds[0], allExpectedIds[1], allExpectedIds[3]];
+      const calledMoveIds = mockDetect.mock.calls.map((c) => c[0].priorTaughtMove.id);
+      expect(calledMoveIds).toEqual([survivingId]);
+      for (const droppedId of droppedIds) {
+        expect(calledMoveIds).not.toContain(droppedId);
+      }
+    });
+  });
+
+  // ─── Layer 2: priorAnnotations Map — maximum-drop semantics ─────────
+
+  describe('priorAnnotations Map (3 of 4 priors drop; P2 survives via hash identity)', () => {
+    it('Map size === 1 (only the surviving P2 prior)', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+      expect(priors.size).toBe(1);
+    });
+
+    it('Map has exactly one key === 2 (P2 hash-identity remap); rewritten iter-2 P0/P1/P3 have no entry', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      const priors = (await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+      })) as Map<number, { priorAnnotations: Array<{ content: string }> }>;
+
+      const keys = Array.from(priors.keys()).sort((a, b) => a - b);
+      expect(keys).toEqual([2]);
+      expect(priors.get(2)?.priorAnnotations[0].content).toMatch(/anchor at P2/);
+      // Rewritten iter-2 paragraphs have no priorAnnotations entries.
+      expect(priors.get(0), 'iter-2 P0 (rewritten) has no entry').toBeUndefined();
+      expect(priors.get(1), 'iter-2 P1 (rewritten) has no entry').toBeUndefined();
+      expect(priors.get(3), 'iter-2 P3 (rewritten) has no entry').toBeUndefined();
+    });
+  });
+
+  // ─── Layer 3: D-1.6.5 landing — surviving move populated, dropped stay undefined ─
+
+  describe('D-1.6.5 landing write-back semantics under maximum-drop transformative rewrite', () => {
+    it('only the surviving P2 prior gets landing populated; 3 dropped priors stay undefined', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      const allMoveIds = expectedIter1MoveIds(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      const survivingMoveId = allMoveIds[2]; // anchors[2] = P2.
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        expect(move.landing).toBeUndefined();
+      }
+
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+      });
+
+      for (const move of profile.iterationLedger.taughtMoves) {
+        if (move.id === survivingMoveId) {
+          expect(
+            move.landing,
+            `surviving P2 move ${move.id} landing populated post-rewrite (D-1.6.5 wire)`,
+          ).toBeDefined();
+          expect(move.landing?.detectedAtIteration).toBe(2);
+        } else {
+          expect(
+            move.landing,
+            `dropped move ${move.id} landing must remain undefined (paragraph_deleted = no detection)`,
+          ).toBeUndefined();
+        }
+      }
+    });
+  });
+
+  // ─── Layer 4: iter-2 commit shape captures the transformative rewrite ─
+
+  describe('iter-2 commit shape reflects transformative rewrite', () => {
+    it('iter-2 IterationRecord captures the rewrite — paragraphsChanged covers 3 indices, structural.added/removed both >0, significance=transformative', async () => {
+      const { profile, iter2Text } = setupIter2(SCENARIO_8_TRANSFORMATIVE_REWRITE);
+      await buildPriorAnnotationsForOrchestrator({
+        essayId: D1_15_ESSAY_ID,
+        profile,
+        currentEssayText: iter2Text,
+        editSignificance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+      });
+
+      const decision: CarryForwardDecision = {
+        iteration: 2,
+        itemKey: 'mode_selection',
+        decision: 'rederive',
+        rationale:
+          'iter-2 transformative_rewrite (75% paragraphs replaced, disjoint vocabulary) — Rule 4 (paragraphs added/removed) fires before Rule 5 (transformative significance); both lead to comprehensive.',
+        arbitrationMechanism: 'comprehensive_rule',
+        costSavedIfCarry: 0,
+        costSpentIfRederive: 0.05,
+      };
+      appendCarryForwardDecision(profile, decision);
+      const summary = synthesizeCarryForwardSummary(
+        profile.iterationLedger.recentDecisions,
+        2,
+      );
+
+      // Transformative rewrite: 3 paragraphs are remove+add (overlap < 0.30
+      // means computeEditDiff classifies each as paragraph_added + the
+      // displaced original as paragraph_removed). Net paragraph count is
+      // unchanged (4 in, 4 out) — but the structural counts reflect the
+      // 3-add + 3-remove churn. reordered=false (the surviving P2 stays
+      // at index 2; no positional reorder).
+      const iter2Record: IterationRecord = {
+        iteration: 2,
+        triggeredBy: 'edit',
+        editScope: {
+          paragraphsChanged: getEditedParagraphIndices(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+          significance: expectedEditSignificance(SCENARIO_8_TRANSFORMATIVE_REWRITE.edit),
+          changeTypes: [],
+          structural: { reordered: false, added: 3, removed: 3 },
+        },
+        carryForwardSummary: summary,
+        costBreakdown: {},
+        comprehensiveBaselineCost: 0.5,
+        carryForwardSavings: 0,
+        escalationLevel: 0,
+        rationale: 'iter-2 transformative_rewrite comprehensive re-analysis (D-1.15 Scenario 8)',
+        startedAt: ITER2_STARTED_AT,
+        finishedAt: ITER2_FINISHED_AT,
+        snapshotText: iter2Text,
+      };
+      profile.iterationLedger.iterations.push(iter2Record);
+
+      expect(profile.iterationLedger.iterations).toHaveLength(2);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.added).toBe(3);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.removed).toBe(3);
+      expect(profile.iterationLedger.iterations[1].editScope?.structural.reordered).toBe(false);
+      expect(profile.iterationLedger.iterations[1].editScope?.paragraphsChanged.sort((a, b) => a - b)).toEqual([0, 1, 3]);
+      expect(profile.iterationLedger.iterations[1].editScope?.significance).toBe('transformative');
+    });
+  });
+
+  // ─── Layer 5: structural validation of the iter-2 essay text ────────
+
+  describe('iter-2 essay text reflects the transformative rewrite', () => {
+    it('iter-2 P0/P1/P3 are wholly replaced (disjoint vocabulary); P2 verbatim from iter-1; paragraph count preserved', () => {
+      const iter2Text = applyScenarioEdit(
+        SCENARIO_8_TRANSFORMATIVE_REWRITE.essayText,
+        SCENARIO_8_TRANSFORMATIVE_REWRITE.edit,
+      );
+      const iter1Paras = splitParagraphs(SCENARIO_8_TRANSFORMATIVE_REWRITE.essayText);
+      const iter2Paras = splitParagraphs(iter2Text);
+
+      expect(iter2Paras).toHaveLength(iter1Paras.length);
+      // P0, P1, P3 differ wholly (different content, different domain).
+      expect(iter2Paras[0]).not.toBe(iter1Paras[0]);
+      expect(iter2Paras[1]).not.toBe(iter1Paras[1]);
+      expect(iter2Paras[3]).not.toBe(iter1Paras[3]);
+      // P2 verbatim — load-bearing for the survives-via-hash-identity
+      // semantics. Without this byte-equality, Phase 1's hash match
+      // wouldn't fire and P2 would also drop.
+      expect(iter2Paras[2]).toBe(iter1Paras[2]);
     });
   });
 });

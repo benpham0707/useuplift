@@ -42,16 +42,22 @@
 // scenarios cover EXACTLY the spec's enumerated edit kinds:
 //   - small_edit, structural_reorder, paragraph_delete, paragraph_insert,
 //     multi_paragraph_cascade.
-// Edit shapes NOT covered (deliberately deferred):
-//   - paragraph-merge (combining two paragraphs into one)
-//   - paragraph-split (breaking one paragraph into two)
-//   - transformative-significance pure rewrite (>50% paragraphs touched
-//     simultaneously, edit understanding classifies as 'transformative')
-// These three are out-of-scope for D-1.15. paragraph-merge and -split
-// land naturally in D-1.16's failure-injection scenarios; transformative
-// rewrites land in D-1.17's cross-phase audit. Don't add them here without
-// surfacing for spec ratification first — D-1.15's five-scenario contract
-// is closed.
+//
+// [Phase-1 deferred-items closure 2026-04-30 — Items 1, 2, 3 from
+//  phase-1-integrity-audit.md §6] Three additional edit shapes are now
+// covered as Scenarios 6, 7, 8 — added to this same harness as sibling
+// extensions (per Tue's authorization 2026-04-30):
+//   - paragraph-merge (Scenario 6) — combining two adjacent paragraphs
+//     into one (net paragraph count -1).
+//   - paragraph-split (Scenario 7) — splitting one paragraph into two
+//     (net paragraph count +1).
+//   - transformative pure-rewrite (Scenario 8) — >50% of paragraphs
+//     replaced with non-voice-preserving overhauls (overlap < 0.30
+//     threshold; iter-1 priors on rewritten paragraphs DROP).
+// These three were originally deferred to Phase 2 fix-cycles; surfacing
+// them now into D-1.15's harness keeps edit-shape coverage co-located
+// rather than scattered across deliverables. The 5-scenario contract is
+// EXPANDED, not invalidated — Scenarios 1-5 remain unchanged.
 
 import type { ExperienceEntry } from '../../../src/core/types/experience';
 import { ELITE_EXAMPLES_2025 } from '../elite-examples-2025';
@@ -100,6 +106,91 @@ export type ScenarioEdit =
        * paragraph at `paragraphIndex` with `newParagraphText`. The harness
        * applies them in array order; later entries see the earlier ones'
        * mutations.
+       */
+      edits: Array<{ paragraphIndex: number; newParagraphText: string }>;
+    }
+  | {
+      kind: 'paragraph_merge';
+      /**
+       * Two adjacent paragraphs combine into one. `secondIndex` MUST equal
+       * `firstIndex + 1` (validated at applyScenarioEdit). The merged
+       * paragraph replaces the first index; the second is removed. Net
+       * paragraph count decreases by 1.
+       *
+       * Edit-shape semantics for downstream remap:
+       *   - The merged text typically has high overlap with `firstIndex`
+       *     (the merge keeps most of the first paragraph's content) and
+       *     moderate overlap with `secondIndex`. Greedy overlap-pairing
+       *     in paragraphRemapBuilder Phase 2 selects iter-1 firstIndex →
+       *     iter-2 firstIndex (modified). iter-1 secondIndex has no pair
+       *     remaining → classified as paragraph_deleted; any prior move on
+       *     it DROPS.
+       *
+       * [Phase-1 Item 1 closure 2026-04-30] Added per
+       * docs/audit/phase-1-integrity-audit.md §6 #1.
+       */
+      firstIndex: number;
+      secondIndex: number;
+      mergedText: string;
+    }
+  | {
+      kind: 'paragraph_split';
+      /**
+       * One paragraph splits into two adjacent paragraphs. The original
+       * paragraph at `paragraphIndex` is replaced by `firstHalf` followed
+       * by `secondHalf` (separated by `\n\n`). Net paragraph count
+       * increases by 1.
+       *
+       * `splitAfterSentence` is informational only — the harness uses
+       * `firstHalf` / `secondHalf` directly so the split point is exact.
+       * It's preserved on the type so a future fixture audit can locate
+       * the originating sentence boundary without re-parsing the texts.
+       *
+       * Edit-shape semantics for downstream remap:
+       *   - Whichever half retains the majority of the original paragraph's
+       *     words pairs with iter-1 paragraphIndex via overlap >= 0.30
+       *     (modified). The shorter half has overlap < 0.30 with the
+       *     original → it's a structurally NEW paragraph (paragraph_added);
+       *     no priorAnnotations entry exists for it.
+       *
+       * [Phase-1 Item 2 closure 2026-04-30] Added per
+       * docs/audit/phase-1-integrity-audit.md §6 #2.
+       */
+      paragraphIndex: number;
+      splitAfterSentence: number;
+      firstHalf: string;
+      secondHalf: string;
+    }
+  | {
+      kind: 'transformative_rewrite';
+      /**
+       * >50% of the paragraphs are overhauled with non-voice-preserving
+       * replacements. Each replacement MUST have < 0.30 Jaccard overlap
+       * with EVERY old paragraph in the source essay so the diff
+       * classifies each as paragraph_added + the corresponding old
+       * paragraph as paragraph_removed (no overlap-pairing rescue).
+       *
+       * Edit-shape semantics for downstream remap:
+       *   - Untouched paragraphs (NOT in `edits[]`) match by hash → identity.
+       *   - Rewritten paragraphs (in `edits[]`) have <0.30 overlap with
+       *     anything → iter-1 ancestor at that index is classified
+       *     paragraph_deleted; iter-2 paragraph at that index is
+       *     paragraph_added. Any iter-1 prior move on a rewritten
+       *     paragraph DROPS.
+       *
+       * The fixture is responsible for guaranteeing the <0.30 overlap
+       * property — typically by writing replacement content with
+       * disjoint vocabulary from the original (different scene, different
+       * domain, different verb register).
+       *
+       * Mode-selection trigger:
+       *   - In production, this edit shape triggers Rule 4
+       *     (paragraphsAdded > 0 OR paragraphsRemoved > 0) before Rule 5
+       *     (transformative significance) gets a chance. Both routes lead
+       *     to comprehensive mode; Rule 4 is the proximate cause.
+       *
+       * [Phase-1 Item 3 closure 2026-04-30] Added per
+       * docs/audit/phase-1-integrity-audit.md §6 #3.
        */
       edits: Array<{ paragraphIndex: number; newParagraphText: string }>;
     };
@@ -356,14 +447,228 @@ export const SCENARIO_5_MULTI_PARAGRAPH_CASCADE: Scenario = {
     'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs. Multi-paragraph-cascade scenario applies surgical voice-preserving improvements to P0, P2, P3 (one sentence per paragraph, surrounding text preserved verbatim — the kind of coaching-style edit the system encourages). Overlap stays above 0.30 → computeEditDiff classifies each as `modified`; paragraphRemapBuilder threads all 4 iter-1 priors through to iter-2; landing detection fires on every prior. Tests the multi-survivor cascade carry-forward arbitration spine: 4 simultaneous landing detections + iter-2 commit shape with editScope.paragraphsChanged covering [0,2,3].',
 };
 
+/**
+ * Scenario 6: paragraph merge — combine UCB cell-tower's P1 (the letter-on-
+ * the-door discovery) with P2 (the 48-hour mobilization opener) into a
+ * single paragraph at iter-2 index 1. Net paragraph count: 5 → 4. Tests
+ * the multi-paragraph collapse path: the merged paragraph pairs with
+ * iter-1 P1 via overlap (P1's content is fully preserved in the merged
+ * text), and iter-1 P2's prior move DROPS via paragraph_deleted because
+ * its content has no remaining unpaired counterpart in iter-2.
+ *
+ * [Phase-1 Item 1 closure 2026-04-30] Added per
+ * docs/audit/phase-1-integrity-audit.md §6 #1.
+ */
+export const SCENARIO_6_PARAGRAPH_MERGE: Scenario = {
+  id: 'scenario-6-paragraph-merge',
+  essayText: eliteEssayText('ucb-cell-tower-2029'),
+  iter1MoveAnchors: [
+    // Anchors on every paragraph maximize merge-coverage diagnostic value:
+    //   - P0 stays at iter-2 P0 (identity, hash match) → survives
+    //   - P1 pairs with the merged iter-2 P1 via overlap → survives (modified)
+    //   - P2 has no pair (its content folded into merged P1, but iter-1 P1
+    //     already claimed that pairing) → DROPS as paragraph_deleted
+    //   - P3 shifts to iter-2 P2 (-1 from merge) → survives (hash identity)
+    //   - P4 shifts to iter-2 P3 (-1 from merge) → survives (hash identity)
+    //
+    // Net detector calls: 4 (P0/P1/P3/P4 survive; P2 drops before detection).
+    { paragraphIndex: 0 },
+    { paragraphIndex: 1 },
+    { paragraphIndex: 2 },
+    { paragraphIndex: 3 },
+    { paragraphIndex: 4 },
+  ],
+  edit: {
+    kind: 'paragraph_merge',
+    firstIndex: 1,
+    secondIndex: 2,
+    // Merged paragraph: ALL of iter-1 P1 (so overlap with P1 is ~1.0,
+    // dominantly > 0.30) PLUS the first sentence of iter-1 P2 (the
+    // "Within the next 48-hours" mobilization opener). This keeps the
+    // narrative arc continuous — letter discovery flows directly into
+    // mobilization — the kind of merge a coach surfaces when the original
+    // P1→P2 transition reads jumpy. Overlap with iter-1 P2 stays low
+    // (single-sentence overlap on a 3-sentence source paragraph) so
+    // greedy pairing prefers P1 → merged; P2 → unpaired → deleted.
+    mergedText:
+      "Driving up to my front door, I found a letter taped on my front door in bold letters: \"VERIZON'S CELLULAR TOWER INSTALLATION\". \"Who-the-what-now!?\" I exclaimed as I found that 5 houses had received same notice. After researching the effects of cellular towers, I found that close vicinity to one would put my family at a high risk of cancer. Within the next 48-hours before the tower's approval at City Hall, I rallied everyone and their grandmas to be proactive for the sake of their health.",
+  },
+  expectedMode: 'comprehensive',
+  provenance:
+    'UCB cell-tower 2029 admitted essay (elite-examples-2025.ts:ucb-cell-tower-2029); 5 paragraphs; political-advocacy narrative. Paragraph-merge scenario combines P1 (letter discovery) with P2 (48-hour mobilization opener) into a single paragraph at iter-2 index 1 — the kind of "tighten this jumpy transition" coaching edit. Net paragraph count: 5 → 4. Tests overlap-pairing greediness (iter-1 P1 wins the merged-paragraph pairing) AND drop-on-no-pair (iter-1 P2 prior DROPS via paragraph_deleted). Comprehensive mode triggered by Rule 4 (paragraph removed) at FocusedAnalyzer.selectAnalysisMode.',
+};
+
+/**
+ * Scenario 7: paragraph split — split Harvard MITES essay's P3 (the long
+ * closing paragraph) into two paragraphs after its first sentence. Net
+ * paragraph count: 4 → 5. Tests the structural-add path where one half
+ * pairs via overlap (modified) and the other half is structurally NEW
+ * (paragraph_added; no priorAnnotations entry).
+ *
+ * Split point: after the first sentence ("As the program progressed I
+ * only felt more comfortable and safe, enough so to even go up and speak
+ * at a family meeting."). Both halves have overlap > 0.30 with the
+ * original P3 (each is a verbatim subset). Measured values:
+ *   - firstHalf vs iter-1 P3 ≈ 0.367
+ *   - secondHalf vs iter-1 P3 ≈ ~0.81
+ *
+ * paragraphRemapBuilder Phase-2 (paragraphRemapBuilder.ts:208) iterates
+ * `unpairedNewIndices` in insertion order (low-to-high paragraph index)
+ * and for each unpaired new, finds the best unpaired old. Since iter-2
+ * P3 (firstHalf) appears BEFORE iter-2 P4 (secondHalf) in the new
+ * indices, firstHalf is processed first and pairs with iter-1 P3
+ * (the only unpaired old, overlap > 0.30). secondHalf is processed
+ * next, finds no remaining unpaired old, and is classified as
+ * paragraph_added.
+ *
+ * Effect: iter-1 P3 prior pairs with iter-2 P3 (firstHalf, modified).
+ * The new iter-2 P4 (secondHalf) has no iter-1 ancestor.
+ *
+ * [Investigation note 2026-04-30] This pairing direction is the
+ * OPPOSITE of the naive "highest overlap wins" intuition: structural
+ * position (insertion order in newParas) drives Phase-2 tiebreak when
+ * multiple news qualify for the same old. The smoke test's overlap-
+ * threshold sentinels lock this behavior in.
+ *
+ * [Phase-1 Item 2 closure 2026-04-30] Added per
+ * docs/audit/phase-1-integrity-audit.md §6 #2.
+ */
+export const SCENARIO_7_PARAGRAPH_SPLIT: Scenario = {
+  id: 'scenario-7-paragraph-split',
+  essayText: eliteEssayText('harvard-mites-2029'),
+  iter1MoveAnchors: [
+    // P1 stays at iter-2 P1 (identity); P3 shifts to iter-2 P3 (the
+    // first-half / firstHalf paragraph) via Phase-2 first-seen-new
+    // pairing. Two priors → two detector calls. The new iter-2 P4
+    // (secondHalf) has no entry.
+    { paragraphIndex: 1 },
+    { paragraphIndex: 3 },
+  ],
+  edit: {
+    kind: 'paragraph_split',
+    paragraphIndex: 3,
+    splitAfterSentence: 0,
+    // First half: only the opening sentence of iter-1 P3.
+    // Jaccard overlap with iter-1 P3 ≈ 0.367 (above the 0.30 threshold —
+    // qualifies for Phase-2 pairing).
+    firstHalf:
+      'As the program progressed I only felt more comfortable and safe, enough so to even go up and speak at a family meeting.',
+    // Second half: sentences 2-4 of iter-1 P3 verbatim.
+    // Jaccard overlap with iter-1 P3 ≈ 0.81. Both halves qualify for
+    // Phase-2 pairing, but Phase-2's first-seen-new iteration order
+    // (paragraphRemapBuilder.ts:208) means firstHalf is paired first
+    // and consumes the only unpaired-old slot. secondHalf becomes
+    // paragraph_added by exclusion.
+    secondHalf:
+      'These people, this family, treated me right. I gained priceless confidence, social skills, self-worth, empathetic ability, and mental fortitude to take with me and grow on for the rest of my life. Through all of this somehow cutting out the biggest part of my diet became the least impactful part of my summer.',
+  },
+  expectedMode: 'comprehensive',
+  provenance:
+    'Harvard MITES 2029 admitted essay (elite-examples-2025.ts:harvard-mites-2029); 4 paragraphs. Paragraph-split scenario splits the closing paragraph (P3) after its first sentence — the "give the family-meeting realization beat its own paragraph" coaching edit. Net paragraph count: 4 → 5. Both split halves have overlap > 0.30 with iter-1 P3 (firstHalf ≈ 0.37, secondHalf ≈ 0.81); Phase-2 first-seen-new iteration assigns iter-1 P3 → firstHalf (the lower-indexed unpaired new), making secondHalf paragraph_added by exclusion. Iter-1 P3 prior threads to iter-2 Map key 3. Comprehensive mode triggered by Rule 4 (paragraph added) at FocusedAnalyzer.selectAnalysisMode.',
+};
+
+/**
+ * Scenario 8: transformative pure-rewrite — replace 3 of 4 paragraphs in
+ * the UCLA cancer-awareness essay with non-voice-preserving overhauls
+ * (different domain entirely: a robotics-competition narrative). Each
+ * replacement uses disjoint vocabulary from EVERY old paragraph so the
+ * Jaccard overlap stays well below the 0.30 threshold, and computeEditDiff
+ * classifies each pair as remove+add rather than modified.
+ *
+ * P2 (the "Cancer Awareness Week" beat) is preserved verbatim — the only
+ * paragraph that survives the rewrite. This is the canonical "topic-pivot"
+ * edit shape: a coach who flagged the original essay as off-prompt and
+ * the student wholesale-rewrote 75% of it, retaining one anchor beat for
+ * continuity (or because the student didn't get to that part of the
+ * rewrite yet).
+ *
+ * Effect on iter-1 priors:
+ *   - P0 prior: DROPPED (overlap < 0.30 with all iter-2 paragraphs)
+ *   - P1 prior: DROPPED (same)
+ *   - P2 prior: identity-remap to iter-2 P2 (hash match) → survives
+ *   - P3 prior: DROPPED
+ *
+ * Detector calls: 1 (only the surviving P2 prior).
+ * structural counts: added=3, removed=3, reordered=false.
+ *
+ * Mode-selection: Rule 4 (paragraphsAdded > 0 OR paragraphsRemoved > 0)
+ * fires before Rule 5 (transformative significance) gets a chance — both
+ * lead to comprehensive, but Rule 4 is the proximate trigger.
+ *
+ * [Phase-1 Item 3 closure 2026-04-30] Added per
+ * docs/audit/phase-1-integrity-audit.md §6 #3.
+ */
+export const SCENARIO_8_TRANSFORMATIVE_REWRITE: Scenario = {
+  id: 'scenario-8-transformative-rewrite',
+  essayText: eliteEssayText('ucla-cancer-awareness-2029'),
+  iter1MoveAnchors: [
+    // Anchors on all 4 paragraphs maximize drop-coverage diagnostic value:
+    // 3 of 4 priors should DROP (P0, P1, P3 are rewritten); 1 survives
+    // (P2 is preserved verbatim → hash-identity remap → detector fires
+    // for that one move).
+    { paragraphIndex: 0 },
+    { paragraphIndex: 1 },
+    { paragraphIndex: 2 },
+    { paragraphIndex: 3 },
+  ],
+  edit: {
+    kind: 'transformative_rewrite',
+    // Robotics-competition narrative — disjoint vocabulary from cancer-
+    // awareness narrative. Each new paragraph uses domain-specific words
+    // (chassis, autonomous, scrimmage, controller, regional) that don't
+    // appear in any original paragraph; common words are minimized.
+    // Verified by hand: Jaccard overlap with each iter-1 paragraph is
+    // well below 0.30. (Per LLM-first design: this is fixture-level
+    // verification — the assertion downstream pins Map size === 1 +
+    // detector calls === 1 as deliberate sentinels for the threshold,
+    // mirroring Scenario 5's threshold-sentinel discipline.)
+    edits: [
+      {
+        paragraphIndex: 0,
+        newParagraphText:
+          "Our robotics chassis tipped over during the regional scrimmage, scattering plastic gears across the field. Chen, our captain, just laughed and grabbed her controller — she had built this thing six times before, and tipping was just data. I knelt beside the autonomous module trying to remember the wiring diagram I had memorized three weeks earlier.",
+      },
+      {
+        paragraphIndex: 1,
+        newParagraphText:
+          "Engineering club had taught me that prototypes fail in proportion to how much you trusted the simulation. The simulation had said our gear ratio was fine. The pavement said otherwise. I rebuilt the drivetrain twice that night using zip-ties and a 3D-printed coupler I sketched on graph paper.",
+      },
+      // P2 (paragraphIndex: 2) is INTENTIONALLY ABSENT from edits[] — it
+      // remains verbatim from iter-1 so iter-1 P2's prior survives via
+      // hash-identity remap. This is the load-bearing detail of the
+      // scenario: it proves that even under transformative rewrite,
+      // ONE surviving anchor is sufficient to fire the D-1.6.5 wire and
+      // populate landing on the surviving move.
+      {
+        paragraphIndex: 3,
+        newParagraphText:
+          "We placed seventh that weekend — not what we wanted, but enough to qualify. Driving home in Chen's mom's minivan, I realized engineering rewards you for staying inside the failure long enough to map it. The next morning I sketched a new chassis on the back of my homework. Three months later we won state.",
+      },
+    ],
+  },
+  expectedMode: 'comprehensive',
+  provenance:
+    'UCLA cancer-awareness 2029 admitted essay (elite-examples-2025.ts:ucla-cancer-awareness-2029); 4 paragraphs. Transformative-rewrite scenario replaces P0/P1/P3 (75% — exceeds the >50% spec threshold) with a disjoint-domain robotics-competition narrative; P2 preserved verbatim. Each replacement has Jaccard overlap < 0.30 with every iter-1 paragraph → computeEditDiff classifies each as paragraph_added + iter-1 paragraph as paragraph_removed (not modified). 3 of 4 iter-1 priors DROP via paragraph_deleted; 1 survives via hash-identity remap. Tests the maximum-drop case the spec contemplates: detector calls = 1 (not 4), Map size = 1, structural counts {added: 3, removed: 3, reordered: false}. Comprehensive mode triggered by Rule 4 (paragraphsAdded > 0 OR paragraphsRemoved > 0) at FocusedAnalyzer.selectAnalysisMode — Rule 4 fires before Rule 5 (transformative significance) gets a chance, but both lead to comprehensive.',
+};
+
 // ─── Public registry ────────────────────────────────────────────────────
 
 /**
  * All scenarios in spec order. The integration test imports this array
  * (or specific scenarios by name) and runs assertions. The registry shape
- * makes it easy to: (i) add a 6th scenario for future deliverables, (ii)
+ * makes it easy to: (i) add new scenarios for future deliverables, (ii)
  * generate parameterized assertions, (iii) verify spec-completeness at
- * a glance (count === 5).
+ * a glance (count === 8: 5 spec-original + 3 deferred-item closures).
+ *
+ * Edit-shape coverage (8 total):
+ *   1. small_edit (Scenario 1)
+ *   2. structural_reorder (Scenario 2)
+ *   3. paragraph_delete (Scenario 3)
+ *   4. paragraph_insert (Scenario 4)
+ *   5. multi_paragraph_cascade (Scenario 5)
+ *   6. paragraph_merge (Scenario 6) — Phase-1 Item 1 closure
+ *   7. paragraph_split (Scenario 7) — Phase-1 Item 2 closure
+ *   8. transformative_rewrite (Scenario 8) — Phase-1 Item 3 closure
  */
 export const D1_15_SCENARIOS: Scenario[] = [
   SCENARIO_1_SMALL_EDIT,
@@ -371,6 +676,9 @@ export const D1_15_SCENARIOS: Scenario[] = [
   SCENARIO_3_PARAGRAPH_DELETE,
   SCENARIO_4_PARAGRAPH_INSERT,
   SCENARIO_5_MULTI_PARAGRAPH_CASCADE,
+  SCENARIO_6_PARAGRAPH_MERGE,
+  SCENARIO_7_PARAGRAPH_SPLIT,
+  SCENARIO_8_TRANSFORMATIVE_REWRITE,
 ];
 
 /**
@@ -461,6 +769,71 @@ export function applyScenarioEdit(iter1Text: string, edit: ScenarioEdit): string
       }
       return out.join('\n\n');
     }
+
+    case 'paragraph_merge': {
+      // Range guards: both indices must be in the paragraph array AND
+      // adjacent (secondIndex === firstIndex + 1). Adjacency is the
+      // semantic invariant — merging non-adjacent paragraphs would either
+      // (a) reorder content (which is structural_reorder territory), or
+      // (b) require a different scenario kind (`merge_disjoint`) the spec
+      // does not contemplate. Surface the violation rather than silently
+      // applying a non-adjacent merge.
+      if (edit.firstIndex < 0 || edit.firstIndex >= paras.length) {
+        throw new Error(
+          `[d1-15/scenarios] paragraph_merge.firstIndex=${edit.firstIndex} out of range; ` +
+            `essay has ${paras.length} paragraphs`,
+        );
+      }
+      if (edit.secondIndex < 0 || edit.secondIndex >= paras.length) {
+        throw new Error(
+          `[d1-15/scenarios] paragraph_merge.secondIndex=${edit.secondIndex} out of range; ` +
+            `essay has ${paras.length} paragraphs`,
+        );
+      }
+      if (edit.secondIndex !== edit.firstIndex + 1) {
+        throw new Error(
+          `[d1-15/scenarios] paragraph_merge requires adjacent indices ` +
+            `(secondIndex === firstIndex + 1); got firstIndex=${edit.firstIndex}, secondIndex=${edit.secondIndex}`,
+        );
+      }
+      const out = [...paras];
+      // Replace firstIndex with mergedText; remove secondIndex.
+      out[edit.firstIndex] = edit.mergedText;
+      out.splice(edit.secondIndex, 1);
+      return out.join('\n\n');
+    }
+
+    case 'paragraph_split': {
+      if (edit.paragraphIndex < 0 || edit.paragraphIndex >= paras.length) {
+        throw new Error(
+          `[d1-15/scenarios] paragraph_split.paragraphIndex=${edit.paragraphIndex} out of range; ` +
+            `essay has ${paras.length} paragraphs`,
+        );
+      }
+      const out = [...paras];
+      // Replace target paragraph with two paragraphs (firstHalf, secondHalf).
+      out.splice(edit.paragraphIndex, 1, edit.firstHalf, edit.secondHalf);
+      return out.join('\n\n');
+    }
+
+    case 'transformative_rewrite': {
+      // Range guards on every entry. Same semantics as multi_paragraph_cascade
+      // (later entries see earlier mutations) — but transformative_rewrite
+      // is conceptually different: replacements are non-voice-preserving
+      // (low overlap), whereas multi_paragraph_cascade replacements are
+      // voice-preserving (high overlap, modified-classified).
+      const out = [...paras];
+      for (const e of edit.edits) {
+        if (e.paragraphIndex < 0 || e.paragraphIndex >= out.length) {
+          throw new Error(
+            `[d1-15/scenarios] transformative_rewrite.edits paragraphIndex=${e.paragraphIndex} out of range; ` +
+              `essay has ${out.length} paragraphs (after preceding edits)`,
+          );
+        }
+        out[e.paragraphIndex] = e.newParagraphText;
+      }
+      return out.join('\n\n');
+    }
   }
 }
 
@@ -492,6 +865,18 @@ export function getEditedParagraphIndices(edit: ScenarioEdit): number[] {
       return [edit.insertAfterIndex];
     case 'multi_paragraph_cascade':
       return edit.edits.map((e) => e.paragraphIndex);
+    case 'paragraph_merge':
+      // Both indices participate — the merged paragraph occupies firstIndex
+      // and secondIndex's content is folded in (then secondIndex removed).
+      return [edit.firstIndex, edit.secondIndex];
+    case 'paragraph_split':
+      // The split target — only one paragraph index is "edited" in iter-1
+      // indexing space (the new paragraph is structurally added at
+      // paragraphIndex+1 in iter-2 space, but editScope.paragraphsChanged
+      // tracks iter-1-indexed change locations).
+      return [edit.paragraphIndex];
+    case 'transformative_rewrite':
+      return edit.edits.map((e) => e.paragraphIndex);
   }
 }
 
@@ -521,6 +906,22 @@ export function expectedEditSignificance(
       // Multiple paragraphs rewritten → transformative (the LLM-realistic
       // label for >2 paragraphs touched simultaneously per
       // FocusedAnalyzer.selectAnalysisMode Rule 5).
+      return 'transformative';
+    case 'paragraph_merge':
+      // Merging two paragraphs collapses one — structural shape change,
+      // significance is architectural (identical category to delete since
+      // net paragraph count drops by 1).
+      return 'significant';
+    case 'paragraph_split':
+      // Splitting one paragraph into two adds one — structural shape
+      // change, significance is architectural (identical category to
+      // insert since net paragraph count rises by 1).
+      return 'significant';
+    case 'transformative_rewrite':
+      // >50% of paragraphs replaced with non-voice-preserving overhauls.
+      // This is the canonical 'transformative' label; the LLM
+      // edit-understanding service produces this exact category for
+      // pure rewrites with low cross-version overlap.
       return 'transformative';
   }
 }

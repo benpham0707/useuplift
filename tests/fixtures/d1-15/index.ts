@@ -24,6 +24,11 @@ export {
   SCENARIO_3_PARAGRAPH_DELETE,
   SCENARIO_4_PARAGRAPH_INSERT,
   SCENARIO_5_MULTI_PARAGRAPH_CASCADE,
+  // [Phase-1 Items 1, 2, 3 closure 2026-04-30] Three additional scenarios
+  // covering deferred edit shapes from docs/audit/phase-1-integrity-audit.md §6.
+  SCENARIO_6_PARAGRAPH_MERGE,
+  SCENARIO_7_PARAGRAPH_SPLIT,
+  SCENARIO_8_TRANSFORMATIVE_REWRITE,
   applyScenarioEdit,
   splitParagraphs,
   getEditedParagraphIndices,
