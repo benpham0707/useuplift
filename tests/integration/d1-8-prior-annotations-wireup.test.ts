@@ -574,3 +574,363 @@ describe('D-1.8 — editSignificance absent → mechanical fallback fires', () =
     expect(call.edit.significance).toBe('minor');
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────
+// D-1.6.5 — Landing write-back wire
+// ────────────────────────────────────────────────────────────────────────
+//
+// Closes F-01 from the Phase 1 dead-wire audit (2026-04-30): the landing
+// detector ran but its result was consumed only into a transient
+// `addressedByEdit` boolean — the canonical `move.landing` field on the
+// ledger stayed `undefined` forever. F-01 was the producer-half of the
+// gap that motivated D-1.15.0's carve-out; D-1.6.5 lands the producer
+// itself.
+//
+// These tests are co-located with D-1.8's wire-up tests because they
+// share the `vi.mock(detectLanding)` setup. The diagnostic naming is
+// deliberate: when one of these fails, the test name points at the
+// write-back wire specifically, not the broader D-1.8 surface.
+describe('D-1.6.5 — landing write-back to source TaughtMove', () => {
+  beforeEach(() => mockDetect.mockReset());
+
+  it('after detection, source move.landing is populated with all 5 fields and detectedAtIteration === currentIteration', async () => {
+    const oldText =
+      'P0 stays the same throughout this edit.\n\n' +
+      'Mom watched the kettle whistle while she folded laundry on the chair.';
+    const newText =
+      'P0 stays the same throughout this edit.\n\n' +
+      'Mom watched the kettle whistle while she folded laundry on the kitchen table.';
+
+    const sourceMove = makeMove({
+      id: 'M-iter1-p1',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 1 },
+      contentSummary: 'P1 needed concrete sensory detail.',
+    });
+    // Pre-condition: source move's landing must be undefined before
+    // detection runs. If this assertion ever fails, the fixture builder
+    // changed and the carve-out's "one-shot undefined → populated"
+    // semantics no longer hold from the test's starting point.
+    expect(sourceMove.landing).toBeUndefined();
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [sourceMove],
+      }),
+      essayText: newText,
+    });
+
+    mockDetect.mockResolvedValue(
+      makeLanding({
+        status: 'addressed',
+        confidence: 0.92,
+        reasoning: 'student rewrote the sentence with concrete detail (kitchen table)',
+        signalsUsed: ['edit_vs_critique'],
+      }),
+    );
+
+    await buildPriorAnnotationsForOrchestrator({
+      essayId: 'test-essay-d165',
+      profile,
+      currentEssayText: newText,
+      editSignificance: 'significant',
+    });
+
+    // Post-condition: source move.landing is now populated with the
+    // detector output + detectedAtIteration === currentIteration. The
+    // mutation goes through the array reference returned by Array.filter,
+    // so the ledger's source move IS this object.
+    const ledgerMove = profile.iterationLedger.taughtMoves[0];
+    expect(ledgerMove.id).toBe('M-iter1-p1');
+    expect(ledgerMove.landing).toBeDefined();
+    expect(ledgerMove.landing?.status).toBe('addressed');
+    expect(ledgerMove.landing?.confidence).toBe(0.92);
+    expect(ledgerMove.landing?.reasoning).toBe(
+      'student rewrote the sentence with concrete detail (kitchen table)',
+    );
+    expect(ledgerMove.landing?.signalsUsed).toEqual(['edit_vs_critique']);
+    // detectedAtIteration === currentIteration (NOT taughtAtIteration + 1
+    // — same value in normal flow but distinct concepts).
+    expect(ledgerMove.landing?.detectedAtIteration).toBe(2);
+  });
+
+  it('throws on D-1.15.0 carve-out violation if move.landing is already populated', async () => {
+    // Construct a move with an already-populated landing. This should
+    // never happen under normal flow because the priorIteration filter
+    // (priorAnnotationsBuilder.ts:177-179) excludes moves whose
+    // taughtAtIteration !== currentIteration - 1. If the filter ever
+    // loosens, this catches the resulting carve-out violation.
+    const preLandedMove = makeMove({
+      id: 'M-pre-landed',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 1 },
+      contentSummary: 'P1 carry-forward content.',
+    });
+    preLandedMove.landing = {
+      status: 'partially_addressed',
+      detectedAtIteration: 2,
+      confidence: 0.6,
+      reasoning: 'pre-existing landing from a hypothetical prior call',
+      signalsUsed: ['edit_vs_critique'],
+    };
+
+    const oldText = 'P0 stays.\n\nP1 with content to detect against.';
+    const newText = 'P0 stays.\n\nP1 with edited content for detection.';
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [preLandedMove],
+      }),
+      essayText: newText,
+    });
+
+    mockDetect.mockResolvedValue(makeLanding({ status: 'addressed' }));
+
+    await expect(
+      buildPriorAnnotationsForOrchestrator({
+        essayId: 'test-essay-d165-violation',
+        profile,
+        currentEssayText: newText,
+        editSignificance: 'significant',
+      }),
+    ).rejects.toThrow(/D-1\.15\.0 carve-out violation/);
+  });
+
+  it('throws on carve-out violation regardless of prior detectedAtIteration value (R-3 closure: assertion is purely about populated-ness, not iteration equality)', async () => {
+    // R-3 review-finding closure: the prior carve-out test used
+    // detectedAtIteration: 2 which matches currentIteration. A stronger
+    // test asserts the throw fires even when detectedAtIteration is
+    // an older iteration (e.g., 1) — proving the throw guards
+    // populated-ness, not iteration-clash.
+    const olderLandedMove = makeMove({
+      id: 'M-older-landed',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 1 },
+      contentSummary: 'P1 carry-forward content.',
+    });
+    olderLandedMove.landing = {
+      status: 'addressed',
+      detectedAtIteration: 1, // older than currentIteration
+      confidence: 0.8,
+      reasoning: 'hypothetical earlier landing record',
+      signalsUsed: ['edit_vs_critique'],
+    };
+
+    const oldText = 'P0 stays.\n\nP1 with content.';
+    const newText = 'P0 stays.\n\nP1 with edited content.';
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [olderLandedMove],
+      }),
+      essayText: newText,
+    });
+
+    mockDetect.mockResolvedValue(makeLanding({ status: 'addressed' }));
+
+    await expect(
+      buildPriorAnnotationsForOrchestrator({
+        essayId: 'test-essay-d165-older-violation',
+        profile,
+        currentEssayText: newText,
+        editSignificance: 'significant',
+      }),
+    ).rejects.toThrow(/D-1\.15\.0 carve-out violation/);
+  });
+
+  it('detector throws → write-back never happens; move.landing stays undefined (C-1 closure: hardens against future refactors that hoist write-back above the await)', async () => {
+    // C-1 contract-audit closure: symmetry with the dropped-move case —
+    // if the detector throws, the write-back must NOT have run, and the
+    // source move.landing must remain undefined. This guards against
+    // a future refactor that accidentally moves the write-back BEFORE
+    // the await (which would persist a fabricated/zero landing on
+    // detector failure).
+    const sourceMove = makeMove({
+      id: 'M-detector-fails',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 1 },
+      contentSummary: 'P1 needed sensory detail.',
+    });
+    expect(sourceMove.landing).toBeUndefined();
+
+    const oldText = 'P0 stays.\n\nP1 original text content here.';
+    const newText = 'P0 stays.\n\nP1 edited text content for detection.';
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [sourceMove],
+      }),
+      essayText: newText,
+    });
+
+    // Detector rejects. The wire enriches the error (per
+    // priorAnnotationsBuilder.ts runDetectorWithEnrichedError) and
+    // re-throws — write-back never runs.
+    mockDetect.mockRejectedValueOnce(new Error('simulated detector LLM failure'));
+
+    await expect(
+      buildPriorAnnotationsForOrchestrator({
+        essayId: 'test-essay-d165-detector-fail',
+        profile,
+        currentEssayText: newText,
+        editSignificance: 'significant',
+      }),
+    ).rejects.toThrow();
+
+    // The throw bubbled out before the write-back. Source move.landing
+    // remains undefined — no fabricated landing persisted.
+    const ledgerMove = profile.iterationLedger.taughtMoves[0];
+    expect(ledgerMove.landing).toBeUndefined();
+  });
+
+  it('dropped moves (paragraph deleted) skip detection AND skip write-back; their landing stays undefined', async () => {
+    // Iter-1 had a move on P1 (chair text). Iter-2 deletes that paragraph
+    // entirely; the remap drops the move. Detector must NOT be called
+    // for this move, AND the source move.landing must remain undefined
+    // (no detection ran, no write-back).
+    const oldText =
+      'P0 stays.\n\n' +
+      'Mom watched the kettle whistle while she folded laundry on the chair.\n\n' +
+      'P2 conclusion text that survives.';
+    const newText =
+      'P0 stays.\n\n' +
+      'P2 conclusion text that survives.';
+
+    const droppedMove = makeMove({
+      id: 'M-dropped',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 1 },
+      contentSummary: 'P1 needed sensory detail.',
+    });
+    expect(droppedMove.landing).toBeUndefined();
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [droppedMove],
+      }),
+      essayText: newText,
+    });
+
+    mockDetect.mockResolvedValue(makeLanding({ status: 'addressed' }));
+
+    await buildPriorAnnotationsForOrchestrator({
+      essayId: 'test-essay-d165-drop',
+      profile,
+      currentEssayText: newText,
+      editSignificance: 'significant',
+    });
+
+    // Detector NOT called for dropped moves — drop happens before the
+    // detector call site (line 200-213 in builder).
+    expect(mockDetect).not.toHaveBeenCalled();
+
+    // Source move.landing remains undefined — no write-back happens for
+    // dropped moves. This is the correct semantics: a dropped move's
+    // landing is structurally undefined (the paragraph is gone, there's
+    // nothing to detect against).
+    const ledgerMove = profile.iterationLedger.taughtMoves[0];
+    expect(ledgerMove.landing).toBeUndefined();
+  });
+
+  it('multiple priors → each move gets its own landing; iteration-2 currentIteration uniformly applied', async () => {
+    // Three moves on three distinct paragraphs from iter-1; iter-2 edits
+    // all three. Each detector call returns distinct landing details;
+    // each move.landing must reflect its own detection (not cross-contaminated)
+    // and detectedAtIteration must be 2 across all three.
+    const oldText =
+      'P0 paragraph zero text here.\n\n' +
+      'P1 paragraph one earlier text.\n\n' +
+      'P2 paragraph two original text.';
+    const newText =
+      'P0 paragraph zero with edits.\n\n' +
+      'P1 paragraph one revised text.\n\n' +
+      'P2 paragraph two updated text.';
+
+    const moveP0 = makeMove({
+      id: 'M-p0',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 0 },
+      contentSummary: 'P0 needs richer hook.',
+    });
+    const moveP1 = makeMove({
+      id: 'M-p1',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 1 },
+      contentSummary: 'P1 needs sensory specifics.',
+    });
+    const moveP2 = makeMove({
+      id: 'M-p2',
+      taughtAtIteration: 1,
+      location: { paragraphIndex: 2 },
+      contentSummary: 'P2 needs sharper resolution.',
+    });
+
+    const profile = makeProfile({
+      ledger: makeLedger({
+        currentIteration: 2,
+        iterations: [makeIterationRecord({ iteration: 1, snapshotText: oldText })],
+        taughtMoves: [moveP0, moveP1, moveP2],
+      }),
+      essayText: newText,
+    });
+
+    // Sequence-dependent mock: returns landings in builder iteration
+    // order (which is ledger-array order today). Assertions below use
+    // findMove-by-id, so they remain correct even if builder iteration
+    // order changes — but the sequence-of-returns would need updating
+    // if the builder ever parallelizes. R-4 audit-finding noted this
+    // brittleness; the id-keyed mockImplementation alternative had a
+    // type-resolution issue with vi.mocked + async closures here, so
+    // we kept the sequence form. If the builder parallelizes in a
+    // future deliverable, this test's mock setup must be revisited.
+    mockDetect
+      .mockResolvedValueOnce(
+        makeLanding({ status: 'addressed', confidence: 0.91, reasoning: 'P0 reasoning', signalsUsed: ['edit_vs_critique'] }),
+      )
+      .mockResolvedValueOnce(
+        makeLanding({ status: 'partially_addressed', confidence: 0.65, reasoning: 'P1 reasoning', signalsUsed: ['edit_vs_critique', 'redetection'] }),
+      )
+      .mockResolvedValueOnce(
+        makeLanding({ status: 'unaddressed', confidence: 0.85, reasoning: 'P2 reasoning', signalsUsed: ['edit_vs_critique'] }),
+      );
+
+    await buildPriorAnnotationsForOrchestrator({
+      essayId: 'test-essay-d165-multi',
+      profile,
+      currentEssayText: newText,
+      editSignificance: 'significant',
+    });
+
+    expect(mockDetect).toHaveBeenCalledTimes(3);
+
+    // Find each move on the ledger and verify its landing.
+    const findMove = (id: string) =>
+      profile.iterationLedger.taughtMoves.find((m) => m.id === id);
+    expect(findMove('M-p0')?.landing?.status).toBe('addressed');
+    expect(findMove('M-p0')?.landing?.confidence).toBe(0.91);
+    expect(findMove('M-p0')?.landing?.reasoning).toBe('P0 reasoning');
+    expect(findMove('M-p0')?.landing?.detectedAtIteration).toBe(2);
+
+    expect(findMove('M-p1')?.landing?.status).toBe('partially_addressed');
+    expect(findMove('M-p1')?.landing?.confidence).toBe(0.65);
+    expect(findMove('M-p1')?.landing?.reasoning).toBe('P1 reasoning');
+    expect(findMove('M-p1')?.landing?.signalsUsed).toEqual([
+      'edit_vs_critique',
+      'redetection',
+    ]);
+
+    expect(findMove('M-p2')?.landing?.status).toBe('unaddressed');
+    expect(findMove('M-p2')?.landing?.reasoning).toBe('P2 reasoning');
+    expect(findMove('M-p2')?.landing?.detectedAtIteration).toBe(2);
+  });
+});

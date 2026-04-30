@@ -220,6 +220,54 @@ export async function buildPriorAnnotations(
     const detectorInput = buildDetectorInput(move, input);
     const landing = await runDetectorWithEnrichedError(detectorInput, move);
 
+    // D-1.6.5: Write back the detected landing to the source TaughtMove on
+    // the ledger. Before this fix, detector output was consumed only into
+    // `addressedByEdit` below — `move.landing` stayed `undefined` forever,
+    // making the cross-iteration audit and any future landing-history
+    // consumer (cross-iteration synthesis, Conversator "have we worked on
+    // this before?" handler) impossible.
+    //
+    // Honors the D-1.15.0 carve-out (see
+    // tests/property/iterationLedgerAppendOnly.ts top-of-file block):
+    // one-shot `undefined → populated` transition only. The
+    // priorIteration filter at line 177-179 should prevent re-detecting
+    // the same move on a later iteration (we only consider moves where
+    // `taughtAtIteration === currentIteration - 1`), so a populated
+    // landing entering this loop is a contract violation worth halting on.
+    //
+    // The filter returns same-reference TaughtMove objects from the
+    // ledger array (Array.filter preserves element refs), so this
+    // assignment mutates the canonical entry on
+    // `iterationLedger.taughtMoves[]` directly. That is the intended
+    // persistence path — no separate write needed.
+    if (move.landing !== undefined) {
+      // R-6 audit closure (D-1.6.5, 2026-04-30): `pending` status is
+      // treated as already-populated by this throw — the D-1.15.0
+      // carve-out is `undefined → populated`, NOT `pending → populated`.
+      // If a future async/streaming detector wants to write `pending`
+      // first and the terminal status later, the carve-out spec must
+      // be widened FIRST (and Property 5 + this throw updated). Don't
+      // silently allow `pending → terminal` overwrites by relaxing
+      // this check — that would erode the spec amendment's tight scope.
+      throw new Error(
+        `[priorAnnotationsBuilder] D-1.15.0 carve-out violation: TaughtMove ` +
+          `id="${move.id}" already has landing populated ` +
+          `(status="${move.landing.status}", ` +
+          `detectedAtIteration=${move.landing.detectedAtIteration}). ` +
+          `Re-detection on iteration ${input.currentIteration} would have mutated ` +
+          `a populated landing field, which is forbidden by the one-shot rule. ` +
+          `Investigate the priorIteration filter (priorAnnotationsBuilder.ts:177-179) — ` +
+          `it should have excluded this move.`,
+      );
+    }
+    move.landing = {
+      status: landing.status,
+      detectedAtIteration: input.currentIteration,
+      confidence: landing.confidence,
+      reasoning: landing.reasoning,
+      signalsUsed: landing.signalsUsed,
+    };
+
     const annotation = {
       content: move.contentSummary,
       // PriorAnnotationContext.type is documented as `string`; the
