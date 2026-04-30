@@ -43,6 +43,8 @@ export default defineConfig({
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',
       'tests/integration/d1-11-decisions.test.ts',
+      // D-1.15.1 harness foundation smoke test (2026-04-30).
+      'tests/integration/d1-15-harness.test.ts',
       // tests/property/ — D-1.13 onward. Spec uses literal filenames
       // without the `.test.ts` suffix (separate test category from
       // unit/integration); they're enumerated explicitly here so vitest
