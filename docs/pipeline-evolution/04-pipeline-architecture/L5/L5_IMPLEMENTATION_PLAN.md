@@ -741,8 +741,9 @@ audit ratified the expansion 2026-04-28.
 - **Depends on:** D-1.10.
 - **Blocks:** D-1.15.
 - **Contract:** Property test asserting that across any sequence of iteration commits, no entry in `iterationLedger.iterations[]` or `iterationLedger.taughtMoves[]` is ever overwritten or removed (only appended). Mutation of an existing entry via the public API throws.
-- **Validation:** Test simulates 100 iteration commits; asserts append-only.
-- **Effort:** 2 hours.
+- **Carve-out (ratified D-1.15.0, 2026-04-29):** the `taughtMoves[i].landing` field is permitted exactly one post-commit transition: `undefined → populated` by the landing detector on the iteration after teaching. Any other landing mutation (`populated → mutated`, `populated → undefined`) is forbidden. `IterationRecord` array remains fully append-only — no carve-outs. See `tests/property/iterationLedgerAppendOnly.ts` top-of-file comment for ratification context. The carve-out is enforced by `assertTaughtMoveAppendOnlyWithLandingCarveOut` in Properties 1 and 5.
+- **Validation:** Test simulates 100 iteration commits; asserts append-only with carve-out semantics.
+- **Effort:** 2 hours (original); +1 hour for the D-1.15.0 carve-out helper + Property 5 self-test.
 
 ### D-1.15 — Mock-LLM integration test (full iteration 1→2 flow)
 

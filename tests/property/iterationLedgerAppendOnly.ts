@@ -58,29 +58,48 @@
 // - Symbol-keyed caches / time-independence: the SUT is a synchronous
 //   array.push; no internal state.
 //
-// ─── Known future-deliberate divergence (round-3 audit Finding 6) ─────
+// ─── Spec-amendment ratification — D-1.15.0 (2026-04-29) ──────────────
 //
-// The spec contains an internal tension this test will surface when D-1.6
-// (landing detector) lands:
-//   - L5_IMPLEMENTATION_PLAN.md §D-1.14 line 743: "Mutation of an existing
-//     entry via the public API throws."
-//   - L5_ITERATION_LOOP_DESIGN.md §7.2 line 499: "The `landing` field is
-//     null at delivery, populated by the landing detector on the *next*
-//     iteration."
+// The spec contained an internal tension this test was originally written
+// to surface:
+//   - L5_IMPLEMENTATION_PLAN.md §D-1.14: "Mutation of an existing entry
+//     via the public API throws."
+//   - L5_ITERATION_LOOP_DESIGN.md §7.2: "The `landing` field is null at
+//     delivery, populated by the landing detector on the *next* iteration."
 //   - L5_ITERATION_LOOP_DESIGN.md §7.5 step 3b: "Persist back to
 //     taughtMoves[move].landing."
 //
-// Property 1 will FAIL when D-1.6 mutates `taughtMoves[i].landing` post-
-// commit. That failure is INTENTIONAL — the test is forcing the
-// inevitable spec-amendment conversation. Resolution options for that
-// future commit:
-//   (a) Carve out `landing` field as the one allowed mutation; amend
-//       D-1.14 spec to say "no mutation EXCEPT taughtMoves[i].landing"
-//       and update Property 1's deep-equal to mask the landing field.
-//   (b) Restructure landing as a parallel `landingHistory[]` array
-//       indexed by move id; keep taughtMoves[] strictly append-only.
-// Either path requires Tue's ratification BEFORE D-1.6 lands. Today the
-// invariant holds because no producer mutates landing yet.
+// Resolution (option (a), ratified by Tue 2026-04-29 before D-1.15 lands):
+//   The `landing` field is carved out of the append-only invariant as the
+//   ONE permitted post-commit mutation, narrowly defined as:
+//
+//     - Allowed: a single transition `landing: undefined → populated`
+//       performed by the landing detector on the iteration after teaching.
+//     - Disallowed: any subsequent rewrite of an already-populated landing
+//       (no `populated → mutated`, no `populated → undefined`).
+//     - Disallowed: any other field mutation on a committed TaughtMove
+//       (`id`, `annotationId`, `location`, `taughtAtIteration`,
+//       `teachingMode`, `contentSummary`, `stakesSnapshot`, `findingId`,
+//       `deepenedBy`, `supersededBy` all stay byte-identical post-commit).
+//
+//   IterationRecord remains FULLY append-only — no field carve-outs.
+//
+//   Rationale: landing IS observed asynchronously, after teaching. A
+//   sibling `taughtMoveLandings: Record<TaughtMoveId, Landing>` structure
+//   (option (b)) would have been architecturally cleaner but cascades
+//   into D-1.6/D-1.8/D-1.10/D-1.12 consumer changes. The carve-out keeps
+//   the schema honest about what already happens semantically: a one-shot
+//   write from undefined to populated, never re-mutated.
+//
+// Property 1 below uses `assertTaughtMoveAppendOnlyWithLandingCarveOut`
+// which encodes this exception precisely. The test was extended (not
+// loosened) — `populated → mutated` and `populated → undefined` are now
+// active assertions.
+//
+// If you ever consider widening the carve-out (e.g., "let `deepenedBy`
+// also be post-commit-mutable"), STOP and surface to product/spec
+// review. Each new carve-out is precedent that makes the next one easier
+// — that's the slippery slope this comment block is designed to halt.
 //
 // Seed convention: deterministic LCG seeded with 0xD1140002 (constant; no
 // semantic meaning beyond reproducibility on CI). Same convention as D-1.13.
@@ -208,6 +227,58 @@ function commitIterationDirectly(
   }
 }
 
+// Encodes the D-1.15.0 landing carve-out (see comment block at the top of
+// this file for ratification context). All non-landing fields must be
+// byte-identical between prior and post snapshots. Landing has a narrow,
+// one-shot allowed transition: `undefined → populated`. Any other landing
+// mutation (populated → mutated, populated → undefined) FAILS the assertion.
+//
+// Why a custom helper instead of a Vitest matcher: the carve-out is a
+// LOCAL, NAMED exception to the broader append-only invariant. A custom
+// matcher would be reusable but would also be tempting to apply to the
+// IterationRecord array (which has NO carve-outs). Keeping this helper
+// scoped to taughtMoves preserves the asymmetry on purpose.
+function assertTaughtMoveAppendOnlyWithLandingCarveOut(
+  prior: TaughtMove[],
+  post: TaughtMove[],
+  context: string,
+): void {
+  expect(
+    post.length,
+    `${context}: post.length must be ≥ prior.length (append-only)`,
+  ).toBeGreaterThanOrEqual(prior.length);
+
+  for (let i = 0; i < prior.length; i++) {
+    const p = prior[i];
+    const q = post[i];
+
+    // All non-landing fields must be byte-identical.
+    const { landing: priorLanding, ...priorRest } = p;
+    const { landing: postLanding, ...postRest } = q;
+    expect(
+      postRest,
+      `${context}: move[${i}] non-landing fields must be byte-identical (id=${p.id})`,
+    ).toEqual(priorRest);
+
+    // Landing carve-out enforcement.
+    if (priorLanding === undefined) {
+      // Permitted: undefined → undefined (still no detection) OR
+      //            undefined → populated (the one-shot detection write).
+      // Either is legal; no further assertion needed.
+    } else {
+      // Once populated, landing must remain byte-identical. Catches:
+      //   - re-detection rewriting an existing landing
+      //   - landing being un-populated back to undefined
+      //   - any field within landing being mutated
+      expect(
+        postLanding,
+        `${context}: move[${i}] landing was populated (status=${priorLanding.status}); ` +
+          `subsequent mutation forbidden — only undefined → populated is permitted exactly once.`,
+      ).toEqual(priorLanding);
+    }
+  }
+}
+
 const N_ITERATIONS = 100;
 
 // ─── Properties ────────────────────────────────────────────────────────
@@ -240,6 +311,12 @@ describe('D-1.14 — IterationLedger append-only invariant (100 iteration commit
       // Prefix invariance: the first priorIterationsSnapshot.length entries
       // of the post-commit array must equal the pre-commit snapshot,
       // entry-by-entry.
+      //
+      // IterationRecord array uses strict toEqual — no carve-outs.
+      // TaughtMove array uses the D-1.15.0 landing carve-out helper, which
+      // permits exactly one transition (undefined → populated) and forbids
+      // every other mutation. See the spec-amendment block at the top of
+      // this file for ratification context.
       const postIterations = profile.iterationLedger.iterations;
       expect(
         postIterations.slice(0, priorIterationsSnapshot.length),
@@ -247,10 +324,14 @@ describe('D-1.14 — IterationLedger append-only invariant (100 iteration commit
       ).toEqual(priorIterationsSnapshot);
 
       const postMoves = profile.iterationLedger.taughtMoves;
-      expect(
-        postMoves.slice(0, priorTaughtMovesSnapshot.length),
-        `iter ${i}: taughtMoves[] prefix must equal pre-commit snapshot`,
-      ).toEqual(priorTaughtMovesSnapshot);
+      // Pass the full post array — the helper iterates only the first
+      // priorTaughtMovesSnapshot.length entries (the prefix invariant
+      // window) and asserts length monotonicity for the rest.
+      assertTaughtMoveAppendOnlyWithLandingCarveOut(
+        priorTaughtMovesSnapshot,
+        postMoves,
+        `iter ${i}: taughtMoves[] prefix`,
+      );
 
       // Length grew by exactly 1 (iterations) and exactly moveCount (taughtMoves).
       expect(postIterations.length).toBe(priorIterationsSnapshot.length + 1);
@@ -310,6 +391,13 @@ describe('D-1.14 — IterationLedger append-only invariant (100 iteration commit
 
     // Call each public mutator. After each, assert iterations[] and
     // taughtMoves[] entries are byte-identical to the seeded snapshot.
+
+    // Property 3 uses STRICT toEqual on taughtMoves (not the carve-out
+    // helper) on purpose: the public-API mutators tested here are NOT the
+    // landing detector. They have no business touching the landing field
+    // even within the carve-out's narrow allowance. If incrementIteration
+    // or appendCarryForwardDecision ever populated landing, that would be
+    // a real bug, and this test must fail on it.
 
     // (a) incrementIteration: mutates currentIteration only.
     incrementIteration(profile, 'edit');
@@ -387,5 +475,112 @@ describe('D-1.14 — IterationLedger append-only invariant (100 iteration commit
         `move ${i}: committed id must match generateTaughtMoveId(annotation, ${iteration})`,
       ).toBe(rederivedId);
     }
+  });
+
+  // Property 5 directly exercises the D-1.15.0 landing carve-out helper.
+  // Property 1 uses the helper but only sees the "no detector running yet"
+  // path (so the carve-out is dormant). Property 5 hand-crafts before/after
+  // snapshots that force each branch:
+  //   (a) undefined → undefined: legal (still no detection)
+  //   (b) undefined → populated: legal (one-shot detection write)
+  //   (c) populated → byte-identical: legal (no re-detection)
+  //   (d) populated → mutated: ILLEGAL (helper throws)
+  //   (e) populated → undefined: ILLEGAL (helper throws)
+  //   (f) non-landing field mutated: ILLEGAL (helper throws)
+  //
+  // Why this property exists: D-1.15 (about to land) WILL exercise the
+  // carve-out's permitted transition (b). If a future change ever
+  // accidentally widens the carve-out (e.g., allows re-detection rewrites),
+  // Property 1 alone won't catch it because random fixture data rarely
+  // hits the populated-landing path. This property is the targeted
+  // safety net.
+  it('Property 5: D-1.15.0 carve-out helper enforces narrow landing semantics (allowed: undefined→populated; forbidden: anything else)', () => {
+    const baseAnnotation = makeRandomAnnotation('A-property5-anchor');
+    const moveNoLanding: TaughtMove = l5AnnotationToTaughtMove(baseAnnotation, 1);
+    const populatedLanding: NonNullable<TaughtMove['landing']> = {
+      status: 'addressed',
+      detectedAtIteration: 2,
+      confidence: 0.85,
+      reasoning: 'student edit substantively addressed the move',
+      signalsUsed: ['edit_vs_critique'],
+    };
+    const moveWithLanding: TaughtMove = { ...moveNoLanding, landing: populatedLanding };
+
+    // (a) undefined → undefined: legal.
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveNoLanding], [moveNoLanding], 'case-a'),
+    ).not.toThrow();
+
+    // (b) undefined → populated: legal (the one permitted transition).
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveNoLanding], [moveWithLanding], 'case-b'),
+    ).not.toThrow();
+
+    // (c) populated → byte-identical: legal.
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveWithLanding], [moveWithLanding], 'case-c'),
+    ).not.toThrow();
+
+    // (d) populated → mutated: ILLEGAL.
+    const mutatedLanding: TaughtMove = {
+      ...moveWithLanding,
+      landing: { ...populatedLanding, confidence: 0.95 },
+    };
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveWithLanding], [mutatedLanding], 'case-d'),
+    ).toThrow();
+
+    // (e) populated → undefined: ILLEGAL.
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveWithLanding], [moveNoLanding], 'case-e'),
+    ).toThrow();
+
+    // (f) non-landing field mutated: ILLEGAL (e.g., contentSummary rewritten).
+    const contentMutated: TaughtMove = { ...moveNoLanding, contentSummary: 'rewritten content' };
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveNoLanding], [contentMutated], 'case-f'),
+    ).toThrow();
+
+    // (g) length monotonicity within helper: post.length < prior.length is ILLEGAL.
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut([moveNoLanding, moveNoLanding], [moveNoLanding], 'case-g'),
+    ).toThrow();
+
+    // (h) interaction: length growth + populated-prefix preservation.
+    // Closes the R-3 review finding — Property 5 cases (a)-(g) test branches
+    // in isolation but none exercise "post is LONGER than prior AND the
+    // populated-landing prefix invariant holds". A bug where the helper
+    // accidentally short-circuits the prefix loop when `post.length > prior.length`
+    // (or skips landing comparison on a populated prefix when growth is detected)
+    // would slip past (a)-(g). This case nails the interaction:
+    //   - prior = [moveWithLanding] (one entry, populated landing)
+    //   - post = [moveWithLanding, moveNoLanding] (two entries, prefix preserved)
+    // Legal: prefix is byte-identical, length grew honestly.
+    const additionalMove: TaughtMove = l5AnnotationToTaughtMove(
+      makeRandomAnnotation('A-property5-h-additional'),
+      2,
+    );
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut(
+        [moveWithLanding],
+        [moveWithLanding, additionalMove],
+        'case-h-legal',
+      ),
+    ).not.toThrow();
+
+    // (h-fail) sibling failing variant: prefix's populated landing is mutated
+    // WHILE post grows. Helper must still throw — growth in the suffix does
+    // not excuse mutation in the prefix.
+    const mutatedPrefix: TaughtMove = {
+      ...moveWithLanding,
+      landing: { ...populatedLanding, status: 'partially_addressed' },
+    };
+    expect(() =>
+      assertTaughtMoveAppendOnlyWithLandingCarveOut(
+        [moveWithLanding],
+        [mutatedPrefix, additionalMove],
+        'case-h-illegal',
+      ),
+    ).toThrow();
   });
 });
