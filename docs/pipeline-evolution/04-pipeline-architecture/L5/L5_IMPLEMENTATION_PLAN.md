@@ -616,7 +616,7 @@ The graph is the spine. Detail follows.
 
 **Failure surface:**
 - `incrementIteration` validation throw at entry → orchestrator halts before any layer runs; surfaces "iteration N could not start; profile state corrupt."
-- L5-buffer call failure → swallowed at the buffer level (the buffer is best-effort; a transient buffer failure is not worth halting an entire iteration over). [REVISIT during D-1.10 implementation: this may need to halt instead per the no-fallback charter; test will tell.]
+- L5-buffer call failure → swallowed at the buffer level (the buffer is best-effort; a transient buffer failure is not worth halting an entire iteration over). *[D-1.10 implementation outcome 2026-04-29: swallow-at-buffer-level is the right call — `bufferTaughtMoves` is per-`(essayId, iter)` keyed and pruned at iteration commit; a buffer failure leaves no orphaned state. Verified by `tests/integration/d1-10-iteration-bracket.test.ts` Scenario 4 (L5-buffer failure → iteration commits with empty taughtMoves rather than halting). REVISIT closed.]*
 - End-commit construction error (malformed IterationRecord) → throw fail-fast.
 - Checkpoint write failure → throw with structured "iteration N did not persist; rerun" context. In-memory ledger remains in post-commit shape; rerun on the same profile will succeed if the underlying storage issue is resolved.
 
