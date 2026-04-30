@@ -52,6 +52,11 @@ export default defineConfig({
       // D-1.16 failure-injection test for every error boundary
       // (no .test.ts suffix per spec; matches D-1.13/14/15 convention).
       'tests/integration/phase1-failure-injection.ts',
+      // D-1.15 deferred-item closure (2026-04-30) — Item 6: brief→editScope
+      // translation. Pure-function tests on buildEditScopeFromBrief plus
+      // live-derivation chain tests (computeEditDiff → constructed brief →
+      // buildEditScopeFromBrief → editScope).
+      'tests/integration/d1-15-brief-editscope-translation.test.ts',
       // tests/property/ — D-1.13 onward. Spec uses literal filenames
       // without the `.test.ts` suffix (separate test category from
       // unit/integration); they're enumerated explicitly here so vitest

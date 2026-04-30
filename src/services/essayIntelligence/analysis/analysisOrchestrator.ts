@@ -135,6 +135,7 @@ import {
   emitIterationEvent,
 } from '../telemetry/iterationTelemetry';
 import { safeAppendCarryForwardDecision } from './carryForwardSynthesis';
+import { buildEditScopeFromBrief } from './editScopeBuilder';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { InMemoryCheckpointStore } from '../profileManager/checkpointStore';
 
@@ -2073,37 +2074,17 @@ export class AnalysisOrchestrator {
     const flushedMoves = flushTaughtMovesForIteration(input.essayId, iter);
 
     // ── Build editScope (only when edit-triggered) ──────────────────────
-    let editScope: IterationRecord['editScope'];
-    if (triggeredBy === 'edit') {
-      const brief = input.reanalysisBrief;
-      // [D-1.11 Step 13 / round-1 audit Agent 1 cleanup] Replaces D-1.10's
-      // boolean→0/1 stub with real counts derived from brief.netChanges[].
-      // The brief's `structural` block carries booleans for
-      // hasReordering/hasInsertions/hasDeletions; netChanges[] carries
-      // per-location entries with changeType. We count by changeType to
-      // populate the `added`/`removed` integer fields on
-      // IterationRecord.editScope.structural — honest counts matter for
-      // D-4.11's escalation calibration (over-escalation patterns
-      // surface in the audit only if added/removed are real counts).
-      let addedCount = 0;
-      let removedCount = 0;
-      if (brief && Array.isArray(brief.netChanges)) {
-        for (const change of brief.netChanges) {
-          if (change.changeType === 'added' || change.changeType === 'paragraph_added') addedCount++;
-          if (change.changeType === 'removed' || change.changeType === 'paragraph_removed' || change.changeType === 'deleted') removedCount++;
-        }
-      }
-      editScope = {
-        paragraphsChanged: brief?.structural.paragraphsChanged ?? [],
-        significance: input.editSignificance ?? 'minor',
-        changeTypes: input.editChangeTypes ?? [],
-        structural: {
-          reordered: brief?.structural.hasReordering ?? false,
-          added: addedCount,
-          removed: removedCount,
-        },
-      };
-    }
+    // [D-1.15 deferred-item closure 2026-04-30 Item 6] Extracted to a pure
+    // helper at `analysis/editScopeBuilder.ts` so the live derivation chain
+    // (computeEditDiff → reanalysisBrief → editScope) is testable as a unit.
+    // Zero behavioral change — the helper carries the same counts-from-
+    // netChanges logic the inline block had (D-1.11 Step 13).
+    const editScope = buildEditScopeFromBrief(
+      triggeredBy,
+      input.reanalysisBrief,
+      input.editSignificance,
+      input.editChangeTypes,
+    );
 
     // ── Build per-layer cost breakdown from CostSummary.layers ──────────
     const costBreakdown: Record<string, number> = {};
