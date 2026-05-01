@@ -1,10 +1,29 @@
-# Phase 2 Prompt Benchmark — Round 1.6 Draft
+# Phase 2 Prompt Benchmark — Round 1.6 (Ratified)
 
 **Date:** 2026-05-01
 **Branch:** `feat/integrated-pipeline-build`
-**HEAD:** `b77550d` (round 1.5) → round 1.6 in flight
-**Status:** Round 1.6 draft. **Awaiting your sign-off before any Phase 2 prompt drafting begins.**
-**Scope:** The bar every Phase 2 prompt (D-2.2, D-2.3, D-2.4, D-2.5, D-2.6) measures against. The round-0 quality gate that fires before length / tone / evidence checks at every revision round.
+**HEAD:** `b77550d` (round 1.5) → `5c99f83` (round 1.6) → ratified
+**Status:** **Ratified by Tue 2026-05-01.** Five principles + round-0 quality gate + per-layer extension templates + 13-item forbid-list now govern every Phase 2 deliverable (prompt and infrastructure alike).
+**Scope:** The bar every Phase 2 deliverable measures against. The round-0 quality gate fires before length / tone / evidence checks at every prompt revision round; the principles apply across infrastructure deliverables (D-2.1 QueueManager extension, D-2.7 aggregator, D-2.8 orchestrator integration, D-2.10–D-2.14 tests/audits) wherever they're applicable.
+
+## Ratification trail
+
+The benchmark went through three substantive iterations with your input at each step:
+
+- **Round 1** (commit `a4d1d8c`): initial draft grounded in PIQ/workshop edge-prompt extractions. You flagged the depth gap — "the examples I gave were surface level" — and pointed at `tests/calibration/top-tier-reference/reviews/05-sarika-i-too-can-dance-review-v2.md` as the calibration anchor.
+- **Round 1.5** (commit `b77550d`): re-grounded in the 14-essay calibration corpus via `PHASE_2_CORPUS_DIGEST.md`. Replaced edge-prompt examples with corpus moves (Sarika's verb-possession, reveal-through-consequence, longing-triplet; Clara's misdirection opener and compressed biography; Daniella's literalized-dead-idiom; Michelle's syllable-seed; Marcus's three-word hinge; Michael's pride-vs-hope distinction). Tue's three corrections applied verbatim in §4.3.
+- **Round 1.6** (commit `5c99f83`): Tue's 2026-05-01 calibration on five further drift points — diagnostic register vs coaching register, transplantation overweight as quality-gate, citation count misframed (corpus is RAG source not enumeration), validation padding in coaching examples, analytical jargon in student-facing prose. Five principles now (was three); five tests in the round-0 gate (was two); 13-item forbid-list (was 10).
+- **Sign-off**: Tue ratified round 1.6 on 2026-05-01 with "Nice let's continue this is great foundation to work off of."
+
+## Retroactive integrity check
+
+Three Phase 2 infrastructure deliverables landed during round 1.5 → 1.6 iteration without explicitly measuring against the ratified round 1.6 framework:
+
+- D-2.1 — QueueManager dig-flow extension (commit `c3214c5`)
+- D-2.10 — Queue persistence concurrency test (commit `f1c98a6`)
+- D-2.7 — specificsNeedAggregator + SpecificsNeedEmission type (commit `39f64ed`)
+
+These deliverables ran their own per-edit + three-agent ratification audits at the time, but those audits used Phase 1's discipline rather than the round 1.6 framework. A retroactive integrity audit pass against the round 1.6 benchmark is now in flight; findings (if any) close inline per the fix-now-always discipline before D-2.11 / D-2.8 / D-2.12 proceed.
 
 ---
 
