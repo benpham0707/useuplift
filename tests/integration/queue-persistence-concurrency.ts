@@ -385,7 +385,7 @@ describe('D-2.10 §4 — Rapid sequential transitions on the same question', () 
 // ─── §5 — Auto-promotion via mergeCuratedOutput is deterministic ──────
 
 describe('D-2.10 §5 — Auto-promotion determinism across many questions', () => {
-  it('every question with iterationsSurvived ≥ 3 gets promoted to high (no drift)', () => {
+  it('every question that crosses the auto-promotion threshold is promoted in a single curation pass (no skips, no drift)', () => {
     // mergeCuratedOutput at questionQueueManager.ts:148-153 promotes
     // every open question with iterationsSurvived ≥ 3 to priority='high'
     // unless already 'critical'. With many questions hitting the threshold
