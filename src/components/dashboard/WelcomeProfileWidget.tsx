@@ -1,87 +1,58 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useProfileCompletion } from '@/hooks/useProfileCompletion';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ArrowRight, CheckCircle2, Circle } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+
+// Type exports for other components
+export type SectionKey = 'activities' | 'academic_details' | 'goals_aspirations' | 'identity_demographics' | 'family_context' | 'support_network' | 'personal_growth';
+
+interface WelcomeProfileWidgetProps {
+  onSectionClick?: (sectionKey: SectionKey) => void;
+}
 
 /**
  * Welcome + Profile Progress Widget
  *
  * Displays:
- * - Time-based greeting with user's name (left side on desktop)
- * - Section progress checklist
+ * - Section progress checklist (clickable)
  * - Circular progress ring showing profile completion (right side on desktop)
  * - Next recommended section to complete (or success state if 100%)
  */
-export default function WelcomeProfileWidget() {
+export default function WelcomeProfileWidget({ onSectionClick }: WelcomeProfileWidgetProps) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { percentage, sections, nextSection, isFullyComplete, isLoading, error } = useProfileCompletion();
-  const [userName, setUserName] = useState<string>('');
 
-  // Get time-based greeting
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-
-  // Get today's date
-  const currentDate = new Date().toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
-
-  // Fetch user's first name
-  useEffect(() => {
-    const fetchUserName = async () => {
-      if (!user) return;
-
-      try {
-        const { supabase } = await import('@/integrations/supabase/client');
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('first_name')
-          .eq('user_id', user.id)
-          .maybeSingle();
-
-        const name = profile?.first_name || user.email?.split('@')[0] || 'there';
-        setUserName(name);
-      } catch (err) {
-        console.error('[WelcomeProfileWidget] Error fetching user name:', err);
-        setUserName(user.email?.split('@')[0] || 'there');
-      }
-    };
-
-    fetchUserName();
-  }, [user]);
+  // Filter out quick_start from the displayed checklist (user already completed onboarding)
+  const displaySections = sections.filter(s => s.key !== 'quick_start');
+  const completedCount = displaySections.filter(s => s.isComplete).length;
 
   // Show loading skeleton while data loads
   if (isLoading) {
     return (
-      <Card className="p-6 border-gray-200">
-        <div className="flex flex-col sm:flex-row sm:justify-between gap-6">
-          <div className="flex-1 space-y-3">
+      <Card className="p-4 border-gray-200">
+        <div className="flex items-start gap-6">
+          <div className="flex-1 max-w-xs space-y-2">
+            <Skeleton className="h-4 w-32" />
             <Skeleton className="h-6 w-48" />
-            <Skeleton className="h-3 w-32" />
-            <div className="space-y-2 mt-4">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-4 w-40" />
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-6 w-48" />
+          </div>
+          <div className="flex-1 space-y-4">
+            <div className="flex flex-col items-center">
+              <Skeleton className="h-[160px] w-[160px] rounded-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-8 w-40" />
             </div>
           </div>
-          <div className="flex flex-col items-center sm:items-end">
-            <Skeleton className="h-28 w-28 rounded-full" />
-            <Skeleton className="h-3 w-24 mt-2" />
-            <Skeleton className="h-2 w-16 mt-1" />
-          </div>
         </div>
-        <div className="border-t border-gray-200 my-4" />
-        <Skeleton className="h-12 w-full" />
       </Card>
     );
   }
@@ -89,21 +60,16 @@ export default function WelcomeProfileWidget() {
   // Handle error state
   if (error) {
     return (
-      <Card className="p-6 border-gray-200">
-        <div className="text-center space-y-4">
-          <h2 className="text-xl font-bold text-gray-900">{greeting}, {userName}</h2>
-          <p className="text-sm text-gray-500">{currentDate}</p>
-          <div className="py-6">
-            <p className="text-sm text-red-600">Couldn't load profile progress</p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-3"
-              onClick={() => window.location.reload()}
-            >
-              Retry
-            </Button>
-          </div>
+      <Card className="p-4 border-gray-200">
+        <div className="text-center space-y-4 py-6">
+          <p className="text-sm text-red-600">Couldn't load profile progress</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.location.reload()}
+          >
+            Retry
+          </Button>
         </div>
       </Card>
     );
@@ -113,84 +79,78 @@ export default function WelcomeProfileWidget() {
   const estimatedTimes: Record<string, number> = {
     activities: 10,
     academic_details: 5,
-    interest_deep_dive: 8,
-    goals_constraints: 5,
-    personality_work_style: 5
+    goals_aspirations: 5,
+    identity_demographics: 3,
+    family_context: 3,
+    support_network: 3,
+    personal_growth: 5
   };
 
-  // Filter out quick_start from the displayed checklist (user already completed onboarding)
-  const displaySections = sections.filter(s => s.key !== 'quick_start');
-  const completedCount = displaySections.filter(s => s.isComplete).length;
-
   return (
-    <Card className="p-6 border-gray-200">
-      {/* Top Section: Greeting + Checklist (left) | Progress Ring (right) */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-6">
-        {/* Left Column: Greeting + Section Checklist */}
-        <div className="flex-1">
-          {/* Greeting */}
-          <div className="mb-4">
-            <h2 className="text-xl font-bold text-gray-900">{greeting}, {userName}!</h2>
-            <p className="text-sm text-gray-500">{currentDate}</p>
-          </div>
+    <Card className="p-4 border-gray-200">
+      <div className="flex items-start gap-6">
+        {/* Left: Section Checklist - Compact */}
+        <div className="flex-1 max-w-xs">
+          {/* Header */}
+          <h3 className="text-sm font-semibold text-gray-900 mb-2">Your profile sections:</h3>
 
-          {/* Section Checklist */}
-          <div className="space-y-1">
+          {/* Section Checklist - Each row is clickable */}
+          <div className="space-y-0.5">
             {displaySections.map((section) => {
               const isNext = nextSection?.key === section.key;
+              const sectionKey = section.key as SectionKey;
+
               return (
-                <div key={section.key} className="flex items-center gap-2">
+                <button
+                  key={section.key}
+                  onClick={() => onSectionClick?.(sectionKey)}
+                  className={`flex items-center gap-2 w-full text-left py-1.5 px-2 rounded transition-colors hover:bg-gray-50 ${
+                    isNext ? 'border-l-2 border-blue-500 pl-1.5' : ''
+                  }`}
+                >
                   {section.isComplete ? (
                     <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
                   ) : (
                     <Circle className={`w-4 h-4 flex-shrink-0 ${isNext ? 'text-blue-600' : 'text-gray-300'}`} />
                   )}
-                  <span className={`text-sm ${section.isComplete ? 'text-gray-700' : isNext ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
+                  <span className={`text-sm ${section.isComplete ? 'text-gray-700' : isNext ? 'text-gray-900 font-semibold' : 'text-gray-500'}`}>
                     {section.label}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>
         </div>
 
-        {/* Right Column: Progress Ring */}
-        <div className="flex flex-col items-center sm:items-end">
-          <ProgressRing percentage={percentage} />
-          <p className="text-sm text-gray-600 mt-2">Profile Complete</p>
-          <p className="text-xs text-gray-500">
-            {completedCount} of {displaySections.length} done
-          </p>
+        {/* Right: Progress Ring + CTA Section */}
+        <div className="flex-1 space-y-4">
+          {/* Circular Progress Ring */}
+          <div className="flex flex-col items-center justify-center">
+            <ProgressRing percentage={percentage} size={160} />
+          </div>
+
+          {/* CTA Section */}
+          {isFullyComplete ? (
+            <div className="flex items-center gap-2 text-sm text-gray-700">
+              <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+              <p>Your profile is complete — all recommendations are fully personalized.</p>
+            </div>
+          ) : nextSection ? (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-1">Up next: {nextSection.label}</h3>
+              <p className="text-xs text-gray-600 mb-2">{nextSection.description}</p>
+              <Button
+                size="sm"
+                className="bg-blue-600 hover:bg-blue-700"
+                onClick={() => onSectionClick?.(nextSection.key as SectionKey)}
+              >
+                Complete Now · ~{estimatedTimes[nextSection.key] || 5} min
+                <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
-
-      {/* Divider */}
-      <div className="border-t border-gray-200 my-4" />
-
-      {/* CTA Section */}
-      {isFullyComplete ? (
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
-          <p>Your profile is complete — all recommendations are fully personalized.</p>
-        </div>
-      ) : nextSection ? (
-        <div>
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-gray-900">Up next: {nextSection.label}</h3>
-            <p className="text-xs text-gray-600 mt-1">{nextSection.description}</p>
-          </div>
-          <div className="flex items-center justify-between">
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
-              onClick={() => navigate(nextSection.route)}
-            >
-              Complete Now · ~{estimatedTimes[nextSection.key] || 5} min
-              <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
-        </div>
-      ) : null}
     </Card>
   );
 }
@@ -199,9 +159,9 @@ export default function WelcomeProfileWidget() {
  * Circular Progress Ring Component
  *
  * Pure SVG progress indicator with animated fill
- * Size: 110px on desktop, responsive
+ * Configurable size
  */
-function ProgressRing({ percentage }: { percentage: number }) {
+function ProgressRing({ percentage, size = 90 }: { percentage: number; size?: number }) {
   const [animatedPercentage, setAnimatedPercentage] = useState(0);
 
   // Animate the ring on mount with 800ms ease-out
@@ -212,9 +172,8 @@ function ProgressRing({ percentage }: { percentage: number }) {
     return () => clearTimeout(timeout);
   }, [percentage]);
 
-  // SVG circle calculations - smaller ring for side-by-side layout
-  const size = 110;
-  const strokeWidth = 8;
+  // SVG circle calculations
+  const strokeWidth = size >= 110 ? 9 : 7;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (animatedPercentage / 100) * circumference;
