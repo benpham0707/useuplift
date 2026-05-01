@@ -1188,59 +1188,10 @@ export class AnalysisOrchestrator {
     {
       const profileForAgg = coordinator.getProfile();
       const aggIter = getCurrentIteration(profileForAgg);
-      try {
-        const { runSpecificsNeedAggregation } = await import(
-          './specificsNeedAggregatorIntegration'
-        );
-        const integrationResult = runSpecificsNeedAggregation(
-          profileForAgg,
-          aggIter,
-        );
-        if (integrationResult.hadEmissions) {
-          emitIterationEvent(input.essayId, {
-            iteration: aggIter,
-            step: 'phase5_6_specifics_need_aggregation',
-            status: 'succeeded',
-            timestamp: new Date().toISOString(),
-            metadata: {
-              totalEmissions: integrationResult.aggregationResult.totalEmissions,
-              addedToQueue: integrationResult.aggregationResult.addedToQueue,
-              deduplicatedAgainstExisting:
-                integrationResult.aggregationResult.deduplicatedAgainstExisting,
-              deduplicatedWithinRun:
-                integrationResult.aggregationResult.deduplicatedWithinRun,
-              byLayer: integrationResult.aggregationResult.byLayer,
-            },
-          });
-          console.log(
-            `[Orchestrator] Phase 5.6 specifics-need aggregation complete: ` +
-              `received=${integrationResult.aggregationResult.totalEmissions}, ` +
-              `added=${integrationResult.aggregationResult.addedToQueue}, ` +
-              `dedup_existing=${integrationResult.aggregationResult.deduplicatedAgainstExisting}, ` +
-              `dedup_within_run=${integrationResult.aggregationResult.deduplicatedWithinRun}`,
-          );
-        }
-      } catch (error) {
-        const msg = error instanceof Error ? error.message : String(error);
-        console.error(
-          '[Orchestrator] Phase 5.6: Specifics-need aggregation failed:',
-          msg,
-        );
-        emitIterationEvent(input.essayId, {
-          iteration: aggIter,
-          step: 'phase5_6_specifics_need_aggregation',
-          status: 'failed',
-          error: {
-            message: msg,
-            code: 'specifics_need_aggregation_failed',
-            context: {
-              downstreamBehavior:
-                'Pipeline continues to Phase 6 with the question queue in its pre-aggregation state plus any partial mutations the aggregator made before the throw. Already-minted questions from earlier emissions persist (sequential validate→mint).',
-            },
-          },
-          timestamp: new Date().toISOString(),
-        });
-      }
+      const { runSpecificsNeedAggregationWithTelemetry } = await import(
+        './specificsNeedAggregatorIntegration'
+      );
+      runSpecificsNeedAggregationWithTelemetry(profileForAgg, aggIter, input.essayId);
     }
 
     // ═══════════════════════════════════════════════════════════════════════

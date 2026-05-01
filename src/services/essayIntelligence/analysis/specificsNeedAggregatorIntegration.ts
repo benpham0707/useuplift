@@ -39,6 +39,7 @@ import {
   aggregateSpecificsNeedEmissions,
   type AggregationResult,
 } from './specificsNeedAggregator';
+import { emitIterationEvent } from '../telemetry/iterationTelemetry';
 
 export interface SpecificsNeedAggregationIntegrationResult {
   /** Stats from the aggregator call — totals, dedup counts, byLayer breakdown. */
@@ -91,6 +92,87 @@ export function runSpecificsNeedAggregation(
     aggregationResult,
     hadEmissions: collected.length > 0,
   };
+}
+
+/** Step name for the Phase 5.6 telemetry event. Pinned for test contracts. */
+export const PHASE_5_6_STEP_NAME = 'phase5_6_specifics_need_aggregation' as const;
+
+/**
+ * Orchestrator-facing wrapper around `runSpecificsNeedAggregation` that
+ * adds telemetry + console-logging at the established Phase 5.6 contract.
+ *
+ *   On success with at least one emission: emits a 'succeeded' iteration
+ *     event carrying the AggregationResult counters as metadata, plus a
+ *     human-readable orchestrator log line. Silence is signal — when
+ *     `hadEmissions=false`, we emit nothing (no event, no log).
+ *
+ *   On schema-invalid emission throw: emits a 'failed' iteration event
+ *     with `code: 'specifics_need_aggregation_failed'` and
+ *     `context.downstreamBehavior` describing what state Phase 6 will
+ *     see. The throw is swallowed at this boundary so the L5 annotation
+ *     pass isn't blocked by an upstream prompt contract violation
+ *     (legitimate isolation boundary, not a degraded fallback — see
+ *     the file header for the no-fallback charter framing).
+ *
+ * Returns the IntegrationResult on success, or null on caught failure.
+ * Callers that need to react to failure should consult the telemetry
+ * buffer rather than the return value (the buffer is the audit-trail
+ * substrate).
+ */
+export function runSpecificsNeedAggregationWithTelemetry(
+  profile: EssayProfile,
+  iteration: number,
+  essayId: string,
+): SpecificsNeedAggregationIntegrationResult | null {
+  try {
+    const result = runSpecificsNeedAggregation(profile, iteration);
+    if (result.hadEmissions) {
+      emitIterationEvent(essayId, {
+        iteration,
+        step: PHASE_5_6_STEP_NAME,
+        status: 'succeeded',
+        timestamp: new Date().toISOString(),
+        metadata: {
+          totalEmissions: result.aggregationResult.totalEmissions,
+          addedToQueue: result.aggregationResult.addedToQueue,
+          deduplicatedAgainstExisting:
+            result.aggregationResult.deduplicatedAgainstExisting,
+          deduplicatedWithinRun:
+            result.aggregationResult.deduplicatedWithinRun,
+          byLayer: result.aggregationResult.byLayer,
+        },
+      });
+      console.log(
+        `[Orchestrator] Phase 5.6 specifics-need aggregation complete: ` +
+          `received=${result.aggregationResult.totalEmissions}, ` +
+          `added=${result.aggregationResult.addedToQueue}, ` +
+          `dedup_existing=${result.aggregationResult.deduplicatedAgainstExisting}, ` +
+          `dedup_within_run=${result.aggregationResult.deduplicatedWithinRun}`,
+      );
+    }
+    return result;
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error(
+      '[Orchestrator] Phase 5.6: Specifics-need aggregation failed:',
+      msg,
+    );
+    emitIterationEvent(essayId, {
+      iteration,
+      step: PHASE_5_6_STEP_NAME,
+      status: 'failed',
+      error: {
+        message: msg,
+        code: 'specifics_need_aggregation_failed',
+        context: {
+          downstreamBehavior:
+            'Pipeline continues to Phase 6 with the question queue in its pre-aggregation state plus any partial mutations the aggregator made before the throw. Already-minted questions from earlier emissions persist (sequential validate→mint).',
+        },
+      },
+      timestamp: new Date().toISOString(),
+    });
+    return null;
+  }
 }
 
 /**

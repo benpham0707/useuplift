@@ -68,6 +68,11 @@ export default defineConfig({
       // D-1.16 failure-injection test for every error boundary
       // (no .test.ts suffix per spec; matches D-1.13/14/15 convention).
       'tests/integration/phase1-failure-injection.ts',
+      // Phase 2 D-2.12 (2026-05-01) — Aggregator spine integration test:
+      // drives runSpecificsNeedAggregationWithTelemetry with synthetic
+      // layer outputs (zero API), asserts queue mutations + telemetry
+      // metadata shape + dig-flow state machine end-to-end.
+      'tests/integration/phase2-aggregator-spine.ts',
       // D-1.15 deferred-item closure (2026-04-30) — Item 6: brief→editScope
       // translation. Pure-function tests on buildEditScopeFromBrief plus
       // live-derivation chain tests (computeEditDiff → constructed brief →
