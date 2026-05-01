@@ -39,6 +39,9 @@ export default defineConfig({
       // D-1.16-prefix F-04 closure (2026-04-30) — buildEditProcessResponse
       // pure-helper branching test for EditProcessResult.deferReason.
       'tests/unit/edit-process-response.test.ts',
+      // Phase 2 D-2.1 (2026-05-01) — QuestionQueueManager dig-flow state
+      // transition tests + getOpenAnalysisGapQuestions accessor.
+      'tests/unit/question-queue-manager.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',

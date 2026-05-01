@@ -14,6 +14,7 @@
 import type {
   UnderstandingQuestion,
   QuestionCurationOutput,
+  DigContext,
 } from '../profileTypes';
 
 // ============================================================================
@@ -221,5 +222,251 @@ export class QuestionQueueManager {
   /** Get count of resolved questions */
   get resolvedCount(): number {
     return this.questions.filter(q => q.status === 'resolved').length;
+  }
+
+  // ============================================================================
+  // [D-2.1 closure 2026-05-01] DIG-FLOW STATE TRANSITIONS
+  // ============================================================================
+  // Phase 2 D-2.1 contract — `L5_IMPLEMENTATION_PLAN.md` §D-2.1.
+  //
+  // The new transition methods below handle the dig-flow lifecycle for
+  // questions of `source: 'analysis_specifics_gap'` (questions whose
+  // resolution requires student input rather than text re-investigation):
+  //
+  //   open → asked_to_student → student_answered
+  //                          ↘ student_declined
+  //
+  // Legal transitions enforced by these methods:
+  //   - markAskedToStudent:  open → asked_to_student
+  //                          (only on source === 'analysis_specifics_gap';
+  //                           only those questions carry DigContext)
+  //   - markStudentAnswered: asked_to_student → student_answered
+  //   - markStudentDeclined: asked_to_student → student_declined
+  //
+  // Illegal transitions THROW with structured context (questionId,
+  // currentStatus, attemptedTransition, source, method). This is a
+  // deliberate divergence from the existing `resolve` / `mergeCuratedOutput`
+  // / `addQuestion` methods in this file, which silently no-op on guard
+  // violations. The new methods follow the spec's explicit "illegal
+  // transitions throw" contract — the throw IS the audit signal. If a
+  // future deliverable wants strict validation on the existing methods,
+  // that's a separate refactor; D-2.1 does NOT touch them.
+  //
+  // One transition NOT permitted under D-2.1's API: student_declined →
+  // asked_to_student. `L5_E2E_INTEGRITY_AUDIT.md` §3.4 names
+  // student_declined as terminal/deferred ("question moves to
+  // deferred"). The "re-ask differently" path §3.4 / §3.6 describes is
+  // the separate stuck-asked_to_student case (5+ iterations without
+  // answer), which is asked_to_student → asked_to_student with revised
+  // framing — also not D-2.1's territory. Both re-ask scenarios require
+  // explicit Phase 3 deliberation about timing / framing / when
+  // re-asking is appropriate; if either is needed, Phase 3 adds a
+  // dedicated method rather than relaxing `markAskedToStudent`'s
+  // validation. Keeps the state machine explicit and forces deliberate
+  // API expansion.
+  //
+  // Two error categories the new methods raise: (a) state-machine
+  // illegal transitions, routed through `buildIllegalTransitionError`
+  // for uniform diagnostic shape; (b) emission-time invariant
+  // violations (e.g., a question with source='analysis_specifics_gap'
+  // arriving without DigContext on the .dig field), which throw
+  // directly with a producer-pointing message because the issue isn't
+  // a transition error but a contract violation upstream of the queue.
+  // Future contributors: don't consolidate these — the divergent
+  // shapes preserve the diagnostic signal.
+  //
+  // Spec deviation to record: D-2.1's spec writes
+  //   `markStudentAnswered(id, structuredAnswer)`
+  // but DigContext requires BOTH `studentAnswerRaw` AND `structuredAnswer`
+  // for honest persistence (per `profileTypes.ts:5759-5767`'s field
+  // contract — raw is "persisted before extraction in case extraction
+  // fails"). The implementation widens the signature to
+  //   `markStudentAnswered(id, rawAnswer, structuredAnswer)`.
+  // Both arguments are required because both fields are load-bearing
+  // for the carry-forward audit trail (raw enables retry without re-
+  // asking the student; structured drives downstream layer consumption).
+
+  /**
+   * Build the structured error context for an illegal-transition throw.
+   * Centralized so every transition method produces identical error shape,
+   * which makes the orchestrator's catch path (and any future telemetry
+   * consumer) able to route on a stable error contract.
+   */
+  private buildIllegalTransitionError(
+    questionId: string,
+    method: 'markAskedToStudent' | 'markStudentAnswered' | 'markStudentDeclined',
+    expectedFromStatus: UnderstandingQuestion['status'],
+    expectedToStatus: UnderstandingQuestion['status'],
+    actualQuestion: UnderstandingQuestion | undefined,
+    extraContext?: Record<string, unknown>,
+  ): Error {
+    const ctx = {
+      questionId,
+      method,
+      expectedFromStatus,
+      expectedToStatus,
+      actualStatus: actualQuestion?.status ?? '<question-not-found>',
+      actualSource: actualQuestion?.source ?? '<question-not-found>',
+      ...extraContext,
+    };
+    return new Error(
+      `[QuestionQueueManager] Illegal transition: ${method} requires ` +
+      `(status='${expectedFromStatus}'${
+        method === 'markAskedToStudent' ? `, source='analysis_specifics_gap'` : ''
+      }) → '${expectedToStatus}', but got ${JSON.stringify(ctx)}`,
+    );
+  }
+
+  /**
+   * Mark a question as asked to the student via the Conversator.
+   *
+   * Transition: `open` → `asked_to_student`.
+   *
+   * Only legal on questions whose `source === 'analysis_specifics_gap'`
+   * (these are the only questions that carry DigContext, per
+   * `profileTypes.ts:5736-5776`). Other sources reach resolution through
+   * synthesis / curation paths, not through the dig flow.
+   *
+   * Mutates: `question.status` → `'asked_to_student'`;
+   *          `question.dig.askedAt` → ISO now;
+   *          `question.dig.conversatorMessageId` → param.
+   *
+   * Throws on illegal transition. Structured error context names the
+   * questionId, attempted transition, current state, and method — so
+   * the orchestrator's catch path can surface diagnostic info without
+   * a second read of the queue.
+   */
+  markAskedToStudent(questionId: string, conversatorMessageId: string): void {
+    const question = this.questions.find(q => q.id === questionId);
+    if (
+      !question ||
+      question.status !== 'open' ||
+      question.source !== 'analysis_specifics_gap'
+    ) {
+      throw this.buildIllegalTransitionError(
+        questionId,
+        'markAskedToStudent',
+        'open',
+        'asked_to_student',
+        question,
+      );
+    }
+
+    // Initialize dig sub-object if it doesn't already carry the optional
+    // surfacing fields. The required dig fields (whyAsked, expectedAnswerShape,
+    // consumers, populates, framingSeed) MUST already be populated by the
+    // analysis layer that emitted the question; this method only adds the
+    // surfacing-time fields. If `dig` is absent on a question that claims
+    // source='analysis_specifics_gap', the question's emission path was
+    // malformed — fail-fast rather than silently fabricate the structure.
+    if (!question.dig) {
+      throw new Error(
+        `[QuestionQueueManager] markAskedToStudent: question ${questionId} ` +
+        `has source='analysis_specifics_gap' but no DigContext on the .dig ` +
+        `field. The emitting analysis layer must populate dig before the ` +
+        `question reaches the queue.`,
+      );
+    }
+
+    question.status = 'asked_to_student';
+    question.dig.askedAt = new Date().toISOString();
+    question.dig.conversatorMessageId = conversatorMessageId;
+  }
+
+  /**
+   * Mark a question as answered by the student. Both raw and structured
+   * answer are persisted — raw enables retry-without-re-asking on extraction
+   * failure (handled separately in Phase 3); structured drives the
+   * downstream layer consumers named in `dig.consumers`.
+   *
+   * Transition: `asked_to_student` → `student_answered`.
+   *
+   * Mutates: `question.status` → `'student_answered'`;
+   *          `question.dig.studentAnswerRaw` → param;
+   *          `question.dig.structuredAnswer` → param.
+   */
+  markStudentAnswered(
+    questionId: string,
+    rawAnswer: string,
+    structuredAnswer: NonNullable<DigContext['structuredAnswer']>,
+  ): void {
+    const question = this.questions.find(q => q.id === questionId);
+    if (!question || question.status !== 'asked_to_student') {
+      throw this.buildIllegalTransitionError(
+        questionId,
+        'markStudentAnswered',
+        'asked_to_student',
+        'student_answered',
+        question,
+      );
+    }
+
+    if (!question.dig) {
+      throw new Error(
+        `[QuestionQueueManager] markStudentAnswered: question ${questionId} ` +
+        `is in status='asked_to_student' but has no DigContext. The state ` +
+        `machine should have rejected the markAskedToStudent call earlier; ` +
+        `if execution reached this point, the queue is in an invariant- ` +
+        `violating state.`,
+      );
+    }
+
+    question.status = 'student_answered';
+    question.dig.studentAnswerRaw = rawAnswer;
+    question.dig.structuredAnswer = structuredAnswer;
+  }
+
+  /**
+   * Mark a question as declined by the student (e.g., "I don't know" /
+   * "skip" / explicit refusal).
+   *
+   * Transition: `asked_to_student` → `student_declined`.
+   *
+   * Mutates: `question.status` → `'student_declined'`;
+   *          `question.resolution` → reason (reusing the existing
+   *            `resolution` field that `resolve()` and `mergeCuratedOutput`
+   *            use for terminal-state metadata; consistent with the
+   *            file's existing pattern);
+   *          `question.resolvedAt` → ISO now (for audit-trail timing
+   *            of the decline event).
+   *
+   * NOTE: this transition is terminal under D-2.1's API. The "re-ask
+   * differently" path (student_declined → asked_to_student) is NOT
+   * permitted by `markAskedToStudent`; if Phase 3 adds that path, it
+   * adds a dedicated `reAskAfterDecline()` method rather than relaxing
+   * the source-state guard.
+   */
+  markStudentDeclined(questionId: string, reason: string): void {
+    const question = this.questions.find(q => q.id === questionId);
+    if (!question || question.status !== 'asked_to_student') {
+      throw this.buildIllegalTransitionError(
+        questionId,
+        'markStudentDeclined',
+        'asked_to_student',
+        'student_declined',
+        question,
+      );
+    }
+
+    question.status = 'student_declined';
+    question.resolution = reason;
+    question.resolvedAt = new Date().toISOString();
+  }
+
+  /**
+   * Get all open questions whose source is `'analysis_specifics_gap'`
+   * (i.e., the dig-pathway questions waiting to be surfaced to the
+   * student). Sorted by the same priority+iterationsSurvived ordering
+   * `getOpenQuestions()` uses, so the Conversator timing policy can
+   * pull the highest-priority pending dig.
+   *
+   * The accessor exists so the Conversator's dig-firing step (Phase 3)
+   * doesn't have to filter the full open-questions list; the queue
+   * manager owns the filter to keep the logic in one place.
+   */
+  getOpenAnalysisGapQuestions(): UnderstandingQuestion[] {
+    return this.getOpenQuestions().filter(
+      q => q.source === 'analysis_specifics_gap',
+    );
   }
 }
