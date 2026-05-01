@@ -42,6 +42,11 @@ export default defineConfig({
       // Phase 2 D-2.1 (2026-05-01) — QuestionQueueManager dig-flow state
       // transition tests + getOpenAnalysisGapQuestions accessor.
       'tests/unit/question-queue-manager.test.ts',
+      // Phase 2 D-2.10 (2026-05-01) — Queue persistence concurrency test.
+      // Quasi-concurrent operation patterns + serialize/deserialize round-
+      // trip integrity (no .test.ts suffix per spec; matches D-1.13/14/15
+      // property/integration test convention).
+      'tests/integration/queue-persistence-concurrency.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',
