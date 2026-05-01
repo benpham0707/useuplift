@@ -243,48 +243,25 @@ export class QuestionQueueManager {
   //   - markStudentAnswered: asked_to_student → student_answered
   //   - markStudentDeclined: asked_to_student → student_declined
   //
-  // Illegal transitions THROW with structured context (questionId,
-  // currentStatus, attemptedTransition, source, method). This is a
-  // deliberate divergence from the existing `resolve` / `mergeCuratedOutput`
-  // / `addQuestion` methods in this file, which silently no-op on guard
-  // violations. The new methods follow the spec's explicit "illegal
-  // transitions throw" contract — the throw IS the audit signal. If a
-  // future deliverable wants strict validation on the existing methods,
-  // that's a separate refactor; D-2.1 does NOT touch them.
+  // [round 1.6 retroactive audit MED-4 closure 2026-05-01] Comment trimmed
+  // to one statement per concern, per §3 test 3. Ratified deviations
+  // (spec signature widening on markStudentAnswered; deliberate non-
+  // permission of student_declined → asked_to_student) live in the
+  // commit body and L5_IMPLEMENTATION_PLAN.md §D-2.1 spec amendment;
+  // future contributors should consult those for the full rationale.
   //
-  // One transition NOT permitted under D-2.1's API: student_declined →
-  // asked_to_student. `L5_E2E_INTEGRITY_AUDIT.md` §3.4 names
-  // student_declined as terminal/deferred ("question moves to
-  // deferred"). The "re-ask differently" path §3.4 / §3.6 describes is
-  // the separate stuck-asked_to_student case (5+ iterations without
-  // answer), which is asked_to_student → asked_to_student with revised
-  // framing — also not D-2.1's territory. Both re-ask scenarios require
-  // explicit Phase 3 deliberation about timing / framing / when
-  // re-asking is appropriate; if either is needed, Phase 3 adds a
-  // dedicated method rather than relaxing `markAskedToStudent`'s
-  // validation. Keeps the state machine explicit and forces deliberate
-  // API expansion.
+  // Two error shapes the new methods raise:
+  //   (a) state-machine illegal transitions → buildIllegalTransitionError
+  //       (uniform diagnostic shape for telemetry routing)
+  //   (b) emission-time invariant violations (source='analysis_specifics_gap'
+  //       arriving without DigContext on .dig) → throw directly with a
+  //       producer-pointing message; the issue is upstream of the queue.
+  // Don't consolidate these — divergent shapes preserve the diagnostic signal.
   //
-  // Two error categories the new methods raise: (a) state-machine
-  // illegal transitions, routed through `buildIllegalTransitionError`
-  // for uniform diagnostic shape; (b) emission-time invariant
-  // violations (e.g., a question with source='analysis_specifics_gap'
-  // arriving without DigContext on the .dig field), which throw
-  // directly with a producer-pointing message because the issue isn't
-  // a transition error but a contract violation upstream of the queue.
-  // Future contributors: don't consolidate these — the divergent
-  // shapes preserve the diagnostic signal.
-  //
-  // Spec deviation to record: D-2.1's spec writes
-  //   `markStudentAnswered(id, structuredAnswer)`
-  // but DigContext requires BOTH `studentAnswerRaw` AND `structuredAnswer`
-  // for honest persistence (per `profileTypes.ts:5759-5767`'s field
-  // contract — raw is "persisted before extraction in case extraction
-  // fails"). The implementation widens the signature to
-  //   `markStudentAnswered(id, rawAnswer, structuredAnswer)`.
-  // Both arguments are required because both fields are load-bearing
-  // for the carry-forward audit trail (raw enables retry without re-
-  // asking the student; structured drives downstream layer consumption).
+  // Existing methods (resolve / mergeCuratedOutput / addQuestion / spawnChild
+  // / advanceIteration) silently no-op on guard violations. The new methods
+  // throw. Two patterns in one class is intentional; D-2.1 does not refactor
+  // the existing methods.
 
   /**
    * Build the structured error context for an illegal-transition throw.
@@ -402,12 +379,15 @@ export class QuestionQueueManager {
     }
 
     if (!question.dig) {
+      // [round 1.6 retroactive audit MED-5 closure 2026-05-01] Plain-
+      // language error per §3 test 4: avoid the "invariant-violating"
+      // jargon and name what the operator can act on.
       throw new Error(
         `[QuestionQueueManager] markStudentAnswered: question ${questionId} ` +
         `is in status='asked_to_student' but has no DigContext. The state ` +
         `machine should have rejected the markAskedToStudent call earlier; ` +
-        `if execution reached this point, the queue is in an invariant- ` +
-        `violating state.`,
+        `if execution reached this point, the queue is in an inconsistent ` +
+        `state — likely from direct mutation or persistence corruption.`,
       );
     }
 
