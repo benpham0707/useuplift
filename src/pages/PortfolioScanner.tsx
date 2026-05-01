@@ -778,58 +778,6 @@ const PortfolioScanner = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Coming Soon Banner */}
-      {isPreviewMode && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 w-[95%] max-w-2xl">
-          <div className="relative bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/50 overflow-hidden">
-            {/* Gradient accent bar */}
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500" />
-            
-            <div className="p-5 pt-6">
-              <div className="flex items-start gap-4">
-                {/* Icon */}
-                <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 via-blue-500 to-purple-500 flex items-center justify-center shadow-lg">
-                  <Construction className="h-6 w-6 text-white" />
-                </div>
-                
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                    Portfolio Scanner Coming Soon
-                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r from-cyan-100 to-purple-100 text-purple-700">
-                      In Development
-                    </span>
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-600 leading-relaxed">
-                    We're building something powerful to analyze your entire portfolio. In the meantime, try our <strong>PIQ Workshop</strong> — it's ready and waiting to help you craft compelling personal insight questions.
-                  </p>
-                  
-                  {/* CTA Button */}
-                  <div className="mt-4">
-                    <Button 
-                      onClick={() => navigate('/piq-workshop')}
-                      className="bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 hover:from-cyan-600 hover:via-blue-600 hover:to-purple-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 font-semibold pr-4"
-                    >
-                      <Rocket className="h-4 w-4 mr-2" />
-                      Try PIQ Workshop
-                      <span className="ml-2 px-1.5 py-0.5 rounded-full bg-white/20 text-[11px] font-medium text-white border border-white/20">
-                        Free to use
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Preview indicator */}
-              <div className="mt-4 pt-3 border-t border-gray-100 flex items-center gap-2 text-xs text-gray-500">
-                <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                <span>Below is a preview of what's coming — scroll down to explore!</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header Section with Scores - AcademicPlanner aesthetic */}
       <div id="overview" ref={overviewRef} className="hero-gradient hero-gradient-fade text-white snap-start snap-always relative">
         {/* Preview mode gray overlay */}

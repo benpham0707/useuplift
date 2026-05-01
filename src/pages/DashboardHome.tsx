@@ -15,13 +15,23 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 
 // Import all widgets
-import WelcomeProfileWidget from '@/components/dashboard/WelcomeProfileWidget';
+import WelcomeProfileWidget, { type SectionKey } from '@/components/dashboard/WelcomeProfileWidget';
 import CharacterStatsWidget from '@/components/dashboard/widgets/CharacterStatsWidget';
 import EnhancedCalendarWidget from '@/components/dashboard/widgets/EnhancedCalendarWidget';
 import ActivityPortfolioWidget from '@/components/dashboard/widgets/ActivityPortfolioWidget';
 import WritingPortfolioWidget from '@/components/dashboard/widgets/WritingPortfolioWidget';
 import '@/components/dashboard/dashboard-animations.css';
 import '@/components/dashboard/dashboard-enhanced-animations.css';
+
+// Import profile section components
+import ProfileSectionModal from '@/components/dashboard/ProfileSectionModal';
+import ActivitiesSection from '@/components/dashboard/sections/ActivitiesSection';
+import AcademicsSection from '@/components/dashboard/sections/AcademicsSection';
+import GoalsSection from '@/components/dashboard/sections/GoalsSection';
+import IdentitySection from '@/components/dashboard/sections/IdentitySection';
+import FamilySection from '@/components/dashboard/sections/FamilySection';
+import SupportSection from '@/components/dashboard/sections/SupportSection';
+import GrowthSection from '@/components/dashboard/sections/GrowthSection';
 
 /**
  * Optimized Dashboard Home - Efficient space utilization
@@ -31,6 +41,9 @@ export default function DashboardHome() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [userName, setUserName] = useState<string>('');
+  const [profileId, setProfileId] = useState<string>('');
+  const [openDrawer, setOpenDrawer] = useState<SectionKey | null>(null);
+  const [drawerRefreshKey, setDrawerRefreshKey] = useState(0);
 
   useEffect(() => {
     const initializeDashboard = async () => {
@@ -39,11 +52,11 @@ export default function DashboardHome() {
         return;
       }
 
-      // Fetch first_name from profiles table (set during onboarding)
+      // Fetch first_name and profile id from profiles table (set during onboarding)
       try {
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
-          .select('first_name')
+          .select('id, first_name')
           .eq('user_id', user.id)
           .maybeSingle() as { data: any; error: any }; // Type assertion for newly added column
 
@@ -54,6 +67,10 @@ export default function DashboardHome() {
         // Use first_name from onboarding, fallback to email username, then 'there'
         const name = profileData?.first_name || user.email?.split('@')[0] || 'there';
         setUserName(name);
+
+        if (profileData?.id) {
+          setProfileId(profileData.id);
+        }
       } catch (error) {
         console.error('Error fetching user name:', error);
         setUserName(user.email?.split('@')[0] || 'there');
@@ -74,6 +91,51 @@ export default function DashboardHome() {
     initializeDashboard();
   }, [user]);
 
+  // Handle section save completion - triggers widget refresh
+  const handleSectionSaveComplete = () => {
+    setOpenDrawer(null);
+    setDrawerRefreshKey(prev => prev + 1); // Forces WelcomeProfileWidget to refetch
+  };
+
+  // Section metadata for drawer configuration
+  const sectionConfig: Record<SectionKey, { title: string; description: string; time: string }> = {
+    activities: {
+      title: 'Activities & Experience',
+      description: 'Add your activities to unlock portfolio analysis',
+      time: '~10 min'
+    },
+    academic_details: {
+      title: 'Academic Details',
+      description: 'Complete your academic profile for personalized school recommendations',
+      time: '~5 min'
+    },
+    goals_aspirations: {
+      title: 'Goals & Aspirations',
+      description: 'Define your goals to get targeted college matches',
+      time: '~5 min'
+    },
+    identity_demographics: {
+      title: 'Identity & Demographics',
+      description: 'Complete your personal information',
+      time: '~5 min'
+    },
+    family_context: {
+      title: 'Family Context',
+      description: 'Share your family context and responsibilities',
+      time: '~5 min'
+    },
+    support_network: {
+      title: 'Support Network',
+      description: 'Add your support network',
+      time: '~5 min'
+    },
+    personal_growth: {
+      title: 'Personal Growth',
+      description: 'Reflect on your personal growth journey',
+      time: '~10 min'
+    }
+  };
+
   if (loading) {
     return <DashboardHomeSkeleton />;
   }
@@ -92,16 +154,19 @@ export default function DashboardHome() {
 
       {/* Main Dashboard Grid - Maximum Efficiency */}
       <div className="p-4 max-w-[1600px] mx-auto">
-        {/* Welcome + Profile Progress Widget - Top Priority */}
-        <div className="mb-4">
-          <WelcomeProfileWidget />
+        {/* Top Row: Profile Builder + Application Progress */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <WelcomeProfileWidget
+            key={drawerRefreshKey}
+            onSectionClick={setOpenDrawer}
+          />
+          <ApplicationProgressCompact />
         </div>
 
         {/* Top Priority Section - 3 columns */}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 mb-4">
-          {/* Left: Application Progress & Key Metrics */}
+          {/* Left: Key Metrics */}
           <div className="xl:col-span-1 space-y-4">
-            <ApplicationProgressCompact />
             <KeyMetricsGrid />
           </div>
 
@@ -141,62 +206,175 @@ export default function DashboardHome() {
           </Card>
         </div>
       </div>
+
+      {/* Profile Section Modals - Render conditionally based on openDrawer state */}
+      {profileId && (
+        <>
+          <ProfileSectionModal
+            isOpen={openDrawer === 'activities'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="activities"
+            title={sectionConfig.activities.title}
+            description={sectionConfig.activities.description}
+            estimatedTime={sectionConfig.activities.time}
+          >
+            <ActivitiesSection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+
+          <ProfileSectionModal
+            isOpen={openDrawer === 'academic_details'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="academic_details"
+            title={sectionConfig.academic_details.title}
+            description={sectionConfig.academic_details.description}
+            estimatedTime={sectionConfig.academic_details.time}
+          >
+            <AcademicsSection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+
+          <ProfileSectionModal
+            isOpen={openDrawer === 'goals_aspirations'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="goals_aspirations"
+            title={sectionConfig.goals_aspirations.title}
+            description={sectionConfig.goals_aspirations.description}
+            estimatedTime={sectionConfig.goals_aspirations.time}
+          >
+            <GoalsSection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+
+          <ProfileSectionModal
+            isOpen={openDrawer === 'identity_demographics'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="identity_demographics"
+            title={sectionConfig.identity_demographics.title}
+            description={sectionConfig.identity_demographics.description}
+            estimatedTime={sectionConfig.identity_demographics.time}
+          >
+            <IdentitySection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+
+          <ProfileSectionModal
+            isOpen={openDrawer === 'family_context'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="family_context"
+            title={sectionConfig.family_context.title}
+            description={sectionConfig.family_context.description}
+            estimatedTime={sectionConfig.family_context.time}
+          >
+            <FamilySection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+
+          <ProfileSectionModal
+            isOpen={openDrawer === 'support_network'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="support_network"
+            title={sectionConfig.support_network.title}
+            description={sectionConfig.support_network.description}
+            estimatedTime={sectionConfig.support_network.time}
+          >
+            <SupportSection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+
+          <ProfileSectionModal
+            isOpen={openDrawer === 'personal_growth'}
+            onClose={() => setOpenDrawer(null)}
+            sectionKey="personal_growth"
+            title={sectionConfig.personal_growth.title}
+            description={sectionConfig.personal_growth.description}
+            estimatedTime={sectionConfig.personal_growth.time}
+          >
+            <GrowthSection
+              profileId={profileId}
+              onSaveComplete={handleSectionSaveComplete}
+            />
+          </ProfileSectionModal>
+        </>
+      )}
     </div>
   );
 }
 
 /**
  * Compact Header Component
+ *
+ * Displays greeting, date, and critical metrics
  */
 function CompactHeader({ userName, date }: { userName: string; date: string }) {
   const { currentStreak } = useUserStreak();
+
+  // Get time-based greeting
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
 
   return (
     <div className="bg-white border-b border-gray-200 px-4 py-3">
-      <div className="max-w-[1600px] mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-8">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">{greeting}, {userName}</h1>
-            <p className="text-xs text-gray-500">{date}</p>
-          </div>
-
-          {/* Inline Critical Metrics */}
-          <div className="hidden md:flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4 text-red-500" />
-              <div>
-                <span className="text-lg font-bold text-gray-900">47</span>
-                <span className="text-xs text-gray-500 ml-1">days left</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-500" />
-              <div>
-                <span className="text-lg font-bold text-gray-900">85%</span>
-                <span className="text-xs text-gray-500 ml-1">strength</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-purple-500" />
-              <div>
-                <span className="text-lg font-bold text-gray-900">92</span>
-                <span className="text-xs text-gray-500 ml-1">profile score</span>
-              </div>
-            </div>
-          </div>
+      <div className="max-w-[1600px] mx-auto">
+        {/* Greeting and Date */}
+        <div className="mb-3">
+          <h2 className="text-xl font-bold text-gray-900">
+            {greeting}{userName ? `, ${userName}` : ''}!
+          </h2>
+          <p className="text-sm text-gray-500">{date}</p>
         </div>
 
-        {/* Streak Badge */}
-        {currentStreak > 0 && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full">
-            <Flame className="w-4 h-4 text-orange-500" />
-            <span className="text-sm font-medium text-orange-700">{currentStreak} day streak</span>
+        {/* Metrics Row */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            {/* Inline Critical Metrics */}
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-red-500" />
+                <div>
+                  <span className="text-lg font-bold text-gray-900">47</span>
+                  <span className="text-xs text-gray-500 ml-1">days left</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-green-500" />
+                <div>
+                  <span className="text-lg font-bold text-gray-900">85%</span>
+                  <span className="text-xs text-gray-500 ml-1">strength</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-purple-500" />
+                <div>
+                  <span className="text-lg font-bold text-gray-900">92</span>
+                  <span className="text-xs text-gray-500 ml-1">profile score</span>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
+
+          {/* Streak Badge */}
+          {currentStreak > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 rounded-full">
+              <Flame className="w-4 h-4 text-orange-500" />
+              <span className="text-sm font-medium text-orange-700">{currentStreak} day streak</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
