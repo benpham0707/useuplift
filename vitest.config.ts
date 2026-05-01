@@ -91,6 +91,10 @@ export default defineConfig({
       // picks them up.
       'tests/property/taughtMoveIdStability.ts',
       'tests/property/iterationLedgerAppendOnly.ts',
+      // Phase 2 D-2.11 (2026-05-01) — specificsNeedAggregator idempotency
+      // property tests (deterministic LCG seed; running aggregate twice
+      // doesn't double the queue).
+      'tests/property/specificsNeedAggregatorIdempotency.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
