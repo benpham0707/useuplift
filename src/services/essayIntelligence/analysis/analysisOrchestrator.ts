@@ -1158,6 +1158,92 @@ export class AnalysisOrchestrator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 5.6: Specifics-need aggregation (D-2.8)
+    //
+    // Each layer (L3 walk, L3.5 analysis, L3.75 holistic, L4 northStar) has
+    // populated optional `specificsNeedEmissions[]` fields on its profile-
+    // state footprint when its prompt surfaced a gap-and-approach. The
+    // aggregator (D-2.7) concatenates them in a stable order, dedupes
+    // against the existing question queue + within the run, and mints
+    // UnderstandingQuestion[] into profile.questionQueue. Pure deterministic
+    // — no LLM cost.
+    //
+    // Position rationale: AFTER L4 + delta synthesis (Phase 5) so L4's
+    // emissions are visible; BEFORE L5 (Phase 6) so the L5 prompts can
+    // reference the freshly-minted questions if their template surfaces
+    // the queue. FindingStore stuck-hypothesis emissions (D-2.6 source
+    // layer 'finding_maturity') are NOT collected here — D-2.6 lands a
+    // separate harvesting service that will concatenate into the call
+    // when it ships. Until then, that source contributes 0 emissions
+    // (silence is a valid signal — round 1.6 §3 Test 3).
+    //
+    // Failure semantics: aggregateSpecificsNeedEmissions throws on schema-
+    // invalid emissions (sequential validate→mint — partial mutations
+    // persist before throw, consistent with priorAnnotationsBuilder
+    // D-1.6 pattern). The throw is caught here, telemetry surfaces, and
+    // the pipeline continues to Phase 6. Rationale: a malformed emission
+    // from one prompt should not block the L5 annotation pass; the
+    // already-minted questions from prior passes are still in the queue,
+    // and the malformed one earns an audit signal for upstream fix.
+    {
+      const profileForAgg = coordinator.getProfile();
+      const aggIter = getCurrentIteration(profileForAgg);
+      try {
+        const { runSpecificsNeedAggregation } = await import(
+          './specificsNeedAggregatorIntegration'
+        );
+        const integrationResult = runSpecificsNeedAggregation(
+          profileForAgg,
+          aggIter,
+        );
+        if (integrationResult.hadEmissions) {
+          emitIterationEvent(input.essayId, {
+            iteration: aggIter,
+            step: 'phase5_6_specifics_need_aggregation',
+            status: 'succeeded',
+            timestamp: new Date().toISOString(),
+            metadata: {
+              totalEmissions: integrationResult.aggregationResult.totalEmissions,
+              addedToQueue: integrationResult.aggregationResult.addedToQueue,
+              deduplicatedAgainstExisting:
+                integrationResult.aggregationResult.deduplicatedAgainstExisting,
+              deduplicatedWithinRun:
+                integrationResult.aggregationResult.deduplicatedWithinRun,
+              byLayer: integrationResult.aggregationResult.byLayer,
+            },
+          });
+          console.log(
+            `[Orchestrator] Phase 5.6 specifics-need aggregation complete: ` +
+              `received=${integrationResult.aggregationResult.totalEmissions}, ` +
+              `added=${integrationResult.aggregationResult.addedToQueue}, ` +
+              `dedup_existing=${integrationResult.aggregationResult.deduplicatedAgainstExisting}, ` +
+              `dedup_within_run=${integrationResult.aggregationResult.deduplicatedWithinRun}`,
+          );
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error(
+          '[Orchestrator] Phase 5.6: Specifics-need aggregation failed:',
+          msg,
+        );
+        emitIterationEvent(input.essayId, {
+          iteration: aggIter,
+          step: 'phase5_6_specifics_need_aggregation',
+          status: 'failed',
+          error: {
+            message: msg,
+            code: 'specifics_need_aggregation_failed',
+            context: {
+              downstreamBehavior:
+                'Pipeline continues to Phase 6 with the question queue in its pre-aggregation state plus any partial mutations the aggregator made before the throw. Already-minted questions from earlier emissions persist (sequential validate→mint).',
+            },
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     // PHASE 6: Annotations (L5 — FAIL-FAST)
     // ═══════════════════════════════════════════════════════════════════════
 

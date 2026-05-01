@@ -51,6 +51,10 @@ export default defineConfig({
       // schema validation, dedup against existing queue questions,
       // within-run dedup, tokenization + Jaccard helpers, edge cases.
       'tests/unit/specifics-need-aggregator.test.ts',
+      // Phase 2 D-2.8 (2026-05-01) — orchestrator integration helper unit
+      // tests: collection from every profile-state layer, stable order,
+      // existing-queue interaction (preserve + dedup), error propagation.
+      'tests/unit/specifics-need-aggregator-integration.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',

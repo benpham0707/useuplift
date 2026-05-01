@@ -835,6 +835,19 @@ export interface ParagraphUnderstanding {
     voiceConsistency: string;
     standoutMoment: string | null;
   };
+
+  /**
+   * Specifics-need emissions surfaced by the L3 walk for this paragraph.
+   * Each emission documents a gap-and-approach: the walk noticed the essay
+   * is referencing something it doesn't yet specify, and it has a concrete
+   * angle for the question that would unlock the gap. The aggregator (D-2.7)
+   * concatenates these with emissions from L3.5 / L3.75 / L4 / FindingStore,
+   * dedupes, and mints UnderstandingQuestion[] into profile.questionQueue
+   * (D-2.8 integration). Optional — undefined / [] when the walk had no
+   * gap-and-approach to surface for this paragraph (silence is the audit
+   * signal per round 1.6 §3 Test 3, not a defect).
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -856,6 +869,15 @@ export interface ParagraphAnalysis {
     quality: string;
     description: string;
   }>;
+
+  /**
+   * Specifics-need emissions surfaced by the L3.5 analysis pass for this
+   * paragraph. Same contract as ParagraphUnderstanding.specificsNeedEmissions
+   * (see that field). Aggregator (D-2.7) folds these in with L3 walk + L3.75
+   * holistic + L4 northStar emissions; D-2.8 integration site between Phase 5
+   * and Phase 6 is what calls the aggregator.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -1447,6 +1469,17 @@ export interface EssayNorthStar {
   lastUpdatedBy: string;
   /** Version/changelog tracking for re-crystallization (present after version >= 2) */
   evolution?: NorthStarEvolution;
+
+  /**
+   * Specifics-need emissions surfaced by L4 crystallization. Essay-level
+   * emissions: gaps that only become visible from the North Star vantage
+   * (through-line missing connective tissue, distinctiveness signature
+   * leaning on something the essay doesn't yet specify, intent bridge with
+   * a concrete answerable question). Same dedup contract as the other
+   * source layers; aggregator (D-2.7) folds these in before minting.
+   * Optional — undefined / [] when L4 had no gap-and-approach to surface.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -2200,6 +2233,17 @@ export interface EssayUnderstanding {
     trigger: 'walk' | 'deep_dive' | 'coaching' | 'edit' | 'coherence_check';
     whatChanged: string;
   }>;
+
+  /**
+   * Specifics-need emissions surfaced by L3.75 holistic synthesis (Phase A
+   * and / or Phase B). Essay-level emissions: gaps the synthesis noticed
+   * looking across paragraphs (cross-paragraph specificity gaps, holistic
+   * questions that no single paragraph would have flagged on its own).
+   * Same dedup contract as paragraph-scoped emissions; the aggregator
+   * (D-2.7) unifies all sources before minting questions. Optional —
+   * undefined / [] when the synthesis had no gap-and-approach to surface.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -5404,6 +5448,16 @@ export interface IterationTelemetryEvent {
   durationMs?: number;
   /** Model name (LLM-touching steps only). */
   model?: string;
+  /**
+   * Success-side context payload — counters, byLayer breakdowns, dedup
+   * deltas, anything observable about a successful step that doesn't fit
+   * the scalar fields above. Mirror to `error.context` for failures.
+   * Free-form by design (analogous to `error.context: Record<string, unknown>`).
+   * First consumer: Phase 5.6 specifics-need aggregation event (D-2.8) carries
+   * `{ totalEmissions, addedToQueue, deduplicatedAgainstExisting,
+   * deduplicatedWithinRun, byLayer }` here.
+   */
+  metadata?: Record<string, unknown>;
   /** ISO timestamp of the event. */
   timestamp: string;
 }
