@@ -47,6 +47,10 @@ export default defineConfig({
       // trip integrity (no .test.ts suffix per spec; matches D-1.13/14/15
       // property/integration test convention).
       'tests/integration/queue-persistence-concurrency.ts',
+      // Phase 2 D-2.7 (2026-05-01) — specificsNeedAggregator unit tests:
+      // schema validation, dedup against existing queue questions,
+      // within-run dedup, tokenization + Jaccard helpers, edge cases.
+      'tests/unit/specifics-need-aggregator.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',

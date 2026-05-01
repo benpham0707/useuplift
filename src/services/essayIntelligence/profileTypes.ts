@@ -5752,6 +5752,19 @@ export interface DigContext {
    * actual student-facing message; the seed encodes the analytic intent.
    */
   framingSeed: string;
+  /**
+   * Optional sentence-level anchor (zero-indexed) within the parent
+   * `UnderstandingQuestion.anchorParagraph`. Some emission sources
+   * naturally anchor at sentence granularity (e.g., L3.5's per-sentence
+   * confidence judgments) and persisting that granularity lets the
+   * Conversator (Phase 3) compose questions that reference the exact
+   * sentence rather than the whole paragraph.
+   *
+   * Added by D-2.7 (round-1 audit HIGH-1 closure 2026-05-01) so emissions
+   * carrying anchorSentence persist that signal end-to-end rather than
+   * being silently dropped at mint time.
+   */
+  anchorSentence?: number;
   /** ISO timestamp when the question was asked to the student. */
   askedAt?: string;
   /** Conversator chat message ID that surfaced the question (links into essay_chat_conversations). */
@@ -5773,4 +5786,120 @@ export interface DigContext {
     rawAnswer: string;
     failureReason: string;
   };
+}
+
+// ============================================================================
+// SPECIFICS-NEED EMISSION (Phase 2 D-2.7)
+// ============================================================================
+// Spec: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_E2E_INTEGRITY_AUDIT.md
+//   §3.2 (per-layer contributors).
+// Contract (D-2.7): The input type that the analysis layers (D-2.2 L3
+// walk, D-2.3 L3.5 analysis, D-2.4 L3.75 holistic Phase A/B, D-2.5 L4
+// northStar, D-2.6 FindingStore stuck-hypothesis) emit when they
+// recognize a gap that re-reading the text alone cannot resolve. The
+// aggregator (`specificsNeedAggregator.ts`) consumes these emissions,
+// deduplicates them against the existing question queue, and mints
+// new `UnderstandingQuestion` entries with `source: 'analysis_specifics_gap'`
+// + populated `dig: DigContext` for unmatched emissions.
+//
+// Why this type exists alongside DigContext: DigContext is the persisted
+// sub-object on `UnderstandingQuestion`; SpecificsNeedEmission is the
+// per-iteration emission shape the layers produce BEFORE aggregation
+// decides whether to mint a new question. Carrying analytical reasoning
+// (whyAsked, framingSeed) and routing fields (consumers, populates,
+// expectedAnswerShape) on the emission keeps the aggregator's dedup
+// + minting logic deterministic — no LLM call inside the aggregator,
+// just pure transformation.
+
+/**
+ * The set of analysis-layer surfaces that can emit a SpecificsNeedEmission.
+ *
+ * Closed enum — system bookkeeping for telemetry routing and dedup tie-
+ * breaking (Rule 6 of feedback_llm-first-design.md). Phase 2 deliverables
+ * map 1:1 to entries: D-2.2 → 'l3_walk', D-2.3 → 'l3_5_analysis',
+ * D-2.4 → 'l3_75_phase_a' / 'l3_75_phase_b', D-2.5 → 'l4_north_star',
+ * D-2.6 → 'finding_maturity'. New emission sources require a deliberate
+ * enum extension (and a corresponding plan-doc deliverable).
+ */
+export type SpecificsNeedSourceLayer =
+  | 'l3_walk'
+  | 'l3_5_analysis'
+  | 'l3_75_phase_a'
+  | 'l3_75_phase_b'
+  | 'l4_north_star'
+  | 'finding_maturity';
+
+/**
+ * One specifics-need emission from an analysis layer.
+ *
+ * The emission carries:
+ *   - PROVENANCE (sourceLayer, emittingTrigger) — for telemetry, dedup
+ *     tie-breaking, and audit-trail debugging
+ *   - ANCHOR (anchorParagraph, anchorSentence?) — where in the essay
+ *     this gap lives; load-bearing for the dedup key
+ *   - QUESTION CONTENT (question, dimensions, expectedInsight, priority)
+ *     — populates the UnderstandingQuestion top-level fields
+ *   - DIG-CONTEXT FIELDS (whyAsked, expectedAnswerShape, consumers,
+ *     populates, framingSeed) — populates the `dig: DigContext` sub-object
+ *     on the minted UnderstandingQuestion
+ *
+ * Producer: each of D-2.2 through D-2.6 emits an array of these from
+ * the layer's structured output.
+ *
+ * Consumer: D-2.7 specificsNeedAggregator validates schema, deduplicates,
+ * mints new UnderstandingQuestion entries, increments iterationsSurvived
+ * on matched existing questions.
+ *
+ * Failure surface (per the no-fallback charter): the aggregator throws on
+ * malformed emissions with structured context (sourceLayer, emission index,
+ * missing/invalid field). Iteration completes without that signal but
+ * with a visible flag; we do NOT silently drop the entry.
+ */
+export interface SpecificsNeedEmission {
+  /** Which layer surface emitted this. */
+  sourceLayer: SpecificsNeedSourceLayer;
+  /**
+   * Free-text describing what specifically triggered the emission within
+   * the layer (e.g., "F12 deepeningPotential != null with raisesQuestions[0]
+   * citing student's mother's reaction"). Diagnostic, not load-bearing
+   * for dedup or queue insertion. Required to be non-empty.
+   */
+  emittingTrigger: string;
+  /** Zero-indexed paragraph this emission anchors to. */
+  anchorParagraph: number;
+  /** Optional zero-indexed sentence within the anchor paragraph. */
+  anchorSentence?: number;
+  /**
+   * The question the layer would ask if the student were reachable.
+   * Populates `UnderstandingQuestion.question` on the minted entry.
+   * Plain language; the Conversator's composer (Phase 3 D-3.5) will
+   * polish into the actual student-facing message via `framingSeed`.
+   */
+  question: string;
+  /**
+   * Dimensions the question touches (one or more of the holistic
+   * dimensions). Populates `UnderstandingQuestion.dimensions`.
+   */
+  dimensions: string[];
+  /**
+   * What the layer expects to learn that would let it advance. Populates
+   * `UnderstandingQuestion.expectedInsight`.
+   */
+  expectedInsight: string;
+  /**
+   * LLM-assigned priority. Populates `UnderstandingQuestion.priority`
+   * directly; mergeCuratedOutput's auto-promotion path (3+ iterations
+   * → high) applies in subsequent iterations.
+   */
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  /** Why this dig matters — populates `dig.whyAsked`. */
+  whyAsked: string;
+  /** Populates `dig.expectedAnswerShape`. Drives Conversator extractor routing. */
+  expectedAnswerShape: DigContext['expectedAnswerShape'];
+  /** Populates `dig.consumers`. Names which downstream layers consume the answer. */
+  consumers: DigContext['consumers'];
+  /** Populates `dig.populates`. Documents which profile fields the structured answer fills. */
+  populates: string[];
+  /** Populates `dig.framingSeed`. Non-leading way to phrase the question. */
+  framingSeed: string;
 }
