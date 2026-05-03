@@ -227,28 +227,33 @@ export function runSpecificsNeedAggregationWithTelemetry(
 function collectEmissionsFromProfile(
   profile: EssayProfile,
 ): SpecificsNeedEmission[] {
+  // Option 5 rebuild: emissions live at one location —
+  // profile.specificsNeedEmissions[] — populated by Phase B
+  // (essayLevelEmissionService) at Phase 5.55. Replaces the prior round 1.8
+  // 4-source collection (paragraph.understanding, paragraph.analysis,
+  // essayUnderstanding, northStar). Backward-compat: legacy profiles with
+  // emissions in the prior locations are still read in case a coordinator
+  // upgrade lags during deploy; can be deleted once all profiles have
+  // refreshed.
   const out: SpecificsNeedEmission[] = [];
 
+  if (profile.specificsNeedEmissions && profile.specificsNeedEmissions.length > 0) {
+    out.push(...profile.specificsNeedEmissions);
+    return out;
+  }
+
+  // Backward-compat fallback (delete once all profiles refresh).
   for (const paragraph of profile.paragraphs ?? []) {
     const walkEmissions = paragraph.understanding?.specificsNeedEmissions;
-    if (walkEmissions && walkEmissions.length > 0) {
-      out.push(...walkEmissions);
-    }
+    if (walkEmissions && walkEmissions.length > 0) out.push(...walkEmissions);
     const analysisEmissions = paragraph.analysis?.specificsNeedEmissions;
-    if (analysisEmissions && analysisEmissions.length > 0) {
-      out.push(...analysisEmissions);
-    }
+    if (analysisEmissions && analysisEmissions.length > 0) out.push(...analysisEmissions);
   }
-
-  const holisticEmissions = profile.essayUnderstanding?.specificsNeedEmissions;
-  if (holisticEmissions && holisticEmissions.length > 0) {
-    out.push(...holisticEmissions);
+  if (profile.essayUnderstanding?.specificsNeedEmissions) {
+    out.push(...profile.essayUnderstanding.specificsNeedEmissions);
   }
-
-  const northStarEmissions = profile.northStar?.specificsNeedEmissions;
-  if (northStarEmissions && northStarEmissions.length > 0) {
-    out.push(...northStarEmissions);
+  if (profile.northStar?.specificsNeedEmissions) {
+    out.push(...profile.northStar.specificsNeedEmissions);
   }
-
   return out;
 }

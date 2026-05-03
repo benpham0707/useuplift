@@ -1158,97 +1158,84 @@ export class AnalysisOrchestrator {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHASE 5.6: Specifics-need aggregation (D-2.8)
+    // PHASE 5.55: Essay-level emission decision (Option 5 rebuild — Phase B)
     //
-    // Each layer (L3 walk, L3.5 analysis, L3.75 holistic, L4 northStar) has
-    // populated optional `specificsNeedEmissions[]` fields on its profile-
-    // state footprint when its prompt surfaced a gap-and-approach. The
-    // aggregator (D-2.7) concatenates them in a stable order, dedupes
-    // against the existing question queue + within the run, and mints
-    // UnderstandingQuestion[] into profile.questionQueue. Pure deterministic
-    // — no LLM cost.
+    // Single Sonnet call that reads ALL per-layer artifacts (L3 walk
+    // findings + gap candidates, L3.5 weaknesses/growthEdges, L3.75
+    // holistic synthesis, L4 northStar, FindingStore stuck findings) +
+    // the full essay text + concept library, and decides 0-3 specifics-
+    // need emissions for the essay. Replaces the prior round 1.8
+    // architecture's 5 distributed emission services + D-2.6 maturity-
+    // refresh + L3 post-walk consolidation. Single decision point with
+    // full context = naturally enforces the 3-cap, prevents concept tag
+    // fragmentation, eliminates cross-layer anti-repetition coordination.
     //
-    // Position rationale: AFTER L4 + delta synthesis (Phase 5) so L4's
-    // emissions are visible; BEFORE L5 (Phase 6) so the L5 prompts can
-    // reference the freshly-minted questions if their template surfaces
-    // the queue. FindingStore stuck-hypothesis emissions (D-2.6 source
-    // layer 'finding_maturity') are NOT collected here — D-2.6 lands a
-    // separate harvesting service that will concatenate into the call
-    // when it ships. Until then, that source contributes 0 emissions
-    // (silence is a valid signal — round 1.6 §3 Test 3).
+    // Silence path: when there are zero gap candidates AND no stuck
+    // findings, skips the LLM call entirely (saves ~$0.25).
     //
-    // Failure semantics: aggregateSpecificsNeedEmissions throws on schema-
-    // invalid emissions (sequential validate→mint — partial mutations
-    // persist before throw, consistent with priorAnnotationsBuilder
-    // D-1.6 pattern). The throw is caught here, telemetry surfaces, and
-    // the pipeline continues to Phase 6. Rationale: a malformed emission
-    // from one prompt should not block the L5 annotation pass; the
-    // already-minted questions from prior passes are still in the queue,
-    // and the malformed one earns an audit signal for upstream fix.
+    // Failure semantics: wrapped in try/catch — Phase B failure does NOT
+    // block Phase 5.6 aggregation or Phase 6 L5. Empty
+    // profile.specificsNeedEmissions falls through to Phase 5.6 silence
+    // path automatically.
+    // ═══════════════════════════════════════════════════════════════════════
+    try {
+      const profileForPhaseB = coordinator.getProfile();
+      const findingStoreForPhaseB = coordinator.getFindingStore();
+      if (findingStoreForPhaseB) {
+        const { runEssayLevelEmissionPass, applyEssayLevelEmissionsToProfile } = await import(
+          './essayLevelEmissionService'
+        );
+        const phaseBResult = await runEssayLevelEmissionPass(
+          profileForPhaseB,
+          findingStoreForPhaseB,
+        );
+        applyEssayLevelEmissionsToProfile(profileForPhaseB, phaseBResult.emissions);
+        if (phaseBResult.emissions.length > 0 || phaseBResult.cost > 0) {
+          costTracker.record(
+            'phase_b_essay_level_emissions',
+            phaseBResult.cost,
+            phaseBResult.tokenUsage,
+            phaseBResult.timingMs,
+          );
+          console.log(
+            `[Orchestrator] Phase 5.55 essay-level emissions: ` +
+              `${phaseBResult.emissions.length} emissions, ` +
+              `cost=$${phaseBResult.cost.toFixed(4)}, time=${phaseBResult.timingMs}ms`,
+          );
+        }
+      }
+    } catch (phaseBError) {
+      const msg =
+        phaseBError instanceof Error ? phaseBError.message : String(phaseBError);
+      console.error(
+        '[Orchestrator] Phase 5.55 essay-level emission pass failed (non-blocking):',
+        msg,
+      );
+      emitIterationEvent(input.essayId, {
+        iteration: getCurrentIteration(coordinator.getProfile()),
+        step: 'phase5_55_essay_level_emissions',
+        status: 'failed',
+        error: {
+          message: msg,
+          code: 'phase_b_essay_level_emissions_failed',
+          context: {
+            downstreamBehavior:
+              'Phase 5.6 aggregation continues with empty profile.specificsNeedEmissions; queue gets no new specifics-need mints this iteration but other queue mutations (curated questions from L3.75 growth cycle) still apply.',
+          },
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHASE 5.6: Specifics-need aggregation (reads from
+    // profile.specificsNeedEmissions[] populated by Phase 5.55 above).
+    // Pure deterministic dedup + queue mint — no LLM call. Failure caught
+    // here surfaces telemetry; pipeline continues to Phase 6.
+    // ═══════════════════════════════════════════════════════════════════════
     {
       const profileForAgg = coordinator.getProfile();
       const aggIter = getCurrentIteration(profileForAgg);
-
-      // D-2.6 round 1.8: FindingStore stuck-hypothesis maturity-refresh
-      // pass. Runs BEFORE Phase 5.6 aggregation so its emissions feed into
-      // the same aggregator + queue + concept-library pipeline as the
-      // per-layer emissions. Single Sonnet call when stuck findings exist;
-      // skipped entirely (silence is signal) when none. Wrapped in try/catch
-      // so a refresh failure does NOT block the aggregator — it surfaces
-      // telemetry and continues with empty additionalEmissions.
-      let additionalEmissions: import('../profileTypes').SpecificsNeedEmission[] = [];
-      try {
-        const findingStoreForRefresh = coordinator.getFindingStore();
-        if (findingStoreForRefresh && findingStoreForRefresh.size > 0) {
-          const { refreshFindingMaturity } = await import(
-            '../findings/findingMaturityRefresh'
-          );
-          const refreshResult = await refreshFindingMaturity(
-            profileForAgg,
-            findingStoreForRefresh,
-          );
-          additionalEmissions = refreshResult.emissions;
-          if (additionalEmissions.length > 0) {
-            costTracker.record(
-              'finding_maturity_refresh',
-              refreshResult.cost,
-              refreshResult.tokenUsage,
-              refreshResult.timingMs,
-            );
-            console.log(
-              `[Orchestrator] D-2.6 finding-maturity refresh: ` +
-                `${additionalEmissions.length} stuck-finding emissions, ` +
-                `cost=$${refreshResult.cost.toFixed(4)}`,
-            );
-          }
-        }
-      } catch (refreshError) {
-        const msg =
-          refreshError instanceof Error
-            ? refreshError.message
-            : String(refreshError);
-        console.error(
-          '[Orchestrator] D-2.6 finding-maturity refresh failed (non-blocking):',
-          msg,
-        );
-        // Telemetry surfaces the failure; aggregation continues without
-        // the maturity-refresh emissions (additionalEmissions stays []).
-        emitIterationEvent(input.essayId, {
-          iteration: aggIter,
-          step: 'phase5_6_finding_maturity_refresh',
-          status: 'failed',
-          error: {
-            message: msg,
-            code: 'finding_maturity_refresh_failed',
-            context: {
-              downstreamBehavior:
-                'Phase 5.6 aggregation continues with empty additionalEmissions; per-layer emissions still flow through the aggregator. Stuck-finding maturity is unchanged this iteration.',
-            },
-          },
-          timestamp: new Date().toISOString(),
-        });
-      }
-
       const { runSpecificsNeedAggregationWithTelemetry } = await import(
         './specificsNeedAggregatorIntegration'
       );
@@ -1256,7 +1243,6 @@ export class AnalysisOrchestrator {
         profileForAgg,
         aggIter,
         input.essayId,
-        additionalEmissions,
       );
     }
 

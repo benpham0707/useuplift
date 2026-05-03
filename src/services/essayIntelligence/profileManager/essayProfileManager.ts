@@ -2218,53 +2218,10 @@ export class EssayProfileCoordinator {
       }
     }
 
-    // D-2.4 round 1.8: copy specifics-need emissions onto essayUnderstanding
-    // (D-2.7 type location at profileTypes.ts:2200 area). Top-level
-    // HolisticSynthesisOutput field → essay-level profile storage. D-2.8's
-    // integration helper reads from this nested location at Phase 5.6.
-    //
-    // ALSO appends instances into profile.conceptLibrary[] per each emission's
-    // conceptTag, so per-essay concept caps see L3.75's contribution alongside
-    // L3 + L3.5 emissions (cross-layer cap awareness).
-    //
-    // Per-layer post-pass consolidation deferred to calibration follow-up
-    // (mirrors D-2.3 deferral). L3.75 emits at most a handful per pass given
-    // single LLM call structure.
-    if (
-      synthesis.specificsNeedEmissions &&
-      synthesis.specificsNeedEmissions.length > 0
-    ) {
-      // Ensure essayUnderstanding exists; in practice it's populated by
-      // applyFullHolisticSynthesis above, but guard defensively.
-      if (this.profile.essayUnderstanding) {
-        this.profile.essayUnderstanding.specificsNeedEmissions =
-          synthesis.specificsNeedEmissions;
-      }
-      if (!this.profile.conceptLibrary) this.profile.conceptLibrary = [];
-      const currentIteration =
-        this.profile.index?.iterationLedger?.currentIteration ?? 1;
-      for (const emission of synthesis.specificsNeedEmissions) {
-        let entry = this.profile.conceptLibrary.find(
-          (e) => e.tag === emission.conceptTag,
-        );
-        if (!entry) {
-          entry = {
-            tag: emission.conceptTag,
-            complexity: emission.conceptComplexity,
-            definition: emission.conceptDefinition,
-            example: emission.conceptExample,
-            instances: [],
-          };
-          this.profile.conceptLibrary.push(entry);
-        }
-        entry.instances.push({
-          paragraph: emission.anchorParagraph,
-          sentence: emission.anchorSentence,
-          iteration: currentIteration,
-          gapResolved: false,
-        });
-      }
-    }
+    // Option 5 rebuild: per-layer specifics-need emission write-back removed.
+    // Phase B (essayLevelEmissionService.applyEssayLevelEmissionsToProfile)
+    // is the single library-update path; runs after L4 + delta synthesis
+    // and before Phase 5.6 aggregator.
 
     this.afterMutation(allMutations, {});
 
@@ -2358,56 +2315,10 @@ export class EssayProfileCoordinator {
     );
     allMutations.push(...pMutations);
 
-    // D-2.3 round 1.8: copy specifics-need emissions onto the paragraph's
-    // ParagraphAnalysis (D-2.7 type location at profileTypes.ts:880). Top-
-    // level AnalysisPassOutput field → nested profile storage. D-2.8's
-    // integration helper reads from the nested location at Phase 5.6.
-    //
-    // ALSO appends instances into profile.conceptLibrary[] per each
-    // emission's conceptTag — critical for cross-layer cap awareness, since
-    // L3.5 emissions need to count against the per-essay concept caps the
-    // L3 walk and downstream layers see.
-    //
-    // Per-layer post-pass consolidation (cap-by-complexity + per-layer
-    // 3 ceiling, mirroring L3's consolidateSpecificsNeedEmissions) is
-    // DEFERRED to a calibration-stage follow-up. L3.5 may emit more than
-    // 3 per pass in the interim; the aggregator (D-2.7) at Phase 5.6
-    // dedups across all source layers. Cross-layer caps will be added
-    // in D-2.13 cross-phase audit work.
-    if (
-      result.specificsNeedEmissions &&
-      result.specificsNeedEmissions.length > 0
-    ) {
-      const para = this.profile.paragraphs[result.paragraphIndex];
-      if (para && para.analysis) {
-        para.analysis.specificsNeedEmissions = result.specificsNeedEmissions;
-      }
-      // Library append (mirrors D-2.2 consolidation Step 6).
-      if (!this.profile.conceptLibrary) this.profile.conceptLibrary = [];
-      const currentIteration =
-        this.profile.index?.iterationLedger?.currentIteration ?? 1;
-      for (const emission of result.specificsNeedEmissions) {
-        let entry = this.profile.conceptLibrary.find(
-          (e) => e.tag === emission.conceptTag,
-        );
-        if (!entry) {
-          entry = {
-            tag: emission.conceptTag,
-            complexity: emission.conceptComplexity,
-            definition: emission.conceptDefinition,
-            example: emission.conceptExample,
-            instances: [],
-          };
-          this.profile.conceptLibrary.push(entry);
-        }
-        entry.instances.push({
-          paragraph: emission.anchorParagraph,
-          sentence: emission.anchorSentence,
-          iteration: currentIteration,
-          gapResolved: false,
-        });
-      }
-    }
+    // Option 5 rebuild: per-layer L3.5 specifics-need emission write-back
+    // removed. Phase B (essayLevelEmissionService) reads L3.5's existing
+    // weakness/growthEdge/improvementCandidate artifacts directly when
+    // deciding emissions at essay level.
 
     // HolisticMutator: update craft assessment if there are new strength signatures
     if (result.holisticAnalysisEvolution) {
@@ -2507,41 +2418,10 @@ export class EssayProfileCoordinator {
 
     const mutations = this.northStarMutator.applyNorthStar(this.profile, northStar);
 
-    // D-2.5 round 1.8: append L4 specifics-need emissions into the concept
-    // library (instances increment per emission's conceptTag). The
-    // northStar object itself already carries specificsNeedEmissions per
-    // EssayNorthStar.specificsNeedEmissions (D-2.8 type location); the
-    // mutator's wholesale assignment lands those on profile.northStar.
-    // Library append mirrors D-2.3 / D-2.4 cross-layer cap-awareness.
-    if (
-      northStar.specificsNeedEmissions &&
-      northStar.specificsNeedEmissions.length > 0
-    ) {
-      if (!this.profile.conceptLibrary) this.profile.conceptLibrary = [];
-      const currentIteration =
-        this.profile.index?.iterationLedger?.currentIteration ?? 1;
-      for (const emission of northStar.specificsNeedEmissions) {
-        let entry = this.profile.conceptLibrary.find(
-          (e) => e.tag === emission.conceptTag,
-        );
-        if (!entry) {
-          entry = {
-            tag: emission.conceptTag,
-            complexity: emission.conceptComplexity,
-            definition: emission.conceptDefinition,
-            example: emission.conceptExample,
-            instances: [],
-          };
-          this.profile.conceptLibrary.push(entry);
-        }
-        entry.instances.push({
-          paragraph: emission.anchorParagraph,
-          sentence: emission.anchorSentence,
-          iteration: currentIteration,
-          gapResolved: false,
-        });
-      }
-    }
+    // Option 5 rebuild: per-layer L4 specifics-need emission write-back
+    // removed. Phase B (essayLevelEmissionService) reads L4's northStar
+    // (through-line, structural roles, distinctiveness, intent bridge)
+    // directly when deciding emissions at essay level.
 
     this.afterMutation(mutations, {});
 

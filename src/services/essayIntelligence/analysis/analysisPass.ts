@@ -640,99 +640,6 @@ The orchestrator harvests these into the ImprovementCandidateStore after L3.5 co
 
 ${symptomTaxonomyBlock}
 
-## SPECIFICS-NEED EMISSION (D-2.3 round 1.8) — the second prescriptive surface
-
-Some weaknesses you identify carry a gap the writer alone can close — a moment they remember that isn't on the page, a specific person beyond their function, a stake whose consequence is unstated. L3.5 emits a specifics-need question when answering would be worth the writer's time AND the system's coaching can already function without the answer (the answer would UPGRADE coaching, not ENABLE it).
-
-Distinct from L3 walk's emissions: L3 walk catches gaps from UNDERSTANDING (a finding's depth depends on writer-side info); L3.5 catches gaps from EVALUATION (a weakness or low-effectiveness judgment whose specific fix the writer holds). Both flow into the same queue + concept library.
-
-Primary purpose: produce questions worth the writer's time. Every emission is built to surface to the user. Across the corpus, essays distribute 0-3 emissions per layer; emit only what passes the gate below regardless of where this essay lands.
-
-EMIT only when ALL six conditions hold (uncertainty counts as No on every fork):
-
-1. WORKING-SENTENCE SILENCE. The sentence/paragraph in question is reaching but not landing. If the writer's craft is working as written (a sentence that earns its effectiveness score because its mechanism IS the move), say nothing. If you scored a sentence 86+ because the move is landing, do NOT emit on it.
-
-2. THE WEAKNESS IS REAL. Text-evidenced, not a guess. The growthEdge or weakness has cited specific text.
-
-3. WRITER-SIDE ONLY. The fix depends on something not on the page — re-reading won't close the gap; later paragraphs won't close it; only the writer can. If the fix is "rewrite the sentence using a craft technique" and you can model the technique without the writer's input → that's L3.5's improvementCandidate territory, NOT a specifics-need emission.
-
-4. YOU HAVE AN ANGLE. Not "tell me more" but a specific direction (a moment to recover, a sensory anchor, a stakes-context, a person to name).
-
-5. ANSWER UPGRADES — DOESN'T ENABLE. You must already have produced (or be producing in this same paragraph output) a corresponding text-grounded coaching artifact for this gap — a growthEdge, an improvementCandidate, a weakness with suggestedChange. If no such artifact exists for this gap, you have under-coached; re-coach harder before considering emission. Constructive-proof rider: if the only specific text-grounded coaching you can write is "ask the writer for the specific thing," your coaching has BECOME the question — that's the enable case, not the upgrade case. Re-coach.
-
-6. SURFACE-VS-DEEP. The emission must dig at a discovery OR a coaching-unlock different in SHAPE (not better in detail):
-   (a) Discovery — answering surfaces a pattern, inversion, hidden choice, or unowned emotion the writer hasn't seen in their own essay.
-   (b) Coaching-unlock — answering lets the system coach in a fundamentally different SHAPE (e.g., model consequence-style reveal on the writer's actual material, replace generic suggestedChange with a writer-specific rewrite). "Better in detail" doesn't qualify; "different in shape" does.
-
-CONCEPT LIBRARY + REUSE POLICY (round 1.8 §3 + §8):
-
-The user prompt includes a CONCEPT LIBRARY block listing concepts already taught in this essay (across all layers, all walk passes) plus their unresolved-instance counts. Per-concept caps:
-  simple   → max 1 unresolved instance per essay
-  medium   → max 2 unresolved instances per essay
-  complex  → max 3 unresolved instances per essay
-PLUS hard ceiling of 3 emissions per layer (L3.5) per pass.
-
-The concept library is USER-ACCESSIBLE ON DEMAND — writers can look up the definition + example for any concept they've been taught in this essay. This is why the system can stay terse in coaching: the writer has a permanent reference to the principle even when the prompt doesn't re-teach it. The LLM never surfaces library content inline in framingSeed; the library serves the writer's lookup, not the prompt's repetition.
-
-Before minting a new conceptTag, scan the library: REUSE an existing tag if the underlying mechanism is identical (not just thematically similar). Two tags differ only if a writer who internalized concept A would not yet have internalized concept B. Tags are PROSE phrases, not snake_case.
-
-CAP RELAXATION ON DEMONSTRATED UNDERSTANDING. If the user iterates and resolves prior instances of a concept, the unresolved count drops, and a NEW instance of the same concept can fire fresh teaching. The cap relaxes when the user demonstrates understanding via iteration; it does not permanently suppress.
-
-POST-PASS CONSOLIDATION. After L3.5 finishes all paragraphs, a deterministic step groups candidates by conceptTag, applies complexity caps (keep top N per group), then ranks by priority (critical > high > medium > low) and trims to 3 total per pass. Surviving emissions land on paragraph.analysis.specificsNeedEmissions.
-
-ANTI-REPETITION. Drop emissions that:
-- Quote the same student line + target the same gap as a prior emission (visible in PRIOR EMISSIONS context block).
-- Use the same angle phrasing — revise to be specific to this paragraph's material, OR drop.
-- Surface the same gap from a different weakness/growthEdge — drop.
-- Duplicate an L3 walk emission already in the library on the same anchor + same concept — drop. L3.5 only emits when the EVALUATIVE lens surfaces something L3's understanding lens didn't.
-
-framingSeed CALIBRATION (the only student-facing field):
-- MUST embed the student's actual line as a direct quote.
-- PLAIN language. NO analytical jargon. NO engineering vocabulary. NO scoring talk ("you scored 52 because...").
-- NO validation padding.
-- NO template with quote slot — framing language must come from THIS essay's specifics.
-- More than three sentences is almost always padding.
-- Quote-then-gap-then-angle, no opening filler.
-- Where possible, name the writing principle inside the seed when first-teaching this concept — turns the question into teaching.
-
-CORPUS-BAR EXAMPLES of L3.5 framingSeed:
-
-(L3.5 evaluative gap on a concrete-detail weakness — concept: "specific over general")
-"You wrote that the lab was 'frustrating.' Frustration could mean a hundred things — was it the seventh failed PCR? The collaborator who took credit? The piece of equipment that broke at 11pm? The honest specific is what makes frustration land."
-
-(L3.5 evaluative gap on a vague-stakes growthEdge — concept: "concrete stakes over abstract consequence")
-"You wrote that quitting the team 'changed things.' What changed — your friendships, your routine, the version of yourself you woke up as? One specific shift the next morning, and we'd see what 'changed' actually meant."
-
-PRIORITY (structural two-question test):
-  Q1: Without the answer, does the weakness's claim collapse? YES → critical
-  Q2: Without the answer, can the suggestedChange in improvementCandidate still be specific?
-      NO  → high
-      YES → medium
-  "low" reserved for emissions where the analysis is uncertain whether to emit at all (per silence default, prefer not emitting).
-
-EXPECTED-INSIGHT BANNED TRIVIAL PHRASINGS:
-- "Matures the finding from hypothesis to confirmed."
-- "Makes the coaching more concrete."
-- "Reduces fabrication risk."
-- "Improves the system's understanding."
-- "Helps L5 generate better feedback."
-Name the SPECIFIC content: WHICH coaching move, WHICH growthEdge, WHICH fabrication scenario.
-
-EXPECTED-DISCOVERY BANNED TRIVIAL PHRASINGS:
-- "the writer would discover what they were feeling"
-- "the writer would discover their actual emotion"
-- "the writer would discover a specific detail"
-- "the writer would discover more about themselves"
-Name the SPECIFIC discovery: WHICH pattern, WHICH inversion, WHICH unowned emotion.
-
-PRE-OUTPUT SWAP CHECK (final gate before emit):
-
-Before you emit each candidate, run two swap tests against your own draft:
-- Could the candidate's expectedDiscovery appear word-for-word on a different essay's emission? If yes, the discovery is generic — drop the emission.
-- Could the candidate's conceptTag appear word-for-word on a different essay's emission AND name an underlying mechanism that's actually different from this essay's? If yes, refine the tag or reuse an existing library tag whose mechanism matches.
-
-OUTPUT specificsNeedEmissions as a top-level array (sibling of paragraphEffectiveness in the OUTPUT FORMAT below). Empty array is valid and the default — silence is the audit signal.
-
 ## OUTPUT FORMAT
 
 Respond with a single JSON object matching this schema EXACTLY:
@@ -780,29 +687,7 @@ Respond with a single JSON object matching this schema EXACTLY:
     "strengthSignatures": [{ "quality": "string", "evidence": "string (MAX 10 WORDS)", "paragraphs": [0] }],
     "growthEdges": [{ "quality": "string", "description": "string", "paragraphs": [0] }],
     "aoTakeaway": "string — what an AO would think after reading this paragraph in context"
-  },
-  "specificsNeedEmissions": [
-    {
-      "sourceLayer": "l3_5_analysis",
-      "emittingTrigger": "The growthEdge or weakness claim that triggered this — one short sentence naming what L3.5 noticed evaluatively",
-      "anchorParagraph": 0,
-      "anchorSentence": 1,
-      "question": "Short specific plain-language question the system would surface to the writer",
-      "dimensions": ["narrative", "emotion"],
-      "expectedInsight": "ONE SENTENCE — how the answer UPGRADES coaching (content-specific; banned trivial categories: 'matures the finding', 'makes coaching more concrete', 'reduces fabrication risk', 'improves the system\\'s understanding', 'helps L5 generate better feedback')",
-      "expectedDiscovery": "ONE SENTENCE — what the writer would discover about their own essay, OR null if the emission's value is purely a coaching-unlock with no discovery component",
-      "conceptTag": "short prose phrase (NOT snake_case) — examples: 'specific over general', 'discovery over delivery', 'concrete moment over summary', 'honest word over easy word'",
-      "conceptComplexity": "simple | medium | complex",
-      "conceptDefinition": "ONE-SENTENCE universal definition of the concept, written GENERICALLY — not this student's essay",
-      "conceptExample": "ONE corpus-quality EXAMPLE demonstrating the concept, generic (not this student's essay)",
-      "priority": "critical | high | medium | low",
-      "whyAsked": "Operator-facing recognition: WHY this gap can only be closed by the writer (allowed jargon — internal, not student-facing)",
-      "expectedAnswerShape": "scalar | short_phrase | specific_memory | list | narrative",
-      "consumers": ["l3_5", "l5"],
-      "populates": ["weakness.evidence", "growthEdge.description"],
-      "framingSeed": "Student-facing seed (PLAIN LANGUAGE, embeds the student's actual line as a quote) — quote-then-gap-then-angle, no validation padding, no template-with-quote-slot framing"
-    }
-  ]
+  }
 }
 
 SCHEMA BREVITY CAPS (Scope 1 Phase 2):
@@ -1676,21 +1561,13 @@ function validateAndTransform(
     (raw as { narrativeQualityIndex?: unknown }).narrativeQualityIndex,
   );
 
-  // D-2.3 round 1.8: parse top-level specificsNeedEmissions (sibling of
-  // paragraphEffectiveness in OUTPUT FORMAT). STRICT-PASSTHROUGH per round
-  // 1.8 §11.10 — verify wrapper is array + elements are objects, then cast
-  // through unknown. Aggregator validator (D-2.7) catches malformed
-  // emissions with structured context, producing the audit signal per the
-  // no-fallback charter.
-  const specificsNeedEmissions: SpecificsNeedEmission[] = [];
-  if (Array.isArray((raw as Record<string, unknown>).specificsNeedEmissions)) {
-    for (const item of (raw as { specificsNeedEmissions: unknown[] })
-      .specificsNeedEmissions) {
-      if (item && typeof item === 'object') {
-        specificsNeedEmissions.push(item as unknown as SpecificsNeedEmission);
-      }
-    }
-  }
+  // Option 5 rebuild: L3.5 no longer emits per-paragraph specificsNeedEmissions
+  // or gapCandidates. Phase B (essay-level emission service) reads L3.5's
+  // existing artifacts (weaknesses, growthEdges, improvementCandidates,
+  // narrativeQualityIndex) directly from the profile when deciding emissions
+  // at essay level. This drops L3.5 per-paragraph output cost meaningfully
+  // (no emission output) while preserving evaluative recognition (the
+  // weakness/growthEdge artifacts still capture L3.5's judgments).
 
   return {
     paragraphIndex,
@@ -1704,7 +1581,6 @@ function validateAndTransform(
     narrativeQualityIndex,
     holisticAnalysisEvolution,
     ...(paragraphPatternMatches.length > 0 ? { paragraphPatternMatches } : {}),
-    ...(specificsNeedEmissions.length > 0 ? { specificsNeedEmissions } : {}),
   };
 }
 
