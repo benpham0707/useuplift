@@ -55,7 +55,11 @@ import { parseLlmJsonOutput } from './llmJsonParser';
 const SONNET = 'claude-sonnet-4-5-20250929';
 const ESSAY_WALK_TEMPERATURE = 0.3;
 const ESSAY_WALK_TIMEOUT_MS = 240_000;
-const ESSAY_WALK_MAX_TOKENS = 8000;
+// Raised from 8000 → 12000 after Crochet isolated test (2026-05-03) hit
+// 8000 cap exactly, truncating centralThesis + voiceSignature. 12000 gives
+// ~50% headroom over the typical 7-8K legitimate output and keeps cost
+// under $0.30 even at full budget.
+const ESSAY_WALK_MAX_TOKENS = 12000;
 
 // ─── Output types ───────────────────────────────────────────────────────
 
@@ -207,38 +211,44 @@ Produce centralThesis (the essay's emerging central meaning), thesisConfidence (
 
 Return a single JSON object. No markdown, no explanation, no code blocks.
 
+**FIELD ORDER MATTERS — produce essay-level signals FIRST (centralThesis, voiceSignature, arcMomentum, thesisConfidence) so they aren't lost if you hit token cap. Then paragraphSummaries, findings (5-12 total — quality over quantity), connections, gapCandidates.**
+
 {
+  "centralThesis": "<the essay's emerging central meaning — one tight sentence>",
+  "thesisConfidence": 0.0,
+  "voiceSignature": "<one-line voice description>",
+  "arcMomentum": "building | sustaining | releasing | stalling",
   "paragraphSummaries": [
     {
       "index": 0,
-      "role": "<one-sentence architectural role — what this paragraph IS in the essay's structure>",
-      "function": "<one-sentence purpose — what this paragraph is trying to achieve>",
-      "narrativeContribution": "<one-sentence: how it advances thesis / serves emotional arc / carries thematic threads>",
-      "dominantEmotion": "<short phrase, named precisely (e.g., 'quiet determination born of suppressed grief' not 'positive')>",
-      "voiceNotes": "<one short sentence: how this paragraph's voice relates to the essay's emerging voice>",
+      "role": "<one-sentence architectural role>",
+      "function": "<one-sentence purpose>",
+      "narrativeContribution": "<one-sentence: how it advances thesis/arc/threads>",
+      "dominantEmotion": "<short phrase, named precisely>",
+      "voiceNotes": "<one short sentence>",
       "craftNotes": ["<short phrase per craft choice; max 5>"]
     }
   ],
   "findings": [
     {
-      "claim": "<paragraph-level or cross-paragraph claim, specific and evidence-grounded>",
+      "claim": "<paragraph-level or cross-paragraph claim, specific>",
       "scope": { "type": "paragraph | cross_paragraph | essay_level", "paragraph": 0, "paragraphs": [0, 2] },
       "maturity": "hypothesis | developing | confirmed | deepened",
-      "maturityReasoning": "<one-sentence justification>",
+      "maturityReasoning": "<one tight sentence>",
       "coachingValue": "critical | high | medium | contextual | diagnostic",
       "dimensions": ["<voice | theme | narrative | emotion | character | craft | admissions | structure>"],
       "evidence": [{ "text": "<quoted text>", "location": { "paragraph": 0, "sentence": 1 } }],
-      "deepeningPotential": "<one sentence on what investigation could reveal, or null>",
-      "raisesQuestions": ["<question this finding raises>"]
+      "deepeningPotential": "<one sentence, or null>",
+      "raisesQuestions": ["<question>"]
     }
   ],
   "connections": [
     {
-      "from": { "paragraph": 0, "sentence": 2, "label": "<brief label>" },
-      "to": { "paragraph": 4, "sentence": 1, "label": "<brief label>" },
-      "description": "<what connects these two locations>",
-      "reverseIllumination": "<what this connection reveals about the FROM endpoint, or null>",
-      "significance": "<why this connection matters to the essay's architecture of meaning>",
+      "from": { "paragraph": 0, "sentence": 2, "label": "<brief>" },
+      "to": { "paragraph": 4, "sentence": 1, "label": "<brief>" },
+      "description": "<what connects them>",
+      "reverseIllumination": "<or null>",
+      "significance": "<why this matters architecturally>",
       "strengthCategory": "foundational | significant | supporting | tentative",
       "directionality": "forward | reverse | bidirectional | asymmetric"
     }
@@ -248,14 +258,10 @@ Return a single JSON object. No markdown, no explanation, no code blocks.
       "sourceLayer": "l3_walk",
       "anchorParagraph": 0,
       "anchorSentence": 1,
-      "triggeringArtifact": "<which finding/observation surfaced this gap>",
-      "briefRecognition": "<one sentence — what you noticed about the gap>"
+      "triggeringArtifact": "<short>",
+      "briefRecognition": "<one sentence>"
     }
-  ],
-  "centralThesis": "<the essay's emerging central meaning — one sentence>",
-  "thesisConfidence": 0.0,
-  "voiceSignature": "<one-line voice description>",
-  "arcMomentum": "building | sustaining | releasing | stalling"
+  ]
 }
 
 === BREVITY DISCIPLINE ===
