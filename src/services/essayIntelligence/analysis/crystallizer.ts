@@ -444,9 +444,83 @@ ${activeDims.includes('trajectory') ? `    "trajectory": { "currentState": "..."
     "distinctivenessSignature": { "articulation": "...", "entanglementRefs": [...], "nonInterchangeableFactors": [...] },
 ${activeDims.includes('intentBridge') ? `    "intentBridge": { "studentIntent": null, "systemReading": "...", "alignments": [...], "sourceInsightIds": [] },` : `    "intentBridge": null,`}
     "confidence": "hypothesis",
-    "lastUpdatedBy": "L4"
+    "lastUpdatedBy": "L4",
+    "specificsNeedEmissions": [
+      {
+        "sourceLayer": "l4_north_star",
+        "emittingTrigger": "The architecture-of-meaning gap that triggered this — one short sentence",
+        "anchorParagraph": 0,
+        "anchorSentence": null,
+        "question": "Short specific plain-language question",
+        "dimensions": ["narrative", "admissions"],
+        "expectedInsight": "ONE SENTENCE — how the answer UPGRADES coaching (banned categories: 'matures the finding', 'makes coaching more concrete', 'reduces fabrication risk', 'improves the system\\'s understanding', 'helps L5 generate better feedback')",
+        "expectedDiscovery": "ONE SENTENCE — what the writer would discover, OR null",
+        "conceptTag": "short prose phrase (NOT snake_case)",
+        "conceptComplexity": "simple | medium | complex",
+        "conceptDefinition": "ONE-SENTENCE universal definition",
+        "conceptExample": "ONE corpus-quality EXAMPLE",
+        "priority": "critical | high | medium | low",
+        "whyAsked": "Operator-facing recognition (allowed jargon — internal)",
+        "expectedAnswerShape": "scalar | short_phrase | specific_memory | list | narrative",
+        "consumers": ["l4", "l5"],
+        "populates": ["distinctivenessSignature.nonInterchangeableFactors", "intentBridge.studentIntent"],
+        "framingSeed": "Student-facing seed (PLAIN LANGUAGE, embeds student's actual line as quote)"
+      }
+    ]
   }
-}`;
+}
+
+=== SPECIFICS-NEED EMISSION (D-2.5 round 1.8) — architecture-of-meaning prescriptive surface ===
+
+L4 sees the essay's architecture of meaning — through-lines, structural roles, trajectory, distinctiveness, intent bridge. Sometimes the architecture exposes a gap that L3 / L3.5 / L3.75 could not see: a through-line that needs a specific anchor it never gets, a distinctivenessFactor leaning on context the essay doesn't make explicit, an intentBridge whose alignment claim depends on writer-side info.
+
+Primary purpose: produce questions worth the writer's time. Across the corpus, essays distribute 0-3 emissions per layer; emit only what passes the gate.
+
+EMIT only when ALL six conditions hold (uncertainty counts as No on every fork):
+
+1. WORKING-ARCHITECTURE SILENCE. The architectural element is reaching but not landing. If the through-line works as written, if distinctiveness is genuinely articulated, say nothing. The crystallization's depth lives in the descriptive output.
+2. THE ARCHITECTURAL GAP IS REAL. Text-evidenced — points to specific elements in the northStar fields you just produced.
+3. WRITER-SIDE ONLY. The fix depends on something not on the page; only the writer can.
+4. YOU HAVE AN ANGLE. Specific direction (a moment to recover that anchors the through-line, a specific instance that grounds a distinctivenessFactor).
+5. ANSWER UPGRADES — DOESN'T ENABLE. Your northStar fields already produce text-grounded coaching for this gap. If not, you have under-crystallized; deepen the descriptive output. Constructive-proof rider applies.
+6. SURFACE-VS-DEEP. Discovery OR coaching-unlock different in SHAPE.
+
+L4-SPECIFIC EMISSION DOMAIN. Only emit on gaps the architecture-of-meaning view exposes that L3/L3.5/L3.75 could not have caught:
+- Through-line missing connective tissue between paragraphs (the line is named but the passage between two appearances has no anchor).
+- Distinctiveness signature claims (nonInterchangeableFactors) that the essay implies but doesn't demonstrate.
+- Trajectory / intentBridge claims requiring writer-side context.
+
+If a gap could have been caught at a per-paragraph layer (L3 / L3.5) or at L3.75 holistic, DO NOT emit it here. L4 only emits gaps that REQUIRE the architecture-of-meaning vantage.
+
+ANTI-REPETITION. The user prompt includes a CONCEPT LIBRARY block + PRIOR EMISSIONS context. Drop emissions that duplicate L3 walk / L3.5 / L3.75 emissions already in the library on the same anchor + same concept.
+
+CONCEPT LIBRARY + REUSE POLICY. Per-concept caps tied to UNRESOLVED instances:
+  simple → max 1, medium → max 2, complex → max 3 unresolved instances per essay
+PLUS hard ceiling of 3 emissions per L4 pass.
+
+Library is USER-ACCESSIBLE ON DEMAND. Reuse existing tags when underlying mechanism matches.
+
+framingSeed CALIBRATION:
+- MUST embed student's actual line as a direct quote.
+- PLAIN language. NO architecture jargon ("through-line topology", "structural role").
+- NO validation padding. NO template-with-quote-slot.
+- Quote-then-gap-then-angle.
+
+CORPUS-BAR EXAMPLES of L4 framingSeed:
+
+(L4 through-line gap — concept: "specific bridge between scenes")
+"Your essay names the through-line — small acts of repair as how you process loss — and it appears in P2 (fixing the watch) and P5 (fixing the friendship). What's the connective moment between them? Did the watch teach you something the friendship needed? One specific bridge moment, and the through-line stops being two scenes and becomes a path."
+
+(L4 distinctiveness-factor gap — concept: "writer-specific demonstration")
+"Your distinctivenessFactor — 'I think in systems, not stories' — is the kind of claim that needs ONE moment to land. What's the conversation where you caught yourself diagramming a friendship in your head? Or the homework problem you solved by drawing relationships between unrelated things? The specific instance is what makes the claim non-interchangeable."
+
+EXPECTED-INSIGHT BANNED TRIVIAL PHRASINGS (from D-2.2-D-2.4): "Matures the finding...", "Makes the coaching more concrete...", "Reduces fabrication risk...", "Improves the system's understanding...", "Helps L5 generate better feedback...". Name SPECIFIC content.
+
+EXPECTED-DISCOVERY BANNED TRIVIAL PHRASINGS: "the writer would discover what they were feeling/their actual emotion/a specific detail/more about themselves." Name SPECIFIC discovery.
+
+PRE-OUTPUT SWAP CHECK: Before emit, swap-check expectedDiscovery + conceptTag against another essay; if word-for-word portable, drop or refine.
+
+OUTPUT specificsNeedEmissions as part of the northStar object (per the OUTPUT FORMAT schema above). Empty array is valid and the default — silence is the audit signal.`;
 }
 
 /**
@@ -1264,6 +1338,23 @@ function buildNorthStar(
     };
   }
 
+  // D-2.5 round 1.8: STRICT-PASSTHROUGH parser for specificsNeedEmissions.
+  // Verify wrapper is array + elements are objects; do NOT defensively
+  // coerce. Aggregator validator (D-2.7) catches malformed entries with
+  // structured context, producing the audit signal per the no-fallback
+  // charter (CLAUDE.md §1a + round 1.8 §11.10).
+  const rawNs = raw as unknown as Record<string, unknown>;
+  let specificsNeedEmissions: EssayNorthStar['specificsNeedEmissions'];
+  if (Array.isArray(rawNs.specificsNeedEmissions)) {
+    const arr: NonNullable<EssayNorthStar['specificsNeedEmissions']> = [];
+    for (const item of rawNs.specificsNeedEmissions) {
+      if (item && typeof item === 'object') {
+        arr.push(item as unknown as NonNullable<EssayNorthStar['specificsNeedEmissions']>[number]);
+      }
+    }
+    if (arr.length > 0) specificsNeedEmissions = arr;
+  }
+
   return {
     activeScale: scale,
     throughLineMap,
@@ -1274,6 +1365,7 @@ function buildNorthStar(
     confidence,
     lastUpdatedBy: 'L4',
     ...(evolution ? { evolution } : {}),
+    ...(specificsNeedEmissions ? { specificsNeedEmissions } : {}),
   };
 }
 

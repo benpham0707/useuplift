@@ -2507,6 +2507,42 @@ export class EssayProfileCoordinator {
 
     const mutations = this.northStarMutator.applyNorthStar(this.profile, northStar);
 
+    // D-2.5 round 1.8: append L4 specifics-need emissions into the concept
+    // library (instances increment per emission's conceptTag). The
+    // northStar object itself already carries specificsNeedEmissions per
+    // EssayNorthStar.specificsNeedEmissions (D-2.8 type location); the
+    // mutator's wholesale assignment lands those on profile.northStar.
+    // Library append mirrors D-2.3 / D-2.4 cross-layer cap-awareness.
+    if (
+      northStar.specificsNeedEmissions &&
+      northStar.specificsNeedEmissions.length > 0
+    ) {
+      if (!this.profile.conceptLibrary) this.profile.conceptLibrary = [];
+      const currentIteration =
+        this.profile.index?.iterationLedger?.currentIteration ?? 1;
+      for (const emission of northStar.specificsNeedEmissions) {
+        let entry = this.profile.conceptLibrary.find(
+          (e) => e.tag === emission.conceptTag,
+        );
+        if (!entry) {
+          entry = {
+            tag: emission.conceptTag,
+            complexity: emission.conceptComplexity,
+            definition: emission.conceptDefinition,
+            example: emission.conceptExample,
+            instances: [],
+          };
+          this.profile.conceptLibrary.push(entry);
+        }
+        entry.instances.push({
+          paragraph: emission.anchorParagraph,
+          sentence: emission.anchorSentence,
+          iteration: currentIteration,
+          gapResolved: false,
+        });
+      }
+    }
+
     this.afterMutation(mutations, {});
 
     // Checkpoint after L4
