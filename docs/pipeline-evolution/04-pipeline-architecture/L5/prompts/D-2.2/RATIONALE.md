@@ -91,3 +91,45 @@ Per the D-2.7 audit's forward-looking action item, this prompt's RATIONALE must 
 
 **Ratified by Tue: 2026-05-01.**
 **Next step:** §11 translation work order execution.
+
+---
+
+## §11 translation closure (5 commits + post-close audit)
+
+| Commit | Phase | Tests |
+|---|---|---|
+| `5b497ec` | §11.1-4 type extensions + RATIONALE.md | 631 → 631 |
+| `84cc0ab` | §11.5+13 validator + fixture migration | 631 → 638 (+7 validator) |
+| `b34d3f9` | §11.6-8+10-11 walk prompt + parser + write-back + walkContext | 638 → 638 |
+| `8205f0d` | §11.9+12 gap-resolution + post-walk consolidation | 638 → 638 |
+| `c3263be` | §11.14 consolidation tests + private-method JSDoc | 638 → 652 (+14 consolidation) |
+| close commit | Three-agent audit closures (2 LOWs inline) | 652 → 652 |
+
+**Test count:** 638 (D-2.12 close) → **652** (+14 consolidation tests across 5 groups).
+
+**Per-edit cycle discovery:** `npx tsc --noEmit` (bare default with project references in `tsconfig.json`) silently no-ops on broken files. Real errors surface only with `npx tsc -p tsconfig.app.json --noEmit`. Documented in commit `c3263be` body. Forward-looking deliverable: flip pre-commit hook / CLAUDE.md quick-reference to use the explicit app-config flag, OR add a CI gate that runs the app-config explicitly. Not in D-2.2's scope; surfaced for follow-up.
+
+## Three-agent audit verdicts (post-implementation, before close)
+
+**Contract auditor — GREEN-TO-CLOSE.**
+All 10 mechanisms verified line-by-line against round 1.8 §2/§3/§8/§10/§11: six-condition gate, schema literal correctness, validator alignment for 5 new fields, strict-passthrough parser, write-back wiring, 6-step consolidation, walkContext threading, cap relaxation, profile migration, no-fallback charter chain. No findings.
+
+**Code quality auditor — GREEN-TO-CLOSE with 3 forward-looking NIT/LOWs.**
+12/12 checklist items pass. Forward-looking items (calibration-stage work, not blocking):
+- Test coverage gap: end-to-end strict-passthrough test (LLM produces malformed → parser passes → aggregator throws). Behavior implicitly covered.
+- Test coverage gap: steady-state cross-pass library persistence test (prior unresolved survives + new emission appends).
+- OUTPUT_SCHEMA description text could leak under stress; calibration runs (RATIONALE forward-looking note 1) will surface drift.
+- Naming nit: `survivingPerConcept` could read better as `perConceptSurvivors`. Not worth a rename.
+- Audit-gap meta-finding: `npx tsc --noEmit` default-config no-op behavior (already flagged above).
+
+**Round 1.6+1.8 conformance auditor — ROUND-1.6+1.8-CLEAN with 2 LOW findings (closed inline).**
+Both LOWs closed in close commit:
+1. **Pre-output swap-check block** — added 4-line block instructing the LLM to swap-check `expectedDiscovery` and `conceptTag` against another essay before emit; drop or refine if either is word-for-word portable. Closes Test 1/2/8 explicit-gate finding.
+2. **Library "user-accessible on demand" framing** — added one paragraph in the concept-library section naming that the library is user-accessible by design (writers can look up definition + example for any concept taught in this essay), so the system can stay terse without re-teaching. Closes Tue calibration #3 framing-gap finding.
+
+## Net verdict on D-2.2
+
+**Implementation feature-complete. All 18 audit findings (1 CRITICAL + 5 HIGH + 6 MED + 6 LOW from round 1.7 audits → resolved in round 1.8 spec) honored in shipped code. Two LOW findings from post-implementation conformance audit closed inline. Three forward-looking items tracked for calibration-stage work.**
+
+**Status:** D-2.2 CLOSED 2026-05-01. Ready for §11.15 calibration runs against the 14-essay corpus, which is the next deliverable to surface (a) Mode-A vs Mode-B/C transitions in the consolidation step under realistic prompt outputs, (b) `framingSeed` quality at corpus depth, (c) `expectedDiscovery` content-specificity drift detection, (d) gap-resolution detector accuracy on iterated drafts (the deterministic anchor-existence proxy may need an LLM-judgment replacement if false-positive rate proves high), (e) per-concept complexity cap calibration (whether simple/medium/complex thresholds match real coaching density on top-tier essays).
+

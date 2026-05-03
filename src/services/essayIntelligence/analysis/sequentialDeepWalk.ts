@@ -579,6 +579,13 @@ counts. Per-concept caps:
   complex  → max 3 unresolved instances per essay
 PLUS hard ceiling of 3 emissions per essay total.
 
+The concept library is USER-ACCESSIBLE ON DEMAND — writers can look up the
+definition + example for any concept they've been taught in this essay.
+This is why the system can stay terse in coaching: the writer has a
+permanent reference to the principle even when the prompt doesn't re-teach
+it. The LLM never surfaces library content inline in framingSeed; the
+library serves the writer's lookup, not the prompt's repetition.
+
 Before minting a new conceptTag, scan the library: REUSE an existing tag if
 the underlying mechanism is identical (not just thematically similar). Two
 tags differ only if a writer who internalized concept A would not yet have
@@ -663,6 +670,18 @@ EXPECTED-DISCOVERY BANNED TRIVIAL PHRASINGS (same discipline):
 - "the writer would discover more about themselves"
 Name the SPECIFIC discovery: WHICH pattern, WHICH inversion, WHICH unowned
 emotion.
+
+PRE-OUTPUT SWAP CHECK (final gate before emit):
+
+Before you emit each candidate, run two swap tests against your own draft:
+- Could the candidate's expectedDiscovery appear word-for-word on a
+  different essay's emission? If yes, the discovery is generic — drop the
+  emission.
+- Could the candidate's conceptTag appear word-for-word on a different
+  essay's emission AND name an underlying mechanism that's actually
+  different from this essay's? If yes, the tag is too generic — either
+  reuse the existing library tag whose mechanism matches, or refine the
+  tag to name THIS essay's specific principle.
 
 OUTPUT specificsNeedEmissions as a top-level array (sibling of paragraph-
 Understanding). Empty array is valid and the default — silence is the audit
