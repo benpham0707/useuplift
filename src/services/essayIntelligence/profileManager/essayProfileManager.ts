@@ -2218,6 +2218,54 @@ export class EssayProfileCoordinator {
       }
     }
 
+    // D-2.4 round 1.8: copy specifics-need emissions onto essayUnderstanding
+    // (D-2.7 type location at profileTypes.ts:2200 area). Top-level
+    // HolisticSynthesisOutput field → essay-level profile storage. D-2.8's
+    // integration helper reads from this nested location at Phase 5.6.
+    //
+    // ALSO appends instances into profile.conceptLibrary[] per each emission's
+    // conceptTag, so per-essay concept caps see L3.75's contribution alongside
+    // L3 + L3.5 emissions (cross-layer cap awareness).
+    //
+    // Per-layer post-pass consolidation deferred to calibration follow-up
+    // (mirrors D-2.3 deferral). L3.75 emits at most a handful per pass given
+    // single LLM call structure.
+    if (
+      synthesis.specificsNeedEmissions &&
+      synthesis.specificsNeedEmissions.length > 0
+    ) {
+      // Ensure essayUnderstanding exists; in practice it's populated by
+      // applyFullHolisticSynthesis above, but guard defensively.
+      if (this.profile.essayUnderstanding) {
+        this.profile.essayUnderstanding.specificsNeedEmissions =
+          synthesis.specificsNeedEmissions;
+      }
+      if (!this.profile.conceptLibrary) this.profile.conceptLibrary = [];
+      const currentIteration =
+        this.profile.index?.iterationLedger?.currentIteration ?? 1;
+      for (const emission of synthesis.specificsNeedEmissions) {
+        let entry = this.profile.conceptLibrary.find(
+          (e) => e.tag === emission.conceptTag,
+        );
+        if (!entry) {
+          entry = {
+            tag: emission.conceptTag,
+            complexity: emission.conceptComplexity,
+            definition: emission.conceptDefinition,
+            example: emission.conceptExample,
+            instances: [],
+          };
+          this.profile.conceptLibrary.push(entry);
+        }
+        entry.instances.push({
+          paragraph: emission.anchorParagraph,
+          sentence: emission.anchorSentence,
+          iteration: currentIteration,
+          gapResolved: false,
+        });
+      }
+    }
+
     this.afterMutation(allMutations, {});
 
     // Checkpoint after L3.75 (first comprehensive holistic understanding)

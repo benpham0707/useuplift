@@ -100,8 +100,18 @@ const SYNTHESIS_TEMPERATURE = 0.4;
 // focus on the most valuable insights, not fill a large token budget with filler.
 /** Phase A (voice+earned-ness) — concise voice map + earned-ness with strict mechanism quality */
 const SYNTHESIS_MAX_TOKENS_PHASE_A = 8000;
-/** Phase B (theme+narrative+character+craft+admissions) — 6 sections, quality over volume */
-const SYNTHESIS_MAX_TOKENS_PHASE_B = 7000;
+/**
+ * Phase B (theme+narrative+character+craft+admissions+entanglements) — 6 sections.
+ * Raised from 7000 → 10000 after confirmed truncation on craft-phase essays (e.g.
+ * harvard-2028-i-too-can-dance): Phase B hit exactly 7000 output tokens with
+ * stopReason=max_tokens, and jsonrepair patched the structure but couldn't invent
+ * the missing admissionsPositioning/entanglements content, causing parsePhaseB to
+ * fail the completeness contract. 10K gives ~40% headroom over the legitimate ~7K
+ * emitted for craft-phase essays; if future fixtures still truncate, raise further
+ * rather than weakening the parse contract (silently empty sections = worse than
+ * a hard fail).
+ */
+const SYNTHESIS_MAX_TOKENS_PHASE_B = 10000;
 /** 5 minutes per phase — each phase generates ~8K tokens, well within this limit */
 const SYNTHESIS_TIMEOUT_MS = 300_000;
 /** W5.3: Delta synthesis needs ~4K tokens (only 1-3 sections) */
@@ -675,10 +685,105 @@ RIGHT: 'The person who stays late not because they have to but because they got 
       "reasoning": "Why this finding's maturity should change now that you see the full picture",
       "supersedes": "other-finding-ID-if-superseding"
     }
+  ],
+
+  "specificsNeedEmissions": [
+    {
+      "sourceLayer": "l3_75_phase_b",
+      "emittingTrigger": "The cross-paragraph holistic claim or pattern that triggered this — one short sentence",
+      "anchorParagraph": 0,
+      "anchorSentence": 1,
+      "question": "Short specific plain-language question the system would surface to the writer",
+      "dimensions": ["narrative", "theme"],
+      "expectedInsight": "ONE SENTENCE — how the answer UPGRADES coaching (banned categories: 'matures the finding', 'makes coaching more concrete', 'reduces fabrication risk', 'improves the system\\'s understanding', 'helps L5 generate better feedback')",
+      "expectedDiscovery": "ONE SENTENCE — what the writer would discover about their own essay, OR null if the emission's value is purely a coaching-unlock with no discovery component",
+      "conceptTag": "short prose phrase (NOT snake_case) — examples: 'specific over general', 'cross-paragraph through-line', 'metaphor-fact collapse'",
+      "conceptComplexity": "simple | medium | complex",
+      "conceptDefinition": "ONE-SENTENCE universal definition of the concept, written GENERICALLY",
+      "conceptExample": "ONE corpus-quality EXAMPLE demonstrating the concept",
+      "priority": "critical | high | medium | low",
+      "whyAsked": "Operator-facing recognition: WHY this gap can only be closed by the writer (allowed jargon — internal)",
+      "expectedAnswerShape": "scalar | short_phrase | specific_memory | list | narrative",
+      "consumers": ["l3_75", "l5"],
+      "populates": ["thematicArchitecture.threads", "characterRevelation.valuesRevealed"],
+      "framingSeed": "Student-facing seed (PLAIN LANGUAGE, embeds the student's actual line as a quote)"
+    }
   ]
 }
 
 IMPORTANT: "newFindings" and "findingEvolutions" are OPTIONAL. Omit them entirely (or use empty arrays) if synthesis does not warrant any. Only produce findings that meet the UTILITY threshold: would this finding change the understanding or teaching of this essay?
+
+=== SPECIFICS-NEED EMISSION (D-2.4 round 1.8) — the holistic-level prescriptive surface ===
+
+L3.75 sees the entire essay simultaneously. Sometimes the synthesis notices a gap that no single paragraph would have flagged — a cross-paragraph through-line that's referenced but never grounded, a holistic claim that depends on writer-side context the essay never made explicit, a thematic thread that needs a specific moment to land. THESE are L3.75-specific specifics-need emissions. Distinct from L3 walk (sentence-level gaps) and L3.5 (per-paragraph evaluative gaps).
+
+Primary purpose: produce questions worth the writer's time. Every emission is built to surface to the user. Across the corpus, essays distribute 0-3 emissions per layer; emit only what passes the gate below.
+
+EMIT only when ALL six conditions hold (uncertainty counts as No on every fork):
+
+1. WORKING-PATTERN SILENCE. The cross-paragraph pattern is reaching but not landing. If the holistic move (a through-line, a metaphor system, a recurring image) IS landing as written, say nothing. The synthesis's depth lives in your descriptive output; not every observation needs an emission.
+
+2. THE PATTERN IS REAL. Text-evidenced across multiple paragraphs, not a guess.
+
+3. WRITER-SIDE ONLY. The gap depends on something not on the page — re-reading the essay won't surface it; only the writer can.
+
+4. YOU HAVE AN ANGLE. Not "tell me more" but a specific direction (a moment to recover that would anchor the through-line; a specific person/value/stake whose articulation would crystallize a theme).
+
+5. ANSWER UPGRADES — DOESN'T ENABLE. Your synthesis already produced a corresponding text-grounded artifact for this gap — a craftPattern with pairedImprovement, a thematic thread description, a redFlag. If no such artifact exists, you have under-synthesized; deepen the descriptive output before considering emission. Constructive-proof rider: if the only specific text-grounded coaching is "ask the writer for the specific thing," your synthesis has BECOME the question. Re-synthesize.
+
+6. SURFACE-VS-DEEP. Discovery OR coaching-unlock different in SHAPE:
+   (a) Discovery — answering surfaces a cross-paragraph pattern or hidden thematic move the writer hasn't seen.
+   (b) Coaching-unlock — answering lets coaching propose a SHAPE-different intervention (e.g., model a metaphor-fact collapse on the writer's actual material).
+
+L3.75-SPECIFIC EMISSION DOMAIN. Only emit on gaps the holistic view exposes that L3 walk + L3.5 analysis could not have caught:
+- Cross-paragraph through-lines that need a specific anchor not in any single paragraph.
+- Thematic claims (in thematicArchitecture, characterRevelation) that the essay implies but doesn't ground.
+- Admissions-positioning gaps (distinctivenessFactors that need writer-specific context).
+- Metaphor-system gaps where a system is reaching but the literal anchor is missing.
+
+If a gap could have been caught at the per-paragraph level (L3 walk's understanding-gap territory or L3.5's evaluative-gap territory), DO NOT emit it here. L3.75 only emits gaps that REQUIRE the simultaneous full-text view to recognize.
+
+ANTI-REPETITION. The user prompt includes a CONCEPT LIBRARY block + PRIOR EMISSIONS context. Drop emissions that:
+- Quote the same student line + target the same gap as a prior emission (visible in PRIOR EMISSIONS).
+- Duplicate an L3 walk OR L3.5 emission already in the library on the same anchor + same concept. L3.75 only emits when the holistic lens surfaces something the per-paragraph layers couldn't.
+
+CONCEPT LIBRARY + REUSE POLICY. Per-concept caps tied to UNRESOLVED instances:
+  simple   → max 1 unresolved instance per essay
+  medium   → max 2 unresolved instances per essay
+  complex  → max 3 unresolved instances per essay
+PLUS hard ceiling of 3 emissions per L3.75 pass.
+
+Library is USER-ACCESSIBLE ON DEMAND — writers can look up definition + example for any taught concept. The prompt does not surface library content inline. Reuse existing library tags when the underlying mechanism matches; mint new prose tags only for genuinely distinct principles.
+
+CAP RELAXATION ON DEMONSTRATED UNDERSTANDING. When user iterates and resolves prior instances, the unresolved count drops, and a new instance can fire fresh teaching.
+
+framingSeed CALIBRATION (the only student-facing field):
+- MUST embed the student's actual line as a direct quote.
+- PLAIN language. NO synthesis jargon ("through-line architecture," "thematic threading").
+- NO validation padding.
+- NO template with quote slot — framing language must come from THIS essay.
+- More than three sentences is almost always padding.
+- Quote-then-gap-then-angle, no opening filler.
+
+CORPUS-BAR EXAMPLES of L3.75 framingSeed:
+
+(L3.75 cross-paragraph through-line gap — concept: "specific moment over abstract claim")
+"Your essay says you 'found yourself' through teaching, and the closing makes it the whole story — but I keep waiting for the moment where that actually happened. One specific Tuesday, one specific student, one specific shift you could feel happening as it happened. The found-yourself line is the thesis; the missing moment is the proof."
+
+(L3.75 distinctiveness-factor gap — concept: "specific instance over general claim")
+"You wrote that you 'love asking questions no one else thinks to ask.' That's a strong claim about who you are — but you don't show me one. What was the question you asked in physics last semester that surprised your teacher? Or the question you can't stop thinking about now? One specific question makes the claim land instead of float."
+
+EXPECTED-INSIGHT BANNED TRIVIAL PHRASINGS (from D-2.2/D-2.3): "Matures the finding...", "Makes the coaching more concrete...", "Reduces fabrication risk...", "Improves the system's understanding...", "Helps L5 generate better feedback...". Name the SPECIFIC content.
+
+EXPECTED-DISCOVERY BANNED TRIVIAL PHRASINGS: "the writer would discover what they were feeling/their actual emotion/a specific detail/more about themselves." Name the SPECIFIC discovery: WHICH cross-paragraph pattern, WHICH unowned thematic move, WHICH missing anchor.
+
+PRE-OUTPUT SWAP CHECK (final gate before emit):
+
+Before emit each candidate, swap-check:
+- Could the candidate's expectedDiscovery appear word-for-word on a different essay? If yes, drop.
+- Could the candidate's conceptTag appear word-for-word on a different essay AND name a different mechanism? If yes, refine the tag or reuse an existing library tag.
+
+OUTPUT specificsNeedEmissions as a top-level array (sibling of findingEvolutions in the schema above). Empty array is valid and the default — silence is the audit signal.
 
 === QUALITY STANDARDS ===
 
@@ -1071,6 +1176,8 @@ interface PhaseBOutput {
   // W1.4 finding outputs
   newFindings?: HolisticSynthesisOutput['newFindings'];
   findingEvolutions?: HolisticSynthesisOutput['findingEvolutions'];
+  // D-2.4 round 1.8 specifics-need emissions
+  specificsNeedEmissions?: HolisticSynthesisOutput['specificsNeedEmissions'];
 }
 
 /**
@@ -1138,6 +1245,24 @@ function parsePhaseB(raw: unknown): PhaseBOutput {
     result.findingEvolutions = coerceFindingEvolutions(parsed.findingEvolutions as Array<Record<string, unknown>>);
   }
 
+  // D-2.4 round 1.8: STRICT-PASSTHROUGH parser for specificsNeedEmissions.
+  // Verify wrapper is array + elements are objects; do NOT defensively
+  // coerce. Aggregator validator (D-2.7) catches malformed entries with
+  // structured context, producing the audit signal per the no-fallback
+  // charter (CLAUDE.md §1a + round 1.8 §11.10). Mirrors D-2.2 / D-2.3
+  // strict-passthrough pattern.
+  if (Array.isArray(parsed.specificsNeedEmissions)) {
+    const arr: HolisticSynthesisOutput['specificsNeedEmissions'] = [];
+    for (const item of parsed.specificsNeedEmissions) {
+      if (item && typeof item === 'object') {
+        arr!.push(item as unknown as NonNullable<HolisticSynthesisOutput['specificsNeedEmissions']>[number]);
+      }
+    }
+    if (arr && arr.length > 0) {
+      result.specificsNeedEmissions = arr;
+    }
+  }
+
   return result;
 }
 
@@ -1175,6 +1300,11 @@ function mergePhases(phaseA: PhaseAOutput, phaseB: PhaseBOutput): HolisticSynthe
   }
   if (phaseB.findingEvolutions && phaseB.findingEvolutions.length > 0) {
     result.findingEvolutions = phaseB.findingEvolutions;
+  }
+
+  // D-2.4 round 1.8: pass through specifics-need emissions from Phase B.
+  if (phaseB.specificsNeedEmissions && phaseB.specificsNeedEmissions.length > 0) {
+    result.specificsNeedEmissions = phaseB.specificsNeedEmissions;
   }
 
   return result;
@@ -2194,6 +2324,12 @@ export class HolisticSynthesisService {
         timeoutMs: SYNTHESIS_TIMEOUT_MS,
         useJsonMode: true,
         cacheSystemPrompt: true,
+      }).then(r => {
+        console.log(
+          `[HolisticSynthesis] Iter ${input.iterationNumber} Phase A — ` +
+          `${r.usage.output_tokens} output tokens, stopReason: ${r.stopReason}`
+        );
+        return r;
       }),
       callClaudeWithRetry<unknown>({
         model: SONNET,
@@ -2204,8 +2340,21 @@ export class HolisticSynthesisService {
         timeoutMs: SYNTHESIS_TIMEOUT_MS,
         useJsonMode: true,
         cacheSystemPrompt: true,
+      }).then(r => {
+        console.log(
+          `[HolisticSynthesis] Iter ${input.iterationNumber} Phase B — ` +
+          `${r.usage.output_tokens} output tokens, stopReason: ${r.stopReason}`
+        );
+        return r;
       }),
     ]);
+
+    if (responseA.stopReason === 'max_tokens') {
+      console.warn(`[HolisticSynthesis] WARNING: Iter ${input.iterationNumber} Phase A output was truncated by maxTokens limit.`);
+    }
+    if (responseB.stopReason === 'max_tokens') {
+      console.warn(`[HolisticSynthesis] WARNING: Iter ${input.iterationNumber} Phase B output was truncated by maxTokens limit.`);
+    }
 
     const phaseA = parsePhaseA(responseA.content);
     const phaseB = parsePhaseB(responseB.content);
@@ -2999,16 +3148,20 @@ Produce the understanding synthesis as JSON.`;
     timeoutMs: UNDERSTANDING_PROSE_TIMEOUT_MS,
   });
 
-  const parsed = parseLlmJsonOutput<{
+  // response.content is a string here (ClaudeMessageInput path sets
+  // useJsonMode=false). Previously this read `response.text` which does not
+  // exist on ClaudeResponse, producing the recurring "Unexpected response
+  // type: undefined" non-fatal log seen in checkpoint3 runs.
+  const parsed = parseLlmJsonOutput(response.content) as {
     prose: string;
     centralTension: string;
     confirmedInsights: string[];
     activeHypotheses: string[];
     maturity: EssayUnderstanding['maturity'];
-  }>(response.text);
+  };
 
   const timingMs = Date.now() - startTime;
-  const cost = calculateCost(response);
+  const cost = calculateCost(response.usage, SONNET);
 
   // Determine what changed for the growth log
   const trigger: EssayUnderstanding['growthLog'][0]['trigger'] = input.previousUnderstanding

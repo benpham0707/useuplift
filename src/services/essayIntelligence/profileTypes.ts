@@ -3982,6 +3982,21 @@ export interface HolisticSynthesisOutput {
     reasoning: string;
     supersedes?: string;
   }>;
+
+  /**
+   * D-2.4 round 1.8 — specifics-need emissions surfaced by L3.75 holistic
+   * synthesis. Essay-level emissions: gaps the synthesis noticed looking
+   * across paragraphs (cross-paragraph specificity gaps, holistic questions
+   * no single paragraph would have flagged). sourceLayer = 'l3_75_phase_a'
+   * or 'l3_75_phase_b' per the D-2.7 closed enum.
+   *
+   * Storage flow: parser extracts this top-level field;
+   * `applyHolisticSynthesis` copies onto `profile.essayUnderstanding.
+   * specificsNeedEmissions` (D-2.7 type location) AND appends instances
+   * into profile.conceptLibrary[]. D-2.8's integration helper reads from
+   * the essayUnderstanding location at Phase 5.6.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
