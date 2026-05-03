@@ -79,18 +79,31 @@ export interface SpecificsNeedAggregationIntegrationResult {
 export function runSpecificsNeedAggregation(
   profile: EssayProfile,
   iteration: number,
+  /**
+   * D-2.6 round 1.8: optional additional emissions from sources outside
+   * the per-paragraph + essay-level profile-state footprint (e.g.,
+   * FindingStore stuck-hypothesis maturity-refresh service produces a
+   * SpecificsNeedEmission[] not stored on any per-layer field).
+   * Concatenated AFTER the per-layer collected emissions, preserving the
+   * stable-order contract documented above. Default [].
+   */
+  additionalEmissions: ReadonlyArray<SpecificsNeedEmission> = [],
 ): SpecificsNeedAggregationIntegrationResult {
   const collected = collectEmissionsFromProfile(profile);
+  const allEmissions: SpecificsNeedEmission[] = [
+    ...collected,
+    ...additionalEmissions,
+  ];
   const queueManager = new QuestionQueueManager(profile.questionQueue ?? []);
   const aggregationResult = aggregateSpecificsNeedEmissions(
-    collected,
+    allEmissions,
     queueManager,
     iteration,
   );
   profile.questionQueue = queueManager.getAll();
   return {
     aggregationResult,
-    hadEmissions: collected.length > 0,
+    hadEmissions: allEmissions.length > 0,
   };
 }
 
@@ -123,9 +136,20 @@ export function runSpecificsNeedAggregationWithTelemetry(
   profile: EssayProfile,
   iteration: number,
   essayId: string,
+  /**
+   * D-2.6 forwards FindingStore stuck-hypothesis emissions through this
+   * parameter — they're produced by `refreshFindingMaturity` (a separate
+   * Sonnet call) before the orchestrator hits Phase 5.6, then handed to
+   * the aggregator wrapper here.
+   */
+  additionalEmissions: ReadonlyArray<SpecificsNeedEmission> = [],
 ): SpecificsNeedAggregationIntegrationResult | null {
   try {
-    const result = runSpecificsNeedAggregation(profile, iteration);
+    const result = runSpecificsNeedAggregation(
+      profile,
+      iteration,
+      additionalEmissions,
+    );
     if (result.hadEmissions) {
       emitIterationEvent(essayId, {
         iteration,

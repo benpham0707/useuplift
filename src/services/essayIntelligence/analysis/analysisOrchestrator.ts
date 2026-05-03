@@ -1188,10 +1188,76 @@ export class AnalysisOrchestrator {
     {
       const profileForAgg = coordinator.getProfile();
       const aggIter = getCurrentIteration(profileForAgg);
+
+      // D-2.6 round 1.8: FindingStore stuck-hypothesis maturity-refresh
+      // pass. Runs BEFORE Phase 5.6 aggregation so its emissions feed into
+      // the same aggregator + queue + concept-library pipeline as the
+      // per-layer emissions. Single Sonnet call when stuck findings exist;
+      // skipped entirely (silence is signal) when none. Wrapped in try/catch
+      // so a refresh failure does NOT block the aggregator — it surfaces
+      // telemetry and continues with empty additionalEmissions.
+      let additionalEmissions: import('../profileTypes').SpecificsNeedEmission[] = [];
+      try {
+        const findingStoreForRefresh = coordinator.getFindingStore();
+        if (findingStoreForRefresh && findingStoreForRefresh.size > 0) {
+          const { refreshFindingMaturity } = await import(
+            '../findings/findingMaturityRefresh'
+          );
+          const refreshResult = await refreshFindingMaturity(
+            profileForAgg,
+            findingStoreForRefresh,
+          );
+          additionalEmissions = refreshResult.emissions;
+          if (additionalEmissions.length > 0) {
+            costTracker.record(
+              'finding_maturity_refresh',
+              refreshResult.cost,
+              refreshResult.tokenUsage,
+              refreshResult.timingMs,
+            );
+            console.log(
+              `[Orchestrator] D-2.6 finding-maturity refresh: ` +
+                `${additionalEmissions.length} stuck-finding emissions, ` +
+                `cost=$${refreshResult.cost.toFixed(4)}`,
+            );
+          }
+        }
+      } catch (refreshError) {
+        const msg =
+          refreshError instanceof Error
+            ? refreshError.message
+            : String(refreshError);
+        console.error(
+          '[Orchestrator] D-2.6 finding-maturity refresh failed (non-blocking):',
+          msg,
+        );
+        // Telemetry surfaces the failure; aggregation continues without
+        // the maturity-refresh emissions (additionalEmissions stays []).
+        emitIterationEvent(input.essayId, {
+          iteration: aggIter,
+          step: 'phase5_6_finding_maturity_refresh',
+          status: 'failed',
+          error: {
+            message: msg,
+            code: 'finding_maturity_refresh_failed',
+            context: {
+              downstreamBehavior:
+                'Phase 5.6 aggregation continues with empty additionalEmissions; per-layer emissions still flow through the aggregator. Stuck-finding maturity is unchanged this iteration.',
+            },
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
+
       const { runSpecificsNeedAggregationWithTelemetry } = await import(
         './specificsNeedAggregatorIntegration'
       );
-      runSpecificsNeedAggregationWithTelemetry(profileForAgg, aggIter, input.essayId);
+      runSpecificsNeedAggregationWithTelemetry(
+        profileForAgg,
+        aggIter,
+        input.essayId,
+        additionalEmissions,
+      );
     }
 
     // ═══════════════════════════════════════════════════════════════════════
