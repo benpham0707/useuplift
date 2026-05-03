@@ -4138,6 +4138,24 @@ export interface AnalysisPassOutput {
     evidence: string;
     paragraphs: number[];
   }>;
+
+  /**
+   * D-2.3 round 1.8 — specifics-need emissions surfaced by L3.5 analysis
+   * for this paragraph. Top-level sibling of `paragraphEffectiveness` per
+   * round 1.8 §9 placement convention. Optional — undefined / [] when the
+   * analysis pass had no gap-and-approach to surface (silence is the audit
+   * signal, round 1.6 §3 Test 3).
+   *
+   * Storage flow (round 1.8 §11 + D-2.8 D-2.7 type location): the parser
+   * extracts this top-level array; the analysis-pass orchestrator copies
+   * onto `paragraph.analysis.specificsNeedEmissions` (D-2.7 type location at
+   * profileTypes.ts:880) AND appends instances into
+   * `profile.conceptLibrary[].instances[]` per each emission's
+   * `conceptTag`. Post-pass consolidation step trims to the per-essay 3
+   * cap + per-concept complexity caps. Analogous to L3 walk's
+   * `UnderstandingWalkOutput.specificsNeedEmissions?` pattern.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**

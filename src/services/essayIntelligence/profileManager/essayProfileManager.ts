@@ -2310,6 +2310,57 @@ export class EssayProfileCoordinator {
     );
     allMutations.push(...pMutations);
 
+    // D-2.3 round 1.8: copy specifics-need emissions onto the paragraph's
+    // ParagraphAnalysis (D-2.7 type location at profileTypes.ts:880). Top-
+    // level AnalysisPassOutput field → nested profile storage. D-2.8's
+    // integration helper reads from the nested location at Phase 5.6.
+    //
+    // ALSO appends instances into profile.conceptLibrary[] per each
+    // emission's conceptTag — critical for cross-layer cap awareness, since
+    // L3.5 emissions need to count against the per-essay concept caps the
+    // L3 walk and downstream layers see.
+    //
+    // Per-layer post-pass consolidation (cap-by-complexity + per-layer
+    // 3 ceiling, mirroring L3's consolidateSpecificsNeedEmissions) is
+    // DEFERRED to a calibration-stage follow-up. L3.5 may emit more than
+    // 3 per pass in the interim; the aggregator (D-2.7) at Phase 5.6
+    // dedups across all source layers. Cross-layer caps will be added
+    // in D-2.13 cross-phase audit work.
+    if (
+      result.specificsNeedEmissions &&
+      result.specificsNeedEmissions.length > 0
+    ) {
+      const para = this.profile.paragraphs[result.paragraphIndex];
+      if (para && para.analysis) {
+        para.analysis.specificsNeedEmissions = result.specificsNeedEmissions;
+      }
+      // Library append (mirrors D-2.2 consolidation Step 6).
+      if (!this.profile.conceptLibrary) this.profile.conceptLibrary = [];
+      const currentIteration =
+        this.profile.index?.iterationLedger?.currentIteration ?? 1;
+      for (const emission of result.specificsNeedEmissions) {
+        let entry = this.profile.conceptLibrary.find(
+          (e) => e.tag === emission.conceptTag,
+        );
+        if (!entry) {
+          entry = {
+            tag: emission.conceptTag,
+            complexity: emission.conceptComplexity,
+            definition: emission.conceptDefinition,
+            example: emission.conceptExample,
+            instances: [],
+          };
+          this.profile.conceptLibrary.push(entry);
+        }
+        entry.instances.push({
+          paragraph: emission.anchorParagraph,
+          sentence: emission.anchorSentence,
+          iteration: currentIteration,
+          gapResolved: false,
+        });
+      }
+    }
+
     // HolisticMutator: update craft assessment if there are new strength signatures
     if (result.holisticAnalysisEvolution) {
       const hMutations = this.holisticMutator.updateCraftAssessment(
