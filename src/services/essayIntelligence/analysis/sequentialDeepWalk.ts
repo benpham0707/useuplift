@@ -45,6 +45,8 @@ import type {
   FindingCoachingValue,
   FindingEvidence,
   HolisticDimension,
+  SpecificsNeedEmission,
+  ConceptLibraryEntry,
 } from '../profileTypes';
 
 import type { StructuralCartography } from '../types';
@@ -419,6 +421,28 @@ Return a JSON object matching this EXACT structure:
       "reasoning": "Why this finding's maturity should change based on what this paragraph reveals",
       "supersedes": "other-finding-ID-if-superseding"
     }
+  ],
+  "specificsNeedEmissions": [
+    {
+      "sourceLayer": "l3_walk",
+      "emittingTrigger": "The finding's claim text — one short sentence naming what the finding noticed",
+      "anchorParagraph": 0,
+      "anchorSentence": 1,
+      "question": "Short specific plain-language question the system would surface to the writer",
+      "dimensions": ["narrative", "emotion"],
+      "expectedInsight": "ONE SENTENCE — how the answer UPGRADES coaching (content-specific; banned trivial categories: 'matures the finding', 'makes coaching more concrete', 'reduces fabrication risk', 'improves the system\\'s understanding', 'helps L5 generate better feedback')",
+      "expectedDiscovery": "ONE SENTENCE — what the writer would discover about their own essay, OR null if the emission's value is purely a coaching-unlock with no discovery component",
+      "conceptTag": "short prose phrase (NOT snake_case) — examples: 'specific over general', 'discovery over delivery', 'concrete moment over summary', 'honest word over easy word'",
+      "conceptComplexity": "simple | medium | complex",
+      "conceptDefinition": "ONE-SENTENCE universal definition of the concept, written GENERICALLY — not this student's essay",
+      "conceptExample": "ONE corpus-quality EXAMPLE demonstrating the concept, generic (not this student's essay)",
+      "priority": "critical | high | medium | low",
+      "whyAsked": "Operator-facing recognition: WHY this gap can only be closed by the writer (allowed jargon — internal, not student-facing)",
+      "expectedAnswerShape": "scalar | short_phrase | specific_memory | list | narrative",
+      "consumers": ["l3", "l5"],
+      "populates": ["finding.evidence", "groundTruthFacts.byLocation"],
+      "framingSeed": "Student-facing seed (PLAIN LANGUAGE, embeds the student's actual line as a quote) — quote-then-gap-then-angle, no validation padding, no template-with-quote-slot framing"
+    }
   ]
 }
 
@@ -491,6 +515,158 @@ Improvement candidate:
   "demonstrationSketch": null,
   "coachingValue": "high"
 }
+
+=== SPECIFICS-NEED EMISSION (D-2.2 round 1.8) — the second prescriptive surface ===
+
+Some findings carry a gap the writer alone can close — a moment they remember
+that isn't on the page, a person they know who appears only as a function, a
+stake whose consequence is unstated. The walk emits a specifics-need question
+when answering would be worth the writer's time AND the system's coaching can
+already function without the answer (the answer would UPGRADE coaching, not
+ENABLE it).
+
+Primary purpose: produce questions worth the writer's time. Every emission is
+built to surface to the user. If an emission would not be worth surfacing, it
+should not fire. Across the corpus, essays distribute 0-3 emissions; emit only
+what passes the gate below regardless of where this essay lands.
+
+EMIT only when ALL six conditions hold (uncertainty counts as No on every fork):
+
+1. WORKING-MOVE SILENCE. The move on this anchor is reaching but not landing.
+   If the writer's craft is working as written (a reveal that lands, a metaphor
+   doing its work, a structural choice paying off), say nothing. Worked example:
+   "Sometimes, I even ran over my friends' toes" lands as written via reveal-
+   through-consequence + meek framing + inferential geometry. The walk's
+   internal recognition fires, but emission count = ZERO.
+
+2. THE FINDING IS REAL. Text-evidenced, not a guess.
+
+3. WRITER-SIDE ONLY. The depth depends on something not on the page —
+   re-reading won't close the gap; later paragraphs won't close it; only the
+   writer can.
+
+4. YOU HAVE AN ANGLE. Not "tell me more" but a specific direction (a moment to
+   recover, a sensory anchor, a stakes-context, a person to name).
+
+5. ANSWER UPGRADES — DOESN'T ENABLE. You must already have produced (or be
+   producing in this same walk output) a corresponding text-grounded coaching
+   artifact for this gap — a finding-with-claim, an improvementCandidate, a
+   growthEdge. If no such artifact exists for this gap, you have under-coached;
+   re-coach harder before considering emission. Constructive-proof rider: if
+   the only specific text-grounded coaching you can write is "ask the writer
+   for the specific thing," your coaching has BECOME the question — that's
+   the enable case, not the upgrade case. Re-coach.
+
+6. SURFACE-VS-DEEP. The emission must dig at a discovery OR a coaching-unlock
+   different in SHAPE (not better in detail):
+   (a) Discovery — answering surfaces a pattern, inversion, hidden choice, or
+       unowned emotion the writer hasn't seen in their own essay.
+   (b) Coaching-unlock — answering lets the system coach in a fundamentally
+       different SHAPE (e.g., model consequence-style reveal on the writer's
+       actual material). "Better in detail" doesn't qualify; "different in
+       shape" does.
+   "What were you feeling at that moment?" applied generically = surface,
+   drop. "You wrote 'freeing' for watching something you couldn't do — what's
+   the version that's true?" = deep, keep.
+
+CONCEPT LIBRARY + REUSE POLICY (round 1.8 §3 + §8):
+
+The user prompt includes a CONCEPT LIBRARY block listing concepts already
+taught in this essay (across all walk passes) plus their unresolved-instance
+counts. Per-concept caps:
+  simple   → max 1 unresolved instance per essay
+  medium   → max 2 unresolved instances per essay
+  complex  → max 3 unresolved instances per essay
+PLUS hard ceiling of 3 emissions per essay total.
+
+Before minting a new conceptTag, scan the library: REUSE an existing tag if
+the underlying mechanism is identical (not just thematically similar). Two
+tags differ only if a writer who internalized concept A would not yet have
+internalized concept B. Tags are PROSE phrases, not snake_case.
+
+CAP RELAXATION ON DEMONSTRATED UNDERSTANDING. If the user iterates and
+resolves prior instances of a concept (gap-resolution detector flips
+gapResolved=true), the unresolved count drops, and a NEW instance of the
+same concept can fire fresh teaching. The cap relaxes when the user
+demonstrates understanding via iteration; it does not permanently
+suppress.
+
+POST-WALK CONSOLIDATION. After all paragraphs walk, a deterministic step
+groups candidates by conceptTag, applies complexity caps (keep top N per
+group), then ranks by priority (critical > high > medium > low) and trims
+to 3 total. Surviving emissions land on paragraph.understanding.specifics-
+NeedEmissions. Candidates dropped at consolidation do NOT register in the
+concept library.
+
+ANTI-REPETITION (cross-paragraph in this walk). Drop emissions that:
+- Quote the same student line + target the same gap as a prior emission.
+- Use the same angle phrasing — revise to be specific to this paragraph's
+  material, OR drop.
+- Surface the same gap from a different finding — drop.
+
+SINGLE-LINE GAP BUNDLING. When a single line carries multiple distinct
+gaps, prefer ONE emission whose angle bundles them — UNLESS the gaps need
+fundamentally different answer-shapes.
+
+framingSeed CALIBRATION (the only student-facing field):
+- MUST embed the student's actual line as a direct quote.
+- PLAIN language. NO analytical jargon ("subject-deferral grammar,"
+  "deepeningPotential," "F12"). NO engineering vocabulary.
+- NO validation padding ("your description of X is beautiful and full of...").
+- NO template with quote slot — the framing language around the quote must
+  come from THIS essay's specifics, not a portable template applied to any
+  student's essay.
+- Length matches what the gap and angle need; more than three sentences is
+  almost always padding.
+- Quote-then-gap-then-angle, no opening filler.
+- When the concept is being taught for the first time in this essay, name the
+  writing principle inside the seed — that turns the question into teaching.
+
+CORPUS-BAR EXAMPLES of framingSeed (each ties to a different concept):
+- "You wrote that watching her dance was 'freeing' — what did being the kid
+  who couldn't move that way actually feel like? Not the sad version, the
+  actual one. Was it longing, or anger, or something quieter that 'freeing'
+  is the inverse of? The honest word under that one is what makes the rest
+  land." (concept: "honest word over easy word")
+- "You said your friends 'didn't get it.' What did one specific moment look
+  like — was it a face one of them made, a sentence that landed wrong, a
+  conversation that ended too fast? One real moment we can hear and see
+  lands harder than the summary." (concept: "specific moment over summary")
+- "You wrote that your grandmother was 'kind.' Kind is the word everyone
+  uses for their grandmother. What did she do that no one else's would? One
+  specific thing — a phrase she said, a small ritual, the way she fixed
+  something — and we'd see her instead of hearing about her." (concept:
+  "specific over general")
+
+PRIORITY (structural two-question test):
+  Q1: Without the answer, does the finding's claim collapse? YES → critical
+  Q2: Without the answer, can downstream coaching still be specific?
+      NO  → high
+      YES → medium
+  "low" reserved for emissions where the walk is uncertain whether to emit
+  at all (per silence default, prefer not emitting over emitting at "low").
+
+EXPECTED-INSIGHT BANNED TRIVIAL PHRASINGS (don't write these — they autopass
+without filtering):
+- "Matures the finding from hypothesis to confirmed."
+- "Makes the coaching more concrete."
+- "Reduces fabrication risk."
+- "Improves the system's understanding."
+- "Helps L5 generate better feedback."
+Name the SPECIFIC content: WHICH coaching move, WHICH finding-claim, WHICH
+fabrication scenario.
+
+EXPECTED-DISCOVERY BANNED TRIVIAL PHRASINGS (same discipline):
+- "the writer would discover what they were feeling"
+- "the writer would discover their actual emotion"
+- "the writer would discover a specific detail"
+- "the writer would discover more about themselves"
+Name the SPECIFIC discovery: WHICH pattern, WHICH inversion, WHICH unowned
+emotion.
+
+OUTPUT specificsNeedEmissions as a top-level array (sibling of paragraph-
+Understanding). Empty array is valid and the default — silence is the audit
+signal.
 
 === CRITICAL REMINDERS ===
 
@@ -607,11 +783,15 @@ export class SequentialDeepWalkService {
       }
 
       try {
-        // 1. Assemble context via Profile Router
+        // 1. Assemble context via Profile Router. Intentionally NO tokenBudget
+        // override here — the router's RULE_BASE_BUDGETS (8000) is used. A
+        // previous hardcoded 3000 was unrealistic for the walk's always-priority
+        // set (typically 9-16K) and produced 150+ "exceed budget" warnings per
+        // run without changing behavior, since always-priority sections are
+        // never dropped regardless of budget.
         const assembledContext = this.router.assembleContext(profile, {
           rule: 'l3_understanding_walk',
           paragraphIndex: pIdx,
-          tokenBudget: 3000,
         });
 
         // 2. Build user prompt
@@ -631,6 +811,16 @@ export class SequentialDeepWalkService {
               options.reanalysisContext;
           }
         }
+        // D-2.2 round 1.8: assemble walkContext for cross-paragraph
+        // anti-repetition (§7.1) + concept-library cap awareness (§8).
+        // priorEmissions = flatMap from already-walked paragraphs in this
+        // pass; conceptLibrary = profile.conceptLibrary (defaults to []
+        // for legacy / fresh profiles per coordinator migration).
+        const priorEmissions: SpecificsNeedEmission[] = walkOutputs.flatMap(
+          (w) => w.specificsNeedEmissions ?? [],
+        );
+        const conceptLibrary: ConceptLibraryEntry[] = profile.conceptLibrary ?? [];
+
         const userPrompt = this.buildUserPrompt(
           markedEssay,
           paragraphs,
@@ -643,6 +833,7 @@ export class SequentialDeepWalkService {
           reanalysisContextForPara,
           options?.findingStore,
           walkCorpusArchetypeBlock,
+          { priorEmissions, conceptLibrary },
         );
 
         // 3. Call Sonnet — dynamically scale output tokens by sentence count
@@ -861,6 +1052,12 @@ export class SequentialDeepWalkService {
     reanalysisContext?: string,
     findingStore?: FindingStore,
     corpusArchetypeBlock?: string,
+    walkContext?: {
+      /** Emissions from earlier paragraphs in this walk run — drives §7.1 cross-paragraph anti-repetition. */
+      priorEmissions: SpecificsNeedEmission[];
+      /** Concepts already taught in this essay across walk passes — drives §8 cap awareness. */
+      conceptLibrary: ConceptLibraryEntry[];
+    },
   ): string {
     const sections: string[] = [];
 
@@ -909,6 +1106,50 @@ export class SequentialDeepWalkService {
       if (currentHolisticEvolution.arcMomentum) {
         sections.push(`Arc momentum: ${currentHolisticEvolution.arcMomentum}`);
       }
+    }
+
+    // ── D-2.2 round 1.8: PRIOR EMISSIONS IN THIS WALK ──
+    // Drives §7.1 cross-paragraph anti-repetition. The walk sees every
+    // emission produced by earlier paragraphs in THIS pass; it must not
+    // re-emit on the same line + same gap or recycle the same angle.
+    if (walkContext && walkContext.priorEmissions.length > 0) {
+      sections.push('\n=== PRIOR EMISSIONS IN THIS WALK (avoid repeating gaps + angles) ===');
+      walkContext.priorEmissions.forEach((emission, i) => {
+        sections.push(
+          `[${i + 1}] P${emission.anchorParagraph + 1}` +
+            (typeof emission.anchorSentence === 'number'
+              ? `S${emission.anchorSentence + 1}`
+              : '') +
+            ` — concept: "${emission.conceptTag}"`,
+        );
+        sections.push(`     framingSeed: ${emission.framingSeed}`);
+        sections.push(`     whyAsked: ${emission.whyAsked}`);
+      });
+    }
+
+    // ── D-2.2 round 1.8: CONCEPT LIBRARY (concepts already taught in this essay) ──
+    // Drives §8 cap awareness + reuse policy. The walk sees concepts taught
+    // across walk passes (this essay's analysis history) with unresolved-
+    // instance counts. Per-concept caps fire on unresolved instances:
+    // simple → 1 max, medium → 2 max, complex → 3 max. Reuse existing tags
+    // when the underlying mechanism matches; mint a new tag only for a
+    // genuinely distinct principle.
+    if (walkContext && walkContext.conceptLibrary.length > 0) {
+      sections.push('\n=== CONCEPT LIBRARY (concepts already taught in this essay) ===');
+      sections.push(
+        'Per-concept caps (unresolved instances): simple = 1, medium = 2, complex = 3.',
+      );
+      sections.push(
+        'Reuse an existing tag if the underlying principle matches; otherwise mint a new prose tag.',
+      );
+      walkContext.conceptLibrary.forEach((entry) => {
+        const unresolved = entry.instances.filter((i) => !i.gapResolved).length;
+        const total = entry.instances.length;
+        sections.push(
+          `- "${entry.tag}" [${entry.complexity}]: ${unresolved} unresolved / ${total} total instances`,
+        );
+        sections.push(`     definition: ${entry.definition}`);
+      });
     }
 
     // ── W1.3: FINDING CONTEXT (existing findings for reference) ──
@@ -1134,7 +1375,51 @@ export class SequentialDeepWalkService {
       result.findingEvolutions = parsedEvolutions;
     }
 
+    // D-2.2 round 1.8: parse top-level specificsNeedEmissions (sibling of
+    // paragraphUnderstanding). STRICT-PASSTHROUGH per round 1.8 §11.10 —
+    // we do NOT defensively coerce malformed emissions. Pass them through
+    // to the aggregator's validator (which throws with structured context),
+    // producing the audit signal per the no-fallback charter. Defensive
+    // coercion would silently mask LLM contract violations.
+    const parsedEmissions = this.parseSpecificsNeedEmissions(raw.specificsNeedEmissions);
+    if (parsedEmissions.length > 0) {
+      result.specificsNeedEmissions = parsedEmissions;
+    }
+
     return result;
+  }
+
+  /**
+   * D-2.2 round 1.8 — parse top-level specificsNeedEmissions array from
+   * walk output. STRICT-PASSTHROUGH: the parser only verifies the wrapper
+   * is an array and elements are objects; it does NOT reshape, default-fill,
+   * or sanitize emission fields. The downstream aggregator validator
+   * (specificsNeedAggregator.ts:validateEmission) throws on malformed
+   * emissions with structured context, producing the audit signal per the
+   * no-fallback charter (CLAUDE.md §1a + round 1.8 §11.10).
+   *
+   * Why strict-passthrough vs defensive coercion (the pattern other walk
+   * parsers use):
+   * - Other parsers (parseParagraphUnderstanding, parseSentenceUnderstandings)
+   *   coerce silently to keep the walk going under partial output. Their
+   *   gaps don't fail-fast because the walk's findings/connections still
+   *   carry signal.
+   * - specificsNeedEmissions feed into the queue-mutation pipeline (D-2.7
+   *   aggregator → questionQueue → student-facing surface). A silently-
+   *   coerced bad emission would land a malformed question in front of
+   *   the user. Failing loud at the aggregator is the right discipline.
+   */
+  private parseSpecificsNeedEmissions(raw: unknown): SpecificsNeedEmission[] {
+    if (!Array.isArray(raw)) return [];
+    const out: SpecificsNeedEmission[] = [];
+    for (const item of raw) {
+      if (item && typeof item === 'object') {
+        // Cast through unknown — trusting the aggregator validator to throw
+        // on shape violations. We do NOT reach into fields here.
+        out.push(item as unknown as SpecificsNeedEmission);
+      }
+    }
+    return out;
   }
 
   /**
@@ -1722,6 +2007,16 @@ export class SequentialDeepWalkService {
 
     // Apply paragraph understanding
     para.understanding = output.paragraphUnderstanding;
+
+    // D-2.2 round 1.8: copy specifics-need emissions onto the paragraph's
+    // ParagraphUnderstanding (D-2.7 storage location at profileTypes.ts:850).
+    // Top-level walk output → nested profile storage; D-2.8's integration
+    // helper reads from this nested location at Phase 5.6. Concept library
+    // append + post-walk consolidation step run later (§11.11/12) — this
+    // write is the raw landing pad before consolidation trims.
+    if (output.specificsNeedEmissions && output.specificsNeedEmissions.length > 0) {
+      para.understanding.specificsNeedEmissions = output.specificsNeedEmissions;
+    }
 
     // Apply sentence understandings
     for (const sentenceOutput of output.sentenceUnderstandings) {
