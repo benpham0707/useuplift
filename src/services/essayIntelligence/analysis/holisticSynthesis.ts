@@ -102,16 +102,17 @@ const SYNTHESIS_TEMPERATURE = 0.4;
 const SYNTHESIS_MAX_TOKENS_PHASE_A = 8000;
 /**
  * Phase B (theme+narrative+character+craft+admissions+entanglements) — 6 sections.
- * Raised from 7000 → 10000 after confirmed truncation on craft-phase essays (e.g.
- * harvard-2028-i-too-can-dance): Phase B hit exactly 7000 output tokens with
- * stopReason=max_tokens, and jsonrepair patched the structure but couldn't invent
- * the missing admissionsPositioning/entanglements content, causing parsePhaseB to
- * fail the completeness contract. 10K gives ~40% headroom over the legitimate ~7K
- * emitted for craft-phase essays; if future fixtures still truncate, raise further
- * rather than weakening the parse contract (silently empty sections = worse than
- * a hard fail).
+ * Raised from 7000 → 10000 → 14000 after confirmed truncation on dense essays
+ * (Crochet hit 10000 cap mid-craftAssessment, omitting admissionsPositioning +
+ * entanglements). 14K gives ~70% headroom over the typical ~7-8K legitimate
+ * output for dense-history essays. Combined with the BREVITY DISCIPLINE prompt
+ * preamble (added 2026-05-03), expected typical output ~5000-7000 tokens; the
+ * 14K cap is the safety belt for outliers, not the target.
+ *
+ * Per the original tuning principle: silently empty sections = worse than a
+ * hard fail. Raise the cap rather than weaken the parse contract.
  */
-const SYNTHESIS_MAX_TOKENS_PHASE_B = 10000;
+const SYNTHESIS_MAX_TOKENS_PHASE_B = 14000;
 /** 5 minutes per phase — each phase generates ~8K tokens, well within this limit */
 const SYNTHESIS_TIMEOUT_MS = 300_000;
 /** W5.3: Delta synthesis needs ~4K tokens (only 1-3 sections) */
@@ -327,6 +328,10 @@ GENERAL STANDARDS:
  */
 const SYSTEM_PROMPT_PHASE_A = `${SHARED_PREAMBLE}
 
+=== BREVITY DISCIPLINE (read before producing output) ===
+
+Each field below has a target depth. Hit the target — don't exceed it. Lists (observations, dimensions, peakMoments, etc.) cap at ~5 entries each unless the essay genuinely warrants more. Per-entry prose: one tight sentence, not a paragraph. Total output should land at ~3000-4500 tokens. If you find yourself producing 6000+ tokens, STOP — your entries are too verbose. Re-read and compress.
+
 === OUTPUT SCHEMA (Phase A: Voice + Emotion + Earned-ness) ===
 
 Return a single JSON object with EXACTLY these 4 top-level keys:
@@ -522,6 +527,10 @@ emotionalTopography caps:
  * These are the structural/interpretive dimensions that trace WHAT the essay is.
  */
 const SYSTEM_PROMPT_PHASE_B = `${SHARED_PREAMBLE}
+
+=== BREVITY DISCIPLINE (read before producing output) ===
+
+Six required sections (thematicArchitecture, narrativeStrategy, characterRevelation, craftAssessment, admissionsPositioning, entanglements) plus optional connection/finding fields. Each section has a target depth. Lists cap at ~5 entries unless essay genuinely warrants more. Per-entry prose: one tight sentence, not a paragraph. **Total output should land at ~5000-7000 tokens — leave headroom under the 14000 cap so all 6 required sections complete.** If you find yourself producing 8000+ tokens before reaching the entanglements section, STOP and compress earlier sections. **A truncated output that omits admissionsPositioning or entanglements gets rejected entirely** — partial output is worse than disciplined output.
 
 === PRESCRIPTIVE CARVE-OUT (Scope 2 Phase 5) ===
 

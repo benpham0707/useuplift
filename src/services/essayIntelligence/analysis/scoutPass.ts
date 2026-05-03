@@ -129,34 +129,50 @@ function buildUserPrompt(
 ): string {
   const paragraphs = essayText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
 
-  // Build essay with paragraph and sentence markers
+  // Build essay with paragraph and sentence markers — 0-INDEXED to match
+  // the JSON schema's expected output. Previously markers used 1-indexed
+  // labels while schema required 0-indexed values; the implicit conversion
+  // step is a documented hallucination source for Haiku tracking.
   const markedEssay = paragraphs.map((p, pIdx) => {
     const sentences = impressions[pIdx]?.sentences ?? [];
     if (sentences.length > 0) {
       const markedSentences = sentences
-        .map(s => `  [S${s.index + 1}] ${s.text}`)
+        .map(s => `  [P${pIdx}S${s.index}] ${s.text}`)
         .join('\n');
-      return `[P${pIdx + 1}]\n${markedSentences}`;
+      return `${markedSentences}`;
     }
-    return `[P${pIdx + 1}] ${p.trim()}`;
+    return `[P${pIdx}] ${p.trim()}`;
   }).join('\n\n');
 
-  // Build L1 tone observations for context
+  // Per-paragraph sentence-count summary so the LLM can validate its
+  // outputs against actual paragraph bounds (prevents hallucinating
+  // sentence indices like S9 in a 6-sentence paragraph).
+  const sentenceBounds = impressions
+    .map((imp, i) => `  P${i}: ${imp.sentences.length} sentences (valid sentenceIndex: 0 to ${imp.sentences.length - 1})`)
+    .join('\n');
+
+  // Build L1 tone observations for context (also 0-indexed).
   const toneContext = impressions.map((imp, i) => {
     const shifts = imp.sentences.filter(s => s.toneShift);
     const shiftInfo = shifts.length > 0
-      ? ` | tone_shifts_at: [${shifts.map(s => `S${s.index + 1}`).join(', ')}]`
+      ? ` | tone_shifts_at: [${shifts.map(s => `P${i}S${s.index}`).join(', ')}]`
       : '';
-    return `  P${i + 1}: register="${imp.emotionalRegister}" | voice="${imp.voiceObservation}"${shiftInfo}`;
+    return `  P${i}: register="${imp.emotionalRegister}" | voice="${imp.voiceObservation}"${shiftInfo}`;
   }).join('\n');
 
-  return `ESSAY TEXT (${paragraphs.length} paragraphs, sentences marked):
+  return `ESSAY TEXT (${paragraphs.length} paragraphs, sentences marked with 0-indexed [P{n}S{n}] labels):
+
 ${markedEssay}
+
+PARAGRAPH SENTENCE BOUNDS (validate your sentenceIndex against these):
+${sentenceBounds}
 
 L1 TONE OBSERVATIONS:
 ${toneContext}
 
-Scan for cross-paragraph patterns. Report observations as JSON. Do NOT interpret significance — just report what you find.`;
+Scan for cross-paragraph patterns. Report observations as JSON. Do NOT interpret significance — just report what you find.
+
+CRITICAL: every paragraphIndex + sentenceIndex you emit MUST exist in the bounds above. If you cite a sentenceIndex outside its paragraph's range, the system rejects the entry.`;
 }
 
 // ============================================================================

@@ -99,14 +99,22 @@ const WALK_TEMPERATURE = 0.3;
  * Freed budget goes to richer findings.
  */
 // Tightened from 4096/8192/3500 as part of observation economy optimization.
-// The OBSERVATION ECONOMY prompt guidance (30-50 total observations for 7 paragraphs)
-// means each paragraph produces 4-10 observations instead of 15-20. This naturally
-// reduces output volume, so we can safely lower the token budgets.
-const WALK_BASE_MAX_TOKENS = 2500;
+// Option 5 rebuild (2026-05-03): further tightened to 1800/4000/1500 since
+// Option 5 removed the SPECIFICS-NEED EMISSION output bloat (~150 lines of
+// schema description + emission shape was producing 500-800 output tokens
+// per paragraph). The remaining schema (paragraphUnderstanding,
+// sentenceUnderstandings, holisticEvolution, priorSentenceUpdates,
+// newConnections, newFindings, findingEvolutions, gapCandidates) lands at
+// 1500-2200 typical output for 1-4 sentence paragraphs. The CAP at 4000
+// preserves headroom for dense paragraphs (5+ sentences) so jsonrepair
+// doesn't trip on truncation. Finding budget reduced to 1500 since
+// observation economy + emission removal both reduced finding-output
+// pressure.
+const WALK_BASE_MAX_TOKENS = 1800;
 const WALK_MAX_TOKENS_CAP = 5000;
 const WALK_TIMEOUT_MS = 180_000;
 /** Finding budget: space for paragraph understanding + 1-3 findings + metadata */
-const WALK_FINDING_BUDGET = 2000;
+const WALK_FINDING_BUDGET = 1500;
 
 /**
  * Compute max tokens for a paragraph's walk call based on sentence count.
@@ -187,6 +195,12 @@ function buildSystemPrompt(): string {
 }
 
 const SYSTEM_PROMPT_TEMPLATE = `You are a Literature PhD who has read 10,000 college application essays and can articulate what a casual reader feels but cannot name. You read like an expert: you notice not just WHAT techniques appear, but what their presence REVEALS about the essay's architecture of meaning. Your task is to deeply UNDERSTAND one paragraph at a time, building compound understanding across the essay.
+
+=== BREVITY DISCIPLINE + JSON CLEANLINESS (read before producing output) ===
+
+Total output should land at ~1500-2500 tokens per paragraph. The schema has many fields; each gets a tight one- or two-sentence value, not a paragraph. Architecture-level depth (the THIRD level explained below) is achieved through PRECISION, not VOLUME — one well-chosen sentence beats three vague ones.
+
+JSON CLEANLINESS — produce well-formed JSON the first time. The schema below uses placeholder notation (e.g., "<one sentence about X>") for guidance — replace each placeholder with your actual content. Do NOT include the placeholder description text in your output. Verify before returning: every brace balanced, every string properly quoted, every array properly closed. The system runs jsonrepair as a safety net but malformed output is friction we want to avoid.
 
 === YOUR SOLE JOB: UNDERSTANDING (NOT EVALUATION) ===
 
@@ -305,20 +319,36 @@ Also discover connections the scout missed — structural parallels, image recur
 
 === FINDINGS (MANDATORY — EVERY PARAGRAPH PRODUCES FINDINGS) ===
 
-Every paragraph MUST produce at least one finding. Findings are the PRIMARY unit of understanding — referenceable, growable, evidence-grounded.
+**Findings are NOT observations.** OBSERVATION ECONOMY (above) governs sentence-level observations. Findings are different — they are paragraph-level CLAIMS the system can REFERENCE later. Findings produce themselves on every paragraph, including polished ones, because every paragraph's purpose IS a finding.
+
+Every paragraph MUST produce at least one finding. **No exceptions.** Polished essays produce findings about WHAT IS WORKING — that is descriptive, not evaluative, and not banned by FORBIDDEN VOCABULARY. The finding describes the paragraph's structural CONTRIBUTION, not whether the contribution is "strong."
 
 CALIBRATION BY PARAGRAPH SIGNIFICANCE:
 - TRANSITIONAL paragraph: 1 finding about its structural function (what it bridges, sets up).
 - CONTRIBUTING paragraph: 2-3 findings about what it contributes to the essay's architecture.
 - PIVOTAL paragraph: 3-5 findings about the architectural insights, tensions, or patterns it reveals.
 
-Every paragraph serves a purpose — that purpose IS a finding.
+WORKED EXAMPLE — what a finding LOOKS LIKE:
+
+For Crochet's P3 (the Vietnam War + grandmother + crochet origin paragraph):
+- Finding 1 (claim): "P3 compresses three generations of family history into a single paragraph through one architectural move: each sentence carries a load-bearing biographical specific (Vietnam War / 13-year imprisonment / matriarch + literature professor / yarn scarcity → practical objects / chrysanthemums-and-roses pivot)."
+  - dimensions: ["narrative", "character", "structure"]
+  - maturity: "confirmed"
+  - evidence: quoted text from each escalation point
+  - coachingValue: "critical"
+- Finding 2 (claim): "The paragraph closes by transitioning from grandmother's wartime-driven practical crochet to writer's leisure-driven flower crochet — the family-history compression is in service of the generational pivot the essay's central tension hinges on."
+  - dimensions: ["theme", "narrative"]
+  - maturity: "developing"
+
+Both findings describe WHAT IS happening structurally. Neither uses banned evaluative vocabulary. Both are REFERENCEABLE — downstream layers can cite "F1" and reason about the family-history compression as a structural unit. **This is the bar.** Polished paragraphs produce findings of this shape.
 
 MATURITY: assess honestly. A first sighting is 'hypothesis'. If confirmed by multiple evidence locations, 'developing' or 'confirmed'. If it reveals something deeper, 'deepened'.
 
 FINDING EVOLUTIONS: If existing findings should be updated based on what this paragraph reveals — confirmed, deepened, or superseded — produce finding evolutions.
 
-SUPERSESSION IS RARE: On a first analysis pass, prefer 'deepened' or 'confirmed' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED — not when a later paragraph adds nuance. If P3 reveals that a P1 finding was incomplete, that's 'deepened', not 'superseded'. Supersession means the original claim is no longer true. If you supersede a finding, you MUST produce a replacement finding in newFindings that captures the corrected understanding.
+SUPERSESSION IS RARE: On a first analysis pass, prefer 'deepened' or 'confirmed' over 'superseded'. A finding should only be superseded when its claim is WRONG or CONTRADICTED — not when a later paragraph adds nuance. If you supersede a finding, you MUST produce a replacement finding in newFindings that captures the corrected understanding.
+
+**FINDINGS DISCIPLINE OVERRIDES OBSERVATION ECONOMY.** Even if a paragraph's purpose seems "obvious," the finding that names that purpose is required. The MANDATORY rule does not yield to "would a competent teacher already know this." Findings are the system's referenceable substrate; without them downstream coaching has nothing to point to.
 
 === INDEX CONVENTION ===
 
@@ -396,23 +426,15 @@ Return a JSON object matching this EXACT structure:
   ],
   "newFindings": [
     {
-      "claim": "A referenceable claim about the essay — specific, evidence-grounded, above sentence-level",
-      "scope": {
-        "type": "word | sentence | sentence_group | paragraph | cross_paragraph | essay_level",
-        "paragraph": 0,
-        "sentences": [0, 1],
-        "paragraphs": [0, 2],
-        "textEvidence": [{ "text": "quoted text from essay", "location": { "paragraph": 0, "sentence": 1 } }]
-      },
+      "claim": "<one-sentence claim about this paragraph that is referenceable later — above sentence-level, structurally meaningful>",
+      "scope": { "type": "paragraph | cross_paragraph | essay_level", "paragraph": 0, "paragraphs": [0, 2] },
       "maturity": "hypothesis | developing | confirmed | deepened",
-      "maturityReasoning": "Why this maturity level — what evidence supports it",
+      "maturityReasoning": "<one-sentence justification for this maturity>",
       "coachingValue": "critical | high | medium | contextual | diagnostic",
-      "dimensions": ["voice", "theme", "narrative", "emotion", "character", "craft", "admissions", "structure"],
-      "evidence": [{ "text": "quoted text or description of absence", "location": { "paragraph": 0, "sentence": 1 }, "type": "present | absent" }],
-      "deepeningPotential": "What further investigation could reveal, or null",
-      "raisesQuestions": ["Questions this finding raises for further investigation"],
-      "buildsOn": ["existing-finding-ID"],
-      "relatedTo": ["existing-finding-ID"]
+      "dimensions": ["voice | theme | narrative | emotion | character | craft | admissions | structure"],
+      "evidence": [{ "text": "<quoted text>", "location": { "paragraph": 0, "sentence": 1 } }],
+      "deepeningPotential": "<one sentence on what investigation could reveal, or null>",
+      "raisesQuestions": ["<question>"]
     }
   ],
   "findingEvolutions": [
@@ -565,6 +587,10 @@ Empty array is valid and the default — silence is the audit signal.
 7. Tags must be semantic and useful for routing: "turning_point", "sensory_grounding", "thesis_crystallization", "voice_shift", "emotional_peak".
 8. Every sentence needs a "primaryFunction" (one-line architectural summary) and "significance" (pivotal/contributing/transitional).
 9. "craft" and "significantChoices" are OPTIONAL — include only for pivotal/contributing sentences where they add genuine insight. Omit for transitional sentences.
+
+=== FINAL CHECK BEFORE OUTPUT ===
+
+Re-scan your draft. Does newFindings have at least one entry? If not, STOP and produce one before returning. Every paragraph has a structural function — that function IS a finding. The MANDATORY rule does not yield. A response with newFindings = [] on a real paragraph is a contract violation; the system will reject it as if you returned nothing.
 
 Return ONLY the JSON object. No markdown, no explanation, no code blocks.`;
 

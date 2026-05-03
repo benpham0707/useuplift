@@ -82,37 +82,34 @@ FRAME CONSTRAINT: Every observation must be completable with "I notice that..." 
   WRONG: "The narrator skillfully shifts perspective"
   WRONG: "The word choice is powerful here"
 
-WHAT YOU PRODUCE FOR EACH PARAGRAPH:
-1. apparentPurpose: What this paragraph appears to be doing (setting a scene, introducing a person, describing an event, reflecting on a moment, making an argument, etc.)
-2. emotionalRegister: What emotional tone is present (urgent, contemplative, anxious, playful, matter-of-fact, etc.) — describe the emotion, do NOT judge whether it works
-3. voiceObservation: What the narrator's voice sounds like here (formal, conversational, fragmented, flowing, etc.) — describe the sound, NOT its quality
-4. craftNotices: List specific craft choices you observe (sentence length patterns, use of imagery, dialogue presence, tense choices, punctuation patterns) — WHAT they are, not whether they work
-5. tags: 3-5 topic/content tags (e.g., "family", "competition", "self-discovery", "cultural-identity")
+WHAT YOU PRODUCE FOR EACH PARAGRAPH (paragraph-level — be specific but compact):
+1. apparentPurpose: One sentence — what this paragraph appears to be doing (scene-setting, person-introduction, event-description, reflection, argument).
+2. emotionalRegister: One short phrase — emotional tone present (urgent, contemplative, anxious, playful, matter-of-fact). Describe the emotion, do NOT judge whether it works.
+3. voiceObservation: One sentence — what the narrator's voice sounds like here (formal, conversational, fragmented, flowing).
+4. craftNotices: Up to 5 specific craft choices observed (sentence length patterns, imagery, dialogue, tense, punctuation). One short phrase each.
+5. tags: 3-5 topic/content tags (e.g., "family", "competition", "self-discovery", "cultural-identity").
 
-FOR EACH SENTENCE in the paragraph:
-1. apparentPurpose: What this sentence appears to be doing within the paragraph
-2. rhetoricalFunction: Label the function (scene-setting, character-introduction, argument-advancing, transition, reflection, concrete-detail, emotional-disclosure, etc.)
-3. toneShift: true/false — whether the tone noticeably changes at this sentence
-4. notableElements: Specific elements worth noting (a metaphor, a proper noun, a number, a direct quote, a question, an unusual word, etc.)
-5. tags: 2-3 content tags for this sentence
+FOR EACH SENTENCE (BE BRIEF — one short phrase per field):
+1. apparentPurpose: ≤10 words — what this sentence does in the paragraph.
+2. rhetoricalFunction: ONE label (scene-setting | character-introduction | argument-advancing | transition | reflection | concrete-detail | emotional-disclosure | other).
+3. toneShift: boolean.
+4. notableElements: 0-3 short labels (metaphor / proper-noun / direct-quote / unusual-word). Empty array if nothing notable.
+5. tags: 1-3 content tags. Empty array if not applicable.
+
+PER-SENTENCE BREVITY DISCIPLINE: First impressions are LIGHTWEIGHT. Each sentence's per-field output should fit on one short line. If you find yourself writing full prose for a per-sentence field, STOP — rewrite as a phrase. The total per-paragraph output should fit comfortably under 1500 tokens.
 
 FIELD-SPECIFIC EXAMPLES (correct vs incorrect):
 
-apparentPurpose:
-  CORRECT: "This paragraph introduces a physical setting through sensory details — the sound of a cash register, the smell of leather — and places the narrator inside a specific location."
-  WRONG: "This paragraph effectively establishes the scene and draws the reader in with vivid sensory language." (evaluative: "effectively", "vivid", "draws the reader in")
+apparentPurpose (paragraph): "Introduces a physical setting through sensory details, places narrator inside a specific location." NOT "This paragraph effectively establishes the scene and draws the reader in with vivid sensory language."
 
-voiceObservation:
-  CORRECT: "The narrator uses short declarative sentences, avoids adjectives, and addresses the reader in second person. The rhythm is staccato."
-  WRONG: "The narrator's voice is refreshingly direct and achieves a compelling conversational tone." (evaluative: "refreshingly", "compelling", "achieves")
+voiceObservation: "Short declarative sentences, no adjectives, second-person address, staccato rhythm." NOT "The narrator's voice is refreshingly direct and achieves a compelling conversational tone."
 
-tags:
-  Tags should be CONTENT labels (what is discussed) not QUALITY labels. Use "family-dinner", "violin-practice", "code-switching" — NOT "powerful-moment", "vivid-scene", "strong-opening".
+tags: CONTENT labels (what is discussed), NOT quality labels. Use "family-dinner", "violin-practice", "code-switching" — NOT "powerful-moment", "vivid-scene".
 
-FOR NOTABLE PHRASES (words/phrases that stand out):
-1. phrase: The exact text
-2. sentenceIndex: Which sentence it appears in
-3. significance: WHAT makes it notable — its position, its unusualness, its relationship to other elements — NOT whether it is good or bad
+FOR NOTABLE PHRASES (cap at 3 per paragraph — pick the most distinctive):
+1. phrase: Exact text.
+2. sentenceIndex: Which sentence it appears in.
+3. significance: ≤15 words — WHAT makes it notable (position, unusualness, relationship to other elements). NOT whether it's good or bad.
 
 OUTPUT: Valid JSON matching this schema:
 {
