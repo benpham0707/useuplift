@@ -915,6 +915,20 @@ export class SequentialDeepWalkService {
       void persistCorpusTelemetry(record);
     }
 
+    // D-2.2 round 1.8 §11.9 + §11.12: post-walk consolidation step. Runs
+    // AFTER all paragraphs walk, BEFORE the result returns. Three actions:
+    //   1. Gap-resolution detection — compare prior unresolved instances
+    //      against the current draft anchors; mark resolved if anchor text
+    //      changed (deterministic heuristic; LLM judgment can replace later
+    //      if false-positive rate is high in calibration).
+    //   2. Group emissions by conceptTag, apply complexity caps (simple=1,
+    //      medium=2, complex=3 unresolved instances per essay), then rank
+    //      by priority (critical > high > medium > low) and trim to 3 total.
+    //   3. Update profile.conceptLibrary instances for surviving emissions
+    //      and write trimmed result back to per-paragraph specifics-
+    //      NeedEmissions arrays.
+    this.consolidateSpecificsNeedEmissions(profile, walkOutputs);
+
     return {
       walkOutputs,
       backPropagations: allBackPropagations,
@@ -924,6 +938,215 @@ export class SequentialDeepWalkService {
       tokenUsage: totalTokens,
       timingMs: Date.now() - startTime,
     };
+  }
+
+  /**
+   * D-2.2 round 1.8 §11.9 + §11.12 — post-walk consolidation step.
+   *
+   * Mutates `profile` and `walkOutputs` in place. After this returns:
+   * - `profile.paragraphs[i].understanding.specificsNeedEmissions` carries
+   *   only the surviving emissions (per-essay 3 ceiling + per-concept
+   *   complexity caps).
+   * - `walkOutputs[i].specificsNeedEmissions` mirrors the per-paragraph
+   *   surviving set.
+   * - `profile.conceptLibrary[]` has new entries (or appended instances on
+   *   existing entries) for each SURVIVING emission's conceptTag. Dropped
+   *   emissions do NOT register in the library (round 1.8 §10).
+   * - Prior unresolved instances of any conceptLibrary entry whose anchor
+   *   text changed since the prior iteration are marked `gapResolved: true`
+   *   with `resolvedAtIteration` set to current iteration.
+   */
+  private consolidateSpecificsNeedEmissions(
+    profile: EssayProfile,
+    walkOutputs: UnderstandingWalkOutput[],
+  ): void {
+    const currentIteration =
+      profile.index?.iterationLedger?.currentIteration ?? 1;
+
+    // Ensure conceptLibrary exists (defensive — coordinator migration also
+    // defaults this, but a profile constructed outside the coordinator
+    // path could miss it).
+    if (!profile.conceptLibrary) profile.conceptLibrary = [];
+
+    // ── Step 1: gap-resolution detection ───────────────────────────────
+    // For each prior unresolved instance, check whether the anchor text
+    // (paragraph + sentence, when sentence-scoped) has changed. A changed
+    // anchor signals the writer iterated; we mark the gap resolved
+    // tentatively (the walk can re-emit if the gap returns at the same
+    // anchor, which becomes a fresh instance with iteration =
+    // currentIteration).
+    for (const entry of profile.conceptLibrary) {
+      for (const instance of entry.instances) {
+        if (instance.gapResolved) continue;
+        if (instance.iteration >= currentIteration) continue;
+
+        // Detect whether anchor text changed. If the paragraph at this
+        // index doesn't exist anymore (essay shortened), we treat as
+        // resolved (nothing to fix). If sentence-scoped and the sentence
+        // doesn't exist, same. Conservative default: if comparison can't
+        // run (no prior text snapshot available), do NOT mark resolved —
+        // the walk's emission re-eval will catch persistent gaps.
+        // Note: this iteration uses sentence-existence as proxy for
+        // "anchor still valid"; richer text-diff detection can replace
+        // this in a future calibration iteration if false-positive rate
+        // proves high.
+        const para = profile.paragraphs[instance.paragraph];
+        if (!para) {
+          instance.gapResolved = true;
+          instance.resolvedAtIteration = currentIteration;
+          continue;
+        }
+        if (typeof instance.sentence === 'number') {
+          const sentence = para.sentences[instance.sentence];
+          if (!sentence) {
+            instance.gapResolved = true;
+            instance.resolvedAtIteration = currentIteration;
+            continue;
+          }
+        }
+        // Anchor still exists; leave gapResolved=false. The walk's emission
+        // logic decides whether the same gap reappears at this anchor — if
+        // the walk re-emits on this conceptTag at the same anchor, the
+        // post-walk consolidation step appends a NEW instance (with
+        // iteration=currentIteration). The prior unresolved instance stays
+        // unresolved until later iteration explicitly resolves it via
+        // anchor disappearance.
+      }
+    }
+
+    // ── Step 2: collect candidates from walkOutputs ────────────────────
+    // Each candidate carries a back-reference so we can prune at the
+    // per-paragraph storage when consolidation drops it.
+    interface Candidate {
+      emission: SpecificsNeedEmission;
+      paragraphIndex: number;
+      emissionIndex: number;
+    }
+    const candidates: Candidate[] = [];
+    walkOutputs.forEach((output) => {
+      const emissions = output.specificsNeedEmissions ?? [];
+      emissions.forEach((emission, idx) => {
+        candidates.push({
+          emission,
+          paragraphIndex: output.paragraphIndex,
+          emissionIndex: idx,
+        });
+      });
+    });
+
+    if (candidates.length === 0) return;
+
+    // ── Step 3: apply per-concept complexity caps ──────────────────────
+    // Group by conceptTag. For each group, count UNRESOLVED instances
+    // already in the library + new candidates in this group; apply the
+    // cap. Surviving candidates within the group rank by priority then
+    // emission order.
+    const COMPLEXITY_CAP: Record<
+      SpecificsNeedEmission['conceptComplexity'],
+      number
+    > = { simple: 1, medium: 2, complex: 3 };
+    const PRIORITY_RANK: Record<SpecificsNeedEmission['priority'], number> = {
+      critical: 0,
+      high: 1,
+      medium: 2,
+      low: 3,
+    };
+
+    const byTag = new Map<string, Candidate[]>();
+    for (const c of candidates) {
+      const tag = c.emission.conceptTag;
+      if (!byTag.has(tag)) byTag.set(tag, []);
+      byTag.get(tag)!.push(c);
+    }
+
+    const survivingPerConcept: Candidate[] = [];
+    for (const [tag, group] of byTag.entries()) {
+      const complexity = group[0].emission.conceptComplexity;
+      const cap = COMPLEXITY_CAP[complexity];
+
+      // Existing unresolved instances in the library count against the cap.
+      const existingEntry = profile.conceptLibrary.find((e) => e.tag === tag);
+      const existingUnresolved = existingEntry
+        ? existingEntry.instances.filter((i) => !i.gapResolved).length
+        : 0;
+      const slotsRemaining = Math.max(0, cap - existingUnresolved);
+
+      // Sort group by priority (critical first) then emission order.
+      group.sort((a, b) => {
+        const dp = PRIORITY_RANK[a.emission.priority] - PRIORITY_RANK[b.emission.priority];
+        if (dp !== 0) return dp;
+        if (a.paragraphIndex !== b.paragraphIndex) {
+          return a.paragraphIndex - b.paragraphIndex;
+        }
+        return a.emissionIndex - b.emissionIndex;
+      });
+
+      survivingPerConcept.push(...group.slice(0, slotsRemaining));
+    }
+
+    // ── Step 4: apply per-essay hard ceiling (3) ───────────────────────
+    survivingPerConcept.sort((a, b) => {
+      const dp = PRIORITY_RANK[a.emission.priority] - PRIORITY_RANK[b.emission.priority];
+      if (dp !== 0) return dp;
+      if (a.paragraphIndex !== b.paragraphIndex) {
+        return a.paragraphIndex - b.paragraphIndex;
+      }
+      return a.emissionIndex - b.emissionIndex;
+    });
+    const ESSAY_CEILING = 3;
+    const surviving = survivingPerConcept.slice(0, ESSAY_CEILING);
+
+    // ── Step 5: write surviving emissions back to per-paragraph storage ─
+    // Rebuild each paragraph's specificsNeedEmissions array from surviving
+    // candidates only. Dropped candidates leave no trace (no library entry,
+    // no per-paragraph storage). walkOutputs[].specificsNeedEmissions is
+    // also rebuilt to mirror.
+    const survivingByParagraph = new Map<number, SpecificsNeedEmission[]>();
+    for (const c of surviving) {
+      if (!survivingByParagraph.has(c.paragraphIndex)) {
+        survivingByParagraph.set(c.paragraphIndex, []);
+      }
+      survivingByParagraph.get(c.paragraphIndex)!.push(c.emission);
+    }
+
+    for (const output of walkOutputs) {
+      const survived = survivingByParagraph.get(output.paragraphIndex);
+      if (survived && survived.length > 0) {
+        output.specificsNeedEmissions = survived;
+      } else {
+        delete output.specificsNeedEmissions;
+      }
+      const para = profile.paragraphs[output.paragraphIndex];
+      if (para && para.understanding) {
+        if (survived && survived.length > 0) {
+          para.understanding.specificsNeedEmissions = survived;
+        } else {
+          delete para.understanding.specificsNeedEmissions;
+        }
+      }
+    }
+
+    // ── Step 6: append surviving emissions into conceptLibrary ─────────
+    for (const c of surviving) {
+      const e = c.emission;
+      let entry = profile.conceptLibrary.find((x) => x.tag === e.conceptTag);
+      if (!entry) {
+        entry = {
+          tag: e.conceptTag,
+          complexity: e.conceptComplexity,
+          definition: e.conceptDefinition,
+          example: e.conceptExample,
+          instances: [],
+        };
+        profile.conceptLibrary.push(entry);
+      }
+      entry.instances.push({
+        paragraph: e.anchorParagraph,
+        sentence: e.anchorSentence,
+        iteration: currentIteration,
+        gapResolved: false,
+      });
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
