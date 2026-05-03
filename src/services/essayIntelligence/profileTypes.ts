@@ -1471,14 +1471,14 @@ export interface EssayNorthStar {
   evolution?: NorthStarEvolution;
 
   /**
-   * Specifics-need emissions surfaced by L4 crystallization. Essay-level
-   * emissions: gaps that only become visible from the North Star vantage
-   * (through-line missing connective tissue, distinctiveness signature
-   * leaning on something the essay doesn't yet specify, intent bridge with
-   * a concrete answerable question). Same dedup contract as the other
-   * source layers; aggregator (D-2.7) folds these in before minting.
-   * Optional — undefined / [] when L4 had no gap-and-approach to surface.
+   * Option 5 rebuild — gap candidates from L4 northStar crystallization
+   * (lightweight; Phase B promotes 0-3 with full essay context). Replaces
+   * the heavier specificsNeedEmissions field used in the prior round 1.8
+   * architecture for this layer.
    */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
   specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
@@ -2432,6 +2432,19 @@ export interface EssayProfile {
   /** All questions ever raised — persistent store with status tracking.
    *  Managed by QuestionQueueManager, synced at growth cycle end. */
   questionQueue: UnderstandingQuestion[];
+
+  /**
+   * Option 5 rebuild — single essay-level emission storage. Phase B
+   * (essayLevelEmissionService) writes the promoted SpecificsNeedEmission[]
+   * here after reading per-layer gap candidates + the full essay context.
+   * D-2.8 integration helper at Phase 5.6 reads from here (single source
+   * of truth) and feeds the aggregator → questionQueue.
+   *
+   * Replaces the prior round 1.8 architecture's 4 per-layer storage
+   * locations (paragraph.understanding, paragraph.analysis,
+   * essayUnderstanding, northStar). Capped at 3 per essay by Phase B itself.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 
   /**
    * D-2.2 round 1.8 — concept library tracker for specifics-need emissions.
@@ -3877,19 +3890,15 @@ export interface UnderstandingWalkOutput {
   }>;
 
   /**
-   * D-2.2 round 1.8 — specifics-need emissions surfaced by the walk for
-   * this paragraph. Top-level sibling of `paragraphUnderstanding` per
-   * round 1.8 §9. Optional — undefined / [] when the walk had no
-   * gap-and-approach to surface (silence is the audit signal,
-   * round 1.6 §3 Test 3).
-   *
-   * Storage flow (round 1.8 §11.11): the parser extracts this top-level
-   * array; `applyWalkOutputToProfile` copies onto
-   * `paragraph.understanding.specificsNeedEmissions` (D-2.7 type location)
-   * AND appends instances into `profile.conceptLibrary[].instances[]` per
-   * each emission's `conceptTag`. Post-walk consolidation step trims to
-   * the per-essay 3 cap + per-concept complexity caps.
+   * Option 5 rebuild — gap candidates from this paragraph's walk
+   * (lightweight; Phase B promotes 0-3 to full emissions). Per-paragraph
+   * recognition stays here; full emission shape is filled in by Phase B
+   * with full essay context. Replaces the heavier round 1.8
+   * specificsNeedEmissions field on this layer output.
    */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. Kept for backward compat. */
   specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
@@ -3984,18 +3993,14 @@ export interface HolisticSynthesisOutput {
   }>;
 
   /**
-   * D-2.4 round 1.8 — specifics-need emissions surfaced by L3.75 holistic
-   * synthesis. Essay-level emissions: gaps the synthesis noticed looking
-   * across paragraphs (cross-paragraph specificity gaps, holistic questions
-   * no single paragraph would have flagged). sourceLayer = 'l3_75_phase_a'
-   * or 'l3_75_phase_b' per the D-2.7 closed enum.
-   *
-   * Storage flow: parser extracts this top-level field;
-   * `applyHolisticSynthesis` copies onto `profile.essayUnderstanding.
-   * specificsNeedEmissions` (D-2.7 type location) AND appends instances
-   * into profile.conceptLibrary[]. D-2.8's integration helper reads from
-   * the essayUnderstanding location at Phase 5.6.
+   * Option 5 rebuild — gap candidates from L3.75 holistic synthesis
+   * (lightweight; Phase B promotes 0-3). Replaces the heavier
+   * specificsNeedEmissions field that lived here in the prior round 1.8
+   * architecture.
    */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
   specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
@@ -4155,21 +4160,15 @@ export interface AnalysisPassOutput {
   }>;
 
   /**
-   * D-2.3 round 1.8 — specifics-need emissions surfaced by L3.5 analysis
-   * for this paragraph. Top-level sibling of `paragraphEffectiveness` per
-   * round 1.8 §9 placement convention. Optional — undefined / [] when the
-   * analysis pass had no gap-and-approach to surface (silence is the audit
-   * signal, round 1.6 §3 Test 3).
-   *
-   * Storage flow (round 1.8 §11 + D-2.8 D-2.7 type location): the parser
-   * extracts this top-level array; the analysis-pass orchestrator copies
-   * onto `paragraph.analysis.specificsNeedEmissions` (D-2.7 type location at
-   * profileTypes.ts:880) AND appends instances into
-   * `profile.conceptLibrary[].instances[]` per each emission's
-   * `conceptTag`. Post-pass consolidation step trims to the per-essay 3
-   * cap + per-concept complexity caps. Analogous to L3 walk's
-   * `UnderstandingWalkOutput.specificsNeedEmissions?` pattern.
+   * Option 5 rebuild — gap candidates from L3.5 analysis for this
+   * paragraph (lightweight; Phase B promotes 0-3 with full essay context).
+   * In Option 5, L3.5's emission proposals come from the essay-level mode
+   * (one call) rather than per-paragraph mode (10 calls), but the field
+   * lives here for type symmetry across layer-output types.
    */
+  gapCandidates?: EssayGapCandidate[];
+
+  /** @deprecated Replaced by gapCandidates + Phase B essay-level emission. */
   specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
@@ -6079,6 +6078,45 @@ export interface SpecificsNeedEmission {
    * user can reference on demand. Required non-empty after trim.
    */
   conceptExample: string;
+}
+
+/**
+ * Option 5 rebuild — lightweight gap-candidate proposal emitted by per-layer
+ * analysis (L3 walk, L3.5 analysis, L3.75 holistic, L4 northStar). NOT
+ * persisted on the profile; transient between Phase A (recognition at the
+ * cognitive moment that surfaced the gap) and Phase B (single essay-level
+ * decision that promotes 0-3 candidates into full SpecificsNeedEmission[]).
+ *
+ * Per-layer emission was costly because each layer filled in 17 fields per
+ * emission. Splitting into recognition (lightweight) + decision (full shape,
+ * once at essay level) preserves depth (recognition stays in the cognitive
+ * moment) while collapsing cost (one Sonnet call instead of N per-layer
+ * full-emission outputs).
+ *
+ * Source layers populate `sourceLayer` so Phase B can audit-trace each
+ * promoted emission back to which layer's recognition produced it.
+ */
+export interface EssayGapCandidate {
+  /** Which layer's cognitive work surfaced this candidate. */
+  sourceLayer: SpecificsNeedSourceLayer;
+  /** Zero-indexed paragraph the candidate anchors to. */
+  anchorParagraph: number;
+  /** Optional zero-indexed sentence within the anchor paragraph. */
+  anchorSentence?: number;
+  /**
+   * Free-text describing the artifact whose recognition triggered the
+   * candidate (e.g., "F12 deepeningPotential cites moment writer's mother
+   * reacted but text doesn't show it"). Phase B reads this to understand
+   * which finding/weakness/pattern the layer was working on when the gap
+   * appeared.
+   */
+  triggeringArtifact: string;
+  /**
+   * One sentence — what the layer NOTICED about the gap. Brief because
+   * Phase B will fill in the full delivery shape (framingSeed, conceptTag,
+   * conceptDefinition, etc.) with full essay context.
+   */
+  briefRecognition: string;
 }
 
 /**
