@@ -917,6 +917,9 @@ export function createInitialProfile(input: {
     // Persistent question queue — empty (Gap 2)
     questionQueue: [],
 
+    // D-2.2 round 1.8: concept library starts empty for new profiles
+    conceptLibrary: [],
+
     // Conversation insights — empty
     conversationInsights: [],
     patternInsights: [],
@@ -1604,6 +1607,15 @@ export class EssayProfileCoordinator {
       insight: IInsightMutator;
     }>,
   ): EssayProfileCoordinator {
+    // ── D-2.2 round 1.8: Legacy profile gets empty conceptLibrary ────────
+    // Mirrors the improvementCandidateSnapshot migration pattern — defaults
+    // the field for profiles persisted before D-2.2 shipped. The library is
+    // append-only; an empty default is safe (no instances to consult, no
+    // caps to enforce, walks emit fresh as if no concepts had been taught).
+    if (!profile.conceptLibrary) {
+      profile.conceptLibrary = [];
+    }
+
     // ── Phase 1.5: Legacy profile migration hook ──────────────────────────
     if (!profile.improvementCandidateSnapshot) {
       try {

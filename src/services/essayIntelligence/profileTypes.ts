@@ -2433,6 +2433,19 @@ export interface EssayProfile {
    *  Managed by QuestionQueueManager, synced at growth cycle end. */
   questionQueue: UnderstandingQuestion[];
 
+  /**
+   * D-2.2 round 1.8 — concept library tracker for specifics-need emissions.
+   * Append-only across walk passes. User-accessible on demand for concept
+   * definitions + examples. Per-concept emission caps (simple=1, medium=2,
+   * complex=3 unresolved instances per essay) are enforced against this
+   * structure by the post-walk consolidation step (D-2.2 §11.12).
+   *
+   * Optional / defaults to `[]` for legacy profiles via
+   * `EssayProfileCoordinator.fromCheckpoint` migration (mirrors the
+   * `improvementCandidateSnapshot` migration pattern).
+   */
+  conceptLibrary?: ConceptLibraryEntry[];
+
   // -- CONVERSATION INSIGHTS (L6-sourced student revelations) --
   conversationInsights: ConversationInsight[];
   patternInsights: PatternInsight[];
@@ -3862,6 +3875,22 @@ export interface UnderstandingWalkOutput {
     reasoning: string;
     supersedes?: string;
   }>;
+
+  /**
+   * D-2.2 round 1.8 — specifics-need emissions surfaced by the walk for
+   * this paragraph. Top-level sibling of `paragraphUnderstanding` per
+   * round 1.8 §9. Optional — undefined / [] when the walk had no
+   * gap-and-approach to surface (silence is the audit signal,
+   * round 1.6 §3 Test 3).
+   *
+   * Storage flow (round 1.8 §11.11): the parser extracts this top-level
+   * array; `applyWalkOutputToProfile` copies onto
+   * `paragraph.understanding.specificsNeedEmissions` (D-2.7 type location)
+   * AND appends instances into `profile.conceptLibrary[].instances[]` per
+   * each emission's `conceptTag`. Post-walk consolidation step trims to
+   * the per-essay 3 cap + per-concept complexity caps.
+   */
+  specificsNeedEmissions?: SpecificsNeedEmission[];
 }
 
 /**
@@ -5956,4 +5985,102 @@ export interface SpecificsNeedEmission {
   populates: string[];
   /** Populates `dig.framingSeed`. Non-leading way to phrase the question. */
   framingSeed: string;
+
+  // ── D-2.2 round 1.8 extensions (ratified 2026-05-01) ─────────────────
+  // Five new fields capture the emission's user-facing rationale + concept
+  // library record. See `docs/pipeline-evolution/04-pipeline-architecture/
+  // L5/prompts/D-2.2/RATIONALE.md` and `ROUND_1_8_DRAFT.md` for the spec.
+
+  /**
+   * One-sentence articulation of WHAT the writer would discover about their
+   * own essay from answering — a pattern, an inversion, a hidden choice, an
+   * unowned emotion. Required for emissions whose value is (a) discovery
+   * (per round 1.8 §2.5). May be `null` only if the emission's value is
+   * purely (b) coaching-unlock with no discovery component.
+   *
+   * Banned trivial phrasings (round 1.8 §2.5): "the writer would discover
+   * what they were feeling," "the writer would discover their actual
+   * emotion," "the writer would discover a specific detail," "the writer
+   * would discover more about themselves." Name the SPECIFIC content —
+   * WHICH pattern, WHICH inversion, WHICH unowned emotion.
+   */
+  expectedDiscovery: string | null;
+
+  /**
+   * Short PROSE phrase (NOT snake_case) naming the writing principle this
+   * emission teaches. Free-form per Rule 3 (no closed taxonomy on LLM
+   * perception). Examples: "specific over general", "discovery over
+   * delivery", "concrete moment over summary", "honest word over easy word".
+   *
+   * Reuse policy (round 1.8 §3 + §8): before minting a new tag, scan
+   * `EssayProfile.conceptLibrary[]`. Reuse an existing tag if the underlying
+   * mechanism is identical — not just thematically similar. Required
+   * non-empty after trim.
+   */
+  conceptTag: string;
+
+  /**
+   * Drives the per-concept emission cap (round 1.8 §10).
+   *   simple   → max 1 unresolved instance per essay
+   *   medium   → max 2 unresolved instances per essay
+   *   complex  → max 3 unresolved instances per essay
+   * Applied alongside the per-essay hard ceiling of 3.
+   */
+  conceptComplexity: 'simple' | 'medium' | 'complex';
+
+  /**
+   * One-sentence universal definition of the concept, written GENERICALLY
+   * (NOT this student's essay). Stored in the concept library; user can
+   * reference on demand. Required non-empty after trim.
+   *
+   * Example: "Specific over general means choosing the precise concrete
+   * detail (a chair, an hour, a smell) over the abstract category
+   * (a place, sometime, a feeling) because precision earns trust where
+   * abstraction loses it."
+   */
+  conceptDefinition: string;
+
+  /**
+   * One corpus-quality EXAMPLE demonstrating the concept, written
+   * generically (NOT this student's essay). Stored in the concept library;
+   * user can reference on demand. Required non-empty after trim.
+   */
+  conceptExample: string;
+}
+
+/**
+ * D-2.2 round 1.8 — Concept library entry on EssayProfile.
+ *
+ * Append-only across walk passes. User-accessible on demand (definitions +
+ * examples). Each entry tracks where the concept was taught (`instances[]`)
+ * and which prior gaps the user has resolved via iteration (`gapResolved`).
+ *
+ * Per-concept emission caps (round 1.8 §10) count UNRESOLVED instances:
+ * once `instances.filter(i => !i.gapResolved).length >= cap[complexity]`,
+ * the walk stops emitting on this concept. When the user iterates and the
+ * gap-resolution detector marks prior instances resolved, the cap relaxes
+ * and new instances of the same concept can fire fresh teaching.
+ */
+export interface ConceptLibraryEntry {
+  /** Prose tag matching the emission's `conceptTag`. Reuse-respected. */
+  tag: string;
+  /** Drives the per-concept cap (mirror of emission's `conceptComplexity`). */
+  complexity: 'simple' | 'medium' | 'complex';
+  /** Universal definition for the user-accessible library lookup. */
+  definition: string;
+  /** Generic corpus-quality example for the library. */
+  example: string;
+  /** Where this concept has been taught across walk passes for this essay. */
+  instances: Array<{
+    /** Zero-indexed paragraph of the original gap. */
+    paragraph: number;
+    /** Optional zero-indexed sentence of the original gap. */
+    sentence?: number;
+    /** Walk pass / iteration that produced this instance. */
+    iteration: number;
+    /** True iff the gap-resolution detector judged this gap closed in a later iteration. */
+    gapResolved: boolean;
+    /** Iteration at which `gapResolved` flipped to true; undefined while still unresolved. */
+    resolvedAtIteration?: number;
+  }>;
 }
