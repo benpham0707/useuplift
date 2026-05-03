@@ -165,6 +165,16 @@ function randEmission(): SpecificsNeedEmission {
     consumers: [randPick(CONSUMER_LAYERS)],
     populates: [`populate.path.${randInt(0, 99999)}`],
     framingSeed: randSeed(),
+    // D-2.2 round 1.8 fields — fixed defaults; property tests don't
+    // randomize concept fields because they don't affect aggregator dedup
+    // semantics (post-walk consolidation handles concept caps).
+    expectedDiscovery: `synthetic discovery ${randInt(0, 99999)}`,
+    conceptTag: 'specific over general',
+    conceptComplexity: 'simple',
+    conceptDefinition:
+      'Specific over general means choosing a precise concrete detail over an abstract category.',
+    conceptExample:
+      "From a college essay: 'Three days before I got on a plane I quit milk cold-turkey.'",
   };
 }
 

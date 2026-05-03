@@ -89,6 +89,14 @@ function buildEmission(
     consumers: ['l3', 'l5'],
     populates: ['groundTruthFacts.byLocation'],
     framingSeed: `asking about the specific moment unique seed ${emissionCounter} alpha bravo charlie`,
+    // D-2.2 round 1.8 fields
+    expectedDiscovery: `the writer would discover the lived moment ${emissionCounter} that grounds the abstract claim`,
+    conceptTag: 'specific over general',
+    conceptComplexity: 'simple',
+    conceptDefinition:
+      'Specific over general means choosing a precise concrete detail over an abstract category.',
+    conceptExample:
+      "From a college essay: 'Three days before I got on a plane I quit milk cold-turkey.'",
     ...overrides,
   };
 }

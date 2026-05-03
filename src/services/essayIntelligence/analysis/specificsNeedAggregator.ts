@@ -132,6 +132,17 @@ const VALID_PRIORITIES = new Set<UnderstandingQuestion['priority']>([
   'low',
 ]);
 
+/**
+ * Valid conceptComplexity values for runtime validation (D-2.2 round 1.8).
+ * Drives per-concept emission caps via the post-walk consolidation step:
+ *   simple   → max 1 unresolved instance per essay
+ *   medium   → max 2 unresolved instances per essay
+ *   complex  → max 3 unresolved instances per essay
+ */
+const VALID_CONCEPT_COMPLEXITIES = new Set<
+  SpecificsNeedEmission['conceptComplexity']
+>(['simple', 'medium', 'complex']);
+
 // ─── Result type ───────────────────────────────────────────────────────
 
 /**
@@ -434,6 +445,68 @@ function validateEmission(
   // and breaks the dedup contract silently)
   if (typeof emission.framingSeed !== 'string' || emission.framingSeed.trim().length === 0) {
     throw new Error(ctx('framingSeed', 'is missing, not a string, or empty/whitespace'));
+  }
+
+  // ── D-2.2 round 1.8 fields ─────────────────────────────────────────────
+
+  // expectedDiscovery (required, string OR null — null only when emission's
+  // value is purely (b) coaching-unlock per round 1.8 §2.5; if string,
+  // non-empty after trim).
+  if (emission.expectedDiscovery !== null) {
+    if (
+      typeof emission.expectedDiscovery !== 'string' ||
+      emission.expectedDiscovery.trim().length === 0
+    ) {
+      throw new Error(
+        ctx(
+          'expectedDiscovery',
+          'must be `string | null`; if string, non-empty after trim',
+        ),
+      );
+    }
+  }
+
+  // conceptTag (required, non-empty prose after trim — round 1.8 §3 says
+  // prose-form not snake_case; the validator can't detect snake_case
+  // structurally, but downstream Test 8 swap test catches LLM drift).
+  if (
+    typeof emission.conceptTag !== 'string' ||
+    emission.conceptTag.trim().length === 0
+  ) {
+    throw new Error(ctx('conceptTag', 'is missing, not a string, or empty/whitespace'));
+  }
+
+  // conceptComplexity (required, valid enum)
+  if (!VALID_CONCEPT_COMPLEXITIES.has(emission.conceptComplexity)) {
+    throw new Error(
+      ctx(
+        'conceptComplexity',
+        `'${emission.conceptComplexity}' is not a valid conceptComplexity ` +
+          `(expected one of: ${[...VALID_CONCEPT_COMPLEXITIES].join(', ')})`,
+      ),
+    );
+  }
+
+  // conceptDefinition (required, non-empty after trim — universal
+  // one-sentence definition stored in the user-accessible concept library)
+  if (
+    typeof emission.conceptDefinition !== 'string' ||
+    emission.conceptDefinition.trim().length === 0
+  ) {
+    throw new Error(
+      ctx('conceptDefinition', 'is missing, not a string, or empty/whitespace'),
+    );
+  }
+
+  // conceptExample (required, non-empty after trim — generic corpus-quality
+  // example stored in the user-accessible concept library)
+  if (
+    typeof emission.conceptExample !== 'string' ||
+    emission.conceptExample.trim().length === 0
+  ) {
+    throw new Error(
+      ctx('conceptExample', 'is missing, not a string, or empty/whitespace'),
+    );
   }
 }
 

@@ -51,6 +51,14 @@ function buildEmission(
     consumers: ['l3', 'l5'],
     populates: ['groundTruthFacts.byLocation', 'finding.evidence'],
     framingSeed: 'asking about the specific moment in paragraph two and what physically happened',
+    // D-2.2 round 1.8 fields
+    expectedDiscovery: 'the writer would discover the specific physical moment behind the abstract emotion',
+    conceptTag: 'specific over general',
+    conceptComplexity: 'simple',
+    conceptDefinition:
+      'Specific over general means choosing a precise concrete detail (a chair, an hour, a smell) over an abstract category (a place, sometime, a feeling) because precision earns trust where abstraction loses it.',
+    conceptExample:
+      "From a college essay: 'Three days before I got on a plane to go across the country for six weeks I quit milk cold-turkey.' — pairs a concrete time-marker with an unexpectedly specific decision.",
     ...overrides,
   };
 }
@@ -251,6 +259,87 @@ describe('D-2.7 §1 — Schema validation', () => {
     expect(() =>
       aggregateSpecificsNeedEmissions([buildEmission({ framingSeed: '' })], queue, 1),
     ).toThrow(/framingSeed.*missing.*empty/);
+  });
+
+  // ── D-2.2 round 1.8 fields ─────────────────────────────────────────────
+
+  it('accepts emission with expectedDiscovery=null (purely coaching-unlock case)', () => {
+    const queue = new QuestionQueueManager([]);
+    expect(() =>
+      aggregateSpecificsNeedEmissions(
+        [buildEmission({ expectedDiscovery: null })],
+        queue,
+        1,
+      ),
+    ).not.toThrow();
+  });
+
+  it('throws on empty/whitespace expectedDiscovery string', () => {
+    const queue = new QuestionQueueManager([]);
+    expect(() =>
+      aggregateSpecificsNeedEmissions(
+        [buildEmission({ expectedDiscovery: '   ' })],
+        queue,
+        1,
+      ),
+    ).toThrow(/expectedDiscovery.*string \| null.*non-empty/);
+  });
+
+  it('throws on missing conceptTag', () => {
+    const queue = new QuestionQueueManager([]);
+    expect(() =>
+      aggregateSpecificsNeedEmissions(
+        [buildEmission({ conceptTag: '' })],
+        queue,
+        1,
+      ),
+    ).toThrow(/conceptTag.*missing.*empty/);
+  });
+
+  it('throws on invalid conceptComplexity enum value', () => {
+    const queue = new QuestionQueueManager([]);
+    const bad = {
+      ...buildEmission(),
+      conceptComplexity: 'extreme' as SpecificsNeedEmission['conceptComplexity'],
+    };
+    expect(() => aggregateSpecificsNeedEmissions([bad], queue, 1)).toThrow(
+      /conceptComplexity.*'extreme' is not a valid conceptComplexity/,
+    );
+  });
+
+  it('accepts each valid conceptComplexity value (simple, medium, complex)', () => {
+    const queue = new QuestionQueueManager([]);
+    for (const complexity of ['simple', 'medium', 'complex'] as const) {
+      expect(() =>
+        aggregateSpecificsNeedEmissions(
+          [buildEmission({ conceptComplexity: complexity })],
+          queue,
+          1,
+        ),
+      ).not.toThrow();
+    }
+  });
+
+  it('throws on empty conceptDefinition', () => {
+    const queue = new QuestionQueueManager([]);
+    expect(() =>
+      aggregateSpecificsNeedEmissions(
+        [buildEmission({ conceptDefinition: '' })],
+        queue,
+        1,
+      ),
+    ).toThrow(/conceptDefinition.*missing.*empty/);
+  });
+
+  it('throws on empty conceptExample', () => {
+    const queue = new QuestionQueueManager([]);
+    expect(() =>
+      aggregateSpecificsNeedEmissions(
+        [buildEmission({ conceptExample: '' })],
+        queue,
+        1,
+      ),
+    ).toThrow(/conceptExample.*missing.*empty/);
   });
 
   it('error context includes emissionIndex and sourceLayer', () => {
