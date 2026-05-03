@@ -955,6 +955,12 @@ export class SequentialDeepWalkService {
    * - Prior unresolved instances of any conceptLibrary entry whose anchor
    *   text changed since the prior iteration are marked `gapResolved: true`
    *   with `resolvedAtIteration` set to current iteration.
+   *
+   * Test access: this method is `private` but D-2.2 §11.14 unit tests
+   * exercise it via `(service as unknown as { consolidateSpecificsNeed-
+   * Emissions: typeof this.consolidateSpecificsNeedEmissions }).consolidate-
+   * SpecificsNeedEmissions(profile, walkOutputs)` to avoid mocking the
+   * full walk pipeline.
    */
   private consolidateSpecificsNeedEmissions(
     profile: EssayProfile,

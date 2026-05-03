@@ -55,6 +55,11 @@ export default defineConfig({
       // tests: collection from every profile-state layer, stable order,
       // existing-queue interaction (preserve + dedup), error propagation.
       'tests/unit/specifics-need-aggregator-integration.test.ts',
+      // Phase 2 D-2.2 §11.14 (2026-05-01) — walk consolidation step:
+      // per-essay 3 ceiling, per-concept complexity caps (simple=1,
+      // medium=2, complex=3), concept tag reuse policy, cross-pass
+      // gap-resolution detection, survivor write-back.
+      'tests/unit/walk-consolidation.test.ts',
       'tests/integration/phase0-types-migrations.test.ts',
       'tests/integration/d1-8-prior-annotations-wireup.test.ts',
       'tests/integration/d1-10-iteration-bracket.test.ts',
