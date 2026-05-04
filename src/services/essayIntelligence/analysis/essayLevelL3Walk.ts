@@ -46,11 +46,17 @@ import type {
   FindingCoachingValue,
   HolisticDimension,
   EssayGapCandidate,
+  UnderstandingWalkOutput,
+  ParagraphUnderstanding,
+  ConnectionEndpoint,
+  ConnectionStrengthCategory,
+  ConnectionDirectionality,
 } from '../profileTypes';
 import type { StructuralCartography } from '../types';
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
+import type { L3WalkResult } from './sequentialDeepWalk';
 
 const SONNET = 'claude-sonnet-4-5-20250929';
 const ESSAY_WALK_TEMPERATURE = 0.3;
@@ -469,5 +475,158 @@ export async function runEssayLevelL3Walk(
     cost: calculateCost(response.usage, SONNET),
     tokenUsage: response.usage,
     timingMs: Date.now() - startTime,
+  };
+}
+
+
+// ─── Adapter: EssayLevelL3WalkOutput → L3WalkResult shape ───────────────
+
+/**
+ * Adapt the essay-level walk's output into the legacy `L3WalkResult` shape
+ * (with N per-paragraph `UnderstandingWalkOutput[]` entries) so the
+ * orchestrator's existing `applyUnderstandingWalkStep` + finding-store +
+ * connection-mutator wire-up can consume it without rewriting downstream.
+ *
+ * Distribution rules:
+ * - paragraphSummaries are translated 1:1 into per-paragraph
+ *   `UnderstandingWalkOutput.paragraphUnderstanding`. Fields the
+ *   essay-level walk doesn't produce (rhythmPattern, depth, authenticity,
+ *   showVsTell, strongestMoment, standoutMoment) land as empty strings /
+ *   null. Downstream consumers may surface these as gaps; calibration
+ *   runs will reveal whether they're load-bearing.
+ * - newConnections, newFindings, gapCandidates are routed to the
+ *   per-paragraph slot whose anchor matches. Cross-paragraph entries land
+ *   on the LOWEST anchor paragraph index (so the `for walkOutput of
+ *   walkOutputs` loop in the orchestrator sees them in order).
+ * - holisticEvolution (centralThesis + voiceSignature + arcMomentum) is
+ *   placed on the LAST paragraph's output, mirroring the original
+ *   per-paragraph walk semantics where the last paragraph carries the
+ *   final accumulated holistic state.
+ * - sentenceUnderstandings is empty per paragraph (the essay-level walk
+ *   intentionally drops sentence-level depth — downstream layers operate
+ *   at paragraph + essay scale).
+ * - priorSentenceUpdates and findingEvolutions are empty (no sequential
+ *   walk → no back-propagation; on first analysis there are no prior
+ *   findings to evolve).
+ */
+export function adaptEssayLevelOutputToL3WalkResult(
+  output: EssayLevelL3WalkOutput,
+  cost: number,
+  tokenUsage: ClaudeResponse['usage'],
+  timingMs: number,
+): L3WalkResult {
+  const paragraphCount = output.paragraphSummaries.length;
+  const walkOutputs: UnderstandingWalkOutput[] = [];
+
+  for (let pIdx = 0; pIdx < paragraphCount; pIdx++) {
+    const summary = output.paragraphSummaries[pIdx];
+    const isLast = pIdx === paragraphCount - 1;
+
+    const paragraphUnderstanding: ParagraphUnderstanding = {
+      role: summary.role ?? '',
+      function: summary.function ?? '',
+      narrativeContribution: summary.narrativeContribution ?? '',
+      emotionalRegister: {
+        dominantEmotion: summary.dominantEmotion ?? '',
+        depth: '',
+        authenticity: '',
+        showVsTell: '',
+        strongestMoment: null,
+      },
+      craftProfile: {
+        rhythmPattern: '',
+        imageUsage: (summary.craftNotes ?? []).join('; '),
+        voiceConsistency: summary.voiceNotes ?? '',
+        standoutMoment: null,
+      },
+    };
+
+    // Distribute findings: route by scope.paragraph (single-paragraph) or
+    // lowest scope.paragraphs[] entry (cross-paragraph) so each finding
+    // lands on exactly one walkOutput.
+    const findingsForThisPara = output.findings.filter((f) => {
+      const scope = f.scope as { paragraph?: number; paragraphs?: number[] };
+      if (typeof scope.paragraph === 'number') return scope.paragraph === pIdx;
+      if (Array.isArray(scope.paragraphs) && scope.paragraphs.length > 0) {
+        return Math.min(...scope.paragraphs) === pIdx;
+      }
+      return pIdx === 0; // essay-level findings → P0
+    });
+
+    // Distribute connections: route by from.paragraph (the connection's
+    // origin endpoint) so each connection lands once.
+    const connectionsForThisPara = output.connections.filter(
+      (c) => c.from.paragraph === pIdx,
+    );
+
+    // Distribute gap candidates: route by anchorParagraph.
+    const gapCandidatesForThisPara = output.gapCandidates.filter(
+      (g) => g.anchorParagraph === pIdx,
+    );
+
+    const walkOutput: UnderstandingWalkOutput = {
+      paragraphIndex: pIdx,
+      paragraphUnderstanding,
+      sentenceUnderstandings: [],
+      // Holistic evolution: only the last paragraph carries the final
+      // accumulated state (mirrors the legacy walk's semantics).
+      holisticEvolution: isLast
+        ? {
+            centralThesis: output.centralThesis,
+            thesisConfidence: output.thesisConfidence,
+            voiceSignature: output.voiceSignature,
+            arcMomentum: output.arcMomentum,
+          }
+        : {},
+      priorSentenceUpdates: [],
+      newConnections: connectionsForThisPara.map((c) => ({
+        from: { paragraph: c.from.paragraph, sentence: c.from.sentence, label: c.from.label } as ConnectionEndpoint,
+        to: { paragraph: c.to.paragraph, sentence: c.to.sentence, label: c.to.label } as ConnectionEndpoint,
+        description: c.description,
+        reverseIllumination: c.reverseIllumination,
+        significance: c.significance,
+        strengthCategory: c.strengthCategory as ConnectionStrengthCategory,
+        directionality: c.directionality as ConnectionDirectionality,
+      })),
+      newFindings: findingsForThisPara.map((f) => ({
+        claim: f.claim,
+        scope: f.scope as FindingScope,
+        maturity: f.maturity as FindingMaturity,
+        maturityReasoning: f.maturityReasoning,
+        coachingValue: f.coachingValue as FindingCoachingValue,
+        dimensions: f.dimensions as HolisticDimension[],
+        evidence: f.evidence.map((e) => ({
+          text: e.text,
+          location: e.location,
+          type: 'present' as const,
+        })),
+        deepeningPotential: f.deepeningPotential,
+        raisesQuestions: f.raisesQuestions,
+      })),
+      findingEvolutions: [],
+      gapCandidates: gapCandidatesForThisPara,
+    };
+
+    walkOutputs.push(walkOutput);
+  }
+
+  return {
+    walkOutputs,
+    backPropagations: [],
+    holisticEvolution: {
+      centralThesis: output.centralThesis,
+      thesisConfidence: output.thesisConfidence,
+      voiceSignature: output.voiceSignature,
+      arcMomentum: output.arcMomentum,
+    },
+    skippedParagraphs: [],
+    cost,
+    tokenUsage: {
+      inputTokens: tokenUsage.input_tokens,
+      outputTokens: tokenUsage.output_tokens,
+      cacheReadTokens: tokenUsage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: tokenUsage.cache_creation_input_tokens ?? 0,
+    },
+    timingMs,
   };
 }

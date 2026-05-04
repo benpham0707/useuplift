@@ -81,8 +81,8 @@ import { structuralCartographerService } from './structuralCartographer';
 import type { StructuralCartographyResult } from './structuralCartographer';
 import { scoutPassService } from './scoutPass';
 import type { ScoutPassResult } from './scoutPass';
-import { sequentialDeepWalkService } from './sequentialDeepWalk';
 import type { L3WalkResult } from './sequentialDeepWalk';
+import { runEssayLevelL3Walk, adaptEssayLevelOutputToL3WalkResult } from './essayLevelL3Walk';
 import { holisticSynthesisService, synthesizeUnderstandingProse } from './holisticSynthesis';
 import type { HolisticSynthesisResult, DeltaSynthesisResult, SynthesisIterationResult } from './holisticSynthesis';
 
@@ -661,28 +661,34 @@ export class AnalysisOrchestrator {
     try {
       const profile = coordinator.getProfile();
 
-      // Build reanalysis context string for L3 walk injection (Fix A3.1)
-      let l3ReanalysisContext: string | undefined;
-      if (input.reanalysisBrief) {
-        const brief = input.reanalysisBrief;
-        const staleLines = brief.staleAreas.map((a) => `• ${a}`).join('\n');
-        l3ReanalysisContext = `${brief.summaryForPrompt}${staleLines ? `\n\nSTALE AREAS:\n${staleLines}` : ''}`;
-      }
-
-      // Pass FindingStore to walk so it can see prior findings (re-analysis evolution)
-      const walkFindingStore = coordinator.getFindingStore();
-
-      l3Result = await sequentialDeepWalkService.walkEssay(
+      // Step 6 (Option 5 architecture, 2026-05-03): essay-level L3 walk
+      // replaces the per-paragraph sequential walk. One Sonnet call with
+      // full-essay context produces all paragraph summaries + findings +
+      // connections + gap candidates simultaneously. Step 5 isolated test
+      // on Crochet showed 12 findings (vs 0 from per-paragraph) and $0.16
+      // cost (vs $0.46). Adapter translates the essay-level output into
+      // the legacy per-paragraph L3WalkResult shape so the existing
+      // applyUnderstandingWalkStep loop, finding-store routing, connection
+      // mutator, and downstream layers work unchanged.
+      //
+      // Re-analysis context (input.reanalysisBrief) and prior FindingStore
+      // (walkFindingStore) are NOT yet threaded into the essay-level walk.
+      // These will be added in a follow-up step once the first-pass path
+      // is validated end-to-end on Crochet. For first analyses (no prior
+      // findings, no reanalysisBrief), this is a no-op.
+      const essayWalkResult = await runEssayLevelL3Walk(
         input.essayText,
-        profile as EssayProfile,
+        l1Result.impressions,
         structuralMap,
         scoutOutput,
-        l1Result.impressions,
-        {
-          reanalysisContext: l3ReanalysisContext,
-          findingStore: walkFindingStore.size > 0 ? walkFindingStore : undefined,
-          essayId: input.essayId,
-        },
+        profile as EssayProfile,
+      );
+
+      l3Result = adaptEssayLevelOutputToL3WalkResult(
+        essayWalkResult.output,
+        essayWalkResult.cost,
+        essayWalkResult.tokenUsage,
+        essayWalkResult.timingMs,
       );
 
       // Apply each walk step to the coordinator
