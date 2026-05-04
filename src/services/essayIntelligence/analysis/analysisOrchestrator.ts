@@ -671,17 +671,33 @@ export class AnalysisOrchestrator {
       // applyUnderstandingWalkStep loop, finding-store routing, connection
       // mutator, and downstream layers work unchanged.
       //
-      // Re-analysis context (input.reanalysisBrief) and prior FindingStore
-      // (walkFindingStore) are NOT yet threaded into the essay-level walk.
-      // These will be added in a follow-up step once the first-pass path
-      // is validated end-to-end on Crochet. For first analyses (no prior
-      // findings, no reanalysisBrief), this is a no-op.
+      // Step 9 (2026-05-04): re-analysis context + prior FindingStore now
+      // threaded into the essay-level walk. On first analyses (no
+      // reanalysisBrief, empty findingStore) both render as empty strings
+      // — pre-Step-9 behavior preserved. On re-analysis they front-load
+      // the "what changed" framing and expose prior finding IDs for
+      // buildsOn/relatedTo edges, mirroring the legacy walk's contract.
+      let essayWalkReanalysisContext: string | undefined;
+      if (input.reanalysisBrief) {
+        const brief = input.reanalysisBrief;
+        const staleLines = brief.staleAreas.map((a) => `• ${a}`).join('\n');
+        essayWalkReanalysisContext = `${brief.summaryForPrompt}${
+          staleLines ? `\n\nSTALE AREAS:\n${staleLines}` : ''
+        }`;
+      }
+      const essayWalkFindingStore = coordinator.getFindingStore();
+
       const essayWalkResult = await runEssayLevelL3Walk(
         input.essayText,
         l1Result.impressions,
         structuralMap,
         scoutOutput,
         profile as EssayProfile,
+        {
+          reanalysisContext: essayWalkReanalysisContext,
+          findingStore:
+            essayWalkFindingStore.size > 0 ? essayWalkFindingStore : undefined,
+        },
       );
 
       l3Result = adaptEssayLevelOutputToL3WalkResult(

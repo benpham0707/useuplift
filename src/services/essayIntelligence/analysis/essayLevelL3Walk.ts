@@ -57,6 +57,8 @@ import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import type { ClaudeResponse } from '../../../lib/llm/claude';
 import { parseLlmJsonOutput } from './llmJsonParser';
 import type { L3WalkResult } from './sequentialDeepWalk';
+import type { FindingStore } from '../findings/findingStore';
+import { buildFindingReferenceContext } from '../findings/findingContextBuilder';
 
 const SONNET = 'claude-sonnet-4-5-20250929';
 const ESSAY_WALK_TEMPERATURE = 0.3;
@@ -291,6 +293,8 @@ function buildUserPrompt(
   l1Impressions: ParagraphFirstImpression[],
   structuralMap: StructuralCartography,
   scoutOutput: ConnectionScoutOutput,
+  reanalysisContext?: string,
+  findingStore?: FindingStore,
 ): string {
   const paragraphs = essayText.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
 
@@ -357,7 +361,24 @@ function buildUserPrompt(
     }
   }
 
-  return `=== ESSAY TEXT (${paragraphs.length} paragraphs, 0-indexed [P{n}S{n}] labels) ===
+  // ── RE-ANALYSIS CONTEXT (front-load when present) ────────────────────
+  // Mirrors the legacy walk's positioning: re-analysis brief lands FIRST
+  // so the LLM reads the "what changed and why we're re-running" framing
+  // before consuming essay text + accumulated context. On first analyses
+  // this stays empty (no-op). Empty string suppresses the section header.
+  const reanalysisBlock = reanalysisContext && reanalysisContext.trim().length > 0
+    ? `=== RE-ANALYSIS CONTEXT (these areas changed — prioritize them) ===\n${reanalysisContext}\n\n`
+    : '';
+
+  // ── EXISTING FINDINGS (when re-walking against a prior FindingStore) ─
+  // Lets the walk reference prior findings by ID via buildsOn / relatedTo
+  // edges, supporting the W1.3 finding-graph evolution model. On first
+  // analyses (empty store) the helper returns '' and no section is added.
+  const findingsBlock = findingStore && findingStore.size > 0
+    ? `${buildFindingReferenceContext(findingStore)}\n\n`
+    : '';
+
+  return `${reanalysisBlock}${findingsBlock}=== ESSAY TEXT (${paragraphs.length} paragraphs, 0-indexed [P{n}S{n}] labels) ===
 
 ${markedEssay}
 
@@ -413,10 +434,23 @@ export async function runEssayLevelL3Walk(
   structuralMap: StructuralCartography,
   scoutOutput: ConnectionScoutOutput,
   _profile?: Readonly<EssayProfile>, // reserved for future use (re-walk against existing findings)
+  options?: {
+    /** Re-analysis brief from input.reanalysisBrief, rendered into the prompt. */
+    reanalysisContext?: string;
+    /** Prior FindingStore — when non-empty, existing findings are exposed for buildsOn/relatedTo references. */
+    findingStore?: FindingStore;
+  },
 ): Promise<EssayLevelL3WalkResult> {
   const startTime = Date.now();
 
-  const userPrompt = buildUserPrompt(essayText, l1Impressions, structuralMap, scoutOutput);
+  const userPrompt = buildUserPrompt(
+    essayText,
+    l1Impressions,
+    structuralMap,
+    scoutOutput,
+    options?.reanalysisContext,
+    options?.findingStore,
+  );
 
   const response = await callClaudeWithRetry<Record<string, unknown>>({
     model: SONNET,
