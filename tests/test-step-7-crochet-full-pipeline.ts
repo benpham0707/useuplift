@@ -36,15 +36,25 @@ import type { EssayProfile } from '../src/services/essayIntelligence/profileType
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Essay can be overridden via CLI arg: `npx tsx ... --essay <filename>`.
+// When absent, defaults to Crochet (the original Step 7 calibration).
+const ESSAY_FILENAME =
+  (() => {
+    const idx = process.argv.indexOf('--essay');
+    return idx >= 0 && process.argv[idx + 1]
+      ? process.argv[idx + 1]
+      : '14-harvard-2028-crochet.txt';
+  })();
 const ESSAY_PATH = path.join(
   __dirname,
   'calibration',
   'top-tier-reference',
   'essays',
-  '14-harvard-2028-crochet.txt',
+  ESSAY_FILENAME,
 );
+const ESSAY_LABEL = ESSAY_FILENAME.replace(/\.txt$/, '');
 const OUTPUT_DIR = path.join(__dirname, 'output');
-const COST_HARD_CAP_USD = 1.5;
+const COST_HARD_CAP_USD = 3.0;
 
 function fmtCost(n: number): string {
   return `$${n.toFixed(4)}`;
@@ -72,14 +82,14 @@ async function main(): Promise<void> {
 
   const essayText = (await fs.readFile(ESSAY_PATH, 'utf-8')).trim();
   console.log(
-    `[step-7] Loaded Crochet: ${essayText.length} chars, ${essayText.split(/\s+/).length} words`,
+    `[step-7] Loaded ${ESSAY_LABEL}: ${essayText.length} chars, ${essayText.split(/\s+/).length} words`,
   );
 
   const startTime = Date.now();
 
   console.log('[step-7] Running full pipeline (L1 → L4) via analysisOrchestrator...');
   const pipelineResult = await analysisOrchestrator.analyzeEssay({
-    essayId: 'step-7-crochet-full-pipeline',
+    essayId: `step-7-${ESSAY_LABEL}-full-pipeline`,
     essayText,
     essayType: 'common_app',
     includeAnnotations: false,
@@ -201,14 +211,14 @@ async function main(): Promise<void> {
   await fs.mkdir(OUTPUT_DIR, { recursive: true });
   const reportPath = path.join(
     OUTPUT_DIR,
-    `step-7-crochet-${new Date().toISOString().replace(/[:.]/g, '-')}.md`,
+    `step-7-${ESSAY_LABEL}-${new Date().toISOString().replace(/[:.]/g, '-')}.md`,
   );
 
   const lines: string[] = [];
-  lines.push('# Step 7 — Crochet full pipeline (essay-level L3 walk wired)');
+  lines.push(`# Step 7/10 — ${ESSAY_LABEL} full pipeline (essay-level L3 walk wired)`);
   lines.push('');
   lines.push(`- **Date**: ${new Date().toISOString()}`);
-  lines.push(`- **Essay**: 14-harvard-2028-crochet.txt`);
+  lines.push(`- **Essay**: ${ESSAY_FILENAME}`);
   lines.push(
     `- **Time**: ${fmtMs(totalMs)} | **Cost**: ${fmtCost(totalCost)}`,
   );
