@@ -1828,20 +1828,25 @@ ${buildFabricationGuardBlock()}`;
       enrichment, // Scope 1 GAP-6/7/8
     );
 
-    // 3-block caching: system (cached) + shared digest (cached) + paragraph context (not cached)
-    // Block 2 is the COMPACT shared digest (~1800 tokens for L5) instead of the full profile dump.
-    // Paragraph-relevant holistic data is injected between the shared context and the paragraph prompt,
-    // filtered by the AnalysisContextBuilder to only include dimensions relevant to THIS paragraph.
+    // C5 (2026-05-04): 3-block caching now actually wired (system + shared
+    // digest + per-paragraph tail). The comment block here promised this
+    // since the layer was built but only system caching was hooked up —
+    // each L5 call paid full input cost on `sharedContext`. With the
+    // user-prompt cache breakpoint after sharedContext, paragraph 1 writes
+    // the cache (1.25× on ~1800 tokens) and paragraphs 2..N read it (0.1×).
+    // Estimated savings: ~$0.05-0.10 per essay × N annotations when L5 is on.
     const relevantSection = paragraphRelevantContext
       ? `${paragraphRelevantContext}\n\n`
       : '';
-    const userMessage = `${sharedContext}\n\n===\n\n${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}`;
 
     const response: ClaudeResponse<RawParagraphAnnotationOutput> = await callClaudeWithRetry<RawParagraphAnnotationOutput>(
       {
         model: SONNET,
         systemPrompt,
-        userPrompt: userMessage,
+        userPromptBlocks: [
+          { text: `${sharedContext}\n\n===\n\n`, cacheBreakpoint: true },
+          { text: `${relevantSection}TARGET PARAGRAPH ANNOTATION REQUEST:\n\n${paragraphPrompt}` },
+        ],
         maxTokens: 2000,
         temperature: 0.3,
         useJsonMode: true,

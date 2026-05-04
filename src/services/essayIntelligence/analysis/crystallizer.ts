@@ -2125,10 +2125,19 @@ export class CrystallizerService {
     const northStarSystemPrompt = buildSystemPromptL4aNorthStar(scale, essayType);
     const northStarCallInstruction = buildCallInstructionL4aNorthStar(profile, scale, priorNorthStar);
 
+    // C2 (2026-05-04): user-prompt cache breakpoint after the shared
+    // 30K-token bedrock (profileContext + corpusPrepend). NorthStar
+    // writes the cache; ScoreMatrix and L4b read it. ~$0.25/essay
+    // first-pass savings. Quality risk = zero (cache reads are bit-
+    // identical to fresh reads).
+    const l4SharedBedrock = profileContext + '\n\n' + corpusPrepend;
     const northStarResponse = await callClaudeWithRetry<RawNorthStarOutput>({
       model: SONNET,
       systemPrompt: northStarSystemPrompt,
-      userPrompt: profileContext + '\n\n' + corpusPrepend + northStarCallInstruction,
+      userPromptBlocks: [
+        { text: l4SharedBedrock, cacheBreakpoint: true },
+        { text: northStarCallInstruction },
+      ],
       maxTokens: L4A_NORTH_STAR_MAX_TOKENS,
       temperature: TEMPERATURE,
       useJsonMode: true,
@@ -2161,7 +2170,10 @@ export class CrystallizerService {
     const scoreMatrixResponse = await callClaudeWithRetry<RawScoreMatrixOutput>({
       model: SONNET,
       systemPrompt: scoreMatrixSystemPrompt,
-      userPrompt: profileContext + '\n\n' + corpusPrepend + scoreMatrixCallInstruction,
+      userPromptBlocks: [
+        { text: l4SharedBedrock, cacheBreakpoint: true },
+        { text: scoreMatrixCallInstruction },
+      ],
       maxTokens: L4A_SCORE_MATRIX_MAX_TOKENS,
       temperature: TEMPERATURE,
       useJsonMode: true,
@@ -2250,7 +2262,10 @@ export class CrystallizerService {
       const l4bResponse = await callClaudeWithRetry<RawL4bOutput>({
         model: SONNET,
         systemPrompt: l4bSystemPrompt,
-        userPrompt: profileContext + '\n\n' + corpusPrepend + l4bCallInstruction,
+        userPromptBlocks: [
+          { text: l4SharedBedrock, cacheBreakpoint: true },
+          { text: l4bCallInstruction },
+        ],
         maxTokens: L4B_MAX_OUTPUT_TOKENS,
         temperature: TEMPERATURE,
         useJsonMode: true,

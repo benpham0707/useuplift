@@ -477,10 +477,39 @@ function createTimeoutPromise(timeoutMs: number): { promise: Promise<never>; can
  * Extended input format for Claude calls with userPrompt/systemPrompt.
  * This is a simpler alternative to the messages array format.
  */
+/**
+ * Block of user-prompt text with optional cache breakpoint.
+ * When `cacheBreakpoint: true`, the Anthropic API caches the prefix
+ * up to and including this block. Use this for stable shared context
+ * (essay text, accumulated profile, layer outputs) that's reused
+ * across multiple calls within the 5-minute prompt-cache TTL.
+ *
+ * Anthropic supports up to 4 cache breakpoints per request. Place them
+ * at the END of stable prefixes — the cache is keyed on the prefix
+ * up to the breakpoint, so any change in earlier blocks invalidates
+ * the cache.
+ */
+export interface UserPromptBlock {
+  text: string;
+  cacheBreakpoint?: boolean;
+}
+
 interface ClaudeSimpleInput {
   model?: string;
   systemPrompt?: string;
-  userPrompt: string;
+  /**
+   * Single string user prompt (current default). Mutually exclusive with
+   * `userPromptBlocks`. When both are provided, `userPromptBlocks` wins.
+   */
+  userPrompt?: string;
+  /**
+   * Multi-block user prompt with optional per-block cache breakpoints.
+   * Use when the prompt has a stable shared prefix that should be
+   * cached across calls. The wrapper assembles these into a single
+   * user message with proper cache_control on requested blocks.
+   * Mutually exclusive with `userPrompt`.
+   */
+  userPromptBlocks?: UserPromptBlock[];
   maxTokens?: number;
   temperature?: number;
   timeoutMs?: number;
@@ -503,7 +532,10 @@ export async function callClaude<T = any>(
   // Determine which interface is being used
   const isObject = typeof promptOrInput !== 'string';
   const hasMessages = isObject && 'messages' in (promptOrInput as ClaudeMessageInput);
-  const hasUserPrompt = isObject && 'userPrompt' in (promptOrInput as ClaudeSimpleInput);
+  const hasUserPrompt =
+    isObject &&
+    ('userPrompt' in (promptOrInput as ClaudeSimpleInput) ||
+      'userPromptBlocks' in (promptOrInput as ClaudeSimpleInput));
 
   let model: string;
   let temperature: number;
@@ -540,12 +572,37 @@ export async function callClaude<T = any>(
     useJsonMode = input.useJsonMode ?? false;
     cacheSystemPrompt = input.cacheSystemPrompt ?? false;
 
-    messages = [
-      {
-        role: 'user' as const,
-        content: [{ type: 'text' as const, text: input.userPrompt }],
-      },
-    ];
+    // Build user message content. When userPromptBlocks is provided,
+    // assemble a multi-block content array with cache_control on
+    // breakpoint blocks. Otherwise fall through to a single text block
+    // from the legacy `userPrompt` string field.
+    const blocks = input.userPromptBlocks;
+    if (blocks && blocks.length > 0) {
+      const contentBlocks = blocks.map((b) => {
+        const block: Anthropic.Messages.TextBlockParam = {
+          type: 'text' as const,
+          text: b.text,
+        };
+        if (b.cacheBreakpoint) {
+          block.cache_control = { type: 'ephemeral' as const };
+        }
+        return block;
+      });
+      messages = [
+        {
+          role: 'user' as const,
+          content: contentBlocks,
+        },
+      ];
+    } else {
+      const promptText = input.userPrompt ?? '';
+      messages = [
+        {
+          role: 'user' as const,
+          content: [{ type: 'text' as const, text: promptText }],
+        },
+      ];
+    }
   } else {
     // String-based interface: callClaude(userPrompt, options)
     const opts = options ?? {};
