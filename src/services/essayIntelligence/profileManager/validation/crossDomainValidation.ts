@@ -332,7 +332,9 @@ function checkNorthStarHolisticCoherence(profile: Readonly<EssayProfile>): Valid
 
   for (const role of northStar.structuralRolesMap) {
     const isKeyRole = pivotRoles.some(
-      (pr) => role.role.toLowerCase().includes(pr) || role.significance.toLowerCase().includes(pr),
+      (pr) =>
+        (role.role ?? '').toLowerCase().includes(pr) ||
+        (role.significance ?? '').toLowerCase().includes(pr),
     );
     if (isKeyRole) {
       for (const pIdx of role.paragraphs) {
@@ -534,8 +536,10 @@ function checkVoiceMapVsVoiceIdentity(
 
   if (unintentionalShifts.length < 3) return contradictions;
 
-  // Check if voiceIdentity claims consistency
-  const consistencyText = profile.voiceIdentity.consistency.toLowerCase();
+  // Check if voiceIdentity claims consistency. Guard against undefined
+  // consistency field (seen on profiles where L3.75 truncation dropped
+  // optional voiceIdentity sub-fields).
+  const consistencyText = (profile.voiceIdentity?.consistency ?? '').toLowerCase();
   const consistencyMarkers = [
     'consistent', 'unified', 'cohesive', 'stable', 'steady',
     'uniform', 'harmonious', 'unwavering',
@@ -553,7 +557,7 @@ function checkVoiceMapVsVoiceIdentity(
       },
       evidenceB: {
         section: 'voiceIdentity.consistency',
-        claim: `Voice identity describes consistency as: "${profile.voiceIdentity.consistency.substring(0, 150)}"`,
+        claim: `Voice identity describes consistency as: "${(profile.voiceIdentity?.consistency ?? '').substring(0, 150)}"`,
       },
       severity: unintentionalShifts.length >= 5 ? 'blocking' : 'notable',
       consumed: false,
@@ -652,7 +656,7 @@ function checkEarnednessVsEffectiveness(
         type: 'earnedness_vs_effectiveness',
         evidenceA: {
           section: `momentEarnednessMap`,
-          claim: `P${paraIdx} has an earned moment: "${moment.moment.substring(0, 120)}" (${moment.mechanisms.length} earning mechanism(s))`,
+          claim: `P${paraIdx} has an earned moment: "${(moment.moment ?? '').substring(0, 120)}" (${moment.mechanisms?.length ?? 0} earning mechanism(s))`,
           location: { paragraph: paraIdx },
         },
         evidenceB: {

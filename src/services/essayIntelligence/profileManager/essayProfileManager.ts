@@ -1984,6 +1984,23 @@ export class EssayProfileCoordinator {
     );
     allMutations.push(...pMutations);
 
+    // 2b. Option 5 rebuild — propagate per-paragraph gap candidates onto
+    // the paragraph's understanding. Phase B (essayLevelEmissionService)
+    // reads from `para.understanding.gapCandidates` to assemble its
+    // candidate pool. The legacy sequentialDeepWalk did this in its own
+    // `applyToProfile`, but the coordinator path (which the orchestrator
+    // uses for both the legacy and essay-level walks) had no equivalent
+    // step — gap candidates produced by the walk never reached Phase B,
+    // and Phase B silently emitted zero. Diagnosed during Step 7 Crochet
+    // calibration (2026-05-04). Append-only by paragraph; later writes
+    // overwrite per the supersession model used elsewhere in walk output.
+    if (output.gapCandidates && output.gapCandidates.length > 0) {
+      const para = this.profile.paragraphs[pIdx];
+      if (para && para.understanding) {
+        para.understanding.gapCandidates = output.gapCandidates;
+      }
+    }
+
     // 3. SentenceMutator: apply back-propagations
     for (const backProp of output.priorSentenceUpdates) {
       const bpMutations = this.sentenceMutator.applyBackPropagation(this.profile, backProp);

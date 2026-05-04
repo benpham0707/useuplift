@@ -174,7 +174,7 @@ async function main(): Promise<void> {
     profile.voiceMap ? 'present' : 'missing',
   );
 
-  const connectionsCount = profile.connections?.length ?? 0;
+  const connectionsCount = profile.connections?.all?.length ?? 0;
   checkAll(
     'Connections persisted to profile',
     connectionsCount > 0,
