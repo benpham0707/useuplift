@@ -1,47 +1,459 @@
-/**
- * College Seed Script
- *
- * Seeds the colleges table with ~300 colleges covering:
- * - Top nationals (~80): Ivies, Stanford, MIT, etc.
- * - Public flagships (~80): UC system, UVA, UMich, etc.
- * - HBCUs/HSIs/MSIs (~60): Howard, Spelman, UT El Paso, etc.
- * - Geographic coverage (~40): 1-2 colleges per state
- * - Community colleges (~40): Strong transfer programs
- *
- * Data Source: College Scorecard API (public domain)
- * Manual Curation: Logos, colors, descriptions for top schools
- *
- * Required Environment Variables:
- * - SUPABASE_URL: Your Supabase project URL
- * - SUPABASE_SERVICE_ROLE_KEY: Service role key (bypasses RLS)
- *
- * Usage:
- *   npx tsx scripts/seed-colleges.ts
- */
+// scripts/seed-colleges.ts
+//
+// One-time seed script. Pulls institutional data from the College Scorecard API,
+// transforms it, and upserts into the colleges table.
+//
+// Run with: npx tsx scripts/seed-colleges.ts
+// Re-runs are safe (idempotent upsert on scorecard_id).
 
-import { config } from 'dotenv';
+import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
-import fs from 'fs';
-import path from 'path';
 
-// Load .env file
-config();
+// ===== Configuration =====
 
-// Configuration
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SCORECARD_API_KEY = process.env.COLLEGE_SCORECARD_API;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// IMPORTANT: This script needs the SERVICE ROLE key (not anon) to write to colleges.
+// If service role isn't set, fall back to anon key but warn — RLS may block writes.
 
-// Validate environment
-if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
-  console.error('❌ Missing Supabase environment variables');
-  console.log('   Need: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY');
-  process.exit(1);
+if (!SCORECARD_API_KEY) {
+  throw new Error('COLLEGE_SCORECARD_API is not set in .env');
+}
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error('Supabase URL or service role key not configured');
 }
 
-// Initialize Supabase client with service role (bypasses RLS)
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Helper function to create slug from college name
+// ===== Field list (must match section 5) =====
+
+const FIELDS = [
+  'id',
+  'school.name',
+  'school.city',
+  'school.state',
+  'school.zip',
+  'school.school_url',
+  'location.lat',
+  'location.lon',
+  'school.region_id',
+  'school.ownership',
+  'school.degrees_awarded.predominant',
+  'school.locale',
+  'school.carnegie_size_setting',
+  'school.minority_serving.historically_black',
+  'school.minority_serving.hispanic',
+  'school.minority_serving.tribal',
+  'school.women_only',
+  'school.men_only',
+  'school.religious_affiliation',
+  'latest.student.size',
+  'latest.student.enrollment.all',
+  'latest.admissions.admission_rate.overall',
+  'latest.admissions.sat_scores.25th_percentile.critical_reading',
+  'latest.admissions.sat_scores.75th_percentile.critical_reading',
+  'latest.admissions.sat_scores.25th_percentile.math',
+  'latest.admissions.sat_scores.75th_percentile.math',
+  'latest.admissions.act_scores.25th_percentile.cumulative',
+  'latest.admissions.act_scores.75th_percentile.cumulative',
+  'latest.cost.tuition.in_state',
+  'latest.cost.tuition.out_of_state',
+  'latest.cost.attendance.academic_year',
+  'latest.cost.avg_net_price.overall',
+  'latest.aid.pell_grant_rate',
+  'latest.completion.rate_suppressed.overall',
+  'latest.student.retention_rate.four_year.full_time',
+  'latest.earnings.10_yrs_after_entry.median',
+  'latest.student.share_firstgeneration',
+  'latest.student.demographics.race_ethnicity.white',
+  'latest.student.demographics.race_ethnicity.black',
+  'latest.student.demographics.race_ethnicity.hispanic',
+  'latest.student.demographics.race_ethnicity.asian',
+  'latest.student.demographics.race_ethnicity.aian',
+  'latest.student.demographics.race_ethnicity.nhpi',
+  'latest.student.demographics.race_ethnicity.two_or_more',
+  'latest.student.demographics.race_ethnicity.non_resident_alien',
+  'latest.academics.program_percentage.agriculture',
+  'latest.academics.program_percentage.resources',
+  'latest.academics.program_percentage.architecture',
+  'latest.academics.program_percentage.ethnic_cultural_gender',
+  'latest.academics.program_percentage.communication',
+  'latest.academics.program_percentage.communications_technology',
+  'latest.academics.program_percentage.computer',
+  'latest.academics.program_percentage.personal_culinary',
+  'latest.academics.program_percentage.education',
+  'latest.academics.program_percentage.engineering',
+  'latest.academics.program_percentage.engineering_technology',
+  'latest.academics.program_percentage.language',
+  'latest.academics.program_percentage.family_consumer_science',
+  'latest.academics.program_percentage.legal',
+  'latest.academics.program_percentage.english',
+  'latest.academics.program_percentage.humanities',
+  'latest.academics.program_percentage.library',
+  'latest.academics.program_percentage.biological',
+  'latest.academics.program_percentage.mathematics',
+  'latest.academics.program_percentage.military',
+  'latest.academics.program_percentage.multidiscipline',
+  'latest.academics.program_percentage.parks_recreation_fitness',
+  'latest.academics.program_percentage.philosophy_religious',
+  'latest.academics.program_percentage.theology_religious_vocation',
+  'latest.academics.program_percentage.physical_science',
+  'latest.academics.program_percentage.science_technology',
+  'latest.academics.program_percentage.psychology',
+  'latest.academics.program_percentage.security_law_enforcement',
+  'latest.academics.program_percentage.public_administration_social_service',
+  'latest.academics.program_percentage.social_science',
+  'latest.academics.program_percentage.construction',
+  'latest.academics.program_percentage.mechanic_repair_technology',
+  'latest.academics.program_percentage.precision_production',
+  'latest.academics.program_percentage.transportation',
+  'latest.academics.program_percentage.visual_performing',
+  'latest.academics.program_percentage.health',
+  'latest.academics.program_percentage.business_marketing',
+  'latest.academics.program_percentage.history',
+].join(',');
+
+// ===== API filters =====
+
+const API_FILTERS = [
+  'school.operating=1',
+  'school.degrees_awarded.predominant__range=2..3',
+  'latest.student.size__range=100..',
+].join('&');
+
+// ===== Program name to CIP code mapping =====
+
+const PROGRAM_NAME_TO_CIP: Record<string, string> = {
+  'agriculture': '01',
+  'resources': '03',
+  'architecture': '04',
+  'ethnic_cultural_gender': '05',
+  'communication': '09',
+  'communications_technology': '10',
+  'computer': '11',
+  'personal_culinary': '12',
+  'education': '13',
+  'engineering': '14',
+  'engineering_technology': '15',
+  'language': '16',
+  'family_consumer_science': '19',
+  'legal': '22',
+  'english': '23',
+  'humanities': '24',
+  'library': '25',
+  'biological': '26',
+  'mathematics': '27',
+  'military': '29',
+  'multidiscipline': '30',
+  'parks_recreation_fitness': '31',
+  'philosophy_religious': '38',
+  'theology_religious_vocation': '39',
+  'physical_science': '40',
+  'science_technology': '41',
+  'psychology': '42',
+  'security_law_enforcement': '43',
+  'public_administration_social_service': '44',
+  'social_science': '45',
+  'construction': '46',
+  'mechanic_repair_technology': '47',
+  'precision_production': '48',
+  'transportation': '49',
+  'visual_performing': '50',
+  'health': '51',
+  'business_marketing': '52',
+  'history': '54',
+};
+
+// ===== Main flow =====
+
+async function main() {
+  console.log('🎓 Starting College Scorecard ingestion...');
+
+  // 1. Load CIP → interest tag mapping into memory
+  const cipMap = await loadCipMapping();
+  console.log(`✓ Loaded ${Object.keys(cipMap).length} CIP mappings`);
+
+  // 2. Fetch all pages
+  let page = 0;
+  let totalFetched = 0;
+  let totalUpserted = 0;
+  let totalSkipped = 0;
+  let totalRecords = Infinity;
+
+  while (totalFetched < totalRecords) {
+    const response = await fetchPage(page);
+
+    if (page === 0) {
+      totalRecords = response.metadata.total;
+      console.log(`📊 Total matching records: ${totalRecords}`);
+    }
+
+    const transformed = response.results
+      .map((raw: any) => transformRecord(raw, cipMap))
+      .filter((rec): rec is CollegeRecord => rec !== null);
+
+    totalSkipped += response.results.length - transformed.length;
+
+    if (transformed.length > 0) {
+      // Process records one by one to handle conflicts gracefully
+      for (const record of transformed) {
+        const { error } = await supabase
+          .from('colleges')
+          .upsert([record], { onConflict: 'scorecard_id', ignoreDuplicates: false });
+
+        if (error) {
+          // If slug conflict, try updating by scorecard_id or inserting with modified slug
+          if (error.code === '23505' && error.message.includes('slug')) {
+            // Try to update existing record by scorecard_id
+            const { error: updateError } = await supabase
+              .from('colleges')
+              .update(record)
+              .eq('scorecard_id', record.scorecard_id);
+
+            if (updateError) {
+              // If no existing scorecard_id, update by slug
+              const { error: slugUpdateError } = await supabase
+                .from('colleges')
+                .update(record)
+                .eq('slug', record.slug);
+
+              if (slugUpdateError) {
+                console.error(`❌ Failed to upsert ${record.name}:`, error);
+                continue;
+              }
+            }
+          } else {
+            console.error(`❌ Upsert failed for ${record.name}:`, error);
+            continue;
+          }
+        }
+        totalUpserted++;
+      }
+    }
+
+    totalFetched += response.results.length;
+    console.log(
+      `  Page ${page}: ${response.results.length} fetched, ${transformed.length} upserted (running total: ${totalUpserted})`
+    );
+
+    page++;
+
+    // Gentle pacing to avoid rate limits
+    await new Promise((r) => setTimeout(r, 100));
+  }
+
+  console.log('');
+  console.log('✅ Ingestion complete');
+  console.log(`   Total fetched:  ${totalFetched}`);
+  console.log(`   Total upserted: ${totalUpserted}`);
+  console.log(`   Total skipped:  ${totalSkipped}`);
+}
+
+// ===== Helpers =====
+
+async function fetchPage(page: number) {
+  const url =
+    `https://api.data.gov/ed/collegescorecard/v1/schools` +
+    `?api_key=${SCORECARD_API_KEY}` +
+    `&${API_FILTERS}` +
+    `&fields=${FIELDS}` +
+    `&per_page=100` +
+    `&page=${page}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Scorecard API error ${res.status}: ${await res.text()}`);
+  }
+  return res.json();
+}
+
+async function loadCipMapping(): Promise<Record<string, string[]>> {
+  const { data, error } = await supabase
+    .from('cip_interest_mapping')
+    .select('cip_code, interest_tags');
+
+  if (error) throw error;
+
+  const map: Record<string, string[]> = {};
+  for (const row of data ?? []) {
+    map[row.cip_code] = row.interest_tags;
+  }
+  return map;
+}
+
+interface CollegeRecord {
+  scorecard_id: number;
+  name: string;
+  city: string | null;
+  state: string;
+  zip_code: string | null;
+  website_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  region: string | null;
+  type: string | null;
+  school_type: string | null;
+  setting: string | null;
+  size_category: string | null;
+  size: string | null;
+  undergrad_enrollment: number;
+  total_enrollment: number;
+  designations: Record<string, any>;
+  acceptance_rate: number | null;
+  sat_reading_25: number | null;
+  sat_reading_75: number | null;
+  sat_math_25: number | null;
+  sat_math_75: number | null;
+  sat_total_25: number | null;
+  sat_total_75: number | null;
+  act_25: number | null;
+  act_75: number | null;
+  avg_sat_min: number | null;
+  avg_sat_max: number | null;
+  avg_act_min: number | null;
+  avg_act_max: number | null;
+  tuition_in_state: number | null;
+  tuition_out_of_state: number | null;
+  cost_of_attendance: number | null;
+  net_price_average: number | null;
+  pell_grant_rate: number | null;
+  graduation_rate: number | null;
+  retention_rate: number | null;
+  median_earnings_10yr: number | null;
+  first_gen_pct: number | null;
+  demographics: Record<string, any>;
+  program_breakdown: Record<string, number>;
+  interest_tags: string[];
+  data_year: number;
+  last_synced_at: string;
+  is_active: boolean;
+  slug: string;
+  campus_setting: string | null;
+  enrollment_size: number;
+  description: string | null;
+}
+
+function transformRecord(
+  raw: Record<string, any>,
+  cipMap: Record<string, string[]>
+): CollegeRecord | null {
+  // Apply script-level filters first
+  if (!raw['school.name']?.trim()) return null;
+  if (!raw['school.state']) return null;
+  if (!raw['latest.student.size']) return null;
+
+  // Predatory for-profit filter
+  const ownership = raw['school.ownership'];
+  const gradRate = raw['latest.completion.rate_suppressed.overall'];
+  if (ownership === 3 && (gradRate === null || gradRate < 0.2)) return null;
+
+  // Build program_breakdown JSONB from program_percentage
+  const programBreakdown: Record<string, number> = {};
+  const programPrefix = 'latest.academics.program_percentage.';
+
+  for (const [key, val] of Object.entries(raw)) {
+    if (key.startsWith(programPrefix) && typeof val === 'number' && val > 0) {
+      const programName = key.substring(programPrefix.length);
+      const cipCode = PROGRAM_NAME_TO_CIP[programName];
+      if (cipCode) {
+        programBreakdown[cipCode] = val;
+      }
+    }
+  }
+
+  // Derive interest tags from program_breakdown
+  const tagSet = new Set<string>();
+  for (const [cip, pct] of Object.entries(programBreakdown)) {
+    if (pct >= 0.05 && cipMap[cip]) {
+      cipMap[cip].forEach((tag) => tagSet.add(tag));
+    }
+  }
+
+  // Build demographics JSONB
+  const demographics = {
+    white: raw['latest.student.demographics.race_ethnicity.white'],
+    black: raw['latest.student.demographics.race_ethnicity.black'],
+    hispanic: raw['latest.student.demographics.race_ethnicity.hispanic'],
+    asian: raw['latest.student.demographics.race_ethnicity.asian'],
+    native_american: raw['latest.student.demographics.race_ethnicity.aian'],
+    pacific_islander: raw['latest.student.demographics.race_ethnicity.nhpi'],
+    two_or_more: raw['latest.student.demographics.race_ethnicity.two_or_more'],
+    international: raw['latest.student.demographics.race_ethnicity.non_resident_alien'],
+  };
+
+  // Build designations JSONB
+  const designations = {
+    hbcu: raw['school.minority_serving.historically_black'] === 1,
+    hsi: raw['school.minority_serving.hispanic'] === 1,
+    tribal: raw['school.minority_serving.tribal'] === 1,
+    women_only: raw['school.women_only'] === 1,
+    men_only: raw['school.men_only'] === 1,
+    religious_affiliation: mapReligiousAffiliation(raw['school.religious_affiliation']),
+  };
+
+  const acceptanceRate = raw['latest.admissions.admission_rate.overall'] ?? null;
+  const satReading25 = raw['latest.admissions.sat_scores.25th_percentile.critical_reading'];
+  const satReading75 = raw['latest.admissions.sat_scores.75th_percentile.critical_reading'];
+  const satMath25 = raw['latest.admissions.sat_scores.25th_percentile.math'];
+  const satMath75 = raw['latest.admissions.sat_scores.75th_percentile.math'];
+
+  const collegeName = raw['school.name'].trim();
+  const enrollmentSize = raw['latest.student.size'];
+
+  return {
+    scorecard_id: raw.id,
+    name: collegeName,
+    slug: slugify(collegeName),
+    city: raw['school.city'] ?? null,
+    state: raw['school.state'],
+    zip_code: raw['school.zip']?.toString().slice(0, 5) ?? null,
+    website_url: normalizeUrl(raw['school.school_url']),
+    latitude: raw['location.lat'] ?? null,
+    longitude: raw['location.lon'] ?? null,
+    region: mapRegion(raw['school.region_id']),
+    type: mapOwnership(ownership),
+    school_type: mapSchoolType(raw['school.degrees_awarded.predominant']),
+    setting: mapLocale(raw['school.locale']),
+    campus_setting: mapLocale(raw['school.locale']),
+    size_category: mapSize(raw['school.carnegie_size_setting']),
+    size: mapSizeToLegacy(enrollmentSize),
+    undergrad_enrollment: enrollmentSize,
+    total_enrollment: raw['latest.student.enrollment.all'] ?? enrollmentSize,
+    enrollment_size: enrollmentSize,
+    designations,
+    acceptance_rate: acceptanceRate ? acceptanceRate * 100 : null,
+    sat_reading_25: satReading25 ?? null,
+    sat_reading_75: satReading75 ?? null,
+    sat_math_25: satMath25 ?? null,
+    sat_math_75: satMath75 ?? null,
+    sat_total_25: satReading25 && satMath25 ? satReading25 + satMath25 : null,
+    sat_total_75: satReading75 && satMath75 ? satReading75 + satMath75 : null,
+    avg_sat_min: satReading25 && satMath25 ? satReading25 + satMath25 : null,
+    avg_sat_max: satReading75 && satMath75 ? satReading75 + satMath75 : null,
+    act_25: raw['latest.admissions.act_scores.25th_percentile.cumulative'] ?? null,
+    act_75: raw['latest.admissions.act_scores.75th_percentile.cumulative'] ?? null,
+    avg_act_min: raw['latest.admissions.act_scores.25th_percentile.cumulative'] ?? null,
+    avg_act_max: raw['latest.admissions.act_scores.75th_percentile.cumulative'] ?? null,
+    tuition_in_state: raw['latest.cost.tuition.in_state'] ?? null,
+    tuition_out_of_state: raw['latest.cost.tuition.out_of_state'] ?? null,
+    cost_of_attendance: raw['latest.cost.attendance.academic_year'] ?? null,
+    net_price_average: raw['latest.cost.avg_net_price.overall'] ?? null,
+    pell_grant_rate: raw['latest.aid.pell_grant_rate'] ?? null,
+    graduation_rate: gradRate ?? null,
+    retention_rate: raw['latest.student.retention_rate.four_year.full_time'] ?? null,
+    median_earnings_10yr: raw['latest.earnings.10_yrs_after_entry.median'] ?? null,
+    first_gen_pct: raw['latest.student.share_firstgeneration'] ?? null,
+    demographics,
+    program_breakdown: programBreakdown,
+    interest_tags: Array.from(tagSet),
+    data_year: new Date().getFullYear(),
+    last_synced_at: new Date().toISOString(),
+    is_active: true,
+    description: generateDescription(collegeName, mapOwnership(ownership), mapSchoolType(raw['school.degrees_awarded.predominant']), raw['school.city'], raw['school.state']),
+  };
+}
+
 function slugify(name: string): string {
   return name
     .toLowerCase()
@@ -51,647 +463,96 @@ function slugify(name: string): string {
     .trim();
 }
 
-// Helper to map state to region
-function getRegion(state: string): string {
-  const regions: Record<string, string> = {
-    // West
-    CA: 'West', OR: 'West', WA: 'West', NV: 'West', ID: 'West', MT: 'West',
-    WY: 'West', UT: 'West', CO: 'West', AZ: 'West', NM: 'West', AK: 'West', HI: 'West',
-    // Northeast
-    ME: 'Northeast', NH: 'Northeast', VT: 'Northeast', MA: 'Northeast', RI: 'Northeast',
-    CT: 'Northeast', NY: 'Northeast', NJ: 'Northeast', PA: 'Northeast',
-    // South
-    MD: 'South', DE: 'South', VA: 'South', WV: 'South', NC: 'South', SC: 'South',
-    GA: 'South', FL: 'South', KY: 'South', TN: 'South', AL: 'South', MS: 'South',
-    AR: 'South', LA: 'South', OK: 'South', TX: 'South',
-    // Midwest
-    OH: 'Midwest', MI: 'Midwest', IN: 'Midwest', IL: 'Midwest', WI: 'Midwest',
-    MN: 'Midwest', IA: 'Midwest', MO: 'Midwest', ND: 'Midwest', SD: 'Midwest',
-    NE: 'Midwest', KS: 'Midwest',
-  };
-  return regions[state] || 'Other';
+function normalizeUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
 }
 
-// Helper to determine size category from enrollment
-function getSize(enrollment: number): string {
+function mapOwnership(code: number | null): string | null {
+  switch (code) {
+    case 1: return 'public';
+    case 2: return 'private';
+    case 3: return 'private';
+    default: return null;
+  }
+}
+
+function mapSchoolType(code: number | null): string | null {
+  switch (code) {
+    case 1: return 'less_than_two_year';
+    case 2: return 'two_year';
+    case 3: return 'four_year';
+    default: return null;
+  }
+}
+
+function mapLocale(code: number | null): string | null {
+  if (code === null || code === undefined) return null;
+  if (code >= 11 && code <= 13) return 'urban';
+  if (code >= 21 && code <= 23) return 'suburban';
+  if (code >= 31 && code <= 33) return 'rural';
+  if (code >= 41 && code <= 43) return 'rural';
+  return null;
+}
+
+function mapSize(code: number | null): string | null {
+  if (code === null || code === undefined) return null;
+  if ([1, 6, 11].includes(code)) return 'very_small';
+  if ([2, 7, 12].includes(code)) return 'small';
+  if ([3, 8, 13].includes(code)) return 'medium';
+  if ([4, 9, 14].includes(code)) return 'large';
+  return 'very_large';
+}
+
+function mapSizeToLegacy(enrollment: number): string {
   if (enrollment < 5000) return 'small';
   if (enrollment <= 15000) return 'medium';
   return 'large';
 }
 
-// ============================================================================
-// CURATED COLLEGE DATA
-// ============================================================================
-// For MVP, we'll seed a curated list of top colleges with complete data
-// This can be expanded to ~300 by adding more entries or pulling from an API
-
-interface CollegeData {
-  name: string;
-  city: string;
-  state: string;
-  campus_setting: 'urban' | 'suburban' | 'rural';
-  type: 'public' | 'private' | 'community';
-  enrollment_size: number;
-  acceptance_rate: number;
-  avg_gpa_min?: number;
-  avg_gpa_max?: number;
-  avg_sat_min?: number;
-  avg_sat_max?: number;
-  avg_act_min?: number;
-  avg_act_max?: number;
-  tuition_in_state?: number;
-  tuition_out_of_state?: number;
-  financial_aid_percentage?: number;
-  website_url: string;
-  description?: string;
-  popular_majors?: string[];
-  program_strengths?: string[];
-  interest_tags?: string[];
-  application_deadlines?: Record<string, string>;
-  required_materials?: string[];
+function mapRegion(code: number | null): string | null {
+  const regions: Record<number, string> = {
+    0: 'U.S. Service Schools',
+    1: 'Northeast',
+    2: 'Northeast',
+    3: 'Midwest',
+    4: 'Midwest',
+    5: 'South',
+    6: 'South',
+    7: 'West',
+    8: 'West',
+    9: 'West',
+  };
+  return code !== null && code !== undefined ? regions[code] ?? null : null;
 }
 
-const colleges: CollegeData[] = [
-  // TOP NATIONALS (Ivies + Elite Private)
-  {
-    name: 'Stanford University',
-    city: 'Stanford',
-    state: 'CA',
-    campus_setting: 'suburban',
-    type: 'private',
-    enrollment_size: 7761,
-    acceptance_rate: 3.7,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1470,
-    avg_sat_max: 1570,
-    avg_act_min: 33,
-    avg_act_max: 35,
-    tuition_out_of_state: 57693,
-    financial_aid_percentage: 58,
-    website_url: 'https://www.stanford.edu',
-    description: 'Located in Silicon Valley, Stanford is known for innovation, entrepreneurship, and academic excellence across engineering, sciences, and humanities.',
-    popular_majors: ['Computer Science', 'Engineering', 'Biology', 'Economics'],
-    program_strengths: ['Engineering', 'Computer Science', 'Entrepreneurship', 'Research'],
-    interest_tags: ['research', 'entrepreneurship', 'athletics', 'innovation'],
-    application_deadlines: { restrictive_ea: '2025-11-01', rd: '2026-01-05' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'SAT/ACT', 'Supplemental Essays'],
-  },
-  {
-    name: 'Harvard University',
-    city: 'Cambridge',
-    state: 'MA',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 7240,
-    acceptance_rate: 3.2,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1460,
-    avg_sat_max: 1580,
-    avg_act_min: 33,
-    avg_act_max: 35,
-    tuition_out_of_state: 54269,
-    financial_aid_percentage: 55,
-    website_url: 'https://www.harvard.edu',
-    description: 'The oldest institution of higher learning in the US, Harvard combines rigorous academics with unparalleled resources and a global alumni network.',
-    popular_majors: ['Economics', 'Government', 'Computer Science', 'Psychology'],
-    program_strengths: ['Liberal Arts', 'Research', 'Leadership', 'Global Studies'],
-    interest_tags: ['research', 'leadership', 'history', 'diversity'],
-    application_deadlines: { restrictive_ea: '2025-11-01', rd: '2026-01-01' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'SAT/ACT', 'Supplemental Essays'],
-  },
-  {
-    name: 'Massachusetts Institute of Technology',
-    city: 'Cambridge',
-    state: 'MA',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 4638,
-    acceptance_rate: 3.96,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1520,
-    avg_sat_max: 1580,
-    avg_act_min: 35,
-    avg_act_max: 36,
-    tuition_out_of_state: 57986,
-    financial_aid_percentage: 58,
-    website_url: 'https://www.mit.edu',
-    description: 'A world leader in science, technology, and innovation, MIT fosters hands-on learning and cutting-edge research in a collaborative environment.',
-    popular_majors: ['Computer Science', 'Mechanical Engineering', 'Mathematics', 'Physics'],
-    program_strengths: ['Engineering', 'Computer Science', 'Research', 'Innovation'],
-    interest_tags: ['research', 'innovation', 'hands-on', 'entrepreneurship'],
-    application_deadlines: { ea: '2025-11-01', rd: '2026-01-01' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'SAT/ACT', 'Supplemental Essays'],
-  },
-  {
-    name: 'Yale University',
-    city: 'New Haven',
-    state: 'CT',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 6536,
-    acceptance_rate: 4.6,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1470,
-    avg_sat_max: 1570,
-    avg_act_min: 33,
-    avg_act_max: 35,
-    tuition_out_of_state: 62250,
-    financial_aid_percentage: 52,
-    website_url: 'https://www.yale.edu',
-    description: 'Known for its residential college system and strong liberal arts tradition, Yale excels in humanities, arts, law, and sciences.',
-    popular_majors: ['Economics', 'Political Science', 'History', 'Psychology'],
-    program_strengths: ['Liberal Arts', 'Law', 'Drama', 'Research'],
-    interest_tags: ['liberal-arts', 'residential-colleges', 'arts', 'leadership'],
-    application_deadlines: { scea: '2025-11-01', rd: '2026-01-02' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'SAT/ACT', 'Supplemental Essays'],
-  },
-  {
-    name: 'Princeton University',
-    city: 'Princeton',
-    state: 'NJ',
-    campus_setting: 'suburban',
-    type: 'private',
-    enrollment_size: 5604,
-    acceptance_rate: 5.7,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1450,
-    avg_sat_max: 1570,
-    avg_act_min: 33,
-    avg_act_max: 35,
-    tuition_out_of_state: 57410,
-    financial_aid_percentage: 60,
-    website_url: 'https://www.princeton.edu',
-    description: 'Focused on undergraduate education with a strong emphasis on research, Princeton offers generous financial aid and a beautiful campus.',
-    popular_majors: ['Economics', 'Computer Science', 'Public Policy', 'History'],
-    program_strengths: ['Liberal Arts', 'Research', 'Public Policy', 'Engineering'],
-    interest_tags: ['research', 'undergraduate-focus', 'financial-aid', 'tradition'],
-    application_deadlines: { scea: '2025-11-01', rd: '2026-01-01' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'SAT/ACT', 'Supplemental Essays'],
-  },
-  {
-    name: 'Columbia University',
-    city: 'New York',
-    state: 'NY',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 8832,
-    acceptance_rate: 3.9,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1470,
-    avg_sat_max: 1560,
-    avg_act_min: 33,
-    avg_act_max: 35,
-    tuition_out_of_state: 65524,
-    financial_aid_percentage: 50,
-    website_url: 'https://www.columbia.edu',
-    description: 'Located in New York City with a rigorous Core Curriculum, Columbia offers unmatched access to cultural and professional opportunities.',
-    popular_majors: ['Economics', 'Political Science', 'Computer Science', 'Engineering'],
-    program_strengths: ['Liberal Arts', 'Journalism', 'Business', 'International Relations'],
-    interest_tags: ['urban', 'core-curriculum', 'nyc', 'diversity'],
-    application_deadlines: { ed: '2025-11-01', rd: '2026-01-01' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'SAT/ACT', 'Supplemental Essays'],
-  },
-
-  // PUBLIC FLAGSHIPS (UC System)
-  {
-    name: 'University of California, Berkeley',
-    city: 'Berkeley',
-    state: 'CA',
-    campus_setting: 'urban',
-    type: 'public',
-    enrollment_size: 31814,
-    acceptance_rate: 11.4,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1330,
-    avg_sat_max: 1530,
-    avg_act_min: 29,
-    avg_act_max: 35,
-    tuition_in_state: 14226,
-    tuition_out_of_state: 44008,
-    financial_aid_percentage: 48,
-    website_url: 'https://www.berkeley.edu',
-    description: 'A top public university known for academic excellence, groundbreaking research, and social activism in the San Francisco Bay Area.',
-    popular_majors: ['Computer Science', 'Engineering', 'Economics', 'Business'],
-    program_strengths: ['Engineering', 'Computer Science', 'Research', 'Public Policy'],
-    interest_tags: ['research', 'activism', 'diversity', 'innovation'],
-    application_deadlines: { uc: '2025-11-30' },
-    required_materials: ['UC Application', 'Transcript', 'Personal Insight Questions'],
-  },
-  {
-    name: 'University of California, Los Angeles',
-    city: 'Los Angeles',
-    state: 'CA',
-    campus_setting: 'urban',
-    type: 'public',
-    enrollment_size: 32423,
-    acceptance_rate: 9.0,
-    avg_gpa_min: 3.9,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1290,
-    avg_sat_max: 1510,
-    avg_act_min: 27,
-    avg_act_max: 34,
-    tuition_in_state: 13401,
-    tuition_out_of_state: 43003,
-    financial_aid_percentage: 55,
-    website_url: 'https://www.ucla.edu',
-    description: 'Combining academic rigor with vibrant campus life and athletics, UCLA is a leading public research university in Southern California.',
-    popular_majors: ['Biology', 'Psychology', 'Economics', 'Political Science'],
-    program_strengths: ['Film', 'Medicine', 'Engineering', 'Business'],
-    interest_tags: ['athletics', 'film', 'research', 'diversity'],
-    application_deadlines: { uc: '2025-11-30' },
-    required_materials: ['UC Application', 'Transcript', 'Personal Insight Questions'],
-  },
-  {
-    name: 'University of California, San Diego',
-    city: 'La Jolla',
-    state: 'CA',
-    campus_setting: 'suburban',
-    type: 'public',
-    enrollment_size: 33096,
-    acceptance_rate: 24.0,
-    avg_gpa_min: 3.8,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1270,
-    avg_sat_max: 1480,
-    avg_act_min: 26,
-    avg_act_max: 34,
-    tuition_in_state: 14427,
-    tuition_out_of_state: 44181,
-    financial_aid_percentage: 52,
-    website_url: 'https://www.ucsd.edu',
-    description: 'A research powerhouse near the Pacific Ocean, UCSD excels in STEM fields, particularly biology, engineering, and oceanography.',
-    popular_majors: ['Biology', 'Computer Science', 'Economics', 'Cognitive Science'],
-    program_strengths: ['Biology', 'Engineering', 'Research', 'Oceanography'],
-    interest_tags: ['research', 'stem', 'beach', 'innovation'],
-    application_deadlines: { uc: '2025-11-30' },
-    required_materials: ['UC Application', 'Transcript', 'Personal Insight Questions'],
-  },
-  {
-    name: 'University of Michigan',
-    city: 'Ann Arbor',
-    state: 'MI',
-    campus_setting: 'suburban',
-    type: 'public',
-    enrollment_size: 32282,
-    acceptance_rate: 17.7,
-    avg_gpa_min: 3.8,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1340,
-    avg_sat_max: 1530,
-    avg_act_min: 31,
-    avg_act_max: 34,
-    tuition_in_state: 17786,
-    tuition_out_of_state: 57273,
-    financial_aid_percentage: 45,
-    website_url: 'https://www.umich.edu',
-    description: 'A flagship public university combining Big Ten athletics with top-tier academics in engineering, business, and liberal arts.',
-    popular_majors: ['Business', 'Engineering', 'Computer Science', 'Psychology'],
-    program_strengths: ['Business', 'Engineering', 'Research', 'Athletics'],
-    interest_tags: ['athletics', 'school-spirit', 'research', 'greek-life'],
-    application_deadlines: { ea: '2025-11-01', rd: '2026-02-01' },
-    required_materials: ['Common App', 'Transcript', 'Supplemental Essays'],
-  },
-  {
-    name: 'University of Virginia',
-    city: 'Charlottesville',
-    state: 'VA',
-    campus_setting: 'suburban',
-    type: 'public',
-    enrollment_size: 17311,
-    acceptance_rate: 19.0,
-    avg_gpa_min: 3.8,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1370,
-    avg_sat_max: 1520,
-    avg_act_min: 31,
-    avg_act_max: 34,
-    tuition_in_state: 19698,
-    tuition_out_of_state: 56837,
-    financial_aid_percentage: 40,
-    website_url: 'https://www.virginia.edu',
-    description: 'Founded by Thomas Jefferson, UVA combines historic architecture with strong programs in business, law, and liberal arts.',
-    popular_majors: ['Economics', 'Commerce', 'Biology', 'Government'],
-    program_strengths: ['Business', 'Law', 'Liberal Arts', 'History'],
-    interest_tags: ['history', 'tradition', 'honor-code', 'greek-life'],
-    application_deadlines: { ea: '2025-11-01', rd: '2026-01-05' },
-    required_materials: ['Common App', 'Transcript', 'Supplemental Essays'],
-  },
-
-  // HBCUs
-  {
-    name: 'Howard University',
-    city: 'Washington',
-    state: 'DC',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 9907,
-    acceptance_rate: 35.0,
-    avg_gpa_min: 3.3,
-    avg_gpa_max: 3.8,
-    avg_sat_min: 1050,
-    avg_sat_max: 1280,
-    avg_act_min: 21,
-    avg_act_max: 28,
-    tuition_out_of_state: 31443,
-    financial_aid_percentage: 85,
-    website_url: 'https://www.howard.edu',
-    description: 'A leading HBCU in the nation\'s capital, Howard produces Black leaders across all fields with strong programs in law, medicine, and business.',
-    popular_majors: ['Biology', 'Psychology', 'Nursing', 'Communications'],
-    program_strengths: ['Pre-Med', 'Law', 'Business', 'Communications'],
-    interest_tags: ['hbcu', 'leadership', 'diversity', 'washington-dc'],
-    application_deadlines: { ea: '2025-11-01', rd: '2026-02-15' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'Supplemental Essay'],
-  },
-  {
-    name: 'Spelman College',
-    city: 'Atlanta',
-    state: 'GA',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 2291,
-    acceptance_rate: 30.0,
-    avg_gpa_min: 3.6,
-    avg_gpa_max: 3.9,
-    avg_sat_min: 1130,
-    avg_sat_max: 1310,
-    avg_act_min: 24,
-    avg_act_max: 29,
-    tuition_out_of_state: 32700,
-    financial_aid_percentage: 90,
-    website_url: 'https://www.spelman.edu',
-    description: 'A historically Black women\'s college fostering excellence in STEM, humanities, and social sciences with strong sisterhood and mentorship.',
-    popular_majors: ['Psychology', 'Biology', 'Political Science', 'Chemistry'],
-    program_strengths: ['STEM', 'Pre-Med', 'Liberal Arts', 'Leadership'],
-    interest_tags: ['hbcu', 'womens-college', 'stem', 'sisterhood'],
-    application_deadlines: { ea: '2025-11-01', rd: '2026-02-01' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'Supplemental Essay'],
-  },
-  {
-    name: 'Morehouse College',
-    city: 'Atlanta',
-    state: 'GA',
-    campus_setting: 'urban',
-    type: 'private',
-    enrollment_size: 2202,
-    acceptance_rate: 60.0,
-    avg_gpa_min: 3.2,
-    avg_gpa_max: 3.7,
-    avg_sat_min: 990,
-    avg_sat_max: 1180,
-    avg_act_min: 20,
-    avg_act_max: 25,
-    tuition_out_of_state: 29664,
-    financial_aid_percentage: 92,
-    website_url: 'https://www.morehouse.edu',
-    description: 'A historically Black men\'s college dedicated to developing leaders in business, medicine, law, and public service.',
-    popular_majors: ['Business', 'Biology', 'Political Science', 'Psychology'],
-    program_strengths: ['Pre-Med', 'Business', 'Leadership', 'Social Justice'],
-    interest_tags: ['hbcu', 'mens-college', 'leadership', 'brotherhood'],
-    application_deadlines: { ea: '2025-11-15', rd: '2026-02-15' },
-    required_materials: ['Common App', 'Transcript', 'Letters of Recommendation', 'Supplemental Essay'],
-  },
-
-  // Community Colleges (Strong Transfer Programs)
-  {
-    name: 'Santa Monica College',
-    city: 'Santa Monica',
-    state: 'CA',
-    campus_setting: 'urban',
-    type: 'community',
-    enrollment_size: 27793,
-    acceptance_rate: 100,
-    tuition_in_state: 1238,
-    tuition_out_of_state: 10678,
-    website_url: 'https://www.smc.edu',
-    description: 'One of the top transfer colleges to UC and CSU systems, SMC offers strong academics and beach-adjacent location.',
-    popular_majors: ['Liberal Arts', 'Business', 'STEM'],
-    program_strengths: ['UC Transfer', 'Associate Degrees', 'Career Programs'],
-    interest_tags: ['transfer', 'beach', 'uc-pipeline', 'affordable'],
-    application_deadlines: { rolling: 'true' },
-    required_materials: ['Online Application'],
-  },
-  {
-    name: 'De Anza College',
-    city: 'Cupertino',
-    state: 'CA',
-    campus_setting: 'suburban',
-    type: 'community',
-    enrollment_size: 20357,
-    acceptance_rate: 100,
-    tuition_in_state: 1288,
-    tuition_out_of_state: 7888,
-    website_url: 'https://www.deanza.edu',
-    description: 'Located in Silicon Valley, De Anza is known for strong STEM programs and high transfer rates to top universities.',
-    popular_majors: ['Computer Science', 'Engineering', 'Business'],
-    program_strengths: ['STEM', 'UC Transfer', 'Tech Careers'],
-    interest_tags: ['transfer', 'silicon-valley', 'stem', 'tech'],
-    application_deadlines: { rolling: 'true' },
-    required_materials: ['Online Application'],
-  },
-
-  // More diverse options across regions
-  {
-    name: 'University of Texas at Austin',
-    city: 'Austin',
-    state: 'TX',
-    campus_setting: 'urban',
-    type: 'public',
-    enrollment_size: 40916,
-    acceptance_rate: 31.0,
-    avg_gpa_min: 3.6,
-    avg_gpa_max: 3.9,
-    avg_sat_min: 1230,
-    avg_sat_max: 1480,
-    avg_act_min: 27,
-    avg_act_max: 33,
-    tuition_in_state: 11752,
-    tuition_out_of_state: 40996,
-    financial_aid_percentage: 50,
-    website_url: 'https://www.utexas.edu',
-    description: 'The flagship of the UT system, UT Austin offers top programs in business, engineering, and liberal arts in a vibrant city.',
-    popular_majors: ['Business', 'Engineering', 'Biology', 'Communications'],
-    program_strengths: ['Business', 'Engineering', 'Film', 'Computer Science'],
-    interest_tags: ['athletics', 'music', 'entrepreneurship', 'school-spirit'],
-    application_deadlines: { rd: '2025-12-01' },
-    required_materials: ['ApplyTexas', 'Transcript', 'Supplemental Essays'],
-  },
-  {
-    name: 'University of Washington',
-    city: 'Seattle',
-    state: 'WA',
-    campus_setting: 'urban',
-    type: 'public',
-    enrollment_size: 36206,
-    acceptance_rate: 48.0,
-    avg_gpa_min: 3.7,
-    avg_gpa_max: 3.9,
-    avg_sat_min: 1220,
-    avg_sat_max: 1470,
-    avg_act_min: 27,
-    avg_act_max: 33,
-    tuition_in_state: 12092,
-    tuition_out_of_state: 40740,
-    financial_aid_percentage: 45,
-    website_url: 'https://www.washington.edu',
-    description: 'A leading public research university in the Pacific Northwest with strengths in medicine, computer science, and environmental science.',
-    popular_majors: ['Computer Science', 'Biology', 'Business', 'Psychology'],
-    program_strengths: ['Medicine', 'Computer Science', 'Research', 'Environmental Science'],
-    interest_tags: ['research', 'seattle', 'tech', 'outdoors'],
-    application_deadlines: { rd: '2025-11-15' },
-    required_materials: ['Coalition App', 'Transcript', 'Supplemental Essays'],
-  },
-  {
-    name: 'University of North Carolina at Chapel Hill',
-    city: 'Chapel Hill',
-    state: 'NC',
-    campus_setting: 'suburban',
-    type: 'public',
-    enrollment_size: 19897,
-    acceptance_rate: 19.2,
-    avg_gpa_min: 3.8,
-    avg_gpa_max: 4.0,
-    avg_sat_min: 1330,
-    avg_sat_max: 1500,
-    avg_act_min: 29,
-    avg_act_max: 34,
-    tuition_in_state: 8987,
-    tuition_out_of_state: 36776,
-    financial_aid_percentage: 48,
-    website_url: 'https://www.unc.edu',
-    description: 'The first public university in the US, UNC combines strong academics with vibrant campus culture and top-tier athletics.',
-    popular_majors: ['Biology', 'Business', 'Psychology', 'Media Studies'],
-    program_strengths: ['Journalism', 'Business', 'Public Health', 'Liberal Arts'],
-    interest_tags: ['athletics', 'journalism', 'tradition', 'school-spirit'],
-    application_deadlines: { ea: '2025-10-15', rd: '2026-01-15' },
-    required_materials: ['Common App', 'Transcript', 'Supplemental Essays'],
-  },
-];
-
-// ============================================================================
-// MAIN SEED FUNCTION
-// ============================================================================
-async function seedColleges() {
-  console.log('🌱 Starting college seed script...\n');
-
-  let successCount = 0;
-  let errorCount = 0;
-  const errors: Array<{ college: string; error: string }> = [];
-
-  for (const college of colleges) {
-    try {
-      const slug = slugify(college.name);
-      const region = getRegion(college.state);
-      const size = getSize(college.enrollment_size);
-
-      const collegeData = {
-        name: college.name,
-        slug,
-        description: college.description || null,
-        city: college.city,
-        state: college.state,
-        region,
-        campus_setting: college.campus_setting,
-        type: college.type,
-        size,
-        enrollment_size: college.enrollment_size,
-        acceptance_rate: college.acceptance_rate,
-        avg_gpa_min: college.avg_gpa_min || null,
-        avg_gpa_max: college.avg_gpa_max || null,
-        avg_sat_min: college.avg_sat_min || null,
-        avg_sat_max: college.avg_sat_max || null,
-        avg_act_min: college.avg_act_min || null,
-        avg_act_max: college.avg_act_max || null,
-        tuition_in_state: college.tuition_in_state || null,
-        tuition_out_of_state: college.tuition_out_of_state || null,
-        financial_aid_percentage: college.financial_aid_percentage || null,
-        website_url: college.website_url,
-        logo_url: null, // To be added manually via Supabase dashboard
-        image_url: null, // To be added manually via Supabase dashboard
-        primary_color: null, // To be added manually
-        secondary_color: null, // To be added manually
-        popular_majors: college.popular_majors || [],
-        program_strengths: college.program_strengths || [],
-        interest_tags: college.interest_tags || [],
-        student_demographics: {},
-        application_deadlines: college.application_deadlines || {},
-        required_materials: college.required_materials || [],
-        is_active: true,
-      };
-
-      const { error } = await supabase
-        .from('colleges')
-        .insert([collegeData]);
-
-      if (error) {
-        // If duplicate, update instead
-        if (error.code === '23505') {
-          const { error: updateError } = await supabase
-            .from('colleges')
-            .update(collegeData)
-            .eq('slug', slug);
-
-          if (updateError) {
-            throw updateError;
-          }
-          console.log(`✓ Updated: ${college.name}`);
-        } else {
-          throw error;
-        }
-      } else {
-        console.log(`✓ Inserted: ${college.name}`);
-      }
-
-      successCount++;
-    } catch (error) {
-      errorCount++;
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      errors.push({ college: college.name, error: errorMessage });
-      console.error(`✗ Failed: ${college.name} - ${errorMessage}`);
-    }
-  }
-
-  // Summary
-  console.log('\n' + '='.repeat(60));
-  console.log(`✅ Successfully seeded ${successCount} colleges`);
-  if (errorCount > 0) {
-    console.log(`❌ Failed to seed ${errorCount} colleges`);
-    console.log('\nErrors:');
-    errors.forEach(({ college, error }) => {
-      console.log(`  - ${college}: ${error}`);
-    });
-  }
-  console.log('='.repeat(60));
-
-  // Save raw data for debugging
-  const logsDir = path.join(process.cwd(), 'logs');
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
-  const logFile = path.join(logsDir, 'college-seed-log.json');
-  fs.writeFileSync(logFile, JSON.stringify({ successCount, errorCount, errors, timestamp: new Date().toISOString() }, null, 2));
-  console.log(`\n📄 Detailed log saved to: ${logFile}`);
-
-  console.log('\n💡 Next steps:');
-  console.log('   1. Manually add logos and colors for top colleges via Supabase dashboard');
-  console.log('   2. Expand the curated list to ~300 colleges');
-  console.log('   3. Optionally integrate College Scorecard API for automated updates');
+function mapReligiousAffiliation(code: number | null): string | null {
+  // Scorecard's religious_affiliation is a coded field with 60+ values.
+  // For v1, just return null if -2 (not applicable) or the raw code as string otherwise.
+  // A future spec can map all codes to readable names.
+  if (code === null || code === undefined || code === -2) return null;
+  return String(code);
 }
 
-// Run the seed script
-seedColleges()
-  .then(() => {
-    console.log('\n✨ Seed script completed');
-    process.exit(0);
-  })
-  .catch((error) => {
-    console.error('\n❌ Fatal error:', error);
-    process.exit(1);
-  });
+function generateDescription(name: string, ownership: string | null, schoolType: string | null, city: string | null, state: string | null): string | null {
+  if (!ownership || !schoolType) return null;
+
+  const typeLabel = schoolType === 'four_year' ? 'four-year' :
+                    schoolType === 'two_year' ? 'two-year' :
+                    'institution';
+
+  const ownershipLabel = ownership === 'public' ? 'public' : 'private';
+
+  if (city && state) {
+    return `${name} is a ${ownershipLabel} ${typeLabel} institution in ${city}, ${state}.`;
+  }
+  return `${name} is a ${ownershipLabel} ${typeLabel} institution.`;
+}
+
+main().catch((err) => {
+  console.error('💥 Fatal error:', err);
+  process.exit(1);
+});
