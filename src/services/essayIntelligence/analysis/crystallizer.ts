@@ -2125,19 +2125,20 @@ export class CrystallizerService {
     const northStarSystemPrompt = buildSystemPromptL4aNorthStar(scale, essayType);
     const northStarCallInstruction = buildCallInstructionL4aNorthStar(profile, scale, priorNorthStar);
 
-    // C2 (2026-05-04): user-prompt cache breakpoint after the shared
-    // 30K-token bedrock (profileContext + corpusPrepend). NorthStar
-    // writes the cache; ScoreMatrix and L4b read it. ~$0.25/essay
-    // first-pass savings. Quality risk = zero (cache reads are bit-
-    // identical to fresh reads).
-    const l4SharedBedrock = profileContext + '\n\n' + corpusPrepend;
+    // C2 ROLLBACK (2026-05-04): user-prompt cache breakpoint added in
+    // 979187a turned out to be net-negative because each L4 call has
+    // a DIFFERENT system prompt (NorthStar vs ScoreMatrix vs L4b).
+    // Anthropic's cache key includes the entire prefix (system + tools
+    // + messages) up to the breakpoint, so different system prompts =
+    // different cache keys = no cross-call hit. C6 calibration showed
+    // L4 cost $0.549 → $0.625 (+$0.08 cache_creation overhead × 3
+    // calls, zero reads). Reverting to plain userPrompt until a
+    // proper fix lands (either unify system prompts or use system-
+    // block cache breakpoints — see C7 follow-up).
     const northStarResponse = await callClaudeWithRetry<RawNorthStarOutput>({
       model: SONNET,
       systemPrompt: northStarSystemPrompt,
-      userPromptBlocks: [
-        { text: l4SharedBedrock, cacheBreakpoint: true },
-        { text: northStarCallInstruction },
-      ],
+      userPrompt: profileContext + '\n\n' + corpusPrepend + northStarCallInstruction,
       maxTokens: L4A_NORTH_STAR_MAX_TOKENS,
       temperature: TEMPERATURE,
       useJsonMode: true,
@@ -2170,10 +2171,7 @@ export class CrystallizerService {
     const scoreMatrixResponse = await callClaudeWithRetry<RawScoreMatrixOutput>({
       model: SONNET,
       systemPrompt: scoreMatrixSystemPrompt,
-      userPromptBlocks: [
-        { text: l4SharedBedrock, cacheBreakpoint: true },
-        { text: scoreMatrixCallInstruction },
-      ],
+      userPrompt: profileContext + '\n\n' + corpusPrepend + scoreMatrixCallInstruction,
       maxTokens: L4A_SCORE_MATRIX_MAX_TOKENS,
       temperature: TEMPERATURE,
       useJsonMode: true,
@@ -2262,10 +2260,7 @@ export class CrystallizerService {
       const l4bResponse = await callClaudeWithRetry<RawL4bOutput>({
         model: SONNET,
         systemPrompt: l4bSystemPrompt,
-        userPromptBlocks: [
-          { text: l4SharedBedrock, cacheBreakpoint: true },
-          { text: l4bCallInstruction },
-        ],
+        userPrompt: profileContext + '\n\n' + corpusPrepend + l4bCallInstruction,
         maxTokens: L4B_MAX_OUTPUT_TOKENS,
         temperature: TEMPERATURE,
         useJsonMode: true,
