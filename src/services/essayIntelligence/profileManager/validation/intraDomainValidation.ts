@@ -26,6 +26,8 @@ import type {
   EssayProfile,
   ValidationResult,
   ValidationCheck,
+  SignatureMove,
+  SignatureMoveInstance,
 } from '../../profileTypes';
 
 // ============================================================================
@@ -397,4 +399,126 @@ function checkIndexConsistency(profile: Readonly<EssayProfile>): ValidationCheck
     severity: 'error',
     details: issues.join('; '),
   };
+}
+
+// ============================================================================
+// SIGNATURE MOVE VALIDATOR (Gap 1)
+// ============================================================================
+
+/**
+ * Normalize text for substring comparison: collapses smart quotes, em-dash
+ * variants, and Unicode whitespace into ASCII equivalents, then lowercases.
+ * This is referential-integrity normalization (rule 6 system bookkeeping),
+ * not quality enforcement.
+ */
+function normalizeForSubstring(text: string): string {
+  return text
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„‟]/g, '"')
+    .replace(/[–—―−]/g, '-')
+    // Any Unicode whitespace → ASCII space (NBSP, narrow NBSP, en/em space, tabs, newlines, etc.)
+    .replace(/\s+/g, ' ')
+    // Spaces surrounding a hyphen are stylistic — collapse "now – I" and "now—I" both to "now-i"
+    .replace(/\s*-\s*/g, '-')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Validate a SignatureMove candidate against essay paragraph texts.
+ *
+ * Referential-integrity check only (rule 6). Drops the field to null on any
+ * failure with a diagnostic log. NEVER fabricates a replacement.
+ *
+ * Failure modes that trigger drop-to-null:
+ * - sentence_quote with quotedText not a substring of cited paragraph
+ * - any paragraph index out of range
+ * - cross_paragraph_pattern with fewer than 2 paragraph entries
+ *
+ * @param candidate - LLM-emitted SignatureMove or null
+ * @param paragraphTexts - The essay's paragraphs in order (zero-indexed array
+ *                        position = paragraph.index). The full text of each
+ *                        paragraph is what `sentence_quote.quotedText` must be
+ *                        a substring of.
+ * @param diagnostic - Optional callback for diagnostic logging on rejection
+ * @returns The candidate if valid, or null if any check fails
+ */
+export function validateSignatureMoveAgainstParagraphs(
+  candidate: SignatureMove | null | undefined,
+  paragraphTexts: readonly string[],
+  diagnostic?: (msg: string) => void,
+): SignatureMove | null {
+  if (candidate == null) return null;
+
+  const log = (msg: string): void => {
+    if (diagnostic) diagnostic(msg);
+    else console.warn(`[SignatureMove validator] dropping to null: ${msg}`);
+  };
+
+  const inRange = (idx: number): boolean =>
+    Number.isInteger(idx) && idx >= 0 && idx < paragraphTexts.length;
+
+  if (!Array.isArray(candidate.instances) || candidate.instances.length === 0) {
+    log('candidate has no instances');
+    return null;
+  }
+
+  for (let i = 0; i < candidate.instances.length; i++) {
+    const instance = candidate.instances[i] as SignatureMoveInstance;
+    if (!instance || typeof instance !== 'object') {
+      log(`instance[${i}] is not an object`);
+      return null;
+    }
+
+    switch (instance.kind) {
+      case 'sentence_quote': {
+        const para = instance.location?.paragraph;
+        if (typeof para !== 'number' || !inRange(para)) {
+          log(`instance[${i}] sentence_quote paragraph index ${para} out of range [0, ${paragraphTexts.length})`);
+          return null;
+        }
+        const quotedText = instance.quotedText;
+        if (typeof quotedText !== 'string' || quotedText.length === 0) {
+          log(`instance[${i}] sentence_quote has empty quotedText`);
+          return null;
+        }
+        const haystack = normalizeForSubstring(paragraphTexts[para]);
+        const needle = normalizeForSubstring(quotedText);
+        if (!haystack.includes(needle)) {
+          log(`instance[${i}] sentence_quote quotedText not a substring of P${para}: "${quotedText.slice(0, 60)}…"`);
+          return null;
+        }
+        break;
+      }
+      case 'paragraph_compression': {
+        const para = instance.paragraph;
+        if (typeof para !== 'number' || !inRange(para)) {
+          log(`instance[${i}] paragraph_compression paragraph index ${para} out of range [0, ${paragraphTexts.length})`);
+          return null;
+        }
+        break;
+      }
+      case 'cross_paragraph_pattern': {
+        const paragraphs = instance.paragraphs;
+        if (!Array.isArray(paragraphs) || paragraphs.length < 2) {
+          log(`instance[${i}] cross_paragraph_pattern has fewer than 2 paragraphs`);
+          return null;
+        }
+        for (const p of paragraphs) {
+          if (!inRange(p)) {
+            log(`instance[${i}] cross_paragraph_pattern paragraph index ${p} out of range [0, ${paragraphTexts.length})`);
+            return null;
+          }
+        }
+        break;
+      }
+      default: {
+        const exhaustive: never = instance;
+        log(`instance[${i}] unknown kind: ${JSON.stringify(exhaustive)}`);
+        return null;
+      }
+    }
+  }
+
+  return candidate;
 }

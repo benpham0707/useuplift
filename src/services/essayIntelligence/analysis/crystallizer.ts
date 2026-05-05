@@ -612,6 +612,8 @@ If a candidate doesn't make it into any priority, that's fine — it will be mar
 YOUR THREE OUTPUTS:
 
 1. PRIORITIZED IMPROVEMENTS — Consolidate candidates into 3-7 priorities. Reference North Star structural roles in \`architecturalReason\` (re-derive this framing from the North Star — candidates don't carry it). Each priority MUST have non-empty \`consolidatedFrom\`.
+
+PRESERVE THE SIGNATURE MOVE: If \`craftAssessment.signatureMove != null\`, prioritize improvements that PRESERVE its cited instances; rank improvements that would erase them as net-negative. Where possible, frame near-the-move improvements as "preserve X while doing Y" rather than as replacements.
    BAD: "Improve the opening paragraph." (ungrounded, no consolidatedFrom)
    GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value." consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]
 

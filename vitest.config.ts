@@ -108,6 +108,9 @@ export default defineConfig({
       // property tests (deterministic LCG seed; running aggregate twice
       // doesn't double the queue).
       'tests/property/specificsNeedAggregatorIdempotency.ts',
+      // Quality Gap 1 (2026-05-04) — SignatureMove substring + paragraph-
+      // index validator. Pure referential-integrity check; no API calls.
+      'tests/unit/signature-move-validation.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.

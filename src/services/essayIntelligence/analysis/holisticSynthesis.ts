@@ -66,7 +66,10 @@ import type {
   ImprovementPhase,
   Finding,
   EssayUnderstanding,
+  SignatureMove,
+  SignatureMoveInstance,
 } from '../profileTypes';
+import { validateSignatureMoveAgainstParagraphs } from '../profileManager/validation/intraDomainValidation';
 import { FindingStore } from '../findings/findingStore';
 import {
   buildFindingReferenceContext,
@@ -127,6 +130,9 @@ const META_TIMEOUT_MS = 120_000;
 /** Question Curation call (~2K tokens) */
 const CURATION_MAX_TOKENS = 4000;
 const CURATION_TIMEOUT_MS = 120_000;
+/** Signature Move call (Quality Gap 1) — ONE move + 3-5 instances + reader effect (~1.5K tokens typical) */
+const SIGNATURE_MOVE_MAX_TOKENS = 3000;
+const SIGNATURE_MOVE_TIMEOUT_MS = 90_000;
 
 // ============================================================================
 // INPUT TYPES
@@ -878,6 +884,193 @@ Before including any question: "If I dispatched a deep dive, would the answer pr
 }`;
 
 // ============================================================================
+// V2: SIGNATURE MOVE PROMPT (Quality Gap 1)
+// ============================================================================
+
+const SYSTEM_PROMPT_SIGNATURE_MOVE = `You are an expert essay craft analyst performing the FINAL synthesis step after the holistic walk and synthesis are complete.
+
+Your task: name THE ONE defining structural / voice / rhetorical move that IS this writer's craft fingerprint — the move that an outside reader would recognize as "this writer" if they encountered it in a different essay.
+
+You see: the complete sentence-level walk understanding, the holistic synthesis (voice + emotion + theme + narrative + character + craft + admissions + entanglements), and the META reading strategy. Use ALL of it.
+
+=== CRITICAL — ONE OR NULL ===
+
+You return EXACTLY ONE signature move, OR null. Never two. Never a list.
+
+Return null when:
+- The essay's craft is distributed across multiple strengths with no single defining technique
+- You cannot cite at least 3 concrete instances of the same move
+- The candidate "move" is generic praise dressed up as craft (see anti-example)
+
+Returning null is a real signal, not a failure. Some essays succeed by distributing craft rather than concentrating it.
+
+=== DISTINCTION FROM ADJACENT FIELDS ===
+
+You are NOT producing voiceIdentity.signature (prose voice description), narrativeStrategy.primaryStrategy (essay genre), or strengthSignatures (plural list of strengths). signatureMove is ONE singular technique with cited instances. If your output overlaps with those fields, return null.
+
+=== COMPOUND MOVES ===
+
+A compound move counts as ONE move only when its components are causally linked (X→Y, where Y depends on X) OR jointly produce ONE reader effect. Two unrelated techniques joined by 'and' are TWO moves — return null and let strengthSignatures hold them.
+
+=== EVIDENCE TYPES ===
+
+Three kinds of instances. Use whichever fits the evidence:
+
+1. sentence_quote — a specific quoted line from the essay (≤40 words verbatim)
+2. paragraph_compression — a paragraph whose COMPRESSION itself is the move (e.g., a paragraph that carries a century of family history in 10 sentences; the compression IS the move, no single quote represents it)
+3. cross_paragraph_pattern — a pattern that recurs across paragraphs (e.g., wizard-magic vocabulary returns at multiple paragraphs)
+
+Mix evidence types within one signatureMove. The move's instances should cover at least 3 distinct paragraphs OR distinct sentence clusters.
+
+EVIDENCE GROUNDING (referential integrity, not quality):
+- All paragraph indices are ZERO-INDEXED (the first paragraph is paragraph 0).
+- Every sentence_quote.quotedText MUST be a verbatim substring of the cited paragraph's text. Substring will be checked after smart-quote / em-dash / whitespace normalization. Drift will cause the field to drop to null.
+- cross_paragraph_pattern requires at least 2 paragraph entries.
+
+=== FORBIDDEN VOCABULARY (in oneSentenceName) ===
+
+These words signal praise rather than craft naming. Avoid them in oneSentenceName: "vivid", "engaging", "authentic", "powerful", "effective", "strong", "compelling", "beautiful", "moving".
+
+INSTEAD use syntactic / structural / rhetorical vocabulary:
+- Syntactic: anaphora, parataxis, asyndeton, chiasmus, fragment, parenthetical
+- Structural: opener, callback, bookend, pivot, beat-drop, compression
+- Rhetorical: misdirection, register-shift, triplet, disproportion-hook, inversion, ethical-inflection, double-connotation
+
+(This is GUIDANCE — if a more precise word exists outside this list, use it. The list illustrates the register, not a closed taxonomy.)
+
+=== WORKED EXAMPLE 1 — CROCHET (Harvard 2028) ===
+
+Source paragraphs (zero-indexed):
+P0 opens with: "My nightstand is home to a small menagerie of critters, each glass-eyed specimen lovingly stuffed with cotton. Don't get the wrong idea, now – I'm not a taxidermist or anything. I crochet."
+P1 carries the family history (war, grandfather's imprisonment, grandmother's matriarch role) in ten sentences.
+P3 contains the Agnes-the-cornflower-blue-elephant image.
+
+{
+  "signatureMove": {
+    "oneSentenceName": "Compressed-heritage architecture: misdirection-then-anticlimax opener (P1) sets up a one-paragraph compression of the family's wartime history (P2), then the essay redeems density with a single accumulated-specifics image (Agnes the cornflower-blue elephant, P4).",
+    "whyItIsTheirs": "Clara's essay carries a century of family history, a war, a thirteen-year imprisonment, and a three-generation craft transmission in 650 words. The compression-then-accumulated-specifics rhythm is what lets that weight fit without flattening into abstraction. Remove either move and the essay collapses.",
+    "instances": [
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 0, "sentence": 0 },
+        "quotedText": "My nightstand is home to a small menagerie of critters, each glass-eyed specimen lovingly stuffed with cotton.",
+        "whatThisInstanceShows": "The taxidermy-vocabulary setup that the reader's first hypothesis will be wrong about — buying forward attention through implied misreading."
+      },
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 0, "sentence": 1 },
+        "quotedText": "Don't get the wrong idea, now – I'm not a taxidermist or anything.",
+        "whatThisInstanceShows": "The two-beat anticlimactic reveal — denial of the implied hypothesis followed by the actual subject."
+      },
+      {
+        "kind": "paragraph_compression",
+        "paragraph": 1,
+        "whatThisInstanceShows": "Ten sentences carry the entire wartime history: war, refugees, the grandfather's thirteen-year imprisonment, and the grandmother's expansion into matriarch. The compression IS the move."
+      },
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 3, "sentence": 4 },
+        "quotedText": "Take Agnes, for example, a cornflower-blue elephant named after mathematician Maria Gaetana Agnesi who lives in my calculus teacher's classroom",
+        "whatThisInstanceShows": "Accumulated specifics — name + color + cross-domain origin + location compounded into one sentence to redeem the essay's compressed density with one unforgettable image."
+      }
+    ],
+    "readerEffect": "The reader is committed by P1 through their own incorrect inference, absorbs P2's century of weight without being asked to dwell on it, and is rewarded in P4 with a single image dense enough to function as the essay's memory anchor."
+  }
+}
+
+(Note: oneSentenceName uses 1-indexed paragraph display — P1, P2, P4 — which is how counselors and students reference paragraphs. The data layer uses zero-indexed paragraph fields. This is the existing convention.)
+
+=== WORKED EXAMPLE 2 — THREE DAYS (Harvard 2028) ===
+
+Source paragraphs (zero-indexed):
+P0 opens with: "Three days before I got on a plane to go across the country for six weeks I quit milk cold-turkey."
+P3 contains the Izzy scene with the fear and resolution triplets.
+P4 closes with: "...cutting out the biggest part of my diet became the least impactful part of my summer."
+
+{
+  "signatureMove": {
+    "oneSentenceName": "Hook-by-disproportion between a high-stakes time-marker and a trivial decision (P1S1), set up by a causal-chain triplet pattern that maps fears (P4) to resolutions (P4) element-by-element rather than merely in parallel.",
+    "whyItIsTheirs": "Francisco's essay has many uneven sentences but two structurally tight architectural moves: the disproportion hook plants compound curiosity at the open, and the fear→resolution triplet mapping is what gives the Izzy scene its felt resolution. Together they are the load-bearing skeleton the rest of the prose hangs from.",
+    "instances": [
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 0, "sentence": 0 },
+        "quotedText": "Three days before I got on a plane to go across the country for six weeks I quit milk cold-turkey.",
+        "whatThisInstanceShows": "Disproportion hook: time-marker signals high stakes; the milk decision is banal. Compound curiosity is set in one sentence."
+      },
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 3, "sentence": 5 },
+        "quotedText": "I was afraid; afraid my support wouldn't be good enough, afraid to show that I cared, afraid they didn't care for me.",
+        "whatThisInstanceShows": "Causal-chain fear triplet — each fear logically depends on the previous (inadequate giving → fear of showing → fear of not being received)."
+      },
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 3, "sentence": 9 },
+        "quotedText": "I feel comfortable, I feel wanted, I feel safe.",
+        "whatThisInstanceShows": "Resolution triplet that maps element-by-element to the fear triplet (adequate→included→safe) — structural relief, not just emotional relief."
+      },
+      {
+        "kind": "cross_paragraph_pattern",
+        "paragraphs": [0, 4],
+        "whatThisInstanceShows": "Disproportion bookends: P1 opens with milk-as-mismatched-stakes, P5 closes with cutting-out-milk-as-least-impactful — the hook's disproportion IS the essay's thesis, restated as an inversion."
+      }
+    ],
+    "readerEffect": "The reader is pulled forward at the open by mismatched scales of attention, rewarded mid-essay by structural relief (fears answered formally, not just emotionally), and given thematic closure by the disproportion-hook returning as inversion."
+  }
+}
+
+=== ANTI-EXAMPLE — what NOT to emit ===
+
+{
+  "signatureMove": {
+    "oneSentenceName": "The writer uses vivid imagery and personal voice throughout the essay.",
+    "whyItIsTheirs": "Vivid imagery makes the essay engaging and personal voice connects with the reader.",
+    "instances": [
+      {
+        "kind": "sentence_quote",
+        "location": { "paragraph": 0, "sentence": 0 },
+        "quotedText": "[long unfocused excerpt]",
+        "whatThisInstanceShows": "shows imagery"
+      }
+    ],
+    "readerEffect": "The reader is engaged."
+  }
+}
+
+Why this fails:
+- "vivid" + "engaging" + "personal voice" — all in the forbidden vocabulary register
+- Not a *move* (no syntactic / structural / rhetorical specificity)
+- Could be said about any essay (no this-writer-specific content)
+- Only 1 instance (minimum is 3)
+- whatThisInstanceShows is generic ("shows imagery"), not move-instance-specific
+- readerEffect is praise ("engaged"), not cognitive description
+
+If the only signature move you can name is this generic, return null.
+
+=== OUTPUT SCHEMA ===
+
+Respond with a single JSON object. No markdown, no explanation, no code blocks.
+
+{
+  "signatureMove": {
+    "oneSentenceName": "<one sentence — concrete syntactic/structural/rhetorical move + WHERE it appears>",
+    "whyItIsTheirs": "<1-2 sentences referencing content-specific information from THIS essay>",
+    "instances": [
+      // 3 or more instances, mixed kinds allowed
+      // sentence_quote: { "kind": "sentence_quote", "location": { "paragraph": N, "sentence": N }, "quotedText": "...verbatim...", "whatThisInstanceShows": "..." }
+      // paragraph_compression: { "kind": "paragraph_compression", "paragraph": N, "whatThisInstanceShows": "..." }
+      // cross_paragraph_pattern: { "kind": "cross_paragraph_pattern", "paragraphs": [N, N, ...], "whatThisInstanceShows": "..." }
+    ],
+    "readerEffect": "<one sentence — cognitive/felt effect, not praise>"
+  }
+}
+
+OR
+
+{ "signatureMove": null }`;
+
+// ============================================================================
 // CONTEXT BUILDERS
 // ============================================================================
 
@@ -1590,6 +1783,79 @@ function coercePairedImprovement(
   };
 }
 
+/**
+ * Quality Gap 1: parse a SignatureMove candidate from raw LLM output. Returns
+ * null when the candidate is structurally malformed; the substring + paragraph-
+ * index referential-integrity check is applied separately by
+ * validateSignatureMoveAgainstParagraphs() so that pure-shape parsing stays
+ * decoupled from essay-text-aware validation.
+ */
+function coerceSignatureMove(raw: unknown): SignatureMove | null {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+
+  const oneSentenceName = typeof r.oneSentenceName === 'string' ? r.oneSentenceName.trim() : '';
+  const whyItIsTheirs = typeof r.whyItIsTheirs === 'string' ? r.whyItIsTheirs.trim() : '';
+  const readerEffect = typeof r.readerEffect === 'string' ? r.readerEffect.trim() : '';
+
+  if (oneSentenceName.length === 0 || whyItIsTheirs.length === 0 || readerEffect.length === 0) {
+    return null;
+  }
+
+  const rawInstances = Array.isArray(r.instances) ? r.instances : [];
+  const instances: SignatureMoveInstance[] = [];
+
+  for (const inst of rawInstances) {
+    if (!inst || typeof inst !== 'object') continue;
+    const i = inst as Record<string, unknown>;
+    const kind = typeof i.kind === 'string' ? i.kind : '';
+    const whatThisInstanceShows =
+      typeof i.whatThisInstanceShows === 'string' ? i.whatThisInstanceShows.trim() : '';
+    if (whatThisInstanceShows.length === 0) continue;
+
+    if (kind === 'sentence_quote') {
+      const loc = i.location as Record<string, unknown> | undefined;
+      if (!loc || typeof loc.paragraph !== 'number') continue;
+      const quotedText = typeof i.quotedText === 'string' ? i.quotedText.trim() : '';
+      if (quotedText.length === 0) continue;
+      instances.push({
+        kind: 'sentence_quote',
+        location: {
+          paragraph: loc.paragraph,
+          sentence: typeof loc.sentence === 'number' ? loc.sentence : undefined,
+        },
+        quotedText,
+        whatThisInstanceShows,
+      });
+    } else if (kind === 'paragraph_compression') {
+      if (typeof i.paragraph !== 'number') continue;
+      instances.push({
+        kind: 'paragraph_compression',
+        paragraph: i.paragraph,
+        whatThisInstanceShows,
+      });
+    } else if (kind === 'cross_paragraph_pattern') {
+      const paragraphs = ensureNumberArray(i.paragraphs);
+      if (paragraphs.length < 2) continue;
+      instances.push({
+        kind: 'cross_paragraph_pattern',
+        paragraphs,
+        whatThisInstanceShows,
+      });
+    }
+  }
+
+  if (instances.length === 0) return null;
+
+  return {
+    oneSentenceName,
+    whyItIsTheirs,
+    instances,
+    readerEffect,
+  };
+}
+
 function coerceAdmissionsPositioning(raw: Record<string, unknown>): AdmissionsPositioning {
   const result: AdmissionsPositioning = {
     tellabilitySummary: String(raw.tellabilitySummary ?? ''),
@@ -2293,63 +2559,130 @@ export class HolisticSynthesisService {
       `${metaOutput.reReadCandidates.length} re-read candidates`,
     );
 
-    // ── Step 3: Question Curation ──
+    // ── Step 3 & 3b: Question Curation + SignatureMove (parallel, isolated) ──
+    //
+    // Both consume META.readingStrategy and the synthesis. Neither reads the
+    // other's output. Promise.allSettled isolates failures — a CURATION
+    // failure cannot block SignatureMove and vice versa. Saves ~15-30s
+    // wall-clock vs. serial-after-curation.
     const curationUserPrompt = this.buildCurationUserPrompt(
       input,
       synthesis,
       metaOutput.readingStrategy,
     );
+    const paragraphTexts = input.profile.paragraphs.map((p) => p.text);
 
-    const curationResponse = await callClaudeWithRetry<unknown>({
-      model: SONNET,
-      systemPrompt: SYSTEM_PROMPT_CURATION,
-      userPrompt: curationUserPrompt,
-      maxTokens: CURATION_MAX_TOKENS,
-      temperature: SYNTHESIS_TEMPERATURE,
-      timeoutMs: CURATION_TIMEOUT_MS,
-      useJsonMode: true,
-      cacheSystemPrompt: true,
-    });
+    const [curationSettled, signatureMoveSettled] = await Promise.allSettled([
+      (async () => {
+        const curationResponse = await callClaudeWithRetry<unknown>({
+          model: SONNET,
+          systemPrompt: SYSTEM_PROMPT_CURATION,
+          userPrompt: curationUserPrompt,
+          maxTokens: CURATION_MAX_TOKENS,
+          temperature: SYNTHESIS_TEMPERATURE,
+          timeoutMs: CURATION_TIMEOUT_MS,
+          useJsonMode: true,
+          cacheSystemPrompt: true,
+        });
+        const curationOutput = this.parseCurationOutput(curationResponse.content);
+        return { curationResponse, curationOutput };
+      })(),
+      this.synthesizeSignatureMove(
+        input.essayText,
+        paragraphTexts,
+        synthesis,
+        metaOutput.readingStrategy,
+      ),
+    ]);
 
-    const curationOutput = this.parseCurationOutput(curationResponse.content);
+    let curationOutput: QuestionCurationOutput;
+    let curationResponse: ClaudeResponse<unknown> | null = null;
+    if (curationSettled.status === 'fulfilled') {
+      curationOutput = curationSettled.value.curationOutput;
+      curationResponse = curationSettled.value.curationResponse;
+      console.log(
+        `[HolisticSynthesis] Iteration ${input.iterationNumber} — Curation complete, ` +
+        `${curationOutput.resolvedQuestions.length} resolved, ` +
+        `${curationOutput.curatedQueue.length} curated, ` +
+        `${curationOutput.filteredQuestions.length} filtered`,
+      );
+    } else {
+      console.warn(
+        `[HolisticSynthesis] Iteration ${input.iterationNumber} — Curation FAILED (non-fatal): ` +
+          (curationSettled.reason instanceof Error
+            ? curationSettled.reason.message
+            : String(curationSettled.reason)),
+      );
+      curationOutput = { resolvedQuestions: [], curatedQueue: [], filteredQuestions: [] };
+    }
 
-    console.log(
-      `[HolisticSynthesis] Iteration ${input.iterationNumber} — Curation complete, ` +
-      `${curationOutput.resolvedQuestions.length} resolved, ` +
-      `${curationOutput.curatedQueue.length} curated, ` +
-      `${curationOutput.filteredQuestions.length} filtered`,
-    );
+    let signatureMove: SignatureMove | null = null;
+    let signatureMoveCost = 0;
+    let signatureMoveTokenUsage = {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+    };
+    if (signatureMoveSettled.status === 'fulfilled') {
+      signatureMove = signatureMoveSettled.value.signatureMove;
+      signatureMoveCost = signatureMoveSettled.value.cost;
+      signatureMoveTokenUsage = signatureMoveSettled.value.tokenUsage;
+    } else {
+      console.warn(
+        `[HolisticSynthesis] Iteration ${input.iterationNumber} — SignatureMove FAILED (non-fatal, falling to null): ` +
+          (signatureMoveSettled.reason instanceof Error
+            ? signatureMoveSettled.reason.message
+            : String(signatureMoveSettled.reason)),
+      );
+    }
+
+    // Fold the validated SignatureMove into craftAssessment so the existing
+    // HolisticMutator (which wholesale-replaces craftAssessment from
+    // synthesis.craftAssessment) carries it through to the persisted profile
+    // without any mutator-level code change.
+    if (synthesis.craftAssessment) {
+      synthesis.craftAssessment.signatureMove = signatureMove;
+    }
 
     // ── Aggregate costs ──
     const costA = calculateCost(responseA.usage, SONNET);
     const costB = calculateCost(responseB.usage, SONNET);
     const costMeta = calculateCost(metaResponse.usage, SONNET);
-    const costCuration = calculateCost(curationResponse.usage, SONNET);
-    const totalCost = costA + costB + costMeta + costCuration;
+    const costCuration = curationResponse ? calculateCost(curationResponse.usage, SONNET) : 0;
+    const costSignatureMove = signatureMoveCost;
+    const totalCost = costA + costB + costMeta + costCuration + costSignatureMove;
     const timingMs = Date.now() - startTime;
 
     const tokenUsage = {
       inputTokens: responseA.usage.input_tokens + responseB.usage.input_tokens +
-        metaResponse.usage.input_tokens + curationResponse.usage.input_tokens,
+        metaResponse.usage.input_tokens +
+        (curationResponse?.usage.input_tokens ?? 0) +
+        signatureMoveTokenUsage.inputTokens,
       outputTokens: responseA.usage.output_tokens + responseB.usage.output_tokens +
-        metaResponse.usage.output_tokens + curationResponse.usage.output_tokens,
+        metaResponse.usage.output_tokens +
+        (curationResponse?.usage.output_tokens ?? 0) +
+        signatureMoveTokenUsage.outputTokens,
       cacheReadTokens:
         (responseA.usage.cache_read_input_tokens ?? 0) +
         (responseB.usage.cache_read_input_tokens ?? 0) +
         (metaResponse.usage.cache_read_input_tokens ?? 0) +
-        (curationResponse.usage.cache_read_input_tokens ?? 0),
+        (curationResponse?.usage.cache_read_input_tokens ?? 0) +
+        signatureMoveTokenUsage.cacheReadTokens,
       cacheWriteTokens:
         (responseA.usage.cache_creation_input_tokens ?? 0) +
         (responseB.usage.cache_creation_input_tokens ?? 0) +
         (metaResponse.usage.cache_creation_input_tokens ?? 0) +
-        (curationResponse.usage.cache_creation_input_tokens ?? 0),
+        (curationResponse?.usage.cache_creation_input_tokens ?? 0) +
+        signatureMoveTokenUsage.cacheWriteTokens,
     };
 
     console.log(
       `[HolisticSynthesis] Iteration ${input.iterationNumber} complete — ` +
       `$${totalCost.toFixed(4)} total (A=$${costA.toFixed(3)}, B=$${costB.toFixed(3)}, ` +
-      `Meta=$${costMeta.toFixed(3)}, Curation=$${costCuration.toFixed(3)}), ` +
-      `${timingMs}ms`,
+      `Meta=$${costMeta.toFixed(3)}, Curation=$${costCuration.toFixed(3)}, ` +
+      `SigMove=$${costSignatureMove.toFixed(3)}), ` +
+      `${timingMs}ms, signatureMove=${signatureMove === null ? 'null' : 'populated'}`,
     );
 
     // Wave-3a Phase 3C/3B: persist corpus telemetry (first-iteration only —
@@ -2541,6 +2874,96 @@ export class HolisticSynthesisService {
       }
     }
     return parts.join('\n');
+  }
+
+  /**
+   * Quality Gap 1 — Signature Move micro-call.
+   *
+   * Sonnet call mirroring the META + CURATION pattern. Receives the FINISHED
+   * Phase A + Phase B synthesis plus the META reading strategy as input;
+   * produces ONE SignatureMove (or null). Validated against essay paragraph
+   * texts via referential-integrity check before being returned — never
+   * fabricates on parse failure or substring drift; null is the honest
+   * answer when craft is distributed rather than concentrated.
+   *
+   * Returns the validated candidate, the call's cost, the token usage, and
+   * timing — caller's responsibility to fold this into the iteration result.
+   */
+  private async synthesizeSignatureMove(
+    essayText: string,
+    paragraphTexts: readonly string[],
+    synthesis: HolisticSynthesisOutput,
+    readingStrategy: ReadingStrategy,
+  ): Promise<{
+    signatureMove: SignatureMove | null;
+    cost: number;
+    tokenUsage: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens: number;
+      cacheWriteTokens: number;
+    };
+    timingMs: number;
+  }> {
+    const startTime = Date.now();
+
+    const userPromptParts: string[] = [];
+    userPromptParts.push('=== FULL ESSAY TEXT ===');
+    userPromptParts.push(essayText);
+    userPromptParts.push('');
+    userPromptParts.push('=== HOLISTIC SYNTHESIS (Phase A + Phase B output, full) ===');
+    userPromptParts.push(JSON.stringify(synthesis, null, 2));
+    userPromptParts.push('');
+    userPromptParts.push('=== META READING STRATEGY ===');
+    userPromptParts.push(JSON.stringify(readingStrategy, null, 2));
+    userPromptParts.push('');
+    userPromptParts.push('Name THIS writer\'s ONE signature move, or return { "signatureMove": null }. Cite at least 3 instances. Quote text must be verbatim from the cited paragraph.');
+
+    const userPrompt = userPromptParts.join('\n');
+
+    const response = await callClaudeWithRetry<unknown>({
+      model: SONNET,
+      systemPrompt: SYSTEM_PROMPT_SIGNATURE_MOVE,
+      userPrompt,
+      maxTokens: SIGNATURE_MOVE_MAX_TOKENS,
+      temperature: SYNTHESIS_TEMPERATURE,
+      timeoutMs: SIGNATURE_MOVE_TIMEOUT_MS,
+      useJsonMode: true,
+      cacheSystemPrompt: true,
+    });
+
+    const cost = calculateCost(response.usage, SONNET);
+    const timingMs = Date.now() - startTime;
+
+    const tokenUsage = {
+      inputTokens: response.usage.input_tokens,
+      outputTokens: response.usage.output_tokens,
+      cacheReadTokens: response.usage.cache_read_input_tokens ?? 0,
+      cacheWriteTokens: response.usage.cache_creation_input_tokens ?? 0,
+    };
+
+    let signatureMove: SignatureMove | null = null;
+    try {
+      const parsed = parseLlmJsonOutput(response.content, 'L3.75 SignatureMove');
+      const candidate = coerceSignatureMove(parsed.signatureMove);
+      signatureMove = validateSignatureMoveAgainstParagraphs(candidate, paragraphTexts);
+    } catch (error) {
+      console.warn(
+        `[HolisticSynthesis] SignatureMove parse failed (non-fatal, dropping to null): ` +
+          (error instanceof Error ? error.message : String(error)),
+      );
+      signatureMove = null;
+    }
+
+    console.log(
+      `[HolisticSynthesis] SignatureMove complete — ` +
+        `${signatureMove === null ? 'null (no single defining move identified)' : `populated, ${signatureMove.instances.length} instances`}, ` +
+        `${response.usage.output_tokens} output tokens, ` +
+        `$${cost.toFixed(4)} cost, ` +
+        `${timingMs}ms, stopReason: ${response.stopReason}`,
+    );
+
+    return { signatureMove, cost, tokenUsage, timingMs };
   }
 
   // ── Meta output parser ──

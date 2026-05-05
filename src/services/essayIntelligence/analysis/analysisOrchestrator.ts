@@ -837,11 +837,14 @@ export class AnalysisOrchestrator {
         coordinator.addImprovementCandidates(l375Candidates, { source: 'L3.75' });
       }
 
-      // Record aggregate L3.75 cost
-      costTracker.record('L3.75', growthResult.totalCost, {
-        inputTokens: 0, outputTokens: 0,
-        cacheReadTokens: 0, cacheWriteTokens: 0,
-      }, Date.now() - startTime);
+      // H-2 fix (Quality Gap 1): the aggregate `L3.75` cost row previously
+      // double-counted with the per-iteration `L3.75_iter_N` rows already
+      // recorded inside the growth cycle (and `understanding_prose_iter_N`,
+      // and the new `synthesizeSignatureMove` call's cost which is part of
+      // each iter's totalCost). Adding a sub-call to L3.75 without this fix
+      // would WORSEN the double-count. The per-iter rows are authoritative;
+      // we no longer record an aggregate row here. The growth cycle's total
+      // cost remains visible via the per-layer log line below.
       layersCompleted.push('L3.75');
 
       console.log(

@@ -28,9 +28,22 @@ import type { EssayProfile } from '../src/services/essayIntelligence/profileType
 // CONFIG
 // ============================================================================
 
-const ESSAY_PATH = path.join(__dirname, 'fixtures', 'piano-essay.txt');
+// Essay can be overridden via CLI arg: `npx tsx ... --essay <path-or-corpus-filename>`.
+// If the value contains a path separator, it's treated as a path; otherwise it's
+// looked up in tests/calibration/top-tier-reference/essays/. Defaults to the
+// fixture piano-essay.
+const ESSAY_PATH = (() => {
+  const idx = process.argv.indexOf('--essay');
+  if (idx < 0 || !process.argv[idx + 1]) {
+    return path.join(__dirname, 'fixtures', 'piano-essay.txt');
+  }
+  const arg = process.argv[idx + 1];
+  if (arg.includes('/')) return path.resolve(arg);
+  return path.join(__dirname, 'calibration', 'top-tier-reference', 'essays', arg);
+})();
+const ESSAY_LABEL = path.basename(ESSAY_PATH).replace(/\.txt$/, '');
 const OUTPUT_DIR = path.join(__dirname, 'output');
-const OUTPUT_FILE = path.join(OUTPUT_DIR, 'full-profile-dump.md');
+const OUTPUT_FILE = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.md`);
 
 // ============================================================================
 // HELPERS
@@ -604,6 +617,45 @@ function renderHolisticUnderstanding(profile: EssayProfile): string {
     lines.push(`- **Image system**: ${ca.imageSystem}`);
     lines.push(`- **Sentence patterns**: ${ca.sentencePatterns}`);
     lines.push(`- **Word patterns**: ${ca.wordPatterns}`);
+
+    // Quality Gap 1: render the Signature Move callout BEFORE strengthSignatures.
+    // Populated case shows the one-sentence claim + an evidence table with
+    // 1-indexed paragraph display. Null case renders a teaching block that
+    // explains what null means so a reader doesn't infer the system "missed it".
+    lines.push('\n### Signature Move\n');
+    if (ca.signatureMove) {
+      const sm = ca.signatureMove;
+      lines.push(`> ${sm.oneSentenceName}\n`);
+      lines.push(`**Why it is theirs**: ${sm.whyItIsTheirs}\n`);
+      lines.push(`**Reader effect**: ${sm.readerEffect}\n`);
+      lines.push('| # | Kind | Where | Detail |');
+      lines.push('|---|---|---|---|');
+      for (let i = 0; i < sm.instances.length; i++) {
+        const inst = sm.instances[i];
+        let where: string;
+        let detail: string;
+        if (inst.kind === 'sentence_quote') {
+          const sentence = inst.location.sentence;
+          where = sentence != null
+            ? `P${inst.location.paragraph + 1}S${sentence + 1}`
+            : `P${inst.location.paragraph + 1}`;
+          detail = `"${inst.quotedText}" — ${inst.whatThisInstanceShows}`;
+        } else if (inst.kind === 'paragraph_compression') {
+          where = `P${inst.paragraph + 1}`;
+          detail = inst.whatThisInstanceShows;
+        } else {
+          where = `P${inst.paragraphs.map((p) => p + 1).join(',')}`;
+          detail = inst.whatThisInstanceShows;
+        }
+        // Escape pipe characters in detail to avoid breaking markdown table rendering
+        const escaped = detail.replace(/\|/g, '\\|').replace(/\n/g, ' ');
+        lines.push(`| ${i + 1} | ${inst.kind} | ${where} | ${escaped} |`);
+      }
+      lines.push('');
+    } else {
+      lines.push('*No single defining move identified for this essay.*\n');
+      lines.push('Your essay\'s craft is distributed across multiple strengths rather than concentrated in one identity-defining technique. Both shapes can succeed — some essays earn admission through one unforgettable move, others through sustained competence across many craft elements. See your **Strength Signatures** below for the full picture of your craft.\n');
+    }
 
     if (ca.strengthSignatures.length > 0) {
       lines.push('\n**Strength Signatures:**\n');
@@ -1182,7 +1234,7 @@ async function main(): Promise<void> {
   const pipelineStart = Date.now();
 
   const pipelineResult = await analysisOrchestrator.analyzeEssay({
-    essayId: 'full-profile-dump-piano',
+    essayId: `full-profile-dump-${ESSAY_LABEL}`,
     essayText,
     essayType: 'common_app',
     includeAnnotations: false,
@@ -1214,7 +1266,7 @@ async function main(): Promise<void> {
   const totalCostStr = cost(pipelineResult.costSummary.totalCost);
 
   sections.push(`# Uplift Conversator V2 — Complete Analysis Profile`);
-  sections.push(`## Essay: piano-essay.txt (${wordCount} words)`);
+  sections.push(`## Essay: ${path.basename(ESSAY_PATH)} (${wordCount} words)`);
   sections.push(`## Analysis date: ${analysisDate}`);
   sections.push(`## Cost: ${totalCostStr} | Time: ${formatTime(pipelineTimeMs)}`);
   sections.push('');

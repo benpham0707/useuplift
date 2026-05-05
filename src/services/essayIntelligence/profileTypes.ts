@@ -1310,6 +1310,69 @@ export interface CharacterRevelation {
 }
 
 /**
+ * SignatureMove — the ONE defining structural / voice / rhetorical move that
+ * IS this writer's craft fingerprint. Distinct from `strengthSignatures`
+ * (plural list of things the writer does well) and `voiceIdentity.signature`
+ * (prose description of voice). The signature move is a single repeatable
+ * technique cited at specific paragraphs that an outside reader would
+ * recognize as "this writer."
+ *
+ * Null when the essay has no clear single move — that is a real signal, not
+ * a failure. Do not invent a move to fill the field.
+ */
+export interface SignatureMove {
+  /** One sentence, counselor-grade. Names the move concretely:
+   *  syntactic / structural / rhetorical shape + WHERE it appears.
+   *  Compound-move guidance (when X+Y counts as one move vs. two) lives
+   *  in the prompt, not here. */
+  oneSentenceName: string;
+  /** Why this is THIS writer's move, not just a generic technique. 1-2
+   *  sentences. MUST reference content-specific information from THIS essay
+   *  (e.g., "650 words covering a century" for compression, "Izzy scene" for
+   *  Three Days). Generic transferable claims signal the LLM did not actually
+   *  engage with the essay's specifics. */
+  whyItIsTheirs: string;
+  /** Cited evidence. Heterogeneous evidence types: some moves are
+   *  sentence-level quotes; some are paragraph-level structural patterns
+   *  where COMPRESSION is the move and no single quote represents it.
+   *  Schema supports both via the discriminated `kind` tag. */
+  instances: SignatureMoveInstance[];
+  /** What the move does for the reader's experience. 1 sentence. Pure
+   *  cognitive / felt effect (committed, surprised, primed for X, structural
+   *  relief, etc.). NOT "it's good" / "it works." Judgment lives in L3.5. */
+  readerEffect: string;
+}
+
+export type SignatureMoveInstance =
+  | {
+      kind: 'sentence_quote';
+      /** Reuses ParagraphLocation. ZERO-INDEXED to match the rest of the
+       *  codebase (renderer applies +1 at display time). */
+      location: ParagraphLocation;
+      /** Verbatim excerpt from the essay, ≤40 words. Validator confirms
+       *  this string is a substring of the cited paragraph text after
+       *  whitespace + smart-quote + em-dash normalization. */
+      quotedText: string;
+      /** One sentence: how this specific instance is the move (not a generic
+       *  description of the move itself). */
+      whatThisInstanceShows: string;
+    }
+  | {
+      kind: 'paragraph_compression';
+      /** Zero-indexed paragraph; the compression IS this paragraph. */
+      paragraph: number;
+      /** One sentence describing what is compressed and into what space. */
+      whatThisInstanceShows: string;
+    }
+  | {
+      kind: 'cross_paragraph_pattern';
+      /** Zero-indexed paragraphs where the pattern recurs. Min 2 entries. */
+      paragraphs: number[];
+      /** One sentence describing the pattern that links these paragraphs. */
+      whatThisInstanceShows: string;
+    };
+
+/**
  * CraftAssessment — strength signatures, growth edges, image system, patterns.
  */
 export interface CraftAssessment {
@@ -1352,6 +1415,12 @@ export interface CraftAssessment {
   sentencePatterns: string;
   /** Word-level patterns */
   wordPatterns: string;
+  /** The ONE defining move that IS this writer's craft fingerprint. Null
+   *  when the essay distributes craft rather than concentrating it in a
+   *  single technique. Populated by the L3.75 SignatureMove micro-call;
+   *  validated against essay text (substring + paragraph-index integrity)
+   *  before being written. */
+  signatureMove?: SignatureMove | null;
 }
 
 /**
