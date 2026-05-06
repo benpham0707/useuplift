@@ -44,6 +44,7 @@ const ESSAY_PATH = (() => {
 const ESSAY_LABEL = path.basename(ESSAY_PATH).replace(/\.txt$/, '');
 const OUTPUT_DIR = path.join(__dirname, 'output');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.md`);
+const OUTPUT_JSON = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.json`);
 
 // ============================================================================
 // HELPERS
@@ -750,8 +751,22 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
       }
     }
 
-    lines.push('\n**All Connections (Detailed):**\n');
-    for (const c of conns.all) {
+    // R2 fix: filter out scout-tentative connections from rendered output.
+    // Tentative connections are walker working memory; only foundational /
+    // significant / supporting strength connections are rendered. The full
+    // list (including tentative) remains accessible via profile.connections.all
+    // for downstream layers that need it. Drops ~46 of 59 connections in
+    // typical essays = ~77% reduction in §7.1 length.
+    const renderedConns = conns.all.filter(
+      (c) => c.strengthCategory !== 'tentative',
+    );
+    const suppressedCount = conns.all.length - renderedConns.length;
+    lines.push(
+      `\n**All Connections (Detailed):** ${renderedConns.length} of ${conns.all.length} ` +
+        `(suppressed ${suppressedCount} tentative scout-discovered connections; ` +
+        `set strengthCategory ≥ supporting to render)\n`,
+    );
+    for (const c of renderedConns) {
       const fromStr = c.from.sentence !== undefined
         ? `P${c.from.paragraph+1}S${c.from.sentence+1}`
         : `P${c.from.paragraph+1}`;
@@ -762,14 +777,25 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
       lines.push(`- **From label**: ${c.from.label}`);
       lines.push(`- **To label**: ${c.to.label}`);
       lines.push(`- **Description**: ${c.description}`);
-      lines.push(`- **Reverse illumination**: ${safe(c.reverseIllumination)}`);
-      lines.push(`- **Routing tags**: ${c.routingTags.join(', ')}`);
-      lines.push(`- **Significance**: ${c.significance}`);
+      if (c.reverseIllumination) {
+        lines.push(`- **Reverse illumination**: ${c.reverseIllumination}`);
+      }
+      if (c.routingTags.length > 0) {
+        lines.push(`- **Routing tags**: ${c.routingTags.join(', ')}`);
+      }
+      // R4-related: when significance equals description verbatim, suppress
+      // the duplicate. The LLM emits identical strings into both fields
+      // for ~30% of connections (audit §3.5).
+      if (c.significance && c.significance.trim() !== c.description.trim()) {
+        lines.push(`- **Significance**: ${c.significance}`);
+      }
       lines.push(`- **Strength**: ${c.strengthCategory}`);
       lines.push(`- **Directionality**: ${c.directionality}`);
       lines.push(`- **Discovered by**: ${c.discoveredBy}`);
       lines.push(`- **Status**: ${c.status}`);
-      lines.push(`- **Related findings**: ${c.relatedFindings.join(', ') || '(none)'}`);
+      if (c.relatedFindings.length > 0) {
+        lines.push(`- **Related findings**: ${c.relatedFindings.join(', ')}`);
+      }
       if (c.invalidation) {
         lines.push(`- **Invalidation**: ${c.invalidation.reason} (trigger: ${c.invalidation.trigger})`);
       }
@@ -864,17 +890,48 @@ function renderParagraphProfiles(profile: EssayProfile): string {
         lines.push('**Understanding:**\n');
         lines.push('*Observed Functions:*\n');
         lines.push(renderObservations(su.observedFunctions));
-        lines.push('*Inferred Intents:*\n');
-        lines.push(renderObservations(su.inferredIntents));
-        lines.push('*Narrative Contributions:*\n');
-        lines.push(renderObservations(su.narrativeContributions));
-        lines.push(`- Rhetorical functions: ${su.rhetoricalFunctions.join(', ') || '(none)'}`);
-        lines.push(`- Paragraph contribution: ${su.paragraphContribution}`);
-        lines.push(`- Primary function: ${safe(su.primaryFunction)}`);
-        lines.push(`- Significance: ${safe(su.significance)}`);
-        lines.push(`- Tags: ${su.tags.join(', ') || '(none)'}`);
-        lines.push(`- Connection refs: ${su.connectionRefs.join(', ') || '(none)'}`);
-        lines.push(`- Finding refs: ${su.findingRefs.join(', ') || '(none)'}`);
+        // R3 fix: suppress always-empty schema stubs. The previous renderer
+        // emitted "*Inferred Intents:* (none)", "*Narrative Contributions:*
+        // (none)", "Rhetorical functions: (none)", "Tags: (none)",
+        // "Connection refs: (none)", "Finding refs: (none)" for every
+        // sentence regardless of population. Suppressing when empty drops
+        // ~6 lines per sentence × N sentences = ~150-200 lines per dump.
+        if (su.inferredIntents && su.inferredIntents.length > 0) {
+          lines.push('*Inferred Intents:*\n');
+          lines.push(renderObservations(su.inferredIntents));
+        }
+        if (su.narrativeContributions && su.narrativeContributions.length > 0) {
+          lines.push('*Narrative Contributions:*\n');
+          lines.push(renderObservations(su.narrativeContributions));
+        }
+        if (su.rhetoricalFunctions.length > 0) {
+          lines.push(`- Rhetorical functions: ${su.rhetoricalFunctions.join(', ')}`);
+        }
+        // Paragraph contribution and Primary function are duplicates in practice
+        // (see audit §1.5). Render Primary function only; skip Paragraph contribution
+        // when it equals Primary function. Keep Significance.
+        const primary = su.primaryFunction;
+        const paraContrib = su.paragraphContribution;
+        if (primary) {
+          lines.push(`- Primary function: ${primary}`);
+          if (paraContrib && paraContrib !== primary) {
+            lines.push(`- Paragraph contribution: ${paraContrib}`);
+          }
+        } else if (paraContrib) {
+          lines.push(`- Paragraph contribution: ${paraContrib}`);
+        }
+        if (su.significance) {
+          lines.push(`- Significance: ${su.significance}`);
+        }
+        if (su.tags.length > 0) {
+          lines.push(`- Tags: ${su.tags.join(', ')}`);
+        }
+        if (su.connectionRefs.length > 0) {
+          lines.push(`- Connection refs: ${su.connectionRefs.join(', ')}`);
+        }
+        if (su.findingRefs.length > 0) {
+          lines.push(`- Finding refs: ${su.findingRefs.join(', ')}`);
+        }
 
         if (su.craft) {
           // Scope 1 Phase 1: voiceAlignment dropped from SentenceCraft.
@@ -1305,6 +1362,12 @@ async function main(): Promise<void> {
   ensureOutputDir();
   const output = sections.join('\n');
   fs.writeFileSync(OUTPUT_FILE, output, 'utf-8');
+
+  // R6 fix: persist the profile JSON next to the markdown so future
+  // audits / re-renders / lint checks don't require an API re-run.
+  // Serialized via JSON.stringify with 2-space indent for diffability.
+  fs.writeFileSync(OUTPUT_JSON, JSON.stringify(profile, null, 2), 'utf-8');
+  console.log(`[Profile Dump] Profile JSON persisted to: ${OUTPUT_JSON}`);
   console.log(`\n[Profile Dump] Output written to: ${OUTPUT_FILE}`);
   console.log(`[Profile Dump] Output size: ${(output.length / 1024).toFixed(1)} KB`);
 }

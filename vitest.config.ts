@@ -111,6 +111,10 @@ export default defineConfig({
       // Quality Gap 1 (2026-05-04) — SignatureMove substring + paragraph-
       // index validator. Pure referential-integrity check; no API calls.
       'tests/unit/signature-move-validation.test.ts',
+      // Dump self-audit lint (2026-05-05) — regression catcher for the
+      // recurring problems every full-profile audit identifies (indexing
+      // chaos, connection bloat, schema stubs, verbatim duplicates).
+      'tests/unit/dump-lint.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
