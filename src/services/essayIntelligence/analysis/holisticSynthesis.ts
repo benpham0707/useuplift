@@ -320,12 +320,12 @@ CONTAMINATED (evaluative framing without banned words):
 
 CLEAN (descriptive framing):
   voiceIdentity.signature: "The writer uses second-person address in reflective passages and switches to fragmented, staccato sentences during action sequences. The vocabulary draws from two registers: clinical medical terminology and informal family speech."
-  emotionalTopography.arcTrajectory: "Emotion moves from controlled restraint (P0-P1) through escalating tension (P2-P3, marked by shorter sentences and present tense) to an unguarded disclosure in P4S3, followed by reflective distance in the closing."
+  emotionalTopography.arcTrajectory: "Emotion moves from controlled restraint (P1-P2) through escalating tension (P3-P4, marked by shorter sentences and present tense) to an unguarded disclosure in P5S4, followed by reflective distance in the closing."
 
 GENERAL STANDARDS:
 - Be specific. Use paragraph and sentence numbers. Quote text where it grounds your observation.
 - The walk's holistic evolution is a STARTING POINT. Confirm what's accurate, deepen what's shallow, correct what's wrong.
-- All paragraph indices are 0-based. All sentence indices are 0-based within their paragraph.
+- PARAGRAPH AND SENTENCE INDEXING: the input is labeled 1-indexed for human readability (P1 = first paragraph, S1 = first sentence). Match that convention in every prose string you emit (\`signature\`, \`arcTrajectory\`, \`narrativeStrategy\`, \`craftSignatures\`, etc.). JSON DATA fields use 0-based integers — \`{paragraph: 0, sentence: 0}\` is the first sentence of the first paragraph; \`paragraphs: [0, 4]\` references paragraphs 1 and 5. NEVER write "P0" or "P{n}S0" in prose.
 - Return ONLY valid JSON matching the schema. No markdown, no explanation, no preamble.`;
 
 /**
@@ -724,7 +724,7 @@ ENTANGLEMENTS:
 
 CONNECTION ARCHITECTURE:
 - connectionGraphSummary: Describe the essay's connection TOPOLOGY — linear chain? hub-and-spoke? web? fragmented? sparse? What are the hubs (most connections), islands (no strong connections), and broken chains?
-- newConnections: Only discover connections INVISIBLE to the sequential walk — bookending (P0↔P_last), cross-essay echoes, full-text patterns. The walk already found sequential connections; you add the ones requiring simultaneous full-text view. Return empty array [] if no new connections found.
+- newConnections: Only discover connections INVISIBLE to the sequential walk — bookending (P1↔P_last), cross-essay echoes, full-text patterns. The walk already found sequential connections; you add the ones requiring simultaneous full-text view. Return empty array [] if no new connections found.
 - connectionUpgrades: If you see a walk connection that should be stronger/weaker from the full-text view, or that has reverse illumination the walk couldn't see, include an upgrade. Return empty array [] if no upgrades needed.
 - Don't force connections. Fewer genuine connections are better than many forced ones.
 
@@ -837,7 +837,7 @@ LEVEL 2 — Functional (ONLY if the walk couldn't answer):
   Why borderline: Useful, but the walk should have caught them.
 
 LEVEL 3 — Architectural (GOOD — drive structural understanding):
-  "The constraint-creativity framework is stated in P0, demonstrated in P4, but never TESTED. Is the essay's central claim challenged anywhere?"
+  "The constraint-creativity framework is stated in P1, demonstrated in P5, but never TESTED. Is the essay's central claim challenged anywhere?"
   Why good: Cross-paragraph patterns the walk couldn't fully trace.
 
 LEVEL 4 — Epistemological (EXCELLENT — unlock deepest depth):
@@ -923,7 +923,8 @@ Three kinds of instances. Use whichever fits the evidence:
 Mix evidence types within one signatureMove. The move's instances should cover at least 3 distinct paragraphs OR distinct sentence clusters.
 
 EVIDENCE GROUNDING (referential integrity, not quality):
-- All paragraph indices are ZERO-INDEXED (the first paragraph is paragraph 0).
+- DATA fields are 0-based integers: \`location.paragraph: 0\` is the first paragraph; \`location.sentence: 0\` is the first sentence of that paragraph; \`paragraphs: [0, 4]\` references paragraphs 1 and 5.
+- PROSE strings (\`oneSentenceName\`, \`whyItIsTheirs\`, \`whatThisInstanceShows\`, \`readerEffect\`) use 1-indexed P-labels matching the input convention. Write "P1" for the first paragraph, "P1S2" for the first paragraph's third sentence (S1 = first sentence). NEVER write "P0" or "P{n}S0" in any prose string. The split is intentional: integer fields stay 0-indexed for engineering; counselor-facing prose stays 1-indexed for readability.
 - Every sentence_quote.quotedText MUST be a verbatim substring of the cited paragraph's text. Substring will be checked after smart-quote / em-dash / whitespace normalization. Drift will cause the field to drop to null.
 - cross_paragraph_pattern requires at least 2 paragraph entries.
 
@@ -940,10 +941,10 @@ INSTEAD use syntactic / structural / rhetorical vocabulary:
 
 === WORKED EXAMPLE 1 — CROCHET (Harvard 2028) ===
 
-Source paragraphs (zero-indexed):
-P0 opens with: "My nightstand is home to a small menagerie of critters, each glass-eyed specimen lovingly stuffed with cotton. Don't get the wrong idea, now – I'm not a taxidermist or anything. I crochet."
-P1 carries the family history (war, grandfather's imprisonment, grandmother's matriarch role) in ten sentences.
-P3 contains the Agnes-the-cornflower-blue-elephant image.
+Source paragraphs (1-indexed in this preamble — matching the input markers; the JSON below uses \`location.paragraph: 0\` integer for the same first paragraph):
+P1 opens with: "My nightstand is home to a small menagerie of critters, each glass-eyed specimen lovingly stuffed with cotton. Don't get the wrong idea, now – I'm not a taxidermist or anything. I crochet."
+P2 carries the family history (war, grandfather's imprisonment, grandmother's matriarch role) in ten sentences.
+P4 contains the Agnes-the-cornflower-blue-elephant image.
 
 {
   "signatureMove": {
@@ -978,14 +979,14 @@ P3 contains the Agnes-the-cornflower-blue-elephant image.
   }
 }
 
-(Note: oneSentenceName uses 1-indexed paragraph display — P1, P2, P4 — which is how counselors and students reference paragraphs. The data layer uses zero-indexed paragraph fields. This is the existing convention.)
+(The data/prose split — \`location.paragraph: 0\` (integer) ↔ "P1" (prose) — is the convention defined in EVIDENCE GROUNDING above; this example shows it in action.)
 
 === WORKED EXAMPLE 2 — THREE DAYS (Harvard 2028) ===
 
-Source paragraphs (zero-indexed):
-P0 opens with: "Three days before I got on a plane to go across the country for six weeks I quit milk cold-turkey."
-P3 contains the Izzy scene with the fear and resolution triplets.
-P4 closes with: "...cutting out the biggest part of my diet became the least impactful part of my summer."
+Source paragraphs (1-indexed in this preamble — matching the input markers):
+P1 opens with: "Three days before I got on a plane to go across the country for six weeks I quit milk cold-turkey."
+P4 contains the Izzy scene with the fear and resolution triplets.
+P5 closes with: "...cutting out the biggest part of my diet became the least impactful part of my summer."
 
 {
   "signatureMove": {
@@ -1083,7 +1084,7 @@ function buildUnderstandingContext(profile: EssayProfile, findingStore?: Finding
   // ── Paragraph and sentence understanding ──
   sections.push('=== PARAGRAPH-BY-PARAGRAPH UNDERSTANDING ===\n');
   for (const para of profile.paragraphs) {
-    sections.push(`[P${para.index}] "${truncate(para.text, 120)}"`);
+    sections.push(`[P${para.index + 1}] "${truncate(para.text, 120)}"`);
     if (para.understanding) {
       sections.push(`  Role: ${para.understanding.role}`);
       sections.push(`  Function: ${para.understanding.function}`);
@@ -1095,7 +1096,7 @@ function buildUnderstandingContext(profile: EssayProfile, findingStore?: Finding
     // Sentence-level understanding
     for (const sent of para.sentences) {
       if (sent.understanding) {
-        sections.push(`  [P${para.index}S${sent.index}] "${truncate(sent.text, 80)}"`);
+        sections.push(`  [P${para.index + 1}S${sent.index + 1}] "${truncate(sent.text, 80)}"`);
         // Phase 2: primaryFunction is the primary per-sentence understanding
         if (sent.understanding.primaryFunction) {
           sections.push(`    Function: ${sent.understanding.primaryFunction} [${sent.understanding.significance ?? 'contributing'}]`);
@@ -1124,11 +1125,11 @@ function buildUnderstandingContext(profile: EssayProfile, findingStore?: Finding
     sections.push('=== CONNECTION GRAPH ===\n');
     for (const conn of activeConnections) {
       const from = conn.from.sentence !== undefined
-        ? `P${conn.from.paragraph}S${conn.from.sentence}`
-        : `P${conn.from.paragraph}`;
+        ? `P${conn.from.paragraph + 1}S${conn.from.sentence + 1}`
+        : `P${conn.from.paragraph + 1}`;
       const to = conn.to.sentence !== undefined
-        ? `P${conn.to.paragraph}S${conn.to.sentence}`
-        : `P${conn.to.paragraph}`;
+        ? `P${conn.to.paragraph + 1}S${conn.to.sentence + 1}`
+        : `P${conn.to.paragraph + 1}`;
       const tags = conn.routingTags.length > 0 ? ` [${conn.routingTags.join(',')}]` : '';
       const dir = conn.directionality === 'bidirectional' ? '<->'
         : conn.directionality === 'reverse' ? '<-'
@@ -1139,14 +1140,14 @@ function buildUnderstandingContext(profile: EssayProfile, findingStore?: Finding
     if (profile.connections.imageRecurrences.length > 0) {
       sections.push('\nImage Recurrences:');
       for (const img of profile.connections.imageRecurrences) {
-        sections.push(`  "${img.image}" appears at: ${img.locations.map(l => `P${l[0]}S${l[1]}`).join(', ')}`);
+        sections.push(`  "${img.image}" appears at: ${img.locations.map(l => `P${l[0] + 1}S${l[1] + 1}`).join(', ')}`);
       }
     }
 
     if (profile.connections.narrativeArcMap.length > 0) {
       sections.push('\nNarrative Arc Map:');
       for (const arc of profile.connections.narrativeArcMap) {
-        sections.push(`  ${arc.role} at P${arc.location[0]}S${arc.location[1]}`);
+        sections.push(`  ${arc.role} at P${arc.location[0] + 1}S${arc.location[1] + 1}`);
       }
     }
 
@@ -2787,7 +2788,7 @@ export class HolisticSynthesisService {
     parts.push('\n\n=== WALK PARAGRAPH READINGS ===\n');
     for (const para of input.profile.paragraphs) {
       if (para.understanding) {
-        parts.push(`[P${para.index}] Role: ${para.understanding.role}`);
+        parts.push(`[P${para.index + 1}] Role: ${para.understanding.role}`);
         parts.push(`  Function: ${para.understanding.function}`);
       }
     }
@@ -3108,7 +3109,7 @@ export class HolisticSynthesisService {
     // Build understanding context (same helper as full synthesis)
     const understandingContext = buildUnderstandingContext(currentProfile as EssayProfile);
 
-    const essayText = currentProfile.paragraphs.map((p, i) => `[P${i}] ${p.text}`).join('\n\n');
+    const essayText = currentProfile.paragraphs.map((p, i) => `[P${i + 1}] ${p.text}`).join('\n\n');
 
     const userPrompt = [
       '=== ESSAY TEXT ===\n',

@@ -362,6 +362,12 @@ function buildSystemPromptL4aNorthStar(scale: NorthStarScale, _essayType?: Essay
 
   return `You are the Crystallizer — a literary-architectural analyst who reads a complete essay profile and produces the essay's North Star: its architecture of meaning.
 
+=== DISPLAY CONVENTION ===
+
+The input you receive is labeled with 1-indexed P-labels (P1 = first paragraph, P1S2 = first paragraph's third sentence). Match this convention in every prose string you emit (\`transformation\`, \`role\`, \`significance\`, \`articulation\`, \`currentState\`, \`systemReading\`, etc.).
+
+JSON DATA fields use 0-based integers: \`structuralRolesMap[].paragraphs: [0]\` references paragraph 1 (the first paragraph); \`journey[].location: {paragraph: 0, sentence: 2}\` is the first paragraph's third sentence. Integer fields stay 0-indexed for engineering; counselor-facing prose stays 1-indexed for readability. NEVER write "P0" or "P{n}S0" in any prose string.
+
 YOUR OUTPUT:
 
 ESSAY NORTH STAR — the architecture of meaning.
@@ -478,6 +484,12 @@ function buildSystemPromptL4aScoreMatrix(scale: NorthStarScale, essayType?: Essa
 
 You are provided the essay's North Star as calibration context. Use its structural roles and through-line to inform your scoring — each paragraph's structural score should reflect how well it fulfills the architectural role assigned by the North Star.
 
+=== DISPLAY CONVENTION ===
+
+The input you receive is labeled with 1-indexed P-labels (P1 = first paragraph, P1S2 = first paragraph's third sentence). Match this convention in every prose string you emit (\`verdict\`, \`crossParagraphPatterns[].observation\`, etc.).
+
+JSON DATA fields use 0-based integers: \`scoreMatrix.paragraphs[].index: 0\` is paragraph 1; \`crossParagraphPatterns[].paragraphs: [0, 2]\` references paragraphs 1 and 3. Integer fields stay 0-indexed for engineering; counselor-facing prose stays 1-indexed for readability. NEVER write "P0" or "P{n}S0" in any prose string.
+
 YOUR OUTPUT:
 
 PARAGRAPH SCORE MATRIX — multi-dimensional per-paragraph scoring.
@@ -576,7 +588,7 @@ function buildL4bCandidateContext(candidateStore: ImprovementCandidateStore): st
     s.length > max ? `${s.slice(0, max - 1)}…` : s;
 
   const lines = active.map((c) => {
-    const scope = c.sentence != null ? `P${c.paragraph}S${c.sentence}` : `P${c.paragraph}`;
+    const scope = c.sentence != null ? `P${c.paragraph + 1}S${c.sentence + 1}` : `P${c.paragraph + 1}`;
     const tech = c.technique ? `technique=${c.technique}` : 'technique=null';
     const obs = truncate(c.observation, 120);
     const change = truncate(c.suggestedChange, 120);
@@ -600,6 +612,12 @@ Each candidate was produced by the layer indicated in the source tag, grounded i
 
 function buildSystemPromptL4b(scale: NorthStarScale): string {
   return `You are the Consolidator — you receive a pre-generated set of improvement candidates from L3 (sentence understanding walk), L3.5 (paragraph analysis), and L3.75 (holistic synthesis), along with the authoritative North Star and Paragraph Score Matrix. Your job is to CONSOLIDATE those candidates into 3-7 prioritized improvements, produce the coherence investigation, and assemble the coaching map.
+
+=== DISPLAY CONVENTION ===
+
+The input you receive is labeled with 1-indexed P-labels (P1 = first paragraph, P1S2 = first paragraph's third sentence). Match this convention in every prose string you emit (\`priority\`, \`architecturalReason\`, \`unlocksNext\`, \`whyProtect\`, \`claimA\`, \`claimB\`, \`nature\`, \`likelyResolution\`, \`evidenceA\`, \`evidenceB\`, \`emergentPatterns\`, \`scoreTensions\`, \`transformativeInsight.insight\`, \`whyThisTransforms\`, etc.).
+
+JSON DATA fields use 0-based integers: \`target.paragraphs: [0]\` references paragraph 1 (the first paragraph); \`evidenceLocations: [{paragraph: 0, sentence: 2}]\` is the first paragraph's third sentence. Integer fields stay 0-indexed for engineering; counselor-facing prose stays 1-indexed for readability. NEVER write "P0" or "P{n}S0" in any prose string. (Candidate IDs like \`CAND_L3_P0S1_abc123\` are stable system identifiers — reference them in \`consolidatedFrom\` arrays, but never write them inside prose fields.)
 
 === CRITICAL — YOU CONSOLIDATE, YOU DO NOT INVENT ===
 
@@ -764,11 +782,11 @@ ESSAY DETAILS:
 - Active North Star dimensions: ${ACTIVE_DIMENSIONS[scale].join(', ')}
 
 L3.5 EFFECTIVENESS SCORES (transfer these directly to scoreMatrix.paragraphs[].scores.effectiveness):
-${effectivenessScores.map((e) => `  P${e.index}: effectiveness=${e.effectiveness ?? 'N/A'}, verdict="${e.verdict ?? 'N/A'}"`).join('\n')}
+${effectivenessScores.map((e) => `  P${e.index + 1}: effectiveness=${e.effectiveness ?? 'N/A'}, verdict="${e.verdict ?? 'N/A'}"`).join('\n')}
 
 AVAILABLE ENTANGLEMENT IDs for distinctivenessSignature.entanglementRefs:
 ${entanglementSummary.length > 0
-    ? entanglementSummary.map((e) => `  "${e.id}" — ${e.dimensions.join('+')} at P${e.location.paragraph}${e.location.sentence != null ? `S${e.location.sentence}` : ''}: ${e.description.substring(0, 80)}`).join('\n')
+    ? entanglementSummary.map((e) => `  "${e.id}" — ${e.dimensions.join('+')} at P${e.location.paragraph + 1}${e.location.sentence != null ? `S${e.location.sentence + 1}` : ''}: ${e.description.substring(0, 80)}`).join('\n')
     : '  (none available)'}
 
 AVAILABLE CONNECTION IDs for throughLineMap.connectionRefs:
@@ -830,7 +848,7 @@ ESSAY DETAILS:
 
 AVAILABLE ENTANGLEMENT IDs for distinctivenessSignature.entanglementRefs:
 ${entanglementSummary.length > 0
-    ? entanglementSummary.map((e) => `  "${e.id}" — ${e.dimensions.join('+')} at P${e.location.paragraph}${e.location.sentence != null ? `S${e.location.sentence}` : ''}: ${e.description.substring(0, 80)}`).join('\n')
+    ? entanglementSummary.map((e) => `  "${e.id}" — ${e.dimensions.join('+')} at P${e.location.paragraph + 1}${e.location.sentence != null ? `S${e.location.sentence + 1}` : ''}: ${e.description.substring(0, 80)}`).join('\n')
     : '  (none available)'}
 
 AVAILABLE CONNECTION IDs for throughLineMap.connectionRefs:
@@ -890,7 +908,7 @@ ESSAY DETAILS:
 - Paragraph count: ${paragraphCount}
 
 L3.5 EFFECTIVENESS SCORES (transfer these directly to scoreMatrix.paragraphs[].scores.effectiveness):
-${effectivenessScores.map((e) => `  P${e.index}: effectiveness=${e.effectiveness ?? 'N/A'}, verdict="${e.verdict ?? 'N/A'}"`).join('\n')}
+${effectivenessScores.map((e) => `  P${e.index + 1}: effectiveness=${e.effectiveness ?? 'N/A'}, verdict="${e.verdict ?? 'N/A'}"`).join('\n')}
 
 IMPORTANT REMINDERS:
 - Score matrix must have exactly ${paragraphCount} entries (indices 0 through ${paragraphCount - 1}).
@@ -927,7 +945,7 @@ function buildCallInstructionL4b(
 
   // Build per-paragraph score summary for quick reference
   const scoresSummary = l4aScoreMatrix.paragraphs.map((p) =>
-    `  P${p.index}: effectiveness=${p.scores.effectiveness}, structural=${p.scores.structural}, ` +
+    `  P${p.index + 1}: effectiveness=${p.scores.effectiveness}, structural=${p.scores.structural}, ` +
     `voice=${p.scores.voice}, emotional=${p.scores.emotional}, thematic=${p.scores.thematic} | ` +
     `priority=${p.priorityForImprovement} | "${p.verdict}"`
   ).join('\n');
@@ -1479,7 +1497,7 @@ export function buildCoachingMap(raw: unknown, paragraphCount: number): Coaching
         const tension = String(obj.tension ?? '').trim();
         const impl = String(obj.coachingImplication ?? '').trim();
         if (tension) {
-          return impl ? `P${para}: ${tension} — ${impl}` : `P${para}: ${tension}`;
+          return impl ? `P${para + 1}: ${tension} — ${impl}` : `P${para + 1}: ${tension}`;
         }
         return '';
       }
