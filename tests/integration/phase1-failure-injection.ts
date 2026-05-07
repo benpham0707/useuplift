@@ -146,6 +146,7 @@ import type { EditProcessResult } from '../../src/services/essayIntelligence/ana
 import { focusedAnalyzer } from '../../src/services/essayIntelligence/analysis/focusedAnalyzer';
 import type { FocusedAnalysisResult } from '../../src/services/essayIntelligence/analysis/focusedAnalyzer';
 import { analyzeEssay } from '../../src/services/essayIntelligence/analysis/analysisOrchestrator';
+import type { PipelineResult } from '../../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import { InMemoryCheckpointStore } from '../../src/services/essayIntelligence/profileManager/checkpointStore';
 import {
   flushEventsForIteration,
@@ -1009,6 +1010,153 @@ describe('D-1.16 Item 13 — C4: runComprehensiveMode catch (comprehensive_faile
       (e) => e.step === 'runComprehensiveMode' && e.status === 'failed',
     );
     expect(failureEvent, 'policy-defer must NOT emit failure telemetry').toBeUndefined();
+  });
+});
+
+// ─── Item 13 sub-cases — C5 warm-edit consumer (partial PipelineResult) ───
+//
+// D-1.12 C5's first pass closed only the cold-start consumer at
+// essayCoachingRoutes.ts:413 — the warm-edit consumer inside
+// `triggerReanalysis` was missed. analyzeEssay's F-2 closures
+// (`buildPartialResult`) RESOLVE with a partial PipelineResult rather than
+// throw, so the existing C4 catch never fires; the orchestrator silently
+// adopts a degraded profile, the pre-edit profile is overwritten, and the
+// HTTP boundary returns 200 success on a corrupted state. The fix throws
+// when `pipelineResult.completedAllLayers === false`, propagating into
+// runComprehensiveMode's C4 catch (deferReason='comprehensive_failed').
+
+describe('D-1.16 Item 13 — C5 warm-edit: triggerReanalysis partial-result guard', () => {
+  beforeEach(() => {
+    mockedFocusedRun.mockReset();
+    mockedAnalyzeEssay.mockReset();
+  });
+
+  /** Build a partial PipelineResult shaped like analyzeEssay's buildPartialResult. */
+  function buildPartialPipelineResult(failedLayer: string = 'L3'): PipelineResult {
+    return {
+      profile: {} as PipelineResult['profile'],
+      completedAllLayers: false,
+      highestCompletedLayer: 'L2.5',
+      costSummary: { totalCost: 0.42, layers: [] } as unknown as PipelineResult['costSummary'],
+      layersCompleted: ['L1', 'L2', 'L2.5'],
+      layersFailed: [
+        {
+          layer: failedLayer,
+          errorType: 'unknown',
+          message: `synthetic ${failedLayer} failure`,
+          tokensBilled: 0,
+          costBilled: 0,
+          timestamp: new Date().toISOString(),
+        },
+      ],
+      improvementPhase: null,
+      confidenceLevel: 'shallow',
+    } as unknown as PipelineResult;
+  }
+
+  it('C5 warm (a) — analyzeEssay resolves with completedAllLayers=false → deferReason="comprehensive_failed" + populated error', async () => {
+    mockedAnalyzeEssay.mockResolvedValueOnce(buildPartialPipelineResult('L3'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: {
+          recordEdit: (o: EditUnderstandingOutput, t: string) => void;
+          shouldTriggerReanalysis: () => { shouldTrigger: boolean; reason: string; urgency: string };
+        };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text for trigger nudge');
+    expect(versionTracker.shouldTriggerReanalysis().shouldTrigger).toBe(true);
+
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0);
+
+    expect(result.mode).toBe('comprehensive');
+    expect(result.reanalysisTriggered).toBe(false);
+    expect(result.deferReason).toBe('comprehensive_failed');
+    expect(result.error).toBeDefined();
+    expect(result.error?.layer).toBe('triggerReanalysis');
+    expect(result.error?.code).toBe('trigger_reanalysis_threw');
+    expect(result.error?.message).toMatch(/partial result/);
+    expect(result.error?.message).toMatch(/L3/);
+  });
+
+  it('C5 warm (b) — coordinator stays at the pre-edit profile (NOT overwritten with the partial profile)', async () => {
+    // Capture the pre-edit profile snapshot. Then drive a partial-result
+    // analyzeEssay return. The orchestrator MUST NOT have updated this.coordinator
+    // with the partial profile — readers must see the same Readonly snapshot
+    // as before the failed re-analysis, AND the surfaced error must be the
+    // partial-result guard (not an incidental downstream throw). Without
+    // the assertion on error.message, the coordinator-state check is a
+    // false positive: in the vitest environment the C1 coordinator-rebuild
+    // catch already throws on a `require('../improvements/profileMigration')`
+    // module-resolution failure, so the rebuild gets aborted for the wrong
+    // reason and `coordinator.getProfile()` stays at preEditProfile even
+    // without the partial-result guard. Asserting BOTH proves the guard
+    // is the trigger AND the contract holds.
+    const orchestrator = buildItem13Orchestrator();
+    const coordinator = (
+      orchestrator as unknown as { coordinator: { getProfile: () => unknown } }
+    ).coordinator;
+    const preEditProfile = coordinator.getProfile();
+
+    mockedAnalyzeEssay.mockResolvedValueOnce(buildPartialPipelineResult('L3'));
+
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    const result = await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0);
+
+    // Same reference == coordinator was never rebuilt against the partial
+    // profile. The coordinator's getProfile contract returns the live
+    // Readonly snapshot; identity equality proves the rebuild path was
+    // skipped (a successful rebuild would replace this.coordinator with a
+    // new EssayProfileCoordinator wrapping freshProfile).
+    expect(coordinator.getProfile()).toBe(preEditProfile);
+    // Load-bearing: the partial-result guard fired BEFORE the rebuild path
+    // (so the test passes for the right reason, not because of an unrelated
+    // module-resolution crash inside the rebuild's own catch).
+    expect(result.deferReason).toBe('comprehensive_failed');
+    expect(result.error?.message).toMatch(/partial result/);
+    expect(result.error?.message).not.toMatch(/coordinator_rebuild failed/);
+  });
+
+  it('C5 warm (c) — telemetry: failure event fires with code="trigger_reanalysis_threw" (mirrors the throw path)', async () => {
+    mockedAnalyzeEssay.mockResolvedValueOnce(buildPartialPipelineResult('L4'));
+
+    const orchestrator = buildItem13Orchestrator();
+    const versionTracker = (
+      orchestrator as unknown as {
+        versionTracker: { recordEdit: (o: EditUnderstandingOutput, t: string) => void };
+      }
+    ).versionTracker;
+    const transformativeEdit = buildSyntheticEditOutput();
+    transformativeEdit.understanding.significance = 'transformative';
+    versionTracker.recordEdit(transformativeEdit, 'simulated post-edit text');
+
+    await (
+      orchestrator as unknown as OrchestratorPrivateMethods
+    ).runComprehensiveMode(buildSyntheticEditOutput(), [], 0);
+
+    const events = flushEventsForIteration(D1_15_ESSAY_ID, 2);
+    const failureEvent = events.find(
+      (e) => e.step === 'runComprehensiveMode' && e.status === 'failed',
+    );
+    expect(failureEvent, 'partial-result must surface as comprehensive-mode failure telemetry').toBeDefined();
+    expect(failureEvent?.error?.code).toBe('trigger_reanalysis_threw');
+    expect(failureEvent?.error?.message).toMatch(/partial result/);
   });
 });
 

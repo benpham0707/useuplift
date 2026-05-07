@@ -809,6 +809,23 @@ export class ReanalysisOrchestrator {
       throw error;
     }
 
+    // [D-1.12 C5 closure — warm-edit consumer 2026-05-06] analyzeEssay returns a
+    // PARTIAL PipelineResult (rather than throwing) when an inner layer hits its
+    // F-2 closure path (`buildPartialResult`). The cold-start consumer at
+    // essayCoachingRoutes.ts:413 already null-guards on `completedAllLayers`;
+    // this warm-edit consumer was missed in C5's first pass and silently adopts
+    // the partial profile — the catch above never fires, the coordinator is
+    // rebuilt against a profile missing L3+ output, and the pre-edit profile
+    // is overwritten. Throw so runComprehensiveMode's catch populates
+    // deferReason='comprehensive_failed' + buildEditProcessResponse maps to 503.
+    if (!pipelineResult.completedAllLayers) {
+      const failedLayerNames = pipelineResult.layersFailed.map((l) => l.layer).join(', ');
+      throw new Error(
+        `[ReanalysisOrchestrator] analyzeEssay returned partial result — failed layers=[${failedLayerNames}]; ` +
+        `refusing to overwrite the pre-edit profile with a degraded post-edit profile`,
+      );
+    }
+
     // FIX P0.4: Update this.coordinator with the fresh profile from the pipeline.
     // analyzeEssay() creates a NEW internal coordinator and returns the analyzed profile.
     // Prior findings were already seeded into the pipeline via input.priorFindings,
