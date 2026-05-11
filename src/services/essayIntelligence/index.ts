@@ -145,9 +145,6 @@ export {
 // ANALYSIS PIPELINE (L1 → L5)
 // ============================================================================
 
-// L1: First impressions + sentence/word analysis
-export { EssayUnderstandingService, essayUnderstandingService } from './essayUnderstandingService';
-
 // L2: Structural cartography (Haiku)
 export { StructuralCartographer, structuralCartographer } from './analysis/structuralCartographer';
 
