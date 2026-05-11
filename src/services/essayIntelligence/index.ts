@@ -261,21 +261,3 @@ export {
 } from './versionTracker';
 export type { ReanalysisTrigger } from './versionTracker';
 
-// ============================================================================
-// VERSION BRANCHING (Improvement #10: Snapshot + Compare)
-// ============================================================================
-
-export {
-  SnapshotManager,
-  compareToSnapshot,
-  hashCurrentState,
-  shouldAutoSnapshotForEdit,
-  shouldAutoSnapshotForMilestone,
-} from './versioning';
-export type {
-  SnapshotSummary,
-  CurrentEssayState,
-  EditEvent,
-  AutoSnapshotDecision,
-  MilestoneEvent,
-} from './versioning';
