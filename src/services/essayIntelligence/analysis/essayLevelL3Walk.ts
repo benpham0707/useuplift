@@ -32,9 +32,6 @@
 //   1 sentence/paragraph of understanding content).
 // - Gap candidates feed Phase B (Option 5 essay-level emission service)
 //   per the established Phase A → Phase B contract.
-//
-// PROTOTYPE STATUS: not yet wired into orchestrator. Step 5 tests in
-// isolation; Step 6 wires into orchestrator if isolated test passes.
 // ============================================================================
 
 import type {
