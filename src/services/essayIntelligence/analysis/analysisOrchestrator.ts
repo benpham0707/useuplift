@@ -117,6 +117,10 @@ import { consumeContradictions } from './contradictionConsumer';
 import type { ContradictionConsumptionResult } from './contradictionConsumer';
 import { detectProgrammaticContradictions } from '../profileManager/validation/crossDomainValidation';
 
+// Phase 0a.3 — promote L3.5 paragraph analyses into FindingStore so L4 / L5 /
+// L6 can cite findings by ID instead of re-narrating them.
+import { promoteAnalysisFindings } from './findingPromotion';
+
 // Profile manager
 import {
   EssayProfileCoordinator,
@@ -893,6 +897,45 @@ export class AnalysisOrchestrator {
       // Apply each paragraph's analysis to the coordinator
       for (const paragraphAnalysis of l35Result.paragraphAnalyses) {
         coordinator.applyAnalysisPassResult(paragraphAnalysis);
+      }
+
+      // ─── Phase 0a.3: FindingStore promotion ─────────────────────────────
+      // Promote L3.5 paragraph analyses into the FindingStore so L4
+      // crystallization (line ~949), Phase 5.55 essay-level emission
+      // (line ~1213), and L5 deepAnnotation (line ~1284) can cite findings
+      // by ID rather than re-narrate observations as prose.
+      //
+      // Gated on iteration === 1. The reanalysisOrchestrator re-entry path
+      // (reanalysisOrchestrator.ts:795 → analyzeEssay) seeds the FindingStore
+      // with prior findings via coordinator.seedPriorFindings; re-promoting
+      // here on iter ≥ 2 would generate fresh IDs for the same observations
+      // and grow the store unbounded. Maturity evolution + walk-side
+      // findingEvolutions handle iter ≥ 2 (option `i` in Phase 0a.3 design).
+      //
+      // Warm-edit / focusedAnalyzer.ts:1549 path intentionally NOT wired:
+      // focusedAnalyzer's synthetic AnalysisPassOutput hardcodes
+      // `evidence: ''` (line 1524, 1527), and the promoter's evidence guard
+      // (findingPromotion.ts:119) skips empty-evidence observations.
+      // Productive warm-path promotion requires a focusedAnalyzer-side
+      // change to emit real evidence text — properly scoped to Phase 8.
+      if (getCurrentIteration(coordinator.getProfile()) === 1) {
+        const promotionResult = promoteAnalysisFindings(
+          coordinator.getFindingStore(),
+          l35Result.paragraphAnalyses,
+        );
+        console.log(
+          `[Orchestrator] L3.5 FindingStore promotion: ` +
+          `${promotionResult.promoted} promoted, ` +
+          `${promotionResult.skipped} skipped, ` +
+          `byKind=${JSON.stringify(promotionResult.byKind)}, ` +
+          `errors=${promotionResult.errors.length}`,
+        );
+        if (promotionResult.errors.length > 0) {
+          console.warn(
+            '[Orchestrator] L3.5 promotion errors (first 5):',
+            promotionResult.errors.slice(0, 5),
+          );
+        }
       }
 
       // ── Apply computed improvement phase to profile BEFORE L5 starts ──

@@ -115,6 +115,11 @@ export default defineConfig({
       // recurring problems every full-profile audit identifies (indexing
       // chaos, connection bloat, schema stubs, verbatim duplicates).
       'tests/unit/dump-lint.test.ts',
+      // Phase 0a.3 (2026-05-10) — findingPromotion wire-up unit tests:
+      // promotes L3.5 paragraph analyses into FindingStore so L4/L5/L6 can
+      // cite findings by ID instead of re-narrating. Verifies evidence guard,
+      // byKind counts, coaching-value mapping, cross-paragraph aggregation.
+      'tests/unit/finding-promotion.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
