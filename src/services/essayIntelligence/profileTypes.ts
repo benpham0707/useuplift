@@ -706,13 +706,6 @@ export interface SentenceCraft {
   rhythm: RhythmTag;
   /** Specific craft techniques used */
   techniques: string[];
-  /**
-   * @deprecated Scope 1 removed `voiceAlignment` — no downstream consumers.
-   * Voice alignment is synthesized holistically by L3.75 voiceMap.
-   * Field kept optional for backward compat with profiles stored before
-   * the change. Writers no longer set it; readers see `undefined`.
-   */
-  voiceAlignment?: string;
 }
 
 /**
