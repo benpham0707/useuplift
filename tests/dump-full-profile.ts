@@ -23,6 +23,7 @@ dotenv.config({ path: path.resolve(__dirname, '..', '.env.local') });
 import { analysisOrchestrator } from '../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import type { PipelineResult } from '../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import type { EssayProfile } from '../src/services/essayIntelligence/profileTypes';
+import { lintDump, summarizeLint } from '../src/services/essayIntelligence/profileManager/dumpLint';
 
 // ============================================================================
 // CONFIG
@@ -1370,6 +1371,21 @@ async function main(): Promise<void> {
   console.log(`[Profile Dump] Profile JSON persisted to: ${OUTPUT_JSON}`);
   console.log(`\n[Profile Dump] Output written to: ${OUTPUT_FILE}`);
   console.log(`[Profile Dump] Output size: ${(output.length / 1024).toFixed(1)} KB`);
+
+  // ─── Phase 0a.4: dumpLint production check (WARN-ONLY) ───────────────
+  // Mechanically scans the just-produced markdown for the recurring render
+  // regressions surfaced by every full-profile audit (R1 zero-indexed
+  // prose, R2 tentative connections leaking, R3 empty schema stubs, R4
+  // repeated verdict prose). Surfaces a punch-list inline so Phase 6
+  // verification regens self-validate without a separate audit pass.
+  // Warn-only for first round per Phase 0a.4 default — does not exit
+  // non-zero on findings, so render regressions don't block dump
+  // production. Promote to hard-fail once R1-R4 ratchets reach zero.
+  const lintResult = lintDump(output);
+  console.log(`\n[Profile Dump] Dump-lint findings: ${lintResult.findings.length}`);
+  if (lintResult.findings.length > 0) {
+    console.log(summarizeLint(lintResult));
+  }
 }
 
 main().catch((err) => {
