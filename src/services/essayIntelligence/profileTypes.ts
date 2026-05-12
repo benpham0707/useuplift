@@ -2775,8 +2775,13 @@ export interface CoherenceIssue {
   evidenceA?: string;
   /** Direct evidence quote from section B */
   evidenceB?: string;
-  /** Whether detected by primary crystallization or adversarial pass */
-  source?: 'primary' | 'adversarial';
+  /**
+   * Phase 1 Cut B (2026-05-12): `source` field deprecated — was only used to
+   * distinguish primary L4 contradictions from the now-removed L4-Haiku
+   * adversarial pass. Field kept optional + nullable for back-compat with
+   * persisted profiles; new emissions never set it.
+   */
+  source?: 'primary';
 }
 
 /**
@@ -2792,8 +2797,6 @@ export interface CoherenceReport {
    * explicit evidence references.
    */
   programmaticContradictions?: ProgrammaticContradiction[];
-  /** Adversarial assessment of the North Star's coherence and irreplaceability */
-  northStarAssessment?: NorthStarAssessment;
 }
 
 /**
@@ -2911,16 +2914,6 @@ export interface NorthStarEvolution {
   }>;
   coreIdentityStable: boolean;
   stabilityAssessment: string;
-}
-
-/**
- * NorthStarAssessment — adversarial pass assessment of the North Star's quality.
- * Tests whether the North Star captures something genuinely unique and irreplaceable.
- */
-export interface NorthStarAssessment {
-  passesIrreplaceabilityTest: boolean;
-  reasoning: string;
-  missingInsight: string | null;
 }
 
 // ============================================================================

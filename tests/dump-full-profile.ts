@@ -1114,14 +1114,6 @@ function renderCoherenceReport(profile: EssayProfile): string {
     }
   }
 
-  if (cr.northStarAssessment) {
-    const nsa = cr.northStarAssessment;
-    lines.push('\n**North Star Assessment:**\n');
-    lines.push(`- Passes irreplaceability test: ${nsa.passesIrreplaceabilityTest}`);
-    lines.push(`- Reasoning: ${nsa.reasoning}`);
-    lines.push(`- Missing insight: ${safe(nsa.missingInsight)}`);
-  }
-
   return lines.join('\n') + '\n';
 }
 

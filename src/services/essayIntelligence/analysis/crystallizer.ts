@@ -33,8 +33,6 @@
 import { callClaudeWithRetry, calculateCost } from '../../../lib/llm/claude';
 import { ProfileRouter } from '../profileManager/profileRouter';
 import type { AssembledProfileContext } from '../profileManager/profileRouter';
-import { FindingStore, buildFindingContext } from '../findings';
-import { ConnectionGraph, buildHolisticConnectionContext } from '../connections';
 import { ImprovementCandidateStore } from '../improvements/improvementCandidateStore';
 import { PipelineError } from '../errors';
 import { buildScoreMatrixAnchorsBlock } from './scoreMatrixAnchors';
@@ -109,9 +107,6 @@ const L4A_SCORE_MATRIX_TIMEOUT_MS = 120_000;
 const L4B_MAX_OUTPUT_TOKENS = 6000;
 const L4B_TIMEOUT_MS = 180_000;
 
-/** Max tokens for the adversarial contradiction pass */
-const ADVERSARIAL_MAX_TOKENS = 4000;
-
 /** Temperature — low for deterministic synthesis, slight creativity for interpretation */
 const TEMPERATURE = 0.3;
 
@@ -135,10 +130,6 @@ export interface L4CrystallizationResult {
     cacheWriteTokens: number;
   };
   timingMs: number;
-  /** Cost of the adversarial Haiku pass (if it ran) */
-  adversarialCost?: number;
-  /** Timing of the adversarial Haiku pass (if it ran) */
-  adversarialTimingMs?: number;
   /** L4a (North Star + Score Matrix core) timing in ms */
   l4aTimingMs?: number;
   /** L4b (Coaching Map + Coherence Report) timing in ms */
@@ -1580,9 +1571,6 @@ function buildCoherenceReport(raw: RawCrystallizationOutput['coherenceReport']):
       if (c.evidenceB != null) {
         issue.evidenceB = String(c.evidenceB);
       }
-      if (c.source != null) {
-        issue.source = c.source === 'adversarial' ? 'adversarial' : 'primary';
-      }
       if (c.nature != null) {
         issue.nature = String(c.nature);
       }
@@ -1707,349 +1695,6 @@ function detectScoreClustering(scoreMatrix: ParagraphScoreMatrix): void {
 }
 
 // ============================================================================
-// ADVERSARIAL CONTRADICTION PASS (Improvement 4)
-// ============================================================================
-
-/**
- * Raw output shape from the adversarial Haiku pass.
- * Stays local to crystallizer.ts — not exported.
- *
- * Key design: `nature` is the LLM's free-text description of what the tension IS.
- * It is NOT constrained to categories — the LLM describes what it sees.
- * `routingCategory` is a system routing tag assigned by the LLM for downstream handling.
- */
-interface AdversarialContradictionOutput {
-  contradictions: Array<{
-    sectionA: string;
-    claimA: string;
-    sectionB: string;
-    claimB: string;
-    /** Free-text description of the tension's nature — what the contradiction IS */
-    nature: string;
-    /** System routing tag — LLM assigns the closest category */
-    routingCategory: 'productive_tension' | 'system_disagreement' | 'essay_flaw' | 'depth_signal';
-    /** Can both readings coexist, or is one wrong? */
-    canCoexist: boolean;
-    /** If they can't coexist, which is more likely correct and why? */
-    likelyResolution: string | null;
-    /** LLM-assessed severity for routing */
-    severity: 'blocking' | 'notable' | 'minor';
-    /** Specific evidence from the profile for side A */
-    evidenceA: string;
-    /** Specific evidence from the profile for side B */
-    evidenceB: string;
-  }>;
-  northStarAssessment: {
-    passesIrreplaceabilityTest: boolean;
-    reasoning: string;
-    missingInsight: string | null;
-  };
-  overallCoherence: boolean;
-}
-
-/**
- * Run the adversarial Haiku pass — a fresh-eyes consistency check.
- *
- * Receives the complete profile context PLUS finding context and connection graph
- * context. The adversarial pass reads what already exists and probes for consistency.
- * This is why Haiku is appropriate — it needs to READ critically, not CREATE deeply.
- *
- * Returns null on any failure (graceful degradation — adversarial pass is non-fatal).
- */
-async function runAdversarialPass(
-  essayText: string,
-  profileContext: string,
-  primaryOutput: {
-    northStar: EssayNorthStar;
-    scoreMatrix: ParagraphScoreMatrix;
-    coherenceReport: CoherenceReport;
-  },
-  findingContext: string,
-  connectionContext: string,
-): Promise<{ output: AdversarialContradictionOutput; cost: number; timingMs: number } | null> {
-  const startTime = Date.now();
-
-  const systemPrompt = `You are a skeptical reviewer checking a crystallization analysis for internal consistency. You are NOT re-doing the analysis — you are STRESS-TESTING it.
-
-You receive:
-1. The complete essay profile (understanding + holistic synthesis + scoring)
-2. The primary crystallization output (North Star + Score Matrix + Coaching Map + initial coherence assessment)
-3. The system's findings (structured insights with maturity levels and evidence)
-4. The connection graph (cross-paragraph structural links)
-
-Your job: find tensions the primary analysis missed or smoothed over. The primary analyzer tends to rationalize — it created the synthesis and is naturally biased toward seeing it as coherent. You are the fresh eyes.
-
-PROBING STRATEGY (areas to investigate — NOT a checklist to fill):
-
-PROBE 1 — UNDERSTANDING vs. SCORING:
-For each paragraph, compare what the understanding says this paragraph DOES with how the scoring says it PERFORMS. The understanding describes function; the scoring evaluates execution. They often diverge in interesting ways.
-
-Key patterns to look for:
-- "Fulcrum paragraph" with low effectiveness → structural importance ≠ execution quality
-- "Transitional paragraph" with high effectiveness → best writing in the lowest-stakes position
-- "Opening paragraph" with mediocre effectiveness → the essay's first impression underperforms
-
-For each divergence, briefly read the actual essay text and form your own judgment: which assessment (understanding or scoring) is more defensible? Is this a genuine tension (the paragraph really IS important but poorly executed) or a measurement error?
-
-PROBE 2 — HOLISTIC CLAIMS vs. EVIDENCE:
-The holistic synthesis (voice identity, emotional topography, thematic architecture, narrative strategy, etc.) makes claims about the essay as a whole. Each claim should be evidenced in the paragraph-level data.
-
-Pick the BOLDEST claim in the holistic synthesis and trace its evidence:
-- Which paragraphs support it?
-- Which paragraphs complicate or undermine it?
-- Is the claim well-supported, partially supported, or unsubstantiated?
-
-If a holistic claim is unsubstantiated by the paragraph data, that's either a synthesis overreach (the Sonnet inferred too much) or the paragraph analysis missed something (the data is there but the analysis didn't surface it). State which and why.
-
-PROBE 3 — NORTH STAR IRREPLACEABILITY:
-The North Star should contain EMERGENT understanding that doesn't exist in any individual profile section. Apply three tests:
-
-DISTINCTIVENESS TEST: Read the distinctiveness signature. Now imagine deleting it. Can you reconstruct the SAME insight from the voice identity + thematic architecture + paragraph understandings? If yes, the signature is lossy compression, not emergent insight. It fails.
-
-STRUCTURAL ROLE TEST: Read each structural role description. Does it describe ARCHITECTURAL FUNCTION ("frames the economic lens that makes P3's stakes calculable") or just CONTENT ("introduces the family's background")? Content descriptions are summaries — they exist in the paragraph understanding already. Only architectural descriptions pass.
-
-THROUGH-LINE TEST (if present): Does the through-line trace MEANING TRANSFORMATION ("the diamond's signification shifts from commodity to inheritance to identity marker") or just PHYSICAL APPEARANCES ("the diamond appears in P1, P3, and P5")? Appearance tracking is already done by the connection graph. Only meaning transformation passes.
-
-PROBE 4 — PRODUCTIVE TENSIONS (the essay's own internal complexity):
-Look past system consistency. Are there tensions WITHIN THE ESSAY ITSELF that the analysis hasn't surfaced?
-
-The best essays HAVE productive tensions:
-- "Raw authentic voice but rough craft" — the authenticity might depend on the roughness. Polishing could destroy what makes it real.
-- "Unconventional structure but unclear arc" — the unconventionality might BE the arc, or it might be confusion disguised as creativity.
-- "Specific, grounded early paragraphs but abstract late paragraphs" — intentional shift from concrete to reflective? Or the writer running out of material?
-
-When you find productive tension, describe it as an OPEN QUESTION for coaching, not as a problem with a solution. The student decides how to handle it.
-
-PROBE 5 — COACHING MAP QUALITY:
-Is the transformative insight genuinely transformative, or is it a restatement of an obvious problem? Does the priority ordering make architectural sense (structural before craft, foundational before decorative)? Are the protected strengths genuinely worth protecting?
-
-FINDING CONTEXT:
-You also have access to the system's findings — structured insights about the essay with maturity levels (hypothesis → developing → confirmed → deepened → superseded). Look for:
-- Finding↔Score tension: A confirmed finding claims "P2 has deeply earned emotional resonance" but the score says otherwise
-- Supersession instability: A finding that was superseded multiple times suggests the system kept changing its mind — is the current reading stable?
-- Shallow threads: Findings with no depth chain might indicate areas the system hasn't explored enough
-
-FOR EACH TENSION YOU FIND:
-- State both sides with specific evidence (cite paragraph/sentence indices)
-- Describe the NATURE of the tension in your own words (free-text, not category-constrained)
-- Assess: can both readings coexist (productive) or is one wrong (destructive)?
-- If one is wrong, which is more defensible based on the actual text?
-- Assign a routing category: productive_tension | system_disagreement | essay_flaw | depth_signal
-- Rate severity: blocking | notable | minor
-  (blocking = fundamentally changes the coaching direction;
-   notable = should be surfaced but doesn't change direction;
-   minor = interesting but not actionable)
-
-IMPORTANT:
-- Finding zero tensions is a VALID outcome for a well-analyzed, straightforward essay. Do not manufacture tensions to seem thorough.
-- Do NOT re-score or re-analyze — only check CONSISTENCY.
-- You are a PROOFREADER of the analysis, not a competing analyst.
-
-Output JSON:
-{
-  "contradictions": [
-    {
-      "sectionA": "string — which profile section (e.g., 'P3 understanding')",
-      "claimA": "string — what section A claims",
-      "sectionB": "string — which profile section (e.g., 'L3.5 scoring P3')",
-      "claimB": "string — what section B claims",
-      "nature": "string — free-text description of the tension",
-      "routingCategory": "productive_tension" | "system_disagreement" | "essay_flaw" | "depth_signal",
-      "canCoexist": true/false,
-      "likelyResolution": "string | null — if can't coexist, which is right",
-      "severity": "blocking" | "notable" | "minor",
-      "evidenceA": "string — specific text/data supporting claim A",
-      "evidenceB": "string — specific text/data supporting claim B"
-    }
-  ],
-  "northStarAssessment": {
-    "passesIrreplaceabilityTest": true/false,
-    "reasoning": "string — detailed assessment of each test",
-    "missingInsight": "string | null — what emergent insight is absent"
-  },
-  "overallCoherence": true/false
-}`;
-
-  // Build user prompt with all available context
-  const contextParts: string[] = [
-    '=== ESSAY TEXT ===',
-    essayText,
-    '',
-    '=== PROFILE CONTEXT ===',
-    profileContext,
-  ];
-
-  if (findingContext) {
-    contextParts.push('', '=== SYSTEM FINDINGS ===', findingContext);
-  }
-
-  if (connectionContext) {
-    contextParts.push('', '=== CONNECTION GRAPH ===', connectionContext);
-  }
-
-  contextParts.push(
-    '',
-    '=== CRYSTALLIZATION OUTPUT ===',
-    JSON.stringify(primaryOutput, null, 2),
-    '',
-    'Run all 5 adversarial probes and report your findings.',
-  );
-
-  const userPrompt = contextParts.join('\n');
-
-  try {
-    const response = await callClaudeWithRetry<AdversarialContradictionOutput>({
-      model: HAIKU,
-      systemPrompt,
-      userPrompt,
-      maxTokens: ADVERSARIAL_MAX_TOKENS,
-      temperature: 0.2,
-      useJsonMode: true,
-    });
-
-    const cost = calculateCost(response.usage, HAIKU);
-    const timingMs = Date.now() - startTime;
-
-    console.log(
-      `[Crystallizer] Adversarial pass complete: cost=$${cost.toFixed(4)}, time=${timingMs}ms`,
-    );
-
-    const validated = validateAdversarialOutput(response.content);
-    return { output: validated, cost, timingMs };
-  } catch (error) {
-    console.warn(
-      '[Crystallizer] Adversarial pass failed (non-fatal):',
-      error instanceof Error ? error.message : String(error),
-    );
-    return null;
-  }
-}
-
-/**
- * Validate and normalize adversarial output fields.
- * Defensive: handles the LLM returning slightly different shapes.
- */
-function validateAdversarialOutput(raw: AdversarialContradictionOutput): AdversarialContradictionOutput {
-  const validSeverities = ['blocking', 'notable', 'minor'] as const;
-  const validRoutingCategories = ['productive_tension', 'system_disagreement', 'essay_flaw', 'depth_signal'] as const;
-
-  const rawContradictions = Array.isArray(raw.contradictions) ? raw.contradictions : [];
-  const contradictions = rawContradictions
-    .filter((c: unknown) => c && typeof c === 'object')
-    .map((c: Record<string, unknown>) => {
-      const rawSeverity = String(c.severity ?? 'notable');
-      const severity = validSeverities.includes(rawSeverity as typeof validSeverities[number])
-        ? (rawSeverity as typeof validSeverities[number])
-        : 'notable' as const;
-
-      const rawCategory = String(c.routingCategory ?? 'depth_signal');
-      const routingCategory = validRoutingCategories.includes(rawCategory as typeof validRoutingCategories[number])
-        ? (rawCategory as typeof validRoutingCategories[number])
-        : 'depth_signal' as const;
-
-      return {
-        sectionA: String(c.sectionA ?? ''),
-        claimA: String(c.claimA ?? ''),
-        sectionB: String(c.sectionB ?? ''),
-        claimB: String(c.claimB ?? ''),
-        nature: String(c.nature ?? c.suggestedResolution ?? ''),
-        routingCategory,
-        canCoexist: Boolean(c.canCoexist ?? false),
-        likelyResolution: c.likelyResolution != null ? String(c.likelyResolution) : null,
-        severity,
-        evidenceA: String(c.evidenceA ?? ''),
-        evidenceB: String(c.evidenceB ?? ''),
-      };
-    });
-
-  const northStarAssessment = raw.northStarAssessment && typeof raw.northStarAssessment === 'object'
-    ? {
-        passesIrreplaceabilityTest: Boolean(raw.northStarAssessment.passesIrreplaceabilityTest ?? true),
-        reasoning: String(raw.northStarAssessment.reasoning ?? ''),
-        missingInsight: raw.northStarAssessment.missingInsight != null
-          ? String(raw.northStarAssessment.missingInsight)
-          : null,
-      }
-    : { passesIrreplaceabilityTest: true, reasoning: '', missingInsight: null };
-
-  return {
-    contradictions,
-    northStarAssessment,
-    overallCoherence: Boolean(raw.overallCoherence ?? true),
-  };
-}
-
-/**
- * Merge adversarial results into the primary coherence report.
- * - Tags primary issues with source: 'primary'
- * - Converts adversarial contradictions to CoherenceIssue[] with source: 'adversarial'
- * - Concatenates (both perspectives kept — no deduplication)
- * - Updates isCoherent (either says incoherent → merged is incoherent)
- * - Stores northStarAssessment on the merged report
- */
-function mergeAdversarialResults(
-  primaryReport: CoherenceReport,
-  adversarial: AdversarialContradictionOutput,
-): CoherenceReport {
-  const validSeverities = ['blocking', 'notable', 'minor'] as const;
-  const validRoutingCategories = ['productive_tension', 'system_disagreement', 'essay_flaw', 'depth_signal'] as const;
-
-  // Tag primary issues with source
-  const taggedPrimary: CoherenceIssue[] = primaryReport.contradictions.map((c) => ({
-    ...c,
-    source: (c.source ?? 'primary') as 'primary' | 'adversarial',
-  }));
-
-  // Convert adversarial contradictions — all fields are validated at this point
-  const adversarialIssues: CoherenceIssue[] = adversarial.contradictions.map((c) => {
-    const rawSeverity = String(c.severity ?? 'notable');
-    const severity = validSeverities.includes(rawSeverity as typeof validSeverities[number])
-      ? (rawSeverity as typeof validSeverities[number])
-      : 'notable' as const;
-
-    const rawCategory = String(c.routingCategory ?? 'depth_signal');
-    const routingCategory = validRoutingCategories.includes(rawCategory as typeof validRoutingCategories[number])
-      ? (rawCategory as typeof validRoutingCategories[number])
-      : 'depth_signal' as const;
-
-    return {
-      sectionA: String(c.sectionA ?? ''),
-      claimA: String(c.claimA ?? ''),
-      sectionB: String(c.sectionB ?? ''),
-      claimB: String(c.claimB ?? ''),
-      severity,
-      suggestedResolution: c.likelyResolution ?? c.nature ?? '',
-      nature: c.nature ?? '',
-      routingCategory,
-      canCoexist: Boolean(c.canCoexist ?? false),
-      likelyResolution: c.likelyResolution ?? null,
-      evidenceA: String(c.evidenceA ?? ''),
-      evidenceB: String(c.evidenceB ?? ''),
-      source: 'adversarial' as const,
-    };
-  });
-
-  // Merge — if EITHER pass says incoherent, the merged report is incoherent
-  const allContradictions = [...taggedPrimary, ...adversarialIssues];
-  const hasBlockingContradiction = allContradictions.some((c) => c.severity === 'blocking');
-  const mergedIsCoherent = primaryReport.isCoherent && adversarial.overallCoherence && !hasBlockingContradiction;
-
-  // Build North Star assessment
-  const northStarAssessment: NorthStarAssessment = {
-    passesIrreplaceabilityTest: adversarial.northStarAssessment.passesIrreplaceabilityTest,
-    reasoning: adversarial.northStarAssessment.reasoning,
-    missingInsight: adversarial.northStarAssessment.missingInsight,
-  };
-
-  return {
-    contradictions: allContradictions,
-    isCoherent: mergedIsCoherent,
-    programmaticContradictions: primaryReport.programmaticContradictions,
-    northStarAssessment,
-  };
-}
-
-// ============================================================================
 // CRYSTALLIZER SERVICE
 // ============================================================================
 
@@ -2076,8 +1721,6 @@ export class CrystallizerService {
    * @param essayType     The essay type (determines North Star scaling)
    * @param essayText     The full essay text
    * @param priorNorthStar  Optional prior North Star for re-crystallization evolution tracking
-   * @param findingStore  Optional FindingStore for adversarial pass finding context
-   * @param connectionGraph Optional ConnectionGraph for adversarial pass structural context
    * @returns L4CrystallizationResult with all three artifacts + cost tracking
    */
   async crystallize(
@@ -2089,8 +1732,6 @@ export class CrystallizerService {
     // accidentally skip wiring it.
     candidateStore: ImprovementCandidateStore,
     priorNorthStar?: EssayNorthStar,
-    findingStore?: FindingStore,
-    connectionGraph?: ConnectionGraph,
     essayId?: string,
   ): Promise<L4CrystallizationResult> {
     const startTime = Date.now();
@@ -2356,59 +1997,16 @@ export class CrystallizerService {
       throw PipelineError.l4bConsolidationFailed(inner, candidateStore.size);
     }
 
-    // ── Phase 4: Adversarial Haiku Pass (non-fatal — graceful degradation) ──
-    let finalCoherenceReport = coherenceReport;
-    let adversarialCost: number | undefined;
-    let adversarialTimingMs: number | undefined;
-
-    // Build finding context for adversarial pass (include superseded + evidence for full picture)
-    const findingCtx = findingStore && findingStore.size > 0
-      ? buildFindingContext(findingStore, { includeSuperseded: true, includeEvidence: true })
-      : '';
-
-    // Build connection graph context for adversarial pass (structural islands, hubs, adjacency)
-    const connectionCtx = connectionGraph
-      ? buildHolisticConnectionContext(connectionGraph, paragraphCount)
-      : '';
-
-    const adversarialResult = await runAdversarialPass(
-      essayText,
-      profileContext,
-      { northStar, scoreMatrix, coherenceReport },
-      findingCtx,
-      connectionCtx,
-    );
-
-    if (adversarialResult) {
-      adversarialCost = adversarialResult.cost;
-      adversarialTimingMs = adversarialResult.timingMs;
-
-      finalCoherenceReport = mergeAdversarialResults(coherenceReport, adversarialResult.output);
-
-      const adversarialContradictionCount = adversarialResult.output.contradictions.length;
-      const passesIrreplaceability = adversarialResult.output.northStarAssessment.passesIrreplaceabilityTest;
-      console.log(
-        `[Crystallizer] Adversarial pass merged: ` +
-        `+${adversarialContradictionCount} contradictions, ` +
-        `irreplaceability=${passesIrreplaceability ? 'PASS' : 'FAIL'}, ` +
-        `total contradictions=${finalCoherenceReport.contradictions.length}, ` +
-        `isCoherent=${finalCoherenceReport.isCoherent}`,
-      );
-
-      // Log North Star failure for diagnostic purposes — do NOT re-run crystallization.
-      // A mediocre North Star is still better than none. The failure assessment is stored
-      // in the coherence report so re-crystallization can produce a more emergent North Star.
-      if (!passesIrreplaceability) {
-        console.log(
-          `[Crystallizer] North Star failed irreplaceability test: ` +
-          `${adversarialResult.output.northStarAssessment.reasoning.substring(0, 200)}`,
-        );
-      }
-    }
+    // ── Phase 4 removed 2026-05-12 (Phase 1 Cut B) ──
+    // L4-Haiku adversarial coherence pass dropped (~$0.075/run saved). Primary
+    // coherence detection survives via L4b's prompt-side contradictions emission
+    // + the programmatic detector (cross-domain validation) consumed at
+    // analysisOrchestrator.ts Phase 5.5.
+    const finalCoherenceReport = coherenceReport;
 
     // ── Phase 5: Return ──
     const totalTimingMs = Date.now() - startTime;
-    const totalCost = l4aCost + l4bCost + (adversarialCost ?? 0);
+    const totalCost = l4aCost + l4bCost;
 
     // Wave-3a Phase 3C/3B: attribution detection — scan L4 outputs for
     // [MOVE-#] references and flag fabrications. Archetypes don't carry
@@ -2456,8 +2054,6 @@ export class CrystallizerService {
         cacheWriteTokens: l4aUsage.cache_creation_input_tokens + l4bCacheWriteTokens,
       },
       timingMs: totalTimingMs,
-      adversarialCost,
-      adversarialTimingMs,
       l4aTimingMs,
       l4bTimingMs,
       // Scope 2 Phase 6a: l4bDegraded removed — L4b is now fail-fast, so

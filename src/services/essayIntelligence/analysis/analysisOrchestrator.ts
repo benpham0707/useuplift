@@ -970,25 +970,19 @@ export class AnalysisOrchestrator {
         ? profileForCrystal.northStar
         : undefined;
 
-      // Build FindingStore and ConnectionGraph for adversarial pass context
-      const findingStoreForL4 = coordinator.getFindingStore();
-      const connectionGraphForL4 = ConnectionGraph.fromArray(
-        (profileForCrystal as EssayProfile).connections.all,
-      );
-
       // Scope 2 Phase 6a: pass the candidate store into L4 so L4b can
       // consolidate instead of re-derive. crystallizer.ts fails fast if
       // the store is empty (should be impossible post-Phase-5).
       const candidateStoreForL4 = coordinator.getImprovementCandidateStore();
 
+      // Phase 1 Cut B (2026-05-12): findingStore + connectionGraph args
+      // dropped — they only fed the now-removed L4-Haiku adversarial pass.
       l4Result = await crystallizerService.crystallize(
         profileForCrystal as EssayProfile,
         input.essayType,
         input.essayText,
         candidateStoreForL4,
         priorNorthStar,
-        findingStoreForL4.size > 0 ? findingStoreForL4 : undefined,
-        connectionGraphForL4.totalCount > 0 ? connectionGraphForL4 : undefined,
         input.essayId,
       );
 
