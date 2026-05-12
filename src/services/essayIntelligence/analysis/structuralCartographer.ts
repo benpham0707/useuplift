@@ -99,7 +99,6 @@ You MUST return valid JSON matching this exact schema:
   ],
   "centralTheme": "<The essay's core thematic through-line as a TENSION, not a topic. Not 'family' but 'the gap between inherited values and market values'. Not 'identity' but 'the cost of code-switching between two selves'.>",
   "themeProgression": "<How the theme develops: where it's introduced, where it deepens, where it transforms, where it resolves (or doesn't). Map the progression across specific paragraphs.>",
-  "thematicGaps": ["<Threads introduced but not resolved, themes implied but never explored, promises made to the reader that go unfulfilled. Be specific: 'P2 introduces the mother's silence but it never reappears after P3.'>"],
   "pacingNotes": "<Where the essay rushes (compressing important moments), lingers (spending time proportional to significance), or stalls (circling without advancing). Reference specific paragraphs.>",
   "flatSpots": [<paragraph indices (0-indexed) where narrative momentum drops — where the reader's engagement dips>]
 }
@@ -272,17 +271,6 @@ function validateCartography(
     }
   }
 
-  // -- Validate thematic gaps --
-  const rawGaps = raw.thematicGaps;
-  const thematicGaps: string[] = [];
-  if (Array.isArray(rawGaps)) {
-    for (const g of rawGaps) {
-      if (typeof g === 'string' && g.length > 0) {
-        thematicGaps.push(g);
-      }
-    }
-  }
-
   return {
     paragraphRoles: validatedRoles,
     arcType,
@@ -291,7 +279,7 @@ function validateCartography(
     transitions,
     centralTheme: typeof raw.centralTheme === 'string' ? raw.centralTheme : '',
     themeProgression: typeof raw.themeProgression === 'string' ? raw.themeProgression : '',
-    thematicGaps,
+    thematicGaps: [],
     pacingNotes: typeof raw.pacingNotes === 'string' ? raw.pacingNotes : '',
     flatSpots,
   };
