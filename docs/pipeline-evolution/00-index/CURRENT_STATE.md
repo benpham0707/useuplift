@@ -16,9 +16,35 @@
 |---|---|
 | **Cost (Crochet baseline)** | $1.69 per cold-start (per `tests/output/full-profile-14-harvard-2028-crochet.md` self-report) |
 | **Cost target (v2, locked D1)** | $0.85 cold-start / ~$1.20 lifecycle (1 cold + 3 focused) |
-| **Active execution plan** | 8-phase unified — Phase 0a/0b shipping; Phase 1 next |
+| **Annotation density (locked 2026-05-12)** | **20-30 L5Annotation per essay**, with ~250-375 tokens per annotation (depth > breadth). Carry-forward via `priorAnnotations` builder handles iteration N≥2 progression — NOT a per-call density backfill. |
+| **Active execution plan** | 8-phase unified — Phase 0a/0b/1 shipped; Phase 2 next |
 | **Test baseline** | 670 passed / 5 skipped (was 663/5; +7 for findingPromotion wire) |
 | **Workstreams** | 04 active. 01 dissolved-into-04. 02 + 03 superseded by L5 doc-set. |
+
+## Locked design decisions (binding constraints for all phases)
+
+| # | Decision | Rationale |
+|---|---|---|
+| **L1** | $0.85 cold-start cost target (never silently relaxed) | D1 + cost-budget memory |
+| **L2** | Drop Cut C + S3 R1 from Phase 1 (sunk-cost into Phase 7 retirement) | D2 |
+| **L3** | findingPromotion wired (Phase 0a.3); findingMaturityRefresh deferred to post-Phase-6 | D3 + cost-discipline call |
+| **L4** | Phase 8 flag activation order: Focus Mode → AI Risk → Corpus Retrieval → Voice Profile → deep-dive | D5 |
+| **L5** | **20-30 L5Annotation per essay; quality over quantity** | Locked 2026-05-12. Equal L5 budget invested in depth not breadth — 20-30 deep annotations (~375 tokens each, full teaching frame) beat 60 thin ones. Carry-forward infrastructure handles iter N≥2 cumulative coverage; not a density backfill. |
+| **L6** | Promote UNIFIED_PLAN_HOLD to replace CURRENT_STATE (this doc IS that) | D6 |
+
+## Quality-first protocol (added 2026-05-12)
+
+In addition to the existing 3-gate review protocol (design round → adversarial review → implementation → adversarial diff review → verification gate), every code change classifies under one of three categories with explicit downstream-impact assessment:
+
+1. **Verified-dead-code** (zero static + dynamic grep'd consumers + audit doc): safe to ship.
+2. **Integration-debt wire** (adds capability that was built but unwired): quality UPGRADE; document the unlock.
+3. **Quality bet** (trims surface area downstream consumes): for each downstream consumer, trace contribution to L5Annotation density / depth. If the bet involves a guess without measurement, EITHER surface to Tue OR add measurement criterion for Phase 6 verification regen.
+
+Phase 6 verification regen quality checks:
+- ≥20 annotations per essay, ≤30 (target band)
+- Diverse `teachingMode` mix (≥3 of 4 modes per essay)
+- ≥1 action-mode annotation per paragraph with `rewriteExample` populated
+- Avg per-annotation token count ≥250 (depth proxy)
 
 ---
 
