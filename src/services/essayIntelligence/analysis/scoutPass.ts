@@ -117,7 +117,7 @@ COMPLETENESS RULES:
 - Report tonal shifts between paragraphs AND within paragraphs (mid-paragraph shifts).
 - For structural echoes, both source and echo must reference specific paragraph+sentence indices.
 - If you find nothing in a category, return an empty array. Do NOT fabricate patterns.
-- Maximum 15 repeated elements, 10 tonal shifts, 8 structural echoes. Prioritize the most observable ones if there are more.`;
+- Maximum 8 repeated elements, 4 tonal shifts, 3 structural echoes (total cap ≤15). Prioritize the most observable ones if there are more — the system trims excess emissions.`;
 
 // ============================================================================
 // PROMPT BUILDER
@@ -332,10 +332,14 @@ function validateScoutOutput(
     });
   }
 
+  // Phase 1 Cut E (2026-05-12): backstop the prompt cap with a validator-side
+  // trim. Prompt asks ≤8/4/3; if the LLM overshoots, slice. Prioritization
+  // follows the order the LLM emitted (already "most observable first" per
+  // the prompt's COMPLETENESS RULES).
   return {
-    repeatedElements,
-    tonalShifts,
-    structuralEchoes,
+    repeatedElements: repeatedElements.slice(0, 8),
+    tonalShifts: tonalShifts.slice(0, 4),
+    structuralEchoes: structuralEchoes.slice(0, 3),
   };
 }
 
