@@ -56,8 +56,8 @@ const LEDGER_HEADER = `# Build Cost Ledger
 > \`src/services/essayIntelligence/telemetry/buildCostLedger.ts\` (D-0.10).
 > Cap: $${HARD_CAP_USD.toFixed(2)} hard halt, $${WARN_THRESHOLD_USD.toFixed(2)} warn.
 
-| timestamp | deliverable | model | prompt | fixture | input_tokens | output_tokens | cache_read | cache_write | cost_usd | quality_note | cumulative_usd |
-| --------- | ----------- | ----- | ------ | ------- | ------------ | ------------- | ---------- | ----------- | -------- | ------------ | -------------- |
+| timestamp | deliverable | model | prompt | fixture | input_tokens | output_tokens | cache_read | cache_write | cost_usd | quality_note | cumulative_usd | fresh_input_usd | cache_read_usd | cache_create_usd | output_usd |
+| --------- | ----------- | ----- | ------ | ------- | ------------ | ------------- | ---------- | ----------- | -------- | ------------ | -------------- | --------------- | -------------- | ---------------- | ---------- |
 `;
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -77,6 +77,22 @@ export interface BuildCostEntry {
   cacheWriteTokens?: number;
   costUsd: number;
   qualityNote?: string;
+  /**
+   * Phase 1 A1 cost-component split (2026-05-12, telemetry foundation).
+   * Optional per-component dollars that sum to `costUsd`. Recorded by
+   * `calculateCostBreakdown` in `src/lib/llm/claude.ts` for new entries;
+   * legacy entries leave them blank in the ledger.
+   *
+   * Why: enables Phase 6 verification analysis to attribute cost-cut
+   * impact to specific cost bases (e.g., "Cut B saved $0.075 by
+   * eliminating one Haiku output call" surfaces as a drop in
+   * `output_usd` plus correlated `fresh_input_usd` reduction). A single
+   * rolled-up cost_usd cannot distinguish which cost basis moved.
+   */
+  freshInputUsd?: number;
+  cacheReadUsd?: number;
+  cacheCreateUsd?: number;
+  outputUsd?: number;
   /** Optional iteration tag — when present, telemetry event is keyed to this iteration. */
   iteration?: number;
   /**
@@ -264,6 +280,10 @@ export function getCumulativeCost(): number {
  * precision (4 decimals for USD).
  */
 function appendEntryToLedger(entry: BuildCostEntry & { timestamp: string }): void {
+  // Phase 1 A1 (2026-05-12): 4 cost-component columns appended after
+  // cumulative_usd. Legacy entries (no breakdown provided) emit ' ' so
+  // parseCumulativeFromLedger continues reading cost_usd at cells[10]
+  // without re-indexing.
   const cells = [
     entry.timestamp,
     entry.deliverableId ?? ' ',
@@ -277,6 +297,10 @@ function appendEntryToLedger(entry: BuildCostEntry & { timestamp: string }): voi
     entry.costUsd.toFixed(4),
     (entry.qualityNote ?? ' ').replace(/\|/g, '\\|').replace(/\n/g, ' '),
     cumulativeUsd.toFixed(4),
+    entry.freshInputUsd != null ? entry.freshInputUsd.toFixed(4) : ' ',
+    entry.cacheReadUsd != null ? entry.cacheReadUsd.toFixed(4) : ' ',
+    entry.cacheCreateUsd != null ? entry.cacheCreateUsd.toFixed(4) : ' ',
+    entry.outputUsd != null ? entry.outputUsd.toFixed(4) : ' ',
   ];
   const row = `| ${cells.join(' | ')} |\n`;
   appendFileSync(LEDGER_PATH, row, 'utf-8');

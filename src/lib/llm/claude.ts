@@ -752,14 +752,21 @@ export async function callClaude<T = any>(
       // a missed cost record on a successful call would make the cap
       // unreliable.
       if (buildCostLedger) {
-        const costUsd = calculateCost(usageOut, model);
+        // Phase 1 A1 (2026-05-12): emit cost-component split alongside
+        // the rolled-up total so the ledger can be analyzed by cost basis
+        // in Phase 6 verification (which cost columns moved under each Cut).
+        const breakdown = calculateCostBreakdown(usageOut, model);
         buildCostLedger.recordCost({
           model,
           inputTokens: usageOut.input_tokens,
           outputTokens: usageOut.output_tokens,
           cacheReadTokens: usageOut.cache_read_input_tokens ?? undefined,
           cacheWriteTokens: usageOut.cache_creation_input_tokens ?? undefined,
-          costUsd,
+          costUsd: breakdown.total,
+          freshInputUsd: breakdown.freshInput,
+          cacheReadUsd: breakdown.cacheRead,
+          cacheCreateUsd: breakdown.cacheCreate,
+          outputUsd: breakdown.output,
         });
       }
 
@@ -986,4 +993,50 @@ export function calculateCost(usage: ClaudeResponse['usage'], model?: string): n
   }
 
   return Math.round(cost * 10000) / 10000; // Round to 4 decimal places
+}
+
+/**
+ * Phase 1 A1 cost-component breakdown (2026-05-12, telemetry foundation).
+ *
+ * Returns the same total as `calculateCost` plus per-component dollars
+ * attributed to: fresh (uncached) input, cached input reads, cache creation
+ * writes, and output tokens. The split is the diagnostic foundation for
+ * Phase 6 verification analysis — a Cut that eliminates a Haiku output
+ * call should show as a drop in `output` with correlated `freshInput`
+ * reduction; a Cut that improves cache hit rates shows as a shift from
+ * `freshInput` to `cacheRead`.
+ *
+ * Numerically: `freshInput + cacheRead + cacheCreate + output ≈ total`
+ * (subject to 4-decimal rounding on `total`).
+ */
+export function calculateCostBreakdown(
+  usage: ClaudeResponse['usage'],
+  model?: string,
+): {
+  freshInput: number;
+  cacheRead: number;
+  cacheCreate: number;
+  output: number;
+  total: number;
+} {
+  const pricing = (model && MODEL_PRICING[model]) || DEFAULT_PRICING;
+
+  const round = (n: number) => Math.round(n * 10000) / 10000;
+
+  const freshInput = round((usage.input_tokens / 1_000_000) * pricing.input);
+  const output = round((usage.output_tokens / 1_000_000) * pricing.output);
+  const cacheCreate = usage.cache_creation_input_tokens
+    ? round((usage.cache_creation_input_tokens / 1_000_000) * pricing.cacheWrite)
+    : 0;
+  const cacheRead = usage.cache_read_input_tokens
+    ? round((usage.cache_read_input_tokens / 1_000_000) * pricing.cacheRead)
+    : 0;
+
+  return {
+    freshInput,
+    cacheRead,
+    cacheCreate,
+    output,
+    total: round(freshInput + cacheRead + cacheCreate + output),
+  };
 }
