@@ -778,13 +778,6 @@ You describe WHAT IS, not how WELL. No evaluative language.
     "antiPatterns": ["<what this essay is NOT — prevents misapplied frameworks>"],
     "contextPriorities": ["<profile sections most important for this essay, in priority order>"]
   },
-  "reReadCandidates": [
-    {
-      "paragraph": <number>,
-      "reason": "<why re-reading with full context would reveal more>",
-      "expectedDepthGain": "significant" | "moderate"
-    }
-  ],
   "evolutionNarrative": "<what changed in this iteration and why — or for first iteration, what the synthesis captured>",
   "selfAssessedConvergence": {
     "hasConverged": <boolean>,
@@ -2556,8 +2549,7 @@ export class HolisticSynthesisService {
     console.log(
       `[HolisticSynthesis] Iteration ${input.iterationNumber} — Meta complete, ` +
       `converged=${metaOutput.selfAssessedConvergence.hasConverged}, ` +
-      `${metaOutput.walkDisagreements.length} disagreements, ` +
-      `${metaOutput.reReadCandidates.length} re-read candidates`,
+      `${metaOutput.walkDisagreements.length} disagreements`,
     );
 
     // ── Step 3 & 3b: Question Curation + SignatureMove (parallel, isolated) ──
@@ -2703,7 +2695,6 @@ export class HolisticSynthesisService {
         walkDisagreements: metaOutput.walkDisagreements,
         questionCuration: curationOutput,
         readingStrategy: metaOutput.readingStrategy,
-        reReadCandidates: metaOutput.reReadCandidates,
         evolutionNarrative: metaOutput.evolutionNarrative,
         selfAssessedConvergence: metaOutput.selfAssessedConvergence,
       },
@@ -2972,7 +2963,6 @@ export class HolisticSynthesisService {
   private parseMetaOutput(raw: unknown): {
     walkDisagreements: SynthesisIterationOutput['walkDisagreements'];
     readingStrategy: ReadingStrategy;
-    reReadCandidates: SynthesisIterationOutput['reReadCandidates'];
     evolutionNarrative: string;
     selfAssessedConvergence: SynthesisIterationOutput['selfAssessedConvergence'];
   } {
@@ -3002,14 +2992,6 @@ export class HolisticSynthesisService {
       contextPriorities: ensureStringArray(rawStrategy?.contextPriorities),
     };
 
-    const reReadCandidates = ensureArray(parsed.reReadCandidates).map(
-      (item: Record<string, unknown>) => ({
-        paragraph: Number(item.paragraph ?? 0),
-        reason: String(item.reason ?? ''),
-        expectedDepthGain: (item.expectedDepthGain === 'significant' ? 'significant' : 'moderate') as 'significant' | 'moderate',
-      }),
-    );
-
     const rawConvergence = parsed.selfAssessedConvergence as Record<string, unknown> | undefined;
     const selfAssessedConvergence = {
       hasConverged: rawConvergence?.hasConverged === true,
@@ -3020,7 +3002,6 @@ export class HolisticSynthesisService {
     return {
       walkDisagreements,
       readingStrategy,
-      reReadCandidates,
       evolutionNarrative: String(parsed.evolutionNarrative ?? ''),
       selfAssessedConvergence,
     };

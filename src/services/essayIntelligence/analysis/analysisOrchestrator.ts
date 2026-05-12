@@ -92,7 +92,6 @@ import {
   buildStepRecord,
   dispatchDeepDives,
   mergeFindingsFromDeepDive,
-  mergeFindingsFromReRead,
   analyzeMaturityGaps,
   maturityGapsToQuestions,
   MAX_ITERATIONS,
@@ -102,7 +101,6 @@ import {
 import type { StepResult } from './growthEngine';
 import { QuestionQueueManager } from './questionQueueManager';
 import { runDeepDive } from './deepDiveRunner';
-import { runTargetedReRead } from './fullContextReReader';
 import { analysisPassService } from './analysisPass';
 import { runAOFirstRead } from './aoFirstRead';
 import type { AOFirstReadResult } from './aoFirstRead';
@@ -1780,141 +1778,13 @@ export class AnalysisOrchestrator {
         }
       }
 
-      // ── Step 2: Re-reads run BEFORE convergence check ──
-      // Re-read findings enter the FindingStore (coaching's data source) and connections
-      // enter the profile (router's data source). These are valuable even when L3.75
-      // reports convergence. Running them before the convergence break ensures they
-      // always execute.
-
-      // ── Step 2a: Run re-reads L3.75 flagged ──
-      // L3.75 curated these candidates — respect its ordering. Budget check stops when
-      // we can't afford more. No hard cap beyond the budget backstop. (LLM-first Rule 2)
-      for (const reRead of currentSynthesis.reReadCandidates) {
-        if (state.budgetRemaining < MIN_BUDGET_FOR_STEP) break;
-
-        try {
-          const reReadResult = await runTargetedReRead(
-            reRead.paragraph,
-            essayText,
-            profile,
-            currentSynthesis.synthesis,
-            currentSynthesis.readingStrategy,
-            reRead.reason,
-          );
-
-          state.budgetRemaining -= reReadResult.cost;
-          costTracker.record(
-            `reread_P${reRead.paragraph}`,
-            reReadResult.cost,
-            reReadResult.tokenUsage,
-            reReadResult.timingMs,
-          );
-
-          // Merge findings from re-read into cumulativeFindings AND findingStore
-          let reReadFindingsAbsorbed = 0;
-          if (reReadResult.findings.length > 0) {
-            const newFindingObjects = reReadResult.findings.map((f, idx) => ({
-              ...f,
-              id: `FR${state.iteration}_${reRead.paragraph}_${idx}`,
-              source: 'holistic_synthesis' as const,
-              buildsOn: f.buildsOn ?? [],
-              relatedTo: f.relatedTo ?? [],
-              raisesQuestions: f.raisesQuestions ?? [],
-              lineage: [],
-              createdAt: new Date().toISOString(),
-              lastUpdated: new Date().toISOString(),
-            })) as Finding[];
-            cumulativeFindings = mergeFindingsFromReRead(cumulativeFindings, newFindingObjects);
-
-            // W3.4: Absorb findings into FindingStore so they aren't orphaned
-            if (findingStore) {
-              for (const finding of newFindingObjects) {
-                try {
-                  // Filter buildsOn/relatedTo to only IDs that exist in the store
-                  // (LLM may reference IDs it generated that aren't in our store)
-                  const safeBuildsOn = finding.buildsOn.filter(id => findingStore.has(id));
-                  const safeRelatedTo = finding.relatedTo.filter(id => findingStore.has(id));
-                  findingStore.add({
-                    ...finding,
-                    buildsOn: safeBuildsOn,
-                    relatedTo: safeRelatedTo,
-                  });
-                  reReadFindingsAbsorbed++;
-                } catch (e) {
-                  console.warn(
-                    `[Orchestrator] Failed to absorb re-read finding ${finding.id} into FindingStore: ` +
-                    `${e instanceof Error ? e.message : String(e)}`,
-                  );
-                }
-              }
-              if (reReadFindingsAbsorbed > 0) {
-                console.log(
-                  `[Orchestrator] Absorbed ${reReadFindingsAbsorbed}/${newFindingObjects.length} ` +
-                  `findings from re-read P${reRead.paragraph} into FindingStore`,
-                );
-              }
-            }
-          }
-
-          // W3.4: Absorb connections from re-read into profile via ConnectionMutator
-          // (duplicate detection, connectionRef management, mutation tracking)
-          let reReadConnectionsAbsorbed = 0;
-          if (reReadResult.newConnections.length > 0) {
-            const connectionsToAdd = reReadResult.newConnections.map(conn => ({
-              from: conn.from,
-              to: conn.to,
-              description: conn.description,
-              reverseIllumination: conn.reverseIllumination,
-              significance: conn.significance,
-              strengthCategory: conn.strengthCategory,
-              directionality: conn.directionality,
-              discoveredBy: 'holistic_synthesis' as const,
-            }));
-
-            if (coordinator) {
-              // Route through coordinator → ConnectionMutator for proper integrity
-              const { connectionIds } = coordinator.addConnections(connectionsToAdd);
-              reReadConnectionsAbsorbed = connectionIds.filter(id => id !== '').length;
-            } else {
-              // [D-1.12 H10 closure 2026-04-29] Pre-fix this branch warned
-              // "(should not happen in normal pipeline)" then silently fell
-              // back to direct profile.connections.all.push, bypassing
-              // ConnectionMutator's duplicate detection + connectionRef
-              // management. The "should not happen" guard is exactly the
-              // place to fail loud — silent bypass of an integrity layer
-              // is the dead-wire pattern the no-fallback charter exists to
-              // prevent. Now we throw so the bug surfaces in tests / logs
-              // instead of letting it whisper through into corrupt
-              // connection state.
-              throw new Error(
-                `[Orchestrator] runGrowthCycle: coordinator is missing during re-read connection absorption. ` +
-                  `This branch was previously a silent direct-push fallback that bypassed the ConnectionMutator ` +
-                  `integrity layer. The orchestrator must always have a coordinator at this point in the pipeline; ` +
-                  `arriving here indicates an upstream wiring bug. Halting per the no-fallback charter.`,
-              );
-            }
-
-            if (reReadConnectionsAbsorbed > 0) {
-              console.log(
-                `[Orchestrator] Absorbed ${reReadConnectionsAbsorbed}/${reReadResult.newConnections.length} ` +
-                `connections from re-read P${reRead.paragraph} into profile`,
-              );
-            }
-          }
-
-          const reReadStep: StepResult = {
-            findingsAdded: reReadFindingsAbsorbed,
-            cost: reReadResult.cost,
-            discoveryNote: reReadResult.discoveryNote,
-          };
-          state.activityLog.push(buildStepRecord(`reread_P${reRead.paragraph}`, reReadStep));
-        } catch (error) {
-          console.warn(
-            `[Orchestrator] Re-read P${reRead.paragraph} failed (non-fatal):`,
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
+      // ── Step 2 — REMOVED 2026-05-12 (Phase 1 Cut A) ──
+      // Targeted L3.75 re-reads (runTargetedReRead) were dropped: ~$0.107/run saved.
+      // FindingStore is now populated end-to-end via L3.5 findingPromotion + L3
+      // walk emissions, so the re-read pass's incremental findings contribution
+      // does not justify the per-paragraph Sonnet sub-call. L3.75 still emits
+      // walkDisagreements + readingStrategy; the convergence check below moves
+      // up to fire immediately after Step 1 synthesis.
 
       // ── Step 3.5: Maturity gap analysis (Gap 4) ──
       // Detect stuck findings and feed investigation questions into the persistent queue
@@ -1930,8 +1800,9 @@ export class AnalysisOrchestrator {
         );
       }
 
-      // ── Step 3: Convergence check (after re-reads, before deep dives) ──
-      // Moved here from Step 2 so re-reads always run (their findings enter FindingStore).
+      // ── Step 3: Convergence check ──
+      // Re-reads were removed in Phase 1 Cut A (2026-05-12); convergence check
+      // fires immediately after Step 1 synthesis + Step 3.5 maturity gap analysis.
       // Deep dives are skipped regardless, so convergence here stops the loop cleanly.
       if (currentSynthesis.selfAssessedConvergence.hasConverged) {
         state.isConverged = true;

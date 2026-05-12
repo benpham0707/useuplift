@@ -3,7 +3,6 @@
  *
  * Used by:
  *   - sequentialDeepWalk.parseSentenceCraft() (L3 walk output parser)
- *   - fullContextReReader.coerceSentenceCraft() (re-read output parser)
  *   - Any other consumer that reads rhythm from LLM JSON
  *
  * Why a standalone module: `strict: false` is set in tsconfig, so the

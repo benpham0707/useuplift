@@ -4799,12 +4799,6 @@ export interface SynthesisIterationOutput {
   questionCuration: QuestionCurationOutput;
   /** Reading Strategy — meta-understanding of how to read THIS essay */
   readingStrategy: ReadingStrategy;
-  /** Which paragraphs would benefit from re-reading with full context */
-  reReadCandidates: Array<{
-    paragraph: number;
-    reason: string;
-    expectedDepthGain: 'significant' | 'moderate';
-  }>;
   /** What changed compared to previous iteration (LLM-generated narrative) */
   evolutionNarrative: string;
   /** Self-assessed convergence signal */
