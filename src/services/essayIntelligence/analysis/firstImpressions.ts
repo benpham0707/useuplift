@@ -30,7 +30,13 @@ import type {
 
 const HAIKU_MODEL = 'claude-haiku-4-5-20251001';
 const TEMPERATURE = 0.2;
-const MAX_TOKENS = 2000;
+// Phase 1 Cut D (2026-05-12): MAX_TOKENS lowered 2000 → 1500. Output schema
+// tightened (notableElements field dropped from per-sentence emission;
+// craftNotices cap 5 → 3; paragraph tags cap "3-5" → "exactly 3";
+// notablePhrases cap 3 → 2). Empirical L1 output on Crochet was ~6.7K
+// tokens across 6 paragraphs (~1100 each); the new cap leaves headroom while
+// nudging the LLM toward the tighter targets.
+const MAX_TOKENS = 1500;
 
 // ============================================================================
 // RESULT TYPE
@@ -86,17 +92,16 @@ WHAT YOU PRODUCE FOR EACH PARAGRAPH (paragraph-level — be specific but compact
 1. apparentPurpose: One sentence — what this paragraph appears to be doing (scene-setting, person-introduction, event-description, reflection, argument).
 2. emotionalRegister: One short phrase — emotional tone present (urgent, contemplative, anxious, playful, matter-of-fact). Describe the emotion, do NOT judge whether it works.
 3. voiceObservation: One sentence — what the narrator's voice sounds like here (formal, conversational, fragmented, flowing).
-4. craftNotices: Up to 5 specific craft choices observed (sentence length patterns, imagery, dialogue, tense, punctuation). One short phrase each.
-5. tags: 3-5 topic/content tags (e.g., "family", "competition", "self-discovery", "cultural-identity").
+4. craftNotices: Up to 3 specific craft choices observed (sentence length patterns, imagery, dialogue, tense, punctuation). One short phrase each.
+5. tags: Exactly 3 topic/content tags (e.g., "family", "competition", "self-discovery", "cultural-identity").
 
 FOR EACH SENTENCE (BE BRIEF — one short phrase per field):
 1. apparentPurpose: ≤10 words — what this sentence does in the paragraph.
 2. rhetoricalFunction: ONE label (scene-setting | character-introduction | argument-advancing | transition | reflection | concrete-detail | emotional-disclosure | other).
 3. toneShift: boolean.
-4. notableElements: 0-3 short labels (metaphor / proper-noun / direct-quote / unusual-word). Empty array if nothing notable.
-5. tags: 1-3 content tags. Empty array if not applicable.
+4. tags: 1-3 content tags. Empty array if not applicable.
 
-PER-SENTENCE BREVITY DISCIPLINE: First impressions are LIGHTWEIGHT. Each sentence's per-field output should fit on one short line. If you find yourself writing full prose for a per-sentence field, STOP — rewrite as a phrase. The total per-paragraph output should fit comfortably under 1500 tokens.
+PER-SENTENCE BREVITY DISCIPLINE: First impressions are LIGHTWEIGHT. Each sentence's per-field output should fit on one short line. If you find yourself writing full prose for a per-sentence field, STOP — rewrite as a phrase. The total per-paragraph output should fit comfortably under 1200 tokens.
 
 FIELD-SPECIFIC EXAMPLES (correct vs incorrect):
 
@@ -106,7 +111,7 @@ voiceObservation: "Short declarative sentences, no adjectives, second-person add
 
 tags: CONTENT labels (what is discussed), NOT quality labels. Use "family-dinner", "violin-practice", "code-switching" — NOT "powerful-moment", "vivid-scene".
 
-FOR NOTABLE PHRASES (cap at 3 per paragraph — pick the most distinctive):
+FOR NOTABLE PHRASES (cap at 2 per paragraph — pick the most distinctive):
 1. phrase: Exact text.
 2. sentenceIndex: Which sentence it appears in.
 3. significance: ≤15 words — WHAT makes it notable (position, unusualness, relationship to other elements). NOT whether it's good or bad.
@@ -126,7 +131,6 @@ OUTPUT: Valid JSON matching this schema:
       "apparentPurpose": "<what this sentence does>",
       "rhetoricalFunction": "<functional label>",
       "toneShift": <boolean>,
-      "notableElements": ["<element>", ...],
       "tags": ["<tag>", ...]
     }
   ],
@@ -199,9 +203,6 @@ function validateImpression(
       toneShift: typeof rawSentence?.toneShift === 'boolean'
         ? rawSentence.toneShift
         : false,
-      notableElements: Array.isArray(rawSentence?.notableElements)
-        ? (rawSentence.notableElements as unknown[]).filter((e): e is string => typeof e === 'string')
-        : [],
       tags: Array.isArray(rawSentence?.tags)
         ? (rawSentence.tags as unknown[]).filter((t): t is string => typeof t === 'string')
         : [],
@@ -331,7 +332,6 @@ function buildPlaceholderImpression(
       apparentPurpose: 'Not classified — L1 call failed',
       rhetoricalFunction: 'unclassified',
       toneShift: false,
-      notableElements: [],
       tags: [],
     })),
     notablePhrases: [],

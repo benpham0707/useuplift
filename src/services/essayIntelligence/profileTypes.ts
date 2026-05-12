@@ -3806,7 +3806,6 @@ export interface ParagraphFirstImpression {
     apparentPurpose: string;
     rhetoricalFunction: string;
     toneShift: boolean;
-    notableElements: string[];
     tags: string[];
   }>;
 
