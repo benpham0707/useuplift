@@ -130,14 +130,22 @@ function renderPipelineOverview(result: PipelineResult, essayText: string, pipel
     }
   }
 
-  lines.push('\n### Layer Cost Breakdown\n');
-  lines.push('| Layer | Cost | Input Tokens | Output Tokens | Cache Read | Time |');
-  lines.push('|-------|------|-------------|---------------|------------|------|');
-  for (const lc of result.costSummary.layers) {
-    const tu = lc.tokenUsage;
-    lines.push(`| ${lc.layer} | ${cost(lc.cost)} | ${tu.inputTokens} | ${tu.outputTokens} | ${tu.cacheReadTokens} | ${lc.timingMs}ms |`);
+  // Phase 1 R5 (2026-05-12): §1 Layer Cost Breakdown table gated behind
+  // DUMP_DEBUG_COST=1. The header line above already reports total cost +
+  // time; the detailed per-layer breakdown is diagnostic and consumes ~12
+  // lines of dump without editorial value for the student-facing audit.
+  // Cost ledger CSV (BUILD_COST_LEDGER.md) is the authoritative
+  // per-call cost-history surface.
+  if (process.env.DUMP_DEBUG_COST === '1') {
+    lines.push('\n### Layer Cost Breakdown\n');
+    lines.push('| Layer | Cost | Input Tokens | Output Tokens | Cache Read | Time |');
+    lines.push('|-------|------|-------------|---------------|------------|------|');
+    for (const lc of result.costSummary.layers) {
+      const tu = lc.tokenUsage;
+      lines.push(`| ${lc.layer} | ${cost(lc.cost)} | ${tu.inputTokens} | ${tu.outputTokens} | ${tu.cacheReadTokens} | ${lc.timingMs}ms |`);
+    }
+    lines.push(`| **TOTAL** | **${cost(result.costSummary.totalCost)}** | **${result.costSummary.totalTokenUsage.inputTokens}** | **${result.costSummary.totalTokenUsage.outputTokens}** | **${result.costSummary.totalTokenUsage.cacheReadTokens}** | **${result.costSummary.totalTimingMs}ms** |`);
   }
-  lines.push(`| **TOTAL** | **${cost(result.costSummary.totalCost)}** | **${result.costSummary.totalTokenUsage.inputTokens}** | **${result.costSummary.totalTokenUsage.outputTokens}** | **${result.costSummary.totalTokenUsage.cacheReadTokens}** | **${result.costSummary.totalTimingMs}ms** |`);
 
   return lines.join('\n') + '\n';
 }
@@ -752,20 +760,22 @@ function renderConnectionsAndEntanglements(profile: EssayProfile): string {
       }
     }
 
-    // R2 fix: filter out scout-tentative connections from rendered output.
-    // Tentative connections are walker working memory; only foundational /
-    // significant / supporting strength connections are rendered. The full
-    // list (including tentative) remains accessible via profile.connections.all
-    // for downstream layers that need it. Drops ~46 of 59 connections in
-    // typical essays = ~77% reduction in §7.1 length.
-    const renderedConns = conns.all.filter(
-      (c) => c.strengthCategory !== 'tentative',
-    );
+    // Phase 1 R6/R7 (2026-05-12): tightened from "≥ supporting" to
+    // "foundational | significant only" + cap ≤10. Foundational + significant
+    // connections are the load-bearing structural ties — what the editorial
+    // surface actually surfaces to the student. Supporting + tentative
+    // connections are walker working memory; both remain in
+    // profile.connections.all for downstream layers + the JSON sidecar.
+    const RENDERED_STRENGTH_FILTER = new Set(['foundational', 'significant']);
+    const RENDERED_CONNECTION_CAP = 10;
+    const renderedConns = conns.all
+      .filter((c) => RENDERED_STRENGTH_FILTER.has(c.strengthCategory))
+      .slice(0, RENDERED_CONNECTION_CAP);
     const suppressedCount = conns.all.length - renderedConns.length;
     lines.push(
       `\n**All Connections (Detailed):** ${renderedConns.length} of ${conns.all.length} ` +
-        `(suppressed ${suppressedCount} tentative scout-discovered connections; ` +
-        `set strengthCategory ≥ supporting to render)\n`,
+        `(suppressed ${suppressedCount} connections at strengthCategory < significant or beyond cap=${RENDERED_CONNECTION_CAP}; ` +
+        `set DUMP_DEBUG_CONNECTIONS=1 — TODO — for the full list)\n`,
     );
     for (const c of renderedConns) {
       const fromStr = c.from.sentence !== undefined
@@ -1346,10 +1356,19 @@ async function main(): Promise<void> {
   sections.push(renderCoherenceReport(profile));
   sections.push('---\n');
   sections.push(renderQuestionQueue(profile));
-  sections.push('---\n');
-  sections.push(renderProfileIndex(profile));
-  sections.push('---\n');
-  sections.push(renderMetadata(profile));
+
+  // Phase 1 R8/R9 (2026-05-12): §13 Profile Index + §14 Profile Metadata
+  // suppressed from the markdown dump. Both are system-bookkeeping surfaces
+  // with no editorial value (paragraph digests duplicated elsewhere, section
+  // token counts + maturity histograms + staleness snapshots are diagnostic).
+  // Full content remains accessible in the JSON sidecar (OUTPUT_JSON) written
+  // below. Toggle DUMP_DEBUG_INDEX=1 to re-render in markdown for debugging.
+  if (process.env.DUMP_DEBUG_INDEX === '1') {
+    sections.push('---\n');
+    sections.push(renderProfileIndex(profile));
+    sections.push('---\n');
+    sections.push(renderMetadata(profile));
+  }
 
   // Write output
   ensureOutputDir();
