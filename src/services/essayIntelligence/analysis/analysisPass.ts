@@ -694,6 +694,7 @@ SCHEMA BREVITY CAPS (Scope 1 Phase 2):
 - strengths[].evidence: MAX 10 words — a specific text quote, not commentary
 - weaknesses[].evidence: MAX 10 words — same
 - strengthSignatures[].evidence: MAX 10 words — same
+- growthEdges: MAX 3 entries per paragraph output. Pick the highest-leverage gaps; the system trims excess. Each description: ≤25 words — concrete and specific, not generic.
 - effectivenessReasoning: UNCAPPED — this is your load-bearing reasoning chain and is consumed downstream by L4 and coaching. Write it fully.${piqAntiClusteringLine}`;
 
   // Port B1: schema-extension appendix for pattern catalog emission. Kept
@@ -1505,13 +1506,18 @@ function validateAndTransform(
   }
 
   if (Array.isArray(rawHolistic.growthEdges) && rawHolistic.growthEdges.length > 0) {
-    holisticAnalysisEvolution.growthEdges = rawHolistic.growthEdges.map(
-      (ge: Record<string, unknown>) => ({
-        quality: String(ge.quality || ''),
-        description: String(ge.description || ''),
-        paragraphs: Array.isArray(ge.paragraphs) ? ge.paragraphs.map(Number) : [paragraphIndex],
-      })
-    );
+    // Phase 1 Cut G (2026-05-12): cap growthEdges at 3 per paragraph output.
+    // Prompt asks for the cap; validator backstops it. Downstream digest +
+    // router consumers iterate the array — smaller is fine.
+    holisticAnalysisEvolution.growthEdges = rawHolistic.growthEdges
+      .slice(0, 3)
+      .map(
+        (ge: Record<string, unknown>) => ({
+          quality: String(ge.quality || ''),
+          description: String(ge.description || ''),
+          paragraphs: Array.isArray(ge.paragraphs) ? ge.paragraphs.map(Number) : [paragraphIndex],
+        })
+      );
   }
 
   if (typeof rawHolistic.aoTakeaway === 'string' && rawHolistic.aoTakeaway.length > 0) {
