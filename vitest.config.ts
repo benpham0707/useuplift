@@ -126,6 +126,12 @@ export default defineConfig({
       // annotations, idempotency. Zero LLM cost.
       // Design: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md
       'tests/unit/l5-topn-ranker.test.ts',
+      // Phase 2 (2026-05-14) — student-doc markdown projection smoke test.
+      // Validates renderStudentDocumentMarkdown covers every StudentAnalysisDocument
+      // section (committee one-liner, AO reaction, annotated essay, revision
+      // priorities, structural map, overall assessment) + edge cases (empty
+      // priorities, no inline annotations). Pure function; no LLM.
+      'tests/unit/student-document-markdown.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.

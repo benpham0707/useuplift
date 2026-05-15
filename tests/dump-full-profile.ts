@@ -24,6 +24,10 @@ import { analysisOrchestrator } from '../src/services/essayIntelligence/analysis
 import type { PipelineResult } from '../src/services/essayIntelligence/analysis/analysisOrchestrator';
 import type { EssayProfile } from '../src/services/essayIntelligence/profileTypes';
 import { lintDump, summarizeLint } from '../src/services/essayIntelligence/profileManager/dumpLint';
+import {
+  renderAnalysisForStudent,
+  renderStudentDocumentMarkdown,
+} from '../src/services/essayIntelligence/presentation';
 
 // ============================================================================
 // CONFIG
@@ -46,6 +50,13 @@ const ESSAY_LABEL = path.basename(ESSAY_PATH).replace(/\.txt$/, '');
 const OUTPUT_DIR = path.join(__dirname, 'output');
 const OUTPUT_FILE = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.md`);
 const OUTPUT_JSON = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}.json`);
+// Phase 2 — student-facing snapshot. Produced from EssayProfile by
+// renderAnalysisForStudent; markdown projection lives alongside as readable
+// sibling. Lands in `tests/output/` so Phase 4 parity gate can diff
+// across regens. See:
+// docs/pipeline-evolution/04-pipeline-architecture/L3-75/FIELD_DISPOSITION_TABLE.md
+const OUTPUT_STUDENT_JSON = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}-student.json`);
+const OUTPUT_STUDENT_MD = path.join(OUTPUT_DIR, `full-profile-${ESSAY_LABEL}-student.md`);
 
 // ============================================================================
 // HELPERS
@@ -1382,6 +1393,25 @@ async function main(): Promise<void> {
   console.log(`[Profile Dump] Profile JSON persisted to: ${OUTPUT_JSON}`);
   console.log(`\n[Profile Dump] Output written to: ${OUTPUT_FILE}`);
   console.log(`[Profile Dump] Output size: ${(output.length / 1024).toFixed(1)} KB`);
+
+  // ─── Phase 2 — student-facing render snapshot ─────────────────────────
+  // renderAnalysisForStudent is the composition-layer prototype (per
+  // UNIFIED_PLAN_HOLD_2026_05_10.md §Phase 2). Wiring it here produces a
+  // snapshot every dump regen so Phase 4 parity gate can diff structured
+  // student output across runs without re-spending the analysis cost.
+  // The renderer reads only EssayProfile (no LLM); failure here surfaces
+  // as a non-fatal log so the analytical dump still lands.
+  try {
+    const studentDoc = renderAnalysisForStudent(profile, { mode: 'initial' });
+    fs.writeFileSync(OUTPUT_STUDENT_JSON, JSON.stringify(studentDoc, null, 2), 'utf-8');
+    fs.writeFileSync(OUTPUT_STUDENT_MD, renderStudentDocumentMarkdown(studentDoc), 'utf-8');
+    console.log(`[Profile Dump] Student render JSON: ${OUTPUT_STUDENT_JSON}`);
+    console.log(`[Profile Dump] Student render MD:   ${OUTPUT_STUDENT_MD}`);
+  } catch (err) {
+    console.warn(
+      `[Profile Dump] Student render skipped (non-fatal): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
 
   // ─── Phase 0a.4: dumpLint production check (WARN-ONLY) ───────────────
   // Mechanically scans the just-produced markdown for the recurring render

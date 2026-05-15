@@ -18,7 +18,7 @@
 | **Cost target (v2, locked D1)** | $0.85 cold-start / ~$1.20 lifecycle (1 cold + 3 focused) |
 | **Annotation density (locked 2026-05-12)** | **20-30 L5Annotation per essay**, with ~250-375 tokens per annotation (depth > breadth). Carry-forward via `priorAnnotations` builder handles iteration N≥2 progression — NOT a per-call density backfill. |
 | **Active execution plan** | 8-phase unified — Phase 0a/0b/1 shipped; Phase 2 next |
-| **Test baseline** | 680 passed / 5 skipped (was 670/5; +10 for L5 Top-N ranker unit tests) |
+| **Test baseline** | 688 passed / 5 skipped (was 680/5; +8 for student-doc markdown projection) |
 | **Workstreams** | 04 active. 01 dissolved-into-04. 02 + 03 superseded by L5 doc-set. |
 
 ## Locked design decisions (binding constraints for all phases)
@@ -55,7 +55,7 @@ Phase 6 verification regen quality checks:
 | **0a** Code hygiene + integration-debt | 9 commits, ~7,800 LOC code deleted + 2 huge JSONs + `findingPromotion` wired + `dumpLint` warn-only check wired | **complete** |
 | **0b** Doc regeneration | This doc rewrite + matrix update + 4 supersession marks + L5 index priorAnnotations row | **in progress (this commit)** |
 | **1** Bridge cost cuts | Cuts A/B/D/E/F/G + render R1-R9 + Phase A1 cost-ledger split. **Cut C and S3 R1 dropped per D2** (reshape L3.75 internals being deleted in Phase 7). Projected $1.69 → $1.42 | not started |
-| **2** Assembler convergence | Wire `presentation/renderAnalysisForStudent.ts` to production render path; spec composition contract for Phase 4 merger. $0 cost. | not started |
+| **2** Assembler convergence | Wire `presentation/renderAnalysisForStudent.ts` to production render path; spec composition contract for Phase 4 merger. $0 cost. **SHIPPED 2026-05-14** — `tests/dump-full-profile.ts` now invokes the renderer alongside the analytical dump, writes `<essay>-student.json` + `<essay>-student.md` per regen. Composition contract: `04-pipeline-architecture/L3-75/COMPOSITION_CONTRACT.md`. Open call: L5-surface persistence on profile (option 1 recommended). | shipped |
 | **3** L4 collapse | S3 R2 — collapse `crystallizer.ts` 3 sub-calls (NorthStar/ScoreMatrix/L4b) into 1 composite call; resolves C2 cache-defeat. $1.42 → ~$1.20. | not started |
 | **4** Composition layer + parity gate | Build `compositionLayer.ts` per `L3-75/FIELD_DISPOSITION_TABLE.md` (16 pure functions, calibration block by EssayType); MERGE with `renderAnalysisForStudent.ts`. Snapshot parity gate against persisted Crochet + Three Days dumps. $0 cost. | not started |
 | **5** Lens + residue prompts | L3 lens prompts (Voice/Story/Meaning/Admissions); residue call (4 fields); L3.5 schema additions (contradictionFlags + essayStrengthSignatures); L4b ImprovementManifest extension; F1 fix (`profileRouter.ts:783, 809`). $0 dry-run. **L5 Top-N ranker prerequisite SHIPPED 2026-05-14** — `rankAndSurfaceAnnotations()` at `deepAnnotationService.ts`, surfaces 20-30 from full pool, ≥3 mode diversity floor, per-paragraph ACTION+rewrite floor; design at `04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`. | not started (ranker landed early) |
