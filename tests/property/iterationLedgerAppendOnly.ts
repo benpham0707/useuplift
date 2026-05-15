@@ -218,6 +218,7 @@ function makeRandomAnnotation(idOverride?: string): L5Annotation {
     confidence: rand(),
     crossParagraphRefs: [],
     capacityBuildingNote: null,
+    surfaced: true,
   };
 }
 

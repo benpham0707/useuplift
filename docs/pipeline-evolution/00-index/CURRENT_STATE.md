@@ -4,9 +4,9 @@
 >
 > **This is a current-status descendant of [`UNIFIED_PLAN_HOLD_2026_05_10.md`](./UNIFIED_PLAN_HOLD_2026_05_10.md)** — the planning rationale lives there. This doc captures *what's live now* and *what's queued next*.
 
-**Last updated**: 2026-05-10 (Phase 0b doc regen).
+**Last updated**: 2026-05-14 (L5 Top-N ranker landed).
 **Branch**: `fix/warm-edit-completedalllayers`.
-**HEAD**: post-Phase-0a (commits `a9e2022` → `9f2a0c8` since `f181f84`).
+**HEAD**: post-Phase-0a + L5 ranker (Top-N capability shipped as Phase 5 prerequisite).
 
 ---
 
@@ -18,7 +18,7 @@
 | **Cost target (v2, locked D1)** | $0.85 cold-start / ~$1.20 lifecycle (1 cold + 3 focused) |
 | **Annotation density (locked 2026-05-12)** | **20-30 L5Annotation per essay**, with ~250-375 tokens per annotation (depth > breadth). Carry-forward via `priorAnnotations` builder handles iteration N≥2 progression — NOT a per-call density backfill. |
 | **Active execution plan** | 8-phase unified — Phase 0a/0b/1 shipped; Phase 2 next |
-| **Test baseline** | 670 passed / 5 skipped (was 663/5; +7 for findingPromotion wire) |
+| **Test baseline** | 680 passed / 5 skipped (was 670/5; +10 for L5 Top-N ranker unit tests) |
 | **Workstreams** | 04 active. 01 dissolved-into-04. 02 + 03 superseded by L5 doc-set. |
 
 ## Locked design decisions (binding constraints for all phases)
@@ -58,7 +58,7 @@ Phase 6 verification regen quality checks:
 | **2** Assembler convergence | Wire `presentation/renderAnalysisForStudent.ts` to production render path; spec composition contract for Phase 4 merger. $0 cost. | not started |
 | **3** L4 collapse | S3 R2 — collapse `crystallizer.ts` 3 sub-calls (NorthStar/ScoreMatrix/L4b) into 1 composite call; resolves C2 cache-defeat. $1.42 → ~$1.20. | not started |
 | **4** Composition layer + parity gate | Build `compositionLayer.ts` per `L3-75/FIELD_DISPOSITION_TABLE.md` (16 pure functions, calibration block by EssayType); MERGE with `renderAnalysisForStudent.ts`. Snapshot parity gate against persisted Crochet + Three Days dumps. $0 cost. | not started |
-| **5** Lens + residue prompts | L3 lens prompts (Voice/Story/Meaning/Admissions); residue call (4 fields); L3.5 schema additions (contradictionFlags + essayStrengthSignatures); L4b ImprovementManifest extension; F1 fix (`profileRouter.ts:783, 809`). $0 dry-run. | not started |
+| **5** Lens + residue prompts | L3 lens prompts (Voice/Story/Meaning/Admissions); residue call (4 fields); L3.5 schema additions (contradictionFlags + essayStrengthSignatures); L4b ImprovementManifest extension; F1 fix (`profileRouter.ts:783, 809`). $0 dry-run. **L5 Top-N ranker prerequisite SHIPPED 2026-05-14** — `rankAndSurfaceAnnotations()` at `deepAnnotationService.ts`, surfaces 20-30 from full pool, ≥3 mode diversity floor, per-paragraph ACTION+rewrite floor; design at `04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`. | not started (ranker landed early) |
 | **6** Bundled verification regen | ONE Crochet dump regen (~$1.20 estimated). REQUIRES TUE APPROVAL per cost-budget. Quality review checkpoint. | not started |
 | **7** L3.75 retirement PR | Delete `holisticSynthesis.ts` (3,573 lines); migrate ~6 consumer reads; tag rollback commit. $1.20 → $0.85. | not started |
 | **8** Activation phase | Per D5: Focus Mode → AI Risk → Corpus Retrieval (master) → Voice Profile → deep-dive decision. Per-flag A/B with quality + $ measurement. | not started |

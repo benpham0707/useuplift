@@ -274,6 +274,20 @@ export interface L5Annotation {
    * Populated during post-processing. Diagnostic signal, not a filter.
    */
   groundingQuality?: 'grounded' | 'weakly_grounded' | 'ungrounded';
+
+  /**
+   * Top-N ranker — whether this annotation is selected for student-facing
+   * render. Set by `rankAndSurfaceAnnotations()` after dedup + cross-paragraph
+   * merge. Surfaced=false annotations stay in the result for the iteration
+   * ledger and carry-forward (Rule 2 — nothing discarded). The render layer
+   * filters by this flag.
+   *
+   * Defaults to `true` so callers that pre-date the ranker still see the full
+   * set without behavior change.
+   *
+   * Design: `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`.
+   */
+  surfaced: boolean;
 }
 
 /**
@@ -297,7 +311,15 @@ export interface L5AnnotationResult {
   /** Cross-paragraph annotations that span multiple paragraphs */
   crossParagraphAnnotations: L5Annotation[];
   phase: ImprovementPhaseLevel;
+  /** Total annotations in the result, surfaced + unsurfaced. */
   annotationCount: number;
+  /**
+   * Annotations with `surfaced=true` — the student-facing subset.
+   * Lock target: 20 ≤ surfacedCount ≤ 30 per essay.
+   * Set by `rankAndSurfaceAnnotations()`. When the pool is < 20, all
+   * annotations are surfaced and a diagnostic is logged.
+   */
+  surfacedCount: number;
   /** Density diagnostics per paragraph — signal, not a problem to fix */
   densityDiagnostics: AnnotationDensityDiagnostic[];
   cost: number;
@@ -786,6 +808,14 @@ class DeepAnnotationService {
       0,
     ) + allAnnotations.essayLevelAnnotations.length + crossParagraphAnnotations.length;
 
+    // ── Top-N ranker — surface 20-30 from the full pool. ──
+    // Mutates `surfaced` in place; nothing is deleted (Rule 2).
+    const { surfacedCount } = rankAndSurfaceAnnotations(
+      allAnnotations.paragraphAnnotations,
+      allAnnotations.essayLevelAnnotations,
+      crossParagraphAnnotations,
+    );
+
     // Port G2 — Focus Mode. When ENABLE_FOCUS_MODE is set, rank active
     // candidates by ROI and mark all but the top-N with `visible = false`.
     // Full emission stays in the store (Rule 2 — nothing discarded); only
@@ -838,6 +868,7 @@ class DeepAnnotationService {
       crossParagraphAnnotations,
       phase: phase.level,
       annotationCount,
+      surfacedCount,
       densityDiagnostics,
       cost: totalCost,
       tokenUsage: totalTokenUsage,
@@ -2082,6 +2113,10 @@ ${buildFabricationGuardBlock()}`;
         capacityBuildingNote: (raw.capacityBuildingNote && typeof raw.capacityBuildingNote === 'string')
           ? raw.capacityBuildingNote.trim()
           : null,
+        // Top-N ranker default: every annotation is surfaced until the
+        // ranker decides otherwise. `rankAndSurfaceAnnotations()` flips
+        // beyond-Top-N entries to false after dedup + cross-paragraph merge.
+        surfaced: true,
       });
     }
 
@@ -2334,6 +2369,127 @@ Output JSON: { "annotations": [...] }`;
   private getEssayText(profile: Readonly<EssayProfile>): string {
     return profile.paragraphs.map((p) => p.text).join('\n\n');
   }
+}
+
+// ============================================================================
+// TOP-N RANKER — surfaces a curated 20–30 from the full annotation pool
+// ============================================================================
+
+/**
+ * Lock targets per `CURRENT_STATE.md` L5 + `b32534b` (2026-05-12).
+ * Window for student-facing surfaced annotations.
+ */
+export const L5_SURFACED_TARGET = { min: 20, max: 30 } as const;
+
+/** Number of distinct teachingModes the diversity floor tries to cover. */
+const L5_TEACHING_MODE_DIVERSITY_FLOOR = 3;
+
+/**
+ * Rank the full annotation pool (paragraph + essay-level + cross-paragraph)
+ * and mark a curated 20–30 with `surfaced=true`. Everything else stays in the
+ * result with `surfaced=false` — Rule 2 (nothing discarded). Idempotent.
+ *
+ * Selection (deterministic, no LLM call):
+ *   1. Sort the combined pool by `priority` asc (LLM-judged, 1=highest), then
+ *      by `confidence` desc as a tiebreak.
+ *   2. Floor pass 1 — per-paragraph ACTION coverage. For each paragraph that
+ *      has any ACTION-mode annotation with `rewriteExample` in the pool, mark
+ *      its top-priority such annotation as required.
+ *   3. Floor pass 2 — teachingMode diversity. If the required set covers
+ *      fewer than 3 distinct teachingModes and the pool has more, add the
+ *      top-priority annotation of each missing mode, capping at 3 modes.
+ *   4. Fill pass. Greedy in sorted order, append until 30 are surfaced or the
+ *      pool is exhausted.
+ *   5. Floor target. If the surfaced set < 20, surface everything (the LLM
+ *      under-emitted; hiding good annotations is worse than over-surfacing).
+ *
+ * Design: `docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md`.
+ */
+export function rankAndSurfaceAnnotations(
+  paragraphAnnotations: ParagraphAnnotations[],
+  essayLevelAnnotations: L5Annotation[],
+  crossParagraphAnnotations: L5Annotation[],
+): { surfacedCount: number; totalCount: number } {
+  const pool: L5Annotation[] = [
+    ...paragraphAnnotations.flatMap((pa) => pa.annotations),
+    ...essayLevelAnnotations,
+    ...crossParagraphAnnotations,
+  ];
+
+  // Reset: idempotent if the ranker is re-run after an upstream mutation.
+  for (const a of pool) a.surfaced = false;
+
+  if (pool.length === 0) {
+    return { surfacedCount: 0, totalCount: 0 };
+  }
+
+  // Stable sort: priority asc, confidence desc.
+  const sorted = pool
+    .map((a, i) => ({ a, i })) // preserve original order for ties beyond confidence
+    .sort((x, y) => {
+      const dp = x.a.priority - y.a.priority;
+      if (dp !== 0) return dp;
+      const dc = (y.a.confidence ?? 0) - (x.a.confidence ?? 0);
+      if (dc !== 0) return dc;
+      return x.i - y.i;
+    })
+    .map((w) => w.a);
+
+  // ── Floor pass 1: per-paragraph ACTION+rewrite coverage. ──
+  const required = new Set<L5Annotation>();
+  const seenParagraphAction = new Set<number>();
+  for (const a of sorted) {
+    if (a.teachingMode !== 'action') continue;
+    if (!a.rewriteExample) continue;
+    const p = a.location.paragraphIndex;
+    if (seenParagraphAction.has(p)) continue;
+    seenParagraphAction.add(p);
+    required.add(a);
+  }
+
+  // ── Floor pass 2: teachingMode diversity (≥3 of 4). ──
+  const modesPresent = new Set<L5TeachingMode>();
+  for (const a of required) modesPresent.add(a.teachingMode);
+
+  if (modesPresent.size < L5_TEACHING_MODE_DIVERSITY_FLOOR) {
+    for (const a of sorted) {
+      if (modesPresent.size >= L5_TEACHING_MODE_DIVERSITY_FLOOR) break;
+      if (modesPresent.has(a.teachingMode)) continue;
+      // Only promote if the mode actually exists in the pool.
+      required.add(a);
+      modesPresent.add(a.teachingMode);
+    }
+  }
+
+  // ── Fill pass: greedy by sort order up to max. ──
+  const surfaced = new Set<L5Annotation>(required);
+  for (const a of sorted) {
+    if (surfaced.size >= L5_SURFACED_TARGET.max) break;
+    surfaced.add(a);
+  }
+
+  // ── Floor target: if under min, surface everything. ──
+  if (surfaced.size < L5_SURFACED_TARGET.min) {
+    for (const a of sorted) surfaced.add(a);
+  }
+
+  for (const a of surfaced) a.surfaced = true;
+
+  const surfacedCount = surfaced.size;
+  const totalCount = pool.length;
+
+  // Diagnostic — only fire when out of band on essays large enough to expect
+  // a full pool. Phase 6 verification regen reads this signal.
+  if (surfacedCount < L5_SURFACED_TARGET.min || surfacedCount > L5_SURFACED_TARGET.max) {
+    console.log(
+      `[L5/ranker] surfaced=${surfacedCount} pool=${totalCount} — outside target band ` +
+        `[${L5_SURFACED_TARGET.min}, ${L5_SURFACED_TARGET.max}]; ` +
+        `modes=${Array.from(modesPresent).join(',') || '∅'}; ` +
+        `required(action+rewrite+diversity)=${required.size}.`,
+    );
+  }
+
+  return { surfacedCount, totalCount };
 }
 
 // ============================================================================

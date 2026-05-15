@@ -101,6 +101,7 @@ function makeRandomAnnotation(overrides: Partial<L5Annotation> = {}): L5Annotati
     crossParagraphRefs: rand() > 0.7 ? [randInt(0, 24), randInt(0, 24)] : [],
     capacityBuildingNote: rand() > 0.5 ? randString('capacity') : null,
     groundingQuality: rand() > 0.5 ? GROUNDING[randInt(0, GROUNDING.length)] : undefined,
+    surfaced: true,
     ...overrides,
   };
 }

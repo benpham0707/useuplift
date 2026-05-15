@@ -46,6 +46,7 @@ function makeAnnotation(overrides: Partial<L5Annotation> = {}): L5Annotation {
     confidence: 0.88,
     crossParagraphRefs: [],
     capacityBuildingNote: null,
+    surfaced: true,
     ...overrides,
   };
 }

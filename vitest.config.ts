@@ -120,6 +120,12 @@ export default defineConfig({
       // cite findings by ID instead of re-narrating. Verifies evidence guard,
       // byKind counts, coaching-value mapping, cross-paragraph aggregation.
       'tests/unit/finding-promotion.test.ts',
+      // L5 Top-N ranker (2026-05-14) — surfaces 20-30 from full pool per
+      // CURRENT_STATE.md L5 lock. Validates band, diversity floor (≥3 modes),
+      // per-paragraph ACTION+rewrite floor, preservation of unsurfaced
+      // annotations, idempotency. Zero LLM cost.
+      // Design: docs/pipeline-evolution/04-pipeline-architecture/L5/L5_TOPN_RANKER_DESIGN.md
+      'tests/unit/l5-topn-ranker.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
