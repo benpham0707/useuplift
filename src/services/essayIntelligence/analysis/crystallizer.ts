@@ -107,8 +107,22 @@ const L4A_SCORE_MATRIX_TIMEOUT_MS = 120_000;
 const L4B_MAX_OUTPUT_TOKENS = 6000;
 const L4B_TIMEOUT_MS = 180_000;
 
+/**
+ * L4 composite (Phase 3): single Sonnet call emitting NorthStar + ScoreMatrix +
+ * L4b artifacts together. Active when `L4_COMPOSITE_CALL=true`. Output budget
+ * is the sum of the three sub-call budgets plus headroom for the JSON wrapper.
+ * Design: docs/pipeline-evolution/04-pipeline-architecture/L4/COMPOSITE_CALL_DESIGN.md
+ */
+const L4_COMPOSITE_MAX_TOKENS =
+  L4A_NORTH_STAR_MAX_TOKENS + L4A_SCORE_MATRIX_MAX_TOKENS + L4B_MAX_OUTPUT_TOKENS + 1000;
+const L4_COMPOSITE_TIMEOUT_MS = 240_000;
+
 /** Temperature — low for deterministic synthesis, slight creativity for interpretation */
 const TEMPERATURE = 0.3;
+
+function isL4CompositeEnabled(): boolean {
+  return process.env.L4_COMPOSITE_CALL === 'true';
+}
 
 // ============================================================================
 // L4 OUTPUT TYPES (ParagraphScoreEntry, ParagraphScoreMatrix, CoherenceIssue,
@@ -970,6 +984,393 @@ REMINDERS:
 }
 
 // ============================================================================
+// L4 COMPOSITE CALL (Phase 3) — single Sonnet call emitting NorthStar +
+// ScoreMatrix + L4b artifacts together. Replaces the 3-call path when
+// `L4_COMPOSITE_CALL=true`. Eliminates the C2 cache-defeat by removing the
+// three competing system prompts and the 3× profile-context bill.
+//
+// Design: docs/pipeline-evolution/04-pipeline-architecture/L4/COMPOSITE_CALL_DESIGN.md
+// ============================================================================
+
+/**
+ * Composite system prompt — covers all three sections in one document.
+ *
+ * Design principles applied here (don't lose):
+ *   1. Shared frames stated ONCE, not three times (display convention, output
+ *      format, JSON-only directive).
+ *   2. Output ordering protocol — the dependency chain (roles → scores →
+ *      priorities → coherence) is preserved as reasoning order, not call
+ *      order. The model produces JSON in this order so the later sections
+ *      can reference the earlier ones consistently.
+ *   3. Every load-bearing rule from the focused prompts is preserved.
+ *      Only redundant framing and per-section examples have been trimmed.
+ *   4. Anti-shortcut clause — "in one response is not permission to short
+ *      any section. Each contract is the same as the focused call's."
+ */
+export function buildSystemPromptL4Composite(scale: NorthStarScale, essayType?: EssayType): string {
+  const activeDims = ACTIVE_DIMENSIONS[scale];
+
+  // W3.2: Essay-type-aware scoring calibration guidance (preserved verbatim
+  // from buildSystemPromptL4aScoreMatrix — load-bearing for short/medium essays).
+  const scoringCalibration = essayType === 'supplement'
+    ? `\n   ESSAY-TYPE CALIBRATION (supplement — short essay):
+   Short essays have simpler structural expectations. A 3-paragraph supplement achieving focused impact
+   is at the SAME quality level as a 5-paragraph personal statement with full structural complexity.
+   Do NOT penalize supplements for lacking:
+   - Complex multi-paragraph arcs (a single-turn narrative is structurally valid for 150-250 words)
+   - Multiple thematic threads (one well-developed thread is sufficient)
+   - Emotional build-up and release (concentrated emotion is appropriate)
+   Structural and thematic scores should reflect how well the essay achieves its scale-appropriate goals.\n`
+    : essayType === 'piq'
+    ? `\n   ESSAY-TYPE CALIBRATION (PIQ — medium essay):
+   PIQs (~350 words) should demonstrate moderate structural development.
+   Expect 2-3 clear sections with purposeful transitions. Thematic depth should be proportional
+   to length — a focused exploration of one insight is often stronger than scattered breadth.
+   Score structural dimensions against PIQ-appropriate expectations, not personal-statement complexity.\n`
+    : '';
+
+  return `You are the Crystallizer — a literary-architectural analyst who reads a complete essay profile and produces, in one response, the structural core (North Star + Paragraph Score Matrix) AND the consolidation layer (priorities + coaching map + coherence report).
+
+Producing all of this in one response is NOT permission to short any section. Each section's contract below is the same as if it ran as a focused call. The single-response format exists for prompt-budget efficiency, not for compression of analytical content.
+
+=== DISPLAY CONVENTION (applies to every prose string you emit) ===
+
+Input is labeled with 1-indexed P-labels (P1 = first paragraph, P1S2 = first paragraph's third sentence). Match this convention in every prose field (\`transformation\`, \`role\`, \`significance\`, \`articulation\`, \`currentState\`, \`systemReading\`, \`verdict\`, \`priority\`, \`architecturalReason\`, \`unlocksNext\`, \`whyProtect\`, \`claimA\`, \`claimB\`, \`nature\`, \`likelyResolution\`, \`evidenceA\`, \`evidenceB\`, \`emergentPatterns\`, \`scoreTensions\`, \`transformativeInsight.insight\`, \`whyThisTransforms\`).
+
+JSON DATA fields use 0-based integers: \`structuralRolesMap[].paragraphs: [0]\` references paragraph 1; \`journey[].location: {paragraph: 0, sentence: 2}\` is the first paragraph's third sentence; \`scoreMatrix.paragraphs[].index: 0\` is paragraph 1. Integer fields stay 0-indexed for engineering; counselor-facing prose stays 1-indexed for readability. NEVER write "P0" or "P{n}S0" in any prose string. Candidate IDs like \`CAND_L3_P0S1_abc123\` are stable system identifiers — reference them in \`consolidatedFrom\` arrays only, never inside prose.
+
+=== OUTPUT ORDERING PROTOCOL (load-bearing) ===
+
+You will emit a single JSON object with three top-level fields: \`northStar\`, \`scoreMatrix\`, \`coherenceReport\`. Reason through them in this order — each section's quality depends on the prior sections being settled first:
+
+  1. \`northStar.structuralRolesMap\` first — this is the architectural anchor everything else references.
+  2. \`northStar\` remaining fields (throughLine/trajectory/distinctiveness/intentBridge per active dimensions).
+  3. \`scoreMatrix.paragraphs[].scores\` — use the structural roles from step 1 as the calibration for the \`structural\` dimension.
+  4. \`scoreMatrix.crossParagraphPatterns\` — at most 3 single-line observations.
+  5. \`scoreMatrix.coachingMap.priorities\` — CONSOLIDATE the candidate set into 3-7 priorities, each with non-empty \`consolidatedFrom\`. The structural roles + scores from steps 1-3 are your architectural framing.
+  6. \`scoreMatrix.coachingMap\` remaining fields (transformativeInsight, protectedStrengths, emergentPatterns, scoreTensions).
+  7. \`scoreMatrix.prioritizedImprovements\` — legacy flat shape; 3-7 entries paralleling coachingMap.priorities.
+  8. \`coherenceReport\` last — cross-check the northStar + scoreMatrix you just produced against the profile sections provided in the user prompt.
+
+This is the reasoning order. Stay disciplined: do not score paragraphs before structural roles exist, do not consolidate before scoring is settled, do not investigate coherence before everything else is on the page.
+
+==================================================================
+SECTION 1 — ESSAY NORTH STAR (architecture of meaning)
+==================================================================
+
+The North Star is NOT a summary. A summary is lossy compression — everything in it exists more deeply elsewhere. The North Star is an EMERGENT PROPERTY — an interpretive synthesis that transcends any individual profile section. Think of a conductor studying a symphony score: the conductor doesn't need the notes (sentence understanding) or tuning assessment (analysis). The conductor needs the interpretive vision — the first movement's theme reappears inverted in the fourth, and that inversion IS the emotional argument.
+
+Active dimensions for this ${scale} essay: ${activeDims.join(', ')}.
+
+${activeDims.includes('throughLineMap') ? `THROUGH-LINE MAP (personal statements and PIQs):
+Trace the central element's MEANING transformation — not its physical appearances.
+BAD: "The diamond appears in P1, P3, and P5."
+GOOD: "The diamond's signification transforms: P1 establishes it as commodity (pawnshop appraisal), P3 reframes it as inheritance (grandmother's ring), P5 claims it as identity marker (refusal to sell = refusal to reduce self to market value)."
+The connection graph already tracks WHERE things appear. The through-line traces HOW MEANING CHANGES.
+
+Required fields:
+- centralElement: the element being traced
+- elementType: "image" | "question" | "tension" | "metaphor" | "relationship" | "idea"
+- transformation: the overall meaning journey in one sentence
+- journey: array of { location: { paragraph, sentence? }, meaningAtPoint, narrativeMove }
+  narrativeMove must be: "introduction" | "development" | "submersion" | "resurfacing" | "transformation" | "resolution" | "complication" | "echo"
+- connectionRefs: IDs from the connection graph that constitute this through-line
+` : ''}
+STRUCTURAL ROLES MAP (all essay types — load-bearing anchor for everything downstream):
+What each section IS in the architecture of meaning — structural necessity, not topic.
+BAD: "P1 introduces the topic. P2 provides background. P3 makes the point."
+GOOD: "P1 frames the economic lens that makes P3's emotional stakes calculable, P2 populates the world the lens examines, P3 is the fulcrum where market-value logic encounters irreducible personal value."
+Ask: "If I removed this section, what architectural load would be unsupported?"
+Required fields per role:
+- paragraphs: number[] (which paragraphs this role covers)
+- role: string (architectural role name)
+- significance: string (WHY this role matters)
+- weight: "load_bearing" | "supporting" | "transitional" | "decorative"
+
+${activeDims.includes('trajectory') ? `TRAJECTORY (PIQ + personal statements):
+Where the essay IS and where it COULD go — ALWAYS multiple plausible paths.
+The student decides; you map options with honest assessment of text support.
+Required fields:
+- currentState: assessment of where the essay stands
+- plausiblePaths: array of { description, textSupport: "strong"|"moderate"|"speculative", requirements: string[] }
+- unrealizedConnections: array of { description, locations: [paragraph, sentence][] }
+
+` : ''}DISTINCTIVENESS SIGNATURE (all essay types):
+What makes this essay NON-INTERCHANGEABLE.
+If your signature could describe any essay about [topic], it's not specific enough.
+BAD: "This essay uniquely combines personal narrative with thematic depth."
+GOOD: "Uses pawnshop economics to dramatize the gap between market value and inherited value — the specific structural choice of opening with an appraisal makes the grandmother's ring both literally and figuratively priceable, which is what gives the refusal-to-sell its force."
+The distinctiveness must be specific to THIS essay's EXECUTION, not its topic.
+Required fields:
+- articulation: one-paragraph statement of what makes it unique
+- entanglementRefs: string[] (IDs of cross-dimension entanglements that evidence this — the available IDs appear in the user prompt)
+- nonInterchangeableFactors: string[] (specific, not categorical)
+
+${activeDims.includes('intentBridge') ? `INTENT BRIDGE (personal statements):
+The system's reading alongside the student's stated intent (null until L6 conversation). Divergences are coaching opportunities, not problems.
+Required fields:
+- studentIntent: null (not yet populated — L6 conversation will fill this)
+- systemReading: what the system reads the essay as doing
+- alignments: array of { aspect, alignment: "confirmed"|"partial"|"divergent"|"student_unaware", detail }
+- sourceInsightIds: [] (empty until L6)
+
+` : ''}North Star confidence: "hypothesis" for first analysis, "emerging" after re-analysis, "full" after deep re-analysis, "student_confirmed" only after L6 student confirms. For a first-time crystallization, use "hypothesis". For a re-crystallization with a prior North Star supplied in the user prompt, emit an \`evolution\` field per the user-prompt instructions.
+
+==================================================================
+SECTION 2 — PARAGRAPH SCORE MATRIX (multi-dimensional scoring)
+==================================================================
+
+Use the structural roles you produced in Section 1 to calibrate the \`structural\` dimension. A paragraph with role weight \`load_bearing\` is scored against that expectation; \`transitional\` against transition standards.
+
+5 dimensions per paragraph, each 0-100:
+- effectiveness: TRANSFER directly from the L3.5 paragraph analysis effectiveness score provided in the user prompt
+- structural: how well this paragraph fulfills its architectural role (from your structural roles)
+- voice: voice consistency / intentional variation quality relative to the essay's dominant voice
+- emotional: emotional depth, authenticity, and earned-ness of significant moments
+- thematic: contribution to the through-line and themes
+
+CALIBRATION: Use the L3.5 effectiveness scores as your anchor. The other 4 dimensions should be calibrated relative to the same scale. A paragraph with 75 effectiveness and 90 structural means its execution underperforms its architectural importance — that tension is diagnostic.
+${scoringCalibration}
+ANTI-CLUSTERING PROTOCOL (W3.3 — mandatory):
+Before assigning scores, you MUST:
+1. FORCED RANKING: For each of the 4 new dimensions (structural, voice, emotional, thematic), rank ALL paragraphs from strongest to weakest BEFORE assigning any score.
+2. WITHIN-PARAGRAPH RANGE: Each paragraph's 4 new dimension scores must span at least 15 points. If a paragraph truly excels equally in all dimensions, document your reasoning explicitly in the verdict.
+3. CROSS-PARAGRAPH RANGE: For each of the 4 new dimensions, the range across all paragraphs must be at least 20 points. Best and worst paragraph for any dimension MUST differ by 20+ points.
+4. FULL-RANGE ANCHORS: Calibrate using the full 0-100 scale:
+   - 90+: This paragraph is among the best you've seen for this dimension
+   - 70-89: Genuinely strong — does something distinctive
+   - 50-69: Functional — does its job without distinction
+   - 30-49: Weak — significant room for improvement
+   - Below 30: Actively problematic for this dimension
+   If all paragraphs cluster in the 70-85 range for any dimension, you have FAILED to differentiate.
+
+${buildScoreMatrixAnchorsBlock()}
+
+verdict: A single sentence capturing the paragraph's architectural assessment.
+BAD: "Good paragraph with strong writing."
+GOOD: "Carries the essay's emotional load but underearns P4's revelation by telling rather than showing the grandmother's gesture."
+
+priorityForImprovement: 1 (fine) to 5 (urgent). Load-bearing paragraphs with low scores get highest priority.
+
+crossParagraphPatterns: Max 3 items, each ≤15 words. Single-line observations across paragraphs.
+Example: "P1-P4: emotional intensity builds linearly — no dip before climax reduces earned weight".
+These strings are surfaced directly as coaching hooks in L5. Do NOT produce long prose.
+
+==================================================================
+SECTION 3 — CONSOLIDATION (priorities + coachingMap + coherenceReport)
+==================================================================
+
+You receive a pre-generated set of improvement candidates from L3, L3.5, and L3.75 in the user prompt. CONSOLIDATE those candidates into 3-7 prioritized improvements — you DO NOT invent improvements outside the candidate set.
+
+CRITICAL — CONSOLIDATE, DO NOT INVENT:
+Every priority you output MUST cite \`consolidatedFrom: [candidate IDs]\` — the specific candidate(s) it absorbs. The upstream layers already did the analytical work of identifying problems; your job is to group, prioritize, and frame them architecturally.
+
+If two candidates point at the same architectural theme (e.g., "P2 summarizes" from L3 and "P2 is the load-bearing pivot but stays abstract" from L3.75), MERGE them into ONE priority with both candidate IDs in \`consolidatedFrom\`. A single priority CAN and SHOULD absorb multiple candidates when they share a theme.
+
+If a candidate doesn't make it into any priority, that's fine — it will be marked \`superseded\` in the lifecycle. Be intentional: pick the 3-7 highest-leverage priorities, let the rest supersede. Do NOT list every candidate as a separate priority — that's the opposite of consolidation.
+
+PRESERVE THE SIGNATURE MOVE: If \`craftAssessment.signatureMove != null\` in the profile, prioritize improvements that PRESERVE its cited instances; rank improvements that would erase them as net-negative. Where possible, frame near-the-move improvements as "preserve X while doing Y" rather than as replacements.
+BAD: "Improve the opening paragraph." (ungrounded, no consolidatedFrom)
+GOOD: "P1 is the frame of economic risk that makes P3's emotional stakes legible — but its current effectiveness (62) means the reader hasn't internalized the appraiser's logic before being asked to feel the ring's non-market value." consolidatedFrom: ["CAND_L3_P0S1_abc123", "CAND_L3_5_P0S2_def456"]
+
+prioritizedImprovements (legacy flat shape, kept for backward compat): 3-7 entries, paralleling coachingMap.priorities. Each carries \`paragraph\`, \`improvement\`, \`whyThisMatters\`, \`expectedImpact\`.
+
+coachingMap (the structured coaching surface — five sections):
+
+  transformativeInsight: The SINGLE most important thing about this essay — the insight that, if the student understood it, would unlock the most improvement. Include evidence locations and explain WHY this transforms understanding. Set requiresStudentAwareness if the student must understand this before any specific feedback makes sense.
+
+  priorities: Ordered list of improvements. Each has:
+  - priority: what to do
+  - target: { paragraphs: [...], description: "..." }
+  - architecturalReason: WHY this matters to the essay's architecture (not just the paragraph). Reference the North Star structural roles from Section 1.
+  - unlocksNext: what becomes possible AFTER this improvement
+  - expectedImpact: "transformative" | "significant" | "incremental"
+  - consolidatedFrom: [candidate IDs] (non-empty, required)
+
+  protectedStrengths: Things that MUST NOT be damaged during improvement. These are the essay's current assets. Include locations and WHY they must be protected.
+
+  emergentPatterns: Max 3 items. Each ≤20 words, single line. Format: "Pattern: {name} — {observation with P refs}".
+  Example: "Pattern: voice strongest in physical scenes (P1, P3), retreats to abstraction in reflection (P2, P4)".
+  Flat strings ONLY — do NOT emit object structures.
+
+  scoreTensions: Max 3 items. Each ≤15 words. Format: "P{n}: {dim1}({score}) >> {dim2}({score}) — {one-line hook}".
+  Example: "P2: structural(92) >> effectiveness(55) — pivot telegraphed, not enacted".
+  Flat strings ONLY — do NOT emit object structures.
+
+coherenceReport — ACTIVELY investigate contradictions ACROSS profile sections.
+You are not passively checking for problems. You are ACTIVELY INVESTIGATING coherence.
+
+INVESTIGATION PROTOCOL — for each pair of profile sections, ASK:
+a) Does the voice map's account of shifts MATCH the voice identity's characterization?
+b) Do the earnedness assessments ALIGN with the effectiveness scores?
+c) Do the structural roles' importance claims MATCH the score matrix's scoring?
+d) Does the thematic architecture's through-line claim MATCH the actual evidence?
+e) Do the emotional topography peaks and valleys MATCH the narrative strategy's claimed arc?
+
+For each tension found, CLASSIFY it:
+- routingCategory: How should the system respond?
+  "productive_tension" — both sides are valid; the tension reveals something about the essay
+  "system_disagreement" — different analysis layers reached incompatible conclusions
+  "essay_flaw" — the essay itself contains an unresolved tension the student should address
+  "depth_signal" — the tension suggests deeper understanding is needed
+- canCoexist: Can both claims be true simultaneously? (productive tensions often can)
+- likelyResolution: Free-text explanation of how to resolve, or null if unresolvable
+- evidenceA: Direct quote/reference supporting claim A
+- evidenceB: Direct quote/reference supporting claim B
+
+severity:
+- "blocking": the profile contradicts itself in a way that would confuse downstream consumers
+- "notable": genuine tension that reveals something about the essay
+- "minor": a nuance difference between sections
+
+isCoherent: false if ANY blocking contradictions exist. Zero contradictions is a valid honest answer if the profile is consistent.
+
+==================================================================
+OUTPUT FORMAT
+==================================================================
+
+Respond with a single JSON object. No markdown, no explanation, no code blocks. Emit the three top-level fields \`northStar\`, \`scoreMatrix\`, \`coherenceReport\` in that order.
+
+{
+  "northStar": {
+    "activeScale": "${scale}",
+${activeDims.includes('throughLineMap') ? `    "throughLineMap": { "centralElement": "...", "elementType": "...", "transformation": "...", "journey": [...], "connectionRefs": [...] },` : `    "throughLineMap": null,`}
+    "structuralRolesMap": [{ "paragraphs": [...], "role": "...", "significance": "...", "weight": "..." }],
+${activeDims.includes('trajectory') ? `    "trajectory": { "currentState": "...", "plausiblePaths": [...], "unrealizedConnections": [...] },` : `    "trajectory": null,`}
+    "distinctivenessSignature": { "articulation": "...", "entanglementRefs": [...], "nonInterchangeableFactors": [...] },
+${activeDims.includes('intentBridge') ? `    "intentBridge": { "studentIntent": null, "systemReading": "...", "alignments": [...], "sourceInsightIds": [] },` : `    "intentBridge": null,`}
+    "confidence": "hypothesis",
+    "lastUpdatedBy": "L4"
+  },
+  "scoreMatrix": {
+    "paragraphs": [
+      {
+        "index": 0,
+        "scores": { "effectiveness": <from L3.5>, "structural": <0-100>, "voice": <0-100>, "emotional": <0-100>, "thematic": <0-100> },
+        "verdict": "...",
+        "priorityForImprovement": <1-5>
+      }
+    ],
+    "crossParagraphPatterns": ["..."],
+    "prioritizedImprovements": [
+      { "paragraph": <index>, "improvement": "...", "whyThisMatters": "...", "expectedImpact": "transformative"|"significant"|"incremental" }
+    ],
+    "coachingMap": {
+      "transformativeInsight": { "insight": "...", "evidenceLocations": [{"paragraph": 0, "sentence": 2}], "whyThisTransforms": "...", "requiresStudentAwareness": true|false },
+      "priorities": [
+        { "priority": "...", "target": { "paragraphs": [0], "description": "..." }, "architecturalReason": "...", "unlocksNext": "...", "expectedImpact": "transformative"|"significant"|"incremental", "consolidatedFrom": ["CAND_L3_P0S1_abc123"] }
+      ],
+      "protectedStrengths": [{ "description": "...", "locations": [{"paragraph": 0}], "whyProtect": "..." }],
+      "emergentPatterns": ["Pattern: ..."],
+      "scoreTensions": ["P2: structural(92) >> effectiveness(55) — pivot telegraphed, not enacted"]
+    }
+  },
+  "coherenceReport": {
+    "contradictions": [
+      { "sectionA": "...", "claimA": "...", "sectionB": "...", "claimB": "...", "severity": "blocking"|"notable"|"minor", "suggestedResolution": "...", "nature": "...", "routingCategory": "productive_tension"|"system_disagreement"|"essay_flaw"|"depth_signal", "canCoexist": true|false, "likelyResolution": "..."|null, "evidenceA": "...", "evidenceB": "..." }
+    ],
+    "isCoherent": <boolean>
+  }
+}`;
+}
+
+/**
+ * Composite call instruction — runtime context the LLM needs to produce all
+ * three sections. Replaces the three sequential call instructions; no
+ * re-serialization of North Star or Score Matrix since the LLM produces them
+ * in this same call.
+ *
+ * Includes: essay details, entanglement IDs (for NS distinctiveness),
+ * connection IDs (for NS through-line), L3.5 effectiveness scores (for SM
+ * scoring anchor), candidate context (for L4b consolidation), prior NS if
+ * re-crystallization.
+ */
+export function buildCallInstructionL4Composite(
+  profile: Readonly<EssayProfile>,
+  scale: NorthStarScale,
+  candidateStore: ImprovementCandidateStore,
+  priorNorthStar?: EssayNorthStar,
+): string {
+  const paragraphCount = profile.paragraphs.length;
+
+  // Entanglement IDs for distinctivenessSignature.entanglementRefs
+  const entanglementSummary = profile.entanglements.map((e) => ({
+    id: e.id,
+    dimensions: e.dimensions,
+    location: e.location,
+    description: e.description,
+  }));
+
+  // Connection IDs for throughLineMap.connectionRefs
+  const connectionIds = profile.connections.all.map((c) => c.id);
+
+  // L3.5 effectiveness anchors for Score Matrix calibration
+  const effectivenessScores = profile.paragraphs.map((p) => ({
+    index: p.index,
+    effectiveness: p.analysis?.effectiveness ?? null,
+    verdict: p.analysis?.verdict ?? null,
+  }));
+
+  // Candidate context for L4b consolidation
+  const candidateContext = buildL4bCandidateContext(candidateStore);
+
+  const reCrystallizationBlock = priorNorthStar
+    ? `
+
+=== RE-CRYSTALLIZATION CONTEXT ===
+This is a RE-CRYSTALLIZATION — a North Star already exists from a prior analysis round.
+Prior North Star (version ${(priorNorthStar.evolution?.version ?? 1)}):
+${JSON.stringify(priorNorthStar, null, 2)}
+
+Produce an UPDATED North Star. Include an "evolution" field on the northStar output:
+{
+  "evolution": {
+    "version": ${(priorNorthStar.evolution?.version ?? 1) + 1},
+    "changelog": [{ "field": "...", "previousValue": "...", "newValue": "...", "trigger": "..." }, ...],
+    "coreIdentityStable": <boolean — true if the essay's core meaning identity hasn't shifted>,
+    "stabilityAssessment": "one sentence on how stable the North Star is across versions"
+  }
+}
+Log EVERY field that changed (even subtly) in the changelog. If nothing changed, emit an empty changelog and set coreIdentityStable: true.`
+    : '';
+
+  return `Crystallize the profile above into the three artifacts per the system prompt's contracts.
+
+ESSAY DETAILS:
+- Scale: ${scale}
+- Paragraph count: ${paragraphCount}
+- Active North Star dimensions: ${ACTIVE_DIMENSIONS[scale].join(', ')}
+
+AVAILABLE ENTANGLEMENT IDs for distinctivenessSignature.entanglementRefs:
+${entanglementSummary.length > 0
+    ? entanglementSummary.map((e) => `  "${e.id}" — ${e.dimensions.join('+')} at P${e.location.paragraph + 1}${e.location.sentence != null ? `S${e.location.sentence + 1}` : ''}: ${e.description.substring(0, 80)}`).join('\n')
+    : '  (none available)'}
+
+AVAILABLE CONNECTION IDs for throughLineMap.connectionRefs:
+${connectionIds.length > 0 ? `  ${connectionIds.join(', ')}` : '  (none available)'}
+
+L3.5 EFFECTIVENESS SCORES (transfer these directly to scoreMatrix.paragraphs[].scores.effectiveness):
+${effectivenessScores.map((e) => `  P${e.index + 1}: effectiveness=${e.effectiveness ?? 'N/A'}, verdict="${e.verdict ?? 'N/A'}"`).join('\n')}
+
+${candidateContext}
+
+REMINDERS:
+- Structural roles must cover ALL ${paragraphCount} paragraphs.
+- Score matrix must have exactly ${paragraphCount} entries (indices 0 through ${paragraphCount - 1}).
+- Every \`coachingMap.priorities[i].consolidatedFrom\` MUST contain at least one valid candidate ID from the candidate list above. Do not invent IDs.
+- Prefer MERGING candidates into fewer, higher-leverage priorities over enumerating every candidate. 3-7 priorities total.
+- For distinctiveness: if your signature could describe any essay about this topic, make it more specific to THIS essay's execution.
+- Coherence investigation should surface genuine internal tensions. Report honestly — zero is fine if consistent.
+${scale === 'personal_statement' ? '- Intent bridge: studentIntent is null (no L6 conversation yet). System reading should articulate what the system understands the essay to be doing.' : ''}${reCrystallizationBlock}`;
+}
+
+/**
+ * Composite raw output — identical shape to RawCrystallizationOutput. Aliased
+ * so the call site reads naturally.
+ */
+type RawL4CompositeOutput = RawCrystallizationOutput;
+
+// ============================================================================
 // JSON PARSING + VALIDATION
 // ============================================================================
 
@@ -1778,6 +2179,183 @@ export class CrystallizerService {
       crystallizerCorpusTel.totalLatencyMs = Date.now() - corpusRunStart;
     }
     const corpusPrepend = corpusBlock ? corpusBlock + '\n\n' : '';
+
+    // ── Phase 3 (2026-05-19) — composite call branch ──
+    // When L4_COMPOSITE_CALL=true, run a single Sonnet call emitting all three
+    // L4 artifacts together. Eliminates the C2 cache-defeat by removing the
+    // three competing system prompts and the 3× profileContext bill. The
+    // 3-call path stays intact below and is the default until verification.
+    // Design: docs/pipeline-evolution/04-pipeline-architecture/L4/COMPOSITE_CALL_DESIGN.md
+    if (isL4CompositeEnabled()) {
+      // Belt-and-suspenders: composite still consolidates the candidate set,
+      // so the empty-store invariant (Phase 6a) must hold here too.
+      if (candidateStore.size === 0) {
+        throw PipelineError.emptyCandidateStore(0, ['L3', 'L3.5', 'L3.75']);
+      }
+
+      const compositeStartTime = Date.now();
+      const compositeSystemPrompt = buildSystemPromptL4Composite(scale, essayType);
+      const compositeCallInstruction = buildCallInstructionL4Composite(
+        profile,
+        scale,
+        candidateStore,
+        priorNorthStar,
+      );
+
+      let compositeResponse;
+      try {
+        compositeResponse = await callClaudeWithRetry<RawL4CompositeOutput>({
+          model: SONNET,
+          systemPrompt: compositeSystemPrompt,
+          userPrompt: profileContext + '\n\n' + corpusPrepend + compositeCallInstruction,
+          maxTokens: L4_COMPOSITE_MAX_TOKENS,
+          temperature: TEMPERATURE,
+          useJsonMode: true,
+          cacheSystemPrompt: true,
+          timeoutMs: L4_COMPOSITE_TIMEOUT_MS,
+        });
+      } catch (compositeError) {
+        // Fail-fast — composite is a hard dependency. Surface the same
+        // failure shape as the 3-call path's L4b failure (callers branch
+        // on this to skip downstream layers).
+        const inner = compositeError instanceof Error ? compositeError : new Error(String(compositeError));
+        console.error('[Crystallizer] L4 composite failed — fail-fast:', inner.message);
+        throw PipelineError.l4bConsolidationFailed(inner, candidateStore.size);
+      }
+
+      const compositeCost = calculateCost(compositeResponse.usage, SONNET);
+      const compositeTimingMs = Date.now() - compositeStartTime;
+      console.log(
+        `[EssayIntelligence] L4 composite: ${compositeResponse.usage.input_tokens.toLocaleString()} input + ` +
+          `${compositeResponse.usage.output_tokens.toLocaleString()} output = $${compositeCost.toFixed(4)}, time=${compositeTimingMs}ms`,
+      );
+
+      // Parse + validate. The composite output schema is RawCrystallizationOutput
+      // verbatim, so we reuse the existing builders unchanged.
+      const compositeRaw = compositeResponse.content ?? ({} as RawL4CompositeOutput);
+
+      // North Star (fail-fast on parse failure — same surface as L4a today)
+      if (!compositeRaw.northStar) {
+        throw new Error(
+          '[Crystallizer] L4 composite response missing `northStar` — parse failure or LLM did not produce it. Fail-fast.',
+        );
+      }
+      const compositeNorthStar = buildNorthStar(compositeRaw.northStar, scale, paragraphCount, profile);
+
+      // Score Matrix (fail-fast on parse failure — same surface as L4a today)
+      if (!compositeRaw.scoreMatrix?.paragraphs) {
+        throw new Error(
+          '[Crystallizer] L4 composite response missing `scoreMatrix.paragraphs` — parse failure or LLM did not produce it. Fail-fast.',
+        );
+      }
+      const rawImprovementsComposite = Array.isArray(compositeRaw.scoreMatrix.prioritizedImprovements)
+        ? compositeRaw.scoreMatrix.prioritizedImprovements
+        : [];
+      const compositeScoreMatrix = buildScoreMatrix(
+        {
+          paragraphs: compositeRaw.scoreMatrix.paragraphs,
+          crossParagraphPatterns: compositeRaw.scoreMatrix.crossParagraphPatterns ?? [],
+          prioritizedImprovements: rawImprovementsComposite,
+        },
+        paragraphCount,
+        profile,
+      );
+
+      // Re-attach prioritizedImprovements via the L4b parser so downstream
+      // consumers see the same shape as today.
+      compositeScoreMatrix.prioritizedImprovements = parsePrioritizedImprovements(
+        rawImprovementsComposite,
+        paragraphCount,
+      );
+
+      // Coaching map (fail-fast — composite must produce it; L4b surface)
+      if (!compositeRaw.scoreMatrix.coachingMap) {
+        throw PipelineError.l4bConsolidationFailed(
+          new Error('L4 composite response missing `scoreMatrix.coachingMap`'),
+          candidateStore.size,
+        );
+      }
+      compositeScoreMatrix.coachingMap = buildCoachingMap(compositeRaw.scoreMatrix.coachingMap, paragraphCount);
+
+      // Coherence report (truncation-tolerant — same default as L4b at :1957-1962)
+      let compositeCoherenceReport: CoherenceReport;
+      if (compositeRaw.coherenceReport && typeof compositeRaw.coherenceReport === 'object') {
+        compositeCoherenceReport = buildCoherenceReport(compositeRaw.coherenceReport);
+      } else {
+        console.warn(
+          '[Crystallizer] L4 composite coherenceReport missing or truncated — using empty default',
+        );
+        compositeCoherenceReport = { contradictions: [], isCoherent: true };
+      }
+
+      // Post-parse diagnostics (W3.3 anti-clustering — same call as 3-call path)
+      detectScoreClustering(compositeScoreMatrix);
+
+      const compositeRoleCount = compositeNorthStar.structuralRolesMap.length;
+      const compositeImprovementCount = compositeScoreMatrix.prioritizedImprovements.length;
+      const compositeCoachingMapSections = compositeScoreMatrix.coachingMap
+        ? [
+            compositeScoreMatrix.coachingMap.priorities.length > 0 ? 'priorities' : null,
+            compositeScoreMatrix.coachingMap.protectedStrengths.length > 0 ? 'strengths' : null,
+            compositeScoreMatrix.coachingMap.emergentPatterns.length > 0 ? 'patterns' : null,
+            compositeScoreMatrix.coachingMap.scoreTensions.length > 0 ? 'tensions' : null,
+            compositeScoreMatrix.coachingMap.transformativeInsight.insight ? 'insight' : null,
+          ].filter(Boolean)
+        : [];
+      console.log(
+        `[Crystallizer] L4 composite complete — roles=${compositeRoleCount}, paragraphScores=${compositeScoreMatrix.paragraphs.length}, ` +
+          `crossPatterns=${compositeScoreMatrix.crossParagraphPatterns.length}, contradictions=${compositeCoherenceReport.contradictions.length}, ` +
+          `improvements=${compositeImprovementCount}, coachingMap=[${compositeCoachingMapSections.join(',')}], ` +
+          `cost=$${compositeCost.toFixed(4)}, time=${compositeTimingMs}ms`,
+      );
+
+      // Corpus telemetry — same scan + persist as the 3-call path. Composite
+      // emits one response blob; scan it for [MOVE-#] references.
+      if (crystallizerCorpusTel && injectedCrystalMoveCount > 0) {
+        const outputBlob = JSON.stringify(compositeResponse.content);
+        const { referenced, fabricated } = detectFabricatedReferences(
+          outputBlob,
+          injectedCrystalMoveCount,
+          0,
+        );
+        const moveRefs = referenced.filter((r) => r.startsWith('[MOVE-'));
+        crystallizerCorpusTel.attribution.movesReferenced += moveRefs.length;
+        crystallizerCorpusTel.attribution.fabricatedReferences.push(...fabricated);
+        if (fabricated.length > 0) {
+          console.warn(
+            `[L4/corpus] Fabricated corpus references detected: ${fabricated.join(', ')}`,
+          );
+        }
+      }
+      if (crystallizerCorpusTel) {
+        const record = buildCorpusTelemetryRecord({
+          essayId: essayId ?? 'unknown',
+          layer: 'L4',
+          telemetry: crystallizerCorpusTel,
+        });
+        void persistCorpusTelemetry(record);
+      }
+
+      const compositeTotalTimingMs = Date.now() - startTime;
+      return {
+        northStar: compositeNorthStar,
+        scoreMatrix: compositeScoreMatrix,
+        coherenceReport: compositeCoherenceReport,
+        cost: compositeCost,
+        tokenUsage: {
+          inputTokens: compositeResponse.usage.input_tokens,
+          outputTokens: compositeResponse.usage.output_tokens,
+          cacheReadTokens: compositeResponse.usage.cache_read_input_tokens ?? 0,
+          cacheWriteTokens: compositeResponse.usage.cache_creation_input_tokens ?? 0,
+        },
+        timingMs: compositeTotalTimingMs,
+        // L4a/L4b sub-call timings don't exist in the composite path; both
+        // unified into compositeTimingMs which lands in timingMs above.
+        l4aTimingMs: compositeTimingMs,
+        l4bTimingMs: undefined,
+        l4bDegraded: undefined,
+      };
+    }
 
     // ── Phase 2: L4a split calls (CRITICAL PATH — North Star then Score Matrix) ──
     const l4aStartTime = Date.now();

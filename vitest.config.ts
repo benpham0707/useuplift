@@ -132,6 +132,13 @@ export default defineConfig({
       // priorities, structural map, overall assessment) + edge cases (empty
       // priorities, no inline annotations). Pure function; no LLM.
       'tests/unit/student-document-markdown.test.ts',
+      // Phase 3 (2026-05-19) — L4 composite call prompt + parsing tests.
+      // Validates buildSystemPromptL4Composite preserves every load-bearing
+      // marker from the 3 focused prompts, buildCallInstructionL4Composite
+      // renders the runtime context, and the composite parse paths
+      // (fail-fast vs truncation-tolerant) behave per design. Zero LLM cost.
+      // Design: docs/pipeline-evolution/04-pipeline-architecture/L4/COMPOSITE_CALL_DESIGN.md
+      'tests/unit/l4-composite.test.ts',
     ],
     // Node environment — these are unit tests of business logic, not
     // browser components.
